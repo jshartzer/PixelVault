@@ -14,11 +14,11 @@ The app now runs from packaged builds under `C:\Codex\dist\PixelVault-x.xxx`, wi
 
 Current published build:
 
-- `0.714`
+- `0.728`
 
 Current executable:
 
-- `C:\Codex\dist\PixelVault-0.714\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.728\PixelVault.exe`
 
 Desktop shortcut:
 
@@ -45,7 +45,7 @@ Workspace root:
 
 Current live source file:
 
-- `C:\Codex\dist\PixelVault-0.714\PixelVault.Native.cs`
+- `C:\Codex\dist\PixelVault-0.728\PixelVault.Native.cs`
 
 Shared data root:
 

@@ -156,7 +156,7 @@ namespace PixelVaultNative
 
     public sealed class MainWindow : Window
     {
-        const string AppVersion = "0.714";
+        const string AppVersion = "0.727";
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
         const int MaxImageCacheEntries = 240;
@@ -174,7 +174,8 @@ namespace PixelVaultNative
         readonly Dictionary<string, BitmapImage> imageCache = new Dictionary<string, BitmapImage>(StringComparer.OrdinalIgnoreCase);
         readonly Queue<string> imageCacheOrder = new Queue<string>();
         readonly object imageCacheSync = new object();
-        readonly SemaphoreSlim imageLoadLimiter = new SemaphoreSlim(Math.Max(1, Math.Min(Environment.ProcessorCount, 3)));
+        readonly SemaphoreSlim imageLoadLimiter = new SemaphoreSlim(Math.Max(2, Math.Min(Environment.ProcessorCount, 6)));
+        readonly SemaphoreSlim priorityImageLoadLimiter = new SemaphoreSlim(Math.Max(1, Math.Min(Environment.ProcessorCount, 3)));
         readonly Dictionary<string, List<string>> folderImageCache = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
         readonly Dictionary<string, long> folderImageCacheStamp = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
         readonly Dictionary<string, string[]> fileTagCache = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
@@ -773,7 +774,7 @@ namespace PixelVaultNative
             }
         }
 
-        void QueueImageLoad(Image imageControl, string sourcePath, int decodePixelWidth, Action<BitmapImage> onLoaded)
+        void QueueImageLoad(Image imageControl, string sourcePath, int decodePixelWidth, Action<BitmapImage> onLoaded, bool prioritize = false, Func<bool> shouldLoad = null)
         {
             if (imageControl == null)
             {
@@ -781,26 +782,46 @@ namespace PixelVaultNative
             }
 
             var requestToken = Guid.NewGuid().ToString("N");
+            var hadSource = imageControl.Source != null;
+            var limiter = prioritize ? priorityImageLoadLimiter : imageLoadLimiter;
             imageControl.Uid = requestToken;
-            imageControl.Source = null;
-            Task.Factory.StartNew(delegate
+            if (!hadSource)
             {
-                imageLoadLimiter.Wait();
+                imageControl.Visibility = Visibility.Collapsed;
+            }
+            Task.Run(delegate
+            {
+                if (shouldLoad != null && !shouldLoad()) return null;
+                limiter.Wait();
                 try
                 {
+                    if (shouldLoad != null && !shouldLoad()) return null;
                     return LoadImageSource(sourcePath, decodePixelWidth);
                 }
                 finally
                 {
-                    imageLoadLimiter.Release();
+                    limiter.Release();
                 }
             }).ContinueWith(delegate(Task<BitmapImage> task)
             {
                 imageControl.Dispatcher.BeginInvoke(new Action(delegate
                 {
                     if (!string.Equals(imageControl.Uid, requestToken, StringComparison.Ordinal)) return;
-                    if (task.IsFaulted || task.IsCanceled) return;
-                    if (task.Result == null) return;
+                    if (shouldLoad != null && !shouldLoad())
+                    {
+                        if (!hadSource) imageControl.Visibility = Visibility.Collapsed;
+                        return;
+                    }
+                    if (task.IsFaulted || task.IsCanceled)
+                    {
+                        if (!hadSource) imageControl.Visibility = Visibility.Collapsed;
+                        return;
+                    }
+                    if (task.Result == null)
+                    {
+                        if (!hadSource) imageControl.Visibility = Visibility.Collapsed;
+                        return;
+                    }
                     if (onLoaded != null) onLoaded(task.Result);
                     else imageControl.Source = task.Result;
                 }));
@@ -3250,12 +3271,13 @@ namespace PixelVaultNative
                             presenter.Children.Add(placeholder);
                             presenter.Children.Add(image);
                             tile.Child = presenter;
+                            var renderFolder = current;
                             QueueImageLoad(image, file, size * 2, delegate(BitmapImage loaded)
                             {
                                 image.Source = loaded;
                                 image.Visibility = Visibility.Visible;
                                 placeholder.Visibility = Visibility.Collapsed;
-                            });
+                            }, false, delegate { return SameLibraryFolderSelection(current, renderFolder); });
                             tile.MouseLeftButtonDown += delegate(object sender, System.Windows.Input.MouseButtonEventArgs e)
                             {
                                 if (e.ClickCount >= 2)
@@ -3293,11 +3315,17 @@ namespace PixelVaultNative
                     current = info;
                     detailTitle.Text = info.Name;
                     detailMeta.Text = info.FileCount + " item(s) | " + info.PlatformLabel + " | " + info.FolderPath;
-                    previewImage.Source = null;
-                    QueueImageLoad(previewImage, ResolveLibraryArt(info, false), 720, delegate(BitmapImage loaded)
+                    var artPath = ResolveLibraryArt(info, false);
+                    if (string.IsNullOrWhiteSpace(artPath) || !File.Exists(artPath))
+                    {
+                        previewImage.Source = null;
+                        previewImage.Visibility = Visibility.Collapsed;
+                    }
+                    else QueueImageLoad(previewImage, artPath, 720, delegate(BitmapImage loaded)
                     {
                         previewImage.Source = loaded;
-                    });
+                        previewImage.Visibility = Visibility.Visible;
+                    }, true, delegate { return SameLibraryFolderSelection(current, info); });
                     renderSelectedFolder();
                 };
 
@@ -3319,6 +3347,19 @@ namespace PixelVaultNative
                     var tileWidth = (int)folderTileSizeSlider.Value;
                     var tileHeight = (int)Math.Round(tileWidth * 1.5d);
                     folderTileSizeValue.Text = tileWidth.ToString();
+                    LibraryFolderInfo selectedFolder = null;
+                    if (folders.Count > 0 && current == null) selectedFolder = folders[0];
+                    else if (current != null)
+                    {
+                        selectedFolder = folders.FirstOrDefault(f => f.FolderPath == current.FolderPath && string.Equals(f.PlatformLabel, current.PlatformLabel, StringComparison.OrdinalIgnoreCase));
+                        if (selectedFolder == null) selectedFolder = folders.FirstOrDefault(f => f.FolderPath == current.FolderPath);
+                    }
+                    if (selectedFolder != null)
+                    {
+                        if (forceRefresh || !SameLibraryFolderSelection(current, selectedFolder)) showFolder(selectedFolder);
+                        else current = selectedFolder;
+                    }
+
                     tilePanel.Children.Clear();
                     var folderGroups = visibleFolders
                         .GroupBy(folder => DetermineLibraryFolderGroup(folder))
@@ -3434,13 +3475,6 @@ namespace PixelVaultNative
                             Content = groupWrap
                         };
                         tilePanel.Children.Add(expander);
-                    }
-                    if (folders.Count > 0 && current == null) showFolder(folders[0]);
-                    else if (current != null)
-                    {
-                        var match = folders.FirstOrDefault(f => f.FolderPath == current.FolderPath && string.Equals(f.PlatformLabel, current.PlatformLabel, StringComparison.OrdinalIgnoreCase));
-                        if (match == null) match = folders.FirstOrDefault(f => f.FolderPath == current.FolderPath);
-                        if (match != null) showFolder(match);
                     }
                 };
 
@@ -5158,6 +5192,15 @@ namespace PixelVaultNative
                 if (!string.IsNullOrWhiteSpace(appId)) return appId;
             }
             return string.Empty;
+        }
+
+        bool SameLibraryFolderSelection(LibraryFolderInfo left, LibraryFolderInfo right)
+        {
+            if (ReferenceEquals(left, right)) return true;
+            if (left == null || right == null) return false;
+            return string.Equals(left.FolderPath ?? string.Empty, right.FolderPath ?? string.Empty, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(left.PlatformLabel ?? string.Empty, right.PlatformLabel ?? string.Empty, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(left.Name ?? string.Empty, right.Name ?? string.Empty, StringComparison.OrdinalIgnoreCase);
         }
 
         string ResolveBestLibraryFolderSteamAppId(string root, LibraryFolderInfo folder)

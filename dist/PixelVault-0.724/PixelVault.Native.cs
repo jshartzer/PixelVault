@@ -156,7 +156,7 @@ namespace PixelVaultNative
 
     public sealed class MainWindow : Window
     {
-        const string AppVersion = "0.714";
+        const string AppVersion = "0.724";
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
         const int MaxImageCacheEntries = 240;
@@ -783,7 +783,7 @@ namespace PixelVaultNative
             var requestToken = Guid.NewGuid().ToString("N");
             imageControl.Uid = requestToken;
             imageControl.Source = null;
-            Task.Factory.StartNew(delegate
+            Task.Run(delegate
             {
                 imageLoadLimiter.Wait();
                 try

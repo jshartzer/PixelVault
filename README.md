@@ -8,7 +8,7 @@ The live app line is based in:
 
 Current published build:
 
-- `C:\Codex\dist\PixelVault-0.714\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.728\PixelVault.exe`
 
 Desktop shortcut:
 
@@ -89,7 +89,7 @@ Important files:
 
 The live published source snapshot for the current build is:
 
-- `C:\Codex\dist\PixelVault-0.714\PixelVault.Native.cs`
+- `C:\Codex\dist\PixelVault-0.728\PixelVault.Native.cs`
 
 There is also an older `native\PixelVault.Native.cs` workspace copy in the repo for reference/history, but the current shipped line should be treated carefully and documented through the live `C:\Codex` workflow.
 
@@ -98,7 +98,7 @@ There is also an older `native\PixelVault.Native.cs` workspace copy in the repo 
 Use the current published executable:
 
 ```powershell
-C:\Codex\dist\PixelVault-0.714\PixelVault.exe
+C:\Codex\dist\PixelVault-0.728\PixelVault.exe
 ```
 
 Or launch it from:

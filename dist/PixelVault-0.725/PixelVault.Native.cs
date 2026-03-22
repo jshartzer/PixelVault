@@ -156,7 +156,7 @@ namespace PixelVaultNative
 
     public sealed class MainWindow : Window
     {
-        const string AppVersion = "0.714";
+        const string AppVersion = "0.725";
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
         const int MaxImageCacheEntries = 240;
@@ -781,9 +781,13 @@ namespace PixelVaultNative
             }
 
             var requestToken = Guid.NewGuid().ToString("N");
+            var hadSource = imageControl.Source != null;
             imageControl.Uid = requestToken;
-            imageControl.Source = null;
-            Task.Factory.StartNew(delegate
+            if (!hadSource)
+            {
+                imageControl.Visibility = Visibility.Collapsed;
+            }
+            Task.Run(delegate
             {
                 imageLoadLimiter.Wait();
                 try
@@ -799,8 +803,16 @@ namespace PixelVaultNative
                 imageControl.Dispatcher.BeginInvoke(new Action(delegate
                 {
                     if (!string.Equals(imageControl.Uid, requestToken, StringComparison.Ordinal)) return;
-                    if (task.IsFaulted || task.IsCanceled) return;
-                    if (task.Result == null) return;
+                    if (task.IsFaulted || task.IsCanceled)
+                    {
+                        if (!hadSource) imageControl.Visibility = Visibility.Collapsed;
+                        return;
+                    }
+                    if (task.Result == null)
+                    {
+                        if (!hadSource) imageControl.Visibility = Visibility.Collapsed;
+                        return;
+                    }
                     if (onLoaded != null) onLoaded(task.Result);
                     else imageControl.Source = task.Result;
                 }));
