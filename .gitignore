@@ -1,0 +1,61 @@
+# Generated binaries
+dist/**/PixelVault.exe
+dist/**/PixelVault.exe.bak-*
+dist/**/PixelVault.settings.ini
+dist/**/assets/
+dist/**/tools/
+
+# Runtime state
+logs/
+tools/
+PixelVault.lnk
+PixelVaultData/logs/
+PixelVaultData/cache/covers/
+PixelVaultData/cache/thumbs/
+PixelVaultData/cache/*.bak-*
+PixelVaultData/cache/library-folders-*.cache
+PixelVaultData/cache/photography-gallery-*.cache
+PixelVaultData/cache/last-import.tsv
+
+# Local backups and temp artifacts
+backups/
+tmp_*
+tmp-*
+
+# Older archived builds
+dist/PixelVault-0.600/
+dist/PixelVault-0.610/
+dist/PixelVault-0.620/
+dist/PixelVault-0.630/
+dist/PixelVault-0.631/
+dist/PixelVault-0.632/
+dist/PixelVault-0.633/
+dist/PixelVault-0.635/
+dist/PixelVault-0.640/
+dist/PixelVault-0.650/
+dist/PixelVault-0.651/
+dist/PixelVault-0.660/
+dist/PixelVault-0.670/
+dist/PixelVault-0.675/
+dist/PixelVault-0.680/
+dist/PixelVault-0.690/
+dist/PixelVault-0.695/
+dist/PixelVault-0.696/
+dist/PixelVault-0.697/
+dist/PixelVault-0.698/
+dist/PixelVault-0.699/
+dist/PixelVault-0.700/
+dist/PixelVault-0.701/
+dist/PixelVault-0.702/
+dist/PixelVault-0.703/
+dist/PixelVault-0.704/
+dist/PixelVault-0.710/
+dist/PixelVault-0.711/
+dist/PixelVault-0.712/
+dist/PixelVault-0.713/
+
+# OS/editor noise
+Thumbs.db
+.DS_Store
+*.user
+*.suo

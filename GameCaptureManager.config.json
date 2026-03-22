@@ -1,0 +1,17 @@
+{
+  "OpenFolderAfterRun": false,
+  "RecurseRename": true,
+  "SourceFolder": "A:\\Dropbox\\Camera Uploads\\Screenshot Upload",
+  "DestinationFolder": "A:\\Dropbox\\Game Captures",
+  "WhatIfMove": false,
+  "MoveExtensions": ".jpg, .jpeg, .png, .mp4, .mkv, .avi, .mov, .wmv, .webm",
+  "RenameExtensions": ".png, .jpg, .jpeg, .webp",
+  "AddGameCaptureKeywords": true,
+  "ExifToolPath": "A:\\Codex\\tools\\exiftool.exe",
+  "WhatIfRename": false,
+  "MoveConflictMode": "Rename",
+  "WhatIfMetadata": false,
+  "OpenDestinationAfterMove": true,
+  "MetadataExtensions": ".png, .jpg, .jpeg",
+  "AppIdRegex": "(?<!\\d)(\\d{3,})(?!\\d)"
+}

@@ -1,0 +1,358 @@
+# PixelVault Working Policy
+
+## Purpose
+
+This document defines the working rules for the live `C:\Codex` PixelVault app line.
+
+Use it as the source of truth for:
+
+- workspace expectations
+- versioning behavior
+- form responsibilities
+- data ownership rules
+- release packaging
+- git snapshot policy
+
+## Active Workspace
+
+Current active workspace:
+
+- `C:\Codex`
+
+Do not treat `A:\Codex` as the live source anymore. It may contain older experiments, failed handoffs, or stale staging artifacts.
+
+Live packaged builds are published under:
+
+- `C:\Codex\dist\PixelVault-x.xxx`
+
+Shared persistent app data lives under:
+
+- `C:\Codex\PixelVaultData`
+
+## Versioning Policy
+
+PixelVault uses decimal build versioning.
+
+General rule:
+
+- very small fix or narrow cleanup: increment by roughly `0.001` to `0.004`
+- normal bugfix or focused UX improvement: increment by roughly `0.005`
+- feature-sized change or workflow adjustment: increment by roughly `0.010`
+- major data-model or architectural shift: increment by more than `0.010` when justified
+
+The exact bump should reflect the real size and risk of the change, not an arbitrary schedule.
+
+### Release responsibilities
+
+When a new app build is published:
+
+1. Update `AppVersion` in the current live source file.
+2. Publish the build into a new folder under `C:\Codex\dist\PixelVault-x.xxx`.
+3. Update `C:\Codex\CURRENT_BUILD.txt`.
+4. Update `C:\Codex\CHANGELOG.md`.
+5. Update the version-local `CHANGELOG.md` inside the new dist folder.
+6. Repoint `C:\Codex\PixelVault.lnk` to the newest `PixelVault.exe`.
+
+Data-only cleanup work does not require a new build version unless app code changes are also shipped.
+
+## Application Structure
+
+PixelVault is a native Windows desktop app built in C# and WPF.
+
+The current live implementation is still centered in a single source file:
+
+- `C:\Codex\dist\PixelVault-0.714\PixelVault.Native.cs`
+
+That is acceptable for the current line, but any future refactor should preserve the behavioral contracts below.
+
+## Form Responsibilities
+
+### Library window
+
+The Library is the main startup window.
+
+It is responsible for:
+
+- browsing the grouped game library
+- searching folders
+- resizing folder tiles
+- opening folder detail previews
+- running `Refresh`, `Rebuild`, and `Fetch Covers`
+- supporting right-click folder actions such as single-folder cover fetch
+
+It should not act as the global settings editor.
+
+### Settings window
+
+The Settings window is the former home screen and now acts as the utility hub.
+
+It is responsible for:
+
+- intake preview
+- import processing
+- process-with-comments flow
+- manual intake launch
+- maintenance utilities
+- utility shortcuts such as indexes and logs
+
+It should not be the primary browsing surface for the library.
+
+### Path Settings window
+
+The Path Settings window is only for environment configuration.
+
+It is responsible for:
+
+- source folder list
+- destination folder
+- library folder
+- `ExifTool` path
+
+It should not mix in import actions or index editing.
+
+### Review window
+
+The Review window is the `Process with Comments` flow.
+
+It is responsible for:
+
+- reviewing intake items before processing
+- per-item comments
+- console/platform tag selection
+- optional `Game Photography` tagging
+- optional delete-before-processing
+
+It should only affect the items currently being reviewed.
+
+### Manual Intake / metadata editor
+
+The manual metadata form handles unmatched or manually-curated intake items.
+
+It is responsible for:
+
+- assigning title, platform, tags, comments, and capture time
+- selecting or confirming a master game record
+- writing metadata back to the selected files
+- updating the photo index to match the applied edit
+
+Behavior contract:
+
+- file metadata writes are driven by the form values
+- the photo index must mirror the applied form values immediately after save
+- new game-index rows should only be created through explicit confirmation
+
+### Library Edit Metadata form
+
+The library metadata form is for editing existing media already in the library.
+
+It is responsible for:
+
+- updating metadata on the selected file or files
+- reassigning a file to an existing game record
+- optionally confirming creation of a new master game record
+- updating the photo index for the selected rows only
+
+Behavior contract:
+
+- only selected items may be changed
+- tag removals must remove tags from the file itself, not just the index
+- tag changes must be written both to the file and to the photo index
+- console tags must be interpreted consistently from the final saved tag set
+
+### Game Index editor
+
+The Game Index editor is the master-record editor.
+
+It is responsible for:
+
+- maintaining one canonical record per game and platform
+- storing `GameId`, title, console, Steam App ID, file counts, and folder path context
+- adding new game records intentionally
+- resolving or manually correcting Steam App IDs
+- deleting or merging stale master rows when appropriate
+
+Behavior contract:
+
+- same title on different platforms gets different master records
+- duplicate rows for the same title and platform should merge
+- zero-file rows should not appear as active library folders
+
+### Photo Index editor
+
+The Photo Index editor is the per-file metadata cache editor.
+
+It is responsible for:
+
+- editing per-file `GameId`, console label, and tag text
+- multi-row selection
+- deleting selected rows
+- pulling selected rows from the underlying file metadata
+- saving the updated index and refreshing the editor grid
+
+Behavior contract:
+
+- it reflects per-file state, not master-record state
+- `Pull From File` / `Reload` must read the selected file(s), update only those rows, save, and refresh
+- it should not invent tags or game assignments on its own
+
+### Photography window
+
+The Photography window is a filtered browsing surface for captures tagged as game photography.
+
+It should remain a browse/filter view, not a competing metadata source.
+
+### Changelog and logs windows
+
+These are support windows.
+
+They are responsible for inspection and traceability only and should not mutate app state.
+
+## Data Ownership Rules
+
+### File metadata
+
+Per-file embedded metadata is the source of truth for:
+
+- tag membership
+- comments / descriptions
+- platform tags
+- date overrides written into the file
+
+If file metadata and cache disagree, the long-term target is for scans and reloads to realign the cache to the file.
+
+### Photo index
+
+The photo index is a persistent per-file mirror and working cache.
+
+Current file:
+
+- `C:\Codex\PixelVaultData\cache\library-metadata-index-y_game_captures.cache`
+
+It stores:
+
+- file path
+- stamp
+- `GameId`
+- console label
+- tag text
+
+The photo index should mirror the effective file metadata and should be updated whenever metadata edits are applied or file-based reloads are run.
+
+### Game index
+
+The game index is the master registry for game identities.
+
+Current file:
+
+- `C:\Codex\PixelVaultData\cache\game-index-y_game_captures.cache`
+
+It stores canonical game-level data such as:
+
+- `GameId`
+- canonical title
+- platform / console
+- Steam App ID
+- file count
+- folder path reference
+
+Grouping should be driven by `GameId`, not fragile title text.
+
+### Folder cache
+
+The folder cache is derived state.
+
+Current file:
+
+- `C:\Codex\PixelVaultData\cache\library-folders-y_game_captures.cache`
+
+It is allowed to be rebuilt from the photo index and game index. It should not be treated as the long-term source of truth for tags.
+
+### Covers and thumbnails
+
+Cover art caches and thumbnails are derived assets.
+
+They should be considered rebuildable and should not be treated as canonical metadata.
+
+## Console Tag Rules
+
+Console grouping must come from recognized console tags in the final saved tag set.
+
+Current recognized families:
+
+- `Steam`
+- `PC`
+- `PS5` / `PlayStation`
+- `Xbox`
+- `Platform:<Custom>`
+
+Rules:
+
+- `Steam` and `PC` are separate console tags
+- if more than one console family is present, the item becomes `Multiple Tags`
+- `Other` should only be used when no recognized platform family exists
+
+## Index Integrity Rules
+
+- Photo-index edits should only change the selected row or rows.
+- Library metadata edits should only change the selected item or items.
+- Game-index changes should be explicit and deliberate because it is the master record.
+- If a file is corrected away from `Multiple Tags`, stale zero-file `Multiple Tags` master rows should disappear.
+- If a file has both `Steam` and `PC` and `Steam` is the intended platform, `PC` must be removable from both file metadata and the photo index.
+
+## Persistence Rules
+
+App state should persist across versioned builds by storing shared data under:
+
+- `C:\Codex\PixelVaultData`
+
+Versioned `dist` folders should be replaceable without losing:
+
+- settings
+- indexes
+- logs
+- covers
+- thumbnails
+
+## Git Snapshot Policy
+
+GitHub should be used for source history and curated state snapshots.
+
+Track in git:
+
+- source files
+- docs such as `PROJECT_CONTEXT.md`, `HANDOFF.md`, `POLICY.md`, and `CHANGELOG.md`
+- `CURRENT_BUILD.txt`
+- the game index
+- the photo index
+
+Avoid tracking in git:
+
+- the actual screenshot / video library on `Y:\`
+- logs
+- cover cache
+- generated thumbnails
+- `.bak-*` backup files
+- temporary files
+- versioned EXE output unless intentionally archived
+
+Recommended commit cadence:
+
+- after each published build
+- after meaningful metadata/index cleanup passes
+- after behavior-contract documentation changes
+
+Recommended tag cadence:
+
+- create a git tag for important published builds such as `v0.714`
+
+## Handoff Rule
+
+Any future handoff should update:
+
+- `C:\Codex\HANDOFF.md`
+- `C:\Codex\CHANGELOG.md`
+- `C:\Codex\CURRENT_BUILD.txt` when a new build is published
+
+`HANDOFF.md` should summarize the current stop point.
+
+`POLICY.md` should remain the durable rulebook.
