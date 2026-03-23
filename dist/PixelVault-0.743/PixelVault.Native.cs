@@ -176,7 +176,7 @@ namespace PixelVaultNative
 
     public sealed class MainWindow : Window
     {
-        const string AppVersion = "0.732";
+        const string AppVersion = "0.743";
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
         const int MaxImageCacheEntries = 240;
@@ -5653,11 +5653,14 @@ namespace PixelVaultNative
                 folder.SteamGridDbId = saved.SteamGridDbId;
                 return folder.SteamGridDbId;
             }
-            var appId = ResolveBestLibraryFolderSteamAppId(root, folder);
-            var steamGridDbId = !string.IsNullOrWhiteSpace(appId)
-                ? TryResolveSteamGridDbIdBySteamAppId(appId)
-                : null;
-            if (string.IsNullOrWhiteSpace(steamGridDbId)) steamGridDbId = TryResolveSteamGridDbIdByName(folder.Name);
+            var steamGridDbId = TryResolveSteamGridDbIdByName(folder.Name);
+            if (string.IsNullOrWhiteSpace(steamGridDbId))
+            {
+                var appId = ResolveBestLibraryFolderSteamAppId(root, folder);
+                steamGridDbId = !string.IsNullOrWhiteSpace(appId)
+                    ? TryResolveSteamGridDbIdBySteamAppId(appId)
+                    : null;
+            }
             if (!string.IsNullOrWhiteSpace(steamGridDbId))
             {
                 folder.SteamGridDbId = steamGridDbId;
@@ -5666,7 +5669,7 @@ namespace PixelVaultNative
             return folder.SteamGridDbId ?? string.Empty;
         }
 
-        string ResolveBestLibraryFolderSteamAppId(string root, LibraryFolderInfo folder)
+        string ResolveBestLibraryFolderSteamAppId(string root, LibraryFolderInfo folder, bool allowLookup = true)
         {
             if (folder == null || string.IsNullOrWhiteSpace(folder.Name)) return string.Empty;
             if (!string.IsNullOrWhiteSpace(folder.SteamAppId)) return folder.SteamAppId;
@@ -5676,6 +5679,7 @@ namespace PixelVaultNative
                 folder.SteamAppId = saved.SteamAppId;
                 return folder.SteamAppId;
             }
+            if (!allowLookup) return folder.SteamAppId ?? string.Empty;
             var appId = ResolveLibraryFolderSteamAppId(folder.PlatformLabel, folder.FilePaths ?? new string[0]);
             if (string.IsNullOrWhiteSpace(appId)) appId = TryResolveSteamAppId(folder.Name);
             if (!string.IsNullOrWhiteSpace(appId))
@@ -5766,12 +5770,13 @@ namespace PixelVaultNative
                 var itemLabel = "Game " + (i + 1) + " of " + targetFolders.Count + " | " + folder.Name;
                 var hadAppId = !string.IsNullOrWhiteSpace(folder.SteamAppId);
                 var hadSteamGridDbId = !string.IsNullOrWhiteSpace(folder.SteamGridDbId);
-                var appId = ResolveBestLibraryFolderSteamAppId(root, folder);
                 var steamGridDbId = ResolveBestLibraryFolderSteamGridDbId(root, folder);
+                var appId = ResolveBestLibraryFolderSteamAppId(root, folder, string.IsNullOrWhiteSpace(steamGridDbId));
                 if ((!hadAppId && !string.IsNullOrWhiteSpace(appId)) || (!hadSteamGridDbId && !string.IsNullOrWhiteSpace(steamGridDbId)))
                 {
                     resolvedIds++;
-                    foreach (var match in folders.Where(entry => entry != null && string.Equals(entry.Name ?? string.Empty, folder.Name ?? string.Empty, StringComparison.OrdinalIgnoreCase)))
+                    var matchKey = BuildLibraryFolderMasterKey(folder);
+                    foreach (var match in folders.Where(entry => entry != null && string.Equals(BuildLibraryFolderMasterKey(entry), matchKey, StringComparison.OrdinalIgnoreCase)))
                     {
                         match.SteamAppId = appId;
                         match.SteamGridDbId = steamGridDbId;
@@ -5785,12 +5790,17 @@ namespace PixelVaultNative
                         : (!string.IsNullOrWhiteSpace(appId) ? "AppID " + appId : "no external ID"));
                 if (progress != null) progress(completed, totalWork, itemLabel + " | " + idDetail);
                 if (isCancellationRequested != null && isCancellationRequested()) throw new OperationCanceledException("Cover refresh cancelled.");
-                if (string.IsNullOrWhiteSpace(CustomCoverPath(folder))) DeleteCachedCover(folder.Name);
-                ResolveLibraryArt(folder, true);
                 var coverReady = HasDedicatedLibraryCover(folder);
+                var coverDetail = "cover already present";
+                if (!coverReady)
+                {
+                    ResolveLibraryArt(folder, true);
+                    coverReady = HasDedicatedLibraryCover(folder);
+                    coverDetail = coverReady ? "cover ready" : "cover not available";
+                }
                 if (coverReady) coversReady++;
                 completed++;
-                if (progress != null) progress(completed, totalWork, itemLabel + " | cover " + (coverReady ? "ready" : "not available"));
+                if (progress != null) progress(completed, totalWork, itemLabel + " | " + coverDetail);
             }
             var stamp = BuildLibraryFolderInventoryStamp(root);
             var cached = LoadLibraryFolderCache(root, stamp);
@@ -6298,8 +6308,8 @@ namespace PixelVaultNative
             if (folder == null) return null;
             try
             {
-            var appId = ResolveBestLibraryFolderSteamAppId(libraryRoot, folder);
-            if (string.IsNullOrWhiteSpace(appId)) return null;
+                var appId = ResolveBestLibraryFolderSteamAppId(libraryRoot, folder, string.IsNullOrWhiteSpace(folder.SteamGridDbId));
+                if (string.IsNullOrWhiteSpace(appId)) return null;
                 using (var wc = CreateSteamWebClient())
                 {
                     var portraitUrls = new[]
@@ -6819,6 +6829,11 @@ namespace PixelVaultNative
                 tags.Add("Steam");
                 tags.Add("PC");
             }
+            else if (Regex.IsMatch(file, @"^.+_\d{4}-\d{2}-\d{2}_\d+\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$", RegexOptions.IgnoreCase))
+            {
+                tags.Add("Steam");
+                tags.Add("PC");
+            }
             else if (Regex.IsMatch(file, @"^.+_\d{14}\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$", RegexOptions.IgnoreCase))
             {
                 tags.Add("PS5");
@@ -6851,6 +6866,12 @@ namespace PixelVaultNative
             DateTime d;
             var a = Regex.Match(file, @"_(\d{14})(?:_|(?=\.[^.]+$))");
             if (a.Success && DateTime.TryParseExact(a.Groups[1].Value, "yyyyMMddHHmmss", null, System.Globalization.DateTimeStyles.None, out d)) return d;
+            var steamLegacy = Regex.Match(file, @"_(\d{4})-(\d{2})-(\d{2})(?:_|(?=\.[^.]+$))");
+            if (steamLegacy.Success)
+            {
+                var raw = steamLegacy.Groups[1].Value + steamLegacy.Groups[2].Value + steamLegacy.Groups[3].Value;
+                if (DateTime.TryParseExact(raw, "yyyyMMdd", null, System.Globalization.DateTimeStyles.None, out d)) return d;
+            }
             var b = Regex.Match(file, @"-(\d{4})_(\d{2})_(\d{2})[-_](\d{2})[-_](\d{2})[-_](\d{2})");
             if (b.Success)
             {

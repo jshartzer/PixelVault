@@ -6,7 +6,7 @@ Work out of:
 
 - `C:\Codex`
 
-Do not use `A:\Codex` as the live source of truth. It may contain older staging work, failed handoffs, and historical artifacts.
+Treat `C:\Codex` as the only live source of truth for code, builds, docs, and shared app data.
 
 ## Rulebook First
 
@@ -29,11 +29,11 @@ This handoff is the short current-state summary.
 
 Current live build:
 
-- `0.732`
+- `0.743`
 
 Current executable:
 
-- `C:\Codex\dist\PixelVault-0.732\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.743\PixelVault.exe`
 
 Current build pointer:
 
@@ -75,11 +75,11 @@ Behavior summary:
 - the photo index is the persistent per-file mirror/cache
 - the game index is the master registry for `GameId`, canonical title, console, Steam App ID, and `STID`
 - the folder cache is derived state and may be rebuilt
-- as of `0.732`, Game Index save is also authoritative for canonical library folder naming
+- as of `0.742`, Game Index save is also authoritative for canonical library folder naming
 
 ## Recent Shipped State
 
-Recent important published changes in the current `0.724` to `0.732` line:
+Recent important published changes in the current `0.724` to `0.743` line:
 
 - intake preview/process/manual flows now reuse shared source inventories instead of rescanning the same roots repeatedly
 - metadata writes run with bounded parallel `ExifTool` workers
@@ -90,6 +90,10 @@ Recent important published changes in the current `0.724` to `0.732` line:
 - the Game Index now stores `STID` for SteamGridDB IDs
 - Game Index save now remaps stale game IDs before rebuild so deleted/consolidated rows stop resurrecting
 - Game Index save now renames/moves library folders on disk to canonical names based on the saved title/platform, adding ` - Platform` suffixes when the same title exists on multiple platforms
+- SteamGridDB token-backed `STID` resolution is now wired into the Game Index
+- cover refresh can now prefer SteamGridDB portrait art when an `STID` is available
+- Steam screenshot rename/import now records the raw Steam AppID into the Game Index before filename normalization
+- cover refresh now defaults to saved `STID` values, preserves existing cached art, and avoids unnecessary Steam App ID lookups during single-folder fetches
 
 See `C:\Codex\CHANGELOG.md` for the detailed version history.
 
@@ -117,17 +121,17 @@ This was a data-only maintenance pass, not a new app build.
 
 ## Current Stop Point
 
-The current live build is `0.732`, and the latest work focused on making the Game Index the true authority for naming and grouping:
+The current live build is `0.743`, and the latest work focused on tightening the SteamGridDB cover workflow so it behaves better against the saved Game Index:
 
-1. `STID` was added to the Game Index and persisted through the game-index and folder-cache formats.
-2. Game Index save was fixed so deleted/consolidated rows stop reappearing on reopen from stale file assignments.
-3. Game Index save now renames/moves library folders on disk to match the saved canonical title and platform.
+1. cover refresh now prefers saved `STID` values before attempting Steam App ID discovery
+2. existing cached covers are preserved unless a new cover download actually succeeds
+3. single-folder right-click cover fetch avoids the extra Steam App ID lookup path when `STID` is already present
 
 The most likely next product step is:
 
-1. use `STID` to drive cover-art lookup from SteamGridDB instead of relying on Steam App IDs
-2. decide whether intake sorting should stay filename-first with later normalization, or move directly to index-owned folder naming earlier in the workflow
-3. validate the `0.732` folder-rename behavior on a few real multi-platform titles before widening the automation further
+1. run a live SteamGridDB backfill so the existing Game Index rows gain `STID` values
+2. validate the new SteamGridDB-first cover flow on a few real multi-platform titles and confirm the preferred portrait art is stable
+3. decide whether intake sorting should stay filename-first with later normalization, or move directly to index-owned folder naming earlier in the workflow
 
 ## Important Expectations
 

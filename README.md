@@ -8,7 +8,7 @@ The live app line is based in:
 
 Current published build:
 
-- `C:\Codex\dist\PixelVault-0.732\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.743\PixelVault.exe`
 
 Desktop shortcut:
 
@@ -22,7 +22,7 @@ Desktop shortcut:
 - writes metadata into files and sidecars through `ExifTool`
 - maintains a photo-level metadata index and a master game index
 - groups the library by stable `GameId` records
-- fetches Steam cover art using saved Steam App IDs
+- fetches cover art with `STID`-first SteamGridDB lookup and Steam App ID fallback
 - stores `STID` values in the Game Index for SteamGridDB-driven workflows
 - provides in-app editors for the Game Index and Photo Index
 - opens into the Library as the main browsing experience
@@ -92,7 +92,7 @@ Important files:
 
 The live published source snapshot for the current build is:
 
-- `C:\Codex\dist\PixelVault-0.732\PixelVault.Native.cs`
+- `C:\Codex\dist\PixelVault-0.743\PixelVault.Native.cs`
 
 There is also an older `native\PixelVault.Native.cs` workspace copy in the repo for reference/history, but the current shipped line should be treated carefully and documented through the live `C:\Codex` workflow.
 
@@ -101,7 +101,7 @@ There is also an older `native\PixelVault.Native.cs` workspace copy in the repo 
 Use the current published executable:
 
 ```powershell
-C:\Codex\dist\PixelVault-0.732\PixelVault.exe
+C:\Codex\dist\PixelVault-0.743\PixelVault.exe
 ```
 
 Or launch it from:

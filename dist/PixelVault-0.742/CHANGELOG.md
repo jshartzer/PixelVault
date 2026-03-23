@@ -1,8 +1,3 @@
-## 0.743
-- Changed cover refresh to prefer saved `STID` values first, then fall back to Steam App ID discovery only when SteamGridDB IDs are missing.
-- Stopped cover refresh from deleting existing cached covers before a replacement is successfully downloaded, so already-good art stays in place.
-- Tightened single-folder cover fetch so right-click refresh no longer stalls on unnecessary Steam App ID lookups when an `STID` is already available.
-
 ## 0.742
 - Added SteamGridDB integration so PixelVault can store a local API token, resolve missing `STID` values in the Game Index, and prefer SteamGridDB portrait grid art during cover refresh when an `STID` is available.
 - Updated the Steam screenshot rename/import path so the raw Steam AppID is captured into the Game Index before the filename is converted to the game title.

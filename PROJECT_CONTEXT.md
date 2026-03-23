@@ -14,11 +14,11 @@ The app now runs from packaged builds under `C:\Codex\dist\PixelVault-x.xxx`, wi
 
 Current published build:
 
-- `0.732`
+- `0.743`
 
 Current executable:
 
-- `C:\Codex\dist\PixelVault-0.732\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.743\PixelVault.exe`
 
 Desktop shortcut:
 
@@ -45,7 +45,7 @@ Workspace root:
 
 Current live source file:
 
-- `C:\Codex\dist\PixelVault-0.732\PixelVault.Native.cs`
+- `C:\Codex\dist\PixelVault-0.743\PixelVault.Native.cs`
 
 Shared data root:
 
@@ -172,7 +172,7 @@ It stores:
 
 Grouping is intended to follow `GameId`, not raw title text.
 
-As of `0.732`, Game Index save is also responsible for normalizing library folder names on disk. When multiple records share the same normalized title across platforms, canonical folder naming now appends ` - Platform`.
+As of `0.742`, Game Index save is also responsible for normalizing library folder names on disk. When multiple records share the same normalized title across platforms, canonical folder naming now appends ` - Platform`.
 
 ### Folder cache
 
@@ -213,6 +213,7 @@ Recent published lines introduced:
 - dedicated game and photo index editors
 - `GameId`-based grouping
 - Steam App ID persistence in the game index
+- `STID`-first SteamGridDB cover refresh with Steam fallback only when needed
 - right-click cover fetch on a single folder
 - startup Library view
 - search and size sliders in the library
@@ -244,4 +245,4 @@ Use these documents together:
 
 ## Immediate Next Step
 
-The next likely milestone is to use `STID` to fetch cover art from SteamGridDB and reduce dependence on Steam App IDs for artwork lookup.
+The next likely milestone is to backfill live `STID` values from SteamGridDB and validate the new SteamGridDB-first cover flow against a few real library folders.

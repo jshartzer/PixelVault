@@ -19,7 +19,7 @@ Current active workspace:
 
 - `C:\Codex`
 
-Do not treat `A:\Codex` as the live source anymore. It may contain older experiments, failed handoffs, or stale staging artifacts.
+Treat `C:\Codex` as the only live workspace for the active PixelVault line.
 
 Live packaged builds are published under:
 
@@ -61,7 +61,7 @@ PixelVault is a native Windows desktop app built in C# and WPF.
 
 The current live implementation is still centered in a single source file:
 
-- `C:\Codex\dist\PixelVault-0.714\PixelVault.Native.cs`
+- `C:\Codex\dist\PixelVault-x.xxx\PixelVault.Native.cs`
 
 That is acceptable for the current line, but any future refactor should preserve the behavioral contracts below.
 
