@@ -43,6 +43,7 @@ namespace PixelVaultNative
         public string PlatformLabel;
         public string[] FilePaths;
         public string SteamAppId;
+        public string SteamGridDbId;
     }
 
     sealed class GameIndexEditorRow
@@ -51,6 +52,7 @@ namespace PixelVaultNative
         public string Name { get; set; }
         public string PlatformLabel { get; set; }
         public string SteamAppId { get; set; }
+        public string SteamGridDbId { get; set; }
         public int FileCount { get; set; }
         public string FolderPath { get; set; }
         public string PreviewImagePath { get; set; }
@@ -174,7 +176,7 @@ namespace PixelVaultNative
 
     public sealed class MainWindow : Window
     {
-        const string AppVersion = "0.728";
+        const string AppVersion = "0.729";
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
         const int MaxImageCacheEntries = 240;
@@ -4254,6 +4256,7 @@ namespace PixelVaultNative
                 Name = NormalizeGameIndexName(row.Name, row.FolderPath),
                 PlatformLabel = NormalizeConsoleLabel(row.PlatformLabel),
                 SteamAppId = CleanTag(row.SteamAppId),
+                SteamGridDbId = CleanTag(row.SteamGridDbId),
                 FileCount = Math.Max(0, row.FileCount),
                 FolderPath = (row.FolderPath ?? string.Empty).Trim(),
                 PreviewImagePath = (row.PreviewImagePath ?? string.Empty).Trim(),
@@ -4372,6 +4375,7 @@ namespace PixelVaultNative
                     Name = preferredName ?? NormalizeGameIndexName(representative.Name, folderPath),
                     PlatformLabel = NormalizeConsoleLabel(representative.PlatformLabel),
                     SteamAppId = groupRows.Select(row => row.SteamAppId ?? string.Empty).FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty,
+                    SteamGridDbId = groupRows.Select(row => row.SteamGridDbId ?? string.Empty).FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty,
                     FileCount = mergedFilePaths.Length > 0 ? mergedFilePaths.Length : groupRows.Max(row => row.FileCount),
                     FolderPath = folderPath ?? string.Empty,
                     PreviewImagePath = previewPath,
@@ -4439,7 +4443,7 @@ namespace PixelVaultNative
             foreach (var line in lines.Skip(1))
             {
                 var parts = line.Split('\t');
-                if (parts.Length >= 8)
+                if (parts.Length >= 9)
                 {
                     list.Add(new GameIndexEditorRow
                     {
@@ -4448,6 +4452,24 @@ namespace PixelVaultNative
                         Name = parts[2],
                         PlatformLabel = parts[3],
                         SteamAppId = parts[4],
+                        SteamGridDbId = parts[5],
+                        FileCount = parts.Length > 6 ? ParseInt(parts[6]) : 0,
+                        PreviewImagePath = parts.Length > 7 ? parts[7] : string.Empty,
+                        FilePaths = parts.Length > 8 && !string.IsNullOrWhiteSpace(parts[8])
+                            ? parts[8].Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries).Where(File.Exists).ToArray()
+                            : new string[0]
+                    });
+                }
+                else if (parts.Length >= 8)
+                {
+                    list.Add(new GameIndexEditorRow
+                    {
+                        GameId = parts[0],
+                        FolderPath = parts[1],
+                        Name = parts[2],
+                        PlatformLabel = parts[3],
+                        SteamAppId = parts[4],
+                        SteamGridDbId = string.Empty,
                         FileCount = parts.Length > 5 ? ParseInt(parts[5]) : 0,
                         PreviewImagePath = parts.Length > 6 ? parts[6] : string.Empty,
                         FilePaths = parts.Length > 7 && !string.IsNullOrWhiteSpace(parts[7])
@@ -4464,6 +4486,7 @@ namespace PixelVaultNative
                         Name = parts[1],
                         PlatformLabel = parts[2],
                         SteamAppId = parts[3],
+                        SteamGridDbId = string.Empty,
                         FileCount = parts.Length > 4 ? ParseInt(parts[4]) : 0,
                         PreviewImagePath = parts.Length > 5 ? parts[5] : string.Empty,
                         FilePaths = parts.Length > 6 && !string.IsNullOrWhiteSpace(parts[6])
@@ -4489,6 +4512,7 @@ namespace PixelVaultNative
                     row.Name ?? string.Empty,
                     row.PlatformLabel ?? string.Empty,
                     row.SteamAppId ?? string.Empty,
+                    row.SteamGridDbId ?? string.Empty,
                     row.FileCount.ToString(),
                     row.PreviewImagePath ?? string.Empty,
                     string.Join("|", (row.FilePaths ?? new string[0]).Where(File.Exists))
@@ -4644,6 +4668,11 @@ namespace PixelVaultNative
                     folder.SteamAppId = saved.SteamAppId;
                     changed = true;
                 }
+                if (!string.IsNullOrWhiteSpace(saved.SteamGridDbId) && !string.Equals(folder.SteamGridDbId ?? string.Empty, saved.SteamGridDbId ?? string.Empty, StringComparison.Ordinal))
+                {
+                    folder.SteamGridDbId = saved.SteamGridDbId;
+                    changed = true;
+                }
             }
             return changed;
         }
@@ -4668,6 +4697,7 @@ namespace PixelVaultNative
                     Name = folder.Name ?? string.Empty,
                     PlatformLabel = folder.PlatformLabel ?? string.Empty,
                     SteamAppId = folder.SteamAppId ?? string.Empty,
+                    SteamGridDbId = folder.SteamGridDbId ?? string.Empty,
                     FileCount = folder.FileCount,
                     PreviewImagePath = folder.PreviewImagePath ?? string.Empty,
                     FilePaths = folder.FilePaths ?? new string[0]
@@ -4679,6 +4709,7 @@ namespace PixelVaultNative
                 saved.Name = folder.Name ?? string.Empty;
                 saved.PlatformLabel = folder.PlatformLabel ?? string.Empty;
                 if (!string.IsNullOrWhiteSpace(folder.SteamAppId)) saved.SteamAppId = folder.SteamAppId;
+                if (!string.IsNullOrWhiteSpace(folder.SteamGridDbId)) saved.SteamGridDbId = folder.SteamGridDbId;
                 saved.FileCount = folder.FileCount;
                 saved.PreviewImagePath = folder.PreviewImagePath ?? string.Empty;
                 saved.FilePaths = folder.FilePaths ?? new string[0];
@@ -4707,7 +4738,7 @@ namespace PixelVaultNative
             {
                 var parts = line.Split('\t');
                 if (parts.Length < 5) continue;
-                if (parts.Length >= 8)
+                if (parts.Length >= 9)
                 {
                     list.Add(new LibraryFolderInfo
                     {
@@ -4720,7 +4751,25 @@ namespace PixelVaultNative
                         FilePaths = parts.Length > 6 && !string.IsNullOrWhiteSpace(parts[6])
                             ? parts[6].Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries).Where(File.Exists).ToArray()
                             : new string[0],
-                        SteamAppId = parts.Length > 7 ? parts[7] : string.Empty
+                        SteamAppId = parts.Length > 7 ? parts[7] : string.Empty,
+                        SteamGridDbId = parts.Length > 8 ? parts[8] : string.Empty
+                    });
+                }
+                else if (parts.Length >= 8)
+                {
+                    list.Add(new LibraryFolderInfo
+                    {
+                        GameId = !string.IsNullOrWhiteSpace(NormalizeGameId(parts[0])) && aliasMap.ContainsKey(NormalizeGameId(parts[0])) ? aliasMap[NormalizeGameId(parts[0])] : parts[0],
+                        FolderPath = parts[1],
+                        Name = parts[2],
+                        FileCount = ParseInt(parts[3]),
+                        PreviewImagePath = parts[4],
+                        PlatformLabel = parts[5],
+                        FilePaths = parts.Length > 6 && !string.IsNullOrWhiteSpace(parts[6])
+                            ? parts[6].Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries).Where(File.Exists).ToArray()
+                            : new string[0],
+                        SteamAppId = parts.Length > 7 ? parts[7] : string.Empty,
+                        SteamGridDbId = string.Empty
                     });
                 }
                 else
@@ -4736,7 +4785,8 @@ namespace PixelVaultNative
                         FilePaths = parts.Length > 5 && !string.IsNullOrWhiteSpace(parts[5])
                             ? parts[5].Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries).Where(File.Exists).ToArray()
                             : new string[0],
-                        SteamAppId = parts.Length > 6 ? parts[6] : string.Empty
+                        SteamAppId = parts.Length > 6 ? parts[6] : string.Empty,
+                        SteamGridDbId = string.Empty
                     });
                 }
             }
@@ -4760,7 +4810,8 @@ namespace PixelVaultNative
                     folder.PreviewImagePath ?? string.Empty,
                     folder.PlatformLabel ?? string.Empty,
                     string.Join("|", (folder.FilePaths ?? new string[0]).Where(File.Exists)),
-                    folder.SteamAppId ?? string.Empty
+                    folder.SteamAppId ?? string.Empty,
+                    folder.SteamGridDbId ?? string.Empty
                 }));
             }
             File.WriteAllLines(path, lines.ToArray());
@@ -4985,6 +5036,7 @@ namespace PixelVaultNative
                 Name = normalizedName,
                 PlatformLabel = normalizedPlatform,
                 SteamAppId = string.Empty,
+                SteamGridDbId = string.Empty,
                 FileCount = 0,
                 FolderPath = string.Empty,
                 PreviewImagePath = string.Empty,
@@ -5063,6 +5115,11 @@ namespace PixelVaultNative
                     if (!string.IsNullOrWhiteSpace(folder.SteamAppId) && !string.Equals(row.SteamAppId ?? string.Empty, folder.SteamAppId ?? string.Empty, StringComparison.Ordinal))
                     {
                         row.SteamAppId = folder.SteamAppId ?? string.Empty;
+                        changed = true;
+                    }
+                    if (!string.IsNullOrWhiteSpace(folder.SteamGridDbId) && !string.Equals(row.SteamGridDbId ?? string.Empty, folder.SteamGridDbId ?? string.Empty, StringComparison.Ordinal))
+                    {
+                        row.SteamGridDbId = folder.SteamGridDbId ?? string.Empty;
                         changed = true;
                     }
                     if (row.FileCount != folder.FileCount)
@@ -5185,7 +5242,8 @@ namespace PixelVaultNative
                     PreviewImagePath = groupFiles.FirstOrDefault(IsImage) ?? groupFiles.FirstOrDefault(),
                     PlatformLabel = platformLabel,
                     FilePaths = groupFiles,
-                    SteamAppId = saved != null && !string.IsNullOrWhiteSpace(saved.SteamAppId) ? saved.SteamAppId : ResolveLibraryFolderSteamAppId(platformLabel, groupFiles)
+                    SteamAppId = saved != null && !string.IsNullOrWhiteSpace(saved.SteamAppId) ? saved.SteamAppId : ResolveLibraryFolderSteamAppId(platformLabel, groupFiles),
+                    SteamGridDbId = saved == null ? string.Empty : (saved.SteamGridDbId ?? string.Empty)
                 });
             }
             gameRowsChanged = SyncGameIndexRowsFromLibraryFolders(gameRows, list) || gameRowsChanged;
@@ -5914,6 +5972,7 @@ namespace PixelVaultNative
             if (match == null) return;
             match.GameId = !string.IsNullOrWhiteSpace(normalizedGameId) ? normalizedGameId : match.GameId;
             match.SteamAppId = folder.SteamAppId ?? string.Empty;
+            match.SteamGridDbId = folder.SteamGridDbId ?? string.Empty;
             SaveLibraryFolderCache(root, stamp, cached);
             UpsertSavedGameIndexRow(root, folder);
         }
@@ -5963,7 +6022,10 @@ namespace PixelVaultNative
             var preservedAppId = !string.IsNullOrWhiteSpace(originalSavedRow == null ? string.Empty : originalSavedRow.SteamAppId)
                 ? originalSavedRow.SteamAppId
                 : (originalFolder == null ? string.Empty : (originalFolder.SteamAppId ?? string.Empty));
-            if (string.IsNullOrWhiteSpace(preservedAppId)) return;
+            var preservedSteamGridDbId = !string.IsNullOrWhiteSpace(originalSavedRow == null ? string.Empty : originalSavedRow.SteamGridDbId)
+                ? originalSavedRow.SteamGridDbId
+                : (originalFolder == null ? string.Empty : (originalFolder.SteamGridDbId ?? string.Empty));
+            if (string.IsNullOrWhiteSpace(preservedAppId) && string.IsNullOrWhiteSpace(preservedSteamGridDbId)) return;
             var rows = LoadSavedGameIndexRows(root);
             var sourceGameId = NormalizeGameId(originalSavedRow == null ? (originalFolder == null ? string.Empty : originalFolder.GameId) : originalSavedRow.GameId);
             var sourceName = NormalizeGameIndexName(originalSavedRow == null ? (originalFolder == null ? string.Empty : originalFolder.Name) : originalSavedRow.Name);
@@ -5983,6 +6045,7 @@ namespace PixelVaultNative
                     Name = sourceName,
                     PlatformLabel = sourcePlatform,
                     SteamAppId = string.Empty,
+                    SteamGridDbId = string.Empty,
                     FileCount = 0,
                     FolderPath = originalSavedRow == null ? (originalFolder == null ? string.Empty : originalFolder.FolderPath ?? string.Empty) : originalSavedRow.FolderPath ?? string.Empty,
                     PreviewImagePath = string.Empty,
@@ -5995,6 +6058,7 @@ namespace PixelVaultNative
             if (string.IsNullOrWhiteSpace(existing.Name)) existing.Name = sourceName;
             if (string.IsNullOrWhiteSpace(existing.PlatformLabel)) existing.PlatformLabel = sourcePlatform;
             if (string.IsNullOrWhiteSpace(existing.SteamAppId)) existing.SteamAppId = preservedAppId;
+            if (string.IsNullOrWhiteSpace(existing.SteamGridDbId)) existing.SteamGridDbId = preservedSteamGridDbId;
             SaveSavedGameIndexRows(root, rows);
         }
 
@@ -6988,7 +7052,7 @@ namespace PixelVaultNative
                 var searchBox = new TextBox { Padding = new Thickness(10, 6, 10, 6), BorderBrush = Brush("#D7E1E8"), BorderThickness = new Thickness(1), Background = Brushes.White, Margin = new Thickness(0, 0, 14, 0) };
                 Grid.SetColumn(searchBox, 1);
                 controlGrid.Children.Add(searchBox);
-                var helperText = new TextBlock { Text = "Edit the master Game, Platform, and Steam AppID fields. Game ID stays stable, and folder/file details stay read-only so photo-level assignments drive grouping.", VerticalAlignment = VerticalAlignment.Center, Foreground = Brush("#5F6970"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 14, 0) };
+                var helperText = new TextBlock { Text = "Edit the master Game, Platform, Steam AppID, and STID fields. Game ID stays stable, and folder/file details stay read-only so photo-level assignments drive grouping.", VerticalAlignment = VerticalAlignment.Center, Foreground = Brush("#5F6970"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 14, 0) };
                 Grid.SetColumn(helperText, 2);
                 controlGrid.Children.Add(helperText);
                 var addRowButton = Btn("Add Game", null, "#8A5A17", Brushes.White);
@@ -7046,6 +7110,7 @@ namespace PixelVaultNative
                 grid.Columns.Add(new DataGridTextColumn { Header = "Game", Binding = new System.Windows.Data.Binding("Name") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus }, Width = new DataGridLength(1.15, DataGridLengthUnitType.Star) });
                 grid.Columns.Add(new DataGridTextColumn { Header = "Platform", Binding = new System.Windows.Data.Binding("PlatformLabel") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus }, Width = 130 });
                 grid.Columns.Add(new DataGridTextColumn { Header = "Steam AppID", Binding = new System.Windows.Data.Binding("SteamAppId") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus }, Width = 130 });
+                grid.Columns.Add(new DataGridTextColumn { Header = "STID", Binding = new System.Windows.Data.Binding("SteamGridDbId") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus }, Width = 120 });
                 grid.Columns.Add(new DataGridTextColumn { Header = "Files", Binding = new System.Windows.Data.Binding("FileCount"), IsReadOnly = true, Width = 74 });
                 grid.Columns.Add(new DataGridTextColumn { Header = "Folder", Binding = new System.Windows.Data.Binding("FolderPath"), IsReadOnly = true, Width = new DataGridLength(1.85, DataGridLengthUnitType.Star) });
                 Grid.SetRow(grid, 1);
@@ -7099,6 +7164,7 @@ namespace PixelVaultNative
                             (!string.IsNullOrWhiteSpace(row.Name) && row.Name.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0) ||
                             (!string.IsNullOrWhiteSpace(row.PlatformLabel) && row.PlatformLabel.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0) ||
                             (!string.IsNullOrWhiteSpace(row.SteamAppId) && row.SteamAppId.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0) ||
+                            (!string.IsNullOrWhiteSpace(row.SteamGridDbId) && row.SteamGridDbId.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0) ||
                             (!string.IsNullOrWhiteSpace(row.FolderPath) && row.FolderPath.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0));
                     }
                     grid.ItemsSource = rows
@@ -7128,6 +7194,7 @@ namespace PixelVaultNative
                         Name = string.Empty,
                         PlatformLabel = "Other",
                         SteamAppId = string.Empty,
+                        SteamGridDbId = string.Empty,
                         FileCount = 0,
                         FolderPath = string.Empty,
                         PreviewImagePath = string.Empty,
@@ -7213,6 +7280,7 @@ namespace PixelVaultNative
                             row.Name = NormalizeGameIndexName(row.Name, row.FolderPath);
                             row.PlatformLabel = NormalizeConsoleLabel(string.IsNullOrWhiteSpace(row.PlatformLabel) ? "Other" : row.PlatformLabel.Trim());
                             row.SteamAppId = (row.SteamAppId ?? string.Empty).Trim();
+                            row.SteamGridDbId = (row.SteamGridDbId ?? string.Empty).Trim();
                         }
                         allRows = MergeGameIndexRows(allRows);
                         SaveGameIndexEditorRows(libraryRoot, allRows);
@@ -7258,6 +7326,7 @@ namespace PixelVaultNative
                     Name = folder.Name ?? string.Empty,
                     PlatformLabel = folder.PlatformLabel ?? string.Empty,
                     SteamAppId = folder.SteamAppId ?? string.Empty,
+                    SteamGridDbId = folder.SteamGridDbId ?? string.Empty,
                     FileCount = folder.FileCount,
                     FolderPath = folder.FolderPath ?? string.Empty,
                     PreviewImagePath = folder.PreviewImagePath ?? string.Empty,
@@ -7307,7 +7376,8 @@ namespace PixelVaultNative
                     PreviewImagePath = row.PreviewImagePath ?? string.Empty,
                     PlatformLabel = row.PlatformLabel ?? string.Empty,
                     FilePaths = row.FilePaths ?? new string[0],
-                    SteamAppId = row.SteamAppId ?? string.Empty
+                    SteamAppId = row.SteamAppId ?? string.Empty,
+                    SteamGridDbId = row.SteamGridDbId ?? string.Empty
                 };
                 var appId = ResolveBestLibraryFolderSteamAppId(root, folder);
                 if (!string.IsNullOrWhiteSpace(appId))

@@ -14,11 +14,11 @@ The app now runs from packaged builds under `C:\Codex\dist\PixelVault-x.xxx`, wi
 
 Current published build:
 
-- `0.728`
+- `0.732`
 
 Current executable:
 
-- `C:\Codex\dist\PixelVault-0.728\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.732\PixelVault.exe`
 
 Desktop shortcut:
 
@@ -45,7 +45,7 @@ Workspace root:
 
 Current live source file:
 
-- `C:\Codex\dist\PixelVault-0.728\PixelVault.Native.cs`
+- `C:\Codex\dist\PixelVault-0.732\PixelVault.Native.cs`
 
 Shared data root:
 
@@ -166,10 +166,13 @@ It stores:
 - canonical title
 - console/platform
 - Steam App ID
+- `STID` for SteamGridDB
 - file count
 - folder-path context
 
 Grouping is intended to follow `GameId`, not raw title text.
+
+As of `0.732`, Game Index save is also responsible for normalizing library folder names on disk. When multiple records share the same normalized title across platforms, canonical folder naming now appends ` - Platform`.
 
 ### Folder cache
 
@@ -215,6 +218,10 @@ Recent published lines introduced:
 - search and size sliders in the library
 - preview-tile right-click actions
 - self-healing for stale `Multiple Tags` master rows
+- thumbnail queue prioritization and loader hardening for large libraries
+- Steam cover-refresh timeout protection and better scoped-refresh deduping
+- `STID` persistence in the Game Index
+- Game Index save-time game-ID remapping and canonical folder renaming/moves
 
 ## Recent Non-Build Maintenance
 
@@ -237,4 +244,4 @@ Use these documents together:
 
 ## Immediate Next Step
 
-The next planned milestone is to initialize git in `C:\Codex`, add a proper `.gitignore`, and commit the code plus curated docs/index snapshots to GitHub.
+The next likely milestone is to use `STID` to fetch cover art from SteamGridDB and reduce dependence on Steam App IDs for artwork lookup.

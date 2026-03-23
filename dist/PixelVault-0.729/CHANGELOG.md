@@ -1,15 +1,3 @@
-## 0.732
-- Made the Game Index authoritative for library folder naming by deriving canonical folder names from the saved game title and platform instead of leaving folders bound to the original filename guess.
-- Game Index saves now move files and sidecars into the canonical folder on disk, including adding ` - Platform` suffixes for duplicate multi-platform titles, before rebuilding the library cache.
-
-## 0.731
-- Fixed Game Index saves so deleted or consolidated master rows no longer get immediately resurrected on reopen from stale file-to-game assignments.
-- Added a save-time game ID remap pass that rewrites the library metadata index and folder cache toward the surviving record before the library cache rebuild runs.
-
-## 0.730
-- Added an `STID` field to the Game Index so SteamGridDB IDs can be stored, searched, edited, and saved alongside Steam AppIDs.
-- Extended the game-index and library-folder cache formats to persist `STID` while remaining backward-compatible with older saved rows.
-
 ## 0.729
 - Added explicit timeouts to the Steam AppID and cover-download web requests so a single slow or stalled response can no longer hang cover refresh indefinitely.
 - Made cover-refresh deduping use the library folder master key instead of raw game name, which keeps scoped right-click fetches aligned with the app's folder identity rules.
@@ -132,18 +120,6 @@
 ## 0.640
 - Added a top-row `Game Index` button on the main screen so the cached game index is easier to reach.
 - Replaced the raw text-file handoff with an in-app table editor for the cached game index, including search, editable game/platform/AppID fields, and a save action that writes changes back into the cache.
-
-## 0.638
-- Fixed batched ExifTool library scans so rebuilds and folder scans normalize both queued metadata paths and ExifTool-returned SourceFile paths before matching them, which lets existing Steam/PS5/Xbox tags survive cache rebuilds instead of falling back to Other.
-- Kept the safer folder-cover persistence from 0.636 so library tiles can keep using the resolved portrait cover art path.
-## 0.637
-- Fixed batched ExifTool library scans so they normalize returned source paths before matching them back to queued files, which keeps rebuilds from dropping tagged files into Other when the tags are still present.
-- Kept the safer folder-cover persistence from 0.636 so library tiles can keep using the resolved portrait cover art path.
-
-## 0.636
-- Hardened library rebuilds so a blank tag rescan preserves the last known tag state instead of collapsing whole folders back to Other.
-- Persisted resolved folder cover paths alongside cached library entries so folder tiles keep the same art the detail preview is already showing.
-- Preserved cached Steam AppIDs and resolved cover art paths when rebuilding the library folder cache.
 
 ## 0.635
 - Fixed a library/manual metadata regression where saving a loaded folder could clear keyword tags across every file in that batch.
@@ -320,9 +296,6 @@
 ## 0.370
 - Added Steam, PS5, and Xbox console-tag checkboxes next to the Game Photography option in the review popup.
 - Refined the main workflow layout with a lighter Preview button, consistent button sizing, stronger button shadows, and white content cards.
-
-
-
 
 
 

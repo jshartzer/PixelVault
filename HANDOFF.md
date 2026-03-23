@@ -29,11 +29,11 @@ This handoff is the short current-state summary.
 
 Current live build:
 
-- `0.728`
+- `0.732`
 
 Current executable:
 
-- `C:\Codex\dist\PixelVault-0.728\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.732\PixelVault.exe`
 
 Current build pointer:
 
@@ -73,18 +73,23 @@ Behavior summary:
 
 - file metadata is the source of truth for per-file tags
 - the photo index is the persistent per-file mirror/cache
-- the game index is the master registry for `GameId`, canonical title, console, and Steam App ID
+- the game index is the master registry for `GameId`, canonical title, console, Steam App ID, and `STID`
 - the folder cache is derived state and may be rebuilt
+- as of `0.732`, Game Index save is also authoritative for canonical library folder naming
 
 ## Recent Shipped State
 
-Recent important published changes already in the `0.710` to `0.714` line:
+Recent important published changes in the current `0.724` to `0.732` line:
 
-- Library opens first and Settings became the separate utility hub
-- library search and persistent folder-size slider were added
-- folder preview slider was re-centered and preview tile chrome was reduced
-- right-click actions were added for folder preview images
-- stale `Multiple Tags` master rows now self-heal when files are corrected
+- intake preview/process/manual flows now reuse shared source inventories instead of rescanning the same roots repeatedly
+- metadata writes run with bounded parallel `ExifTool` workers
+- the library/gallery now use deferred thumbnail loading plus capped image caching
+- optional FFmpeg-backed video poster generation is implemented
+- thumbnail-loader regressions were fixed through `0.728`
+- cover-refresh requests now use explicit timeouts, and scoped cover refresh dedupes by folder master key instead of raw name
+- the Game Index now stores `STID` for SteamGridDB IDs
+- Game Index save now remaps stale game IDs before rebuild so deleted/consolidated rows stop resurrecting
+- Game Index save now renames/moves library folders on disk to canonical names based on the saved title/platform, adding ` - Platform` suffixes when the same title exists on multiple platforms
 
 See `C:\Codex\CHANGELOG.md` for the detailed version history.
 
@@ -112,14 +117,17 @@ This was a data-only maintenance pass, not a new app build.
 
 ## Current Stop Point
 
-The app docs have now been brought forward with a working policy document.
+The current live build is `0.732`, and the latest work focused on making the Game Index the true authority for naming and grouping:
 
-Immediate next task after this handoff:
+1. `STID` was added to the Game Index and persisted through the game-index and folder-cache formats.
+2. Game Index save was fixed so deleted/consolidated rows stop reappearing on reopen from stale file assignments.
+3. Game Index save now renames/moves library folders on disk to match the saved canonical title and platform.
 
-1. initialize git in `C:\Codex`
-2. add an appropriate `.gitignore`
-3. commit the code, docs, and curated index snapshots
-4. push to GitHub
+The most likely next product step is:
+
+1. use `STID` to drive cover-art lookup from SteamGridDB instead of relying on Steam App IDs
+2. decide whether intake sorting should stay filename-first with later normalization, or move directly to index-owned folder naming earlier in the workflow
+3. validate the `0.732` folder-rename behavior on a few real multi-platform titles before widening the automation further
 
 ## Important Expectations
 
@@ -127,3 +135,4 @@ Immediate next task after this handoff:
 - Keep `POLICY.md` as the durable behavior contract.
 - Keep `HANDOFF.md` short and current.
 - Do not let the game index or photo index drift from the actual intended behavior without documenting the rule change.
+- If a build changes record identity or folder naming, update both the handoff docs and the curated cache snapshots intentionally before committing.
