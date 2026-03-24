@@ -37,11 +37,11 @@ This handoff is the short current-state summary.
 
 Current live build:
 
-- `0.752`
+- `0.753`
 
 Current executable:
 
-- `C:\Codex\dist\PixelVault-0.752\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.753\PixelVault.exe`
 
 Current build pointer:
 
@@ -90,7 +90,7 @@ Behavior summary:
 
 ## Recent Shipped State
 
-Recent important published changes in the current `0.724` to `0.752` line:
+Recent important published changes in the current `0.724` to `0.753` line:
 
 - intake preview/process/manual flows now reuse shared source inventories instead of rescanning the same roots repeatedly
 - metadata writes run with bounded parallel `ExifTool` workers
@@ -118,6 +118,7 @@ Recent important published changes in the current `0.724` to `0.752` line:
 - Library-driven imports now default move conflicts to `Rename` even when the Settings-only conflict dropdown has not been created yet, which fixes a null-reference crash after metadata writes
 - import failure logging now records full exception details for workflow and manual-intake errors
 - the live Game Index and Photo Index runtime store now uses a per-library SQLite database with first-run migration from the older flat cache files
+- the SQLite-backed index store now initializes its runtime provider correctly on startup, fixing the `SetProvider` popup that appeared on write paths
 
 See `C:\Codex\docs\CHANGELOG.md` for the detailed version history.
 
@@ -145,15 +146,15 @@ This was a data-only maintenance pass, not a new app build.
 
 ## Current Stop Point
 
-The current live build is `0.752`, and the latest work moved the Game Index and Photo Index onto a per-library SQLite store while keeping the earlier import-path fixes in place:
+The current live build is `0.753`, and the latest work fixed the SQLite provider initialization for the new per-library index store:
 
-1. the live Game Index and Photo Index now read and write through `pixelvault-index-<library>.sqlite` instead of relying on flat cache files as the primary runtime store
-2. first-run migration pulls forward the older `game-index-*.cache` and `library-metadata-index-*.cache` data into SQLite without changing the folder cache contract
-3. the earlier Library import null-reference fix, Steam rename hardening, `GameId` preservation, and Steam-tag cleanup fixes remain part of the current line
+1. the live Game Index and Photo Index still read and write through `pixelvault-index-<library>.sqlite` instead of relying on flat cache files as the primary runtime store
+2. the startup path now initializes the SQLite runtime provider before any index read or write path executes, which fixes the `SetProvider` error in published builds
+3. the earlier SQLite migration, Library import null-reference fix, Steam rename hardening, `GameId` preservation, and Steam-tag cleanup fixes remain part of the current line
 
 The most likely next product step is:
 
-1. run a focused real-library validation pass against `0.752` to confirm the SQLite-backed index store behaves cleanly across import, manual-intake, metadata edits, library refresh, and cover fetch
+1. run a focused real-library validation pass against `0.753` to confirm the SQLite-backed index store behaves cleanly across import, manual-intake, metadata edits, library refresh, and cover fetch
 2. decide whether the legacy tracked `game-index-*.cache` and `library-metadata-index-*.cache` snapshots should remain in git as historical artifacts or be retired now that SQLite is the live runtime store
 3. consider adding lightweight index-health tooling such as row counts, rebuild/migrate status, and vacuum/backup actions if library scale keeps growing
 

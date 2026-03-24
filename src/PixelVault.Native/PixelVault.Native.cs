@@ -18,6 +18,7 @@ using System.Windows.Media;
 using System.Windows.Media.Effects;
 using System.Windows.Media.Imaging;
 using Microsoft.Data.Sqlite;
+using SQLitePCL;
 using Forms = System.Windows.Forms;
 
 namespace PixelVaultNative
@@ -31,6 +32,7 @@ namespace PixelVaultNative
                 (SecurityProtocolType)3072 |
                 (SecurityProtocolType)768 |
                 SecurityProtocolType.Tls;
+            Batteries_V2.Init();
             new Application().Run(new MainWindow());
         }
     }
@@ -232,7 +234,7 @@ namespace PixelVaultNative
 
     public sealed class MainWindow : Window
     {
-        const string AppVersion = "0.752";
+        const string AppVersion = "0.753";
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
         const int MaxImageCacheEntries = 240;

@@ -1,3 +1,7 @@
+## 0.753
+- Fixed the SQLite runtime provider initialization so the new SQLite-backed index store no longer throws `You need to call SQLitePCL.raw.SetProvider()` when a save or write path touches the Game Index or Photo Index.
+- Added the explicit SQLite bundle dependency and startup initialization needed for the per-library index database to work reliably in published builds.
+
 ## 0.752
 - Moved the live Game Index and Photo Index runtime storage to a per-library SQLite database under `PixelVaultData\cache`, so index growth no longer depends on rewriting flat tab-delimited cache files on every save.
 - Added first-run migration from the legacy `game-index-*.cache` and `library-metadata-index-*.cache` files into the SQLite store while keeping the folder cache as rebuildable derived state.
