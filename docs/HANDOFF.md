@@ -37,11 +37,11 @@ This handoff is the short current-state summary.
 
 Current live build:
 
-- `0.750`
+- `0.751`
 
 Current executable:
 
-- `C:\Codex\dist\PixelVault-0.750\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.751\PixelVault.exe`
 
 Current build pointer:
 
@@ -87,7 +87,7 @@ Behavior summary:
 
 ## Recent Shipped State
 
-Recent important published changes in the current `0.724` to `0.750` line:
+Recent important published changes in the current `0.724` to `0.751` line:
 
 - intake preview/process/manual flows now reuse shared source inventories instead of rescanning the same roots repeatedly
 - metadata writes run with bounded parallel `ExifTool` workers
@@ -112,6 +112,8 @@ Recent important published changes in the current `0.724` to `0.750` line:
 - Steam rename detection is now limited to known Steam screenshot filename patterns so unrelated numeric filenames do not get misclassified during intake
 - library refresh/index reconciliation now preserves an existing `GameId` when the platform still matches, reducing accidental regrouping from folder-name guesses
 - normal Steam intake now writes `Steam` without silently adding `PC`, keeping shipped metadata aligned with the current review flow and prior cleanup rules
+- Library-driven imports now default move conflicts to `Rename` even when the Settings-only conflict dropdown has not been created yet, which fixes a null-reference crash after metadata writes
+- import failure logging now records full exception details for workflow and manual-intake errors
 
 See `C:\Codex\docs\CHANGELOG.md` for the detailed version history.
 
@@ -139,15 +141,15 @@ This was a data-only maintenance pass, not a new app build.
 
 ## Current Stop Point
 
-The current live build is `0.750`, and the latest work tightened the import and library identity pipeline:
+The current live build is `0.751`, and the latest work fixed a Library-surface import crash while keeping the earlier import-pipeline hardening in place:
 
-1. Steam rename now only fires on recognized Steam screenshot filename formats instead of any arbitrary 3+ digit match
-2. library rescans now keep an existing assigned `GameId` when the saved platform still matches, preventing folder-name drift from splitting groups
-3. Steam intake no longer writes a hidden extra `PC` tag during the normal review/import flow
+1. Library-driven imports no longer depend on the Settings-only move-conflict combo box being instantiated before they can move files
+2. import and manual-intake failures now log full exception text for easier diagnosis
+3. the earlier Steam rename, `GameId` preservation, and Steam-tag cleanup fixes remain part of the current line
 
 The most likely next product step is:
 
-1. run a focused real-library validation pass against `0.750` to confirm Steam, PS5, Xbox, and manual-intake edge cases behave cleanly after the import-pipeline hardening
+1. run a focused real-library validation pass against `0.751` to confirm Steam, PS5, Xbox, Library-driven import, and manual-intake edge cases all behave cleanly after the import-path fixes
 2. run a live SteamGridDB backfill so the existing Game Index rows gain `STID` values where possible
 3. validate the `STID`-first cover flow on a few real multi-platform titles and confirm the preferred portrait art is stable
 
