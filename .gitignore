@@ -10,6 +10,7 @@ dist/**/tools/
 logs/
 tools/
 PixelVault.lnk
+PixelVaultData/PixelVault.settings.ini
 PixelVaultData/logs/
 PixelVaultData/cache/covers/
 PixelVaultData/cache/thumbs/
