@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -90,11 +91,8 @@ namespace PixelVaultNative
         public string Comment;
         public bool AddPhotographyTag;
         public bool TagSteam;
-        public bool TagPc;
         public bool TagPs5;
         public bool TagXbox;
-        public bool TagOther;
-        public string CustomPlatformTag;
         public bool DeleteBeforeProcessing;
     }
 
@@ -156,21 +154,78 @@ namespace PixelVaultNative
         public string SuccessDetail;
     }
 
-    sealed class TimeoutWebClient : WebClient
+    sealed class TimeoutWebClient : IDisposable
     {
-        public int TimeoutMilliseconds = 15000;
+        readonly HttpClientHandler handler = new HttpClientHandler();
+        readonly HttpClient client;
+        bool disposed;
 
-        protected override WebRequest GetWebRequest(Uri address)
+        public TimeoutWebClient()
         {
-            var request = base.GetWebRequest(address);
-            if (request == null) return null;
-            request.Timeout = TimeoutMilliseconds;
-            var http = request as HttpWebRequest;
-            if (http != null)
+            client = new HttpClient(handler, true);
+        }
+
+        public Encoding Encoding = Encoding.UTF8;
+        public int TimeoutMilliseconds = 15000;
+        public WebHeaderCollection Headers = new WebHeaderCollection();
+
+        HttpRequestMessage BuildRequest(HttpMethod method, string address)
+        {
+            var request = new HttpRequestMessage(method, address);
+            foreach (string key in Headers.AllKeys)
             {
-                http.ReadWriteTimeout = TimeoutMilliseconds;
+                if (string.IsNullOrWhiteSpace(key)) continue;
+                var value = Headers[key];
+                if (string.IsNullOrWhiteSpace(value)) continue;
+                request.Headers.TryAddWithoutValidation(key, value);
             }
             return request;
+        }
+
+        public string DownloadString(string address)
+        {
+            using (var request = BuildRequest(HttpMethod.Get, address))
+            using (var cts = new CancellationTokenSource(TimeoutMilliseconds))
+            using (var response = client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cts.Token).GetAwaiter().GetResult())
+            {
+                response.EnsureSuccessStatusCode();
+                var bytes = response.Content.ReadAsByteArrayAsync().GetAwaiter().GetResult();
+                var charset = response.Content.Headers.ContentType == null ? null : response.Content.Headers.ContentType.CharSet;
+                if (!string.IsNullOrWhiteSpace(charset))
+                {
+                    try
+                    {
+                        return System.Text.Encoding.GetEncoding(charset).GetString(bytes);
+                    }
+                    catch
+                    {
+                    }
+                }
+                return (Encoding ?? System.Text.Encoding.UTF8).GetString(bytes);
+            }
+        }
+
+        public void DownloadFile(string address, string filePath)
+        {
+            using (var request = BuildRequest(HttpMethod.Get, address))
+            using (var cts = new CancellationTokenSource(TimeoutMilliseconds))
+            using (var response = client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cts.Token).GetAwaiter().GetResult())
+            {
+                response.EnsureSuccessStatusCode();
+                using (var stream = response.Content.ReadAsStreamAsync().GetAwaiter().GetResult())
+                using (var target = File.Create(filePath))
+                {
+                    stream.CopyTo(target);
+                }
+            }
+        }
+
+        public void Dispose()
+        {
+            if (disposed) return;
+            disposed = true;
+            client.Dispose();
+            handler.Dispose();
         }
     }
 
@@ -7009,11 +7064,12 @@ namespace PixelVaultNative
                     }
                     play.Freeze();
                     dc.DrawGeometry(Brushes.White, null, play);
-                    var titleText = new FormattedText(title, System.Globalization.CultureInfo.CurrentCulture, FlowDirection.LeftToRight, new Typeface("Segoe UI Semibold"), 18, fg);
+                    var pixelsPerDip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+                    var titleText = new FormattedText(title, System.Globalization.CultureInfo.CurrentCulture, FlowDirection.LeftToRight, new Typeface("Segoe UI Semibold"), 18, fg, pixelsPerDip);
                     titleText.MaxTextWidth = renderWidth - 64;
                     titleText.TextAlignment = TextAlignment.Center;
                     dc.DrawText(titleText, new Point((renderWidth - titleText.Width) / 2d, renderHeight - 84));
-                    var subText = new FormattedText(Path.GetExtension(videoPath).TrimStart('.').ToUpperInvariant() + " video", System.Globalization.CultureInfo.CurrentCulture, FlowDirection.LeftToRight, new Typeface("Segoe UI"), 13, sub);
+                    var subText = new FormattedText(Path.GetExtension(videoPath).TrimStart('.').ToUpperInvariant() + " video", System.Globalization.CultureInfo.CurrentCulture, FlowDirection.LeftToRight, new Typeface("Segoe UI"), 13, sub, pixelsPerDip);
                     subText.MaxTextWidth = renderWidth - 64;
                     subText.TextAlignment = TextAlignment.Center;
                     dc.DrawText(subText, new Point((renderWidth - subText.Width) / 2d, renderHeight - 56));
