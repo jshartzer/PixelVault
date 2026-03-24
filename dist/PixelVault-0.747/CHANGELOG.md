@@ -1,8 +1,3 @@
-## 0.748
-- Replaced the Library's `Game Library` text header with the shared PixelVault logo, kept the title area within a fixed width so the logo fits cleanly, and aligned the search field to the left-side import action group.
-- Centered the selected text inside the sort picker, cleaned up the dropdown item alignment, and rebalanced the top filter row so the sort control and folder-size controls sit more evenly.
-- Lowered the folder-size slider so it sits between the `Folder size` label and the current numeric value instead of riding too high in the row.
-
 ## 0.747
 - Tightened the Library top-bar spacing by shrinking the `Settings` button and reducing the maintenance-button cluster width so `Fetch Covers` no longer gets clipped on the right edge.
 - Restyled the Library sort picker with a softer shell, rounded border, and stronger text treatment so the selected mode reads more cleanly in the dark toolbar.

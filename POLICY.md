@@ -75,6 +75,7 @@ It is responsible for:
 
 - browsing the grouped game library
 - searching folders
+- running `Import`, `Import and Comment`, and `Manual Import` from the Library toolbar
 - resizing folder tiles
 - opening folder detail previews
 - running `Refresh`, `Rebuild`, and `Fetch Covers`
@@ -107,6 +108,8 @@ It is responsible for:
 - destination folder
 - library folder
 - `ExifTool` path
+- `FFmpeg` path
+- SteamGridDB token
 
 It should not mix in import actions or index editing.
 
@@ -166,9 +169,10 @@ The Game Index editor is the master-record editor.
 It is responsible for:
 
 - maintaining one canonical record per game and platform
-- storing `GameId`, title, console, Steam App ID, file counts, and folder path context
+- storing `GameId`, title, console, Steam App ID, `STID`, file counts, and folder path context
 - adding new game records intentionally
 - resolving or manually correcting Steam App IDs
+- resolving or manually correcting SteamGridDB IDs
 - deleting or merging stale master rows when appropriate
 
 Behavior contract:
@@ -252,6 +256,7 @@ It stores canonical game-level data such as:
 - canonical title
 - platform / console
 - Steam App ID
+- `STID`
 - file count
 - folder path reference
 

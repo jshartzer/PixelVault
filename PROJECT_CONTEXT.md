@@ -14,11 +14,11 @@ The app now runs from packaged builds under `C:\Codex\dist\PixelVault-x.xxx`, wi
 
 Current published build:
 
-- `0.743`
+- `0.748`
 
 Current executable:
 
-- `C:\Codex\dist\PixelVault-0.743\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.748\PixelVault.exe`
 
 Desktop shortcut:
 
@@ -45,7 +45,7 @@ Workspace root:
 
 Current live source file:
 
-- `C:\Codex\dist\PixelVault-0.743\PixelVault.Native.cs`
+- `C:\Codex\dist\PixelVault-0.748\PixelVault.Native.cs`
 
 Shared data root:
 
@@ -74,6 +74,7 @@ Current library/intake defaults:
 Tool dependency:
 
 - `C:\Codex\tools\exiftool.exe`
+- `C:\Codex\tools\ffmpeg.exe` when video poster generation is desired
 
 ## Current Architecture
 
@@ -108,6 +109,7 @@ It handles:
 
 - grouped folder browsing
 - search
+- direct `Import`, `Import and Comment`, and `Manual Import` actions from the toolbar
 - folder tile sizing
 - folder detail preview
 - `Refresh`
@@ -215,6 +217,11 @@ Recent published lines introduced:
 - Steam App ID persistence in the game index
 - `STID`-first SteamGridDB cover refresh with Steam fallback only when needed
 - right-click cover fetch on a single folder
+- refreshed platform-group headers in the Library with icon-led presentation from the shared workspace asset set
+- persistent Library sorting modes with flattened non-platform views and per-tile platform badges
+- Library top-bar import actions moved into the main browse surface with a quieter footer-style status line
+- tightened Library toolbar spacing and restyled the sort picker shell
+- Library header branding with the shared PixelVault logo, aligned search placement, and a cleaner filter-row balance for sort and folder-size controls
 - startup Library view
 - search and size sliders in the library
 - preview-tile right-click actions
@@ -245,4 +252,4 @@ Use these documents together:
 
 ## Immediate Next Step
 
-The next likely milestone is to backfill live `STID` values from SteamGridDB and validate the new SteamGridDB-first cover flow against a few real library folders.
+The next likely milestone is to keep polishing the Library browse surface while continuing the SteamGridDB backfill and validating the `STID`-first cover workflow against real library folders.

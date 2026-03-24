@@ -29,11 +29,11 @@ This handoff is the short current-state summary.
 
 Current live build:
 
-- `0.743`
+- `0.748`
 
 Current executable:
 
-- `C:\Codex\dist\PixelVault-0.743\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.748\PixelVault.exe`
 
 Current build pointer:
 
@@ -79,7 +79,7 @@ Behavior summary:
 
 ## Recent Shipped State
 
-Recent important published changes in the current `0.724` to `0.743` line:
+Recent important published changes in the current `0.724` to `0.748` line:
 
 - intake preview/process/manual flows now reuse shared source inventories instead of rescanning the same roots repeatedly
 - metadata writes run with bounded parallel `ExifTool` workers
@@ -92,8 +92,14 @@ Recent important published changes in the current `0.724` to `0.743` line:
 - Game Index save now renames/moves library folders on disk to canonical names based on the saved title/platform, adding ` - Platform` suffixes when the same title exists on multiple platforms
 - SteamGridDB token-backed `STID` resolution is now wired into the Game Index
 - cover refresh can now prefer SteamGridDB portrait art when an `STID` is available
+- Path Settings now supports both a SteamGridDB token and an optional `FFmpeg` path for video poster generation
 - Steam screenshot rename/import now records the raw Steam AppID into the Game Index before filename normalization
 - cover refresh now defaults to saved `STID` values, preserves existing cached art, and avoids unnecessary Steam App ID lookups during single-folder fetches
+- Library section headers now use larger typography, cleaner folder counts, and shared console icons from `C:\Codex\assets`
+- the Library now has persistent sort modes for grouped platform view, recently added, and most photos, with platform badges on tiles when headers are hidden
+- the Library top bar now exposes Import actions directly, drops the Photography shortcut there, and moves status into a smaller footer line
+- the Library toolbar spacing was tightened again so the right-side action buttons fit cleanly, and the sort picker got a cleaner shell treatment
+- the Library header now uses the shared PixelVault logo, the search field lines up with the import actions, and the sort and folder-size controls were rebalanced for a cleaner filter row
 
 See `C:\Codex\CHANGELOG.md` for the detailed version history.
 
@@ -121,17 +127,17 @@ This was a data-only maintenance pass, not a new app build.
 
 ## Current Stop Point
 
-The current live build is `0.743`, and the latest work focused on tightening the SteamGridDB cover workflow so it behaves better against the saved Game Index:
+The current live build is `0.748`, and the latest work focused on cleaning up the Library header and filter row:
 
-1. cover refresh now prefers saved `STID` values before attempting Steam App ID discovery
-2. existing cached covers are preserved unless a new cover download actually succeeds
-3. single-folder right-click cover fetch avoids the extra Steam App ID lookup path when `STID` is already present
+1. the `Game Library` text header was replaced with the shared PixelVault logo and constrained so it fits the left title block cleanly
+2. the search box now lines up with the import action group, and the sort picker text is centered more cleanly
+3. the folder-size slider was lowered within its row so it sits more naturally between the label and value
 
 The most likely next product step is:
 
-1. run a live SteamGridDB backfill so the existing Game Index rows gain `STID` values
-2. validate the new SteamGridDB-first cover flow on a few real multi-platform titles and confirm the preferred portrait art is stable
-3. decide whether intake sorting should stay filename-first with later normalization, or move directly to index-owned folder naming earlier in the workflow
+1. continue polishing the Library browse surface now that the header, import bar, sort row, and folder-size controls have all been tightened through `0.748`
+2. run a live SteamGridDB backfill so the existing Game Index rows gain `STID` values where possible
+3. validate the `STID`-first cover flow on a few real multi-platform titles and confirm the preferred portrait art is stable
 
 ## Important Expectations
 
