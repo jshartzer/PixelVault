@@ -14,11 +14,11 @@ The app now runs from packaged builds under `C:\Codex\dist\PixelVault-x.xxx`, wi
 
 Current published build:
 
-- `0.751`
+- `0.752`
 
 Current executable:
 
-- `C:\Codex\dist\PixelVault-0.751\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.752\PixelVault.exe`
 
 Desktop shortcut:
 
@@ -69,6 +69,7 @@ Shared logs folder:
 
 Live cache files:
 
+- `C:\Codex\PixelVaultData\cache\pixelvault-index-y_game_captures.sqlite`
 - `C:\Codex\PixelVaultData\cache\game-index-y_game_captures.cache`
 - `C:\Codex\PixelVaultData\cache\library-metadata-index-y_game_captures.cache`
 - `C:\Codex\PixelVaultData\cache\library-folders-y_game_captures.cache`
@@ -160,6 +161,8 @@ Per-file metadata is the source of truth for:
 
 The photo index is the persistent per-file mirror/cache.
 
+It is now stored in the per-library SQLite index database and surfaced in the UI through the Photo Index editor.
+
 It stores:
 
 - file path
@@ -171,6 +174,8 @@ It stores:
 ### Game index
 
 The game index is the master record table.
+
+It is now stored in the per-library SQLite index database and remains the authority for `GameId`, canonical title, platform, Steam App ID, and `STID`.
 
 It stores:
 

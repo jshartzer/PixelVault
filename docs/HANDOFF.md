@@ -37,11 +37,11 @@ This handoff is the short current-state summary.
 
 Current live build:
 
-- `0.751`
+- `0.752`
 
 Current executable:
 
-- `C:\Codex\dist\PixelVault-0.751\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.752\PixelVault.exe`
 
 Current build pointer:
 
@@ -73,6 +73,7 @@ Shared persistent data lives under:
 
 Important live cache files:
 
+- `C:\Codex\PixelVaultData\cache\pixelvault-index-y_game_captures.sqlite`
 - `C:\Codex\PixelVaultData\cache\game-index-y_game_captures.cache`
 - `C:\Codex\PixelVaultData\cache\library-metadata-index-y_game_captures.cache`
 - `C:\Codex\PixelVaultData\cache\library-folders-y_game_captures.cache`
@@ -80,14 +81,16 @@ Important live cache files:
 Behavior summary:
 
 - file metadata is the source of truth for per-file tags
+- the SQLite index database is the live runtime store for the Game Index and Photo Index
 - the photo index is the persistent per-file mirror/cache
 - the game index is the master registry for `GameId`, canonical title, console, Steam App ID, and `STID`
 - the folder cache is derived state and may be rebuilt
+- the older `game-index-*.cache` and `library-metadata-index-*.cache` files are now legacy migration/snapshot files rather than the primary runtime store
 - as of `0.742`, Game Index save is also authoritative for canonical library folder naming
 
 ## Recent Shipped State
 
-Recent important published changes in the current `0.724` to `0.751` line:
+Recent important published changes in the current `0.724` to `0.752` line:
 
 - intake preview/process/manual flows now reuse shared source inventories instead of rescanning the same roots repeatedly
 - metadata writes run with bounded parallel `ExifTool` workers
@@ -114,6 +117,7 @@ Recent important published changes in the current `0.724` to `0.751` line:
 - normal Steam intake now writes `Steam` without silently adding `PC`, keeping shipped metadata aligned with the current review flow and prior cleanup rules
 - Library-driven imports now default move conflicts to `Rename` even when the Settings-only conflict dropdown has not been created yet, which fixes a null-reference crash after metadata writes
 - import failure logging now records full exception details for workflow and manual-intake errors
+- the live Game Index and Photo Index runtime store now uses a per-library SQLite database with first-run migration from the older flat cache files
 
 See `C:\Codex\docs\CHANGELOG.md` for the detailed version history.
 
@@ -141,17 +145,17 @@ This was a data-only maintenance pass, not a new app build.
 
 ## Current Stop Point
 
-The current live build is `0.751`, and the latest work fixed a Library-surface import crash while keeping the earlier import-pipeline hardening in place:
+The current live build is `0.752`, and the latest work moved the Game Index and Photo Index onto a per-library SQLite store while keeping the earlier import-path fixes in place:
 
-1. Library-driven imports no longer depend on the Settings-only move-conflict combo box being instantiated before they can move files
-2. import and manual-intake failures now log full exception text for easier diagnosis
-3. the earlier Steam rename, `GameId` preservation, and Steam-tag cleanup fixes remain part of the current line
+1. the live Game Index and Photo Index now read and write through `pixelvault-index-<library>.sqlite` instead of relying on flat cache files as the primary runtime store
+2. first-run migration pulls forward the older `game-index-*.cache` and `library-metadata-index-*.cache` data into SQLite without changing the folder cache contract
+3. the earlier Library import null-reference fix, Steam rename hardening, `GameId` preservation, and Steam-tag cleanup fixes remain part of the current line
 
 The most likely next product step is:
 
-1. run a focused real-library validation pass against `0.751` to confirm Steam, PS5, Xbox, Library-driven import, and manual-intake edge cases all behave cleanly after the import-path fixes
-2. run a live SteamGridDB backfill so the existing Game Index rows gain `STID` values where possible
-3. validate the `STID`-first cover flow on a few real multi-platform titles and confirm the preferred portrait art is stable
+1. run a focused real-library validation pass against `0.752` to confirm the SQLite-backed index store behaves cleanly across import, manual-intake, metadata edits, library refresh, and cover fetch
+2. decide whether the legacy tracked `game-index-*.cache` and `library-metadata-index-*.cache` snapshots should remain in git as historical artifacts or be retired now that SQLite is the live runtime store
+3. consider adding lightweight index-health tooling such as row counts, rebuild/migrate status, and vacuum/backup actions if library scale keeps growing
 
 ## Important Expectations
 

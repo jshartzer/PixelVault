@@ -8,7 +8,7 @@ The live app line is based in:
 
 Current published build:
 
-- `C:\Codex\dist\PixelVault-0.751\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.752\PixelVault.exe`
 
 Desktop shortcut:
 
@@ -84,6 +84,7 @@ Shared persistent app data lives under:
 
 Important files:
 
+- `C:\Codex\PixelVaultData\cache\pixelvault-index-<library>.sqlite`
 - `C:\Codex\PixelVaultData\cache\game-index-y_game_captures.cache`
 - `C:\Codex\PixelVaultData\cache\library-metadata-index-y_game_captures.cache`
 - `C:\Codex\docs\CURRENT_BUILD.txt`
@@ -108,7 +109,7 @@ Important files:
 
 The live published source snapshot for the current build is:
 
-- `C:\Codex\dist\PixelVault-0.751\PixelVault.Native.cs`
+- `C:\Codex\dist\PixelVault-0.752\PixelVault.Native.cs`
 
 The live build source now lives at:
 
@@ -124,7 +125,7 @@ Use the publish helper for new release folders:
 Use the current published executable:
 
 ```powershell
-C:\Codex\dist\PixelVault-0.751\PixelVault.exe
+C:\Codex\dist\PixelVault-0.752\PixelVault.exe
 ```
 
 Or launch it from:
@@ -142,7 +143,7 @@ dotnet build C:\Codex\src\PixelVault.Native\PixelVault.Native.csproj -c Release
 Publish a new versioned dist folder with the helper script:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File C:\Codex\scripts\Publish-PixelVault.ps1 -Version 0.751
+powershell -ExecutionPolicy Bypass -File C:\Codex\scripts\Publish-PixelVault.ps1 -Version 0.752
 ```
 
 ## Project Documents
@@ -174,3 +175,9 @@ It should not track:
 ## Legacy Note
 
 Older PowerShell workflow files are now grouped under `C:\Codex\legacy\GameCaptureManager` so the active native app line is easier to navigate.
+
+## Storage Note
+
+The live Game Index and Photo Index are now backed by a per-library SQLite database in `C:\Codex\PixelVaultData\cache`.
+
+The older tab-delimited `game-index-*.cache` and `library-metadata-index-*.cache` files are now legacy migration inputs and historical snapshots, not the primary runtime store.

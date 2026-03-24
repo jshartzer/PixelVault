@@ -60,9 +60,11 @@ if (Test-Path $outputDir)
 $publishArgs = @(
     "publish",
     $projectPath,
+    "-nodeReuse:false",
     "-c", $Configuration,
     "-r", $RuntimeIdentifier,
     "-p:PublishSingleFile=true",
+    "-p:UseSharedCompilation=false",
     ("-p:SelfContained=" + $(if ($SelfContained) { "true" } else { "false" })),
     "-o", $outputDir
 )

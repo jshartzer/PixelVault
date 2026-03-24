@@ -238,6 +238,8 @@ If file metadata and cache disagree, the long-term target is for scans and reloa
 
 The photo index is a persistent per-file mirror and working cache.
 
+Its live runtime storage is the per-library SQLite index database under `C:\Codex\PixelVaultData\cache`.
+
 Current file:
 
 - `C:\Codex\PixelVaultData\cache\library-metadata-index-y_game_captures.cache`
@@ -255,6 +257,8 @@ The photo index should mirror the effective file metadata and should be updated 
 ### Game index
 
 The game index is the master registry for game identities.
+
+Its live runtime storage is the per-library SQLite index database under `C:\Codex\PixelVaultData\cache`.
 
 Current file:
 
@@ -281,6 +285,12 @@ Current file:
 - `C:\Codex\PixelVaultData\cache\library-folders-y_game_captures.cache`
 
 It is allowed to be rebuilt from the photo index and game index. It should not be treated as the long-term source of truth for tags.
+
+### Legacy cache files
+
+The old tab-delimited `game-index-*.cache` and `library-metadata-index-*.cache` files are now legacy migration/snapshot artifacts.
+
+They should not be treated as the authoritative live runtime store once the SQLite database exists for a library root.
 
 ### Covers and thumbnails
 

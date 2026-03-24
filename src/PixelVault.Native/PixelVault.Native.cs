@@ -17,6 +17,7 @@ using System.Windows.Documents;
 using System.Windows.Media;
 using System.Windows.Media.Effects;
 using System.Windows.Media.Imaging;
+using Microsoft.Data.Sqlite;
 using Forms = System.Windows.Forms;
 
 namespace PixelVaultNative
@@ -231,7 +232,7 @@ namespace PixelVaultNative
 
     public sealed class MainWindow : Window
     {
-        const string AppVersion = "0.751";
+        const string AppVersion = "0.752";
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
         const int MaxImageCacheEntries = 240;
@@ -4613,7 +4614,8 @@ namespace PixelVaultNative
                 var dirTicks = Directory.GetLastWriteTimeUtc(dir).Ticks;
                 if (dirTicks > latestDirTicks) latestDirTicks = dirTicks;
             }
-            var metadataPath = LibraryMetadataIndexPath(root);
+            var metadataPath = IndexDatabasePath(root);
+            if (!File.Exists(metadataPath)) metadataPath = LibraryMetadataIndexPath(root);
             long metadataTicks = File.Exists(metadataPath) ? File.GetLastWriteTimeUtc(metadataPath).Ticks : 0;
             long metadataLength = File.Exists(metadataPath) ? new FileInfo(metadataPath).Length : 0;
             return folderCount + "|" + latestDirTicks + "|" + metadataTicks + "|" + metadataLength;
@@ -4624,9 +4626,316 @@ namespace PixelVaultNative
             return Path.Combine(cacheRoot, "library-folders-" + SafeCacheName(root) + ".cache");
         }
 
+        string IndexDatabasePath(string root)
+        {
+            return Path.Combine(cacheRoot, "pixelvault-index-" + SafeCacheName(root) + ".sqlite");
+        }
+
         string GameIndexPath(string root)
         {
             return Path.Combine(cacheRoot, "game-index-" + SafeCacheName(root) + ".cache");
+        }
+
+        SqliteConnection OpenIndexDatabase(string root)
+        {
+            Directory.CreateDirectory(cacheRoot);
+            var builder = new SqliteConnectionStringBuilder
+            {
+                DataSource = IndexDatabasePath(root),
+                Mode = SqliteOpenMode.ReadWriteCreate
+            };
+            var connection = new SqliteConnection(builder.ToString());
+            connection.Open();
+            InitializeIndexDatabase(connection);
+            EnsureLegacyIndexMigration(root, connection);
+            return connection;
+        }
+
+        void InitializeIndexDatabase(SqliteConnection connection)
+        {
+            using (var pragma = connection.CreateCommand())
+            {
+                pragma.CommandText = "PRAGMA journal_mode=WAL; PRAGMA foreign_keys=OFF;";
+                pragma.ExecuteNonQuery();
+            }
+
+            using (var command = connection.CreateCommand())
+            {
+                command.CommandText = @"
+CREATE TABLE IF NOT EXISTS game_index (
+    root TEXT NOT NULL,
+    game_id TEXT NOT NULL,
+    folder_path TEXT NOT NULL DEFAULT '',
+    name TEXT NOT NULL DEFAULT '',
+    platform_label TEXT NOT NULL DEFAULT '',
+    steam_app_id TEXT NOT NULL DEFAULT '',
+    steam_grid_db_id TEXT NOT NULL DEFAULT '',
+    file_count INTEGER NOT NULL DEFAULT 0,
+    preview_image_path TEXT NOT NULL DEFAULT '',
+    file_paths TEXT NOT NULL DEFAULT '',
+    PRIMARY KEY (root, game_id)
+);
+CREATE INDEX IF NOT EXISTS idx_game_index_root_identity ON game_index(root, name, platform_label);
+CREATE TABLE IF NOT EXISTS photo_index (
+    root TEXT NOT NULL,
+    file_path TEXT NOT NULL,
+    stamp TEXT NOT NULL DEFAULT '',
+    game_id TEXT NOT NULL DEFAULT '',
+    console_label TEXT NOT NULL DEFAULT '',
+    tag_text TEXT NOT NULL DEFAULT '',
+    PRIMARY KEY (root, file_path)
+);
+CREATE INDEX IF NOT EXISTS idx_photo_index_root_game ON photo_index(root, game_id);
+";
+                command.ExecuteNonQuery();
+            }
+        }
+
+        long CountIndexDatabaseRows(SqliteConnection connection, string tableName, string root)
+        {
+            using (var command = connection.CreateCommand())
+            {
+                command.CommandText = "SELECT COUNT(1) FROM " + tableName + " WHERE root = $root;";
+                command.Parameters.AddWithValue("$root", root ?? string.Empty);
+                var result = command.ExecuteScalar();
+                return result == null || result == DBNull.Value ? 0L : Convert.ToInt64(result);
+            }
+        }
+
+        List<GameIndexEditorRow> ReadSavedGameIndexRowsFromDatabase(string root, SqliteConnection connection)
+        {
+            var rows = new List<GameIndexEditorRow>();
+            using (var command = connection.CreateCommand())
+            {
+                command.CommandText = @"
+SELECT game_id, folder_path, name, platform_label, steam_app_id, steam_grid_db_id, file_count, preview_image_path, file_paths
+FROM game_index
+WHERE root = $root
+ORDER BY name COLLATE NOCASE, platform_label COLLATE NOCASE, game_id COLLATE NOCASE;";
+                command.Parameters.AddWithValue("$root", root ?? string.Empty);
+                using (var reader = command.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        var filePathsText = reader.IsDBNull(8) ? string.Empty : reader.GetString(8);
+                        rows.Add(new GameIndexEditorRow
+                        {
+                            GameId = reader.IsDBNull(0) ? string.Empty : reader.GetString(0),
+                            FolderPath = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
+                            Name = reader.IsDBNull(2) ? string.Empty : reader.GetString(2),
+                            PlatformLabel = reader.IsDBNull(3) ? string.Empty : reader.GetString(3),
+                            SteamAppId = reader.IsDBNull(4) ? string.Empty : reader.GetString(4),
+                            SteamGridDbId = reader.IsDBNull(5) ? string.Empty : reader.GetString(5),
+                            FileCount = reader.IsDBNull(6) ? 0 : reader.GetInt32(6),
+                            PreviewImagePath = reader.IsDBNull(7) ? string.Empty : reader.GetString(7),
+                            FilePaths = string.IsNullOrWhiteSpace(filePathsText)
+                                ? new string[0]
+                                : filePathsText.Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries).Where(File.Exists).ToArray()
+                        });
+                    }
+                }
+            }
+            return rows;
+        }
+
+        void WriteSavedGameIndexRowsToDatabase(string root, IEnumerable<GameIndexEditorRow> rows, SqliteConnection connection)
+        {
+            using (var transaction = connection.BeginTransaction())
+            {
+                using (var delete = connection.CreateCommand())
+                {
+                    delete.Transaction = transaction;
+                    delete.CommandText = "DELETE FROM game_index WHERE root = $root;";
+                    delete.Parameters.AddWithValue("$root", root ?? string.Empty);
+                    delete.ExecuteNonQuery();
+                }
+
+                foreach (var row in (rows ?? Enumerable.Empty<GameIndexEditorRow>()).Where(row => row != null))
+                {
+                    using (var insert = connection.CreateCommand())
+                    {
+                        insert.Transaction = transaction;
+                        insert.CommandText = @"
+INSERT INTO game_index (root, game_id, folder_path, name, platform_label, steam_app_id, steam_grid_db_id, file_count, preview_image_path, file_paths)
+VALUES ($root, $gameId, $folderPath, $name, $platformLabel, $steamAppId, $steamGridDbId, $fileCount, $previewImagePath, $filePaths);";
+                        insert.Parameters.AddWithValue("$root", root ?? string.Empty);
+                        insert.Parameters.AddWithValue("$gameId", NormalizeGameId(row.GameId));
+                        insert.Parameters.AddWithValue("$folderPath", row.FolderPath ?? string.Empty);
+                        insert.Parameters.AddWithValue("$name", row.Name ?? string.Empty);
+                        insert.Parameters.AddWithValue("$platformLabel", row.PlatformLabel ?? string.Empty);
+                        insert.Parameters.AddWithValue("$steamAppId", row.SteamAppId ?? string.Empty);
+                        insert.Parameters.AddWithValue("$steamGridDbId", row.SteamGridDbId ?? string.Empty);
+                        insert.Parameters.AddWithValue("$fileCount", Math.Max(0, row.FileCount));
+                        insert.Parameters.AddWithValue("$previewImagePath", row.PreviewImagePath ?? string.Empty);
+                        insert.Parameters.AddWithValue("$filePaths", string.Join("|", (row.FilePaths ?? new string[0]).Where(File.Exists)));
+                        insert.ExecuteNonQuery();
+                    }
+                }
+
+                transaction.Commit();
+            }
+        }
+
+        Dictionary<string, LibraryMetadataIndexEntry> ReadLibraryMetadataIndexFromDatabase(string root, SqliteConnection connection, Dictionary<string, string> aliasMap)
+        {
+            var index = new Dictionary<string, LibraryMetadataIndexEntry>(StringComparer.OrdinalIgnoreCase);
+            using (var command = connection.CreateCommand())
+            {
+                command.CommandText = @"
+SELECT file_path, stamp, game_id, console_label, tag_text
+FROM photo_index
+WHERE root = $root
+ORDER BY file_path COLLATE NOCASE;";
+                command.Parameters.AddWithValue("$root", root ?? string.Empty);
+                using (var reader = command.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        var filePath = reader.IsDBNull(0) ? string.Empty : reader.GetString(0);
+                        if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath)) continue;
+                        var currentGameId = NormalizeGameId(reader.IsDBNull(2) ? string.Empty : reader.GetString(2));
+                        string mappedGameId;
+                        var tagText = reader.IsDBNull(4) ? string.Empty : reader.GetString(4);
+                        index[filePath] = new LibraryMetadataIndexEntry
+                        {
+                            FilePath = filePath,
+                            Stamp = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
+                            GameId = !string.IsNullOrWhiteSpace(currentGameId) && aliasMap != null && aliasMap.TryGetValue(currentGameId, out mappedGameId) ? mappedGameId : currentGameId,
+                            ConsoleLabel = DetermineConsoleLabelFromTags(ParseTagText(tagText)),
+                            TagText = tagText
+                        };
+                    }
+                }
+            }
+            return index;
+        }
+
+        void WriteLibraryMetadataIndexToDatabase(string root, Dictionary<string, LibraryMetadataIndexEntry> index, SqliteConnection connection)
+        {
+            var savedEntries = (index ?? new Dictionary<string, LibraryMetadataIndexEntry>(StringComparer.OrdinalIgnoreCase))
+                .Values
+                .Where(v => v != null && !string.IsNullOrWhiteSpace(v.FilePath) && File.Exists(v.FilePath))
+                .OrderBy(v => v.FilePath, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            using (var transaction = connection.BeginTransaction())
+            {
+                using (var delete = connection.CreateCommand())
+                {
+                    delete.Transaction = transaction;
+                    delete.CommandText = "DELETE FROM photo_index WHERE root = $root;";
+                    delete.Parameters.AddWithValue("$root", root ?? string.Empty);
+                    delete.ExecuteNonQuery();
+                }
+
+                foreach (var entry in savedEntries)
+                {
+                    using (var insert = connection.CreateCommand())
+                    {
+                        insert.Transaction = transaction;
+                        insert.CommandText = @"
+INSERT INTO photo_index (root, file_path, stamp, game_id, console_label, tag_text)
+VALUES ($root, $filePath, $stamp, $gameId, $consoleLabel, $tagText);";
+                        insert.Parameters.AddWithValue("$root", root ?? string.Empty);
+                        insert.Parameters.AddWithValue("$filePath", entry.FilePath ?? string.Empty);
+                        insert.Parameters.AddWithValue("$stamp", entry.Stamp ?? string.Empty);
+                        insert.Parameters.AddWithValue("$gameId", NormalizeGameId(entry.GameId));
+                        insert.Parameters.AddWithValue("$consoleLabel", entry.ConsoleLabel ?? string.Empty);
+                        insert.Parameters.AddWithValue("$tagText", entry.TagText ?? string.Empty);
+                        insert.ExecuteNonQuery();
+                    }
+                }
+
+                transaction.Commit();
+            }
+        }
+
+        Dictionary<string, LibraryMetadataIndexEntry> ReadLegacyLibraryMetadataIndexFile(string root, Dictionary<string, string> aliasMap)
+        {
+            var legacyIndex = new Dictionary<string, LibraryMetadataIndexEntry>(StringComparer.OrdinalIgnoreCase);
+            var path = LibraryMetadataIndexPath(root);
+            if (!File.Exists(path)) return legacyIndex;
+            foreach (var line in File.ReadAllLines(path).Skip(1))
+            {
+                var parts = line.Split('\t');
+                if (parts.Length >= 5)
+                {
+                    if (!File.Exists(parts[0])) continue;
+                    var tagText = parts[4] ?? string.Empty;
+                    string mappedGameId;
+                    var currentGameId = NormalizeGameId(parts[2]);
+                    legacyIndex[parts[0]] = new LibraryMetadataIndexEntry
+                    {
+                        FilePath = parts[0],
+                        Stamp = parts[1],
+                        GameId = !string.IsNullOrWhiteSpace(currentGameId) && aliasMap != null && aliasMap.TryGetValue(currentGameId, out mappedGameId) ? mappedGameId : parts[2],
+                        ConsoleLabel = DetermineConsoleLabelFromTags(ParseTagText(tagText)),
+                        TagText = tagText
+                    };
+                }
+                else if (parts.Length >= 4)
+                {
+                    if (!File.Exists(parts[0])) continue;
+                    var tagText = parts[3] ?? string.Empty;
+                    legacyIndex[parts[0]] = new LibraryMetadataIndexEntry
+                    {
+                        FilePath = parts[0],
+                        Stamp = parts[1],
+                        GameId = string.Empty,
+                        ConsoleLabel = DetermineConsoleLabelFromTags(ParseTagText(tagText)),
+                        TagText = tagText
+                    };
+                }
+            }
+            return legacyIndex;
+        }
+
+        void EnsureLegacyIndexMigration(string root, SqliteConnection connection)
+        {
+            if (string.IsNullOrWhiteSpace(root)) return;
+
+            var gameRowsInDb = CountIndexDatabaseRows(connection, "game_index", root);
+            var photoRowsInDb = CountIndexDatabaseRows(connection, "photo_index", root);
+
+            List<GameIndexEditorRow> rawLegacyGameRows = null;
+            List<GameIndexEditorRow> normalizedLegacyGameRows = null;
+            Dictionary<string, string> aliasMap = null;
+
+            if (gameRowsInDb == 0)
+            {
+                rawLegacyGameRows = ReadSavedGameIndexRowsFile(root);
+                normalizedLegacyGameRows = MergeGameIndexRows(rawLegacyGameRows);
+                WriteSavedGameIndexRowsToDatabase(root, normalizedLegacyGameRows, connection);
+                aliasMap = BuildGameIdAliasMap(rawLegacyGameRows, normalizedLegacyGameRows);
+                if (HasGameIdAliasChanges(aliasMap))
+                {
+                    RewriteGameIdAliasesInLibraryFolderCacheFile(root, aliasMap);
+                }
+            }
+
+            if (photoRowsInDb == 0)
+            {
+                if (aliasMap == null)
+                {
+                    var currentRows = ReadSavedGameIndexRowsFromDatabase(root, connection);
+                    rawLegacyGameRows = ReadSavedGameIndexRowsFile(root);
+                    if (rawLegacyGameRows.Count > 0 && currentRows.Count > 0)
+                    {
+                        aliasMap = BuildGameIdAliasMap(rawLegacyGameRows, currentRows);
+                    }
+                    else if (currentRows.Count > 0)
+                    {
+                        aliasMap = BuildGameIdAliasMap(currentRows, currentRows);
+                    }
+                    else
+                    {
+                        normalizedLegacyGameRows = MergeGameIndexRows(rawLegacyGameRows);
+                        aliasMap = BuildGameIdAliasMap(rawLegacyGameRows, normalizedLegacyGameRows);
+                    }
+                }
+                var legacyIndex = ReadLegacyLibraryMetadataIndexFile(root, aliasMap);
+                WriteLibraryMetadataIndexToDatabase(root, legacyIndex, connection);
+            }
         }
 
         string NormalizeGameId(string gameId)
@@ -4978,6 +5287,15 @@ namespace PixelVaultNative
 
         Dictionary<string, string> BuildSavedGameIdAliasMapFromFile(string root)
         {
+            var databasePath = IndexDatabasePath(root);
+            if (File.Exists(databasePath))
+            {
+                using (var connection = OpenIndexDatabase(root))
+                {
+                    var rows = ReadSavedGameIndexRowsFromDatabase(root, connection);
+                    return BuildGameIdAliasMap(rows, rows);
+                }
+            }
             var rawRows = ReadSavedGameIndexRowsFile(root);
             if (rawRows.Count == 0) return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             var normalizedRows = MergeGameIndexRows(rawRows);
@@ -4987,6 +5305,40 @@ namespace PixelVaultNative
         void RewriteGameIdAliasesInLibraryMetadataIndexFile(string root, Dictionary<string, string> aliasMap)
         {
             if (aliasMap == null || aliasMap.Count == 0) return;
+            var databasePath = IndexDatabasePath(root);
+            if (File.Exists(databasePath))
+            {
+                using (var connection = OpenIndexDatabase(root))
+                using (var transaction = connection.BeginTransaction())
+                {
+                    foreach (var pair in aliasMap.Where(pair => !string.IsNullOrWhiteSpace(NormalizeGameId(pair.Key)) && !string.IsNullOrWhiteSpace(NormalizeGameId(pair.Value))))
+                    {
+                        using (var update = connection.CreateCommand())
+                        {
+                            update.Transaction = transaction;
+                            update.CommandText = @"
+UPDATE photo_index
+SET game_id = $newGameId
+WHERE root = $root AND game_id = $oldGameId;";
+                            update.Parameters.AddWithValue("$root", root ?? string.Empty);
+                            update.Parameters.AddWithValue("$oldGameId", NormalizeGameId(pair.Key));
+                            update.Parameters.AddWithValue("$newGameId", NormalizeGameId(pair.Value));
+                            update.ExecuteNonQuery();
+                        }
+                    }
+                    transaction.Commit();
+                }
+                if (string.Equals(libraryMetadataIndexRoot, root, StringComparison.OrdinalIgnoreCase))
+                {
+                    foreach (var entry in libraryMetadataIndex.Values.Where(entry => entry != null))
+                    {
+                        var currentGameId = NormalizeGameId(entry.GameId);
+                        string mappedGameId;
+                        if (!string.IsNullOrWhiteSpace(currentGameId) && aliasMap.TryGetValue(currentGameId, out mappedGameId)) entry.GameId = mappedGameId;
+                    }
+                }
+                return;
+            }
             var path = LibraryMetadataIndexPath(root);
             if (!File.Exists(path)) return;
             var lines = File.ReadAllLines(path);
@@ -5060,16 +5412,20 @@ namespace PixelVaultNative
 
         List<GameIndexEditorRow> LoadSavedGameIndexRows(string root)
         {
-            var rawRows = ReadSavedGameIndexRowsFile(root);
-            var normalizedRows = MergeGameIndexRows(rawRows);
-            var aliasMap = BuildGameIdAliasMap(rawRows, normalizedRows);
-            if (rawRows.Count > 0 && (HasGameIdAliasChanges(aliasMap) || normalizedRows.Count != rawRows.Count || rawRows.Any(row => string.IsNullOrWhiteSpace(row.GameId))))
+            List<GameIndexEditorRow> rawRows;
+            using (var connection = OpenIndexDatabase(root))
             {
-                WriteSavedGameIndexRowsFile(root, normalizedRows);
-                RewriteGameIdAliasesInLibraryMetadataIndexFile(root, aliasMap);
-                RewriteGameIdAliasesInLibraryFolderCacheFile(root, aliasMap);
+                rawRows = ReadSavedGameIndexRowsFromDatabase(root, connection);
+                var normalizedRows = MergeGameIndexRows(rawRows);
+                var aliasMap = BuildGameIdAliasMap(rawRows, normalizedRows);
+                if (rawRows.Count > 0 && (HasGameIdAliasChanges(aliasMap) || normalizedRows.Count != rawRows.Count || rawRows.Any(row => string.IsNullOrWhiteSpace(row.GameId))))
+                {
+                    WriteSavedGameIndexRowsToDatabase(root, normalizedRows, connection);
+                    RewriteGameIdAliasesInLibraryMetadataIndexFile(root, aliasMap);
+                    RewriteGameIdAliasesInLibraryFolderCacheFile(root, aliasMap);
+                }
+                return normalizedRows;
             }
-            return normalizedRows;
         }
 
         void SaveSavedGameIndexRows(string root, IEnumerable<GameIndexEditorRow> rows)
@@ -5077,7 +5433,10 @@ namespace PixelVaultNative
             var sourceRows = (rows ?? Enumerable.Empty<GameIndexEditorRow>()).Where(row => row != null).Select(CloneGameIndexEditorRow).ToList();
             var mergedRows = MergeGameIndexRows(sourceRows);
             var aliasMap = BuildGameIdAliasMap(sourceRows, mergedRows);
-            WriteSavedGameIndexRowsFile(root, mergedRows);
+            using (var connection = OpenIndexDatabase(root))
+            {
+                WriteSavedGameIndexRowsToDatabase(root, mergedRows, connection);
+            }
             if (HasGameIdAliasChanges(aliasMap))
             {
                 RewriteGameIdAliasesInLibraryMetadataIndexFile(root, aliasMap);
@@ -6078,7 +6437,7 @@ namespace PixelVaultNative
                 return folder.SteamGridDbId;
             }
             var steamGridDbId = TryResolveSteamGridDbIdByName(folder.Name);
-            if (string.IsNullOrWhiteSpace(steamGridDbId))
+            if (string.IsNullOrWhiteSpace(steamGridDbId) && ShouldUseSteamStoreLookups(folder))
             {
                 var appId = ResolveBestLibraryFolderSteamAppId(root, folder);
                 steamGridDbId = !string.IsNullOrWhiteSpace(appId)
@@ -6103,6 +6462,7 @@ namespace PixelVaultNative
                 folder.SteamAppId = saved.SteamAppId;
                 return folder.SteamAppId;
             }
+            if (!ShouldUseSteamStoreLookups(folder)) return string.Empty;
             if (!allowLookup) return folder.SteamAppId ?? string.Empty;
             var appId = ResolveLibraryFolderSteamAppId(folder.PlatformLabel, folder.FilePaths ?? new string[0]);
             if (string.IsNullOrWhiteSpace(appId)) appId = TryResolveSteamAppId(folder.Name);
@@ -6112,6 +6472,13 @@ namespace PixelVaultNative
                 UpsertSavedGameIndexRow(root, folder);
             }
             return folder.SteamAppId ?? string.Empty;
+        }
+
+        bool ShouldUseSteamStoreLookups(LibraryFolderInfo folder)
+        {
+            var platform = NormalizeConsoleLabel(folder == null ? string.Empty : folder.PlatformLabel);
+            return string.Equals(platform, "Steam", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(platform, "PC", StringComparison.OrdinalIgnoreCase);
         }
 
         int EnrichLibraryFoldersWithSteamAppIds(string root, List<LibraryFolderInfo> folders, Action<int, int, string> progress)
@@ -6281,39 +6648,12 @@ namespace PixelVaultNative
             if (!forceDiskReload && string.Equals(libraryMetadataIndexRoot, root, StringComparison.OrdinalIgnoreCase) && libraryMetadataIndex.Count > 0) return libraryMetadataIndex;
             libraryMetadataIndex.Clear();
             libraryMetadataIndexRoot = root;
-            var path = LibraryMetadataIndexPath(root);
-            if (!File.Exists(path)) return libraryMetadataIndex;
             var aliasMap = BuildSavedGameIdAliasMapFromFile(root);
-            foreach (var line in File.ReadAllLines(path).Skip(1))
+            using (var connection = OpenIndexDatabase(root))
             {
-                var parts = line.Split('\t');
-                if (parts.Length >= 5)
+                foreach (var pair in ReadLibraryMetadataIndexFromDatabase(root, connection, aliasMap))
                 {
-                    if (!File.Exists(parts[0])) continue;
-                    var tagText = parts[4] ?? string.Empty;
-                    string mappedGameId;
-                    var currentGameId = NormalizeGameId(parts[2]);
-                    libraryMetadataIndex[parts[0]] = new LibraryMetadataIndexEntry
-                    {
-                        FilePath = parts[0],
-                        Stamp = parts[1],
-                        GameId = !string.IsNullOrWhiteSpace(currentGameId) && aliasMap.TryGetValue(currentGameId, out mappedGameId) ? mappedGameId : parts[2],
-                        ConsoleLabel = DetermineConsoleLabelFromTags(ParseTagText(tagText)),
-                        TagText = tagText
-                    };
-                }
-                else if (parts.Length >= 4)
-                {
-                    if (!File.Exists(parts[0])) continue;
-                    var tagText = parts[3] ?? string.Empty;
-                    libraryMetadataIndex[parts[0]] = new LibraryMetadataIndexEntry
-                    {
-                        FilePath = parts[0],
-                        Stamp = parts[1],
-                        GameId = string.Empty,
-                        ConsoleLabel = DetermineConsoleLabelFromTags(ParseTagText(tagText)),
-                        TagText = tagText
-                    };
+                    libraryMetadataIndex[pair.Key] = pair.Value;
                 }
             }
             return libraryMetadataIndex;
@@ -6321,22 +6661,11 @@ namespace PixelVaultNative
 
         void SaveLibraryMetadataIndex(string root, Dictionary<string, LibraryMetadataIndexEntry> index)
         {
-            var path = LibraryMetadataIndexPath(root);
-            var linesOut = new List<string>();
             var savedEntries = index.Values.Where(v => v != null && !string.IsNullOrWhiteSpace(v.FilePath) && File.Exists(v.FilePath)).OrderBy(v => v.FilePath, StringComparer.OrdinalIgnoreCase).ToList();
-            linesOut.Add(root);
-            foreach (var entry in savedEntries)
+            using (var connection = OpenIndexDatabase(root))
             {
-                linesOut.Add(string.Join("\t", new[]
-                {
-                    entry.FilePath ?? string.Empty,
-                    entry.Stamp ?? string.Empty,
-                    NormalizeGameId(entry.GameId),
-                    entry.ConsoleLabel ?? string.Empty,
-                    entry.TagText ?? string.Empty
-                }));
+                WriteLibraryMetadataIndexToDatabase(root, savedEntries.ToDictionary(entry => entry.FilePath, entry => entry, StringComparer.OrdinalIgnoreCase), connection);
             }
-            File.WriteAllLines(path, linesOut.ToArray());
             libraryMetadataIndex.Clear();
             libraryMetadataIndexRoot = root;
             foreach (var entry in savedEntries)

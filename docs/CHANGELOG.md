@@ -1,3 +1,8 @@
+## 0.752
+- Moved the live Game Index and Photo Index runtime storage to a per-library SQLite database under `PixelVaultData\cache`, so index growth no longer depends on rewriting flat tab-delimited cache files on every save.
+- Added first-run migration from the legacy `game-index-*.cache` and `library-metadata-index-*.cache` files into the SQLite store while keeping the folder cache as rebuildable derived state.
+- Updated the SDK project and workspace docs for the new SQLite-backed index model, including Git ignores for SQLite runtime sidecar files.
+
 ## 0.751
 - Fixed a null-reference crash during Library-driven imports by defaulting the move-conflict mode to `Rename` when the Settings-only conflict dropdown is not instantiated.
 - Improved import failure logging so workflow and manual-intake exceptions now write the full exception text to the log instead of only the top-level message.
