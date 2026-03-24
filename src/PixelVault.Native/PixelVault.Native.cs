@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -7,6 +8,8 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
@@ -32,14 +35,37 @@ namespace PixelVaultNative
 
     sealed class LibraryFolderInfo
     {
+        public string GameId;
         public string Name;
         public string FolderPath;
         public int FileCount;
         public string PreviewImagePath;
-        public string CoverArtPath;
         public string PlatformLabel;
         public string[] FilePaths;
         public string SteamAppId;
+        public string SteamGridDbId;
+    }
+
+    sealed class GameIndexEditorRow
+    {
+        public string GameId { get; set; }
+        public string Name { get; set; }
+        public string PlatformLabel { get; set; }
+        public string SteamAppId { get; set; }
+        public string SteamGridDbId { get; set; }
+        public int FileCount { get; set; }
+        public string FolderPath { get; set; }
+        public string PreviewImagePath { get; set; }
+        public string[] FilePaths { get; set; }
+    }
+
+    sealed class PhotoIndexEditorRow
+    {
+        public string FilePath { get; set; }
+        public string Stamp { get; set; }
+        public string GameId { get; set; }
+        public string ConsoleLabel { get; set; }
+        public string TagText { get; set; }
     }
 
 
@@ -47,6 +73,7 @@ namespace PixelVaultNative
     {
         public string FilePath;
         public string Stamp;
+        public string GameId;
         public string ConsoleLabel;
         public string TagText;
     }
@@ -73,6 +100,7 @@ namespace PixelVaultNative
 
     sealed class ManualMetadataItem
     {
+        public string GameId;
         public string FilePath;
         public string FileName;
         public string OriginalFileName;
@@ -82,12 +110,14 @@ namespace PixelVaultNative
         public string Comment;
         public string TagText;
         public bool AddPhotographyTag;
+        public bool ForceTagMetadataWrite;
         public bool TagSteam;
         public bool TagPc;
         public bool TagPs5;
         public bool TagXbox;
         public bool TagOther;
         public string CustomPlatformTag;
+        public string OriginalGameId;
         public DateTime OriginalCaptureTime;
         public bool OriginalUseCustomCaptureTime;
         public string OriginalGameName;
@@ -109,11 +139,48 @@ namespace PixelVaultNative
         public string CurrentPath;
     }
 
+    sealed class SourceInventory
+    {
+        public List<string> TopLevelMediaFiles = new List<string>();
+        public List<string> RenameScopeFiles = new List<string>();
+    }
+
+    sealed class ExifWriteRequest
+    {
+        public string FilePath;
+        public string FileName;
+        public string[] Arguments;
+        public bool RestoreFileTimes;
+        public DateTime OriginalCreateTime;
+        public DateTime OriginalWriteTime;
+        public string SuccessDetail;
+    }
+
+    sealed class TimeoutWebClient : WebClient
+    {
+        public int TimeoutMilliseconds = 15000;
+
+        protected override WebRequest GetWebRequest(Uri address)
+        {
+            var request = base.GetWebRequest(address);
+            if (request == null) return null;
+            request.Timeout = TimeoutMilliseconds;
+            var http = request as HttpWebRequest;
+            if (http != null)
+            {
+                http.ReadWriteTimeout = TimeoutMilliseconds;
+            }
+            return request;
+        }
+    }
+
     public sealed class MainWindow : Window
     {
-        const string AppVersion = "0.638";
+        const string AppVersion = "0.749";
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
+        const int MaxImageCacheEntries = 240;
+        const int SteamRequestTimeoutMilliseconds = 15000;
         readonly string appRoot = AppDomain.CurrentDomain.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar);
         readonly string dataRoot;
         readonly string logsRoot;
@@ -125,7 +192,13 @@ namespace PixelVaultNative
         readonly string undoManifestPath;
         readonly Dictionary<string, string> steamCache = new Dictionary<string, string>();
         readonly Dictionary<string, string> steamSearchCache = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        readonly Dictionary<string, string> steamGridDbSearchCache = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        readonly Dictionary<string, string> steamGridDbPlatformCache = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         readonly Dictionary<string, BitmapImage> imageCache = new Dictionary<string, BitmapImage>(StringComparer.OrdinalIgnoreCase);
+        readonly Queue<string> imageCacheOrder = new Queue<string>();
+        readonly object imageCacheSync = new object();
+        readonly SemaphoreSlim imageLoadLimiter = new SemaphoreSlim(Math.Max(2, Math.Min(Environment.ProcessorCount, 6)));
+        readonly SemaphoreSlim priorityImageLoadLimiter = new SemaphoreSlim(Math.Max(1, Math.Min(Environment.ProcessorCount, 3)));
         readonly Dictionary<string, List<string>> folderImageCache = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
         readonly Dictionary<string, long> folderImageCacheStamp = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
         readonly Dictionary<string, string[]> fileTagCache = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
@@ -138,6 +211,10 @@ namespace PixelVaultNative
         string destinationRoot;
         string libraryRoot;
         string exifToolPath;
+        string ffmpegPath;
+        string steamGridDbApiToken;
+        int libraryFolderTileSize = 240;
+        string libraryFolderSortMode = "platform";
 
         RichTextBox previewBox;
         TextBox logBox;
@@ -166,24 +243,26 @@ namespace PixelVaultNative
             destinationRoot = @"Y:\Game Captures";
             libraryRoot = destinationRoot;
             exifToolPath = Path.Combine(appRoot, "tools", "exiftool.exe");
+            ffmpegPath = Path.Combine(appRoot, "tools", "ffmpeg.exe");
             LoadSettings();
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(libraryRoot) && Directory.Exists(libraryRoot)) LoadSavedGameIndexRows(libraryRoot);
+            }
+            catch { }
 
             Title = "PixelVault " + AppVersion;
-            Width = 1420;
-            Height = 980;
-            MinWidth = 1220;
-            MinHeight = 820;
+            Width = PreferredLibraryWindowWidth();
+            Height = PreferredLibraryWindowHeight();
+            MinWidth = 1200;
+            MinHeight = 780;
             WindowStartupLocation = WindowStartupLocation.CenterScreen;
-            Background = Brushes.White;
+            Background = Brush("#0F1519");
             var iconPath = Path.Combine(appRoot, "assets", "PixelVault.ico");
             if (File.Exists(iconPath)) Icon = BitmapFrame.Create(new Uri(iconPath));
-            Content = BuildUi();
-            recurseBox.IsChecked = true;
-            keywordsBox.IsChecked = true;
-            conflictBox.SelectedIndex = 0;
-            LoadLogView();
+            Content = new Grid();
+            ShowLibraryBrowser(true);
             Log("PixelVault " + AppVersion + " ready.");
-            RefreshPreview();
         }
 
         UIElement BuildUi()
@@ -197,19 +276,25 @@ namespace PixelVaultNative
             hg.ColumnDefinitions.Add(new ColumnDefinition());
             hg.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             var hs = new StackPanel();
-            hs.Children.Add(new TextBlock { Text = "PixelVault " + AppVersion, FontSize = 31, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White });
-            hs.Children.Add(new TextBlock { Text = "Prep captures for upload, then browse the grouped archive without disturbing your flow.", Margin = new Thickness(0, 8, 0, 0), Foreground = Brush("#B7C6C0"), FontSize = 14, TextWrapping = TextWrapping.Wrap });
+            hs.Children.Add(new TextBlock { Text = "PixelVault Settings", FontSize = 31, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White });
+            hs.Children.Add(new TextBlock { Text = "Configure paths, run intake tools, and manage the library without putting the browser itself in the way.", Margin = new Thickness(0, 8, 0, 0), Foreground = Brush("#B7C6C0"), FontSize = 14, TextWrapping = TextWrapping.Wrap });
             status = new TextBlock { Text = "Ready", Foreground = Brushes.White, VerticalAlignment = VerticalAlignment.Center };
             var headerRight = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            var pathSettingsTopButton = Btn("Path Settings", delegate { ShowPathSettingsWindow(); }, "#2B3F47", Brushes.White);
+            pathSettingsTopButton.Margin = new Thickness(0, 0, 12, 0);
             var viewLogsTopButton = Btn("View Logs", delegate { OpenFolder(logsRoot); }, "#2B3F47", Brushes.White);
             viewLogsTopButton.Margin = new Thickness(0, 0, 12, 0);
-            var settingsTopButton = Btn("Settings", delegate { ShowSettingsWindow(); }, "#20343A", Brushes.White);
-            settingsTopButton.Margin = new Thickness(0, 0, 12, 0);
+            var gameIndexTopButton = Btn("Game Index", delegate { OpenGameIndexEditor(); }, "#20343A", Brushes.White);
+            gameIndexTopButton.Margin = new Thickness(0, 0, 12, 0);
+            var photoIndexTopButton = Btn("Photo Index", delegate { OpenPhotoIndexEditor(); }, "#20343A", Brushes.White);
+            photoIndexTopButton.Margin = new Thickness(0, 0, 12, 0);
             var changelogTopButton = Btn("Changelog", delegate { ShowChangelogWindow(); }, "#20343A", Brushes.White);
             changelogTopButton.Margin = new Thickness(0, 0, 12, 0);
             var sp = new Border { Child = status, Background = Brush("#20343A"), CornerRadius = new CornerRadius(12), Padding = new Thickness(14, 10, 14, 10) };
+            headerRight.Children.Add(pathSettingsTopButton);
             headerRight.Children.Add(viewLogsTopButton);
-            headerRight.Children.Add(settingsTopButton);
+            headerRight.Children.Add(gameIndexTopButton);
+            headerRight.Children.Add(photoIndexTopButton);
             headerRight.Children.Add(changelogTopButton);
             headerRight.Children.Add(sp);
             hg.Children.Add(hs);
@@ -226,10 +311,14 @@ namespace PixelVaultNative
 
             var left = Card();
             left.Margin = new Thickness(0, 0, 16, 0);
+            var leftGrid = new Grid();
+            leftGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            leftGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            left.Child = leftGrid;
+
             var leftStack = new StackPanel();
-            left.Child = leftStack;
-            leftStack.Children.Add(TitleBlock("Workflow"));
-            leftStack.Children.Add(new TextBlock { Text = "Use Settings for all path selection. Choose a quick process, add comments when you want them, or open Manual Intake later for files that do not match a known capture format.", Foreground = Brush("#5F6970"), Margin = new Thickness(0, 0, 0, 14), TextWrapping = TextWrapping.Wrap });
+            leftStack.Children.Add(TitleBlock("Control Center"));
+            leftStack.Children.Add(new TextBlock { Text = "Use Path Settings for locations and tools, then run imports or maintenance from here whenever you need them.", Foreground = Brush("#5F6970"), Margin = new Thickness(0, 0, 0, 14), TextWrapping = TextWrapping.Wrap });
             leftStack.Children.Add(BuildSettingsSummary());
 
             leftStack.Children.Add(new TextBlock { Text = "Import options", FontSize = 14, FontWeight = FontWeights.SemiBold, Foreground = Brush("#1F2A30"), Margin = new Thickness(0, 16, 0, 8) });
@@ -255,10 +344,9 @@ namespace PixelVaultNative
             processRow.Children.Add(Btn("Manual Intake", delegate { OpenManualIntakeWindow(); }, null, Brushes.Black));
             leftStack.Children.Add(processRow);
 
-            leftStack.Children.Add(new TextBlock { Text = "Library actions", FontSize = 14, FontWeight = FontWeights.SemiBold, Foreground = Brush("#1F2A30"), Margin = new Thickness(0, 0, 0, 6) });
-            leftStack.Children.Add(new TextBlock { Text = "Browse, organize, and reverse the most recent import from the capture library.", Foreground = Brush("#5F6970"), Margin = new Thickness(0, 0, 0, 10), TextWrapping = TextWrapping.Wrap });
+            leftStack.Children.Add(new TextBlock { Text = "Library maintenance", FontSize = 14, FontWeight = FontWeights.SemiBold, Foreground = Brush("#1F2A30"), Margin = new Thickness(0, 0, 0, 6) });
+            leftStack.Children.Add(new TextBlock { Text = "Organize the destination, reverse the most recent import, and manage supporting library data from the top buttons.", Foreground = Brush("#5F6970"), Margin = new Thickness(0, 0, 0, 10), TextWrapping = TextWrapping.Wrap });
             var libraryRow = new WrapPanel { Margin = new Thickness(0, 0, 0, 12), ItemHeight = 48 };
-            libraryRow.Children.Add(Btn("Browse Library", delegate { ShowLibraryBrowser(); }, null, Brushes.Black));
             libraryRow.Children.Add(Btn("Sort Destination", delegate { SortDestinationFolders(); }, "#E9EEF3", Brush("#33424D")));
             libraryRow.Children.Add(Btn("Undo Last Import", delegate { UndoLastImport(); }, "#FFF1E2", Brush("#7A4B12")));
             leftStack.Children.Add(libraryRow);
@@ -270,19 +358,21 @@ namespace PixelVaultNative
             openRow.Children.Add(Btn("Open Sources", delegate { OpenSourceFolders(); }, "#EEF2F5", Brush("#33424D")));
             openRow.Children.Add(Btn("Open Destination", delegate { OpenFolder(destinationRoot); }, "#EEF2F5", Brush("#33424D")));
             leftStack.Children.Add(openRow);
+            leftGrid.Children.Add(leftStack);
 
             previewBox = new RichTextBox
             {
                 IsReadOnly = true,
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                Height = 560,
                 Margin = new Thickness(0, 4, 0, 0),
+                MinHeight = 320,
                 BorderThickness = new Thickness(0),
                 Background = Brushes.White,
                 FontFamily = new FontFamily("Cascadia Mono"),
                 IsDocumentEnabled = false
             };
-            leftStack.Children.Add(previewBox);
+            Grid.SetRow(previewBox, 1);
+            leftGrid.Children.Add(previewBox);
             main.Children.Add(left);
 
             var right = new Border { Background = Brush("#12191E"), CornerRadius = new CornerRadius(18), Padding = new Thickness(14) };
@@ -313,6 +403,293 @@ namespace PixelVaultNative
         Border Card() { return new Border { Background = Brushes.White, BorderBrush = Brush("#D7E1E8"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(18), Padding = new Thickness(18), Effect = new DropShadowEffect { Color = Color.FromArgb(20, 17, 27, 35), BlurRadius = 18, ShadowDepth = 2, Direction = 270, Opacity = 0.4 } }; }
         TextBlock TitleBlock(string t) { return new TextBlock { Text = t, FontSize = 19, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 14), Foreground = Brush("#1F2A30") }; }
         SolidColorBrush Brush(string hex) { return new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex)); }
+        double PreferredLibraryWindowWidth()
+        {
+            var available = Math.Max(1200, SystemParameters.WorkArea.Width - 24);
+            return Math.Min(available, 2560);
+        }
+        double PreferredLibraryWindowHeight()
+        {
+            var available = Math.Max(780, SystemParameters.WorkArea.Height - 24);
+            return Math.Min(available, 1280);
+        }
+        double PreferredSettingsWindowHeight()
+        {
+            var available = Math.Max(980, SystemParameters.WorkArea.Height - 24);
+            return Math.Min(available, 1480);
+        }
+        string ResolveWorkspaceAssetPath(string fileName)
+        {
+            if (string.IsNullOrWhiteSpace(fileName)) return string.Empty;
+            foreach (var basePath in new[]
+            {
+                Path.Combine(appRoot, "assets"),
+                Path.GetFullPath(Path.Combine(appRoot, "..", "..", "assets"))
+            }.Where(path => !string.IsNullOrWhiteSpace(path)).Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    var candidate = Path.Combine(basePath, fileName);
+                    if (File.Exists(candidate)) return candidate;
+                }
+                catch
+                {
+                }
+            }
+            return string.Empty;
+        }
+        string ResolveLibrarySectionIconPath(string platformLabel)
+        {
+            var normalized = NormalizeConsoleLabel(platformLabel);
+            switch (normalized)
+            {
+                case "Steam":
+                    return ResolveWorkspaceAssetPath("Steam Library Icon.jpg");
+                case "PS5":
+                case "PlayStation":
+                    return ResolveWorkspaceAssetPath("PS5 Library Logo.png");
+                case "Xbox":
+                    return ResolveWorkspaceAssetPath("Xbox Library Logo.png");
+                case "PC":
+                    return ResolveWorkspaceAssetPath("PC Library Icon.jpg");
+                case "Multiple Tags":
+                case "Other":
+                    return ResolveWorkspaceAssetPath("emulator library licon.png");
+                default:
+                    return ResolveWorkspaceAssetPath("PixelVault.png");
+            }
+        }
+        SolidColorBrush LibrarySectionAccentBrush(string platformLabel)
+        {
+            switch (NormalizeConsoleLabel(platformLabel))
+            {
+                case "Steam":
+                    return Brush("#3A8FD6");
+                case "PS5":
+                case "PlayStation":
+                    return Brush("#4E7CFF");
+                case "Xbox":
+                    return Brush("#69B157");
+                case "PC":
+                    return Brush("#8DA0AF");
+                case "Multiple Tags":
+                    return Brush("#D39B4A");
+                default:
+                    return Brush("#B67ECF");
+            }
+        }
+        string LibrarySectionCountLabel(int count)
+        {
+            return count == 1 ? "folder" : "folders";
+        }
+        DateTime GetLibraryFolderNewestDate(LibraryFolderInfo folder)
+        {
+            if (folder == null) return DateTime.MinValue;
+            var files = (folder.FilePaths ?? new string[0]).Where(path => !string.IsNullOrWhiteSpace(path) && File.Exists(path)).ToArray();
+            if (files.Length == 0)
+            {
+                if (!string.IsNullOrWhiteSpace(folder.PreviewImagePath) && File.Exists(folder.PreviewImagePath)) return GetLibraryDate(folder.PreviewImagePath);
+                return DateTime.MinValue;
+            }
+            return files.Select(GetLibraryDate).DefaultIfEmpty(DateTime.MinValue).Max();
+        }
+        FrameworkElement BuildLibraryTilePlatformBadge(string platformLabel)
+        {
+            var normalized = NormalizeConsoleLabel(platformLabel);
+            var iconPath = ResolveLibrarySectionIconPath(normalized);
+            var accent = LibrarySectionAccentBrush(normalized);
+            var badge = new Border
+            {
+                Width = 34,
+                Height = 34,
+                CornerRadius = new CornerRadius(11),
+                Background = Brush("#F6FAFC"),
+                BorderBrush = accent,
+                BorderThickness = new Thickness(1.2),
+                Padding = new Thickness(5),
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Bottom,
+                Margin = new Thickness(0, 0, 8, 8),
+                Opacity = 0.96
+            };
+            if (!string.IsNullOrWhiteSpace(iconPath))
+            {
+                badge.Child = new Image
+                {
+                    Source = LoadImageSource(iconPath, 68),
+                    Stretch = Stretch.Uniform,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+            }
+            else
+            {
+                badge.Child = new TextBlock
+                {
+                    Text = normalized == "Multiple Tags" ? "+" : "•",
+                    FontSize = 14,
+                    FontWeight = FontWeights.Bold,
+                    Foreground = Brush("#1D2931"),
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    TextAlignment = TextAlignment.Center
+                };
+            }
+            return badge;
+        }
+        FrameworkElement BuildLibrarySectionHeader(string platformLabel, int folderCount)
+        {
+            var resolvedLabel = NormalizeConsoleLabel(platformLabel);
+            var accent = LibrarySectionAccentBrush(resolvedLabel);
+            var iconPath = ResolveLibrarySectionIconPath(resolvedLabel);
+
+            var headerGrid = new Grid();
+            headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            headerGrid.ColumnDefinitions.Add(new ColumnDefinition());
+            headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var iconFrame = new Border
+            {
+                Width = 56,
+                Height = 56,
+                Margin = new Thickness(0, 0, 14, 0),
+                Padding = new Thickness(10),
+                CornerRadius = new CornerRadius(16),
+                Background = Brush("#EEF3F6"),
+                BorderBrush = accent,
+                BorderThickness = new Thickness(1.5),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            if (!string.IsNullOrWhiteSpace(iconPath))
+            {
+                iconFrame.Child = new Image
+                {
+                    Source = LoadImageSource(iconPath, 112),
+                    Stretch = Stretch.Uniform,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+            }
+            else
+            {
+                iconFrame.Child = new TextBlock
+                {
+                    Text = resolvedLabel == "Multiple Tags" ? "+" : "•",
+                    FontSize = 22,
+                    FontWeight = FontWeights.Bold,
+                    Foreground = Brush("#1D2931"),
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    TextAlignment = TextAlignment.Center
+                };
+            }
+            headerGrid.Children.Add(iconFrame);
+
+            var titleStack = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+            titleStack.Children.Add(new TextBlock
+            {
+                Text = resolvedLabel,
+                FontSize = 20,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = Brushes.White,
+                VerticalAlignment = VerticalAlignment.Center
+            });
+            titleStack.Children.Add(new Border
+            {
+                Width = 78,
+                Height = 3,
+                CornerRadius = new CornerRadius(999),
+                Background = accent,
+                Margin = new Thickness(0, 7, 0, 0),
+                HorizontalAlignment = HorizontalAlignment.Left
+            });
+            Grid.SetColumn(titleStack, 1);
+            headerGrid.Children.Add(titleStack);
+
+            var countStack = new StackPanel
+            {
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                MinWidth = 74
+            };
+            countStack.Children.Add(new TextBlock
+            {
+                Text = folderCount.ToString(),
+                FontSize = 24,
+                FontWeight = FontWeights.Bold,
+                Foreground = Brushes.White,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                TextAlignment = TextAlignment.Right
+            });
+            countStack.Children.Add(new TextBlock
+            {
+                Text = LibrarySectionCountLabel(folderCount),
+                FontSize = 11.5,
+                FontWeight = FontWeights.Medium,
+                Foreground = Brush("#9AAAB4"),
+                HorizontalAlignment = HorizontalAlignment.Right,
+                TextAlignment = TextAlignment.Right,
+                Margin = new Thickness(0, -2, 0, 0)
+            });
+            Grid.SetColumn(countStack, 2);
+            headerGrid.Children.Add(countStack);
+
+            return new Border
+            {
+                Background = new LinearGradientBrush(
+                    (Color)ColorConverter.ConvertFromString("#1B252B"),
+                    (Color)ColorConverter.ConvertFromString("#12191D"),
+                    90),
+                BorderBrush = Brush("#2A3942"),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(18),
+                Padding = new Thickness(16, 12, 18, 12),
+                Child = headerGrid
+            };
+        }
+        string FindSteamGridDbApiTokenInEnvironment()
+        {
+            foreach (var key in new[] { "PIXELVAULT_STEAMGRIDDB_TOKEN", "STEAMGRIDDB_API_KEY", "STEAMGRIDDB_TOKEN" })
+            {
+                var value = Environment.GetEnvironmentVariable(key);
+                if (!string.IsNullOrWhiteSpace(value)) return value.Trim();
+            }
+            return string.Empty;
+        }
+        string CurrentSteamGridDbApiToken()
+        {
+            var envToken = FindSteamGridDbApiTokenInEnvironment();
+            return !string.IsNullOrWhiteSpace(envToken) ? envToken : (steamGridDbApiToken ?? string.Empty).Trim();
+        }
+        bool HasSteamGridDbApiToken()
+        {
+            return !string.IsNullOrWhiteSpace(CurrentSteamGridDbApiToken());
+        }
+        int NormalizeLibraryFolderTileSize(int value)
+        {
+            if (value < 140) return 140;
+            if (value > 340) return 340;
+            return value;
+        }
+        string NormalizeLibraryFolderSortMode(string value)
+        {
+            var normalized = (value ?? string.Empty).Trim().ToLowerInvariant();
+            if (normalized == "recent" || normalized == "recently added" || normalized == "recently-added") return "recent";
+            if (normalized == "photos" || normalized == "most photos" || normalized == "photo count") return "photos";
+            return "platform";
+        }
+        string LibraryFolderSortModeLabel(string value)
+        {
+            switch (NormalizeLibraryFolderSortMode(value))
+            {
+                case "recent":
+                    return "Recently Added";
+                case "photos":
+                    return "Most Photos";
+                default:
+                    return "Platform";
+            }
+        }
         Button Btn(string t, RoutedEventHandler click, string bg, Brush fg) { var b = new Button { Content = t, Width = 176, Height = 48, Padding = new Thickness(18, 10, 18, 10), Margin = new Thickness(0, 0, 12, 12), Foreground = fg, Background = bg != null ? Brush(bg) : Brushes.White, BorderBrush = Brush("#C0CCD6"), BorderThickness = new Thickness(1), FontWeight = FontWeights.SemiBold, Effect = new DropShadowEffect { Color = Color.FromArgb(64, 18, 27, 36), BlurRadius = 16, ShadowDepth = 4, Direction = 270, Opacity = 0.55 } }; if (click != null) b.Click += click; return b; }
 
         Border BuildSettingsSummary()
@@ -323,33 +700,27 @@ namespace PixelVaultNative
             stack.Children.Add(new TextBlock { Text = "Sources: " + SourceRootsSummary(), TextWrapping = TextWrapping.Wrap, Foreground = Brush("#4C463F"), Margin = new Thickness(0, 0, 0, 4) });
             stack.Children.Add(new TextBlock { Text = "Destination: " + destinationRoot, TextWrapping = TextWrapping.Wrap, Foreground = Brush("#4C463F"), Margin = new Thickness(0, 0, 0, 4) });
             stack.Children.Add(new TextBlock { Text = "Library: " + libraryRoot, TextWrapping = TextWrapping.Wrap, Foreground = Brush("#4C463F"), Margin = new Thickness(0, 0, 0, 4) });
-            stack.Children.Add(new TextBlock { Text = "ExifTool: " + exifToolPath, TextWrapping = TextWrapping.Wrap, Foreground = Brush("#4C463F") });
+            stack.Children.Add(new TextBlock { Text = "ExifTool: " + exifToolPath, TextWrapping = TextWrapping.Wrap, Foreground = Brush("#4C463F"), Margin = new Thickness(0, 0, 0, 4) });
+            stack.Children.Add(new TextBlock { Text = "FFmpeg: " + (string.IsNullOrWhiteSpace(ffmpegPath) ? "(not configured)" : ffmpegPath), TextWrapping = TextWrapping.Wrap, Foreground = Brush("#4C463F"), Margin = new Thickness(0, 0, 0, 4) });
+            stack.Children.Add(new TextBlock { Text = "SteamGridDB: " + (HasSteamGridDbApiToken() ? "token configured" : "(token not configured)"), TextWrapping = TextWrapping.Wrap, Foreground = Brush("#4C463F") });
             border.Child = stack;
             return border;
         }
 
         void RefreshMainUi()
         {
-            bool recurse = recurseBox != null && recurseBox.IsChecked == true;
-            bool keywords = keywordsBox != null && keywordsBox.IsChecked == true;
-            string conflict = conflictBox != null && conflictBox.SelectedItem != null ? Convert.ToString(conflictBox.SelectedItem) : "Rename";
-            Content = BuildUi();
-            recurseBox.IsChecked = recurse;
-            keywordsBox.IsChecked = keywords;
-            conflictBox.SelectedItem = conflict;
-            LoadLogView();
-            RefreshPreview();
+            ShowLibraryBrowser(true);
         }
 
-        void ShowSettingsWindow()
+        void ShowPathSettingsWindow()
         {
             var window = new Window
             {
-                Title = "PixelVault " + AppVersion + " Settings",
+                Title = "PixelVault " + AppVersion + " Path Settings",
                 Width = 760,
-                Height = 460,
+                Height = 620,
                 MinWidth = 680,
-                MinHeight = 560,
+                MinHeight = 700,
                 Owner = this,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
                 Background = Brush("#F3EEE4")
@@ -371,11 +742,15 @@ namespace PixelVaultNative
             var destinationBox = SettingsTextBox(panel, 1, "Destination folder", destinationRoot);
             var libraryBox = SettingsTextBox(panel, 2, "Library folder", libraryRoot);
             var exifBox = SettingsTextBox(panel, 3, "ExifTool path", exifToolPath);
+            var ffmpegBox = SettingsTextBox(panel, 4, "FFmpeg path", ffmpegPath);
+            var steamGridDbTokenBox = SettingsTextBox(panel, 5, "SteamGridDB token", steamGridDbApiToken);
+            steamGridDbTokenBox.ToolTip = "Stored locally in PixelVault.settings.ini. Environment variables can also override it.";
 
             SettingsBrowseButton(panel, 0, delegate { var picked = PickFolder(PrimarySourceRoot()); if (!string.IsNullOrWhiteSpace(picked)) sourceBox.Text = AppendSourceRoot(sourceBox.Text, picked); }, "Add Folder");
             SettingsBrowseButton(panel, 1, delegate { var picked = PickFolder(destinationBox.Text); if (!string.IsNullOrWhiteSpace(picked)) destinationBox.Text = picked; });
             SettingsBrowseButton(panel, 2, delegate { var picked = PickFolder(libraryBox.Text); if (!string.IsNullOrWhiteSpace(picked)) libraryBox.Text = picked; });
             SettingsBrowseButton(panel, 3, delegate { var picked = PickFile(exifBox.Text, "Executable (*.exe)|*.exe|All files (*.*)|*.*"); if (!string.IsNullOrWhiteSpace(picked)) exifBox.Text = picked; });
+            SettingsBrowseButton(panel, 4, delegate { var picked = PickFile(ffmpegBox.Text, "Executable (*.exe)|*.exe|All files (*.*)|*.*"); if (!string.IsNullOrWhiteSpace(picked)) ffmpegBox.Text = picked; });
 
             root.Children.Add(panel);
             var buttons = new WrapPanel { Margin = new Thickness(0, 18, 0, 0) };
@@ -393,12 +768,52 @@ namespace PixelVaultNative
                 destinationRoot = destinationBox.Text;
                 libraryRoot = libraryBox.Text;
                 exifToolPath = exifBox.Text;
+                ffmpegPath = ffmpegBox.Text;
+                steamGridDbApiToken = (steamGridDbTokenBox.Text ?? string.Empty).Trim();
                 SaveSettings();
                 RefreshMainUi();
                 window.Close();
                 Log("Settings saved.");
             };
             cancel.Click += delegate { window.Close(); };
+            window.ShowDialog();
+        }
+
+        void ShowSettingsWindow()
+        {
+            var window = new Window
+            {
+                Title = "PixelVault " + AppVersion + " Settings",
+                Width = 1460,
+                Height = PreferredSettingsWindowHeight(),
+                MinWidth = 1220,
+                MinHeight = 820,
+                Owner = this,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Background = Brushes.White
+            };
+
+            var previousStatus = status;
+            var previousPreviewBox = previewBox;
+            var previousLogBox = logBox;
+            var previousRecurseBox = recurseBox;
+            var previousKeywordsBox = keywordsBox;
+            var previousConflictBox = conflictBox;
+            window.Content = BuildUi();
+            recurseBox.IsChecked = true;
+            keywordsBox.IsChecked = true;
+            conflictBox.SelectedIndex = 0;
+            LoadLogView();
+            RefreshPreview();
+            window.Closed += delegate
+            {
+                status = previousStatus;
+                previewBox = previousPreviewBox;
+                logBox = previousLogBox;
+                recurseBox = previousRecurseBox;
+                keywordsBox = previousKeywordsBox;
+                conflictBox = previousConflictBox;
+            };
             window.ShowDialog();
         }
 
@@ -589,6 +1004,181 @@ namespace PixelVaultNative
             }
         }
 
+        SourceInventory BuildSourceInventory(bool recurseRename)
+        {
+            var topLevelMediaFiles = EnumerateSourceFiles(SearchOption.TopDirectoryOnly, IsMedia).ToList();
+            return new SourceInventory
+            {
+                TopLevelMediaFiles = topLevelMediaFiles,
+                RenameScopeFiles = recurseRename
+                    ? EnumerateSourceFiles(SearchOption.AllDirectories, IsMedia).ToList()
+                    : topLevelMediaFiles.ToList()
+            };
+        }
+
+        int GetMetadataWorkerCount(int workItems)
+        {
+            if (workItems <= 1) return 1;
+            return Math.Max(1, Math.Min(Math.Min(Environment.ProcessorCount, 4), workItems));
+        }
+
+        string FindExecutableOnPath(string executableName)
+        {
+            if (string.IsNullOrWhiteSpace(executableName)) return null;
+            var pathValue = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
+            foreach (var entry in pathValue.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                try
+                {
+                    var candidate = Path.Combine(entry.Trim(), executableName);
+                    if (File.Exists(candidate)) return candidate;
+                }
+                catch
+                {
+                }
+            }
+            return null;
+        }
+
+        void ClearImageCache()
+        {
+            lock (imageCacheSync)
+            {
+                imageCache.Clear();
+                imageCacheOrder.Clear();
+            }
+        }
+
+        BitmapImage TryGetCachedImage(string cacheKey)
+        {
+            if (string.IsNullOrWhiteSpace(cacheKey)) return null;
+            lock (imageCacheSync)
+            {
+                BitmapImage cached;
+                return imageCache.TryGetValue(cacheKey, out cached) ? cached : null;
+            }
+        }
+
+        void StoreCachedImage(string cacheKey, BitmapImage image)
+        {
+            if (string.IsNullOrWhiteSpace(cacheKey) || image == null) return;
+            lock (imageCacheSync)
+            {
+                if (imageCache.ContainsKey(cacheKey))
+                {
+                    imageCache[cacheKey] = image;
+                    return;
+                }
+                imageCache[cacheKey] = image;
+                imageCacheOrder.Enqueue(cacheKey);
+                while (imageCache.Count > MaxImageCacheEntries && imageCacheOrder.Count > 0)
+                {
+                    var oldest = imageCacheOrder.Dequeue();
+                    if (string.IsNullOrWhiteSpace(oldest)) continue;
+                    imageCache.Remove(oldest);
+                }
+            }
+        }
+
+        void QueueImageLoad(Image imageControl, string sourcePath, int decodePixelWidth, Action<BitmapImage> onLoaded, bool prioritize = false, Func<bool> shouldLoad = null)
+        {
+            if (imageControl == null)
+            {
+                return;
+            }
+
+            var requestToken = Guid.NewGuid().ToString("N");
+            var hadSource = imageControl.Source != null;
+            var limiter = prioritize ? priorityImageLoadLimiter : imageLoadLimiter;
+            imageControl.Uid = requestToken;
+            if (!hadSource)
+            {
+                imageControl.Visibility = Visibility.Collapsed;
+            }
+            Task.Run(delegate
+            {
+                if (shouldLoad != null && !shouldLoad()) return null;
+                limiter.Wait();
+                try
+                {
+                    if (shouldLoad != null && !shouldLoad()) return null;
+                    return LoadImageSource(sourcePath, decodePixelWidth);
+                }
+                finally
+                {
+                    limiter.Release();
+                }
+            }).ContinueWith(delegate(Task<BitmapImage> task)
+            {
+                imageControl.Dispatcher.BeginInvoke(new Action(delegate
+                {
+                    if (!string.Equals(imageControl.Uid, requestToken, StringComparison.Ordinal)) return;
+                    if (shouldLoad != null && !shouldLoad())
+                    {
+                        if (!hadSource) imageControl.Visibility = Visibility.Collapsed;
+                        return;
+                    }
+                    if (task.IsFaulted || task.IsCanceled)
+                    {
+                        if (!hadSource) imageControl.Visibility = Visibility.Collapsed;
+                        return;
+                    }
+                    if (task.Result == null)
+                    {
+                        if (!hadSource) imageControl.Visibility = Visibility.Collapsed;
+                        return;
+                    }
+                    if (onLoaded != null) onLoaded(task.Result);
+                    else imageControl.Source = task.Result;
+                }));
+            }, TaskScheduler.Default);
+        }
+
+        Border CreateAsyncImageTile(string sourcePath, int decodePixelWidth, double tileWidth, double tileHeight, Stretch stretch, string fallbackText, Brush fallbackForeground, Thickness margin, Thickness padding, Brush background, CornerRadius cornerRadius, Brush borderBrush, Thickness borderThickness)
+        {
+            var tile = new Border
+            {
+                Width = tileWidth,
+                Height = tileHeight,
+                Margin = margin,
+                Padding = padding,
+                Background = background,
+                CornerRadius = cornerRadius,
+                BorderBrush = borderBrush,
+                BorderThickness = borderThickness
+            };
+            var presenter = new Grid();
+            var placeholder = new TextBlock
+            {
+                Text = fallbackText,
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(8),
+                Foreground = fallbackForeground,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                TextAlignment = TextAlignment.Center
+            };
+            var image = new Image
+            {
+                Width = tileWidth,
+                Height = tileHeight,
+                Stretch = stretch,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Visibility = Visibility.Collapsed
+            };
+            presenter.Children.Add(placeholder);
+            presenter.Children.Add(image);
+            tile.Child = presenter;
+            QueueImageLoad(image, sourcePath, decodePixelWidth, delegate(BitmapImage loaded)
+            {
+                image.Source = loaded;
+                image.Visibility = Visibility.Visible;
+                placeholder.Visibility = Visibility.Collapsed;
+            });
+            return tile;
+        }
+
         void OpenSourceFolders()
         {
             foreach (var root in GetSourceRoots()) OpenFolder(root);
@@ -598,18 +1188,18 @@ namespace PixelVaultNative
             try
             {
                 EnsureSourceFolders();
-                var rename = EnumerateSourceFiles(recurseBox != null && recurseBox.IsChecked == true ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly, IsImage).ToList();
-                var meta = EnumerateSourceFiles(SearchOption.TopDirectoryOnly, IsMedia).Where(file => CanUpdateMetadata(Path.GetFileName(file))).ToList();
-                var move = EnumerateSourceFiles(SearchOption.TopDirectoryOnly, IsMedia).ToList();
-                var reviewItems = BuildReviewItems();
+                var inventory = BuildSourceInventory(recurseBox != null && recurseBox.IsChecked == true);
+                var rename = inventory.RenameScopeFiles;
+                var move = inventory.TopLevelMediaFiles;
+                var reviewItems = BuildReviewItems(move);
                 var recognizedPaths = new HashSet<string>(reviewItems.Select(i => i.FilePath), StringComparer.OrdinalIgnoreCase);
-                var manualItems = BuildManualMetadataItems(recognizedPaths);
+                var manualItems = BuildManualMetadataItems(move, recognizedPaths);
                 var manualPaths = new HashSet<string>(manualItems.Select(i => i.FilePath), StringComparer.OrdinalIgnoreCase);
                 var moveCandidates = move.Where(f => !manualPaths.Contains(f)).ToList();
-                int renameCandidates = rename.Count(f => Regex.IsMatch(Path.GetFileNameWithoutExtension(f), @"(?<!\d)(\d{3,})(?!\d)"));
+                int renameCandidates = rename.Count(f => !string.IsNullOrWhiteSpace(GuessSteamAppIdFromFileName(f)));
                 int metaCandidates = reviewItems.Count;
                 int conflicts = Directory.Exists(destinationRoot) ? moveCandidates.Count(f => File.Exists(Path.Combine(destinationRoot, Path.GetFileName(f)))) : 0;
-                RenderPreview(rename.Count, renameCandidates, meta.Count, metaCandidates, moveCandidates, manualItems, conflicts);
+                RenderPreview(rename.Count, renameCandidates, move.Count, metaCandidates, moveCandidates, manualItems, conflicts);
                 status.Text = "Preview ready";
                 Log("Preview refreshed. Sources=" + SourceRootsSummary() + "; RenameCandidates=" + renameCandidates + "; MetadataCandidates=" + metaCandidates + "; MoveCandidates=" + moveCandidates.Count + "; ManualCandidates=" + manualItems.Count + ".");
             }
@@ -672,10 +1262,12 @@ namespace PixelVaultNative
                 EnsureSourceFolders();
                 EnsureExifTool();
                 Directory.CreateDirectory(destinationRoot);
-                RunRename();
-                var reviewItems = BuildReviewItems();
+                var renameInventory = BuildSourceInventory(recurseBox != null && recurseBox.IsChecked == true);
+                RunRename(renameInventory.RenameScopeFiles);
+                var inventory = BuildSourceInventory(false);
+                var reviewItems = BuildReviewItems(inventory.TopLevelMediaFiles);
                 var recognizedPaths = new HashSet<string>(reviewItems.Select(i => i.FilePath), StringComparer.OrdinalIgnoreCase);
-                var manualItems = BuildManualMetadataItems(recognizedPaths);
+                var manualItems = BuildManualMetadataItems(inventory.TopLevelMediaFiles, recognizedPaths);
                 var manualPaths = new HashSet<string>(manualItems.Select(i => i.FilePath), StringComparer.OrdinalIgnoreCase);
                 if (withReview && reviewItems.Count > 0)
                 {
@@ -695,7 +1287,7 @@ namespace PixelVaultNative
                 }
                 RunDelete(reviewItems);
                 RunMetadata(reviewItems);
-                var imported = RunMove(manualPaths);
+                var imported = RunMove(inventory.TopLevelMediaFiles, manualPaths);
                 if (imported.Count > 0)
                 {
                     SaveUndoManifest(imported);
@@ -724,8 +1316,9 @@ namespace PixelVaultNative
                 EnsureSourceFolders();
                 EnsureExifTool();
                 Directory.CreateDirectory(destinationRoot);
-                var recognizedPaths = new HashSet<string>(BuildReviewItems().Select(i => i.FilePath), StringComparer.OrdinalIgnoreCase);
-                var manualItems = BuildManualMetadataItems(recognizedPaths);
+                var inventory = BuildSourceInventory(false);
+                var recognizedPaths = new HashSet<string>(BuildReviewItems(inventory.TopLevelMediaFiles).Select(i => i.FilePath), StringComparer.OrdinalIgnoreCase);
+                var manualItems = BuildManualMetadataItems(inventory.TopLevelMediaFiles, recognizedPaths);
                 if (manualItems.Count == 0)
                 {
                     status.Text = "No manual intake items";
@@ -767,15 +1360,22 @@ namespace PixelVaultNative
 
         void RunRename()
         {
+            RunRename(BuildSourceInventory(recurseBox != null && recurseBox.IsChecked == true).RenameScopeFiles);
+        }
+
+        void RunRename(IEnumerable<string> sourceFiles)
+        {
             int renamed = 0, skipped = 0;
-            foreach (var file in EnumerateSourceFiles(recurseBox.IsChecked == true ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly, IsMedia))
+            var recordedSteamAppIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var file in (sourceFiles ?? Enumerable.Empty<string>()).Where(File.Exists))
             {
-                var m = Regex.Match(Path.GetFileNameWithoutExtension(file), @"(?<!\d)(\d{3,})(?!\d)");
-                if (!m.Success) { skipped++; continue; }
-                var game = SteamName(m.Groups[1].Value);
+                var appId = GuessSteamAppIdFromFileName(file);
+                if (string.IsNullOrWhiteSpace(appId)) { skipped++; continue; }
+                var game = SteamName(appId);
                 if (string.IsNullOrWhiteSpace(game)) { skipped++; continue; }
+                if (recordedSteamAppIds.Add(appId)) EnsureSteamAppIdInGameIndex(libraryRoot, game, appId);
                 var baseName = Path.GetFileNameWithoutExtension(file);
-                var newBase = baseName.Substring(0, m.Index) + game + baseName.Substring(m.Index + m.Length);
+                var newBase = game + baseName.Substring(appId.Length);
                 var target = Unique(Path.Combine(Path.GetDirectoryName(file), newBase + Path.GetExtension(file)));
                 File.Move(file, target);
                 MoveMetadataSidecarIfPresent(file, target);
@@ -787,8 +1387,13 @@ namespace PixelVaultNative
 
         List<ReviewItem> BuildReviewItems()
         {
+            return BuildReviewItems(BuildSourceInventory(false).TopLevelMediaFiles);
+        }
+
+        List<ReviewItem> BuildReviewItems(IEnumerable<string> sourceFiles)
+        {
             var items = new List<ReviewItem>();
-            foreach (var file in EnumerateSourceFiles(SearchOption.TopDirectoryOnly, IsMedia))
+            foreach (var file in (sourceFiles ?? Enumerable.Empty<string>()).Where(File.Exists).Distinct(StringComparer.OrdinalIgnoreCase))
             {
                 var fileName = Path.GetFileName(file);
                 if (!CanUpdateMetadata(fileName)) continue;
@@ -817,9 +1422,14 @@ namespace PixelVaultNative
 
         List<ManualMetadataItem> BuildManualMetadataItems(HashSet<string> recognizedPaths)
         {
+            return BuildManualMetadataItems(BuildSourceInventory(false).TopLevelMediaFiles, recognizedPaths);
+        }
+
+        List<ManualMetadataItem> BuildManualMetadataItems(IEnumerable<string> sourceFiles, HashSet<string> recognizedPaths)
+        {
             var items = new List<ManualMetadataItem>();
             var known = recognizedPaths ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var file in EnumerateSourceFiles(SearchOption.TopDirectoryOnly, IsMedia))
+            foreach (var file in (sourceFiles ?? Enumerable.Empty<string>()).Where(File.Exists).Distinct(StringComparer.OrdinalIgnoreCase))
             {
                 if (known.Contains(file)) continue;
                 var fileName = Path.GetFileName(file);
@@ -827,6 +1437,7 @@ namespace PixelVaultNative
                 var captureTime = GetLibraryDate(file);
                 items.Add(new ManualMetadataItem
                 {
+                    GameId = string.Empty,
                     FilePath = file,
                     FileName = fileName,
                     OriginalFileName = fileName,
@@ -842,6 +1453,7 @@ namespace PixelVaultNative
                     TagPc = false,
                     TagOther = false,
                     CustomPlatformTag = string.Empty,
+                    OriginalGameId = string.Empty,
                     OriginalCaptureTime = captureTime,
                     OriginalUseCustomCaptureTime = false,
                     OriginalGameName = string.Empty,
@@ -1209,7 +1821,22 @@ namespace PixelVaultNative
             var guessCallout = new Border { Background = Brush("#F4F7F9"), BorderBrush = Brush("#D7E1E8"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(12), Padding = new Thickness(12, 10, 12, 10), Margin = new Thickness(0, 0, 0, 16) };
             var guessText = new TextBlock { Text = "Best Guess | No confident match", FontSize = 13, Foreground = Brush("#8B98A3"), TextWrapping = TextWrapping.Wrap };
             guessCallout.Child = guessText;
-            var gameNameBox = new TextBox { Margin = new Thickness(0, 8, 0, 14), Background = Brushes.White, BorderBrush = Brush("#D7E1E8"), BorderThickness = new Thickness(1), Padding = new Thickness(12), FontSize = 14 };
+            var knownGameChoices = new List<string>();
+            var knownGameChoiceSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var knownGameChoiceNameMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var gameNameBox = new ComboBox
+            {
+                Margin = new Thickness(0, 8, 0, 14),
+                Background = Brushes.White,
+                BorderBrush = Brush("#D7E1E8"),
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(8, 4, 8, 4),
+                FontSize = 14,
+                FontFamily = new FontFamily("Cascadia Mono"),
+                IsEditable = true,
+                IsTextSearchEnabled = true,
+                StaysOpenOnEdit = true
+            };
             var tagsBox = new TextBox { Margin = new Thickness(0, 8, 0, 14), Background = Brushes.White, BorderBrush = Brush("#D7E1E8"), BorderThickness = new Thickness(1), Padding = new Thickness(12), FontSize = 14 };
             var photographyBox = new CheckBox { Content = "Add Game Photography tag", Foreground = Brush("#1F2A30"), Margin = new Thickness(0, 0, 14, 10), IsThreeState = true };
             var tagSeparator = new Border { Width = 1, Height = 20, Background = Brush("#D7E1E8"), Margin = new Thickness(2, 2, 16, 10), VerticalAlignment = VerticalAlignment.Center };
@@ -1266,6 +1893,53 @@ namespace PixelVaultNative
             var badgeBlocks = new Dictionary<ManualMetadataItem, TextBlock>();
             var tileBorders = new Dictionary<ManualMetadataItem, Border>();
             var selectedItems = new List<ManualMetadataItem>();
+            Action refreshSelectionStatus = null;
+            Action refreshGameTitleChoices = delegate
+            {
+                var currentText = gameNameBox.Text;
+                var rows = LoadSavedGameIndexRows(libraryRoot);
+                if (rows.Count == 0) rows = LoadGameIndexEditorRows(libraryRoot);
+                var loadedChoices = rows
+                    .Where(row => row != null && !string.IsNullOrWhiteSpace(row.Name))
+                    .OrderBy(row => row.Name ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+                    .ThenBy(row => row.PlatformLabel ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+                    .Select(row => BuildGameTitleChoiceLabel(row.Name, row.PlatformLabel))
+                    .Where(label => !string.IsNullOrWhiteSpace(label))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                foreach (var extraChoice in knownGameChoices.Where(label => !string.IsNullOrWhiteSpace(label)))
+                {
+                    if (!loadedChoices.Contains(extraChoice, StringComparer.OrdinalIgnoreCase)) loadedChoices.Add(extraChoice);
+                }
+                knownGameChoices = loadedChoices;
+                knownGameChoiceSet = new HashSet<string>(knownGameChoices, StringComparer.OrdinalIgnoreCase);
+                knownGameChoiceNameMap = rows
+                    .Where(row => row != null && !string.IsNullOrWhiteSpace(row.Name))
+                    .Select(row => new { Label = BuildGameTitleChoiceLabel(row.Name, row.PlatformLabel), Name = NormalizeGameIndexName(row.Name, row.FolderPath) })
+                    .Where(entry => !string.IsNullOrWhiteSpace(entry.Label) && !string.IsNullOrWhiteSpace(entry.Name))
+                    .GroupBy(entry => entry.Label, StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(group => CleanTag(group.Key), group => group.First().Name, StringComparer.OrdinalIgnoreCase);
+                foreach (var extraChoice in knownGameChoices)
+                {
+                    var normalizedChoice = CleanTag(extraChoice);
+                    if (knownGameChoiceNameMap.ContainsKey(normalizedChoice)) continue;
+                    var extraName = ExtractGameNameFromChoiceLabel(extraChoice);
+                    if (!string.IsNullOrWhiteSpace(extraName)) knownGameChoiceNameMap[normalizedChoice] = extraName;
+                }
+                gameNameBox.ItemsSource = null;
+                gameNameBox.ItemsSource = knownGameChoices;
+                gameNameBox.Text = currentText;
+            };
+            Action syncSelectedGameNames = delegate
+            {
+                if (suppressSync || selectedItems.Count == 0) return;
+                var selectedTitleText = CleanTag(gameNameBox.Text);
+                string mappedName;
+                if (knownGameChoiceNameMap.TryGetValue(selectedTitleText, out mappedName)) selectedTitleText = mappedName;
+                else selectedTitleText = ExtractGameNameFromChoiceLabel(selectedTitleText);
+                foreach (var item in selectedItems) item.GameName = selectedTitleText;
+                refreshSelectionStatus();
+            };
 
             Func<ManualMetadataItem, string> manualBadgeLabel = delegate(ManualMetadataItem item)
             {
@@ -1342,6 +2016,7 @@ namespace PixelVaultNative
                     item.TagXbox = string.Equals(platform, "Xbox", StringComparison.OrdinalIgnoreCase);
                     item.TagOther = string.Equals(platform, "Other", StringComparison.OrdinalIgnoreCase);
                     if (!item.TagOther) item.CustomPlatformTag = string.Empty;
+                    item.ForceTagMetadataWrite = true;
                 }
             };
 
@@ -1385,7 +2060,7 @@ namespace PixelVaultNative
                 var newTime = new DateTime(date.Year, date.Month, date.Day, hour24, minute, 0);
                 foreach (var item in selectedItems) item.CaptureTime = newTime;
             };
-            Action refreshSelectionStatus = delegate
+            refreshSelectionStatus = delegate
             {
                 var notes = new List<string>();
                 if (selectedItems.Count > 1) notes.Add(selectedItems.Count + " files selected");
@@ -1402,6 +2077,7 @@ namespace PixelVaultNative
                 else if (otherBox.IsChecked == true) notes.Add("platform tag: " + CleanTag(otherPlatformBox.Text));
                 statusText.Text = notes.Count == 0 ? defaultStatusText : string.Join(" | ", notes.ToArray()) + ".";
             };
+            refreshGameTitleChoices();
 
 
             Action refreshSelectionUi = delegate
@@ -1453,7 +2129,11 @@ namespace PixelVaultNative
                     previewBorder.Child = buildMultiPreview(selectedItems.Count);
                 }
 
-                gameNameBox.Text = sharedText(selectedItems, delegate(ManualMetadataItem item) { return item.GameName; });
+                gameNameBox.Text = sharedText(selectedItems, delegate(ManualMetadataItem item)
+                {
+                    var displayLabel = BuildGameTitleChoiceLabel(item.GameName, DetermineManualMetadataPlatformLabel(item));
+                    return knownGameChoiceSet.Contains(displayLabel) ? displayLabel : item.GameName;
+                });
                 tagsBox.Text = sharedText(selectedItems, delegate(ManualMetadataItem item) { return item.TagText; });
                 commentBox.Text = sharedText(selectedItems, delegate(ManualMetadataItem item) { return item.Comment; });
                 photographyBox.IsChecked = sharedBool(selectedItems, delegate(ManualMetadataItem item) { return item.AddPhotographyTag; });
@@ -1502,16 +2182,20 @@ namespace PixelVaultNative
                 refreshSelectionUi();
             };
 
-            gameNameBox.TextChanged += delegate
+            gameNameBox.SelectionChanged += delegate { syncSelectedGameNames(); };
+            gameNameBox.LostKeyboardFocus += delegate { syncSelectedGameNames(); };
+            gameNameBox.AddHandler(TextBox.TextChangedEvent, new TextChangedEventHandler(delegate(object sender, TextChangedEventArgs e)
             {
-                if (suppressSync || selectedItems.Count == 0) return;
-                foreach (var item in selectedItems) item.GameName = gameNameBox.Text;
-                refreshSelectionStatus();
-            };
+                syncSelectedGameNames();
+            }));
             tagsBox.TextChanged += delegate
             {
                 if (suppressSync || selectedItems.Count == 0) return;
-                foreach (var item in selectedItems) item.TagText = tagsBox.Text;
+                foreach (var item in selectedItems)
+                {
+                    item.TagText = tagsBox.Text;
+                    item.ForceTagMetadataWrite = true;
+                }
                 refreshSelectionStatus();
             };
             commentBox.TextChanged += delegate
@@ -1523,13 +2207,21 @@ namespace PixelVaultNative
             photographyBox.Checked += delegate
             {
                 if (suppressSync || selectedItems.Count == 0) return;
-                foreach (var item in selectedItems) item.AddPhotographyTag = true;
+                foreach (var item in selectedItems)
+                {
+                    item.AddPhotographyTag = true;
+                    item.ForceTagMetadataWrite = true;
+                }
                 refreshSelectionUi();
             };
             photographyBox.Unchecked += delegate
             {
                 if (suppressSync || selectedItems.Count == 0) return;
-                foreach (var item in selectedItems) item.AddPhotographyTag = false;
+                foreach (var item in selectedItems)
+                {
+                    item.AddPhotographyTag = false;
+                    item.ForceTagMetadataWrite = true;
+                }
                 refreshSelectionUi();
             };
             steamBox.Checked += delegate
@@ -1543,7 +2235,11 @@ namespace PixelVaultNative
             {
                 if (suppressSync || selectedItems.Count == 0) return;
                 if (steamBox.IsChecked != false) return;
-                foreach (var item in selectedItems) item.TagSteam = false;
+                foreach (var item in selectedItems)
+                {
+                    item.TagSteam = false;
+                    item.ForceTagMetadataWrite = true;
+                }
                 refreshTileBadges();
                 refreshSelectionUi();
             };
@@ -1558,7 +2254,11 @@ namespace PixelVaultNative
             {
                 if (suppressSync || selectedItems.Count == 0) return;
                 if (pcBox.IsChecked != false) return;
-                foreach (var item in selectedItems) item.TagPc = false;
+                foreach (var item in selectedItems)
+                {
+                    item.TagPc = false;
+                    item.ForceTagMetadataWrite = true;
+                }
                 refreshTileBadges();
                 refreshSelectionUi();
             };
@@ -1573,7 +2273,11 @@ namespace PixelVaultNative
             {
                 if (suppressSync || selectedItems.Count == 0) return;
                 if (ps5Box.IsChecked != false) return;
-                foreach (var item in selectedItems) item.TagPs5 = false;
+                foreach (var item in selectedItems)
+                {
+                    item.TagPs5 = false;
+                    item.ForceTagMetadataWrite = true;
+                }
                 refreshTileBadges();
                 refreshSelectionUi();
             };
@@ -1588,7 +2292,11 @@ namespace PixelVaultNative
             {
                 if (suppressSync || selectedItems.Count == 0) return;
                 if (xboxBox.IsChecked != false) return;
-                foreach (var item in selectedItems) item.TagXbox = false;
+                foreach (var item in selectedItems)
+                {
+                    item.TagXbox = false;
+                    item.ForceTagMetadataWrite = true;
+                }
                 refreshTileBadges();
                 refreshSelectionUi();
             };
@@ -1597,7 +2305,11 @@ namespace PixelVaultNative
                 refreshDateControls();
                 if (suppressSync || selectedItems.Count == 0) return;
                 applyConsoleSelection(selectedItems, "Other");
-                foreach (var item in selectedItems) item.CustomPlatformTag = otherPlatformBox.Text;
+                foreach (var item in selectedItems)
+                {
+                    item.CustomPlatformTag = otherPlatformBox.Text;
+                    item.ForceTagMetadataWrite = true;
+                }
                 refreshTileBadges();
                 refreshSelectionUi();
             };
@@ -1610,6 +2322,7 @@ namespace PixelVaultNative
                 {
                     item.TagOther = false;
                     item.CustomPlatformTag = string.Empty;
+                    item.ForceTagMetadataWrite = true;
                 }
                 refreshTileBadges();
                 refreshSelectionUi();
@@ -1617,7 +2330,11 @@ namespace PixelVaultNative
             otherPlatformBox.TextChanged += delegate
             {
                 if (suppressSync || selectedItems.Count == 0) return;
-                foreach (var item in selectedItems) item.CustomPlatformTag = otherPlatformBox.Text;
+                foreach (var item in selectedItems)
+                {
+                    item.CustomPlatformTag = otherPlatformBox.Text;
+                    item.ForceTagMetadataWrite = true;
+                }
                 refreshTileBadges();
                 refreshSelectionStatus();
             };
@@ -1643,23 +2360,90 @@ namespace PixelVaultNative
 
             finishButton.Click += delegate
             {
-                var pendingItems = (libraryMode ? items : selectedItems).Distinct().ToList();
+                var pendingItems = selectedItems.Distinct().ToList();
                 if (pendingItems.Count == 0)
                 {
                     MessageBox.Show(libraryMode ? "Select at least one library image to update." : "Select at least one unmatched image to send.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
                     return;
                 }
                 if (useCustomTimeBox.IsChecked == true) saveSelectedDateTime();
+                foreach (var item in pendingItems)
+                {
+                    var tagNames = new HashSet<string>(ParseTagText(item.TagText), StringComparer.OrdinalIgnoreCase);
+                    if (tagNames.Contains("Steam")) applyConsoleSelection(new[] { item }, "Steam");
+                    else if (tagNames.Contains("PC")) applyConsoleSelection(new[] { item }, "PC");
+                    else if (tagNames.Contains("PS5") || tagNames.Contains("PlayStation")) applyConsoleSelection(new[] { item }, "PS5");
+                    else if (tagNames.Contains("Xbox")) applyConsoleSelection(new[] { item }, "Xbox");
+                }
                 if (pendingItems.Any(item => item.TagOther && string.IsNullOrWhiteSpace(CleanTag(item.CustomPlatformTag))))
                 {
                     MessageBox.Show("Enter a platform name in the Other box before applying changes.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
                     return;
                 }
+                var gameRows = LoadSavedGameIndexRows(libraryRoot);
+                var unresolvedMasterRecords = pendingItems
+                    .Select(item => new
+                    {
+                        Item = item,
+                        Name = NormalizeGameIndexName(
+                            string.IsNullOrWhiteSpace(item.GameName)
+                                ? GetGameNameFromFileName(Path.GetFileNameWithoutExtension(item.FilePath))
+                                : item.GameName),
+                        PlatformLabel = DetermineManualMetadataPlatformLabel(item)
+                    })
+                    .Where(entry => !string.IsNullOrWhiteSpace(entry.Name))
+                    .Where(entry => FindSavedGameIndexRowByIdentity(gameRows, entry.Name, entry.PlatformLabel) == null
+                        && FindSavedGameIndexRowById(gameRows, entry.Item.GameId) == null)
+                    .Select(entry => BuildGameTitleChoiceLabel(entry.Name, entry.PlatformLabel))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(entry => entry, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                if (unresolvedMasterRecords.Count > 0)
+                {
+                    var preview = string.Join(Environment.NewLine, unresolvedMasterRecords.Take(8).Select(title => "- " + title).ToArray());
+                    if (unresolvedMasterRecords.Count > 8) preview += Environment.NewLine + "- ...";
+                    var addChoice = MessageBox.Show(
+                        "These game record" + (unresolvedMasterRecords.Count == 1 ? " is" : "s are") + " not in the game index yet:" + Environment.NewLine + Environment.NewLine +
+                        preview + Environment.NewLine + Environment.NewLine +
+                        "Add " + (unresolvedMasterRecords.Count == 1 ? "it" : "them") + " as new master game record" + (unresolvedMasterRecords.Count == 1 ? "" : "s") + "?",
+                        "Add New Game",
+                        MessageBoxButton.OKCancel,
+                        MessageBoxImage.Question);
+                    if (addChoice != MessageBoxResult.OK) return;
+                    foreach (var title in unresolvedMasterRecords.Distinct(StringComparer.OrdinalIgnoreCase))
+                    {
+                        if (knownGameChoiceSet.Add(title)) knownGameChoices.Add(title);
+                    }
+                    refreshGameTitleChoices();
+                    foreach (var item in pendingItems)
+                    {
+                        var resolvedName = NormalizeGameIndexName(
+                            string.IsNullOrWhiteSpace(item.GameName)
+                                ? GetGameNameFromFileName(Path.GetFileNameWithoutExtension(item.FilePath))
+                                : item.GameName);
+                        var resolvedPlatform = DetermineManualMetadataPlatformLabel(item);
+                        if (FindSavedGameIndexRowByIdentity(gameRows, resolvedName, resolvedPlatform) != null) continue;
+                        if (!string.IsNullOrWhiteSpace(item.GameId) && FindSavedGameIndexRowById(gameRows, item.GameId) != null) continue;
+                        EnsureGameIndexRowForAssignment(gameRows, resolvedName, resolvedPlatform, item.GameId);
+                    }
+                }
                 var confirmText = libraryMode
-                    ? items.Count + " loaded image(s) will be renamed if needed, updated with metadata, and reorganized in the library if their title changes.\n\nApply changes now?"
+                    ? pendingItems.Count + " selected image(s) will be renamed if needed, updated with metadata, and reorganized in the library if their title changes.\n\nApply changes now?"
                     : pendingItems.Count + " image(s) will be renamed if needed, tagged, updated with metadata, and moved to the destination.\n\nApply changes and send them now?";
                 var confirm = MessageBox.Show(confirmText, confirmCaption, MessageBoxButton.OKCancel, MessageBoxImage.Question);
                 if (confirm != MessageBoxResult.OK) return;
+                foreach (var item in pendingItems)
+                {
+                    var resolvedName = NormalizeGameIndexName(
+                        string.IsNullOrWhiteSpace(item.GameName)
+                            ? GetGameNameFromFileName(Path.GetFileNameWithoutExtension(item.FilePath))
+                            : item.GameName);
+                    if (!string.IsNullOrWhiteSpace(resolvedName)) item.GameName = resolvedName;
+                    var resolvedRow = ResolveExistingGameIndexRowForAssignment(gameRows, item.GameName, DetermineManualMetadataPlatformLabel(item), item.GameId);
+                    item.GameId = resolvedRow == null ? string.Empty : resolvedRow.GameId;
+                    if (resolvedRow != null && !string.IsNullOrWhiteSpace(resolvedRow.Name)) item.GameName = resolvedRow.Name;
+                }
+                SaveSavedGameIndexRows(libraryRoot, gameRows);
                 items.Clear();
                 items.AddRange(pendingItems);
                 manualWindow.DialogResult = true;
@@ -1694,6 +2478,7 @@ namespace PixelVaultNative
             foreach (var file in GetFilesForLibraryFolderEntry(folder, false).OrderByDescending(GetLibraryDate).ThenBy(Path.GetFileName))
             {
                 var fileName = Path.GetFileName(file);
+                var indexEntry = TryGetLibraryMetadataIndexEntry(libraryRoot, file, null);
                 var tags = GetEmbeddedKeywordTags(file);
                 var consoleTags = GetConsolePlatformTagsForFile(file);
                 var customPlatform = tags.FirstOrDefault(tag => tag.StartsWith(CustomPlatformPrefix, StringComparison.OrdinalIgnoreCase));
@@ -1726,6 +2511,7 @@ namespace PixelVaultNative
                 var customPlatformValue = useCustomPlatform ? customPlatformName : string.Empty;
                 items.Add(new ManualMetadataItem
                 {
+                    GameId = indexEntry == null ? (folder == null ? string.Empty : folder.GameId) : indexEntry.GameId,
                     FilePath = file,
                     FileName = fileName,
                     OriginalFileName = fileName,
@@ -1741,6 +2527,7 @@ namespace PixelVaultNative
                     TagXbox = tagXbox,
                     TagOther = useCustomPlatform,
                     CustomPlatformTag = customPlatformValue,
+                    OriginalGameId = indexEntry == null ? (folder == null ? string.Empty : folder.GameId) : indexEntry.GameId,
                     OriginalCaptureTime = captureTime,
                     OriginalUseCustomCaptureTime = false,
                     OriginalGameName = folder.Name ?? string.Empty,
@@ -1764,6 +2551,7 @@ namespace PixelVaultNative
             folderImageCacheStamp.Clear();
             fileTagCache.Clear();
             fileTagCacheStamp.Clear();
+            ClearImageCache();
         }
         int OrganizeLibraryItems(List<ManualMetadataItem> items, Action<int, int, string> progress = null)
         {
@@ -1854,6 +2642,7 @@ namespace PixelVaultNative
 
         void RunLibraryMetadataWorkflowWithProgress(LibraryFolderInfo folder, List<ManualMetadataItem> items, Action refreshLibrary)
         {
+            var originalSavedGameIndexRow = folder == null ? null : FindSavedGameIndexRow(LoadSavedGameIndexRows(libraryRoot), folder);
             var progressWindow = new Window
             {
                 Title = "PixelVault " + AppVersion + " Library Metadata Progress",
@@ -1945,7 +2734,8 @@ namespace PixelVaultNative
                 {
                     reportStage(totalPerStage * 2, current, total, detail);
                 });
-                UpsertLibraryMetadataIndexEntries(items.Select(i => i.FilePath), libraryRoot);
+                UpsertLibraryMetadataIndexEntries(items, libraryRoot);
+                PreserveLibraryMetadataEditGameIndex(libraryRoot, folder, originalSavedGameIndexRow, items);
                 progressWindow.Dispatcher.BeginInvoke(new Action(delegate
                 {
                     progressFinished = true;
@@ -2026,6 +2816,8 @@ namespace PixelVaultNative
         {
             int updated = 0, skipped = 0;
             var total = items == null ? 0 : items.Count;
+            var requests = new List<ExifWriteRequest>();
+            var itemsToReset = new List<ManualMetadataItem>();
             if (progress != null) progress(0, total, "Starting metadata step for " + total + " image(s).");
             for (int i = 0; i < total; i++)
             {
@@ -2042,41 +2834,42 @@ namespace PixelVaultNative
                 var preserveFileTimes = !item.UseCustomCaptureTime;
                 var writeDateMetadata = ManualMetadataTouchesCaptureTime(item);
                 var writeCommentMetadata = ManualMetadataTouchesComment(item);
-                var writeTagMetadata = ManualMetadataTouchesTags(item);
+                var writeTagMetadata = item.ForceTagMetadataWrite || ManualMetadataTouchesTags(item);
                 if (!writeDateMetadata && !writeCommentMetadata && !writeTagMetadata)
                 {
                     skipped++;
                     if (progress != null) progress(i + 1, total, "Skipped metadata " + (i + 1) + " of " + total + " | " + remaining + " remaining | unchanged | " + item.FileName);
                     continue;
                 }
-                var extraTags = new List<string>(ParseTagText(item.TagText));
-                if (item.TagSteam) { extraTags.Add("Steam"); extraTags.Add("PC"); }
-                if (item.TagPc) extraTags.Add("PC");
-                if (item.TagPs5) { extraTags.Add("PS5"); extraTags.Add("PlayStation"); }
-                if (item.TagXbox) extraTags.Add("Xbox");
-                if (item.TagOther && !string.IsNullOrWhiteSpace(item.CustomPlatformTag)) extraTags.Add(CustomPlatformPrefix + CleanTag(item.CustomPlatformTag));
+                var extraTags = BuildManualMetadataExtraTags(item);
                 var changeNotes = new List<string>();
                 if (writeDateMetadata) changeNotes.Add("date/time");
                 if (writeCommentMetadata) changeNotes.Add("comment");
                 if (writeTagMetadata) changeNotes.Add("tags");
                 var metadataTarget = effectiveTime.ToString("yyyy-MM-dd HH:mm:ss") + (preserveFileTimes ? " (using filesystem timestamp)" : " (custom)");
                 Log("Updating manual metadata: " + item.FileName + " -> " + metadataTarget + " [" + string.Join(", ", changeNotes.ToArray()) + "]");
-                DateTime originalCreate = DateTime.MinValue;
-                DateTime originalWrite = DateTime.MinValue;
-                if (writeDateMetadata && preserveFileTimes)
+                var originalCreate = DateTime.MinValue;
+                var originalWrite = DateTime.MinValue;
+                var restoreFileTimes = writeDateMetadata && preserveFileTimes;
+                if (restoreFileTimes)
                 {
                     originalCreate = File.GetCreationTime(file);
                     originalWrite = File.GetLastWriteTime(file);
                 }
-                RunExe(exifToolPath, BuildExifArgs(file, effectiveTime, new string[0], extraTags, preserveFileTimes, item.Comment, item.AddPhotographyTag, writeDateMetadata, writeCommentMetadata, writeTagMetadata), Path.GetDirectoryName(exifToolPath), true);
-                if (writeDateMetadata && preserveFileTimes)
+                requests.Add(new ExifWriteRequest
                 {
-                    if (originalCreate != DateTime.MinValue) File.SetCreationTime(file, originalCreate);
-                    if (originalWrite != DateTime.MinValue) File.SetLastWriteTime(file, originalWrite);
-                }
-                updated++;
-                if (progress != null) progress(i + 1, total, "Updated metadata " + (i + 1) + " of " + total + " | " + remaining + " remaining | " + item.FileName + " [" + string.Join(", ", changeNotes.ToArray()) + "]");
+                    FilePath = file,
+                    FileName = item.FileName,
+                    Arguments = BuildExifArgs(file, effectiveTime, new string[0], extraTags, preserveFileTimes, item.Comment, item.AddPhotographyTag, writeDateMetadata, writeCommentMetadata, writeTagMetadata),
+                    RestoreFileTimes = restoreFileTimes,
+                    OriginalCreateTime = originalCreate,
+                    OriginalWriteTime = originalWrite,
+                    SuccessDetail = item.FileName + " [" + string.Join(", ", changeNotes.ToArray()) + "]"
+                });
+                itemsToReset.Add(item);
             }
+            updated = RunExifWriteRequests(requests, total, skipped, progress);
+            foreach (var item in itemsToReset) item.ForceTagMetadataWrite = false;
             if (progress != null) progress(total, total, "Metadata step complete: updated " + updated + ", skipped " + skipped + ".");
             Log("Manual metadata summary: updated " + updated + ", skipped " + skipped + ".");
         }
@@ -2093,9 +2886,47 @@ namespace PixelVaultNative
             if (deleted > 0 || skipped > 0) Log("Delete summary: deleted " + deleted + ", skipped " + skipped + ".");
         }
 
+        int RunExifWriteRequests(List<ExifWriteRequest> requests, int totalCount, int alreadyCompleted, Action<int, int, string> progress = null)
+        {
+            var workItems = requests ?? new List<ExifWriteRequest>();
+            if (workItems.Count == 0) return 0;
+
+            var completed = alreadyCompleted;
+            var failures = new ConcurrentQueue<Exception>();
+            var workerCount = GetMetadataWorkerCount(workItems.Count);
+            Log("Running metadata writes with " + workerCount + " worker(s) for " + workItems.Count + " file(s).");
+
+            Parallel.ForEach(workItems, new ParallelOptions { MaxDegreeOfParallelism = workerCount }, delegate(ExifWriteRequest request)
+            {
+                try
+                {
+                    RunExe(exifToolPath, request.Arguments, Path.GetDirectoryName(exifToolPath), false);
+                    if (request.RestoreFileTimes)
+                    {
+                        if (request.OriginalCreateTime != DateTime.MinValue) File.SetCreationTime(request.FilePath, request.OriginalCreateTime);
+                        if (request.OriginalWriteTime != DateTime.MinValue) File.SetLastWriteTime(request.FilePath, request.OriginalWriteTime);
+                    }
+                    if (progress != null)
+                    {
+                        var current = Interlocked.Increment(ref completed);
+                        var remaining = Math.Max(totalCount - current, 0);
+                        progress(current, totalCount, "Updated metadata " + current + " of " + totalCount + " | " + remaining + " remaining | " + request.SuccessDetail);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    failures.Enqueue(new InvalidOperationException("Metadata update failed for " + request.FileName + ". " + ex.Message, ex));
+                }
+            });
+
+            if (!failures.IsEmpty) throw new AggregateException(failures);
+            return workItems.Count;
+        }
+
         void RunMetadata(List<ReviewItem> reviewItems)
         {
             int updated = 0, skipped = 0;
+            var requests = new List<ExifWriteRequest>();
             foreach (var item in reviewItems)
             {
                 if (item.DeleteBeforeProcessing) { skipped++; continue; }
@@ -2105,7 +2936,6 @@ namespace PixelVaultNative
                 if (item.TagSteam)
                 {
                     selectedPlatformTags.Add("Steam");
-                    selectedPlatformTags.Add("PC");
                 }
                 if (item.TagPs5)
                 {
@@ -2121,32 +2951,42 @@ namespace PixelVaultNative
                 if (item.AddPhotographyTag) notes.Add(GamePhotographyTag + " tag added");
                 var noteSuffix = notes.Count > 0 ? " [" + string.Join(", ", notes.ToArray()) + "]" : string.Empty;
                 Log("Updating metadata: " + item.FileName + " -> " + metadataTarget + (platformTags.Length > 0 ? " [" + string.Join(", ", platformTags) + "]" : " [no platform tag]") + noteSuffix);
-                DateTime originalCreate = DateTime.MinValue;
-                DateTime originalWrite = DateTime.MinValue;
+                var originalCreate = DateTime.MinValue;
+                var originalWrite = DateTime.MinValue;
                 if (item.PreserveFileTimes)
                 {
                     originalCreate = File.GetCreationTime(file);
                     originalWrite = File.GetLastWriteTime(file);
                 }
-                RunExe(exifToolPath, BuildExifArgs(file, item.CaptureTime, platformTags, item.PreserveFileTimes, item.Comment, item.AddPhotographyTag), Path.GetDirectoryName(exifToolPath), true);
-                if (item.PreserveFileTimes)
+                requests.Add(new ExifWriteRequest
                 {
-                    if (originalCreate != DateTime.MinValue) File.SetCreationTime(file, originalCreate);
-                    if (originalWrite != DateTime.MinValue) File.SetLastWriteTime(file, originalWrite);
-                }
-                updated++;
+                    FilePath = file,
+                    FileName = item.FileName,
+                    Arguments = BuildExifArgs(file, item.CaptureTime, platformTags, item.PreserveFileTimes, item.Comment, item.AddPhotographyTag),
+                    RestoreFileTimes = item.PreserveFileTimes,
+                    OriginalCreateTime = originalCreate,
+                    OriginalWriteTime = originalWrite,
+                    SuccessDetail = item.FileName
+                });
             }
+            updated = RunExifWriteRequests(requests, requests.Count + skipped, skipped, null);
             Log("Metadata summary: updated " + updated + ", skipped " + skipped + ".");
         }
 
         List<UndoImportEntry> RunMove()
         {
-            return RunMove(null);
+            return RunMove(BuildSourceInventory(false).TopLevelMediaFiles, null);
         }
 
         List<UndoImportEntry> RunMove(HashSet<string> skipFiles)
         {
-            var files = EnumerateSourceFiles(SearchOption.TopDirectoryOnly, IsMedia)
+            return RunMove(BuildSourceInventory(false).TopLevelMediaFiles, skipFiles);
+        }
+
+        List<UndoImportEntry> RunMove(IEnumerable<string> sourceFiles, HashSet<string> skipFiles)
+        {
+            var files = (sourceFiles ?? Enumerable.Empty<string>())
+                .Where(File.Exists)
                 .Where(file => skipFiles == null || !skipFiles.Contains(file));
             return RunMoveFiles(files, "Move summary");
         }
@@ -2442,71 +3282,86 @@ namespace PixelVaultNative
             }
             if (writeTagMetadata)
             {
-                var tags = new List<string>();
-                bool includeGameCaptureKeywords = true;
-                if (keywordsBox != null)
-                {
-                    if (keywordsBox.Dispatcher.CheckAccess()) includeGameCaptureKeywords = keywordsBox.IsChecked == true;
-                    else includeGameCaptureKeywords = keywordsBox.Dispatcher.Invoke(new Func<bool>(delegate { return keywordsBox.IsChecked == true; }));
-                }
-                if (includeGameCaptureKeywords)
-                {
-                    tags.Add("Game Capture");
-                    if (platformTags != null) tags.AddRange(platformTags);
-                }
-                if (extraTags != null) tags.AddRange(extraTags.Where(t => !string.IsNullOrWhiteSpace(t)));
-                if (addPhotographyTag) tags.Add(GamePhotographyTag);
-                args.Add("-XMP:Subject=");
-                args.Add("-XMP-dc:Subject=");
-                args.Add("-XMP:TagsList=");
+                var tags = BuildMetadataTagSet(platformTags, extraTags, addPhotographyTag);
+                var serializedTags = string.Join("||", tags);
+                args.Add("-sep");
+                args.Add("||");
+                args.Add("-XMP:Subject=" + serializedTags);
+                args.Add("-XMP-dc:Subject=" + serializedTags);
+                args.Add("-XMP:TagsList=" + serializedTags);
+                args.Add("-XMP-digiKam:TagsList=" + serializedTags);
+                args.Add("-XMP-lr:HierarchicalSubject=" + serializedTags);
                 if (!IsVideo(file))
                 {
-                    args.Add("-IPTC:Keywords=");
-                    args.Add("-Keywords=");
-                }
-                else
-                {
-                    args.Add("-XMP-digiKam:TagsList=");
-                    args.Add("-XMP-lr:HierarchicalSubject=");
-                }
-                foreach (var tag in tags.Select(CleanTag).Where(t => !string.IsNullOrWhiteSpace(t)).Distinct(StringComparer.OrdinalIgnoreCase))
-                {
-                    args.Add("-XMP:Subject+=" + tag);
-                    args.Add("-XMP-dc:Subject+=" + tag);
-                    args.Add("-XMP:TagsList+=" + tag);
-                    if (!IsVideo(file))
-                    {
-                        args.Add("-IPTC:Keywords+=" + tag);
-                        args.Add("-Keywords+=" + tag);
-                    }
-                    else
-                    {
-                        args.Add("-XMP-digiKam:TagsList+=" + tag);
-                        args.Add("-XMP-lr:HierarchicalSubject+=" + tag);
-                    }
+                    args.Add("-IPTC:Keywords=" + serializedTags);
+                    args.Add("-Keywords=" + serializedTags);
                 }
             }
             args.Add("-overwrite_original");
             args.Add(targetPath);
             return args.ToArray();
         }
-        void ShowLibraryBrowser()
+
+        bool ShouldIncludeGameCaptureKeywords()
+        {
+            bool includeGameCaptureKeywords = true;
+            if (keywordsBox != null)
+            {
+                if (keywordsBox.Dispatcher.CheckAccess()) includeGameCaptureKeywords = keywordsBox.IsChecked == true;
+                else includeGameCaptureKeywords = (bool)keywordsBox.Dispatcher.Invoke(new Func<bool>(delegate { return keywordsBox.IsChecked == true; }));
+            }
+            return includeGameCaptureKeywords;
+        }
+
+        string[] BuildMetadataTagSet(IEnumerable<string> platformTags, IEnumerable<string> extraTags, bool addPhotographyTag)
+        {
+            var tags = new List<string>();
+            if (ShouldIncludeGameCaptureKeywords())
+            {
+                tags.Add("Game Capture");
+                if (platformTags != null) tags.AddRange(platformTags.Where(tag => !string.IsNullOrWhiteSpace(tag)));
+            }
+            if (extraTags != null) tags.AddRange(extraTags.Where(tag => !string.IsNullOrWhiteSpace(tag)));
+            if (addPhotographyTag) tags.Add(GamePhotographyTag);
+            return tags.Select(CleanTag).Where(tag => !string.IsNullOrWhiteSpace(tag)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        }
+
+        List<string> BuildManualMetadataExtraTags(ManualMetadataItem item)
+        {
+            var extraTags = new List<string>(ParseTagText(item == null ? string.Empty : item.TagText));
+            if (item == null) return extraTags;
+            if (item.TagSteam) extraTags.Add("Steam");
+            if (item.TagPc) extraTags.Add("PC");
+            if (item.TagPs5) { extraTags.Add("PS5"); extraTags.Add("PlayStation"); }
+            if (item.TagXbox) extraTags.Add("Xbox");
+            if (item.TagOther && !string.IsNullOrWhiteSpace(item.CustomPlatformTag)) extraTags.Add(CustomPlatformPrefix + CleanTag(item.CustomPlatformTag));
+            return extraTags;
+        }
+        void ShowLibraryBrowser(bool reuseMainWindow = false)
         {
             try
             {
                 EnsureDir(libraryRoot, "Library folder");
                 var folders = LoadLibraryFoldersCached(libraryRoot, false);
-                var libraryWindow = new Window
-                {
-                    Title = "PixelVault " + AppVersion + " Library",
-                    Width = 1280,
-                    Height = 860,
-                    MinWidth = 1020,
-                    MinHeight = 700,
-                    Owner = this,
-                    WindowStartupLocation = WindowStartupLocation.CenterOwner,
-                    Background = Brush("#0F1519")
-                };
+                var libraryWindow = reuseMainWindow
+                    ? this
+                    : new Window
+                    {
+                        Title = "PixelVault " + AppVersion + " Library",
+                        Width = PreferredLibraryWindowWidth(),
+                        Height = PreferredLibraryWindowHeight(),
+                        MinWidth = 1200,
+                        MinHeight = 780,
+                        Owner = this,
+                        WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                        Background = Brush("#0F1519")
+                    };
+                libraryWindow.Title = "PixelVault " + AppVersion + " Library";
+                libraryWindow.Width = PreferredLibraryWindowWidth();
+                libraryWindow.Height = PreferredLibraryWindowHeight();
+                libraryWindow.MinWidth = 1200;
+                libraryWindow.MinHeight = 780;
+                libraryWindow.Background = Brush("#0F1519");
 
                 var root = new Grid { Margin = new Thickness(18) };
                 root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.25, GridUnitType.Star) });
@@ -2515,39 +3370,121 @@ namespace PixelVaultNative
                 var left = new Border { Background = Brush("#12191E"), CornerRadius = new CornerRadius(18), Padding = new Thickness(18), Margin = new Thickness(0, 0, 16, 0) };
                 var leftGrid = new Grid();
                 leftGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                leftGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
                 leftGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+                leftGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
                 var leftHeader = new Grid { Margin = new Thickness(0, 0, 0, 4) };
-                leftHeader.ColumnDefinitions.Add(new ColumnDefinition());
                 leftHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
                 leftHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                var titleStack = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-                titleStack.Children.Add(new TextBlock { Text = "Game Library", FontSize = 22, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, Margin = new Thickness(0, 0, 12, 0) });
-                var folderCount = new TextBlock { Text = folders.Count + " folders", Foreground = Brush("#B7C6C0"), VerticalAlignment = VerticalAlignment.Center, FontSize = 14 };
-                titleStack.Children.Add(folderCount);
-                leftHeader.Children.Add(titleStack);
-                var photographyButton = Btn("Photography", null, "#20343A", Brushes.White);
-                photographyButton.Margin = new Thickness(18, 0, 18, 0);
-                Grid.SetColumn(photographyButton, 1);
-                leftHeader.Children.Add(photographyButton);
+                leftHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                leftHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                var importButton = Btn("Import", null, "#2B7A52", Brushes.White);
+                importButton.Width = 198;
+                importButton.Height = 56;
+                importButton.FontSize = 16;
+                importButton.Margin = new Thickness(0, 0, 10, 0);
+                var importCommentsButton = Btn("Import and Comment", null, "#355F93", Brushes.White);
+                importCommentsButton.Width = 188;
+                importCommentsButton.Margin = new Thickness(0, 0, 10, 0);
+                var manualImportButton = Btn("Manual Import", null, "#7C5A34", Brushes.White);
+                manualImportButton.Width = 170;
+                manualImportButton.Margin = new Thickness(0, 0, 16, 0);
+                var importActions = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+                importActions.Children.Add(importButton);
+                importActions.Children.Add(importCommentsButton);
+                importActions.Children.Add(manualImportButton);
+                Grid.SetColumn(importActions, 0);
+                leftHeader.Children.Add(importActions);
+                var settingsButton = Btn("Settings", null, "#20343A", Brushes.White);
+                settingsButton.Width = 126;
+                settingsButton.Height = 42;
+                settingsButton.FontSize = 13;
+                settingsButton.Margin = new Thickness(0, 0, 12, 0);
+                Grid.SetColumn(settingsButton, 1);
+                leftHeader.Children.Add(settingsButton);
                 var refreshButton = Btn("Refresh", null, "#20343A", Brushes.White);
                 var rebuildLibraryButton = Btn("Rebuild", null, "#2E4751", Brushes.White);
                 var fetchButton = Btn("Fetch Covers", null, "#275D47", Brushes.White);
-                refreshButton.Margin = new Thickness(12, 0, 0, 0);
-                rebuildLibraryButton.Margin = new Thickness(12, 0, 0, 0);
-                fetchButton.Margin = new Thickness(12, 0, 0, 0);
-                var headerActions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
+                refreshButton.Width = 146;
+                rebuildLibraryButton.Width = 146;
+                fetchButton.Width = 158;
+                refreshButton.Margin = new Thickness(8, 0, 0, 0);
+                rebuildLibraryButton.Margin = new Thickness(8, 0, 0, 0);
+                fetchButton.Margin = new Thickness(8, 0, 0, 0);
+                var headerActions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) };
                 headerActions.Children.Add(refreshButton);
                 headerActions.Children.Add(rebuildLibraryButton);
                 headerActions.Children.Add(fetchButton);
                 Grid.SetColumn(headerActions, 2);
                 leftHeader.Children.Add(headerActions);
                 leftGrid.Children.Add(leftHeader);
+                status = new TextBlock { Text = "Ready", Foreground = Brush("#8EA0AA"), FontSize = 11.5, Margin = new Thickness(2, 12, 0, 0), TextWrapping = TextWrapping.Wrap };
+
+                var filterGrid = new Grid { Margin = new Thickness(0, 16, 0, 0) };
+                filterGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(320) });
+                filterGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                filterGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                filterGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                var searchPanel = new StackPanel { Width = 320 };
+                searchPanel.Children.Add(new TextBlock { Text = "Search", Foreground = Brush("#A7B5BD"), Margin = new Thickness(0, 0, 0, 6) });
+                var searchBox = new TextBox { Padding = new Thickness(10, 6, 10, 6), Background = Brush("#182129"), Foreground = Brush("#F1E9DA"), BorderBrush = Brush("#2D3A43"), BorderThickness = new Thickness(1), FontSize = 13 };
+                searchPanel.Children.Add(searchBox);
+                Grid.SetColumn(searchPanel, 0);
+                filterGrid.Children.Add(searchPanel);
+                var sortPanel = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(18, 0, 0, 0) };
+                sortPanel.Children.Add(new TextBlock { Text = "Sort", Foreground = Brush("#A7B5BD"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) });
+                var sortModeBoxShell = new Border
+                {
+                    Width = 182,
+                    Height = 40,
+                    Background = Brush("#F6F8FA"),
+                    BorderBrush = Brush("#C9D4DD"),
+                    BorderThickness = new Thickness(1),
+                    CornerRadius = new CornerRadius(10),
+                    Padding = new Thickness(10, 2, 10, 2),
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                var sortModeBox = new ComboBox
+                {
+                    Background = Brushes.Transparent,
+                    Foreground = Brush("#1F2A30"),
+                    BorderThickness = new Thickness(0),
+                    Padding = new Thickness(0),
+                    FontSize = 13.5,
+                    FontWeight = FontWeights.SemiBold,
+                    HorizontalContentAlignment = HorizontalAlignment.Center,
+                    VerticalContentAlignment = VerticalAlignment.Center,
+                    ItemsSource = new[] { "Platform", "Recently Added", "Most Photos" },
+                    SelectedItem = LibraryFolderSortModeLabel(libraryFolderSortMode)
+                };
+                var sortModeItemStyle = new Style(typeof(ComboBoxItem));
+                sortModeItemStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Center));
+                sortModeItemStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(8, 6, 8, 6)));
+                sortModeBox.ItemContainerStyle = sortModeItemStyle;
+                sortModeBoxShell.Child = sortModeBox;
+                sortPanel.Children.Add(sortModeBoxShell);
+                Grid.SetColumn(sortPanel, 2);
+                filterGrid.Children.Add(sortPanel);
+                var sizePanel = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(18, 0, 0, 0) };
+                sizePanel.Children.Add(new TextBlock { Text = "Folder size", Foreground = Brush("#A7B5BD"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) });
+                var folderTileSizeSlider = new Slider { Minimum = 140, Maximum = 340, Value = NormalizeLibraryFolderTileSize(libraryFolderTileSize), Width = 170, TickFrequency = 10, IsSnapToTickEnabled = true };
+                folderTileSizeSlider.VerticalAlignment = VerticalAlignment.Center;
+                folderTileSizeSlider.Margin = new Thickness(0, 6, 0, 0);
+                sizePanel.Children.Add(folderTileSizeSlider);
+                var folderTileSizeValue = new TextBlock { Text = NormalizeLibraryFolderTileSize(libraryFolderTileSize).ToString(), Foreground = Brush("#A7B5BD"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0), Width = 40 };
+                sizePanel.Children.Add(folderTileSizeValue);
+                Grid.SetColumn(sizePanel, 3);
+                filterGrid.Children.Add(sizePanel);
+                Grid.SetRow(filterGrid, 1);
+                leftGrid.Children.Add(filterGrid);
 
                 var tileScroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Margin = new Thickness(0, 16, 0, 0) };
                 var tilePanel = new StackPanel();
                 tileScroll.Content = tilePanel;
-                Grid.SetRow(tileScroll, 1);
+                Grid.SetRow(tileScroll, 2);
                 leftGrid.Children.Add(tileScroll);
+                Grid.SetRow(status, 3);
+                leftGrid.Children.Add(status);
                 left.Child = leftGrid;
                 root.Children.Add(left);
 
@@ -2594,9 +3531,9 @@ namespace PixelVaultNative
                 var thumbLabel = new TextBlock { Text = "All captures", FontSize = 18, FontWeight = FontWeights.SemiBold, Foreground = Brush("#F1E9DA"), VerticalAlignment = VerticalAlignment.Center };
                 controls.Children.Add(thumbLabel);
                 var sliderPanel = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
-                var sliderLabel = new TextBlock { Text = "Thumbnail size", Foreground = Brush("#A7B5BD"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) };
-                var sizeValue = new TextBlock { Text = "260", Foreground = Brush("#A7B5BD"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0), Width = 40 };
-                var thumbSizeSlider = new Slider { Minimum = 160, Maximum = 420, Value = 260, Width = 170, TickFrequency = 20, IsSnapToTickEnabled = true };
+                var sliderLabel = new TextBlock { Text = "Capture size", Foreground = Brush("#A7B5BD"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) };
+                var sizeValue = new TextBlock { Text = "320", Foreground = Brush("#A7B5BD"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0), Width = 40 };
+                var thumbSizeSlider = new Slider { Minimum = 140, Maximum = 500, Value = 320, Width = 170, TickFrequency = 20, IsSnapToTickEnabled = true };
                 sliderPanel.Children.Add(sliderLabel);
                 sliderPanel.Children.Add(thumbSizeSlider);
                 sliderPanel.Children.Add(sizeValue);
@@ -2617,7 +3554,45 @@ namespace PixelVaultNative
                 LibraryFolderInfo current = null;
                 Action<string, bool> runLibraryScan = null;
                 Action<LibraryFolderInfo> openLibraryMetadataEditor = null;
+                Action<string> openSingleFileMetadataEditor = null;
                 Action<bool> renderTiles = null;
+                Action<LibraryFolderInfo> showFolder = null;
+                Action<List<LibraryFolderInfo>, string> runScopedCoverRefresh = null;
+
+                openSingleFileMetadataEditor = delegate(string filePath)
+                {
+                    if (current == null || string.IsNullOrWhiteSpace(filePath))
+                    {
+                        MessageBox.Show("Choose a capture first.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
+                        return;
+                    }
+                    var selectedItems = BuildLibraryMetadataItems(current)
+                        .Where(item => string.Equals(item.FilePath, filePath, StringComparison.OrdinalIgnoreCase))
+                        .ToList();
+                    if (selectedItems.Count == 0)
+                    {
+                        MessageBox.Show("That capture could not be loaded for metadata editing.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
+                        return;
+                    }
+                    status.Text = "Editing selected capture metadata";
+                    Log("Opening single-capture metadata editor for " + Path.GetFileName(filePath) + ".");
+                    if (!ShowManualMetadataWindow(selectedItems, true, Path.GetFileName(filePath)))
+                    {
+                        status.Text = "Library metadata unchanged";
+                        return;
+                    }
+                    var currentFolderPath = current.FolderPath;
+                    var currentPlatformLabel = current.PlatformLabel;
+                    var currentName = current.Name;
+                    RunLibraryMetadataWorkflowWithProgress(current, selectedItems, delegate
+                    {
+                        current = string.IsNullOrWhiteSpace(currentFolderPath)
+                            ? null
+                            : new LibraryFolderInfo { FolderPath = currentFolderPath, PlatformLabel = currentPlatformLabel ?? string.Empty, Name = currentName ?? string.Empty };
+                        folders = LoadLibraryFoldersCached(libraryRoot, true);
+                        renderTiles(false);
+                    });
+                };
 
                 Action renderSelectedFolder = delegate
                 {
@@ -2645,19 +3620,23 @@ namespace PixelVaultNative
                             Foreground = Brush("#F1E9DA"),
                             Margin = new Thickness(0, 0, 0, 10)
                         });
-                        var wrap = new WrapPanel { Margin = new Thickness(0, 0, 0, 18) };
+                        var wrap = new WrapPanel { Margin = new Thickness(0, 0, 0, 12) };
                         foreach (var file in group)
                         {
-                            var tile = new Border { Width = size + 20, Margin = new Thickness(0, 0, 14, 14), Padding = new Thickness(10), Background = Brush("#1A232A"), CornerRadius = new CornerRadius(12), BorderBrush = Brush("#31414B"), BorderThickness = new Thickness(1), Tag = file };
-                            var image = LoadImageSource(file, size * 2);
-                            if (image != null)
+                            var tile = new Border { Width = size, Margin = new Thickness(0, 0, 10, 10), Padding = new Thickness(0), Background = Brushes.Transparent, BorderThickness = new Thickness(0), Tag = file };
+                            var presenter = new Grid();
+                            var placeholder = new TextBlock { Text = Path.GetFileName(file), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(8), Foreground = Brush("#F1E9DA"), TextAlignment = TextAlignment.Center };
+                            var image = new Image { Width = size, Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Center, Visibility = Visibility.Collapsed };
+                            presenter.Children.Add(placeholder);
+                            presenter.Children.Add(image);
+                            tile.Child = presenter;
+                            var renderFolder = current;
+                            QueueImageLoad(image, file, size * 2, delegate(BitmapImage loaded)
                             {
-                                tile.Child = new Image { Source = image, Width = size, Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Center };
-                            }
-                            else
-                            {
-                                tile.Child = new TextBlock { Text = Path.GetFileName(file), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(8), Foreground = Brush("#F1E9DA") };
-                            }
+                                image.Source = loaded;
+                                image.Visibility = Visibility.Visible;
+                                placeholder.Visibility = Visibility.Collapsed;
+                            }, false, delegate { return SameLibraryFolderSelection(current, renderFolder); });
                             tile.MouseLeftButtonDown += delegate(object sender, System.Windows.Input.MouseButtonEventArgs e)
                             {
                                 if (e.ClickCount >= 2)
@@ -2666,27 +3645,208 @@ namespace PixelVaultNative
                                     if (clicked != null && clicked.Tag is string) OpenWithShell((string)clicked.Tag);
                                 }
                             };
+                            var contextMenu = new ContextMenu();
+                            var openItem = new MenuItem { Header = "Open" };
+                            openItem.Click += delegate { OpenWithShell(file); };
+                            var openFolderItem = new MenuItem { Header = "Open Folder" };
+                            openFolderItem.Click += delegate { OpenFolder(Path.GetDirectoryName(file) ?? string.Empty); };
+                            var editItem = new MenuItem { Header = "Edit Metadata" };
+                            editItem.Click += delegate { openSingleFileMetadataEditor(file); };
+                            var copyPathItem = new MenuItem { Header = "Copy File Path" };
+                            copyPathItem.Click += delegate
+                            {
+                                try { Clipboard.SetText(file); } catch { }
+                            };
+                            contextMenu.Items.Add(openItem);
+                            contextMenu.Items.Add(openFolderItem);
+                            contextMenu.Items.Add(editItem);
+                            contextMenu.Items.Add(new Separator());
+                            contextMenu.Items.Add(copyPathItem);
+                            tile.ContextMenu = contextMenu;
                             wrap.Children.Add(tile);
                         }
                         thumbContent.Children.Add(wrap);
                     }
                 };
 
-                Action<LibraryFolderInfo> showFolder = delegate(LibraryFolderInfo info)
+                Func<LibraryFolderInfo, int, int, bool, Button> buildFolderTile = delegate(LibraryFolderInfo folder, int tileWidth, int tileHeight, bool showPlatformBadge)
+                {
+                    var tile = new Button
+                    {
+                        Width = tileWidth,
+                        Margin = new Thickness(0, 0, 14, 14),
+                        Padding = new Thickness(0),
+                        Background = Brush("#1A2329"),
+                        BorderBrush = Brush("#243139"),
+                        BorderThickness = new Thickness(1),
+                        HorizontalContentAlignment = HorizontalAlignment.Stretch,
+                        VerticalContentAlignment = VerticalAlignment.Stretch
+                    };
+                    var tileStack = new StackPanel();
+                    var imageBorder = new Border { Width = tileWidth, Height = tileHeight, Background = Brush("#0E1418") };
+                    if (showPlatformBadge)
+                    {
+                        var imageGrid = new Grid();
+                        imageGrid.Children.Add(CreateAsyncImageTile(
+                            ResolveLibraryArt(folder, false),
+                            Math.Max(tileWidth * 3, 760),
+                            tileWidth,
+                            tileHeight,
+                            Stretch.UniformToFill,
+                            folder.PlatformLabel,
+                            Brushes.White,
+                            new Thickness(0),
+                            new Thickness(0),
+                            Brushes.Transparent,
+                            new CornerRadius(0),
+                            Brushes.Transparent,
+                            new Thickness(0)));
+                        imageGrid.Children.Add(BuildLibraryTilePlatformBadge(folder.PlatformLabel));
+                        imageBorder.Child = imageGrid;
+                    }
+                    else
+                    {
+                        imageBorder.Child = CreateAsyncImageTile(
+                            ResolveLibraryArt(folder, false),
+                            Math.Max(tileWidth * 3, 760),
+                            tileWidth,
+                            tileHeight,
+                            Stretch.UniformToFill,
+                            folder.PlatformLabel,
+                            Brushes.White,
+                            new Thickness(0),
+                            new Thickness(0),
+                            Brushes.Transparent,
+                            new CornerRadius(0),
+                            Brushes.Transparent,
+                            new Thickness(0));
+                    }
+                    tileStack.Children.Add(imageBorder);
+                    tileStack.Children.Add(new TextBlock { Text = folder.Name, TextWrapping = TextWrapping.Wrap, Foreground = Brushes.White, Margin = new Thickness(12, 12, 12, 4), FontWeight = FontWeights.SemiBold, FontSize = 13 });
+                    tileStack.Children.Add(new TextBlock { Text = folder.FileCount + " item(s) | " + folder.PlatformLabel, Foreground = Brush("#B7C6C0"), Margin = new Thickness(12, 0, 12, 12), FontSize = 10.5 });
+                    tile.Content = tileStack;
+                    tile.Click += delegate { showFolder(folder); };
+                    var contextMenu = new ContextMenu();
+                    var setCoverItem = new MenuItem { Header = "Set Custom Cover..." };
+                    setCoverItem.Click += delegate
+                    {
+                        var pickedCover = PickFile(ResolveLibraryArt(folder, false), "Image Files|*.jpg;*.jpeg;*.png;*.bmp;*.gif|All Files|*.*");
+                        if (string.IsNullOrWhiteSpace(pickedCover)) return;
+                        SaveCustomCover(folder, pickedCover);
+                        showFolder(folder);
+                        renderTiles(false);
+                        Log("Custom cover set for " + folder.Name + " | " + folder.PlatformLabel + ".");
+                    };
+                    var clearCoverItem = new MenuItem { Header = "Clear Custom Cover", IsEnabled = !string.IsNullOrWhiteSpace(CustomCoverPath(folder)) };
+                    clearCoverItem.Click += delegate
+                    {
+                        ClearCustomCover(folder);
+                        showFolder(folder);
+                        renderTiles(false);
+                        Log("Custom cover cleared for " + folder.Name + " | " + folder.PlatformLabel + ".");
+                    };
+                    var openFolderItem = new MenuItem { Header = "Open Folder" };
+                    openFolderItem.Click += delegate { OpenFolder(folder.FolderPath); };
+                    var editMetadataItem = new MenuItem { Header = "Edit Metadata" };
+                    editMetadataItem.Click += delegate { openLibraryMetadataEditor(folder); };
+                    var refreshFolderItem = new MenuItem { Header = "Refresh Folder" };
+                    refreshFolderItem.Click += delegate { runLibraryScan(folder.FolderPath, false); };
+                    var rebuildFolderItem = new MenuItem { Header = "Rebuild Folder" };
+                    rebuildFolderItem.Click += delegate { runLibraryScan(folder.FolderPath, true); };
+                    var fetchFolderCoverItem = new MenuItem { Header = "Fetch Cover Art" };
+                    fetchFolderCoverItem.Click += delegate
+                    {
+                        showFolder(folder);
+                        runScopedCoverRefresh(new List<LibraryFolderInfo> { folder }, folder.Name + " | " + folder.PlatformLabel);
+                    };
+                    contextMenu.Items.Add(openFolderItem);
+                    contextMenu.Items.Add(editMetadataItem);
+                    contextMenu.Items.Add(new Separator());
+                    contextMenu.Items.Add(refreshFolderItem);
+                    contextMenu.Items.Add(rebuildFolderItem);
+                    contextMenu.Items.Add(fetchFolderCoverItem);
+                    contextMenu.Items.Add(new Separator());
+                    contextMenu.Items.Add(setCoverItem);
+                    contextMenu.Items.Add(clearCoverItem);
+                    tile.ContextMenu = contextMenu;
+                    return tile;
+                };
+
+                showFolder = delegate(LibraryFolderInfo info)
                 {
                     current = info;
                     detailTitle.Text = info.Name;
                     detailMeta.Text = info.FileCount + " item(s) | " + info.PlatformLabel + " | " + info.FolderPath;
-                    previewImage.Source = LoadImageSource(ResolveLibraryArt(info, false), 720);
+                    var artPath = ResolveLibraryArt(info, false);
+                    if (string.IsNullOrWhiteSpace(artPath) || !File.Exists(artPath))
+                    {
+                        previewImage.Source = null;
+                        previewImage.Visibility = Visibility.Collapsed;
+                    }
+                    else QueueImageLoad(previewImage, artPath, 720, delegate(BitmapImage loaded)
+                    {
+                        previewImage.Source = loaded;
+                        previewImage.Visibility = Visibility.Visible;
+                    }, true, delegate { return SameLibraryFolderSelection(current, info); });
                     renderSelectedFolder();
                 };
 
                 renderTiles = delegate(bool forceRefresh)
                 {
                     folders = LoadLibraryFoldersCached(libraryRoot, forceRefresh);
-                    folderCount.Text = folders.Count + " folders";
+                    var sortMode = NormalizeLibraryFolderSortMode(libraryFolderSortMode);
+                    var flattenGroups = !string.Equals(sortMode, "platform", StringComparison.OrdinalIgnoreCase);
+                    var searchText = string.IsNullOrWhiteSpace(searchBox.Text) ? string.Empty : searchBox.Text.Trim();
+                    var visibleFolders = string.IsNullOrWhiteSpace(searchText)
+                        ? folders
+                        : folders.Where(folder =>
+                            (!string.IsNullOrWhiteSpace(folder.Name) && folder.Name.IndexOf(searchText, StringComparison.OrdinalIgnoreCase) >= 0) ||
+                            (!string.IsNullOrWhiteSpace(folder.PlatformLabel) && folder.PlatformLabel.IndexOf(searchText, StringComparison.OrdinalIgnoreCase) >= 0) ||
+                            (!string.IsNullOrWhiteSpace(folder.FolderPath) && folder.FolderPath.IndexOf(searchText, StringComparison.OrdinalIgnoreCase) >= 0) ||
+                            (!string.IsNullOrWhiteSpace(folder.GameId) && folder.GameId.IndexOf(searchText, StringComparison.OrdinalIgnoreCase) >= 0))
+                        .ToList();
+                    var orderedVisibleFolders = visibleFolders
+                        .OrderByDescending(folder => string.Equals(sortMode, "recent", StringComparison.OrdinalIgnoreCase) ? GetLibraryFolderNewestDate(folder) : DateTime.MinValue)
+                        .ThenByDescending(folder => string.Equals(sortMode, "photos", StringComparison.OrdinalIgnoreCase) ? folder.FileCount : 0)
+                        .ThenByDescending(folder => string.Equals(sortMode, "photos", StringComparison.OrdinalIgnoreCase) ? GetLibraryFolderNewestDate(folder) : DateTime.MinValue)
+                        .ThenBy(folder => string.Equals(sortMode, "platform", StringComparison.OrdinalIgnoreCase) ? PlatformGroupOrder(DetermineLibraryFolderGroup(folder)) : 0)
+                        .ThenBy(folder => DetermineLibraryFolderGroup(folder))
+                        .ThenBy(folder => folder.Name ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+                        .ToList();
+                    var tileWidth = (int)folderTileSizeSlider.Value;
+                    var tileHeight = (int)Math.Round(tileWidth * 1.5d);
+                    folderTileSizeValue.Text = tileWidth.ToString();
+                    LibraryFolderInfo selectedFolder = null;
+                    if (orderedVisibleFolders.Count > 0 && current == null) selectedFolder = orderedVisibleFolders[0];
+                    else if (current != null)
+                    {
+                        selectedFolder = folders.FirstOrDefault(f => f.FolderPath == current.FolderPath && string.Equals(f.PlatformLabel, current.PlatformLabel, StringComparison.OrdinalIgnoreCase));
+                        if (selectedFolder == null) selectedFolder = folders.FirstOrDefault(f => f.FolderPath == current.FolderPath);
+                    }
+                    if (selectedFolder != null)
+                    {
+                        if (forceRefresh || !SameLibraryFolderSelection(current, selectedFolder)) showFolder(selectedFolder);
+                        else current = selectedFolder;
+                    }
+
                     tilePanel.Children.Clear();
-                    var folderGroups = folders
+                    if (orderedVisibleFolders.Count == 0)
+                    {
+                        tilePanel.Children.Add(new TextBlock { Text = string.IsNullOrWhiteSpace(searchText) ? "No library folders found." : "No folders match the current search.", Foreground = Brush("#A7B5BD"), Margin = new Thickness(0, 12, 0, 0) });
+                        return;
+                    }
+                    if (flattenGroups)
+                    {
+                        var flatWrap = new WrapPanel { Margin = new Thickness(0, 14, 0, 0) };
+                        foreach (var folder in orderedVisibleFolders)
+                        {
+                            flatWrap.Children.Add(buildFolderTile(folder, tileWidth, tileHeight, true));
+                        }
+                        tilePanel.Children.Add(flatWrap);
+                        return;
+                    }
+
+                    var folderGroups = orderedVisibleFolders
                         .GroupBy(folder => DetermineLibraryFolderGroup(folder))
                         .OrderBy(group => PlatformGroupOrder(group.Key))
                         .ThenBy(group => group.Key)
@@ -2694,79 +3854,14 @@ namespace PixelVaultNative
                     foreach (var folderGroup in folderGroups)
                     {
                         var groupWrap = new WrapPanel { Margin = new Thickness(0, 14, 0, 0) };
-                        foreach (var folder in folderGroup.OrderBy(f => f.Name))
+                        foreach (var folder in folderGroup)
                         {
-                            var tile = new Button
-                            {
-                                Width = 290,
-                                Margin = new Thickness(0, 0, 14, 14),
-                                Padding = new Thickness(0),
-                                Background = Brush("#1A2329"),
-                                BorderBrush = Brush("#243139"),
-                                BorderThickness = new Thickness(1),
-                                HorizontalContentAlignment = HorizontalAlignment.Stretch,
-                                VerticalContentAlignment = VerticalAlignment.Stretch
-                            };
-                            var tileStack = new StackPanel();
-                            var imageBorder = new Border { Width = 290, Height = 435, Background = Brush("#0E1418") };
-                            var tileArt = LoadImageSource(ResolveLibraryArt(folder, false), 760);
-                            if (tileArt != null) imageBorder.Child = new Image { Source = tileArt, Width = 290, Height = 435, Stretch = Stretch.UniformToFill };
-                            else imageBorder.Child = new TextBlock { Text = folder.PlatformLabel, Foreground = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, FontWeight = FontWeights.SemiBold };
-                            tileStack.Children.Add(imageBorder);
-                            tileStack.Children.Add(new TextBlock { Text = folder.Name, TextWrapping = TextWrapping.Wrap, Foreground = Brushes.White, Margin = new Thickness(12, 12, 12, 4), FontWeight = FontWeights.SemiBold, FontSize = 13 });
-                            tileStack.Children.Add(new TextBlock { Text = folder.FileCount + " item(s) | " + folder.PlatformLabel, Foreground = Brush("#B7C6C0"), Margin = new Thickness(12, 0, 12, 12), FontSize = 10.5 });
-                            tile.Content = tileStack;
-                            tile.Click += delegate { showFolder(folder); };
-                            var contextMenu = new ContextMenu();
-                            var setCoverItem = new MenuItem { Header = "Set Custom Cover..." };
-                            setCoverItem.Click += delegate
-                            {
-                                var pickedCover = PickFile(ResolveLibraryArt(folder, false), "Image Files|*.jpg;*.jpeg;*.png;*.bmp;*.gif|All Files|*.*");
-                                if (string.IsNullOrWhiteSpace(pickedCover)) return;
-                                SaveCustomCover(folder, pickedCover);
-                                showFolder(folder);
-                                renderTiles(false);
-                                Log("Custom cover set for " + folder.Name + " | " + folder.PlatformLabel + ".");
-                            };
-                            var clearCoverItem = new MenuItem { Header = "Clear Custom Cover", IsEnabled = !string.IsNullOrWhiteSpace(CustomCoverPath(folder)) };
-                            clearCoverItem.Click += delegate
-                            {
-                                ClearCustomCover(folder);
-                                showFolder(folder);
-                                renderTiles(false);
-                                Log("Custom cover cleared for " + folder.Name + " | " + folder.PlatformLabel + ".");
-                            };
-                            var openFolderItem = new MenuItem { Header = "Open Folder" };
-                            openFolderItem.Click += delegate { OpenFolder(folder.FolderPath); };
-                            var editMetadataItem = new MenuItem { Header = "Edit Metadata" };
-                            editMetadataItem.Click += delegate { openLibraryMetadataEditor(folder); };
-                            var refreshFolderItem = new MenuItem { Header = "Refresh Folder" };
-                            refreshFolderItem.Click += delegate { runLibraryScan(folder.FolderPath, false); };
-                            var rebuildFolderItem = new MenuItem { Header = "Rebuild Folder" };
-                            rebuildFolderItem.Click += delegate { runLibraryScan(folder.FolderPath, true); };
-                            contextMenu.Items.Add(openFolderItem);
-                            contextMenu.Items.Add(editMetadataItem);
-                            contextMenu.Items.Add(new Separator());
-                            contextMenu.Items.Add(refreshFolderItem);
-                            contextMenu.Items.Add(rebuildFolderItem);
-                            contextMenu.Items.Add(new Separator());
-                            contextMenu.Items.Add(setCoverItem);
-                            contextMenu.Items.Add(clearCoverItem);
-                            tile.ContextMenu = contextMenu;
-                            groupWrap.Children.Add(tile);
+                            groupWrap.Children.Add(buildFolderTile(folder, tileWidth, tileHeight, false));
                         }
-
-                        var headerGrid = new Grid();
-                        headerGrid.ColumnDefinitions.Add(new ColumnDefinition());
-                        headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                        headerGrid.Children.Add(new TextBlock { Text = folderGroup.Key, FontSize = 16, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, VerticalAlignment = VerticalAlignment.Center });
-                        var countBadge = new Border { Background = Brush("#20343A"), CornerRadius = new CornerRadius(999), Padding = new Thickness(10, 3, 10, 3), Child = new TextBlock { Text = folderGroup.Count().ToString(), Foreground = Brush("#B7C6C0"), FontSize = 12, FontWeight = FontWeights.SemiBold } };
-                        Grid.SetColumn(countBadge, 1);
-                        headerGrid.Children.Add(countBadge);
 
                         var expander = new Expander
                         {
-                            Header = headerGrid,
+                            Header = BuildLibrarySectionHeader(folderGroup.Key, folderGroup.Count()),
                             IsExpanded = true,
                             Margin = new Thickness(0, 0, 0, 14),
                             Foreground = Brushes.White,
@@ -2777,13 +3872,6 @@ namespace PixelVaultNative
                             Content = groupWrap
                         };
                         tilePanel.Children.Add(expander);
-                    }
-                    if (folders.Count > 0 && current == null) showFolder(folders[0]);
-                    else if (current != null)
-                    {
-                        var match = folders.FirstOrDefault(f => f.FolderPath == current.FolderPath && string.Equals(f.PlatformLabel, current.PlatformLabel, StringComparison.OrdinalIgnoreCase));
-                        if (match == null) match = folders.FirstOrDefault(f => f.FolderPath == current.FolderPath);
-                        if (match != null) showFolder(match);
                     }
                 };
 
@@ -2814,7 +3902,9 @@ namespace PixelVaultNative
                         scanFolderButton.IsEnabled = true;
                         editMetadataButton.IsEnabled = true;
                         fetchButton.IsEnabled = true;
-                        photographyButton.IsEnabled = true;
+                        importButton.IsEnabled = true;
+                        importCommentsButton.IsEnabled = true;
+                        manualImportButton.IsEnabled = true;
                         System.Windows.Input.Mouse.OverrideCursor = null;
                     };
                     try
@@ -2881,7 +3971,9 @@ namespace PixelVaultNative
                         scanFolderButton.IsEnabled = false;
                         editMetadataButton.IsEnabled = false;
                         fetchButton.IsEnabled = false;
-                        photographyButton.IsEnabled = false;
+                        importButton.IsEnabled = false;
+                        importCommentsButton.IsEnabled = false;
+                        manualImportButton.IsEnabled = false;
                         System.Windows.Input.Mouse.OverrideCursor = System.Windows.Input.Cursors.Wait;
                         var capturedFolderPath = folderPath;
                         var capturedForceRescan = forceRescan;
@@ -2964,8 +4056,15 @@ namespace PixelVaultNative
                     }
                 };
 
-                Action runCoverRefresh = delegate
+                runScopedCoverRefresh = delegate(List<LibraryFolderInfo> requestedFolders, string scopeLabel)
                 {
+                    var targetFolders = (requestedFolders ?? new List<LibraryFolderInfo>()).Where(folder => folder != null && !string.IsNullOrWhiteSpace(folder.FolderPath)).ToList();
+                    if (targetFolders.Count == 0)
+                    {
+                        MessageBox.Show("No library folder is available for cover refresh.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
+                        return;
+                    }
+                    var resolvedScopeLabel = string.IsNullOrWhiteSpace(scopeLabel) ? (targetFolders.Count == 1 ? "selected folder" : "library") : scopeLabel.Trim();
                     Window progressWindow = null;
                     TextBlock progressMeta = null;
                     ProgressBar progressBar = null;
@@ -2989,7 +4088,9 @@ namespace PixelVaultNative
                         scanFolderButton.IsEnabled = true;
                         editMetadataButton.IsEnabled = true;
                         fetchButton.IsEnabled = true;
-                        photographyButton.IsEnabled = true;
+                        importButton.IsEnabled = true;
+                        importCommentsButton.IsEnabled = true;
+                        manualImportButton.IsEnabled = true;
                         System.Windows.Input.Mouse.OverrideCursor = null;
                     };
                     try
@@ -3010,7 +4111,7 @@ namespace PixelVaultNative
                         progressRoot.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
                         progressRoot.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
                         progressRoot.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-                        var progressTitle = new TextBlock { Text = "Resolving AppIDs and fetching cover art", FontSize = 24, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, Margin = new Thickness(0, 0, 0, 8) };
+                        var progressTitle = new TextBlock { Text = "Resolving IDs and fetching cover art", FontSize = 24, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, Margin = new Thickness(0, 0, 0, 8) };
                         progressMeta = new TextBlock { Text = "Preparing library entries...", Foreground = Brush("#B7C6C0"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 14) };
                         progressBar = new ProgressBar { Height = 18, Minimum = 0, Maximum = 1, Value = 0, IsIndeterminate = true, Margin = new Thickness(0, 0, 0, 14) };
                         progressLog = new TextBox { IsReadOnly = true, AcceptsReturn = true, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, TextWrapping = TextWrapping.Wrap, Background = Brush("#12191E"), Foreground = Brush("#F1E9DA"), BorderBrush = Brush("#2B3A44"), BorderThickness = new Thickness(1), FontFamily = new FontFamily("Cascadia Mono") };
@@ -3047,20 +4148,22 @@ namespace PixelVaultNative
                         progressRoot.Children.Add(actionButton);
                         progressWindow.Content = progressRoot;
                         progressWindow.Show();
-                        appendProgress("Starting cover refresh.");
-                        status.Text = "Resolving AppIDs and fetching cover art";
+                        appendProgress("Starting cover refresh for " + resolvedScopeLabel + ".");
+                        status.Text = targetFolders.Count == 1 ? "Resolving IDs and fetching folder cover art" : "Resolving IDs and fetching cover art";
                         refreshButton.IsEnabled = false;
                         rebuildLibraryButton.IsEnabled = false;
                         scanFolderButton.IsEnabled = false;
                         editMetadataButton.IsEnabled = false;
                         fetchButton.IsEnabled = false;
-                        photographyButton.IsEnabled = false;
+                        importButton.IsEnabled = false;
+                        importCommentsButton.IsEnabled = false;
+                        manualImportButton.IsEnabled = false;
                         System.Windows.Input.Mouse.OverrideCursor = System.Windows.Input.Cursors.Wait;
                         System.Threading.Tasks.Task.Factory.StartNew(delegate
                         {
                             int resolved = 0;
                             int coversReady = 0;
-                            RefreshLibraryCovers(libraryRoot, folders, delegate(int currentCount, int totalCount, string detail)
+                            RefreshLibraryCovers(libraryRoot, targetFolders, delegate(int currentCount, int totalCount, string detail)
                             {
                                 if (progressWindow == null) return;
                                 progressWindow.Dispatcher.BeginInvoke(new Action(delegate
@@ -3090,13 +4193,13 @@ namespace PixelVaultNative
                                 finishButtons();
                                 if (refreshTask.IsCanceled || (refreshTask.IsFaulted && refreshTask.Exception != null && refreshTask.Exception.Flatten().InnerExceptions.Any(ex => ex is OperationCanceledException)))
                                 {
-                                    status.Text = "Cover refresh cancelled";
+                                    status.Text = targetFolders.Count == 1 ? "Folder cover refresh cancelled" : "Cover refresh cancelled";
                                     if (progressMeta != null) progressMeta.Text = "Cover refresh cancelled before completion.";
                                     appendProgress("Cover refresh cancelled.");
                                 }
                                 else if (refreshTask.IsFaulted)
                                 {
-                                    status.Text = "Cover refresh failed";
+                                    status.Text = targetFolders.Count == 1 ? "Folder cover refresh failed" : "Cover refresh failed";
                                     var flattened = refreshTask.Exception == null ? null : refreshTask.Exception.Flatten();
                                     var refreshError = flattened == null ? new Exception("Cover refresh failed.") : flattened.InnerExceptions.First();
                                     if (progressMeta != null) progressMeta.Text = refreshError.Message;
@@ -3108,11 +4211,11 @@ namespace PixelVaultNative
                                 {
                                     var resolved = refreshTask.Result == null || refreshTask.Result.Length < 1 ? 0 : refreshTask.Result[0];
                                     var coversReady = refreshTask.Result == null || refreshTask.Result.Length < 2 ? 0 : refreshTask.Result[1];
-                                    status.Text = "Cover refresh complete";
+                                    status.Text = targetFolders.Count == 1 ? "Folder cover refresh complete" : "Cover refresh complete";
                                     if (progressMeta != null) progressMeta.Text += " | complete";
                                     appendProgress("Cover refresh finished successfully.");
                                     renderTiles(false);
-                                    Log("Library cover art refresh complete. Resolved " + resolved + " Steam AppID entr" + (resolved == 1 ? "y" : "ies") + "; " + coversReady + " title" + (coversReady == 1 ? " has" : "s have") + " cover art ready.");
+                                    Log((targetFolders.Count == 1 ? "Folder" : "Library") + " cover art refresh complete for " + resolvedScopeLabel + ". Resolved " + resolved + " external ID entr" + (resolved == 1 ? "y" : "ies") + "; " + coversReady + " title" + (coversReady == 1 ? " has" : "s have") + " cover art ready.");
                                 }
                                 if (actionButton != null)
                                 {
@@ -3139,9 +4242,17 @@ namespace PixelVaultNative
                     }
                 };
 
+                Action runCoverRefresh = delegate
+                {
+                    runScopedCoverRefresh(folders, "library");
+                };
+
                 refreshButton.Click += delegate { runLibraryScan(null, false); };
                 rebuildLibraryButton.Click += delegate { runLibraryScan(null, true); };
-                photographyButton.Click += delegate { ShowPhotographyGallery(libraryWindow); };
+                settingsButton.Click += delegate { ShowSettingsWindow(); };
+                importButton.Click += delegate { RunWorkflow(false); };
+                importCommentsButton.Click += delegate { RunWorkflow(true); };
+                manualImportButton.Click += delegate { OpenManualIntakeWindow(); };
                 fetchButton.Click += delegate { runCoverRefresh(); };
                 openFolderButton.Click += delegate { if (current != null) OpenFolder(current.FolderPath); };
                 scanFolderButton.Click += delegate
@@ -3173,9 +4284,25 @@ namespace PixelVaultNative
                 };
                 editMetadataButton.Click += delegate { openLibraryMetadataEditor(current); };
                 thumbSizeSlider.ValueChanged += delegate { if (current != null) renderSelectedFolder(); };
+                folderTileSizeSlider.ValueChanged += delegate
+                {
+                    libraryFolderTileSize = NormalizeLibraryFolderTileSize((int)Math.Round(folderTileSizeSlider.Value));
+                    if (folderTileSizeValue != null) folderTileSizeValue.Text = libraryFolderTileSize.ToString();
+                    SaveSettings();
+                    renderTiles(false);
+                };
+                sortModeBox.SelectionChanged += delegate
+                {
+                    var selectedMode = NormalizeLibraryFolderSortMode(sortModeBox.SelectedItem == null ? string.Empty : sortModeBox.SelectedItem.ToString());
+                    if (string.Equals(selectedMode, NormalizeLibraryFolderSortMode(libraryFolderSortMode), StringComparison.OrdinalIgnoreCase)) return;
+                    libraryFolderSortMode = selectedMode;
+                    SaveSettings();
+                    renderTiles(false);
+                };
+                searchBox.TextChanged += delegate { renderTiles(false); };
 
                 renderTiles(false);
-                libraryWindow.Show();
+                if (!reuseMainWindow) libraryWindow.Show();
             }
             catch (Exception ex)
             {
@@ -3273,15 +4400,18 @@ namespace PixelVaultNative
                         var tile = new Border { Width = width, Margin = new Thickness(0, 0, 18, 22), Background = Brush("#12181E"), CornerRadius = new CornerRadius(10), BorderBrush = Brush("#262F38"), BorderThickness = new Thickness(1), Tag = file };
                         var tileStack = new StackPanel();
                         var frame = new Border { Background = Brush("#050607"), Margin = new Thickness(14, 14, 14, 10), Padding = new Thickness(10), CornerRadius = new CornerRadius(4) };
-                        var img = LoadImageSource(file, width * 2);
-                        if (img != null)
+                        var presenter = new Grid();
+                        var placeholder = new TextBlock { Text = Path.GetFileName(file), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(10), Foreground = Brush("#F5EFE4"), TextAlignment = TextAlignment.Center };
+                        var image = new Image { Width = width - 48, Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Center, Visibility = Visibility.Collapsed };
+                        presenter.Children.Add(placeholder);
+                        presenter.Children.Add(image);
+                        frame.Child = presenter;
+                        QueueImageLoad(image, file, width * 2, delegate(BitmapImage loaded)
                         {
-                            frame.Child = new Image { Source = img, Width = width - 48, Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Center };
-                        }
-                        else
-                        {
-                            frame.Child = new TextBlock { Text = Path.GetFileName(file), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(10), Foreground = Brush("#F5EFE4") };
-                        }
+                            image.Source = loaded;
+                            image.Visibility = Visibility.Visible;
+                            placeholder.Visibility = Visibility.Collapsed;
+                        });
                         tileStack.Children.Add(frame);
                         tileStack.Children.Add(new TextBlock { Text = Path.GetFileName(Path.GetDirectoryName(file)), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(14, 0, 14, 14), Foreground = Brush("#F5EFE4"), FontWeight = FontWeights.SemiBold, FontSize = 16, TextAlignment = TextAlignment.Center });
                         tile.Child = tileStack;
@@ -3397,12 +4527,17 @@ namespace PixelVaultNative
                 var cached = LoadLibraryFolderCache(root, stamp);
                 if (cached != null)
                 {
+                    if (ApplySavedGameIndexRows(root, cached))
+                    {
+                        SaveLibraryFolderCache(root, stamp, cached);
+                    }
                     Log("Library folder cache hit.");
                     return cached;
                 }
             }
             Log("Refreshing library folder cache.");
             var fresh = LoadLibraryFolders(root);
+            ApplySavedGameIndexRows(root, fresh);
             SaveLibraryFolderCache(root, stamp, fresh);
             return fresh;
         }
@@ -3428,6 +4563,757 @@ namespace PixelVaultNative
             return Path.Combine(cacheRoot, "library-folders-" + SafeCacheName(root) + ".cache");
         }
 
+        string GameIndexPath(string root)
+        {
+            return Path.Combine(cacheRoot, "game-index-" + SafeCacheName(root) + ".cache");
+        }
+
+        string NormalizeGameId(string gameId)
+        {
+            return CleanTag(gameId);
+        }
+
+        int ParseGameIdSequence(string gameId)
+        {
+            var normalized = NormalizeGameId(gameId);
+            if (string.IsNullOrWhiteSpace(normalized)) return 0;
+            var match = Regex.Match(normalized, @"^G(?<n>\d+)$", RegexOptions.IgnoreCase);
+            return match.Success ? ParseInt(match.Groups["n"].Value) : 0;
+        }
+
+        string FormatGameId(int number)
+        {
+            if (number < 1) number = 1;
+            return "G" + number.ToString("00000");
+        }
+
+        string CreateGameId(IEnumerable<string> existingGameIds)
+        {
+            var nextNumber = (existingGameIds ?? Enumerable.Empty<string>()).Select(ParseGameIdSequence).DefaultIfEmpty(0).Max() + 1;
+            return FormatGameId(nextNumber);
+        }
+
+        string NormalizeGameIndexName(string name, string folderPath = null)
+        {
+            var normalized = CleanTag(name);
+            if (!string.IsNullOrWhiteSpace(normalized)) return normalized;
+            if (!string.IsNullOrWhiteSpace(folderPath)) return CleanTag(Path.GetFileName(folderPath.TrimEnd(Path.DirectorySeparatorChar)));
+            return string.Empty;
+        }
+
+        string BuildGameIndexIdentity(string name, string platformLabel)
+        {
+            return NormalizeGameIndexName(name) + "|" + NormalizeConsoleLabel(platformLabel);
+        }
+
+        string BuildGameTitleChoiceLabel(string name, string platformLabel)
+        {
+            var normalizedName = NormalizeGameIndexName(name);
+            if (string.IsNullOrWhiteSpace(normalizedName)) return string.Empty;
+            return NormalizeConsoleLabel(string.IsNullOrWhiteSpace(platformLabel) ? "Other" : platformLabel).PadRight(12) + " | " + normalizedName;
+        }
+
+        string ExtractGameNameFromChoiceLabel(string value)
+        {
+            var cleaned = CleanTag(value);
+            if (string.IsNullOrWhiteSpace(cleaned)) return string.Empty;
+            var separatorIndex = cleaned.IndexOf(" | ", StringComparison.Ordinal);
+            return separatorIndex >= 0 && separatorIndex + 3 < cleaned.Length
+                ? CleanTag(cleaned.Substring(separatorIndex + 3))
+                : cleaned;
+        }
+
+        string BuildGameIndexMergeKey(GameIndexEditorRow row)
+        {
+            if (row == null) return string.Empty;
+            var gameId = NormalizeGameId(row.GameId);
+            return !string.IsNullOrWhiteSpace(gameId)
+                ? "id:" + gameId
+                : "identity:" + BuildGameIndexIdentity(row.Name, row.PlatformLabel);
+        }
+
+        string BuildLibraryFolderMasterKey(LibraryFolderInfo folder)
+        {
+            if (folder == null) return string.Empty;
+            var gameId = NormalizeGameId(folder.GameId);
+            return !string.IsNullOrWhiteSpace(gameId)
+                ? "id:" + gameId
+                : "identity:" + BuildGameIndexIdentity(folder.Name, folder.PlatformLabel);
+        }
+
+        GameIndexEditorRow CloneGameIndexEditorRow(GameIndexEditorRow row)
+        {
+            if (row == null) return null;
+            return new GameIndexEditorRow
+            {
+                GameId = NormalizeGameId(row.GameId),
+                Name = NormalizeGameIndexName(row.Name, row.FolderPath),
+                PlatformLabel = NormalizeConsoleLabel(row.PlatformLabel),
+                SteamAppId = CleanTag(row.SteamAppId),
+                SteamGridDbId = CleanTag(row.SteamGridDbId),
+                FileCount = Math.Max(0, row.FileCount),
+                FolderPath = (row.FolderPath ?? string.Empty).Trim(),
+                PreviewImagePath = (row.PreviewImagePath ?? string.Empty).Trim(),
+                FilePaths = (row.FilePaths ?? new string[0]).Where(path => !string.IsNullOrWhiteSpace(path)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray()
+            };
+        }
+
+        Dictionary<string, string> BuildGameIdAliasMap(IEnumerable<GameIndexEditorRow> sourceRows, IEnumerable<GameIndexEditorRow> normalizedRows)
+        {
+            var aliasMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var normalizedByIdentity = (normalizedRows ?? Enumerable.Empty<GameIndexEditorRow>())
+                .Where(row => row != null && !string.IsNullOrWhiteSpace(row.Name))
+                .GroupBy(row => BuildGameIndexIdentity(row.Name, row.PlatformLabel), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(group => group.Key, group => NormalizeGameId(group.First().GameId), StringComparer.OrdinalIgnoreCase);
+            foreach (var row in sourceRows ?? Enumerable.Empty<GameIndexEditorRow>())
+            {
+                if (row == null || string.IsNullOrWhiteSpace(row.Name)) continue;
+                var oldGameId = NormalizeGameId(row.GameId);
+                string newGameId;
+                if (!normalizedByIdentity.TryGetValue(BuildGameIndexIdentity(row.Name, row.PlatformLabel), out newGameId)) continue;
+                if (!string.IsNullOrWhiteSpace(oldGameId)) aliasMap[oldGameId] = newGameId;
+                if (!string.IsNullOrWhiteSpace(newGameId)) aliasMap[newGameId] = newGameId;
+            }
+            foreach (var row in normalizedRows ?? Enumerable.Empty<GameIndexEditorRow>())
+            {
+                var gameId = NormalizeGameId(row == null ? string.Empty : row.GameId);
+                if (!string.IsNullOrWhiteSpace(gameId)) aliasMap[gameId] = gameId;
+            }
+            return aliasMap;
+        }
+
+        bool HasGameIdAliasChanges(Dictionary<string, string> aliasMap)
+        {
+            return (aliasMap ?? new Dictionary<string, string>()).Any(pair => !string.Equals(pair.Key, pair.Value, StringComparison.OrdinalIgnoreCase));
+        }
+
+        List<GameIndexEditorRow> EnsureGameIndexRowsHaveIds(IEnumerable<GameIndexEditorRow> rows)
+        {
+            var normalizedRows = (rows ?? Enumerable.Empty<GameIndexEditorRow>()).Where(row => row != null).Select(CloneGameIndexEditorRow).ToList();
+            var groupedRows = normalizedRows
+                .Where(row => !string.IsNullOrWhiteSpace(row.Name))
+                .GroupBy(row => BuildGameIndexIdentity(row.Name, row.PlatformLabel), StringComparer.OrdinalIgnoreCase)
+                .OrderBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            var assignedIds = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var usedNumbers = new HashSet<int>();
+            foreach (var group in groupedRows)
+            {
+                var preferredNumber = group
+                    .Select(row => ParseGameIdSequence(row.GameId))
+                    .Where(number => number > 0)
+                    .Distinct()
+                    .OrderBy(number => number)
+                    .FirstOrDefault(number => !usedNumbers.Contains(number));
+                if (preferredNumber > 0)
+                {
+                    usedNumbers.Add(preferredNumber);
+                    assignedIds[group.Key] = FormatGameId(preferredNumber);
+                }
+            }
+            var nextNumber = usedNumbers.Count == 0 ? 1 : usedNumbers.Max() + 1;
+            foreach (var group in groupedRows)
+            {
+                string assignedGameId;
+                if (!assignedIds.TryGetValue(group.Key, out assignedGameId))
+                {
+                    while (usedNumbers.Contains(nextNumber)) nextNumber++;
+                    assignedGameId = FormatGameId(nextNumber);
+                    usedNumbers.Add(nextNumber);
+                    assignedIds[group.Key] = assignedGameId;
+                    nextNumber++;
+                }
+                foreach (var row in group) row.GameId = assignedGameId;
+            }
+            return normalizedRows;
+        }
+
+        List<GameIndexEditorRow> MergeGameIndexRows(IEnumerable<GameIndexEditorRow> rows)
+        {
+            var normalizedRows = EnsureGameIndexRowsHaveIds(rows).Where(row => !string.IsNullOrWhiteSpace(row.Name)).ToList();
+            var mergedRows = new List<GameIndexEditorRow>();
+            foreach (var group in normalizedRows.GroupBy(BuildGameIndexMergeKey, StringComparer.OrdinalIgnoreCase))
+            {
+                var groupRows = group.ToList();
+                var preferredName = groupRows
+                    .Select(row => NormalizeGameIndexName(row.Name, row.FolderPath))
+                    .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+                var representative = groupRows
+                    .OrderByDescending(row => !string.IsNullOrWhiteSpace(row.SteamAppId))
+                    .ThenByDescending(row => (row.FilePaths ?? new string[0]).Length)
+                    .ThenByDescending(row => row.FileCount)
+                    .ThenBy(row => row.FolderPath ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+                    .First();
+                var mergedFilePaths = groupRows
+                    .SelectMany(row => row.FilePaths ?? new string[0])
+                    .Where(path => !string.IsNullOrWhiteSpace(path))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
+                var folderPath = groupRows
+                    .Select(row => row.FolderPath ?? string.Empty)
+                    .FirstOrDefault(path => !string.IsNullOrWhiteSpace(path) && Directory.Exists(path));
+                if (string.IsNullOrWhiteSpace(folderPath))
+                {
+                    folderPath = groupRows
+                    .Select(row => row.FolderPath ?? string.Empty)
+                    .FirstOrDefault(path => !string.IsNullOrWhiteSpace(path));
+                }
+                var previewPath = groupRows
+                    .Select(row => row.PreviewImagePath ?? string.Empty)
+                    .FirstOrDefault(path => !string.IsNullOrWhiteSpace(path) && File.Exists(path));
+                if (string.IsNullOrWhiteSpace(previewPath)) previewPath = mergedFilePaths.FirstOrDefault(IsImage) ?? mergedFilePaths.FirstOrDefault() ?? string.Empty;
+                mergedRows.Add(new GameIndexEditorRow
+                {
+                    GameId = NormalizeGameId(representative.GameId),
+                    Name = preferredName ?? NormalizeGameIndexName(representative.Name, folderPath),
+                    PlatformLabel = NormalizeConsoleLabel(representative.PlatformLabel),
+                    SteamAppId = groupRows.Select(row => row.SteamAppId ?? string.Empty).FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty,
+                    SteamGridDbId = groupRows.Select(row => row.SteamGridDbId ?? string.Empty).FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty,
+                    FileCount = mergedFilePaths.Length > 0 ? mergedFilePaths.Length : groupRows.Max(row => row.FileCount),
+                    FolderPath = folderPath ?? string.Empty,
+                    PreviewImagePath = previewPath,
+                    FilePaths = mergedFilePaths
+                });
+            }
+            return mergedRows
+                .OrderBy(row => row.Name ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(row => row.PlatformLabel ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        bool PruneObsoleteMultipleTagsRows(List<GameIndexEditorRow> rows)
+        {
+            var rowList = rows ?? new List<GameIndexEditorRow>();
+            var staleRows = rowList
+                .Where(row => row != null
+                    && string.Equals(NormalizeConsoleLabel(row.PlatformLabel), "Multiple Tags", StringComparison.OrdinalIgnoreCase)
+                    && (row.FilePaths == null || row.FilePaths.Length == 0)
+                    && row.FileCount <= 0
+                    && string.IsNullOrWhiteSpace(row.FolderPath)
+                    && !string.IsNullOrWhiteSpace(row.Name)
+                    && rowList.Any(other => other != null
+                        && !ReferenceEquals(other, row)
+                        && string.Equals(NormalizeGameIndexName(other.Name), NormalizeGameIndexName(row.Name), StringComparison.OrdinalIgnoreCase)
+                        && !string.Equals(NormalizeConsoleLabel(other.PlatformLabel), "Multiple Tags", StringComparison.OrdinalIgnoreCase)
+                        && (((other.FilePaths ?? new string[0]).Length > 0) || other.FileCount > 0)))
+                .ToList();
+            if (staleRows.Count == 0) return false;
+            foreach (var staleRow in staleRows) rowList.Remove(staleRow);
+            return true;
+        }
+
+        void RefreshCachedLibraryFoldersFromGameIndex(string root)
+        {
+            if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root)) return;
+            var folders = LoadLibraryFolders(root, LoadLibraryMetadataIndex(root, true));
+            ApplySavedGameIndexRows(root, folders);
+            SaveLibraryFolderCache(root, BuildLibraryFolderInventoryStamp(root), folders);
+        }
+
+        GameIndexEditorRow FindSavedGameIndexRowById(IEnumerable<GameIndexEditorRow> rows, string gameId)
+        {
+            var wantedId = NormalizeGameId(gameId);
+            if (string.IsNullOrWhiteSpace(wantedId)) return null;
+            return (rows ?? Enumerable.Empty<GameIndexEditorRow>()).FirstOrDefault(row =>
+                row != null && string.Equals(NormalizeGameId(row.GameId), wantedId, StringComparison.OrdinalIgnoreCase));
+        }
+
+        GameIndexEditorRow FindSavedGameIndexRowByIdentity(IEnumerable<GameIndexEditorRow> rows, string name, string platformLabel)
+        {
+            var wantedIdentity = BuildGameIndexIdentity(name, platformLabel);
+            return (rows ?? Enumerable.Empty<GameIndexEditorRow>()).FirstOrDefault(row =>
+                row != null && string.Equals(BuildGameIndexIdentity(row.Name, row.PlatformLabel), wantedIdentity, StringComparison.OrdinalIgnoreCase));
+        }
+
+        List<GameIndexEditorRow> ReadSavedGameIndexRowsFile(string root)
+        {
+            var path = GameIndexPath(root);
+            if (!File.Exists(path)) return new List<GameIndexEditorRow>();
+            var lines = File.ReadAllLines(path);
+            if (lines.Length < 1) return new List<GameIndexEditorRow>();
+            if (!string.Equals(lines[0], root, StringComparison.OrdinalIgnoreCase)) return new List<GameIndexEditorRow>();
+            var list = new List<GameIndexEditorRow>();
+            foreach (var line in lines.Skip(1))
+            {
+                var parts = line.Split('\t');
+                if (parts.Length >= 9)
+                {
+                    list.Add(new GameIndexEditorRow
+                    {
+                        GameId = parts[0],
+                        FolderPath = parts[1],
+                        Name = parts[2],
+                        PlatformLabel = parts[3],
+                        SteamAppId = parts[4],
+                        SteamGridDbId = parts[5],
+                        FileCount = parts.Length > 6 ? ParseInt(parts[6]) : 0,
+                        PreviewImagePath = parts.Length > 7 ? parts[7] : string.Empty,
+                        FilePaths = parts.Length > 8 && !string.IsNullOrWhiteSpace(parts[8])
+                            ? parts[8].Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries).Where(File.Exists).ToArray()
+                            : new string[0]
+                    });
+                }
+                else if (parts.Length >= 8)
+                {
+                    list.Add(new GameIndexEditorRow
+                    {
+                        GameId = parts[0],
+                        FolderPath = parts[1],
+                        Name = parts[2],
+                        PlatformLabel = parts[3],
+                        SteamAppId = parts[4],
+                        SteamGridDbId = string.Empty,
+                        FileCount = parts.Length > 5 ? ParseInt(parts[5]) : 0,
+                        PreviewImagePath = parts.Length > 6 ? parts[6] : string.Empty,
+                        FilePaths = parts.Length > 7 && !string.IsNullOrWhiteSpace(parts[7])
+                            ? parts[7].Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries).Where(File.Exists).ToArray()
+                            : new string[0]
+                    });
+                }
+                else if (parts.Length >= 4)
+                {
+                    list.Add(new GameIndexEditorRow
+                    {
+                        GameId = string.Empty,
+                        FolderPath = parts[0],
+                        Name = parts[1],
+                        PlatformLabel = parts[2],
+                        SteamAppId = parts[3],
+                        SteamGridDbId = string.Empty,
+                        FileCount = parts.Length > 4 ? ParseInt(parts[4]) : 0,
+                        PreviewImagePath = parts.Length > 5 ? parts[5] : string.Empty,
+                        FilePaths = parts.Length > 6 && !string.IsNullOrWhiteSpace(parts[6])
+                            ? parts[6].Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries).Where(File.Exists).ToArray()
+                            : new string[0]
+                    });
+                }
+            }
+            return list;
+        }
+
+        void WriteSavedGameIndexRowsFile(string root, IEnumerable<GameIndexEditorRow> rows)
+        {
+            var path = GameIndexPath(root);
+            var lines = new List<string>();
+            lines.Add(root);
+            foreach (var row in rows.Where(row => row != null))
+            {
+                lines.Add(string.Join("\t", new[]
+                {
+                    NormalizeGameId(row.GameId),
+                    row.FolderPath ?? string.Empty,
+                    row.Name ?? string.Empty,
+                    row.PlatformLabel ?? string.Empty,
+                    row.SteamAppId ?? string.Empty,
+                    row.SteamGridDbId ?? string.Empty,
+                    row.FileCount.ToString(),
+                    row.PreviewImagePath ?? string.Empty,
+                    string.Join("|", (row.FilePaths ?? new string[0]).Where(File.Exists))
+                }));
+            }
+            File.WriteAllLines(path, lines.ToArray());
+        }
+
+        Dictionary<string, string> BuildSavedGameIdAliasMapFromFile(string root)
+        {
+            var rawRows = ReadSavedGameIndexRowsFile(root);
+            if (rawRows.Count == 0) return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var normalizedRows = MergeGameIndexRows(rawRows);
+            return BuildGameIdAliasMap(rawRows, normalizedRows);
+        }
+
+        void RewriteGameIdAliasesInLibraryMetadataIndexFile(string root, Dictionary<string, string> aliasMap)
+        {
+            if (aliasMap == null || aliasMap.Count == 0) return;
+            var path = LibraryMetadataIndexPath(root);
+            if (!File.Exists(path)) return;
+            var lines = File.ReadAllLines(path);
+            if (lines.Length < 2) return;
+            bool changed = false;
+            var rewritten = new List<string> { lines[0] };
+            foreach (var line in lines.Skip(1))
+            {
+                var parts = line.Split('\t');
+                if (parts.Length >= 5)
+                {
+                    string mappedGameId;
+                    var currentGameId = NormalizeGameId(parts[2]);
+                    if (!string.IsNullOrWhiteSpace(currentGameId) && aliasMap.TryGetValue(currentGameId, out mappedGameId) && !string.Equals(parts[2], mappedGameId, StringComparison.Ordinal))
+                    {
+                        parts[2] = mappedGameId;
+                        changed = true;
+                    }
+                    rewritten.Add(string.Join("\t", new[] { parts[0], parts[1], parts[2], parts[3], parts[4] }));
+                }
+                else
+                {
+                    rewritten.Add(line);
+                }
+            }
+            if (changed)
+            {
+                File.WriteAllLines(path, rewritten.ToArray());
+                if (string.Equals(libraryMetadataIndexRoot, root, StringComparison.OrdinalIgnoreCase))
+                {
+                    foreach (var entry in libraryMetadataIndex.Values.Where(entry => entry != null))
+                    {
+                        var currentGameId = NormalizeGameId(entry.GameId);
+                        string mappedGameId;
+                        if (!string.IsNullOrWhiteSpace(currentGameId) && aliasMap.TryGetValue(currentGameId, out mappedGameId)) entry.GameId = mappedGameId;
+                    }
+                }
+            }
+        }
+
+        void RewriteGameIdAliasesInLibraryFolderCacheFile(string root, Dictionary<string, string> aliasMap)
+        {
+            if (aliasMap == null || aliasMap.Count == 0) return;
+            var path = LibraryFolderCachePath(root);
+            if (!File.Exists(path)) return;
+            var lines = File.ReadAllLines(path);
+            if (lines.Length < 3) return;
+            bool changed = false;
+            var rewritten = new List<string> { lines[0], lines[1] };
+            foreach (var line in lines.Skip(2))
+            {
+                var parts = line.Split('\t');
+                if (parts.Length >= 8)
+                {
+                    string mappedGameId;
+                    var currentGameId = NormalizeGameId(parts[0]);
+                    if (!string.IsNullOrWhiteSpace(currentGameId) && aliasMap.TryGetValue(currentGameId, out mappedGameId) && !string.Equals(parts[0], mappedGameId, StringComparison.Ordinal))
+                    {
+                        parts[0] = mappedGameId;
+                        changed = true;
+                    }
+                    rewritten.Add(string.Join("\t", parts));
+                }
+                else
+                {
+                    rewritten.Add(line);
+                }
+            }
+            if (changed) File.WriteAllLines(path, rewritten.ToArray());
+        }
+
+        List<GameIndexEditorRow> LoadSavedGameIndexRows(string root)
+        {
+            var rawRows = ReadSavedGameIndexRowsFile(root);
+            var normalizedRows = MergeGameIndexRows(rawRows);
+            var aliasMap = BuildGameIdAliasMap(rawRows, normalizedRows);
+            if (rawRows.Count > 0 && (HasGameIdAliasChanges(aliasMap) || normalizedRows.Count != rawRows.Count || rawRows.Any(row => string.IsNullOrWhiteSpace(row.GameId))))
+            {
+                WriteSavedGameIndexRowsFile(root, normalizedRows);
+                RewriteGameIdAliasesInLibraryMetadataIndexFile(root, aliasMap);
+                RewriteGameIdAliasesInLibraryFolderCacheFile(root, aliasMap);
+            }
+            return normalizedRows;
+        }
+
+        void SaveSavedGameIndexRows(string root, IEnumerable<GameIndexEditorRow> rows)
+        {
+            var sourceRows = (rows ?? Enumerable.Empty<GameIndexEditorRow>()).Where(row => row != null).Select(CloneGameIndexEditorRow).ToList();
+            var mergedRows = MergeGameIndexRows(sourceRows);
+            var aliasMap = BuildGameIdAliasMap(sourceRows, mergedRows);
+            WriteSavedGameIndexRowsFile(root, mergedRows);
+            if (HasGameIdAliasChanges(aliasMap))
+            {
+                RewriteGameIdAliasesInLibraryMetadataIndexFile(root, aliasMap);
+                RewriteGameIdAliasesInLibraryFolderCacheFile(root, aliasMap);
+            }
+        }
+
+        List<GameIndexEditorRow> BuildGameIndexRowsFromFolders(IEnumerable<LibraryFolderInfo> folders)
+        {
+            return (folders ?? Enumerable.Empty<LibraryFolderInfo>())
+                .Where(folder => folder != null)
+                .Select(folder => new GameIndexEditorRow
+                {
+                    GameId = folder.GameId ?? string.Empty,
+                    Name = folder.Name ?? string.Empty,
+                    PlatformLabel = folder.PlatformLabel ?? string.Empty,
+                    SteamAppId = folder.SteamAppId ?? string.Empty,
+                    SteamGridDbId = folder.SteamGridDbId ?? string.Empty,
+                    FileCount = folder.FileCount,
+                    FolderPath = folder.FolderPath ?? string.Empty,
+                    PreviewImagePath = folder.PreviewImagePath ?? string.Empty,
+                    FilePaths = folder.FilePaths ?? new string[0]
+                })
+                .ToList();
+        }
+
+        Dictionary<string, int> BuildGameIndexTitleCounts(IEnumerable<GameIndexEditorRow> rows)
+        {
+            return (rows ?? Enumerable.Empty<GameIndexEditorRow>())
+                .Where(row => row != null && !string.IsNullOrWhiteSpace(row.Name))
+                .GroupBy(row => NormalizeGameIndexName(row.Name, row.FolderPath), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(group => group.Key, group => group.Count(), StringComparer.OrdinalIgnoreCase);
+        }
+
+        string BuildCanonicalGameIndexFolderName(GameIndexEditorRow row, Dictionary<string, int> titleCounts)
+        {
+            var normalizedName = NormalizeGameIndexName(row == null ? string.Empty : row.Name, row == null ? null : row.FolderPath);
+            if (string.IsNullOrWhiteSpace(normalizedName)) normalizedName = "Unknown Game";
+            var safeName = GetSafeGameFolderName(normalizedName);
+            var key = NormalizeGameIndexName(normalizedName);
+            int count;
+            if (titleCounts != null && titleCounts.TryGetValue(key, out count) && count > 1)
+            {
+                var platform = NormalizeConsoleLabel(row == null ? string.Empty : row.PlatformLabel);
+                return GetSafeGameFolderName(safeName + " - " + platform);
+            }
+            return safeName;
+        }
+
+        string BuildCanonicalGameIndexFolderPath(string root, GameIndexEditorRow row, Dictionary<string, int> titleCounts)
+        {
+            if (string.IsNullOrWhiteSpace(root)) return string.Empty;
+            return Path.Combine(root, BuildCanonicalGameIndexFolderName(row, titleCounts));
+        }
+
+        void TryDeleteEmptyDirectory(string path)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(path) || !Directory.Exists(path)) return;
+                if (Directory.EnumerateFileSystemEntries(path).Any()) return;
+                Directory.Delete(path, false);
+            }
+            catch { }
+        }
+
+        void AlignLibraryFoldersToGameIndex(string root, List<GameIndexEditorRow> rows)
+        {
+            if (string.IsNullOrWhiteSpace(root) || rows == null) return;
+
+            var titleCounts = BuildGameIndexTitleCounts(rows);
+            var index = LoadLibraryMetadataIndex(root, true);
+            var touchedDirectories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var row in rows.Where(entry => entry != null))
+            {
+                var desiredDirectory = BuildCanonicalGameIndexFolderPath(root, row, titleCounts);
+                if (string.IsNullOrWhiteSpace(desiredDirectory))
+                {
+                    row.FolderPath = string.Empty;
+                    continue;
+                }
+
+                var updatedFiles = new List<string>();
+                foreach (var sourcePath in (row.FilePaths ?? new string[0]).Where(File.Exists).ToArray())
+                {
+                    var currentDirectory = Path.GetDirectoryName(sourcePath) ?? string.Empty;
+                    var targetPath = sourcePath;
+
+                    if (!string.Equals(currentDirectory.TrimEnd(Path.DirectorySeparatorChar), desiredDirectory.TrimEnd(Path.DirectorySeparatorChar), StringComparison.OrdinalIgnoreCase))
+                    {
+                        Directory.CreateDirectory(desiredDirectory);
+                        targetPath = Path.Combine(desiredDirectory, Path.GetFileName(sourcePath));
+                        if (File.Exists(targetPath)) targetPath = Unique(targetPath);
+                        File.Move(sourcePath, targetPath);
+                        MoveMetadataSidecarIfPresent(sourcePath, targetPath);
+                        Log("Game index folder align: " + sourcePath + " -> " + targetPath);
+                        if (!string.IsNullOrWhiteSpace(currentDirectory)) touchedDirectories.Add(currentDirectory);
+                    }
+
+                    LibraryMetadataIndexEntry entry;
+                    if (index.TryGetValue(sourcePath, out entry))
+                    {
+                        index.Remove(sourcePath);
+                    }
+                    else
+                    {
+                        entry = new LibraryMetadataIndexEntry
+                        {
+                            FilePath = targetPath,
+                            Stamp = BuildLibraryMetadataStamp(targetPath),
+                            GameId = NormalizeGameId(row.GameId),
+                            ConsoleLabel = NormalizeConsoleLabel(row.PlatformLabel),
+                            TagText = string.Join(", ", ParseTagText(string.Empty))
+                        };
+                    }
+
+                    entry.FilePath = targetPath;
+                    entry.Stamp = BuildLibraryMetadataStamp(targetPath);
+                    entry.GameId = NormalizeGameId(row.GameId);
+                    entry.ConsoleLabel = NormalizeConsoleLabel(row.PlatformLabel);
+                    index[targetPath] = entry;
+                    updatedFiles.Add(targetPath);
+                }
+
+                row.FilePaths = updatedFiles
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
+                row.FileCount = row.FilePaths.Length;
+                row.FolderPath = row.FilePaths.Length > 0
+                    ? desiredDirectory
+                    : (string.IsNullOrWhiteSpace(row.FolderPath) ? string.Empty : desiredDirectory);
+                row.PreviewImagePath = row.FilePaths.FirstOrDefault(IsImage) ?? row.FilePaths.FirstOrDefault() ?? string.Empty;
+            }
+
+            SaveLibraryMetadataIndex(root, index);
+            foreach (var directory in touchedDirectories) TryDeleteEmptyDirectory(directory);
+            ClearLibraryImageCaches();
+        }
+
+        int CountSharedGameIndexFiles(GameIndexEditorRow left, GameIndexEditorRow right)
+        {
+            if (left == null || right == null) return 0;
+            var leftFiles = new HashSet<string>((left.FilePaths ?? new string[0]).Where(path => !string.IsNullOrWhiteSpace(path)), StringComparer.OrdinalIgnoreCase);
+            if (leftFiles.Count == 0) return 0;
+            return (right.FilePaths ?? new string[0]).Count(path => !string.IsNullOrWhiteSpace(path) && leftFiles.Contains(path));
+        }
+
+        Dictionary<string, string> BuildGameIndexSaveAliasMap(IEnumerable<GameIndexEditorRow> previousRows, IEnumerable<GameIndexEditorRow> currentRows)
+        {
+            var aliasMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var oldRows = MergeGameIndexRows(previousRows).Where(row => row != null).ToList();
+            var newRows = MergeGameIndexRows(currentRows).Where(row => row != null).ToList();
+            var newByGameId = newRows
+                .Where(row => !string.IsNullOrWhiteSpace(NormalizeGameId(row.GameId)))
+                .GroupBy(row => NormalizeGameId(row.GameId), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+            var newByIdentity = newRows
+                .Where(row => !string.IsNullOrWhiteSpace(row.Name))
+                .GroupBy(row => BuildGameIndexIdentity(row.Name, row.PlatformLabel), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+
+            foreach (var oldRow in oldRows)
+            {
+                var oldGameId = NormalizeGameId(oldRow.GameId);
+                if (string.IsNullOrWhiteSpace(oldGameId)) continue;
+
+                GameIndexEditorRow target;
+                if (newByGameId.TryGetValue(oldGameId, out target))
+                {
+                    aliasMap[oldGameId] = oldGameId;
+                    continue;
+                }
+
+                var bestByFiles = newRows
+                    .Select(row => new { Row = row, Shared = CountSharedGameIndexFiles(oldRow, row) })
+                    .Where(match => match.Shared > 0)
+                    .OrderByDescending(match => match.Shared)
+                    .ThenByDescending(match => match.Row.FileCount)
+                    .Select(match => match.Row)
+                    .FirstOrDefault();
+                if (bestByFiles != null)
+                {
+                    aliasMap[oldGameId] = NormalizeGameId(bestByFiles.GameId);
+                    continue;
+                }
+
+                var folderMatches = newRows
+                    .Where(row => !string.IsNullOrWhiteSpace(oldRow.FolderPath)
+                        && string.Equals(row.FolderPath ?? string.Empty, oldRow.FolderPath ?? string.Empty, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+                if (folderMatches.Count == 1)
+                {
+                    aliasMap[oldGameId] = NormalizeGameId(folderMatches[0].GameId);
+                    continue;
+                }
+
+                var identity = BuildGameIndexIdentity(oldRow.Name, oldRow.PlatformLabel);
+                if (!string.IsNullOrWhiteSpace(identity) && newByIdentity.TryGetValue(identity, out target))
+                {
+                    aliasMap[oldGameId] = NormalizeGameId(target.GameId);
+                }
+            }
+
+            return aliasMap
+                .Where(pair => !string.IsNullOrWhiteSpace(pair.Key) && !string.IsNullOrWhiteSpace(pair.Value))
+                .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.OrdinalIgnoreCase);
+        }
+
+        GameIndexEditorRow FindSavedGameIndexRow(IEnumerable<GameIndexEditorRow> rows, LibraryFolderInfo folder)
+        {
+            if (folder == null) return null;
+            var savedRows = (rows ?? Enumerable.Empty<GameIndexEditorRow>()).Where(row => row != null).ToList();
+            var byGameId = FindSavedGameIndexRowById(savedRows, folder.GameId);
+            if (byGameId != null) return byGameId;
+            return FindSavedGameIndexRowByIdentity(savedRows, folder.Name, folder.PlatformLabel);
+        }
+
+        bool ApplySavedGameIndexRows(string root, List<LibraryFolderInfo> folders)
+        {
+            var savedRows = LoadSavedGameIndexRows(root);
+            if (savedRows.Count == 0 || folders == null || folders.Count == 0) return false;
+            bool changed = false;
+            foreach (var folder in folders)
+            {
+                var saved = FindSavedGameIndexRow(savedRows, folder);
+                if (saved == null) continue;
+                if (!string.IsNullOrWhiteSpace(saved.GameId) && !string.Equals(folder.GameId ?? string.Empty, saved.GameId ?? string.Empty, StringComparison.Ordinal))
+                {
+                    folder.GameId = saved.GameId;
+                    changed = true;
+                }
+                if (!string.IsNullOrWhiteSpace(saved.Name) && !string.Equals(folder.Name ?? string.Empty, saved.Name ?? string.Empty, StringComparison.Ordinal))
+                {
+                    folder.Name = saved.Name;
+                    changed = true;
+                }
+                if (!string.IsNullOrWhiteSpace(saved.PlatformLabel) && !string.Equals(folder.PlatformLabel ?? string.Empty, saved.PlatformLabel ?? string.Empty, StringComparison.Ordinal))
+                {
+                    folder.PlatformLabel = saved.PlatformLabel;
+                    changed = true;
+                }
+                if (!string.IsNullOrWhiteSpace(saved.SteamAppId) && !string.Equals(folder.SteamAppId ?? string.Empty, saved.SteamAppId ?? string.Empty, StringComparison.Ordinal))
+                {
+                    folder.SteamAppId = saved.SteamAppId;
+                    changed = true;
+                }
+                if (!string.IsNullOrWhiteSpace(saved.SteamGridDbId) && !string.Equals(folder.SteamGridDbId ?? string.Empty, saved.SteamGridDbId ?? string.Empty, StringComparison.Ordinal))
+                {
+                    folder.SteamGridDbId = saved.SteamGridDbId;
+                    changed = true;
+                }
+            }
+            return changed;
+        }
+
+        void UpsertSavedGameIndexRow(string root, LibraryFolderInfo folder)
+        {
+            if (folder == null || string.IsNullOrWhiteSpace(root)) return;
+            var rows = LoadSavedGameIndexRows(root);
+            var saved = FindSavedGameIndexRow(rows, folder);
+            var gameId = NormalizeGameId(folder.GameId);
+            if (string.IsNullOrWhiteSpace(gameId))
+            {
+                var byIdentity = FindSavedGameIndexRowByIdentity(rows, folder.Name, folder.PlatformLabel);
+                gameId = byIdentity == null ? CreateGameId(rows.Select(row => row.GameId)) : byIdentity.GameId;
+            }
+            if (saved == null)
+            {
+                rows.Add(new GameIndexEditorRow
+                {
+                    GameId = gameId,
+                    FolderPath = folder.FolderPath ?? string.Empty,
+                    Name = folder.Name ?? string.Empty,
+                    PlatformLabel = folder.PlatformLabel ?? string.Empty,
+                    SteamAppId = folder.SteamAppId ?? string.Empty,
+                    SteamGridDbId = folder.SteamGridDbId ?? string.Empty,
+                    FileCount = folder.FileCount,
+                    PreviewImagePath = folder.PreviewImagePath ?? string.Empty,
+                    FilePaths = folder.FilePaths ?? new string[0]
+                });
+            }
+            else
+            {
+                saved.GameId = gameId;
+                saved.Name = folder.Name ?? string.Empty;
+                saved.PlatformLabel = folder.PlatformLabel ?? string.Empty;
+                if (!string.IsNullOrWhiteSpace(folder.SteamAppId)) saved.SteamAppId = folder.SteamAppId;
+                if (!string.IsNullOrWhiteSpace(folder.SteamGridDbId)) saved.SteamGridDbId = folder.SteamGridDbId;
+                saved.FileCount = folder.FileCount;
+                saved.PreviewImagePath = folder.PreviewImagePath ?? string.Empty;
+                saved.FilePaths = folder.FilePaths ?? new string[0];
+            }
+            SaveSavedGameIndexRows(root, rows);
+        }
+
 
         void ClearLibraryFolderCache(string root)
         {
@@ -3443,24 +5329,63 @@ namespace PixelVaultNative
             if (lines.Length < 2) return null;
             if (!string.Equals(lines[0], root, StringComparison.OrdinalIgnoreCase)) return null;
             if (!string.Equals(lines[1], stamp, StringComparison.Ordinal)) return null;
+            var aliasMap = BuildSavedGameIdAliasMapFromFile(root);
             var list = new List<LibraryFolderInfo>();
             foreach (var line in lines.Skip(2))
             {
                 var parts = line.Split('\t');
                 if (parts.Length < 5) continue;
-                list.Add(new LibraryFolderInfo
+                if (parts.Length >= 9)
                 {
-                    FolderPath = parts[0],
-                    Name = parts[1],
-                    FileCount = ParseInt(parts[2]),
-                    PreviewImagePath = parts[3],
-                    PlatformLabel = parts[4],
-                    FilePaths = parts.Length > 5 && !string.IsNullOrWhiteSpace(parts[5])
-                        ? parts[5].Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries).Where(File.Exists).ToArray()
-                        : new string[0],
-                    CoverArtPath = parts.Length > 6 ? parts[6] : string.Empty,
-                    SteamAppId = parts.Length > 7 ? parts[7] : string.Empty
-                });
+                    list.Add(new LibraryFolderInfo
+                    {
+                        GameId = !string.IsNullOrWhiteSpace(NormalizeGameId(parts[0])) && aliasMap.ContainsKey(NormalizeGameId(parts[0])) ? aliasMap[NormalizeGameId(parts[0])] : parts[0],
+                        FolderPath = parts[1],
+                        Name = parts[2],
+                        FileCount = ParseInt(parts[3]),
+                        PreviewImagePath = parts[4],
+                        PlatformLabel = parts[5],
+                        FilePaths = parts.Length > 6 && !string.IsNullOrWhiteSpace(parts[6])
+                            ? parts[6].Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries).Where(File.Exists).ToArray()
+                            : new string[0],
+                        SteamAppId = parts.Length > 7 ? parts[7] : string.Empty,
+                        SteamGridDbId = parts.Length > 8 ? parts[8] : string.Empty
+                    });
+                }
+                else if (parts.Length >= 8)
+                {
+                    list.Add(new LibraryFolderInfo
+                    {
+                        GameId = !string.IsNullOrWhiteSpace(NormalizeGameId(parts[0])) && aliasMap.ContainsKey(NormalizeGameId(parts[0])) ? aliasMap[NormalizeGameId(parts[0])] : parts[0],
+                        FolderPath = parts[1],
+                        Name = parts[2],
+                        FileCount = ParseInt(parts[3]),
+                        PreviewImagePath = parts[4],
+                        PlatformLabel = parts[5],
+                        FilePaths = parts.Length > 6 && !string.IsNullOrWhiteSpace(parts[6])
+                            ? parts[6].Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries).Where(File.Exists).ToArray()
+                            : new string[0],
+                        SteamAppId = parts.Length > 7 ? parts[7] : string.Empty,
+                        SteamGridDbId = string.Empty
+                    });
+                }
+                else
+                {
+                    list.Add(new LibraryFolderInfo
+                    {
+                        GameId = string.Empty,
+                        FolderPath = parts[0],
+                        Name = parts[1],
+                        FileCount = ParseInt(parts[2]),
+                        PreviewImagePath = parts[3],
+                        PlatformLabel = parts[4],
+                        FilePaths = parts.Length > 5 && !string.IsNullOrWhiteSpace(parts[5])
+                            ? parts[5].Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries).Where(File.Exists).ToArray()
+                            : new string[0],
+                        SteamAppId = parts.Length > 6 ? parts[6] : string.Empty,
+                        SteamGridDbId = string.Empty
+                    });
+                }
             }
             return list;
         }
@@ -3475,14 +5400,15 @@ namespace PixelVaultNative
             {
                 lines.Add(string.Join("\t", new[]
                 {
+                    NormalizeGameId(folder.GameId),
                     folder.FolderPath ?? string.Empty,
                     folder.Name ?? string.Empty,
                     folder.FileCount.ToString(),
                     folder.PreviewImagePath ?? string.Empty,
                     folder.PlatformLabel ?? string.Empty,
                     string.Join("|", (folder.FilePaths ?? new string[0]).Where(File.Exists)),
-                    folder.CoverArtPath ?? string.Empty,
-                    folder.SteamAppId ?? string.Empty
+                    folder.SteamAppId ?? string.Empty,
+                    folder.SteamGridDbId ?? string.Empty
                 }));
             }
             File.WriteAllLines(path, lines.ToArray());
@@ -3495,20 +5421,9 @@ namespace PixelVaultNative
                 ClearLibraryFolderCache(root);
                 return;
             }
-            var stamp = BuildLibraryFolderInventoryStamp(root);
-            var existing = LoadLibraryFolderCache(root, stamp) ?? new List<LibraryFolderInfo>();
             var fresh = LoadLibraryFolders(root, index);
-            foreach (var folder in fresh)
-            {
-                var match = existing.FirstOrDefault(entry =>
-                    string.Equals(entry.FolderPath, folder.FolderPath, StringComparison.OrdinalIgnoreCase)
-                    && string.Equals(NormalizeConsoleLabel(entry.PlatformLabel), NormalizeConsoleLabel(folder.PlatformLabel), StringComparison.OrdinalIgnoreCase)
-                    && string.Equals(entry.Name ?? string.Empty, folder.Name ?? string.Empty, StringComparison.OrdinalIgnoreCase));
-                if (match == null) continue;
-                if (string.IsNullOrWhiteSpace(folder.SteamAppId)) folder.SteamAppId = match.SteamAppId ?? string.Empty;
-                if (string.IsNullOrWhiteSpace(folder.CoverArtPath) && !string.IsNullOrWhiteSpace(match.CoverArtPath) && File.Exists(match.CoverArtPath)) folder.CoverArtPath = match.CoverArtPath;
-            }
-            SaveLibraryFolderCache(root, stamp, fresh);
+            ApplySavedGameIndexRows(root, fresh);
+            SaveLibraryFolderCache(root, BuildLibraryFolderInventoryStamp(root), fresh);
         }
 
         List<string> GetCachedFolderImages(string folderPath)
@@ -3527,7 +5442,7 @@ namespace PixelVaultNative
         }
         List<string> GetFilesForLibraryFolderEntry(LibraryFolderInfo folder, bool imagesOnly)
         {
-            if (folder == null || string.IsNullOrWhiteSpace(folder.FolderPath) || !Directory.Exists(folder.FolderPath)) return new List<string>();
+            if (folder == null) return new List<string>();
             if (folder.FilePaths != null && folder.FilePaths.Length > 0)
             {
                 return folder.FilePaths
@@ -3536,6 +5451,7 @@ namespace PixelVaultNative
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .ToList();
             }
+            if (string.IsNullOrWhiteSpace(folder.FolderPath) || !Directory.Exists(folder.FolderPath)) return new List<string>();
             IEnumerable<string> files = imagesOnly
                 ? GetCachedFolderImages(folder.FolderPath)
                 : Directory.EnumerateFiles(folder.FolderPath, "*.*", SearchOption.TopDirectoryOnly).Where(IsMedia);
@@ -3558,24 +5474,20 @@ namespace PixelVaultNative
             return !string.IsNullOrWhiteSpace(sidecar) && File.Exists(sidecar) ? sidecar : file;
         }
 
-        string NormalizeMetadataLookupPath(string path)
+        string NormalizeExifToolPathKey(string path)
         {
             if (string.IsNullOrWhiteSpace(path)) return string.Empty;
-            var normalized = path.Trim().Trim('"');
-            normalized = normalized.Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
+            var normalized = path.Replace('/', Path.DirectorySeparatorChar).Replace('\\', Path.DirectorySeparatorChar).Trim();
             try
             {
-                normalized = Path.GetFullPath(normalized);
+                return Path.GetFullPath(normalized);
             }
             catch
             {
+                return normalized;
             }
-            if (normalized.Length >= 2 && normalized[1] == ':')
-            {
-                normalized = char.ToUpperInvariant(normalized[0]) + normalized.Substring(1);
-            }
-            return normalized;
         }
+
         Dictionary<string, string[]> ReadEmbeddedKeywordTagsBatch(IEnumerable<string> files)
         {
             var result = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
@@ -3594,11 +5506,12 @@ namespace PixelVaultNative
                 var readTarget = MetadataReadPath(file);
                 if (string.IsNullOrWhiteSpace(readTarget) || !File.Exists(readTarget)) continue;
                 readTargets[file] = readTarget;
-                targetToSource[readTarget] = file;
-                var normalizedReadTarget = NormalizeMetadataLookupPath(readTarget);
-                if (!string.IsNullOrWhiteSpace(normalizedReadTarget)) targetToSource[normalizedReadTarget] = file;
+                targetToSource[NormalizeExifToolPathKey(readTarget)] = file;
             }
             if (readTargets.Count == 0) return result;
+            var orderedReadTargets = readTargets
+                .OrderBy(pair => pair.Value, StringComparer.OrdinalIgnoreCase)
+                .ToList();
 
             var argFile = Path.Combine(cacheRoot, "exiftool-batch-read-" + Guid.NewGuid().ToString("N") + ".args");
             try
@@ -3608,7 +5521,8 @@ namespace PixelVaultNative
                     "-T",
                     "-sep",
                     "||",
-                    "-SourceFile",
+                    "-Directory",
+                    "-FileName",
                     "-XMP-digiKam:TagsList",
                     "-XMP-lr:HierarchicalSubject",
                     "-XMP-dc:Subject",
@@ -3616,29 +5530,41 @@ namespace PixelVaultNative
                     "-XMP:TagsList",
                     "-IPTC:Keywords"
                 };
-                argLines.AddRange(readTargets.Values.Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(value => value, StringComparer.OrdinalIgnoreCase));
+                argLines.AddRange(orderedReadTargets.Select(pair => pair.Value));
                 File.WriteAllLines(argFile, argLines.ToArray(), Encoding.UTF8);
                 var output = RunExeCapture(exifToolPath, new[] { "-@", argFile }, Path.GetDirectoryName(exifToolPath), false);
-                foreach (var line in output.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries))
+                var matchedFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var outputLines = output.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
+                for (int lineIndex = 0; lineIndex < outputLines.Length; lineIndex++)
                 {
+                    var line = outputLines[lineIndex];
                     var parts = line.Split('\t');
-                    if (parts.Length == 0) continue;
+                    if (parts.Length < 2) continue;
+                    var directoryPart = parts[0] == "-" ? string.Empty : parts[0];
+                    var fileNamePart = parts[1] == "-" ? string.Empty : parts[1];
+                    var exifPath = NormalizeExifToolPathKey(Path.Combine(directoryPart, fileNamePart));
                     string sourceFile;
-                    if (!targetToSource.TryGetValue(parts[0], out sourceFile))
+                    if (!targetToSource.TryGetValue(exifPath, out sourceFile))
                     {
-                        var normalizedSource = NormalizeMetadataLookupPath(parts[0]);
-                        if (string.IsNullOrWhiteSpace(normalizedSource) || !targetToSource.TryGetValue(normalizedSource, out sourceFile)) continue;
+                        if (lineIndex >= orderedReadTargets.Count) continue;
+                        sourceFile = orderedReadTargets[lineIndex].Key;
                     }
                     var tags = new List<string>();
-                    for (int i = 1; i < parts.Length; i++)
+                    for (int i = 2; i < parts.Length; i++)
                     {
                         foreach (var value in parts[i].Split(new[] { "||" }, StringSplitOptions.RemoveEmptyEntries))
                         {
                             var tag = CleanTag(value);
-                            if (!string.IsNullOrWhiteSpace(tag)) tags.Add(tag);
+                            if (!string.IsNullOrWhiteSpace(tag) && tag != "-") tags.Add(tag);
                         }
                     }
                     result[sourceFile] = tags.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+                    matchedFiles.Add(sourceFile);
+                }
+                foreach (var pair in readTargets)
+                {
+                    if (matchedFiles.Contains(pair.Key)) continue;
+                    result[pair.Key] = ReadEmbeddedKeywordTagsDirect(pair.Key);
                 }
             }
             finally
@@ -3678,31 +5604,267 @@ namespace PixelVaultNative
             if (string.IsNullOrWhiteSpace(sidecar) || !File.Exists(sidecar) || entries == null) return;
             entries.Add(new UndoImportEntry { SourceDirectory = sourceDirectory, ImportedFileName = Path.GetFileName(sidecar), CurrentPath = sidecar });
         }
+
+        string GuessGameIndexNameForFile(string file)
+        {
+            var folderName = Path.GetFileName(Path.GetDirectoryName(file) ?? string.Empty);
+            if (!string.IsNullOrWhiteSpace(folderName)) return CleanTag(folderName);
+            return NormalizeGameIndexName(GetGameNameFromFileName(Path.GetFileNameWithoutExtension(file)));
+        }
+
+        GameIndexEditorRow EnsureGameIndexRowForAssignment(List<GameIndexEditorRow> rows, string name, string platformLabel, string preferredGameId = null)
+        {
+            var normalizedName = NormalizeGameIndexName(name);
+            var normalizedPlatform = NormalizeConsoleLabel(platformLabel);
+            var normalizedGameId = NormalizeGameId(preferredGameId);
+            if (!string.IsNullOrWhiteSpace(normalizedGameId))
+            {
+                var byId = FindSavedGameIndexRowById(rows, normalizedGameId);
+                if (byId != null && string.Equals(BuildGameIndexIdentity(byId.Name, byId.PlatformLabel), BuildGameIndexIdentity(normalizedName, normalizedPlatform), StringComparison.OrdinalIgnoreCase))
+                {
+                    return byId;
+                }
+            }
+            var byIdentity = FindSavedGameIndexRowByIdentity(rows, normalizedName, normalizedPlatform);
+            if (byIdentity != null) return byIdentity;
+            var created = new GameIndexEditorRow
+            {
+                GameId = !string.IsNullOrWhiteSpace(normalizedGameId) ? normalizedGameId : CreateGameId(rows.Select(row => row.GameId)),
+                Name = normalizedName,
+                PlatformLabel = normalizedPlatform,
+                SteamAppId = string.Empty,
+                SteamGridDbId = string.Empty,
+                FileCount = 0,
+                FolderPath = string.Empty,
+                PreviewImagePath = string.Empty,
+                FilePaths = new string[0]
+            };
+            rows.Add(created);
+            return created;
+        }
+
+        void EnsureSteamAppIdInGameIndex(string root, string name, string steamAppId)
+        {
+            if (string.IsNullOrWhiteSpace(root) || string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(steamAppId)) return;
+            var rows = LoadSavedGameIndexRows(root);
+            var row = EnsureGameIndexRowForAssignment(rows, name, "Steam");
+            if (string.Equals(row.SteamAppId ?? string.Empty, steamAppId, StringComparison.Ordinal)) return;
+            row.SteamAppId = steamAppId;
+            SaveSavedGameIndexRows(root, rows);
+        }
+
+        GameIndexEditorRow ResolveExistingGameIndexRowForAssignment(IEnumerable<GameIndexEditorRow> rows, string name, string platformLabel, string preferredGameId = null)
+        {
+            var normalizedRows = rows ?? Enumerable.Empty<GameIndexEditorRow>();
+            var normalizedGameId = NormalizeGameId(preferredGameId);
+            if (!string.IsNullOrWhiteSpace(normalizedGameId))
+            {
+                var byId = FindSavedGameIndexRowById(normalizedRows, normalizedGameId);
+                if (byId != null) return byId;
+            }
+            return FindSavedGameIndexRowByIdentity(normalizedRows, NormalizeGameIndexName(name), NormalizeConsoleLabel(platformLabel));
+        }
+
+        bool DoesSavedGameIndexRowMatchIndexedFile(GameIndexEditorRow row, string file, string platformLabel)
+        {
+            if (row == null || string.IsNullOrWhiteSpace(file)) return false;
+            return string.Equals(
+                BuildGameIndexIdentity(row.Name, row.PlatformLabel),
+                BuildGameIndexIdentity(GuessGameIndexNameForFile(file), platformLabel),
+                StringComparison.OrdinalIgnoreCase);
+        }
+
+        bool DoesSavedGameIndexRowMatchIndexedPlatform(GameIndexEditorRow row, string platformLabel)
+        {
+            if (row == null) return false;
+            return string.Equals(NormalizeConsoleLabel(row.PlatformLabel), NormalizeConsoleLabel(platformLabel), StringComparison.OrdinalIgnoreCase);
+        }
+
+        string ResolveGameIdForIndexedFile(string root, string file, string platformLabel, IEnumerable<string> tags, Dictionary<string, LibraryMetadataIndexEntry> index, List<GameIndexEditorRow> gameRows, string preferredGameId = null)
+        {
+            var normalizedPlatform = NormalizeConsoleLabel(platformLabel);
+            var guessedName = GuessGameIndexNameForFile(file);
+            var normalizedPreferredGameId = NormalizeGameId(preferredGameId);
+            var existingRow = FindSavedGameIndexRowById(gameRows, normalizedPreferredGameId);
+            if (DoesSavedGameIndexRowMatchIndexedFile(existingRow, file, normalizedPlatform)) return existingRow.GameId;
+            if (DoesSavedGameIndexRowMatchIndexedPlatform(existingRow, normalizedPlatform)) return existingRow.GameId;
+            LibraryMetadataIndexEntry existingEntry;
+            if (index != null && index.TryGetValue(file, out existingEntry))
+            {
+                var existingGameId = NormalizeGameId(existingEntry.GameId);
+                var existingGameRow = FindSavedGameIndexRowById(gameRows, existingGameId);
+                if (DoesSavedGameIndexRowMatchIndexedFile(existingGameRow, file, normalizedPlatform)) return existingGameId;
+                if (DoesSavedGameIndexRowMatchIndexedPlatform(existingGameRow, normalizedPlatform)) return existingGameId;
+            }
+            var resolvedByIdentity = FindSavedGameIndexRowByIdentity(gameRows, guessedName, normalizedPlatform);
+            if (resolvedByIdentity != null) return resolvedByIdentity.GameId;
+            var resolvedRow = EnsureGameIndexRowForAssignment(gameRows, guessedName, normalizedPlatform);
+            return resolvedRow == null ? string.Empty : resolvedRow.GameId;
+        }
+
+        bool SyncGameIndexRowsFromLibraryFolders(List<GameIndexEditorRow> rows, IEnumerable<LibraryFolderInfo> folders)
+        {
+            var rowList = rows ?? new List<GameIndexEditorRow>();
+            var folderMap = (folders ?? Enumerable.Empty<LibraryFolderInfo>())
+                .Where(folder => folder != null && !string.IsNullOrWhiteSpace(folder.GameId))
+                .GroupBy(folder => NormalizeGameId(folder.GameId), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+            bool changed = false;
+            foreach (var row in rowList)
+            {
+                if (row == null) continue;
+                var normalizedGameId = NormalizeGameId(row.GameId);
+                LibraryFolderInfo folder;
+                if (!string.IsNullOrWhiteSpace(normalizedGameId) && folderMap.TryGetValue(normalizedGameId, out folder))
+                {
+                    if (!string.Equals(row.Name ?? string.Empty, folder.Name ?? string.Empty, StringComparison.Ordinal))
+                    {
+                        row.Name = folder.Name ?? string.Empty;
+                        changed = true;
+                    }
+                    if (!string.Equals(row.PlatformLabel ?? string.Empty, folder.PlatformLabel ?? string.Empty, StringComparison.Ordinal))
+                    {
+                        row.PlatformLabel = folder.PlatformLabel ?? string.Empty;
+                        changed = true;
+                    }
+                    if (!string.IsNullOrWhiteSpace(folder.SteamAppId) && !string.Equals(row.SteamAppId ?? string.Empty, folder.SteamAppId ?? string.Empty, StringComparison.Ordinal))
+                    {
+                        row.SteamAppId = folder.SteamAppId ?? string.Empty;
+                        changed = true;
+                    }
+                    if (!string.IsNullOrWhiteSpace(folder.SteamGridDbId) && !string.Equals(row.SteamGridDbId ?? string.Empty, folder.SteamGridDbId ?? string.Empty, StringComparison.Ordinal))
+                    {
+                        row.SteamGridDbId = folder.SteamGridDbId ?? string.Empty;
+                        changed = true;
+                    }
+                    if (row.FileCount != folder.FileCount)
+                    {
+                        row.FileCount = folder.FileCount;
+                        changed = true;
+                    }
+                    if (!string.Equals(row.FolderPath ?? string.Empty, folder.FolderPath ?? string.Empty, StringComparison.Ordinal))
+                    {
+                        row.FolderPath = folder.FolderPath ?? string.Empty;
+                        changed = true;
+                    }
+                    if (!string.Equals(row.PreviewImagePath ?? string.Empty, folder.PreviewImagePath ?? string.Empty, StringComparison.Ordinal))
+                    {
+                        row.PreviewImagePath = folder.PreviewImagePath ?? string.Empty;
+                        changed = true;
+                    }
+                    if (!Enumerable.SequenceEqual((row.FilePaths ?? new string[0]).OrderBy(path => path, StringComparer.OrdinalIgnoreCase), (folder.FilePaths ?? new string[0]).OrderBy(path => path, StringComparer.OrdinalIgnoreCase), StringComparer.OrdinalIgnoreCase))
+                    {
+                        row.FilePaths = folder.FilePaths ?? new string[0];
+                        changed = true;
+                    }
+                }
+                else
+                {
+                    if (row.FileCount != 0) { row.FileCount = 0; changed = true; }
+                    if (!string.IsNullOrWhiteSpace(row.FolderPath)) { row.FolderPath = string.Empty; changed = true; }
+                    if (!string.IsNullOrWhiteSpace(row.PreviewImagePath)) { row.PreviewImagePath = string.Empty; changed = true; }
+                    if ((row.FilePaths ?? new string[0]).Length > 0) { row.FilePaths = new string[0]; changed = true; }
+                }
+            }
+            return changed;
+        }
+
         List<LibraryFolderInfo> LoadLibraryFolders(string root, Dictionary<string, LibraryMetadataIndexEntry> index = null)
         {
             var list = new List<LibraryFolderInfo>();
             if (index == null) index = LoadLibraryMetadataIndex(root);
-            foreach (var dir in Directory.EnumerateDirectories(root).OrderBy(Path.GetFileName))
+            var gameRows = LoadSavedGameIndexRows(root);
+            bool indexChanged = false;
+            bool gameRowsChanged = false;
+            var allFiles = Directory.EnumerateDirectories(root)
+                .SelectMany(dir => Directory.EnumerateFiles(dir, "*.*", SearchOption.TopDirectoryOnly).Where(IsMedia))
+                .Where(File.Exists)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            foreach (var file in allFiles)
             {
-                var files = Directory.EnumerateFiles(dir, "*.*", SearchOption.TopDirectoryOnly).Where(IsMedia).OrderBy(Path.GetFileName).ToList();
-                var grouped = files.GroupBy(file => NormalizeConsoleLabel(DetermineFolderPlatform(new List<string> { file }, index)));
-                foreach (var group in grouped.OrderBy(g => PlatformGroupOrder(g.Key)).ThenBy(g => g.Key))
+                LibraryMetadataIndexEntry entry;
+                if (!index.TryGetValue(file, out entry) || entry == null)
                 {
-                    var groupFiles = group.OrderByDescending(GetLibraryDate).ThenBy(Path.GetFileName).ToArray();
-                    var folderInfo = new LibraryFolderInfo
+                    var tags = ReadEmbeddedKeywordTagsDirect(file);
+                    var platformLabel = DetermineConsoleLabelFromTags(tags);
+                    var gameId = ResolveGameIdForIndexedFile(root, file, platformLabel, tags, index, gameRows);
+                    index[file] = new LibraryMetadataIndexEntry
                     {
-                        Name = Path.GetFileName(dir),
-                        FolderPath = dir,
-                        FileCount = groupFiles.Length,
-                        PreviewImagePath = groupFiles.FirstOrDefault(IsImage) ?? groupFiles.FirstOrDefault(),
-                        PlatformLabel = group.Key,
-                        FilePaths = groupFiles,
-                        SteamAppId = ResolveLibraryFolderSteamAppId(group.Key, groupFiles)
+                        FilePath = file,
+                        Stamp = BuildLibraryMetadataStamp(file),
+                        GameId = gameId,
+                        ConsoleLabel = platformLabel,
+                        TagText = string.Join(", ", tags)
                     };
-                    folderInfo.CoverArtPath = CustomCoverPath(folderInfo) ?? CachedCoverPath(folderInfo.Name);
-                    list.Add(folderInfo);
+                    entry = index[file];
+                    fileTagCache[file] = tags;
+                    fileTagCacheStamp[file] = MetadataCacheStamp(file);
+                    indexChanged = true;
+                    gameRowsChanged = true;
+                }
+                else if (string.IsNullOrWhiteSpace(entry.GameId))
+                {
+                    var tags = ParseTagText(entry.TagText);
+                    entry.GameId = ResolveGameIdForIndexedFile(root, file, DetermineConsoleLabelFromTags(tags), tags, index, gameRows);
+                    indexChanged = true;
+                    gameRowsChanged = true;
+                }
+                else
+                {
+                    var tags = ParseTagText(entry.TagText);
+                    var platformLabel = DetermineConsoleLabelFromTags(tags);
+                    var resolvedGameId = ResolveGameIdForIndexedFile(root, file, platformLabel, tags, index, gameRows, entry.GameId);
+                    if (!string.Equals(NormalizeGameId(entry.GameId), NormalizeGameId(resolvedGameId), StringComparison.OrdinalIgnoreCase)
+                        || !string.Equals(NormalizeConsoleLabel(entry.ConsoleLabel), NormalizeConsoleLabel(platformLabel), StringComparison.OrdinalIgnoreCase))
+                    {
+                        entry.GameId = resolvedGameId;
+                        entry.ConsoleLabel = platformLabel;
+                        indexChanged = true;
+                        gameRowsChanged = true;
+                    }
                 }
             }
+            var groupedFiles = allFiles
+                .Select(file => new
+                {
+                    File = file,
+                    Entry = index.ContainsKey(file) ? index[file] : null
+                })
+                .Where(item => item.Entry != null && !string.IsNullOrWhiteSpace(item.Entry.GameId))
+                .GroupBy(item => NormalizeGameId(item.Entry.GameId), StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            foreach (var group in groupedFiles)
+            {
+                var groupFiles = group.Select(item => item.File).OrderByDescending(GetLibraryDate).ThenBy(Path.GetFileName).ToArray();
+                var saved = FindSavedGameIndexRowById(gameRows, group.Key);
+                var preferredFolderPath = groupFiles
+                    .Select(file => Path.GetDirectoryName(file) ?? string.Empty)
+                    .GroupBy(path => path, StringComparer.OrdinalIgnoreCase)
+                    .OrderByDescending(pathGroup => pathGroup.Count())
+                    .ThenBy(pathGroup => pathGroup.Key, StringComparer.OrdinalIgnoreCase)
+                    .Select(pathGroup => pathGroup.Key)
+                    .FirstOrDefault();
+                var platformLabel = saved == null
+                    ? DetermineFolderPlatform(groupFiles.ToList(), index)
+                    : NormalizeConsoleLabel(saved.PlatformLabel);
+                list.Add(new LibraryFolderInfo
+                {
+                    GameId = group.Key,
+                    Name = saved == null ? GuessGameIndexNameForFile(groupFiles[0]) : saved.Name,
+                    FolderPath = string.IsNullOrWhiteSpace(saved == null ? string.Empty : saved.FolderPath) ? preferredFolderPath : saved.FolderPath,
+                    FileCount = groupFiles.Length,
+                    PreviewImagePath = groupFiles.FirstOrDefault(IsImage) ?? groupFiles.FirstOrDefault(),
+                    PlatformLabel = platformLabel,
+                    FilePaths = groupFiles,
+                    SteamAppId = saved != null && !string.IsNullOrWhiteSpace(saved.SteamAppId) ? saved.SteamAppId : ResolveLibraryFolderSteamAppId(platformLabel, groupFiles),
+                    SteamGridDbId = saved == null ? string.Empty : (saved.SteamGridDbId ?? string.Empty)
+                });
+            }
+            gameRowsChanged = SyncGameIndexRowsFromLibraryFolders(gameRows, list) || gameRowsChanged;
+            gameRowsChanged = PruneObsoleteMultipleTagsRows(gameRows) || gameRowsChanged;
+            if (gameRowsChanged) SaveSavedGameIndexRows(root, gameRows);
+            if (indexChanged) SaveLibraryMetadataIndex(root, index);
             return list;
         }
 
@@ -3724,13 +5886,170 @@ namespace PixelVaultNative
             return string.Empty;
         }
 
-        string ResolveBestLibraryFolderSteamAppId(LibraryFolderInfo folder)
+        bool SameLibraryFolderSelection(LibraryFolderInfo left, LibraryFolderInfo right)
+        {
+            if (ReferenceEquals(left, right)) return true;
+            if (left == null || right == null) return false;
+            return string.Equals(left.FolderPath ?? string.Empty, right.FolderPath ?? string.Empty, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(left.PlatformLabel ?? string.Empty, right.PlatformLabel ?? string.Empty, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(left.Name ?? string.Empty, right.Name ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        }
+
+        TimeoutWebClient CreateSteamWebClient()
+        {
+            return new TimeoutWebClient
+            {
+                Encoding = Encoding.UTF8,
+                TimeoutMilliseconds = SteamRequestTimeoutMilliseconds
+            };
+        }
+
+        TimeoutWebClient CreateSteamGridDbWebClient()
+        {
+            var token = CurrentSteamGridDbApiToken();
+            if (string.IsNullOrWhiteSpace(token)) return null;
+            var client = new TimeoutWebClient
+            {
+                Encoding = Encoding.UTF8,
+                TimeoutMilliseconds = SteamRequestTimeoutMilliseconds
+            };
+            client.Headers[HttpRequestHeader.Authorization] = "Bearer " + token;
+            client.Headers[HttpRequestHeader.Accept] = "application/json";
+            client.Headers[HttpRequestHeader.UserAgent] = "PixelVault/" + AppVersion;
+            return client;
+        }
+
+        string ParseSteamGridDbIdFromGamePayload(string json)
+        {
+            if (string.IsNullOrWhiteSpace(json)) return null;
+            var match = Regex.Match(json, "\"id\"\\s*:\\s*(?<id>\\d+)");
+            return match.Success ? match.Groups["id"].Value : null;
+        }
+
+        List<Tuple<string, string>> ParseSteamGridDbSearchResults(string json)
+        {
+            var matches = new List<Tuple<string, string>>();
+            if (string.IsNullOrWhiteSpace(json)) return matches;
+            foreach (Match match in Regex.Matches(json, "\"id\"\\s*:\\s*(?<id>\\d+)\\s*,\\s*\"name\"\\s*:\\s*\"(?<name>(?:\\\\.|[^\"])*)\"", RegexOptions.Singleline))
+            {
+                var id = match.Groups["id"].Value;
+                var name = Regex.Unescape(match.Groups["name"].Value).Replace("\\/", "/");
+                if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(name)) continue;
+                matches.Add(Tuple.Create(id, WebUtility.HtmlDecode(name)));
+            }
+            return matches;
+        }
+
+        string FindBestSteamGridDbSearchMatch(string title, IEnumerable<Tuple<string, string>> matches)
+        {
+            var candidates = (matches ?? Enumerable.Empty<Tuple<string, string>>()).ToList();
+            if (string.IsNullOrWhiteSpace(title) || candidates.Count == 0) return null;
+            var wanted = NormalizeTitle(title);
+            var exact = candidates.FirstOrDefault(candidate => NormalizeTitle(candidate.Item2) == wanted);
+            if (exact != null) return exact.Item1;
+            var loose = candidates.Where(candidate =>
+            {
+                var normalized = NormalizeTitle(candidate.Item2);
+                return normalized.StartsWith(wanted + " ", StringComparison.Ordinal)
+                    || wanted.StartsWith(normalized + " ", StringComparison.Ordinal)
+                    || normalized.Contains(wanted)
+                    || wanted.Contains(normalized);
+            }).ToList();
+            return loose.Count == 1 ? loose[0].Item1 : null;
+        }
+
+        string TryResolveSteamGridDbIdBySteamAppId(string steamAppId)
+        {
+            if (string.IsNullOrWhiteSpace(steamAppId) || !HasSteamGridDbApiToken()) return null;
+            string cached;
+            if (steamGridDbPlatformCache.TryGetValue("steam:" + steamAppId, out cached)) return cached;
+            try
+            {
+                using (var wc = CreateSteamGridDbWebClient())
+                {
+                    if (wc == null) return null;
+                    var json = wc.DownloadString("https://www.steamgriddb.com/api/v2/games/steam/" + Uri.EscapeDataString(steamAppId));
+                    cached = ParseSteamGridDbIdFromGamePayload(json);
+                    steamGridDbPlatformCache["steam:" + steamAppId] = cached;
+                    return cached;
+                }
+            }
+            catch (Exception ex)
+            {
+                Log("SteamGridDB lookup failed for Steam AppID " + steamAppId + ". " + ex.Message);
+            }
+            steamGridDbPlatformCache["steam:" + steamAppId] = null;
+            return null;
+        }
+
+        string TryResolveSteamGridDbIdByName(string title)
+        {
+            if (string.IsNullOrWhiteSpace(title) || !HasSteamGridDbApiToken()) return null;
+            string cached;
+            if (steamGridDbSearchCache.TryGetValue(title, out cached)) return cached;
+            try
+            {
+                using (var wc = CreateSteamGridDbWebClient())
+                {
+                    if (wc == null) return null;
+                    var json = wc.DownloadString("https://www.steamgriddb.com/api/v2/search/autocomplete/" + Uri.EscapeDataString(title));
+                    cached = FindBestSteamGridDbSearchMatch(title, ParseSteamGridDbSearchResults(json));
+                    steamGridDbSearchCache[title] = cached;
+                    return cached;
+                }
+            }
+            catch (Exception ex)
+            {
+                Log("SteamGridDB title search failed for " + title + ". " + ex.Message);
+            }
+            steamGridDbSearchCache[title] = null;
+            return null;
+        }
+
+        string ResolveBestLibraryFolderSteamGridDbId(string root, LibraryFolderInfo folder)
+        {
+            if (folder == null || string.IsNullOrWhiteSpace(folder.Name) || !HasSteamGridDbApiToken()) return string.Empty;
+            if (!string.IsNullOrWhiteSpace(folder.SteamGridDbId)) return folder.SteamGridDbId;
+            var saved = FindSavedGameIndexRow(LoadSavedGameIndexRows(root), folder);
+            if (saved != null && !string.IsNullOrWhiteSpace(saved.SteamGridDbId))
+            {
+                folder.SteamGridDbId = saved.SteamGridDbId;
+                return folder.SteamGridDbId;
+            }
+            var steamGridDbId = TryResolveSteamGridDbIdByName(folder.Name);
+            if (string.IsNullOrWhiteSpace(steamGridDbId))
+            {
+                var appId = ResolveBestLibraryFolderSteamAppId(root, folder);
+                steamGridDbId = !string.IsNullOrWhiteSpace(appId)
+                    ? TryResolveSteamGridDbIdBySteamAppId(appId)
+                    : null;
+            }
+            if (!string.IsNullOrWhiteSpace(steamGridDbId))
+            {
+                folder.SteamGridDbId = steamGridDbId;
+                UpsertSavedGameIndexRow(root, folder);
+            }
+            return folder.SteamGridDbId ?? string.Empty;
+        }
+
+        string ResolveBestLibraryFolderSteamAppId(string root, LibraryFolderInfo folder, bool allowLookup = true)
         {
             if (folder == null || string.IsNullOrWhiteSpace(folder.Name)) return string.Empty;
             if (!string.IsNullOrWhiteSpace(folder.SteamAppId)) return folder.SteamAppId;
+            var saved = FindSavedGameIndexRow(LoadSavedGameIndexRows(root), folder);
+            if (saved != null && !string.IsNullOrWhiteSpace(saved.SteamAppId))
+            {
+                folder.SteamAppId = saved.SteamAppId;
+                return folder.SteamAppId;
+            }
+            if (!allowLookup) return folder.SteamAppId ?? string.Empty;
             var appId = ResolveLibraryFolderSteamAppId(folder.PlatformLabel, folder.FilePaths ?? new string[0]);
             if (string.IsNullOrWhiteSpace(appId)) appId = TryResolveSteamAppId(folder.Name);
-            if (!string.IsNullOrWhiteSpace(appId)) folder.SteamAppId = appId;
+            if (!string.IsNullOrWhiteSpace(appId))
+            {
+                folder.SteamAppId = appId;
+                UpsertSavedGameIndexRow(root, folder);
+            }
             return folder.SteamAppId ?? string.Empty;
         }
 
@@ -3738,7 +6057,7 @@ namespace PixelVaultNative
         {
             var targetFolders = (folders ?? new List<LibraryFolderInfo>())
                 .Where(folder => folder != null && !string.IsNullOrWhiteSpace(folder.Name))
-                .GroupBy(folder => (folder.Name ?? string.Empty).Trim(), StringComparer.OrdinalIgnoreCase)
+                .GroupBy(BuildLibraryFolderMasterKey, StringComparer.OrdinalIgnoreCase)
                 .Select(group => group.First())
                 .OrderBy(folder => folder.Name, StringComparer.OrdinalIgnoreCase)
                 .ToList();
@@ -3753,10 +6072,11 @@ namespace PixelVaultNative
                     if (progress != null) progress(i + 1, targetFolders.Count, detailPrefix + " | already cached as " + folder.SteamAppId);
                     continue;
                 }
-                var appId = ResolveBestLibraryFolderSteamAppId(folder);
+                var appId = ResolveBestLibraryFolderSteamAppId(root, folder);
                 if (!string.IsNullOrWhiteSpace(appId))
                 {
-                    foreach (var match in folders.Where(entry => entry != null && string.Equals(entry.Name ?? string.Empty, folder.Name ?? string.Empty, StringComparison.OrdinalIgnoreCase)))
+                    var matchKey = BuildLibraryFolderMasterKey(folder);
+                    foreach (var match in folders.Where(entry => entry != null && string.Equals(BuildLibraryFolderMasterKey(entry), matchKey, StringComparison.OrdinalIgnoreCase)))
                     {
                         match.SteamAppId = appId;
                     }
@@ -3786,16 +6106,16 @@ namespace PixelVaultNative
                 var path = Path.Combine(coversRoot, safe + ext);
                 if (File.Exists(path)) File.Delete(path);
             }
-            imageCache.Clear();
+            ClearImageCache();
         }
 
-        void RefreshLibraryCovers(string root, List<LibraryFolderInfo> folders, Action<int, int, string> progress, Func<bool> isCancellationRequested, out int resolvedAppIds, out int coversReady)
+        void RefreshLibraryCovers(string root, List<LibraryFolderInfo> folders, Action<int, int, string> progress, Func<bool> isCancellationRequested, out int resolvedIds, out int coversReady)
         {
-            resolvedAppIds = 0;
+            resolvedIds = 0;
             coversReady = 0;
             var targetFolders = (folders ?? new List<LibraryFolderInfo>())
                 .Where(folder => folder != null && !string.IsNullOrWhiteSpace(folder.Name))
-                .GroupBy(folder => (folder.Name ?? string.Empty).Trim(), StringComparer.OrdinalIgnoreCase)
+                .GroupBy(BuildLibraryFolderMasterKey, StringComparer.OrdinalIgnoreCase)
                 .Select(group => group.First())
                 .OrderBy(folder => folder.Name, StringComparer.OrdinalIgnoreCase)
                 .ToList();
@@ -3812,32 +6132,62 @@ namespace PixelVaultNative
                 var folder = targetFolders[i];
                 var itemLabel = "Game " + (i + 1) + " of " + targetFolders.Count + " | " + folder.Name;
                 var hadAppId = !string.IsNullOrWhiteSpace(folder.SteamAppId);
-                var appId = ResolveBestLibraryFolderSteamAppId(folder);
-                if (!hadAppId && !string.IsNullOrWhiteSpace(appId))
+                var hadSteamGridDbId = !string.IsNullOrWhiteSpace(folder.SteamGridDbId);
+                var steamGridDbId = ResolveBestLibraryFolderSteamGridDbId(root, folder);
+                var appId = ResolveBestLibraryFolderSteamAppId(root, folder, string.IsNullOrWhiteSpace(steamGridDbId));
+                if ((!hadAppId && !string.IsNullOrWhiteSpace(appId)) || (!hadSteamGridDbId && !string.IsNullOrWhiteSpace(steamGridDbId)))
                 {
-                    resolvedAppIds++;
-                    foreach (var match in folders.Where(entry => entry != null && string.Equals(entry.Name ?? string.Empty, folder.Name ?? string.Empty, StringComparison.OrdinalIgnoreCase)))
+                    resolvedIds++;
+                    var matchKey = BuildLibraryFolderMasterKey(folder);
+                    foreach (var match in folders.Where(entry => entry != null && string.Equals(BuildLibraryFolderMasterKey(entry), matchKey, StringComparison.OrdinalIgnoreCase)))
                     {
                         match.SteamAppId = appId;
+                        match.SteamGridDbId = steamGridDbId;
                     }
                 }
                 completed++;
-                if (progress != null) progress(completed, totalWork, itemLabel + " | AppID " + (string.IsNullOrWhiteSpace(appId) ? "not found" : appId));
+                var idDetail = !string.IsNullOrWhiteSpace(appId) && !string.IsNullOrWhiteSpace(steamGridDbId)
+                    ? "AppID " + appId + " | STID " + steamGridDbId
+                    : (!string.IsNullOrWhiteSpace(steamGridDbId)
+                        ? "STID " + steamGridDbId
+                        : (!string.IsNullOrWhiteSpace(appId) ? "AppID " + appId : "no external ID"));
+                if (progress != null) progress(completed, totalWork, itemLabel + " | " + idDetail);
                 if (isCancellationRequested != null && isCancellationRequested()) throw new OperationCanceledException("Cover refresh cancelled.");
-                if (string.IsNullOrWhiteSpace(CustomCoverPath(folder))) DeleteCachedCover(folder.Name);
-                var resolvedArt = ResolveLibraryArt(folder, true);
-                foreach (var match in folders.Where(entry => entry != null && string.Equals(entry.Name ?? string.Empty, folder.Name ?? string.Empty, StringComparison.OrdinalIgnoreCase)))
-                {
-                    match.CoverArtPath = resolvedArt ?? string.Empty;
-                    if (!string.IsNullOrWhiteSpace(appId) && string.IsNullOrWhiteSpace(match.SteamAppId)) match.SteamAppId = appId;
-                }
-                folder.CoverArtPath = resolvedArt ?? string.Empty;
                 var coverReady = HasDedicatedLibraryCover(folder);
+                var coverDetail = "cover already present";
+                if (!coverReady)
+                {
+                    ResolveLibraryArt(folder, true);
+                    coverReady = HasDedicatedLibraryCover(folder);
+                    coverDetail = coverReady ? "cover ready" : "cover not available";
+                }
                 if (coverReady) coversReady++;
                 completed++;
-                if (progress != null) progress(completed, totalWork, itemLabel + " | cover " + (coverReady ? "ready" : "not available"));
+                if (progress != null) progress(completed, totalWork, itemLabel + " | " + coverDetail);
             }
-            SaveLibraryFolderCache(root, BuildLibraryFolderInventoryStamp(root), folders);
+            var stamp = BuildLibraryFolderInventoryStamp(root);
+            var cached = LoadLibraryFolderCache(root, stamp);
+            if (cached == null || cached.Count == 0)
+            {
+                SaveLibraryFolderCache(root, stamp, folders);
+                return;
+            }
+            foreach (var updated in folders.Where(entry => entry != null))
+            {
+                var normalizedGameId = NormalizeGameId(updated.GameId);
+                var match = !string.IsNullOrWhiteSpace(normalizedGameId)
+                    ? cached.FirstOrDefault(entry => string.Equals(NormalizeGameId(entry.GameId), normalizedGameId, StringComparison.OrdinalIgnoreCase))
+                    : null;
+                if (match == null)
+                {
+                    var folderKey = BuildLibraryFolderMasterKey(updated);
+                    match = cached.FirstOrDefault(entry => string.Equals(BuildLibraryFolderMasterKey(entry), folderKey, StringComparison.OrdinalIgnoreCase));
+                }
+                if (match == null) continue;
+                if (!string.IsNullOrWhiteSpace(updated.SteamAppId)) match.SteamAppId = updated.SteamAppId;
+                if (!string.IsNullOrWhiteSpace(updated.SteamGridDbId)) match.SteamGridDbId = updated.SteamGridDbId;
+            }
+            SaveLibraryFolderCache(root, stamp, cached);
         }
 
         string[] ReadEmbeddedKeywordTagsDirect(string file)
@@ -3865,26 +6215,45 @@ namespace PixelVaultNative
             return MetadataCacheStamp(file).ToString();
         }
 
-        Dictionary<string, LibraryMetadataIndexEntry> LoadLibraryMetadataIndex(string root)
+        Dictionary<string, LibraryMetadataIndexEntry> LoadLibraryMetadataIndex(string root, bool forceDiskReload = false)
         {
-            if (string.Equals(libraryMetadataIndexRoot, root, StringComparison.OrdinalIgnoreCase) && libraryMetadataIndex.Count > 0) return libraryMetadataIndex;
+            if (!forceDiskReload && string.Equals(libraryMetadataIndexRoot, root, StringComparison.OrdinalIgnoreCase) && libraryMetadataIndex.Count > 0) return libraryMetadataIndex;
             libraryMetadataIndex.Clear();
             libraryMetadataIndexRoot = root;
             var path = LibraryMetadataIndexPath(root);
             if (!File.Exists(path)) return libraryMetadataIndex;
+            var aliasMap = BuildSavedGameIdAliasMapFromFile(root);
             foreach (var line in File.ReadAllLines(path).Skip(1))
             {
-                var parts = line.Split(new[] { "\t" }, 4, StringSplitOptions.None);
-                if (parts.Length < 4) continue;
-                if (!File.Exists(parts[0])) continue;
-                var tagText = parts[3] ?? string.Empty;
-                libraryMetadataIndex[parts[0]] = new LibraryMetadataIndexEntry
+                var parts = line.Split('\t');
+                if (parts.Length >= 5)
                 {
-                    FilePath = parts[0],
-                    Stamp = parts[1],
-                    ConsoleLabel = DetermineConsoleLabelFromTags(ParseTagText(tagText)),
-                    TagText = tagText
-                };
+                    if (!File.Exists(parts[0])) continue;
+                    var tagText = parts[4] ?? string.Empty;
+                    string mappedGameId;
+                    var currentGameId = NormalizeGameId(parts[2]);
+                    libraryMetadataIndex[parts[0]] = new LibraryMetadataIndexEntry
+                    {
+                        FilePath = parts[0],
+                        Stamp = parts[1],
+                        GameId = !string.IsNullOrWhiteSpace(currentGameId) && aliasMap.TryGetValue(currentGameId, out mappedGameId) ? mappedGameId : parts[2],
+                        ConsoleLabel = DetermineConsoleLabelFromTags(ParseTagText(tagText)),
+                        TagText = tagText
+                    };
+                }
+                else if (parts.Length >= 4)
+                {
+                    if (!File.Exists(parts[0])) continue;
+                    var tagText = parts[3] ?? string.Empty;
+                    libraryMetadataIndex[parts[0]] = new LibraryMetadataIndexEntry
+                    {
+                        FilePath = parts[0],
+                        Stamp = parts[1],
+                        GameId = string.Empty,
+                        ConsoleLabel = DetermineConsoleLabelFromTags(ParseTagText(tagText)),
+                        TagText = tagText
+                    };
+                }
             }
             return libraryMetadataIndex;
         }
@@ -3893,18 +6262,33 @@ namespace PixelVaultNative
         {
             var path = LibraryMetadataIndexPath(root);
             var linesOut = new List<string>();
+            var savedEntries = index.Values.Where(v => v != null && !string.IsNullOrWhiteSpace(v.FilePath) && File.Exists(v.FilePath)).OrderBy(v => v.FilePath, StringComparer.OrdinalIgnoreCase).ToList();
             linesOut.Add(root);
-            foreach (var entry in index.Values.Where(v => v != null && !string.IsNullOrWhiteSpace(v.FilePath) && File.Exists(v.FilePath)).OrderBy(v => v.FilePath, StringComparer.OrdinalIgnoreCase))
+            foreach (var entry in savedEntries)
             {
                 linesOut.Add(string.Join("\t", new[]
                 {
                     entry.FilePath ?? string.Empty,
                     entry.Stamp ?? string.Empty,
+                    NormalizeGameId(entry.GameId),
                     entry.ConsoleLabel ?? string.Empty,
                     entry.TagText ?? string.Empty
                 }));
             }
             File.WriteAllLines(path, linesOut.ToArray());
+            libraryMetadataIndex.Clear();
+            libraryMetadataIndexRoot = root;
+            foreach (var entry in savedEntries)
+            {
+                libraryMetadataIndex[entry.FilePath] = new LibraryMetadataIndexEntry
+                {
+                    FilePath = entry.FilePath,
+                    Stamp = entry.Stamp,
+                    GameId = NormalizeGameId(entry.GameId),
+                    ConsoleLabel = entry.ConsoleLabel,
+                    TagText = entry.TagText
+                };
+            }
         }
 
         string NormalizeConsoleLabel(string label)
@@ -3958,6 +6342,7 @@ namespace PixelVaultNative
             EnsureDir(root, "Library folder");
             EnsureExifTool();
             var index = LoadLibraryMetadataIndex(root);
+            var gameRows = LoadSavedGameIndexRows(root);
             var targets = new List<string>();
             if (string.IsNullOrWhiteSpace(folderPath))
             {
@@ -3972,7 +6357,7 @@ namespace PixelVaultNative
             }
             var fileList = targets.Where(File.Exists).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(p => p, StringComparer.OrdinalIgnoreCase).ToList();
             var targetSet = new HashSet<string>(fileList, StringComparer.OrdinalIgnoreCase);
-            int updated = 0, unchanged = 0, removed = 0, preserved = 0;
+            int updated = 0, unchanged = 0, removed = 0;
             var scopeLabel = string.IsNullOrWhiteSpace(folderPath) ? "library" : (Path.GetFileName(folderPath) ?? "folder");
             if (progress != null) progress(0, fileList.Count, "Queued " + fileList.Count + " media file(s) for " + scopeLabel + " scan.");
             if (string.IsNullOrWhiteSpace(folderPath))
@@ -3983,8 +6368,22 @@ namespace PixelVaultNative
                     index.Remove(stale);
                     removed++;
                 }
-                if (removed > 0 && progress != null) progress(0, fileList.Count, "Removed " + removed + " stale index entr" + (removed == 1 ? "y" : "ies") + " before scanning.");
             }
+            else
+            {
+                foreach (var stale in index.Keys.Where(key =>
+                {
+                    var fileDirectory = Path.GetDirectoryName(key) ?? string.Empty;
+                    return string.Equals(fileDirectory, folderPath, StringComparison.OrdinalIgnoreCase)
+                        && (!targetSet.Contains(key) || !File.Exists(key));
+                }).ToList())
+                {
+                    if (isCancellationRequested != null && isCancellationRequested()) throw new OperationCanceledException("Library scan cancelled.");
+                    index.Remove(stale);
+                    removed++;
+                }
+            }
+            if (removed > 0 && progress != null) progress(0, fileList.Count, "Removed " + removed + " stale index entr" + (removed == 1 ? "y" : "ies") + " before scanning.");
 
             var pendingFiles = new List<string>();
             var pendingStamps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -4025,34 +6424,14 @@ namespace PixelVaultNative
                     if (isCancellationRequested != null && isCancellationRequested()) throw new OperationCanceledException("Library scan cancelled.");
                     string[] tags;
                     if (!batchTags.TryGetValue(file, out tags)) tags = new string[0];
-                    LibraryMetadataIndexEntry existing;
-                    var hasExisting = index.TryGetValue(file, out existing) && existing != null;
-                    var existingTagText = hasExisting ? (existing.TagText ?? string.Empty) : string.Empty;
-                    var existingLabel = hasExisting ? (existing.ConsoleLabel ?? string.Empty) : string.Empty;
-                    var noTagsRead = tags == null || tags.Length == 0;
-                    var preserveExistingTags = noTagsRead && !string.IsNullOrWhiteSpace(existingTagText);
-                    if (preserveExistingTags)
-                    {
-                        index[file] = new LibraryMetadataIndexEntry
-                        {
-                            FilePath = file,
-                            Stamp = pendingStamps[file],
-                            ConsoleLabel = string.IsNullOrWhiteSpace(existingLabel) ? DetermineConsoleLabelFromTags(ParseTagText(existingTagText)) : existingLabel,
-                            TagText = existingTagText
-                        };
-                        fileTagCache[file] = ParseTagText(existingTagText);
-                        fileTagCacheStamp[file] = MetadataCacheStamp(file);
-                        preserved++;
-                        processed++;
-                        var remainingPreserved = fileList.Count - (unchanged + processed);
-                        if (progress != null) progress(unchanged + processed, fileList.Count, "Preserved cached tags for " + (unchanged + processed) + " of " + fileList.Count + " | " + remainingPreserved + " remaining | " + file);
-                        continue;
-                    }
+                    var platformLabel = DetermineConsoleLabelFromTags(tags);
+                    var existingGameId = index.ContainsKey(file) && index[file] != null ? index[file].GameId : string.Empty;
                     index[file] = new LibraryMetadataIndexEntry
                     {
                         FilePath = file,
                         Stamp = pendingStamps[file],
-                        ConsoleLabel = DetermineConsoleLabelFromTags(tags),
+                        GameId = ResolveGameIdForIndexedFile(root, file, platformLabel, tags, index, gameRows, existingGameId),
+                        ConsoleLabel = platformLabel,
                         TagText = string.Join(", ", tags)
                     };
                     fileTagCache[file] = tags;
@@ -4066,8 +6445,8 @@ namespace PixelVaultNative
             SaveLibraryMetadataIndex(root, index);
             RebuildLibraryFolderCache(root, index);
             var summary = string.IsNullOrWhiteSpace(folderPath)
-                ? "Library metadata index scan complete: updated " + updated + ", preserved " + preserved + ", unchanged " + unchanged + ", removed " + removed + "."
-                : "Library folder scan complete for " + Path.GetFileName(folderPath) + ": updated " + updated + ", preserved " + preserved + ", unchanged " + unchanged + ".";
+                ? "Library metadata index scan complete: updated " + updated + ", unchanged " + unchanged + ", removed " + removed + "."
+                : "Library folder scan complete for " + Path.GetFileName(folderPath) + ": updated " + updated + ", unchanged " + unchanged + ", removed " + removed + ".";
             Log(summary);
             if (progress != null) progress(fileList.Count, fileList.Count, summary);
             return updated;
@@ -4078,19 +6457,56 @@ namespace PixelVaultNative
             if (string.IsNullOrWhiteSpace(root)) return;
             var fileList = (files ?? Enumerable.Empty<string>()).Where(f => !string.IsNullOrWhiteSpace(f) && File.Exists(f)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
             if (fileList.Count == 0) return;
-            var index = LoadLibraryMetadataIndex(root);
+            var index = LoadLibraryMetadataIndex(root, true);
+            var gameRows = LoadSavedGameIndexRows(root);
             foreach (var file in fileList)
             {
                 var tags = ReadEmbeddedKeywordTagsDirect(file);
+                var platformLabel = DetermineConsoleLabelFromTags(tags);
+                var existingGameId = index.ContainsKey(file) && index[file] != null ? index[file].GameId : string.Empty;
                 index[file] = new LibraryMetadataIndexEntry
                 {
                     FilePath = file,
                     Stamp = BuildLibraryMetadataStamp(file),
-                    ConsoleLabel = DetermineConsoleLabelFromTags(tags),
+                    GameId = ResolveGameIdForIndexedFile(root, file, platformLabel, tags, index, gameRows, existingGameId),
+                    ConsoleLabel = platformLabel,
                     TagText = string.Join(", ", tags)
                 };
                 fileTagCache[file] = tags;
                 fileTagCacheStamp[file] = MetadataCacheStamp(file);
+            }
+            SaveLibraryMetadataIndex(root, index);
+            RebuildLibraryFolderCache(root, index);
+        }
+
+        void UpsertLibraryMetadataIndexEntries(IEnumerable<ManualMetadataItem> items, string root)
+        {
+            if (string.IsNullOrWhiteSpace(root)) return;
+            var itemList = (items ?? Enumerable.Empty<ManualMetadataItem>())
+                .Where(item => item != null && !string.IsNullOrWhiteSpace(item.FilePath) && File.Exists(item.FilePath))
+                .GroupBy(item => item.FilePath, StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.Last())
+                .ToList();
+            if (itemList.Count == 0) return;
+            var index = LoadLibraryMetadataIndex(root, true);
+            var gameRows = LoadSavedGameIndexRows(root);
+            foreach (var item in itemList)
+            {
+                var tags = BuildMetadataTagSet(null, BuildManualMetadataExtraTags(item), item.AddPhotographyTag);
+                var platformLabel = DetermineConsoleLabelFromTags(tags);
+                var resolvedRow = ResolveExistingGameIndexRowForAssignment(gameRows, item.GameName, platformLabel, item.GameId);
+                item.GameId = resolvedRow == null ? string.Empty : resolvedRow.GameId;
+                if (resolvedRow != null && !string.IsNullOrWhiteSpace(resolvedRow.Name)) item.GameName = resolvedRow.Name;
+                index[item.FilePath] = new LibraryMetadataIndexEntry
+                {
+                    FilePath = item.FilePath,
+                    Stamp = BuildLibraryMetadataStamp(item.FilePath),
+                    GameId = item.GameId,
+                    ConsoleLabel = platformLabel,
+                    TagText = string.Join(", ", tags)
+                };
+                fileTagCache[item.FilePath] = tags;
+                fileTagCacheStamp[item.FilePath] = MetadataCacheStamp(item.FilePath);
             }
             SaveLibraryMetadataIndex(root, index);
             RebuildLibraryFolderCache(root, index);
@@ -4101,7 +6517,7 @@ namespace PixelVaultNative
             if (string.IsNullOrWhiteSpace(root)) return;
             var fileList = (files ?? Enumerable.Empty<string>()).Where(f => !string.IsNullOrWhiteSpace(f)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
             if (fileList.Count == 0) return;
-            var index = LoadLibraryMetadataIndex(root);
+            var index = LoadLibraryMetadataIndex(root, true);
             var changed = false;
             foreach (var file in fileList)
             {
@@ -4165,13 +6581,14 @@ namespace PixelVaultNative
         }
         string ResolveLibraryArt(LibraryFolderInfo folder, bool allowDownload)
         {
-            if (folder != null && !string.IsNullOrWhiteSpace(folder.CoverArtPath) && File.Exists(folder.CoverArtPath)) return folder.CoverArtPath;
             var custom = CustomCoverPath(folder);
             if (!string.IsNullOrWhiteSpace(custom)) return custom;
             var cached = CachedCoverPath(folder.Name);
             if (cached != null) return cached;
             if (allowDownload)
             {
+                var steamGridDbDownloaded = TryDownloadSteamGridDbCover(folder);
+                if (steamGridDbDownloaded != null) return steamGridDbDownloaded;
                 var downloaded = TryDownloadSteamCover(folder);
                 if (downloaded != null) return downloaded;
             }
@@ -4223,7 +6640,7 @@ namespace PixelVaultNative
             if (string.IsNullOrWhiteSpace(extension)) extension = ".png";
             var target = Path.Combine(coversRoot, "custom-" + key + extension.ToLowerInvariant());
             File.Copy(sourcePath, target, true);
-            imageCache.Clear();
+            ClearImageCache();
         }
 
         void ClearCustomCover(LibraryFolderInfo folder)
@@ -4235,7 +6652,7 @@ namespace PixelVaultNative
                 var existing = Path.Combine(coversRoot, "custom-" + key + ext);
                 if (File.Exists(existing)) File.Delete(existing);
             }
-            imageCache.Clear();
+            ClearImageCache();
         }
 
         string CachedCoverPath(string title)
@@ -4254,11 +6671,10 @@ namespace PixelVaultNative
             if (folder == null) return null;
             try
             {
-                var appId = ResolveBestLibraryFolderSteamAppId(folder);
+                var appId = ResolveBestLibraryFolderSteamAppId(libraryRoot, folder, string.IsNullOrWhiteSpace(folder.SteamGridDbId));
                 if (string.IsNullOrWhiteSpace(appId)) return null;
-                using (var wc = new WebClient())
+                using (var wc = CreateSteamWebClient())
                 {
-                    wc.Encoding = Encoding.UTF8;
                     var portraitUrls = new[]
                     {
                         "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/" + appId + "/library_600x900_2x.jpg",
@@ -4299,20 +6715,59 @@ namespace PixelVaultNative
             return null;
         }
 
+        string TryDownloadSteamGridDbCover(LibraryFolderInfo folder)
+        {
+            if (folder == null || !HasSteamGridDbApiToken()) return null;
+            try
+            {
+                var steamGridDbId = ResolveBestLibraryFolderSteamGridDbId(libraryRoot, folder);
+                if (string.IsNullOrWhiteSpace(steamGridDbId)) return null;
+                using (var wc = CreateSteamGridDbWebClient())
+                {
+                    if (wc == null) return null;
+                    var json = wc.DownloadString("https://www.steamgriddb.com/api/v2/grids/game/" + Uri.EscapeDataString(steamGridDbId) + "?dimensions=600x900,342x482,660x930&types=static&nsfw=false&humor=false&limit=1");
+                    var match = Regex.Match(json, "\"url\"\\s*:\\s*\"(?<u>(?:\\\\.|[^\"])*)\"");
+                    if (!match.Success) return null;
+                    var url = Regex.Unescape(match.Groups["u"].Value).Replace("\\/", "/");
+                    var ext = Path.GetExtension(new Uri(url).AbsolutePath);
+                    if (string.IsNullOrWhiteSpace(ext)) ext = ".png";
+                    var target = Path.Combine(coversRoot, SafeCacheName(folder.Name) + ext);
+                    wc.DownloadFile(url, target);
+                    if (File.Exists(target) && new FileInfo(target).Length > 0)
+                    {
+                        UpdateCachedLibraryFolderInfo(libraryRoot, folder);
+                        return target;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log("SteamGridDB cover download failed for " + (folder.Name ?? "unknown title") + ". " + ex.Message);
+            }
+            return null;
+        }
+
         void UpdateCachedLibraryFolderInfo(string root, LibraryFolderInfo folder)
         {
             if (folder == null || string.IsNullOrWhiteSpace(root)) return;
             var stamp = BuildLibraryFolderInventoryStamp(root);
             var cached = LoadLibraryFolderCache(root, stamp);
             if (cached == null) return;
-            var match = cached.FirstOrDefault(entry =>
-                string.Equals(entry.FolderPath, folder.FolderPath, StringComparison.OrdinalIgnoreCase)
-                && string.Equals(NormalizeConsoleLabel(entry.PlatformLabel), NormalizeConsoleLabel(folder.PlatformLabel), StringComparison.OrdinalIgnoreCase)
-                && string.Equals(entry.Name ?? string.Empty, folder.Name ?? string.Empty, StringComparison.OrdinalIgnoreCase));
+            var normalizedGameId = NormalizeGameId(folder.GameId);
+            var match = !string.IsNullOrWhiteSpace(normalizedGameId)
+                ? cached.FirstOrDefault(entry => string.Equals(NormalizeGameId(entry.GameId), normalizedGameId, StringComparison.OrdinalIgnoreCase))
+                : null;
+            if (match == null)
+            {
+                var folderKey = BuildLibraryFolderMasterKey(folder);
+                match = cached.FirstOrDefault(entry => string.Equals(BuildLibraryFolderMasterKey(entry), folderKey, StringComparison.OrdinalIgnoreCase));
+            }
             if (match == null) return;
+            match.GameId = !string.IsNullOrWhiteSpace(normalizedGameId) ? normalizedGameId : match.GameId;
             match.SteamAppId = folder.SteamAppId ?? string.Empty;
-            match.CoverArtPath = folder.CoverArtPath ?? string.Empty;
+            match.SteamGridDbId = folder.SteamGridDbId ?? string.Empty;
             SaveLibraryFolderCache(root, stamp, cached);
+            UpsertSavedGameIndexRow(root, folder);
         }
 
         string TryResolveSteamAppId(string title)
@@ -4321,9 +6776,8 @@ namespace PixelVaultNative
             if (steamSearchCache.TryGetValue(title, out cached)) return cached;
             try
             {
-                using (var wc = new WebClient())
+                using (var wc = CreateSteamWebClient())
                 {
-                    wc.Encoding = Encoding.UTF8;
                     var html = wc.DownloadString("https://store.steampowered.com/search/suggest?term=" + Uri.EscapeDataString(title) + "&f=games&cc=US&l=english");
                     var matches = Regex.Matches(html, @"https://store\.steampowered\.com/app/(?<id>\d+)/[^""']+.*?<div class=""match_name"">(?<name>.*?)</div>", RegexOptions.Singleline);
                     var wanted = NormalizeTitle(title);
@@ -4344,11 +6798,69 @@ namespace PixelVaultNative
             return null;
         }
 
+        string DetermineManualMetadataPlatformLabel(ManualMetadataItem item)
+        {
+            if (item == null) return "Other";
+            if (item.TagSteam) return "Steam";
+            if (item.TagPc) return "PC";
+            if (item.TagPs5) return "PS5";
+            if (item.TagXbox) return "Xbox";
+            if (item.TagOther && !string.IsNullOrWhiteSpace(item.CustomPlatformTag)) return NormalizeConsoleLabel(item.CustomPlatformTag);
+            return "Other";
+        }
+
+        void PreserveLibraryMetadataEditGameIndex(string root, LibraryFolderInfo originalFolder, GameIndexEditorRow originalSavedRow, List<ManualMetadataItem> items)
+        {
+            if (string.IsNullOrWhiteSpace(root) || items == null || items.Count == 0) return;
+            var preservedAppId = !string.IsNullOrWhiteSpace(originalSavedRow == null ? string.Empty : originalSavedRow.SteamAppId)
+                ? originalSavedRow.SteamAppId
+                : (originalFolder == null ? string.Empty : (originalFolder.SteamAppId ?? string.Empty));
+            var preservedSteamGridDbId = !string.IsNullOrWhiteSpace(originalSavedRow == null ? string.Empty : originalSavedRow.SteamGridDbId)
+                ? originalSavedRow.SteamGridDbId
+                : (originalFolder == null ? string.Empty : (originalFolder.SteamGridDbId ?? string.Empty));
+            if (string.IsNullOrWhiteSpace(preservedAppId) && string.IsNullOrWhiteSpace(preservedSteamGridDbId)) return;
+            var rows = LoadSavedGameIndexRows(root);
+            var sourceGameId = NormalizeGameId(originalSavedRow == null ? (originalFolder == null ? string.Empty : originalFolder.GameId) : originalSavedRow.GameId);
+            var sourceName = NormalizeGameIndexName(originalSavedRow == null ? (originalFolder == null ? string.Empty : originalFolder.Name) : originalSavedRow.Name);
+            var sourcePlatform = NormalizeConsoleLabel(originalSavedRow == null ? (originalFolder == null ? string.Empty : originalFolder.PlatformLabel) : originalSavedRow.PlatformLabel);
+            var existing = !string.IsNullOrWhiteSpace(sourceGameId)
+                ? FindSavedGameIndexRowById(rows, sourceGameId)
+                : null;
+            if (existing == null && !string.IsNullOrWhiteSpace(sourceName))
+            {
+                existing = FindSavedGameIndexRowByIdentity(rows, sourceName, sourcePlatform);
+            }
+            if (existing == null && (originalSavedRow != null || originalFolder != null))
+            {
+                existing = new GameIndexEditorRow
+                {
+                    GameId = !string.IsNullOrWhiteSpace(sourceGameId) ? sourceGameId : CreateGameId(rows.Select(row => row.GameId)),
+                    Name = sourceName,
+                    PlatformLabel = sourcePlatform,
+                    SteamAppId = string.Empty,
+                    SteamGridDbId = string.Empty,
+                    FileCount = 0,
+                    FolderPath = originalSavedRow == null ? (originalFolder == null ? string.Empty : originalFolder.FolderPath ?? string.Empty) : originalSavedRow.FolderPath ?? string.Empty,
+                    PreviewImagePath = string.Empty,
+                    FilePaths = new string[0]
+                };
+                rows.Add(existing);
+            }
+            if (existing == null) return;
+            if (string.IsNullOrWhiteSpace(existing.GameId)) existing.GameId = !string.IsNullOrWhiteSpace(sourceGameId) ? sourceGameId : CreateGameId(rows.Select(row => row.GameId));
+            if (string.IsNullOrWhiteSpace(existing.Name)) existing.Name = sourceName;
+            if (string.IsNullOrWhiteSpace(existing.PlatformLabel)) existing.PlatformLabel = sourcePlatform;
+            if (string.IsNullOrWhiteSpace(existing.SteamAppId)) existing.SteamAppId = preservedAppId;
+            if (string.IsNullOrWhiteSpace(existing.SteamGridDbId)) existing.SteamGridDbId = preservedSteamGridDbId;
+            SaveSavedGameIndexRows(root, rows);
+        }
+
         BitmapImage LoadImageSource(string path, int decodePixelWidth)
         {
             try
             {
                 if (string.IsNullOrWhiteSpace(path) || !File.Exists(path)) return null;
+                var sourcePath = path;
                 if (IsVideo(path))
                 {
                     var poster = EnsureVideoPoster(path, decodePixelWidth);
@@ -4356,16 +6868,24 @@ namespace PixelVaultNative
                 }
                 var info = new FileInfo(path);
                 var cacheKey = path + "|" + info.LastWriteTimeUtc.Ticks + "|" + info.Length + "|" + decodePixelWidth;
-                BitmapImage cached;
-                if (imageCache.TryGetValue(cacheKey, out cached)) return cached;
-                var image = new BitmapImage();
-                image.BeginInit();
-                image.CacheOption = BitmapCacheOption.OnLoad;
-                if (decodePixelWidth > 0) image.DecodePixelWidth = decodePixelWidth;
-                image.UriSource = new Uri(path);
-                image.EndInit();
-                image.Freeze();
-                imageCache[cacheKey] = image;
+                var cached = TryGetCachedImage(cacheKey);
+                if (cached != null) return cached;
+
+                BitmapImage image = null;
+                var thumbnailPath = IsVideo(sourcePath) ? null : ThumbnailCachePath(path, decodePixelWidth);
+                if (!string.IsNullOrWhiteSpace(thumbnailPath) && File.Exists(thumbnailPath))
+                {
+                    image = LoadFrozenBitmap(thumbnailPath, 0);
+                }
+                if (image == null)
+                {
+                    image = LoadFrozenBitmap(path, decodePixelWidth);
+                    if (image != null && !string.IsNullOrWhiteSpace(thumbnailPath) && !File.Exists(thumbnailPath))
+                    {
+                        SaveThumbnailCache(image, thumbnailPath);
+                    }
+                }
+                StoreCachedImage(cacheKey, image);
                 return image;
             }
             catch
@@ -4391,6 +6911,83 @@ namespace PixelVaultNative
                 if (File.Exists(posterPath)) return posterPath;
                 var renderWidth = Math.Max(320, width);
                 var renderHeight = Math.Max(180, (int)Math.Round(renderWidth * 9d / 16d));
+                var ffmpegPoster = TryCreateVideoPosterWithFfmpeg(videoPath, posterPath, renderWidth);
+                if (!string.IsNullOrWhiteSpace(ffmpegPoster) && File.Exists(ffmpegPoster)) return ffmpegPoster;
+                return CreateFallbackVideoPoster(videoPath, posterPath, renderWidth, renderHeight);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        string ResolveFfmpegPath()
+        {
+            if (!string.IsNullOrWhiteSpace(ffmpegPath) && File.Exists(ffmpegPath)) return ffmpegPath;
+            var discovered = FindExecutableOnPath("ffmpeg.exe");
+            if (!string.IsNullOrWhiteSpace(discovered)) ffmpegPath = discovered;
+            return ffmpegPath;
+        }
+
+        string[] BuildFfmpegPosterArgs(string videoPath, string posterPath, int renderWidth, string hwaccel)
+        {
+            var args = new List<string>
+            {
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-y",
+                "-threads",
+                "0"
+            };
+            if (!string.IsNullOrWhiteSpace(hwaccel))
+            {
+                args.Add("-hwaccel");
+                args.Add(hwaccel);
+            }
+            args.Add("-ss");
+            args.Add("00:00:00.250");
+            args.Add("-i");
+            args.Add(videoPath);
+            args.Add("-frames:v");
+            args.Add("1");
+            args.Add("-vf");
+            args.Add("scale=" + Math.Max(320, renderWidth) + ":-2");
+            args.Add(posterPath);
+            return args.ToArray();
+        }
+
+        string TryCreateVideoPosterWithFfmpeg(string videoPath, string posterPath, int renderWidth)
+        {
+            var ffmpeg = ResolveFfmpegPath();
+            if (string.IsNullOrWhiteSpace(ffmpeg) || !File.Exists(ffmpeg)) return null;
+
+            foreach (var hwaccel in new[] { "auto", string.Empty })
+            {
+                try
+                {
+                    if (File.Exists(posterPath)) File.Delete(posterPath);
+                    RunExeCapture(ffmpeg, BuildFfmpegPosterArgs(videoPath, posterPath, renderWidth, hwaccel), Path.GetDirectoryName(ffmpeg), false);
+                    if (File.Exists(posterPath)) return posterPath;
+                }
+                catch
+                {
+                    try
+                    {
+                        if (File.Exists(posterPath)) File.Delete(posterPath);
+                    }
+                    catch
+                    {
+                    }
+                }
+            }
+            return null;
+        }
+
+        string CreateFallbackVideoPoster(string videoPath, string posterPath, int renderWidth, int renderHeight)
+        {
+            try
+            {
                 var title = Path.GetFileNameWithoutExtension(videoPath);
                 var accent = Brush("#3E6D8C");
                 var bg = Brush("#12191E");
@@ -4478,9 +7075,8 @@ namespace PixelVaultNative
             if (steamCache.TryGetValue(appId, out cached)) return cached;
             try
             {
-                using (var wc = new WebClient())
+                using (var wc = CreateSteamWebClient())
                 {
-                    wc.Encoding = Encoding.UTF8;
                     var json = wc.DownloadString("https://store.steampowered.com/api/appdetails?appids=" + appId + "&l=english");
                     var m = Regex.Match(json, "\"name\"\\s*:\\s*\"(?<n>(?:\\\\.|[^\"])*)\"");
                     if (m.Success)
@@ -4594,7 +7190,10 @@ namespace PixelVaultNative
             if (Regex.IsMatch(file, @"^.+_\d{14}_\d+\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$", RegexOptions.IgnoreCase))
             {
                 tags.Add("Steam");
-                tags.Add("PC");
+            }
+            else if (Regex.IsMatch(file, @"^.+_\d{4}-\d{2}-\d{2}_\d+\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$", RegexOptions.IgnoreCase))
+            {
+                tags.Add("Steam");
             }
             else if (Regex.IsMatch(file, @"^.+_\d{14}\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$", RegexOptions.IgnoreCase))
             {
@@ -4628,6 +7227,12 @@ namespace PixelVaultNative
             DateTime d;
             var a = Regex.Match(file, @"_(\d{14})(?:_|(?=\.[^.]+$))");
             if (a.Success && DateTime.TryParseExact(a.Groups[1].Value, "yyyyMMddHHmmss", null, System.Globalization.DateTimeStyles.None, out d)) return d;
+            var steamLegacy = Regex.Match(file, @"_(\d{4})-(\d{2})-(\d{2})(?:_|(?=\.[^.]+$))");
+            if (steamLegacy.Success)
+            {
+                var raw = steamLegacy.Groups[1].Value + steamLegacy.Groups[2].Value + steamLegacy.Groups[3].Value;
+                if (DateTime.TryParseExact(raw, "yyyyMMdd", null, System.Globalization.DateTimeStyles.None, out d)) return d;
+            }
             var b = Regex.Match(file, @"-(\d{4})_(\d{2})_(\d{2})[-_](\d{2})[-_](\d{2})[-_](\d{2})");
             if (b.Success)
             {
@@ -4642,7 +7247,7 @@ namespace PixelVaultNative
         string ThumbnailCachePath(string sourcePath, int decodePixelWidth)
         {
             if (string.IsNullOrWhiteSpace(sourcePath) || !File.Exists(sourcePath)) return null;
-            if (decodePixelWidth <= 0 || decodePixelWidth > 900) return null;
+            if (decodePixelWidth <= 0 || decodePixelWidth > 1600) return null;
             try
             {
                 var info = new FileInfo(sourcePath);
@@ -4773,6 +7378,882 @@ namespace PixelVaultNative
                 Process.Start(new ProcessStartInfo("explorer.exe", fullPath) { UseShellExecute = true });
             }
         }
+
+        List<PhotoIndexEditorRow> LoadPhotoIndexEditorRows(string root)
+        {
+            return LoadLibraryMetadataIndex(root, true)
+                .Values
+                .Where(entry => entry != null && !string.IsNullOrWhiteSpace(entry.FilePath) && File.Exists(entry.FilePath))
+                .Select(entry => new PhotoIndexEditorRow
+                {
+                    FilePath = entry.FilePath ?? string.Empty,
+                    Stamp = entry.Stamp ?? string.Empty,
+                    GameId = NormalizeGameId(entry.GameId),
+                    ConsoleLabel = NormalizeConsoleLabel(entry.ConsoleLabel),
+                    TagText = entry.TagText ?? string.Empty
+                })
+                .OrderBy(row => row.FilePath ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        void SavePhotoIndexEditorRows(string root, IEnumerable<PhotoIndexEditorRow> rows)
+        {
+            if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root)) return;
+            var rowList = (rows ?? Enumerable.Empty<PhotoIndexEditorRow>())
+                .Where(row => row != null && !string.IsNullOrWhiteSpace(row.FilePath) && File.Exists(row.FilePath))
+                .GroupBy(row => row.FilePath, StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.Last())
+                .ToList();
+            var missingGameId = rowList.FirstOrDefault(row => string.IsNullOrWhiteSpace(NormalizeGameId(row.GameId)));
+            if (missingGameId != null) throw new InvalidOperationException("Each photo index row needs a Game ID before saving. Missing: " + Path.GetFileName(missingGameId.FilePath));
+
+            var index = new Dictionary<string, LibraryMetadataIndexEntry>(StringComparer.OrdinalIgnoreCase);
+            foreach (var row in rowList)
+            {
+                var normalizedTags = string.Join(", ", ParseTagText(row.TagText));
+                var normalizedConsole = NormalizeConsoleLabel(string.IsNullOrWhiteSpace(row.ConsoleLabel) ? DetermineConsoleLabelFromTags(ParseTagText(normalizedTags)) : row.ConsoleLabel);
+                index[row.FilePath] = new LibraryMetadataIndexEntry
+                {
+                    FilePath = row.FilePath,
+                    Stamp = BuildLibraryMetadataStamp(row.FilePath),
+                    GameId = NormalizeGameId(row.GameId),
+                    ConsoleLabel = normalizedConsole,
+                    TagText = normalizedTags
+                };
+            }
+
+            var gameRows = LoadSavedGameIndexRows(root);
+            foreach (var group in index.Values.Where(entry => entry != null && !string.IsNullOrWhiteSpace(entry.GameId)).GroupBy(entry => NormalizeGameId(entry.GameId), StringComparer.OrdinalIgnoreCase))
+            {
+                var first = group.First();
+                var row = EnsureGameIndexRowForAssignment(gameRows, GuessGameIndexNameForFile(first.FilePath), first.ConsoleLabel, group.Key);
+                if (row == null) continue;
+                var filePaths = group.Select(entry => entry.FilePath).Where(File.Exists).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(path => path, StringComparer.OrdinalIgnoreCase).ToArray();
+                row.FileCount = filePaths.Length;
+                row.FilePaths = filePaths;
+                row.PreviewImagePath = filePaths.FirstOrDefault(IsImage) ?? filePaths.FirstOrDefault() ?? string.Empty;
+                row.FolderPath = filePaths
+                    .Select(path => Path.GetDirectoryName(path) ?? string.Empty)
+                    .GroupBy(path => path, StringComparer.OrdinalIgnoreCase)
+                    .OrderByDescending(pathGroup => pathGroup.Count())
+                    .ThenBy(pathGroup => pathGroup.Key, StringComparer.OrdinalIgnoreCase)
+                    .Select(pathGroup => pathGroup.Key)
+                    .FirstOrDefault() ?? string.Empty;
+                row.PlatformLabel = NormalizeConsoleLabel(first.ConsoleLabel);
+            }
+
+            SaveSavedGameIndexRows(root, gameRows);
+            SaveLibraryMetadataIndex(root, index);
+            RebuildLibraryFolderCache(root, index);
+        }
+
+        void OpenPhotoIndexEditor()
+        {
+            if (string.IsNullOrWhiteSpace(libraryRoot) || !Directory.Exists(libraryRoot))
+            {
+                MessageBox.Show("Library folder not found. Check Settings before opening the photo index.", "PixelVault");
+                return;
+            }
+
+            try
+            {
+                status.Text = "Loading photo index";
+                var allRows = LoadPhotoIndexEditorRows(libraryRoot);
+                var editorWindow = new Window
+                {
+                    Title = "PixelVault " + AppVersion + " Photo Index",
+                    Width = 1500,
+                    Height = 900,
+                    MinWidth = 1180,
+                    MinHeight = 760,
+                    Owner = this,
+                    WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                    Background = Brush("#F3EEE4")
+                };
+
+                var root = new Grid { Margin = new Thickness(24) };
+                root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+
+                var header = new Border { Background = Brush("#161C20"), CornerRadius = new CornerRadius(20), Padding = new Thickness(24), Margin = new Thickness(0, 0, 0, 18) };
+                var headerStack = new StackPanel();
+                headerStack.Children.Add(new TextBlock { Text = "Photo Index", FontSize = 30, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White });
+                headerStack.Children.Add(new TextBlock { Text = "This is the per-file index cache for the library. Edit Game ID, Console, or Tags here when you need to correct the recorded state for individual files.", Margin = new Thickness(0, 8, 0, 0), FontSize = 14, Foreground = Brush("#B7C6C0"), TextWrapping = TextWrapping.Wrap });
+                headerStack.Children.Add(new TextBlock { Text = "Saving here rewrites the photo-level index and rebuilds the grouped library from it. A later scan or rebuild can resync these values from the files themselves.", Margin = new Thickness(0, 10, 0, 0), FontSize = 13, Foreground = Brush("#D8C7A4"), TextWrapping = TextWrapping.Wrap });
+                header.Child = headerStack;
+                root.Children.Add(header);
+
+                var body = new Border { Background = Brushes.White, CornerRadius = new CornerRadius(18), Padding = new Thickness(18), BorderBrush = Brush("#D7E1E8"), BorderThickness = new Thickness(1) };
+                Grid.SetRow(body, 1);
+                root.Children.Add(body);
+
+                var bodyGrid = new Grid();
+                bodyGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                bodyGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+                bodyGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                body.Child = bodyGrid;
+
+                var controlGrid = new Grid { Margin = new Thickness(0, 0, 0, 14) };
+                controlGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                controlGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(320) });
+                controlGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                controlGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                controlGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                controlGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                controlGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                controlGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                controlGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                controlGrid.Children.Add(new TextBlock { Text = "Search", Margin = new Thickness(0, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center, FontWeight = FontWeights.SemiBold, Foreground = Brush("#1F2A30") });
+                var searchBox = new TextBox { Padding = new Thickness(10, 6, 10, 6), BorderBrush = Brush("#D7E1E8"), BorderThickness = new Thickness(1), Background = Brushes.White, Margin = new Thickness(0, 0, 14, 0) };
+                Grid.SetColumn(searchBox, 1);
+                controlGrid.Children.Add(searchBox);
+                var helperText = new TextBlock { Text = "Edit the recorded Game ID, Console, and Tags for each indexed file. File path and metadata stamp stay read-only.", VerticalAlignment = VerticalAlignment.Center, Foreground = Brush("#5F6970"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 14, 0) };
+                Grid.SetColumn(helperText, 2);
+                controlGrid.Children.Add(helperText);
+                var pullFromFileButton = Btn("Pull From File", null, "#275D47", Brushes.White);
+                pullFromFileButton.Width = 150;
+                pullFromFileButton.Height = 42;
+                pullFromFileButton.Margin = new Thickness(0, 0, 10, 0);
+                pullFromFileButton.IsEnabled = false;
+                Grid.SetColumn(pullFromFileButton, 3);
+                controlGrid.Children.Add(pullFromFileButton);
+                var deleteRowButton = Btn("Delete Row", null, "#A3473E", Brushes.White);
+                deleteRowButton.Width = 134;
+                deleteRowButton.Height = 42;
+                deleteRowButton.Margin = new Thickness(0, 0, 10, 0);
+                deleteRowButton.IsEnabled = false;
+                Grid.SetColumn(deleteRowButton, 4);
+                controlGrid.Children.Add(deleteRowButton);
+                var reloadButton = Btn("Reload", null, "#EEF2F5", Brush("#33424D"));
+                reloadButton.Width = 132;
+                reloadButton.Height = 42;
+                reloadButton.Margin = new Thickness(0, 0, 10, 0);
+                Grid.SetColumn(reloadButton, 5);
+                controlGrid.Children.Add(reloadButton);
+                var openFolderButton = Btn("Open Folder", null, "#20343A", Brushes.White);
+                openFolderButton.Width = 148;
+                openFolderButton.Height = 42;
+                openFolderButton.Margin = new Thickness(0, 0, 10, 0);
+                openFolderButton.IsEnabled = false;
+                Grid.SetColumn(openFolderButton, 6);
+                controlGrid.Children.Add(openFolderButton);
+                var openFileButton = Btn("Open File", null, "#20343A", Brushes.White);
+                openFileButton.Width = 132;
+                openFileButton.Height = 42;
+                openFileButton.Margin = new Thickness(0);
+                openFileButton.IsEnabled = false;
+                Grid.SetColumn(openFileButton, 7);
+                controlGrid.Children.Add(openFileButton);
+                bodyGrid.Children.Add(controlGrid);
+
+                var grid = new DataGrid
+                {
+                    AutoGenerateColumns = false,
+                    CanUserAddRows = false,
+                    CanUserDeleteRows = false,
+                    CanUserResizeRows = false,
+                    SelectionMode = DataGridSelectionMode.Extended,
+                    SelectionUnit = DataGridSelectionUnit.FullRow,
+                    GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
+                    HeadersVisibility = DataGridHeadersVisibility.Column,
+                    BorderThickness = new Thickness(1),
+                    BorderBrush = Brush("#D7E1E8"),
+                    Background = Brushes.White,
+                    AlternatingRowBackground = Brush("#F7FAFC"),
+                    RowHeaderWidth = 0,
+                    Margin = new Thickness(0, 0, 0, 16)
+                };
+                grid.Columns.Add(new DataGridTextColumn { Header = "Game ID", Binding = new System.Windows.Data.Binding("GameId") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus }, Width = 110 });
+                grid.Columns.Add(new DataGridTextColumn { Header = "Console", Binding = new System.Windows.Data.Binding("ConsoleLabel") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus }, Width = 120 });
+                grid.Columns.Add(new DataGridTextColumn { Header = "Tags", Binding = new System.Windows.Data.Binding("TagText") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus }, Width = new DataGridLength(1.05, DataGridLengthUnitType.Star) });
+                grid.Columns.Add(new DataGridTextColumn { Header = "File", Binding = new System.Windows.Data.Binding("FilePath"), IsReadOnly = true, Width = new DataGridLength(1.8, DataGridLengthUnitType.Star) });
+                grid.Columns.Add(new DataGridTextColumn { Header = "Stamp", Binding = new System.Windows.Data.Binding("Stamp"), IsReadOnly = true, Width = 170 });
+                Grid.SetRow(grid, 1);
+                bodyGrid.Children.Add(grid);
+
+                var footerGrid = new Grid();
+                footerGrid.ColumnDefinitions.Add(new ColumnDefinition());
+                footerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                var statusText = new TextBlock { Foreground = Brush("#5F6970"), VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap };
+                footerGrid.Children.Add(statusText);
+                var actionRow = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+                var closeButton = Btn("Close", null, "#EEF2F5", Brush("#33424D"));
+                closeButton.Width = 128;
+                closeButton.Height = 44;
+                closeButton.Margin = new Thickness(0, 0, 10, 0);
+                var saveButton = Btn("Save Index", null, "#275D47", Brushes.White);
+                saveButton.Width = 148;
+                saveButton.Height = 44;
+                saveButton.Margin = new Thickness(0);
+                actionRow.Children.Add(closeButton);
+                actionRow.Children.Add(saveButton);
+                Grid.SetColumn(actionRow, 1);
+                footerGrid.Children.Add(actionRow);
+                Grid.SetRow(footerGrid, 2);
+                bodyGrid.Children.Add(footerGrid);
+
+                editorWindow.Content = root;
+
+                bool dirty = false;
+                Action refreshStatus = null;
+                Action refreshGrid = null;
+                Action<IEnumerable<string>> reselection = null;
+
+                Func<List<PhotoIndexEditorRow>> selectedRows = delegate
+                {
+                    return grid.SelectedItems.Cast<object>()
+                        .OfType<PhotoIndexEditorRow>()
+                        .Where(row => row != null)
+                        .GroupBy(row => row.FilePath ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+                        .Select(group => group.First())
+                        .ToList();
+                };
+
+                refreshStatus = delegate
+                {
+                    var selectedItems = selectedRows();
+                    var selected = selectedItems.FirstOrDefault();
+                    var selectedFile = selected == null ? string.Empty : selected.FilePath ?? string.Empty;
+                    var selectedFolder = string.IsNullOrWhiteSpace(selectedFile) ? string.Empty : (Path.GetDirectoryName(selectedFile) ?? string.Empty);
+                    openFileButton.IsEnabled = selectedItems.Count == 1 && !string.IsNullOrWhiteSpace(selectedFile) && File.Exists(selectedFile);
+                    openFolderButton.IsEnabled = selectedItems.Count == 1 && !string.IsNullOrWhiteSpace(selectedFolder) && Directory.Exists(selectedFolder);
+                    pullFromFileButton.IsEnabled = selectedItems.Any(row => !string.IsNullOrWhiteSpace(row.FilePath) && File.Exists(row.FilePath));
+                    deleteRowButton.IsEnabled = selectedItems.Count > 0;
+                    statusText.Text = grid.Items.Count + " visible row(s) | " + allRows.Count + " total | " + (dirty ? "Unsaved changes" : "Saved") + " | " + (selectedItems.Count == 0 ? "No row selected" : selectedItems.Count + " selected");
+                };
+
+                refreshGrid = delegate
+                {
+                    var query = (searchBox.Text ?? string.Empty).Trim();
+                    IEnumerable<PhotoIndexEditorRow> rows = allRows;
+                    if (!string.IsNullOrWhiteSpace(query))
+                    {
+                        rows = rows.Where(row =>
+                            (!string.IsNullOrWhiteSpace(row.GameId) && row.GameId.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0) ||
+                            (!string.IsNullOrWhiteSpace(row.ConsoleLabel) && row.ConsoleLabel.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0) ||
+                            (!string.IsNullOrWhiteSpace(row.TagText) && row.TagText.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0) ||
+                            (!string.IsNullOrWhiteSpace(row.FilePath) && row.FilePath.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0));
+                    }
+                    grid.ItemsSource = rows.OrderBy(row => row.FilePath ?? string.Empty, StringComparer.OrdinalIgnoreCase).ToList();
+                    refreshStatus();
+                };
+
+                reselection = delegate(IEnumerable<string> filePaths)
+                {
+                    var wanted = new HashSet<string>((filePaths ?? Enumerable.Empty<string>()).Where(path => !string.IsNullOrWhiteSpace(path)), StringComparer.OrdinalIgnoreCase);
+                    if (wanted.Count == 0) return;
+                    grid.SelectedItems.Clear();
+                    foreach (var row in grid.Items.Cast<object>().OfType<PhotoIndexEditorRow>())
+                    {
+                        if (!wanted.Contains(row.FilePath ?? string.Empty)) continue;
+                        grid.SelectedItems.Add(row);
+                    }
+                    refreshStatus();
+                };
+
+                Action reloadRows = delegate
+                {
+                    allRows = LoadPhotoIndexEditorRows(libraryRoot);
+                    dirty = false;
+                    refreshGrid();
+                    status.Text = "Photo index reloaded";
+                    Log("Reloaded photo index editor rows from cache.");
+                };
+
+                searchBox.TextChanged += delegate { refreshGrid(); };
+                grid.SelectionChanged += delegate { refreshStatus(); };
+                grid.CellEditEnding += delegate { dirty = true; refreshStatus(); };
+                pullFromFileButton.Click += delegate
+                {
+                    var selectedItems = selectedRows()
+                        .Where(row => !string.IsNullOrWhiteSpace(row.FilePath) && File.Exists(row.FilePath))
+                        .ToList();
+                    if (selectedItems.Count == 0) return;
+                    foreach (var selected in selectedItems)
+                    {
+                        var tags = ReadEmbeddedKeywordTagsDirect(selected.FilePath);
+                        selected.ConsoleLabel = DetermineConsoleLabelFromTags(tags);
+                        selected.TagText = string.Join(", ", tags);
+                        selected.Stamp = BuildLibraryMetadataStamp(selected.FilePath);
+                    }
+                    dirty = true;
+                    grid.Items.Refresh();
+                    refreshStatus();
+                    status.Text = "Photo index refreshed from " + selectedItems.Count + " file(s)";
+                };
+                deleteRowButton.Click += delegate
+                {
+                    var selectedItems = selectedRows();
+                    if (selectedItems.Count == 0) return;
+                    var choice = MessageBox.Show("Remove " + selectedItems.Count + " selected row(s) from the photo index?\n\nThis does not delete the file itself.", "Delete Photo Index Row", MessageBoxButton.OKCancel, MessageBoxImage.Warning);
+                    if (choice != MessageBoxResult.OK) return;
+                    foreach (var selected in selectedItems) allRows.Remove(selected);
+                    dirty = true;
+                    refreshGrid();
+                    status.Text = "Photo index row(s) removed";
+                };
+                openFolderButton.Click += delegate
+                {
+                    var selected = grid.SelectedItem as PhotoIndexEditorRow;
+                    if (selected != null) OpenFolder(Path.GetDirectoryName(selected.FilePath));
+                };
+                openFileButton.Click += delegate
+                {
+                    var selected = grid.SelectedItem as PhotoIndexEditorRow;
+                    if (selected != null) OpenWithShell(selected.FilePath);
+                };
+                reloadButton.Click += delegate
+                {
+                    var selectedItems = selectedRows()
+                        .Where(row => !string.IsNullOrWhiteSpace(row.FilePath) && File.Exists(row.FilePath))
+                        .ToList();
+                    if (selectedItems.Count == 0)
+                    {
+                        if (dirty)
+                        {
+                            var choice = MessageBox.Show("Discard unsaved photo index edits and reload the current cache from disk?", "Reload Photo Index", MessageBoxButton.OKCancel, MessageBoxImage.Question);
+                            if (choice != MessageBoxResult.OK) return;
+                        }
+                        reloadRows();
+                        return;
+                    }
+                    if (dirty)
+                    {
+                        var choice = MessageBox.Show("Reloading from the selected file(s) will discard unsaved photo index edits. Continue?", "Reload Photo Index", MessageBoxButton.OKCancel, MessageBoxImage.Question);
+                        if (choice != MessageBoxResult.OK) return;
+                    }
+                    var selectedPaths = selectedItems.Select(row => row.FilePath).ToList();
+                    var diskRows = LoadPhotoIndexEditorRows(libraryRoot);
+                    var rowMap = diskRows
+                        .Where(row => row != null && !string.IsNullOrWhiteSpace(row.FilePath))
+                        .GroupBy(row => row.FilePath, StringComparer.OrdinalIgnoreCase)
+                        .ToDictionary(group => group.Key, group => group.Last(), StringComparer.OrdinalIgnoreCase);
+                    int refreshed = 0;
+                    foreach (var path in selectedPaths)
+                    {
+                        PhotoIndexEditorRow target;
+                        if (!rowMap.TryGetValue(path, out target) || !File.Exists(path)) continue;
+                        var tags = ReadEmbeddedKeywordTagsDirect(path);
+                        target.ConsoleLabel = DetermineConsoleLabelFromTags(tags);
+                        target.TagText = string.Join(", ", tags);
+                        target.Stamp = BuildLibraryMetadataStamp(path);
+                        refreshed++;
+                    }
+                    SavePhotoIndexEditorRows(libraryRoot, diskRows);
+                    allRows = LoadPhotoIndexEditorRows(libraryRoot);
+                    dirty = false;
+                    refreshGrid();
+                    reselection(selectedPaths);
+                    status.Text = "Reloaded " + refreshed + " photo index row(s) from file";
+                    Log("Reloaded " + refreshed + " photo index row(s) from selected file(s).");
+                };
+                closeButton.Click += delegate
+                {
+                    if (dirty)
+                    {
+                        var choice = MessageBox.Show("You have unsaved photo index changes.\n\nClose without saving?", "Close Photo Index", MessageBoxButton.OKCancel, MessageBoxImage.Warning);
+                        if (choice != MessageBoxResult.OK) return;
+                    }
+                    editorWindow.Close();
+                };
+                saveButton.Click += delegate
+                {
+                    try
+                    {
+                        grid.CommitEdit(DataGridEditingUnit.Cell, true);
+                        grid.CommitEdit(DataGridEditingUnit.Row, true);
+                        foreach (var row in allRows)
+                        {
+                            row.GameId = NormalizeGameId(row.GameId);
+                            row.ConsoleLabel = CleanTag(row.ConsoleLabel);
+                            row.TagText = string.Join(", ", ParseTagText(row.TagText));
+                        }
+                        SavePhotoIndexEditorRows(libraryRoot, allRows);
+                        allRows = LoadPhotoIndexEditorRows(libraryRoot);
+                        dirty = false;
+                        refreshGrid();
+                        status.Text = "Photo index saved";
+                        Log("Saved " + allRows.Count + " photo index row(s) to cache.");
+                    }
+                    catch (Exception saveEx)
+                    {
+                        status.Text = "Photo index save failed";
+                        Log("Failed to save photo index. " + saveEx.Message);
+                        MessageBox.Show("Could not save the photo index." + Environment.NewLine + Environment.NewLine + saveEx.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                };
+                editorWindow.Closed += delegate { status.Text = "Ready"; };
+
+                refreshGrid();
+                status.Text = "Photo index ready";
+                Log("Opened photo index editor.");
+                editorWindow.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                status.Text = "Photo index unavailable";
+                Log("Failed to open photo index. " + ex.Message);
+                MessageBox.Show("Could not open the photo index." + Environment.NewLine + Environment.NewLine + ex.Message, "PixelVault");
+            }
+        }
+        void OpenGameIndexEditor()
+        {
+            if (string.IsNullOrWhiteSpace(libraryRoot) || !Directory.Exists(libraryRoot))
+            {
+                MessageBox.Show("Library folder not found. Check Settings before opening the game index.", "PixelVault");
+                return;
+            }
+
+            try
+            {
+                status.Text = "Loading game index";
+                var allRows = LoadGameIndexEditorRows(libraryRoot);
+                var editorWindow = new Window
+                {
+                    Title = "PixelVault " + AppVersion + " Game Index",
+                    Width = 1380,
+                    Height = 900,
+                    MinWidth = 1120,
+                    MinHeight = 760,
+                    Owner = this,
+                    WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                    Background = Brush("#F3EEE4")
+                };
+
+                var root = new Grid { Margin = new Thickness(24) };
+                root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+
+                var header = new Border { Background = Brush("#161C20"), CornerRadius = new CornerRadius(20), Padding = new Thickness(24), Margin = new Thickness(0, 0, 0, 18) };
+                var headerStack = new StackPanel();
+                headerStack.Children.Add(new TextBlock { Text = "Game Index", FontSize = 30, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White });
+                headerStack.Children.Add(new TextBlock { Text = "Use this as the master game record: one row per game and platform, with duplicates merged together and platform variants kept separate.", Margin = new Thickness(0, 8, 0, 0), FontSize = 14, Foreground = Brush("#B7C6C0"), TextWrapping = TextWrapping.Wrap });
+                headerStack.Children.Add(new TextBlock { Text = "Saving here updates the master index first, then re-syncs the library cache from it so AppIDs and titles stay consistent.", Margin = new Thickness(0, 10, 0, 0), FontSize = 13, Foreground = Brush("#D8C7A4"), TextWrapping = TextWrapping.Wrap });
+                header.Child = headerStack;
+                root.Children.Add(header);
+
+                var body = new Border { Background = Brushes.White, CornerRadius = new CornerRadius(18), Padding = new Thickness(18), BorderBrush = Brush("#D7E1E8"), BorderThickness = new Thickness(1) };
+                Grid.SetRow(body, 1);
+                root.Children.Add(body);
+
+                var bodyGrid = new Grid();
+                bodyGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                bodyGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+                bodyGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                body.Child = bodyGrid;
+
+                var controlGrid = new Grid { Margin = new Thickness(0, 0, 0, 14) };
+                controlGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                controlGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(320) });
+                controlGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                controlGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                controlGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                controlGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                controlGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                controlGrid.Children.Add(new TextBlock { Text = "Search", Margin = new Thickness(0, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center, FontWeight = FontWeights.SemiBold, Foreground = Brush("#1F2A30") });
+                var searchBox = new TextBox { Padding = new Thickness(10, 6, 10, 6), BorderBrush = Brush("#D7E1E8"), BorderThickness = new Thickness(1), Background = Brushes.White, Margin = new Thickness(0, 0, 14, 0) };
+                Grid.SetColumn(searchBox, 1);
+                controlGrid.Children.Add(searchBox);
+                var helperText = new TextBlock { Text = "Edit the master Game, Platform, Steam AppID, and STID fields. Game ID stays stable, and folder/file details stay read-only so photo-level assignments drive grouping.", VerticalAlignment = VerticalAlignment.Center, Foreground = Brush("#5F6970"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 14, 0) };
+                Grid.SetColumn(helperText, 2);
+                controlGrid.Children.Add(helperText);
+                var addRowButton = Btn("Add Game", null, "#8A5A17", Brushes.White);
+                addRowButton.Width = 140;
+                addRowButton.Height = 42;
+                addRowButton.Margin = new Thickness(0, 0, 10, 0);
+                Grid.SetColumn(addRowButton, 3);
+                controlGrid.Children.Add(addRowButton);
+                var deleteRowButton = Btn("Delete Game", null, "#A3473E", Brushes.White);
+                deleteRowButton.Width = 146;
+                deleteRowButton.Height = 42;
+                deleteRowButton.Margin = new Thickness(0, 0, 10, 0);
+                deleteRowButton.IsEnabled = false;
+                Grid.SetColumn(deleteRowButton, 4);
+                controlGrid.Children.Add(deleteRowButton);
+                var resolveIdsButton = Btn("Resolve IDs", null, "#275D47", Brushes.White);
+                resolveIdsButton.Width = 160;
+                resolveIdsButton.Height = 42;
+                resolveIdsButton.Margin = new Thickness(0, 0, 10, 0);
+                Grid.SetColumn(resolveIdsButton, 5);
+                controlGrid.Children.Add(resolveIdsButton);
+                var reloadButton = Btn("Reload", null, "#EEF2F5", Brush("#33424D"));
+                reloadButton.Width = 132;
+                reloadButton.Height = 42;
+                reloadButton.Margin = new Thickness(0, 0, 10, 0);
+                Grid.SetColumn(reloadButton, 6);
+                controlGrid.Children.Add(reloadButton);
+                var openFolderButton = Btn("Open Folder", null, "#20343A", Brushes.White);
+                openFolderButton.Width = 148;
+                openFolderButton.Height = 42;
+                openFolderButton.Margin = new Thickness(0);
+                openFolderButton.IsEnabled = false;
+                Grid.SetColumn(openFolderButton, 7);
+                controlGrid.Children.Add(openFolderButton);
+                bodyGrid.Children.Add(controlGrid);
+
+                var grid = new DataGrid
+                {
+                    AutoGenerateColumns = false,
+                    CanUserAddRows = false,
+                    CanUserDeleteRows = false,
+                    CanUserResizeRows = false,
+                    SelectionMode = DataGridSelectionMode.Single,
+                    SelectionUnit = DataGridSelectionUnit.FullRow,
+                    GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
+                    HeadersVisibility = DataGridHeadersVisibility.Column,
+                    BorderThickness = new Thickness(1),
+                    BorderBrush = Brush("#D7E1E8"),
+                    Background = Brushes.White,
+                    AlternatingRowBackground = Brush("#F7FAFC"),
+                    RowHeaderWidth = 0,
+                    Margin = new Thickness(0, 0, 0, 16)
+                };
+                grid.Columns.Add(new DataGridTextColumn { Header = "Game ID", Binding = new System.Windows.Data.Binding("GameId"), IsReadOnly = true, Width = 180 });
+                grid.Columns.Add(new DataGridTextColumn { Header = "Game", Binding = new System.Windows.Data.Binding("Name") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus }, Width = new DataGridLength(1.15, DataGridLengthUnitType.Star) });
+                grid.Columns.Add(new DataGridTextColumn { Header = "Platform", Binding = new System.Windows.Data.Binding("PlatformLabel") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus }, Width = 130 });
+                grid.Columns.Add(new DataGridTextColumn { Header = "Steam AppID", Binding = new System.Windows.Data.Binding("SteamAppId") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus }, Width = 130 });
+                grid.Columns.Add(new DataGridTextColumn { Header = "STID", Binding = new System.Windows.Data.Binding("SteamGridDbId") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus }, Width = 120 });
+                grid.Columns.Add(new DataGridTextColumn { Header = "Files", Binding = new System.Windows.Data.Binding("FileCount"), IsReadOnly = true, Width = 74 });
+                grid.Columns.Add(new DataGridTextColumn { Header = "Folder", Binding = new System.Windows.Data.Binding("FolderPath"), IsReadOnly = true, Width = new DataGridLength(1.85, DataGridLengthUnitType.Star) });
+                Grid.SetRow(grid, 1);
+                bodyGrid.Children.Add(grid);
+
+                var footerGrid = new Grid();
+                footerGrid.ColumnDefinitions.Add(new ColumnDefinition());
+                footerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                var statusText = new TextBlock { Foreground = Brush("#5F6970"), VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap };
+                footerGrid.Children.Add(statusText);
+                var actionRow = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+                var closeButton = Btn("Close", null, "#EEF2F5", Brush("#33424D"));
+                closeButton.Width = 128;
+                closeButton.Height = 44;
+                closeButton.Margin = new Thickness(0, 0, 10, 0);
+                var saveButton = Btn("Save Index", null, "#275D47", Brushes.White);
+                saveButton.Width = 148;
+                saveButton.Height = 44;
+                saveButton.Margin = new Thickness(0);
+                actionRow.Children.Add(closeButton);
+                actionRow.Children.Add(saveButton);
+                Grid.SetColumn(actionRow, 1);
+                footerGrid.Children.Add(actionRow);
+                Grid.SetRow(footerGrid, 2);
+                bodyGrid.Children.Add(footerGrid);
+
+                editorWindow.Content = root;
+
+                bool dirty = false;
+                Action refreshStatus = null;
+                Action refreshGrid = null;
+
+                refreshStatus = delegate
+                {
+                    var visibleCount = grid.Items.Count;
+                    var selected = grid.SelectedItem as GameIndexEditorRow;
+                    openFolderButton.IsEnabled = selected != null && !string.IsNullOrWhiteSpace(selected.FolderPath) && Directory.Exists(selected.FolderPath);
+                    deleteRowButton.IsEnabled = selected != null;
+                    var selectionText = selected == null ? "No row selected" : selected.Name + " | " + selected.PlatformLabel + " | " + (selected.GameId ?? string.Empty);
+                    statusText.Text = visibleCount + " visible row(s) | " + allRows.Count + " total | " + (dirty ? "Unsaved changes" : "Saved") + " | " + selectionText;
+                };
+
+                refreshGrid = delegate
+                {
+                    var query = (searchBox.Text ?? string.Empty).Trim();
+                    IEnumerable<GameIndexEditorRow> rows = allRows;
+                    if (!string.IsNullOrWhiteSpace(query))
+                    {
+                        rows = rows.Where(row =>
+                            (!string.IsNullOrWhiteSpace(row.GameId) && row.GameId.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0) ||
+                            (!string.IsNullOrWhiteSpace(row.Name) && row.Name.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0) ||
+                            (!string.IsNullOrWhiteSpace(row.PlatformLabel) && row.PlatformLabel.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0) ||
+                            (!string.IsNullOrWhiteSpace(row.SteamAppId) && row.SteamAppId.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0) ||
+                            (!string.IsNullOrWhiteSpace(row.SteamGridDbId) && row.SteamGridDbId.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0) ||
+                            (!string.IsNullOrWhiteSpace(row.FolderPath) && row.FolderPath.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0));
+                    }
+                    grid.ItemsSource = rows
+                        .OrderBy(row => row.Name ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+                        .ThenBy(row => row.PlatformLabel ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+                        .ToList();
+                    refreshStatus();
+                };
+
+                Action reloadRows = delegate
+                {
+                    allRows = LoadGameIndexEditorRows(libraryRoot);
+                    dirty = false;
+                    refreshGrid();
+                    status.Text = "Game index reloaded";
+                    Log("Reloaded game index editor rows from cache.");
+                };
+
+                searchBox.TextChanged += delegate { refreshGrid(); };
+                grid.SelectionChanged += delegate { refreshStatus(); };
+                grid.CellEditEnding += delegate { dirty = true; refreshStatus(); };
+                addRowButton.Click += delegate
+                {
+                    var newRow = new GameIndexEditorRow
+                    {
+                        GameId = CreateGameId(allRows.Select(row => row.GameId)),
+                        Name = string.Empty,
+                        PlatformLabel = "Other",
+                        SteamAppId = string.Empty,
+                        SteamGridDbId = string.Empty,
+                        FileCount = 0,
+                        FolderPath = string.Empty,
+                        PreviewImagePath = string.Empty,
+                        FilePaths = new string[0]
+                    };
+                    allRows.Add(newRow);
+                    dirty = true;
+                    refreshGrid();
+                    grid.SelectedItem = newRow;
+                    grid.ScrollIntoView(newRow);
+                    status.Text = "New game row added";
+                };
+                deleteRowButton.Click += delegate
+                {
+                    var selected = grid.SelectedItem as GameIndexEditorRow;
+                    if (selected == null) return;
+                    var choice = MessageBox.Show("Remove the selected row from the game index?\n\nThis only deletes the master record row.", "Delete Game Index Row", MessageBoxButton.OKCancel, MessageBoxImage.Warning);
+                    if (choice != MessageBoxResult.OK) return;
+                    allRows.Remove(selected);
+                    dirty = true;
+                    refreshGrid();
+                    status.Text = "Game index row removed";
+                };
+                resolveIdsButton.Click += delegate
+                {
+                    try
+                    {
+                        grid.CommitEdit(DataGridEditingUnit.Cell, true);
+                        grid.CommitEdit(DataGridEditingUnit.Row, true);
+                        foreach (var row in allRows)
+                        {
+                            row.Name = NormalizeGameIndexName(row.Name, row.FolderPath);
+                            row.PlatformLabel = NormalizeConsoleLabel(string.IsNullOrWhiteSpace(row.PlatformLabel) ? "Other" : row.PlatformLabel.Trim());
+                        }
+                        allRows = MergeGameIndexRows(allRows);
+                        var resolvedAppIds = ResolveMissingGameIndexSteamAppIds(libraryRoot, allRows, delegate(int current, int total, string detail)
+                        {
+                            statusText.Text = current + " of " + total + " checked | " + detail;
+                        });
+                        var resolvedSteamGridDbIds = ResolveMissingGameIndexSteamGridDbIds(libraryRoot, allRows, delegate(int current, int total, string detail)
+                        {
+                            statusText.Text = total <= 0 ? detail : (current + " of " + total + " checked | " + detail);
+                        });
+                        dirty = false;
+                        refreshGrid();
+                        status.Text = "Game index IDs resolved";
+                        Log("Resolved " + resolvedAppIds + " Steam AppID entr" + (resolvedAppIds == 1 ? "y" : "ies") + " and " + resolvedSteamGridDbIds + " STID entr" + (resolvedSteamGridDbIds == 1 ? "y" : "ies") + " into the game index.");
+                    }
+                    catch (Exception resolveEx)
+                    {
+                        status.Text = "Game index resolve failed";
+                        Log("Failed to resolve external game index IDs. " + resolveEx.Message);
+                        MessageBox.Show("Could not resolve external IDs for the game index." + Environment.NewLine + Environment.NewLine + resolveEx.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                };
+                openFolderButton.Click += delegate
+                {
+                    var selected = grid.SelectedItem as GameIndexEditorRow;
+                    if (selected != null) OpenFolder(selected.FolderPath);
+                };
+                reloadButton.Click += delegate
+                {
+                    if (dirty)
+                    {
+                        var choice = MessageBox.Show("Discard unsaved index edits and reload the current cache from disk?", "Reload Game Index", MessageBoxButton.OKCancel, MessageBoxImage.Question);
+                        if (choice != MessageBoxResult.OK) return;
+                    }
+                    reloadRows();
+                };
+                closeButton.Click += delegate
+                {
+                    if (dirty)
+                    {
+                        var choice = MessageBox.Show("You have unsaved game index changes.\n\nClose without saving?", "Close Game Index", MessageBoxButton.OKCancel, MessageBoxImage.Warning);
+                        if (choice != MessageBoxResult.OK) return;
+                    }
+                    editorWindow.Close();
+                };
+                saveButton.Click += delegate
+                {
+                    try
+                    {
+                        grid.CommitEdit(DataGridEditingUnit.Cell, true);
+                        grid.CommitEdit(DataGridEditingUnit.Row, true);
+                        foreach (var row in allRows)
+                        {
+                            row.Name = NormalizeGameIndexName(row.Name, row.FolderPath);
+                            row.PlatformLabel = NormalizeConsoleLabel(string.IsNullOrWhiteSpace(row.PlatformLabel) ? "Other" : row.PlatformLabel.Trim());
+                            row.SteamAppId = (row.SteamAppId ?? string.Empty).Trim();
+                            row.SteamGridDbId = (row.SteamGridDbId ?? string.Empty).Trim();
+                        }
+                        allRows = MergeGameIndexRows(allRows);
+                        SaveGameIndexEditorRows(libraryRoot, allRows);
+                        dirty = false;
+                        refreshGrid();
+                        status.Text = "Game index saved";
+                        Log("Saved " + allRows.Count + " game index row(s) to cache.");
+                    }
+                    catch (Exception saveEx)
+                    {
+                        status.Text = "Game index save failed";
+                        Log("Failed to save game index. " + saveEx.Message);
+                        MessageBox.Show("Could not save the game index." + Environment.NewLine + Environment.NewLine + saveEx.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                };
+                editorWindow.Closed += delegate { status.Text = "Ready"; };
+
+                refreshGrid();
+                status.Text = "Game index ready";
+                Log("Opened game index editor.");
+                editorWindow.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                status.Text = "Game index unavailable";
+                Log("Failed to open game index. " + ex.Message);
+                MessageBox.Show("Could not open the game index." + Environment.NewLine + Environment.NewLine + ex.Message, "PixelVault");
+            }
+        }
+        List<GameIndexEditorRow> LoadGameIndexEditorRows(string root)
+        {
+            var folders = LoadLibraryFoldersCached(root, false);
+            if (folders == null || folders.Count == 0)
+            {
+                status.Text = "Building game index";
+                Log("Game index cache missing or stale. Rebuilding it before editing.");
+                folders = LoadLibraryFoldersCached(root, true);
+            }
+            var liveRows = BuildGameIndexRowsFromFolders(folders);
+            var savedRows = LoadSavedGameIndexRows(root);
+            var rows = MergeGameIndexRows(savedRows.Concat(liveRows));
+            if (savedRows.Count == 0 || rows.Count != savedRows.Count)
+            {
+                SaveSavedGameIndexRows(root, rows);
+                RefreshCachedLibraryFoldersFromGameIndex(root);
+            }
+            return rows;
+        }
+        void SaveGameIndexEditorRows(string root, IEnumerable<GameIndexEditorRow> rows)
+        {
+            var normalizedRows = MergeGameIndexRows(rows);
+            var previousRows = MergeGameIndexRows(LoadSavedGameIndexRows(root).Concat(BuildGameIndexRowsFromFolders(LoadLibraryFoldersCached(root, false) ?? new List<LibraryFolderInfo>())));
+            var aliasMap = BuildGameIndexSaveAliasMap(previousRows, normalizedRows);
+            AlignLibraryFoldersToGameIndex(root, normalizedRows);
+            SaveSavedGameIndexRows(root, normalizedRows);
+            if (aliasMap.Count > 0)
+            {
+                RewriteGameIdAliasesInLibraryMetadataIndexFile(root, aliasMap);
+                RewriteGameIdAliasesInLibraryFolderCacheFile(root, aliasMap);
+            }
+            RefreshCachedLibraryFoldersFromGameIndex(root);
+        }
+        int ResolveMissingGameIndexSteamAppIds(string root, List<GameIndexEditorRow> rows, Action<int, int, string> progress)
+        {
+            var allRows = rows ?? new List<GameIndexEditorRow>();
+            var targets = allRows
+                .Where(row => row != null && !string.IsNullOrWhiteSpace(row.Name))
+                .GroupBy(BuildGameIndexMergeKey, StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.First())
+                .OrderBy(row => row.Name ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            int resolved = 0;
+            for (int i = 0; i < targets.Count; i++)
+            {
+                var row = targets[i];
+                var detailPrefix = "Game " + (i + 1) + " of " + targets.Count + " | " + row.Name;
+                if (!string.IsNullOrWhiteSpace(row.SteamAppId))
+                {
+                    if (progress != null) progress(i + 1, targets.Count, detailPrefix + " | already cached as " + row.SteamAppId);
+                    continue;
+                }
+                var folder = new LibraryFolderInfo
+                {
+                    GameId = row.GameId ?? string.Empty,
+                    Name = row.Name ?? string.Empty,
+                    FolderPath = row.FolderPath ?? string.Empty,
+                    FileCount = row.FileCount,
+                    PreviewImagePath = row.PreviewImagePath ?? string.Empty,
+                    PlatformLabel = row.PlatformLabel ?? string.Empty,
+                    FilePaths = row.FilePaths ?? new string[0],
+                    SteamAppId = row.SteamAppId ?? string.Empty,
+                    SteamGridDbId = row.SteamGridDbId ?? string.Empty
+                };
+                var appId = ResolveBestLibraryFolderSteamAppId(root, folder);
+                if (!string.IsNullOrWhiteSpace(appId))
+                {
+                    foreach (var match in allRows.Where(entry =>
+                        string.Equals(BuildGameIndexMergeKey(entry), BuildGameIndexMergeKey(row), StringComparison.OrdinalIgnoreCase)))
+                    {
+                        match.SteamAppId = appId;
+                    }
+                    resolved++;
+                    if (progress != null) progress(i + 1, targets.Count, detailPrefix + " | resolved " + appId);
+                }
+                else
+                {
+                    if (progress != null) progress(i + 1, targets.Count, detailPrefix + " | no match");
+                }
+            }
+            SaveGameIndexEditorRows(root, allRows);
+            return resolved;
+        }
+        int ResolveMissingGameIndexSteamGridDbIds(string root, List<GameIndexEditorRow> rows, Action<int, int, string> progress)
+        {
+            if (!HasSteamGridDbApiToken())
+            {
+                if (progress != null) progress(0, 0, "SteamGridDB token not configured. STID resolution skipped.");
+                return 0;
+            }
+            var allRows = rows ?? new List<GameIndexEditorRow>();
+            var targets = allRows
+                .Where(row => row != null && !string.IsNullOrWhiteSpace(row.Name))
+                .GroupBy(BuildGameIndexMergeKey, StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.First())
+                .OrderBy(row => row.Name ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            int resolved = 0;
+            for (int i = 0; i < targets.Count; i++)
+            {
+                var row = targets[i];
+                var detailPrefix = "STID " + (i + 1) + " of " + targets.Count + " | " + row.Name;
+                if (!string.IsNullOrWhiteSpace(row.SteamGridDbId))
+                {
+                    if (progress != null) progress(i + 1, targets.Count, detailPrefix + " | already cached as " + row.SteamGridDbId);
+                    continue;
+                }
+                var folder = new LibraryFolderInfo
+                {
+                    GameId = row.GameId ?? string.Empty,
+                    Name = row.Name ?? string.Empty,
+                    FolderPath = row.FolderPath ?? string.Empty,
+                    FileCount = row.FileCount,
+                    PreviewImagePath = row.PreviewImagePath ?? string.Empty,
+                    PlatformLabel = row.PlatformLabel ?? string.Empty,
+                    FilePaths = row.FilePaths ?? new string[0],
+                    SteamAppId = row.SteamAppId ?? string.Empty,
+                    SteamGridDbId = row.SteamGridDbId ?? string.Empty
+                };
+                var steamGridDbId = ResolveBestLibraryFolderSteamGridDbId(root, folder);
+                if (!string.IsNullOrWhiteSpace(steamGridDbId))
+                {
+                    foreach (var match in allRows.Where(entry =>
+                        string.Equals(BuildGameIndexMergeKey(entry), BuildGameIndexMergeKey(row), StringComparison.OrdinalIgnoreCase)))
+                    {
+                        match.SteamGridDbId = steamGridDbId;
+                    }
+                    resolved++;
+                    if (progress != null) progress(i + 1, targets.Count, detailPrefix + " | resolved " + steamGridDbId);
+                }
+                else
+                {
+                    if (progress != null) progress(i + 1, targets.Count, detailPrefix + " | no match");
+                }
+            }
+            SaveGameIndexEditorRows(root, allRows);
+            return resolved;
+        }
         void OpenWithShell(string path) { if (!string.IsNullOrWhiteSpace(path) && File.Exists(path)) Process.Start(new ProcessStartInfo(path) { UseShellExecute = true }); }
 
         void LoadSettings()
@@ -4788,12 +8269,31 @@ namespace PixelVaultNative
                 else if (key == "destination") destinationRoot = value;
                 else if (key == "library") libraryRoot = value;
                 else if (key == "exiftool" && !string.IsNullOrWhiteSpace(value)) exifToolPath = value;
+                else if (key == "ffmpeg" && !string.IsNullOrWhiteSpace(value)) ffmpegPath = value;
+                else if (key == "steamgriddb_token") steamGridDbApiToken = value;
+                else if (key == "library_folder_tile_size")
+                {
+                    int parsedSize;
+                    if (int.TryParse(value, out parsedSize)) libraryFolderTileSize = NormalizeLibraryFolderTileSize(parsedSize);
+                }
+                else if (key == "library_folder_sort_mode") libraryFolderSortMode = NormalizeLibraryFolderSortMode(value);
             }
 
             var bundledExifTool = Path.Combine(appRoot, "tools", "exiftool.exe");
             if (!File.Exists(exifToolPath) && File.Exists(bundledExifTool))
             {
                 exifToolPath = bundledExifTool;
+            }
+
+            var bundledFfmpeg = Path.Combine(appRoot, "tools", "ffmpeg.exe");
+            if (string.IsNullOrWhiteSpace(ffmpegPath) || !File.Exists(ffmpegPath))
+            {
+                ffmpegPath = File.Exists(bundledFfmpeg) ? bundledFfmpeg : (FindExecutableOnPath("ffmpeg.exe") ?? string.Empty);
+            }
+            var envSteamGridDbToken = FindSteamGridDbApiTokenInEnvironment();
+            if (!string.IsNullOrWhiteSpace(envSteamGridDbToken))
+            {
+                steamGridDbApiToken = envSteamGridDbToken;
             }
         }
 
@@ -4804,7 +8304,11 @@ namespace PixelVaultNative
                 "source=" + SerializeSourceRoots(sourceRoot),
                 "destination=" + destinationRoot,
                 "library=" + libraryRoot,
-                "exiftool=" + exifToolPath
+                "exiftool=" + exifToolPath,
+                "ffmpeg=" + (ffmpegPath ?? string.Empty),
+                "steamgriddb_token=" + (steamGridDbApiToken ?? string.Empty),
+                "library_folder_tile_size=" + NormalizeLibraryFolderTileSize(libraryFolderTileSize),
+                "library_folder_sort_mode=" + NormalizeLibraryFolderSortMode(libraryFolderSortMode)
             });
         }
 
@@ -4827,27 +8331,6 @@ namespace PixelVaultNative
         }
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

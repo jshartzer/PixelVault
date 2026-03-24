@@ -8,7 +8,7 @@ The live app line is based in:
 
 Current published build:
 
-- `C:\Codex\dist\PixelVault-0.748\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.749\PixelVault.exe`
 
 Desktop shortcut:
 
@@ -86,31 +86,64 @@ Important files:
 
 - `C:\Codex\PixelVaultData\cache\game-index-y_game_captures.cache`
 - `C:\Codex\PixelVaultData\cache\library-metadata-index-y_game_captures.cache`
-- `C:\Codex\CURRENT_BUILD.txt`
-- `C:\Codex\CHANGELOG.md`
-- `C:\Codex\HANDOFF.md`
-- `C:\Codex\POLICY.md`
-- `C:\Codex\PROJECT_CONTEXT.md`
+- `C:\Codex\docs\CURRENT_BUILD.txt`
+- `C:\Codex\docs\CHANGELOG.md`
+- `C:\Codex\docs\HANDOFF.md`
+- `C:\Codex\docs\POLICY.md`
+- `C:\Codex\docs\PROJECT_CONTEXT.md`
+
+## Workspace Map
+
+- `C:\Codex\src\PixelVault.Native`: live app source and SDK project
+- `C:\Codex\scripts`: build/publish and developer utility scripts
+- `C:\Codex\docs`: handoff, policy, changelog, project context, and current-build marker
+- `C:\Codex\dist`: published versioned builds
+- `C:\Codex\assets`: shared branding and UI assets
+- `C:\Codex\tools`: bundled runtime dependencies such as `ExifTool` and `FFmpeg`
+- `C:\Codex\PixelVaultData`: live shared app data, indexes, caches, and logs
+- `C:\Codex\legacy`: older GameCaptureManager workflow files kept for history
+- `C:\Codex\archive`: backups and old artifacts not needed for day-to-day development
 
 ## Source And Packaging
 
 The live published source snapshot for the current build is:
 
-- `C:\Codex\dist\PixelVault-0.748\PixelVault.Native.cs`
+- `C:\Codex\dist\PixelVault-0.749\PixelVault.Native.cs`
 
-There is also an older `native\PixelVault.Native.cs` workspace copy in the repo for reference/history, but the current shipped line should be treated carefully and documented through the live `C:\Codex` workflow.
+The live build source now lives at:
+
+- `C:\Codex\src\PixelVault.Native\PixelVault.Native.cs`
+- `C:\Codex\src\PixelVault.Native\PixelVault.Native.csproj`
+
+Use the publish helper for new release folders:
+
+- `C:\Codex\scripts\Publish-PixelVault.ps1`
 
 ## Running The App
 
 Use the current published executable:
 
 ```powershell
-C:\Codex\dist\PixelVault-0.748\PixelVault.exe
+C:\Codex\dist\PixelVault-0.749\PixelVault.exe
 ```
 
 Or launch it from:
 
 - `C:\Codex\PixelVault.lnk`
+
+## Building And Publishing
+
+Build the live source with the SDK project:
+
+```powershell
+dotnet build C:\Codex\src\PixelVault.Native\PixelVault.Native.csproj -c Release
+```
+
+Publish a new versioned dist folder with the helper script:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File C:\Codex\scripts\Publish-PixelVault.ps1 -Version 0.749
+```
 
 ## Project Documents
 
@@ -140,4 +173,4 @@ It should not track:
 
 ## Legacy Note
 
-Older PowerShell workflow files are still present in the repo because they are part of the project history, but the active product is the native Windows app line documented above.
+Older PowerShell workflow files are now grouped under `C:\Codex\legacy\GameCaptureManager` so the active native app line is easier to navigate.

@@ -14,11 +14,11 @@ The app now runs from packaged builds under `C:\Codex\dist\PixelVault-x.xxx`, wi
 
 Current published build:
 
-- `0.748`
+- `0.749`
 
 Current executable:
 
-- `C:\Codex\dist\PixelVault-0.748\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.749\PixelVault.exe`
 
 Desktop shortcut:
 
@@ -26,7 +26,7 @@ Desktop shortcut:
 
 Current build pointer:
 
-- `C:\Codex\CURRENT_BUILD.txt`
+- `C:\Codex\docs\CURRENT_BUILD.txt`
 
 ## Core Goals
 
@@ -45,7 +45,15 @@ Workspace root:
 
 Current live source file:
 
-- `C:\Codex\dist\PixelVault-0.748\PixelVault.Native.cs`
+- `C:\Codex\src\PixelVault.Native\PixelVault.Native.cs`
+
+Current native build project:
+
+- `C:\Codex\src\PixelVault.Native\PixelVault.Native.csproj`
+
+Current publish helper:
+
+- `C:\Codex\scripts\Publish-PixelVault.ps1`
 
 Shared data root:
 
@@ -79,6 +87,8 @@ Tool dependency:
 ## Current Architecture
 
 The app is still implemented primarily in one native source file.
+
+That file now builds directly through the SDK-style project under `C:\Codex\src\PixelVault.Native`, and each published dist folder keeps a version-local `PixelVault.Native.cs` snapshot for traceability.
 
 Major subsystems inside the current line include:
 
@@ -246,9 +256,9 @@ Result:
 
 Use these documents together:
 
-- `C:\Codex\POLICY.md` for behavior contracts and workflow rules
-- `C:\Codex\HANDOFF.md` for the current stop point
-- `C:\Codex\CHANGELOG.md` for release history
+- `C:\Codex\docs\POLICY.md` for behavior contracts and workflow rules
+- `C:\Codex\docs\HANDOFF.md` for the current stop point
+- `C:\Codex\docs\CHANGELOG.md` for release history
 
 ## Immediate Next Step
 

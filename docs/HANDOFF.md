@@ -8,11 +8,19 @@ Work out of:
 
 Treat `C:\Codex` as the only live source of truth for code, builds, docs, and shared app data.
 
+Current live build source:
+
+- `C:\Codex\src\PixelVault.Native\PixelVault.Native.cs`
+- `C:\Codex\src\PixelVault.Native\PixelVault.Native.csproj`
+- `C:\Codex\scripts\Publish-PixelVault.ps1`
+
+Published `dist\PixelVault-x.xxx\PixelVault.Native.cs` files are version snapshots, not the primary edit target.
+
 ## Rulebook First
 
 Before making app changes, read:
 
-- `C:\Codex\POLICY.md`
+- `C:\Codex\docs\POLICY.md`
 
 That file now holds the durable working rules for:
 
@@ -29,15 +37,15 @@ This handoff is the short current-state summary.
 
 Current live build:
 
-- `0.748`
+- `0.749`
 
 Current executable:
 
-- `C:\Codex\dist\PixelVault-0.748\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.749\PixelVault.exe`
 
 Current build pointer:
 
-- `C:\Codex\CURRENT_BUILD.txt`
+- `C:\Codex\docs\CURRENT_BUILD.txt`
 
 Desktop shortcut that must always follow the newest published build:
 
@@ -79,7 +87,7 @@ Behavior summary:
 
 ## Recent Shipped State
 
-Recent important published changes in the current `0.724` to `0.748` line:
+Recent important published changes in the current `0.724` to `0.749` line:
 
 - intake preview/process/manual flows now reuse shared source inventories instead of rescanning the same roots repeatedly
 - metadata writes run with bounded parallel `ExifTool` workers
@@ -100,8 +108,9 @@ Recent important published changes in the current `0.724` to `0.748` line:
 - the Library top bar now exposes Import actions directly, drops the Photography shortcut there, and moves status into a smaller footer line
 - the Library toolbar spacing was tightened again so the right-side action buttons fit cleanly, and the sort picker got a cleaner shell treatment
 - the Library header now uses the shared PixelVault logo, the search field lines up with the import actions, and the sort and folder-size controls were rebalanced for a cleaner filter row
+- the Library header no longer reserves space for the PixelVault logo or folder count, and the search field now starts on the same left edge as the `Import` button
 
-See `C:\Codex\CHANGELOG.md` for the detailed version history.
+See `C:\Codex\docs\CHANGELOG.md` for the detailed version history.
 
 ## Recent Non-Build Maintenance
 
@@ -127,22 +136,22 @@ This was a data-only maintenance pass, not a new app build.
 
 ## Current Stop Point
 
-The current live build is `0.748`, and the latest work focused on cleaning up the Library header and filter row:
+The current live build is `0.749`, and the latest work focused on simplifying the Library header and left alignment:
 
-1. the `Game Library` text header was replaced with the shared PixelVault logo and constrained so it fits the left title block cleanly
-2. the search box now lines up with the import action group, and the sort picker text is centered more cleanly
-3. the folder-size slider was lowered within its row so it sits more naturally between the label and value
+1. the left-side PixelVault logo block and folder count were removed from the Library header
+2. the import action group now starts flush at the left edge of the header content
+3. the search box now starts on the same left edge as the `Import` button while the rest of the filter row stays intact
 
 The most likely next product step is:
 
-1. continue polishing the Library browse surface now that the header, import bar, sort row, and folder-size controls have all been tightened through `0.748`
+1. continue polishing the Library browse surface now that the header, import bar, sort row, and folder-size controls have all been tightened through `0.749`
 2. run a live SteamGridDB backfill so the existing Game Index rows gain `STID` values where possible
 3. validate the `STID`-first cover flow on a few real multi-platform titles and confirm the preferred portrait art is stable
 
 ## Important Expectations
 
 - After every published build, repoint `C:\Codex\PixelVault.lnk` to the newest executable.
-- Keep `POLICY.md` as the durable behavior contract.
-- Keep `HANDOFF.md` short and current.
+- Keep `C:\Codex\docs\POLICY.md` as the durable behavior contract.
+- Keep `C:\Codex\docs\HANDOFF.md` short and current.
 - Do not let the game index or photo index drift from the actual intended behavior without documenting the rule change.
 - If a build changes record identity or folder naming, update both the handoff docs and the curated cache snapshots intentionally before committing.

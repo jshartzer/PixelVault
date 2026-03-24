@@ -21,6 +21,8 @@ PixelVaultData/cache/last-import.tsv
 backups/
 tmp_*
 tmp-*
+**/bin/
+**/obj/
 
 # Older archived builds
 dist/PixelVault-0.600/

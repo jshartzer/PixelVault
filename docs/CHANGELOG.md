@@ -1,3 +1,7 @@
+## 0.749
+- Removed the PixelVault logo block and folder-count label from the Library header so the browse toolbar starts flush on the left instead of reserving a title column.
+- Shifted the Library search field left so its leading edge aligns with the `Import` button, while keeping the sort and folder-size controls on the same filter row.
+
 ## 0.748
 - Replaced the Library's `Game Library` text header with the shared PixelVault logo, kept the title area within a fixed width so the logo fits cleanly, and aligned the search field to the left-side import action group.
 - Centered the selected text inside the sort picker, cleaned up the dropdown item alignment, and rebalanced the top filter row so the sort control and folder-size controls sit more evenly.

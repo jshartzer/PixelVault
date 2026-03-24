@@ -47,11 +47,13 @@ The exact bump should reflect the real size and risk of the change, not an arbit
 When a new app build is published:
 
 1. Update `AppVersion` in the current live source file.
-2. Publish the build into a new folder under `C:\Codex\dist\PixelVault-x.xxx`.
-3. Update `C:\Codex\CURRENT_BUILD.txt`.
-4. Update `C:\Codex\CHANGELOG.md`.
-5. Update the version-local `CHANGELOG.md` inside the new dist folder.
-6. Repoint `C:\Codex\PixelVault.lnk` to the newest `PixelVault.exe`.
+2. Build and publish from `C:\Codex\src\PixelVault.Native\PixelVault.Native.csproj`, normally through `C:\Codex\scripts\Publish-PixelVault.ps1`.
+3. Publish the build into a new folder under `C:\Codex\dist\PixelVault-x.xxx`.
+4. Copy the current source snapshot into that dist folder as `PixelVault.Native.cs`.
+5. Update `C:\Codex\docs\CURRENT_BUILD.txt`.
+6. Update `C:\Codex\docs\CHANGELOG.md`.
+7. Update the version-local `CHANGELOG.md` inside the new dist folder.
+8. Repoint `C:\Codex\PixelVault.lnk` to the newest `PixelVault.exe`.
 
 Data-only cleanup work does not require a new build version unless app code changes are also shipped.
 
@@ -60,6 +62,14 @@ Data-only cleanup work does not require a new build version unless app code chan
 PixelVault is a native Windows desktop app built in C# and WPF.
 
 The current live implementation is still centered in a single source file:
+
+- `C:\Codex\src\PixelVault.Native\PixelVault.Native.cs`
+
+The SDK build project for that file lives at:
+
+- `C:\Codex\src\PixelVault.Native\PixelVault.Native.csproj`
+
+Published builds should still carry a version-local source snapshot in:
 
 - `C:\Codex\dist\PixelVault-x.xxx\PixelVault.Native.cs`
 
@@ -354,10 +364,10 @@ Recommended tag cadence:
 
 Any future handoff should update:
 
-- `C:\Codex\HANDOFF.md`
-- `C:\Codex\CHANGELOG.md`
-- `C:\Codex\CURRENT_BUILD.txt` when a new build is published
+- `C:\Codex\docs\HANDOFF.md`
+- `C:\Codex\docs\CHANGELOG.md`
+- `C:\Codex\docs\CURRENT_BUILD.txt` when a new build is published
 
-`HANDOFF.md` should summarize the current stop point.
+`C:\Codex\docs\HANDOFF.md` should summarize the current stop point.
 
-`POLICY.md` should remain the durable rulebook.
+`C:\Codex\docs\POLICY.md` should remain the durable rulebook.
