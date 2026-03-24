@@ -1,8 +1,3 @@
-## 0.750
-- Hardened Steam rename detection so the import pass only rewrites filenames that actually match supported Steam screenshot naming patterns instead of grabbing arbitrary 3+ digit numbers.
-- Fixed library refresh/index reconciliation so existing `GameId` assignments are preserved when the saved platform still matches, which prevents folder-name guesses from splitting captures into the wrong game group.
-- Stopped normal Steam intake from silently writing both `Steam` and `PC` tags by default, keeping shipped Steam metadata aligned with the review flow and prior cleanup expectations.
-
 ## 0.749
 - Removed the PixelVault logo block and folder-count label from the Library header so the browse toolbar starts flush on the left instead of reserving a title column.
 - Shifted the Library search field left so its leading edge aligns with the `Import` button, while keeping the sort and folder-size controls on the same filter row.

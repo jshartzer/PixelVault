@@ -37,11 +37,11 @@ This handoff is the short current-state summary.
 
 Current live build:
 
-- `0.749`
+- `0.750`
 
 Current executable:
 
-- `C:\Codex\dist\PixelVault-0.749\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.750\PixelVault.exe`
 
 Current build pointer:
 
@@ -87,7 +87,7 @@ Behavior summary:
 
 ## Recent Shipped State
 
-Recent important published changes in the current `0.724` to `0.749` line:
+Recent important published changes in the current `0.724` to `0.750` line:
 
 - intake preview/process/manual flows now reuse shared source inventories instead of rescanning the same roots repeatedly
 - metadata writes run with bounded parallel `ExifTool` workers
@@ -109,6 +109,9 @@ Recent important published changes in the current `0.724` to `0.749` line:
 - the Library toolbar spacing was tightened again so the right-side action buttons fit cleanly, and the sort picker got a cleaner shell treatment
 - the Library header now uses the shared PixelVault logo, the search field lines up with the import actions, and the sort and folder-size controls were rebalanced for a cleaner filter row
 - the Library header no longer reserves space for the PixelVault logo or folder count, and the search field now starts on the same left edge as the `Import` button
+- Steam rename detection is now limited to known Steam screenshot filename patterns so unrelated numeric filenames do not get misclassified during intake
+- library refresh/index reconciliation now preserves an existing `GameId` when the platform still matches, reducing accidental regrouping from folder-name guesses
+- normal Steam intake now writes `Steam` without silently adding `PC`, keeping shipped metadata aligned with the current review flow and prior cleanup rules
 
 See `C:\Codex\docs\CHANGELOG.md` for the detailed version history.
 
@@ -136,15 +139,15 @@ This was a data-only maintenance pass, not a new app build.
 
 ## Current Stop Point
 
-The current live build is `0.749`, and the latest work focused on simplifying the Library header and left alignment:
+The current live build is `0.750`, and the latest work tightened the import and library identity pipeline:
 
-1. the left-side PixelVault logo block and folder count were removed from the Library header
-2. the import action group now starts flush at the left edge of the header content
-3. the search box now starts on the same left edge as the `Import` button while the rest of the filter row stays intact
+1. Steam rename now only fires on recognized Steam screenshot filename formats instead of any arbitrary 3+ digit match
+2. library rescans now keep an existing assigned `GameId` when the saved platform still matches, preventing folder-name drift from splitting groups
+3. Steam intake no longer writes a hidden extra `PC` tag during the normal review/import flow
 
 The most likely next product step is:
 
-1. continue polishing the Library browse surface now that the header, import bar, sort row, and folder-size controls have all been tightened through `0.749`
+1. run a focused real-library validation pass against `0.750` to confirm Steam, PS5, Xbox, and manual-intake edge cases behave cleanly after the import-pipeline hardening
 2. run a live SteamGridDB backfill so the existing Game Index rows gain `STID` values where possible
 3. validate the `STID`-first cover flow on a few real multi-platform titles and confirm the preferred portrait art is stable
 

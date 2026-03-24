@@ -176,7 +176,7 @@ namespace PixelVaultNative
 
     public sealed class MainWindow : Window
     {
-        const string AppVersion = "0.750";
+        const string AppVersion = "0.749";
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
         const int MaxImageCacheEntries = 240;
@@ -1196,7 +1196,7 @@ namespace PixelVaultNative
                 var manualItems = BuildManualMetadataItems(move, recognizedPaths);
                 var manualPaths = new HashSet<string>(manualItems.Select(i => i.FilePath), StringComparer.OrdinalIgnoreCase);
                 var moveCandidates = move.Where(f => !manualPaths.Contains(f)).ToList();
-                int renameCandidates = rename.Count(f => !string.IsNullOrWhiteSpace(GuessSteamAppIdFromFileName(f)));
+                int renameCandidates = rename.Count(f => Regex.IsMatch(Path.GetFileNameWithoutExtension(f), @"(?<!\d)(\d{3,})(?!\d)"));
                 int metaCandidates = reviewItems.Count;
                 int conflicts = Directory.Exists(destinationRoot) ? moveCandidates.Count(f => File.Exists(Path.Combine(destinationRoot, Path.GetFileName(f)))) : 0;
                 RenderPreview(rename.Count, renameCandidates, move.Count, metaCandidates, moveCandidates, manualItems, conflicts);
@@ -1369,13 +1369,14 @@ namespace PixelVaultNative
             var recordedSteamAppIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var file in (sourceFiles ?? Enumerable.Empty<string>()).Where(File.Exists))
             {
-                var appId = GuessSteamAppIdFromFileName(file);
-                if (string.IsNullOrWhiteSpace(appId)) { skipped++; continue; }
+                var m = Regex.Match(Path.GetFileNameWithoutExtension(file), @"(?<!\d)(\d{3,})(?!\d)");
+                if (!m.Success) { skipped++; continue; }
+                var appId = m.Groups[1].Value;
                 var game = SteamName(appId);
                 if (string.IsNullOrWhiteSpace(game)) { skipped++; continue; }
                 if (recordedSteamAppIds.Add(appId)) EnsureSteamAppIdInGameIndex(libraryRoot, game, appId);
                 var baseName = Path.GetFileNameWithoutExtension(file);
-                var newBase = game + baseName.Substring(appId.Length);
+                var newBase = baseName.Substring(0, m.Index) + game + baseName.Substring(m.Index + m.Length);
                 var target = Unique(Path.Combine(Path.GetDirectoryName(file), newBase + Path.GetExtension(file)));
                 File.Move(file, target);
                 MoveMetadataSidecarIfPresent(file, target);
@@ -5674,12 +5675,6 @@ namespace PixelVaultNative
                 StringComparison.OrdinalIgnoreCase);
         }
 
-        bool DoesSavedGameIndexRowMatchIndexedPlatform(GameIndexEditorRow row, string platformLabel)
-        {
-            if (row == null) return false;
-            return string.Equals(NormalizeConsoleLabel(row.PlatformLabel), NormalizeConsoleLabel(platformLabel), StringComparison.OrdinalIgnoreCase);
-        }
-
         string ResolveGameIdForIndexedFile(string root, string file, string platformLabel, IEnumerable<string> tags, Dictionary<string, LibraryMetadataIndexEntry> index, List<GameIndexEditorRow> gameRows, string preferredGameId = null)
         {
             var normalizedPlatform = NormalizeConsoleLabel(platformLabel);
@@ -5687,14 +5682,12 @@ namespace PixelVaultNative
             var normalizedPreferredGameId = NormalizeGameId(preferredGameId);
             var existingRow = FindSavedGameIndexRowById(gameRows, normalizedPreferredGameId);
             if (DoesSavedGameIndexRowMatchIndexedFile(existingRow, file, normalizedPlatform)) return existingRow.GameId;
-            if (DoesSavedGameIndexRowMatchIndexedPlatform(existingRow, normalizedPlatform)) return existingRow.GameId;
             LibraryMetadataIndexEntry existingEntry;
             if (index != null && index.TryGetValue(file, out existingEntry))
             {
                 var existingGameId = NormalizeGameId(existingEntry.GameId);
                 var existingGameRow = FindSavedGameIndexRowById(gameRows, existingGameId);
                 if (DoesSavedGameIndexRowMatchIndexedFile(existingGameRow, file, normalizedPlatform)) return existingGameId;
-                if (DoesSavedGameIndexRowMatchIndexedPlatform(existingGameRow, normalizedPlatform)) return existingGameId;
             }
             var resolvedByIdentity = FindSavedGameIndexRowByIdentity(gameRows, guessedName, normalizedPlatform);
             if (resolvedByIdentity != null) return resolvedByIdentity.GameId;
@@ -7190,10 +7183,12 @@ namespace PixelVaultNative
             if (Regex.IsMatch(file, @"^.+_\d{14}_\d+\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$", RegexOptions.IgnoreCase))
             {
                 tags.Add("Steam");
+                tags.Add("PC");
             }
             else if (Regex.IsMatch(file, @"^.+_\d{4}-\d{2}-\d{2}_\d+\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$", RegexOptions.IgnoreCase))
             {
                 tags.Add("Steam");
+                tags.Add("PC");
             }
             else if (Regex.IsMatch(file, @"^.+_\d{14}\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$", RegexOptions.IgnoreCase))
             {
