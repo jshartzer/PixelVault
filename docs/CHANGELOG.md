@@ -1,3 +1,7 @@
+## 0.755
+- Increased the Library folder `Edit IDs` dialog height and cleaned up the Save/Cancel action row so both ID fields and buttons fit cleanly without clipping.
+- Moved the `Game Index` and `Photo Index` buttons out of the top Library toolbar and into the space between Search and Sort, with a smaller centered style and light-purple treatment.
+
 ## 0.754
 - Added `Game Index` and `Photo Index` buttons directly to the Library toolbar so those editors are available without going through the Settings surface.
 - Changed the Game Index and Photo Index windows to open modelessly, which lets you keep using the Library while the tables stay open.

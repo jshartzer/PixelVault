@@ -234,7 +234,7 @@ namespace PixelVaultNative
 
     public sealed class MainWindow : Window
     {
-        const string AppVersion = "0.754";
+        const string AppVersion = "0.755";
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
         const int MaxImageCacheEntries = 240;
@@ -3444,7 +3444,6 @@ namespace PixelVaultNative
                 leftHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
                 leftHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
                 leftHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                leftHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
                 var importButton = Btn("Import", null, "#2B7A52", Brushes.White);
                 importButton.Width = 198;
                 importButton.Height = 56;
@@ -3469,20 +3468,6 @@ namespace PixelVaultNative
                 settingsButton.Margin = new Thickness(0, 0, 12, 0);
                 Grid.SetColumn(settingsButton, 1);
                 leftHeader.Children.Add(settingsButton);
-                var gameIndexButton = Btn("Game Index", null, "#20343A", Brushes.White);
-                gameIndexButton.Width = 128;
-                gameIndexButton.Height = 42;
-                gameIndexButton.FontSize = 13;
-                gameIndexButton.Margin = new Thickness(0, 0, 12, 0);
-                Grid.SetColumn(gameIndexButton, 2);
-                leftHeader.Children.Add(gameIndexButton);
-                var photoIndexButton = Btn("Photo Index", null, "#20343A", Brushes.White);
-                photoIndexButton.Width = 128;
-                photoIndexButton.Height = 42;
-                photoIndexButton.FontSize = 13;
-                photoIndexButton.Margin = new Thickness(0, 0, 12, 0);
-                Grid.SetColumn(photoIndexButton, 3);
-                leftHeader.Children.Add(photoIndexButton);
                 var refreshButton = Btn("Refresh", null, "#20343A", Brushes.White);
                 var rebuildLibraryButton = Btn("Rebuild", null, "#2E4751", Brushes.White);
                 var fetchButton = Btn("Fetch Covers", null, "#275D47", Brushes.White);
@@ -3496,7 +3481,7 @@ namespace PixelVaultNative
                 headerActions.Children.Add(refreshButton);
                 headerActions.Children.Add(rebuildLibraryButton);
                 headerActions.Children.Add(fetchButton);
-                Grid.SetColumn(headerActions, 4);
+                Grid.SetColumn(headerActions, 2);
                 leftHeader.Children.Add(headerActions);
                 leftGrid.Children.Add(leftHeader);
                 status = new TextBlock { Text = "Ready", Foreground = Brush("#8EA0AA"), FontSize = 11.5, Margin = new Thickness(2, 12, 0, 0), TextWrapping = TextWrapping.Wrap };
@@ -3512,6 +3497,27 @@ namespace PixelVaultNative
                 searchPanel.Children.Add(searchBox);
                 Grid.SetColumn(searchPanel, 0);
                 filterGrid.Children.Add(searchPanel);
+                var gameIndexButton = Btn("Game Index", null, "#C7B6F4", Brush("#2E2547"));
+                gameIndexButton.Width = 114;
+                gameIndexButton.Height = 36;
+                gameIndexButton.FontSize = 12;
+                gameIndexButton.Margin = new Thickness(0, 0, 10, 0);
+                var photoIndexButton = Btn("Photo Index", null, "#D7C8FB", Brush("#2E2547"));
+                photoIndexButton.Width = 114;
+                photoIndexButton.Height = 36;
+                photoIndexButton.FontSize = 12;
+                photoIndexButton.Margin = new Thickness(0);
+                var indexButtonsPanel = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Bottom,
+                    Margin = new Thickness(18, 0, 18, 0)
+                };
+                indexButtonsPanel.Children.Add(gameIndexButton);
+                indexButtonsPanel.Children.Add(photoIndexButton);
+                Grid.SetColumn(indexButtonsPanel, 1);
+                filterGrid.Children.Add(indexButtonsPanel);
                 var sortPanel = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(18, 0, 0, 0) };
                 sortPanel.Children.Add(new TextBlock { Text = "Sort", Foreground = Brush("#A7B5BD"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) });
                 var sortModeBoxShell = new Border
@@ -5802,10 +5808,10 @@ WHERE root = $root AND game_id = $oldGameId;";
             var editorWindow = new Window
             {
                 Title = "PixelVault " + AppVersion + " Edit IDs",
-                Width = 520,
-                Height = 330,
-                MinWidth = 480,
-                MinHeight = 300,
+                Width = 560,
+                Height = 430,
+                MinWidth = 540,
+                MinHeight = 410,
                 Owner = this,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
                 Background = Brush("#F3EEE4"),
@@ -5823,7 +5829,7 @@ WHERE root = $root AND game_id = $oldGameId;";
             header.Children.Add(new TextBlock { Text = "Update the saved Steam App ID and SteamGridDB ID for this game record without leaving the Library view.", Margin = new Thickness(0, 10, 0, 0), Foreground = Brush("#5F6970"), FontSize = 13, TextWrapping = TextWrapping.Wrap });
             root.Children.Add(header);
 
-            var form = new Grid();
+            var form = new Grid { Margin = new Thickness(0, 0, 0, 12) };
             form.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             form.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             form.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -5846,20 +5852,24 @@ WHERE root = $root AND game_id = $oldGameId;";
                 Text = "Leave a field blank if you want to clear the saved value.",
                 Foreground = Brush("#5F6970"),
                 FontSize = 12.5,
-                TextWrapping = TextWrapping.Wrap
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 4, 0, 0)
             };
             Grid.SetRow(helperText, 2);
             form.Children.Add(helperText);
 
-            var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+            var actions = new Grid { HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 8, 0, 0) };
+            actions.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            actions.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             var cancelButton = Btn("Cancel", null, "#EEF2F5", Brush("#33424D"));
-            cancelButton.Width = 128;
-            cancelButton.Height = 42;
+            cancelButton.Width = 138;
+            cancelButton.Height = 44;
             cancelButton.Margin = new Thickness(0, 0, 10, 0);
             var saveButton = Btn("Save", null, "#275D47", Brushes.White);
-            saveButton.Width = 128;
-            saveButton.Height = 42;
+            saveButton.Width = 138;
+            saveButton.Height = 44;
             actions.Children.Add(cancelButton);
+            Grid.SetColumn(saveButton, 1);
             actions.Children.Add(saveButton);
             Grid.SetRow(actions, 2);
             root.Children.Add(actions);
