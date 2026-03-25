@@ -234,7 +234,7 @@ namespace PixelVaultNative
 
     public sealed class MainWindow : Window
     {
-        const string AppVersion = "0.756";
+        const string AppVersion = "0.757";
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
         const int MaxImageCacheEntries = 240;
@@ -1273,6 +1273,7 @@ namespace PixelVaultNative
 
         void RenderPreview(int renameTotal, int renameCandidates, int metaTotal, int metaCandidates, List<string> moveFiles, List<ManualMetadataItem> manualItems, int conflicts)
         {
+            if (previewBox == null) return;
             var doc = new FlowDocument { PagePadding = new Thickness(0), FontFamily = new FontFamily("Cascadia Mono"), FontSize = 14, Background = Brushes.White };
             doc.Blocks.Add(new Paragraph(new Run("Rename: " + renameCandidates + " candidate(s) out of " + renameTotal)) { Margin = new Thickness(0) });
             doc.Blocks.Add(new Paragraph(new Run("Metadata: " + metaCandidates + " candidate(s) out of " + metaTotal)) { Margin = new Thickness(0) });
@@ -1310,6 +1311,7 @@ namespace PixelVaultNative
 
         void RenderPreviewError(string message)
         {
+            if (previewBox == null) return;
             var doc = new FlowDocument { PagePadding = new Thickness(0), FontFamily = new FontFamily("Cascadia Mono"), FontSize = 14, Background = Brushes.White };
             doc.Blocks.Add(new Paragraph(new Run(message)) { Margin = new Thickness(0) });
             previewBox.Document = doc;

@@ -1,3 +1,6 @@
+## 0.757
+- Fixed a Library-surface import null reference by making the shared preview renderer no-op when the Settings preview box is not present. Library imports now complete without trying to repaint the Settings-only preview control.
+
 ## 0.756
 - Fixed the `Edit IDs` dialog action row so `Save` and `Cancel` use the same vertical alignment and margin treatment instead of sitting crooked.
 

@@ -8,7 +8,7 @@ The live app line is based in:
 
 Current published build:
 
-- `C:\Codex\dist\PixelVault-0.756\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.757\PixelVault.exe`
 
 Desktop shortcut:
 
@@ -109,7 +109,7 @@ Important files:
 
 The live published source snapshot for the current build is:
 
-- `C:\Codex\dist\PixelVault-0.756\PixelVault.Native.cs`
+- `C:\Codex\dist\PixelVault-0.757\PixelVault.Native.cs`
 
 The live build source now lives at:
 
@@ -125,7 +125,7 @@ Use the publish helper for new release folders:
 Use the current published executable:
 
 ```powershell
-C:\Codex\dist\PixelVault-0.756\PixelVault.exe
+C:\Codex\dist\PixelVault-0.757\PixelVault.exe
 ```
 
 Or launch it from:
@@ -143,7 +143,7 @@ dotnet build C:\Codex\src\PixelVault.Native\PixelVault.Native.csproj -c Release
 Publish a new versioned dist folder with the helper script:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File C:\Codex\scripts\Publish-PixelVault.ps1 -Version 0.756
+powershell -ExecutionPolicy Bypass -File C:\Codex\scripts\Publish-PixelVault.ps1 -Version 0.757
 ```
 
 ## Project Documents
