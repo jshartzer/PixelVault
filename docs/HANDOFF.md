@@ -43,11 +43,11 @@ This handoff is the short current-state summary.
 
 Current live build:
 
-- `0.759`
+- `0.774`
 
 Current executable:
 
-- `C:\Codex\dist\PixelVault-0.759\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.774\PixelVault.exe`
 
 Current build pointer:
 
@@ -96,7 +96,7 @@ Behavior summary:
 
 ## Recent Shipped State
 
-Recent important published changes in the current `0.724` to `0.759` line:
+Recent important published changes in the current `0.724` to `0.774` line:
 
 - intake preview/process/manual flows now reuse shared source inventories instead of rescanning the same roots repeatedly
 - metadata writes run with bounded parallel `ExifTool` workers
@@ -131,6 +131,18 @@ Recent important published changes in the current `0.724` to `0.759` line:
 - Library-driven imports now skip the Settings-only preview repaint path when that preview control is not present, which fixes the shared workflow null reference after sort
 - completed import runs now open a dark themed summary window that matches the other status monitors and shows rename, metadata, move, sort, and unmatched-item totals
 - the live source has started moving toward a modular monolith by extracting shared models and the timeout web client into dedicated files without changing the one-executable app shape
+- the Library detail capture view now supports multi-select actions, including selection-aware metadata editing and permanent delete from the live viewer instead of from the Photo Index editor
+- Photo Index row removal is now explicitly `Forget Row`, and Library metadata edits can regroup files when the title or platform identity changes
+- the Library now reuses the rebuilt folder cache after metadata edits and live deletes instead of forcing a cold refresh that temporarily blanked the full tile grid
+- the folder-tile right-click `Fetch Cover Art` action now forces a fresh pull for cached downloaded art, while the toolbar-wide Library cover refresh still skips titles that already have art
+- thumbnail caching now keeps recently used images around longer in memory and buckets decode sizes more aggressively so revisiting a folder is less likely to trigger a cold thumbnail reload
+- manual clears for Steam AppID and STID now persist as explicit do-not-auto-resolve choices, so cover refresh and ID resolution stop writing those values back after you blank them out in `Edit IDs...`
+- Library regroup, Game Index folder-align, and capture-delete flows now invalidate only the changed file and folder thumbnails instead of clearing the whole image cache, which keeps the rest of the Library populated during edits
+- video capture tiles now retry FFmpeg-based frame extraction instead of staying stuck on generic fallback cards, and Library detail tiles support muted hover previews for video clips
+- Library launch now reuses existing on-disk cached thumbnails immediately so the browser looks populated faster on startup, and video hover playback now runs inline inside the same capture tile
+- inline video hover playback now preloads each visible clip source and reuses the existing poster bounds, which makes hover start faster and preserves the video aspect ratio instead of forcing a square playback surface
+- Library video hover now prefers a lightweight cached 10-second preview clip generated with FFmpeg, and visible video tiles warm those preview clips in the background to reduce hover startup lag
+- Library hover preview has been switched back to the original direct-video playback method because it felt materially faster than the preview-clip path, while keeping the newer inline-tile aspect-ratio fix
 
 See `C:\Codex\docs\CHANGELOG.md` for the detailed version history.
 
@@ -158,17 +170,27 @@ This was a data-only maintenance pass, not a new app build.
 
 ## Current Stop Point
 
-The current live build is `0.759`, and the latest work starts the modular refactor while keeping the app behavior stable:
+The current live build is `0.774`, and the latest work now layers real library-side selection/delete behavior plus a grouping fix on top of the modular-refactor baseline:
 
-1. shared import/index model types and the small timeout web client now live in dedicated source files instead of at the top of `PixelVault.Native.cs`
-2. the refactor has been verified with a clean Release build plus app smoke tests covering startup, Settings preview, Game Index, Photo Index, and cover-refresh open/cancel flow
-3. the earlier import summary work, modeless index editors, Library-side ID edit flow, SQLite migration, and provider-init fixes remain part of the current line
+1. Library detail view supports multi-select capture actions, with right-click respecting the selected set and `Edit Metadata` working on the current selection
+2. permanent delete now lives on the Library capture viewer, where it removes the files from disk and clears their photo-index entries; Photo Index row removal is only a temporary `Forget Row`
+3. Library metadata edits now reassign grouping when the game title or platform identity changes, so renamed titles can move into the correct existing group or a new one
+4. post-edit and post-delete Library refresh now uses the rebuilt cache directly, avoiding the temporary full-grid thumbnail unload seen after deleting the last file from a folder
+5. right-click folder cover refresh now forces a new pull for cached auto-downloaded art without changing the toolbar-wide refresh behavior
+6. thumbnail reuse is now stickier across folder revisits because the image cache is recent-use instead of FIFO and on-disk thumbnails share normalized size buckets
+7. manual AppID/STID clears from `Edit IDs...` are now respected by later cover-refresh and resolver flows instead of being auto-filled again
+8. regroup, delete, and folder-align actions now preserve the rest of the live Library thumbnails by evicting only affected cache entries instead of globally clearing the image cache
+9. Library video captures now default to larger `500`-pixel detail tiles, retry real FFmpeg frame thumbs when older fallback cards exist, and can play a muted 10-second hover preview in the detail pane
+10. Library tiles now reuse cached thumbs immediately on startup, and video hover playback happens inline in the existing tile rather than in a popup surface
+11. inline hover preview now preloads the local media source and keeps the video constrained to the poster’s existing layout, improving hover responsiveness and preserving aspect ratio during playback
+12. video hover playback now uses and warms a short cached preview clip rather than the full source file, with the goal of making large local captures start much faster on hover
+13. hover preview now uses the original direct playback path again, but still renders inline inside the tile and preserves the thumbnail aspect ratio while playing
 
 The most likely next product step is:
 
-1. keep peeling code out of `PixelVault.Native.cs` in low-risk slices, with SQLite/indexing the next best extraction target
-2. decide whether the legacy tracked `game-index-*.cache` and `library-metadata-index-*.cache` snapshots should remain in git as historical artifacts or be retired now that SQLite is the live runtime store
-3. consider adding lightweight index-health tooling such as row counts, rebuild/migrate status, and vacuum/backup actions if library scale keeps growing
+1. keep peeling code out of `PixelVault.Native.cs` in low-risk slices, with SQLite/indexing still the next best extraction target
+2. exercise the new Library capture selection/delete path and the metadata regrouping fix against a few live title edge cases such as punctuation and trademark variants
+3. decide whether the legacy tracked `game-index-*.cache` and `library-metadata-index-*.cache` snapshots should remain in git as historical artifacts or be retired now that SQLite is the live runtime store
 
 ## Important Expectations
 

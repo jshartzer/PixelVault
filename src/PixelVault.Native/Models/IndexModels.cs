@@ -13,6 +13,8 @@ namespace PixelVaultNative
         public string[] FilePaths;
         public string SteamAppId;
         public string SteamGridDbId;
+        public bool SuppressSteamAppIdAutoResolve;
+        public bool SuppressSteamGridDbIdAutoResolve;
     }
 
     sealed class GameIndexEditorRow
@@ -22,6 +24,8 @@ namespace PixelVaultNative
         public string PlatformLabel { get; set; }
         public string SteamAppId { get; set; }
         public string SteamGridDbId { get; set; }
+        public bool SuppressSteamAppIdAutoResolve { get; set; }
+        public bool SuppressSteamGridDbIdAutoResolve { get; set; }
         public int FileCount { get; set; }
         public string FolderPath { get; set; }
         public string PreviewImagePath { get; set; }

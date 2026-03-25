@@ -1,3 +1,47 @@
+## 0.774
+- Reverted Library hover preview back to the original direct-video playback method instead of the cached preview-clip path, since the earlier method felt much more immediate in practice.
+- Kept the newer inline-tile rendering and aspect-ratio fix, so hover preview should now behave more like the old fast popup path without stretching the playing frame into a square.
+
+## 0.773
+- Changed Library video hover playback to use a lightweight cached 10-second FFmpeg preview clip instead of opening the full source video directly, which should make hover preview start much faster on large captures.
+- Preview clips are now warmed in the background as visible video tiles render, so by the time you hover a video the short preview asset is often already ready on disk.
+
+## 0.772
+- Changed inline video hover preview to preload the local clip source in the tile so playback can start much faster on hover, instead of re-opening the media file from scratch each time.
+- Kept the preview inside the existing tile bounds and stopped resetting it to a square-sized surface, so the playing video now preserves the same aspect ratio as the thumbnail/poster underneath.
+
+## 0.771
+- Changed Library video hover playback to run inline inside the existing capture tile instead of opening a separate popup preview, while keeping the muted 10-second hover behavior.
+- Added an immediate cached-thumbnail path for Library tiles so existing on-disk image thumbs and cached video posters can show up right away on launch instead of making the Library look unloaded until async loads catch up.
+
+## 0.770
+- Improved video thumbnails by changing FFmpeg poster generation to use dedicated frame-cache files, retry real frame extraction instead of getting stuck on old generic fallback cards, and probe a few later seek positions for captures that do not decode cleanly at the opening instant.
+- Added a muted 10-second hover preview for video captures in the Library detail view and increased the default capture tile size there from `320` to `500` without changing the existing slider scale.
+
+## 0.769
+- Replaced the Library's broad image-cache flush on metadata regroup, Game Index folder-align, and delete flows with targeted invalidation of only the files and folders that actually changed, so the rest of the library stays warm instead of blanking out after an edit.
+- This specifically addresses the cases where renaming a game, regrouping captures, or deleting the last file from a group could temporarily unload large parts of the Library until a later refresh completed.
+
+## 0.768
+- Fixed manual external-ID clears so blanking a saved Steam AppID or STID from the Library `Edit IDs...` flow is treated as an explicit do-not-auto-resolve choice instead of ordinary missing data.
+- Cover refresh and ID-resolution paths now respect those manual clears, so a cleared STID no longer gets silently re-resolved and written back after a right-click cover fetch.
+
+## 0.767
+- Improved thumbnail persistence by switching the in-memory image cache to recent-use behavior instead of simple FIFO eviction, so folders you just opened are less likely to cold-reload when you come back to them.
+- Normalized thumbnail decode sizes into shared cache buckets, which reduces duplicate thumbnail variants on disk and increases cache reuse between the Library grid, folder detail view, and nearby slider sizes.
+
+## 0.766
+- Changed the Library folder right-click `Fetch Cover Art` action to force a fresh pull when the folder already has cached downloaded cover art, while leaving the main toolbar cover refresh on the existing skip-if-present behavior.
+- Preserved custom covers during forced single-folder fetches, so a manual cover choice is not overwritten by the right-click refresh.
+
+## 0.765
+- Fixed a Library refresh regression after metadata edits or capture deletes by reusing the rebuilt folder cache instead of forcing a full cold library reload, which was causing the folder tiles and thumbnails to blank out temporarily after destructive changes.
+
+## 0.764
+- Added multi-select capture actions in the Library detail view, including selection-aware right-click metadata editing and a small red trash button that permanently deletes the selected files and their photo-index records.
+- Changed the Photo Index editor action from `Delete Row` to `Forget Row` so cache-only removal is clearly distinct from real file deletion.
+- Fixed Library metadata edits so changing a capture's game title or platform can move it into the correct existing group or create a new group instead of silently keeping the old `GameId` bucket.
+
 ## 0.759
 - Started the modular refactor by moving the shared import/index model types and the small timeout web client into dedicated source files while keeping the live app as one desktop executable.
 - Verified the refactor with a clean Release build plus safe app smoke tests covering startup, Settings preview, Game Index, Photo Index, and cover-refresh open/cancel flow.
