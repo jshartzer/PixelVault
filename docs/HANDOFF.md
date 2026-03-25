@@ -43,11 +43,11 @@ This handoff is the short current-state summary.
 
 Current live build:
 
-- `0.758`
+- `0.759`
 
 Current executable:
 
-- `C:\Codex\dist\PixelVault-0.758\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.759\PixelVault.exe`
 
 Current build pointer:
 
@@ -96,7 +96,7 @@ Behavior summary:
 
 ## Recent Shipped State
 
-Recent important published changes in the current `0.724` to `0.758` line:
+Recent important published changes in the current `0.724` to `0.759` line:
 
 - intake preview/process/manual flows now reuse shared source inventories instead of rescanning the same roots repeatedly
 - metadata writes run with bounded parallel `ExifTool` workers
@@ -130,6 +130,7 @@ Recent important published changes in the current `0.724` to `0.758` line:
 - the `Edit IDs` Save and Cancel buttons now share the same vertical alignment and margin treatment so the action row sits level
 - Library-driven imports now skip the Settings-only preview repaint path when that preview control is not present, which fixes the shared workflow null reference after sort
 - completed import runs now open a dark themed summary window that matches the other status monitors and shows rename, metadata, move, sort, and unmatched-item totals
+- the live source has started moving toward a modular monolith by extracting shared models and the timeout web client into dedicated files without changing the one-executable app shape
 
 See `C:\Codex\docs\CHANGELOG.md` for the detailed version history.
 
@@ -157,15 +158,15 @@ This was a data-only maintenance pass, not a new app build.
 
 ## Current Stop Point
 
-The current live build is `0.758`, and the latest work adds a proper import summary window to the shared intake workflow:
+The current live build is `0.759`, and the latest work starts the modular refactor while keeping the app behavior stable:
 
-1. standard imports and Manual Intake now end on a dedicated summary screen styled like the scan and cover-refresh status windows
-2. the shared import steps now return explicit rename, delete, metadata, move, and sort counts for that summary surface
-3. the earlier Library import null-reference fix, modeless index editors, Library-side ID edit flow, SQLite migration, and provider-init fixes remain part of the current line
+1. shared import/index model types and the small timeout web client now live in dedicated source files instead of at the top of `PixelVault.Native.cs`
+2. the refactor has been verified with a clean Release build plus app smoke tests covering startup, Settings preview, Game Index, Photo Index, and cover-refresh open/cancel flow
+3. the earlier import summary work, modeless index editors, Library-side ID edit flow, SQLite migration, and provider-init fixes remain part of the current line
 
 The most likely next product step is:
 
-1. smoke-test the new import summary from both the Library and Settings surfaces to confirm the owner window and counts feel right in normal use
+1. keep peeling code out of `PixelVault.Native.cs` in low-risk slices, with SQLite/indexing the next best extraction target
 2. decide whether the legacy tracked `game-index-*.cache` and `library-metadata-index-*.cache` snapshots should remain in git as historical artifacts or be retired now that SQLite is the live runtime store
 3. consider adding lightweight index-health tooling such as row counts, rebuild/migrate status, and vacuum/backup actions if library scale keeps growing
 

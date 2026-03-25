@@ -17,6 +17,9 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="Infrastructure\TimeoutWebClient.cs" />
+    <Compile Include="Models\ImportModels.cs" />
+    <Compile Include="Models\IndexModels.cs" />
     <Compile Include="PixelVault.Native.cs" />
   </ItemGroup>
 
