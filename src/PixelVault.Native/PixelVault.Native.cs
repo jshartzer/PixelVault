@@ -234,7 +234,7 @@ namespace PixelVaultNative
 
     public sealed class MainWindow : Window
     {
-        const string AppVersion = "0.755";
+        const string AppVersion = "0.756";
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
         const int MaxImageCacheEntries = 240;
@@ -5865,9 +5865,12 @@ WHERE root = $root AND game_id = $oldGameId;";
             cancelButton.Width = 138;
             cancelButton.Height = 44;
             cancelButton.Margin = new Thickness(0, 0, 10, 0);
+            cancelButton.VerticalAlignment = VerticalAlignment.Top;
             var saveButton = Btn("Save", null, "#275D47", Brushes.White);
             saveButton.Width = 138;
             saveButton.Height = 44;
+            saveButton.Margin = new Thickness(0);
+            saveButton.VerticalAlignment = VerticalAlignment.Top;
             actions.Children.Add(cancelButton);
             Grid.SetColumn(saveButton, 1);
             actions.Children.Add(saveButton);

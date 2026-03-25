@@ -37,11 +37,11 @@ This handoff is the short current-state summary.
 
 Current live build:
 
-- `0.755`
+- `0.756`
 
 Current executable:
 
-- `C:\Codex\dist\PixelVault-0.755\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.756\PixelVault.exe`
 
 Current build pointer:
 
@@ -90,7 +90,7 @@ Behavior summary:
 
 ## Recent Shipped State
 
-Recent important published changes in the current `0.724` to `0.755` line:
+Recent important published changes in the current `0.724` to `0.756` line:
 
 - intake preview/process/manual flows now reuse shared source inventories instead of rescanning the same roots repeatedly
 - metadata writes run with bounded parallel `ExifTool` workers
@@ -121,6 +121,7 @@ Recent important published changes in the current `0.724` to `0.755` line:
 - the SQLite-backed index store now initializes its runtime provider correctly on startup, fixing the `SetProvider` popup that appeared on write paths
 - the Library toolbar now exposes `Game Index` and `Photo Index` directly, those editors stay modeless, and folder right-click now includes a small `Edit IDs...` dialog for Steam App ID and SteamGridDB ID edits
 - the Library index buttons now sit centered between Search and Sort with a smaller light-purple treatment, and the `Edit IDs` dialog is taller with a cleaner action row
+- the `Edit IDs` Save and Cancel buttons now share the same vertical alignment and margin treatment so the action row sits level
 
 See `C:\Codex\docs\CHANGELOG.md` for the detailed version history.
 
@@ -148,15 +149,15 @@ This was a data-only maintenance pass, not a new app build.
 
 ## Current Stop Point
 
-The current live build is `0.755`, and the latest work polishes the new Library-side index controls:
+The current live build is `0.756`, and the latest work finishes the `Edit IDs` action-row alignment tweak:
 
-1. the Library index buttons now sit between Search and Sort instead of in the top toolbar, with a smaller centered treatment that leaves the action row cleaner
-2. the folder `Edit IDs...` dialog is taller and its Save/Cancel buttons are aligned more cleanly, so both ID fields stay visible
+1. the Library index buttons still sit between Search and Sort instead of in the top toolbar, with a smaller centered treatment
+2. the folder `Edit IDs...` dialog now has level Save and Cancel buttons in addition to the earlier height increase
 3. the earlier modeless index editors, Library-side ID edit flow, SQLite migration, and provider-init fixes remain part of the current line
 
 The most likely next product step is:
 
-1. run a focused real-library validation pass against `0.755` to confirm the repositioned Library index buttons and taller `Edit IDs...` dialog feel right in normal use
+1. run a quick visual check against `0.756` to confirm the `Edit IDs...` action row now looks level in the live app
 2. decide whether the legacy tracked `game-index-*.cache` and `library-metadata-index-*.cache` snapshots should remain in git as historical artifacts or be retired now that SQLite is the live runtime store
 3. consider adding lightweight index-health tooling such as row counts, rebuild/migrate status, and vacuum/backup actions if library scale keeps growing
 

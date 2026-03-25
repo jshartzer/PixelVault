@@ -1,3 +1,6 @@
+## 0.756
+- Fixed the `Edit IDs` dialog action row so `Save` and `Cancel` use the same vertical alignment and margin treatment instead of sitting crooked.
+
 ## 0.755
 - Increased the Library folder `Edit IDs` dialog height and cleaned up the Save/Cancel action row so both ID fields and buttons fit cleanly without clipping.
 - Moved the `Game Index` and `Photo Index` buttons out of the top Library toolbar and into the space between Search and Sort, with a smaller centered style and light-purple treatment.
