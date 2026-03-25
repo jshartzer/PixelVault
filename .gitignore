@@ -1,4 +1,5 @@
 # Generated binaries
+dist/PixelVault-*/
 dist/**/PixelVault.exe
 dist/**/PixelVault.pdb
 dist/**/PixelVault.exe.bak-*
