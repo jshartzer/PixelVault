@@ -1,3 +1,8 @@
+## 0.754
+- Added `Game Index` and `Photo Index` buttons directly to the Library toolbar so those editors are available without going through the Settings surface.
+- Changed the Game Index and Photo Index windows to open modelessly, which lets you keep using the Library while the tables stay open.
+- Added a new folder-tile right-click `Edit IDs...` action in the Library to edit Steam App ID and SteamGridDB ID with a small Save/Cancel dialog.
+
 ## 0.753
 - Fixed the SQLite runtime provider initialization so the new SQLite-backed index store no longer throws `You need to call SQLitePCL.raw.SetProvider()` when a save or write path touches the Game Index or Photo Index.
 - Added the explicit SQLite bundle dependency and startup initialization needed for the per-library index database to work reliably in published builds.

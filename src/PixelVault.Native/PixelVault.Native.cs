@@ -234,7 +234,7 @@ namespace PixelVaultNative
 
     public sealed class MainWindow : Window
     {
-        const string AppVersion = "0.753";
+        const string AppVersion = "0.754";
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
         const int MaxImageCacheEntries = 240;
@@ -279,6 +279,8 @@ namespace PixelVaultNative
         TextBlock status;
         CheckBox recurseBox, keywordsBox;
         ComboBox conflictBox;
+        Window photoIndexEditorWindow;
+        Window gameIndexEditorWindow;
 
         public MainWindow()
         {
@@ -3442,6 +3444,7 @@ namespace PixelVaultNative
                 leftHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
                 leftHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
                 leftHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                leftHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
                 var importButton = Btn("Import", null, "#2B7A52", Brushes.White);
                 importButton.Width = 198;
                 importButton.Height = 56;
@@ -3466,6 +3469,20 @@ namespace PixelVaultNative
                 settingsButton.Margin = new Thickness(0, 0, 12, 0);
                 Grid.SetColumn(settingsButton, 1);
                 leftHeader.Children.Add(settingsButton);
+                var gameIndexButton = Btn("Game Index", null, "#20343A", Brushes.White);
+                gameIndexButton.Width = 128;
+                gameIndexButton.Height = 42;
+                gameIndexButton.FontSize = 13;
+                gameIndexButton.Margin = new Thickness(0, 0, 12, 0);
+                Grid.SetColumn(gameIndexButton, 2);
+                leftHeader.Children.Add(gameIndexButton);
+                var photoIndexButton = Btn("Photo Index", null, "#20343A", Brushes.White);
+                photoIndexButton.Width = 128;
+                photoIndexButton.Height = 42;
+                photoIndexButton.FontSize = 13;
+                photoIndexButton.Margin = new Thickness(0, 0, 12, 0);
+                Grid.SetColumn(photoIndexButton, 3);
+                leftHeader.Children.Add(photoIndexButton);
                 var refreshButton = Btn("Refresh", null, "#20343A", Brushes.White);
                 var rebuildLibraryButton = Btn("Rebuild", null, "#2E4751", Brushes.White);
                 var fetchButton = Btn("Fetch Covers", null, "#275D47", Brushes.White);
@@ -3479,7 +3496,7 @@ namespace PixelVaultNative
                 headerActions.Children.Add(refreshButton);
                 headerActions.Children.Add(rebuildLibraryButton);
                 headerActions.Children.Add(fetchButton);
-                Grid.SetColumn(headerActions, 2);
+                Grid.SetColumn(headerActions, 4);
                 leftHeader.Children.Add(headerActions);
                 leftGrid.Children.Add(leftHeader);
                 status = new TextBlock { Text = "Ready", Foreground = Brush("#8EA0AA"), FontSize = 11.5, Margin = new Thickness(2, 12, 0, 0), TextWrapping = TextWrapping.Wrap };
@@ -3813,6 +3830,15 @@ namespace PixelVaultNative
                     openFolderItem.Click += delegate { OpenFolder(folder.FolderPath); };
                     var editMetadataItem = new MenuItem { Header = "Edit Metadata" };
                     editMetadataItem.Click += delegate { openLibraryMetadataEditor(folder); };
+                    var editIdsItem = new MenuItem { Header = "Edit IDs..." };
+                    editIdsItem.Click += delegate
+                    {
+                        OpenLibraryFolderIdEditor(folder, delegate
+                        {
+                            showFolder(folder);
+                            renderTiles(false);
+                        });
+                    };
                     var refreshFolderItem = new MenuItem { Header = "Refresh Folder" };
                     refreshFolderItem.Click += delegate { runLibraryScan(folder.FolderPath, false); };
                     var rebuildFolderItem = new MenuItem { Header = "Rebuild Folder" };
@@ -3825,6 +3851,7 @@ namespace PixelVaultNative
                     };
                     contextMenu.Items.Add(openFolderItem);
                     contextMenu.Items.Add(editMetadataItem);
+                    contextMenu.Items.Add(editIdsItem);
                     contextMenu.Items.Add(new Separator());
                     contextMenu.Items.Add(refreshFolderItem);
                     contextMenu.Items.Add(rebuildFolderItem);
@@ -4314,6 +4341,8 @@ namespace PixelVaultNative
                 refreshButton.Click += delegate { runLibraryScan(null, false); };
                 rebuildLibraryButton.Click += delegate { runLibraryScan(null, true); };
                 settingsButton.Click += delegate { ShowSettingsWindow(); };
+                gameIndexButton.Click += delegate { OpenGameIndexEditor(); };
+                photoIndexButton.Click += delegate { OpenPhotoIndexEditor(); };
                 importButton.Click += delegate { RunWorkflow(false); };
                 importCommentsButton.Click += delegate { RunWorkflow(true); };
                 manualImportButton.Click += delegate { OpenManualIntakeWindow(); };
@@ -5734,6 +5763,150 @@ WHERE root = $root AND game_id = $oldGameId;";
                 saved.FilePaths = folder.FilePaths ?? new string[0];
             }
             SaveSavedGameIndexRows(root, rows);
+        }
+
+        void OpenLibraryFolderIdEditor(LibraryFolderInfo folder, Action refreshLibrary)
+        {
+            if (folder == null)
+            {
+                MessageBox.Show("Choose a library folder first.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+            if (string.IsNullOrWhiteSpace(libraryRoot) || !Directory.Exists(libraryRoot))
+            {
+                MessageBox.Show("Library folder not found. Check Settings before editing IDs.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var savedRows = LoadGameIndexEditorRows(libraryRoot);
+            var savedRow = FindSavedGameIndexRow(savedRows, folder);
+            var appIdBox = new TextBox
+            {
+                Text = savedRow == null ? (folder.SteamAppId ?? string.Empty) : (savedRow.SteamAppId ?? string.Empty),
+                Padding = new Thickness(10, 7, 10, 7),
+                Background = Brushes.White,
+                BorderBrush = Brush("#D7E1E8"),
+                BorderThickness = new Thickness(1),
+                FontSize = 14
+            };
+            var steamGridDbIdBox = new TextBox
+            {
+                Text = savedRow == null ? (folder.SteamGridDbId ?? string.Empty) : (savedRow.SteamGridDbId ?? string.Empty),
+                Padding = new Thickness(10, 7, 10, 7),
+                Background = Brushes.White,
+                BorderBrush = Brush("#D7E1E8"),
+                BorderThickness = new Thickness(1),
+                FontSize = 14
+            };
+
+            var editorWindow = new Window
+            {
+                Title = "PixelVault " + AppVersion + " Edit IDs",
+                Width = 520,
+                Height = 330,
+                MinWidth = 480,
+                MinHeight = 300,
+                Owner = this,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Background = Brush("#F3EEE4"),
+                ResizeMode = ResizeMode.NoResize
+            };
+
+            var root = new Grid { Margin = new Thickness(22) };
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+            var header = new StackPanel { Margin = new Thickness(0, 0, 0, 18) };
+            header.Children.Add(new TextBlock { Text = folder.Name ?? "Selected Folder", FontSize = 24, FontWeight = FontWeights.SemiBold, Foreground = Brush("#1F2A30"), TextWrapping = TextWrapping.Wrap });
+            header.Children.Add(new TextBlock { Text = NormalizeConsoleLabel(folder.PlatformLabel), Margin = new Thickness(0, 6, 0, 0), Foreground = Brush("#5F6970"), FontSize = 13 });
+            header.Children.Add(new TextBlock { Text = "Update the saved Steam App ID and SteamGridDB ID for this game record without leaving the Library view.", Margin = new Thickness(0, 10, 0, 0), Foreground = Brush("#5F6970"), FontSize = 13, TextWrapping = TextWrapping.Wrap });
+            root.Children.Add(header);
+
+            var form = new Grid();
+            form.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            form.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            form.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            Grid.SetRow(form, 1);
+            root.Children.Add(form);
+
+            var appIdStack = new StackPanel { Margin = new Thickness(0, 0, 0, 14) };
+            appIdStack.Children.Add(new TextBlock { Text = "Steam App ID", FontWeight = FontWeights.SemiBold, Foreground = Brush("#1F2A30"), Margin = new Thickness(0, 0, 0, 6) });
+            appIdStack.Children.Add(appIdBox);
+            form.Children.Add(appIdStack);
+
+            var steamGridDbIdStack = new StackPanel { Margin = new Thickness(0, 0, 0, 14) };
+            steamGridDbIdStack.Children.Add(new TextBlock { Text = "SteamGridDB ID", FontWeight = FontWeights.SemiBold, Foreground = Brush("#1F2A30"), Margin = new Thickness(0, 0, 0, 6) });
+            steamGridDbIdStack.Children.Add(steamGridDbIdBox);
+            Grid.SetRow(steamGridDbIdStack, 1);
+            form.Children.Add(steamGridDbIdStack);
+
+            var helperText = new TextBlock
+            {
+                Text = "Leave a field blank if you want to clear the saved value.",
+                Foreground = Brush("#5F6970"),
+                FontSize = 12.5,
+                TextWrapping = TextWrapping.Wrap
+            };
+            Grid.SetRow(helperText, 2);
+            form.Children.Add(helperText);
+
+            var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+            var cancelButton = Btn("Cancel", null, "#EEF2F5", Brush("#33424D"));
+            cancelButton.Width = 128;
+            cancelButton.Height = 42;
+            cancelButton.Margin = new Thickness(0, 0, 10, 0);
+            var saveButton = Btn("Save", null, "#275D47", Brushes.White);
+            saveButton.Width = 128;
+            saveButton.Height = 42;
+            actions.Children.Add(cancelButton);
+            actions.Children.Add(saveButton);
+            Grid.SetRow(actions, 2);
+            root.Children.Add(actions);
+
+            cancelButton.Click += delegate { editorWindow.Close(); };
+            saveButton.Click += delegate
+            {
+                try
+                {
+                    var steamAppId = CleanTag(appIdBox.Text);
+                    var steamGridDbId = CleanTag(steamGridDbIdBox.Text);
+                    var rows = LoadGameIndexEditorRows(libraryRoot);
+                    var row = FindSavedGameIndexRow(rows, folder);
+                    if (row == null)
+                    {
+                        if (string.IsNullOrWhiteSpace(steamAppId) && string.IsNullOrWhiteSpace(steamGridDbId))
+                        {
+                            editorWindow.Close();
+                            return;
+                        }
+                        row = EnsureGameIndexRowForAssignment(rows, folder.Name, folder.PlatformLabel, folder.GameId);
+                    }
+                    row.Name = NormalizeGameIndexName(string.IsNullOrWhiteSpace(row.Name) ? folder.Name : row.Name, folder.FolderPath);
+                    row.PlatformLabel = NormalizeConsoleLabel(string.IsNullOrWhiteSpace(row.PlatformLabel) ? folder.PlatformLabel : row.PlatformLabel);
+                    row.FolderPath = string.IsNullOrWhiteSpace(folder.FolderPath) ? (row.FolderPath ?? string.Empty) : folder.FolderPath;
+                    row.FileCount = folder.FileCount > 0 ? folder.FileCount : row.FileCount;
+                    row.PreviewImagePath = string.IsNullOrWhiteSpace(folder.PreviewImagePath) ? (row.PreviewImagePath ?? string.Empty) : folder.PreviewImagePath;
+                    row.FilePaths = folder.FilePaths == null || folder.FilePaths.Length == 0 ? (row.FilePaths ?? new string[0]) : folder.FilePaths;
+                    row.SteamAppId = steamAppId;
+                    row.SteamGridDbId = steamGridDbId;
+                    SaveGameIndexEditorRows(libraryRoot, rows);
+                    folder.SteamAppId = steamAppId;
+                    folder.SteamGridDbId = steamGridDbId;
+                    status.Text = "Folder IDs saved";
+                    Log("Updated IDs for " + (folder.Name ?? "folder") + " | " + NormalizeConsoleLabel(folder.PlatformLabel) + " | AppID=" + (string.IsNullOrWhiteSpace(steamAppId) ? "(blank)" : steamAppId) + " | STID=" + (string.IsNullOrWhiteSpace(steamGridDbId) ? "(blank)" : steamGridDbId));
+                    if (refreshLibrary != null) refreshLibrary();
+                    editorWindow.Close();
+                }
+                catch (Exception ex)
+                {
+                    Log(ex.ToString());
+                    MessageBox.Show("Could not save the folder IDs." + Environment.NewLine + Environment.NewLine + ex.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            };
+
+            editorWindow.Content = root;
+            editorWindow.ShowDialog();
         }
 
 
@@ -7847,6 +8020,15 @@ WHERE root = $root AND game_id = $oldGameId;";
                 MessageBox.Show("Library folder not found. Check Settings before opening the photo index.", "PixelVault");
                 return;
             }
+            if (photoIndexEditorWindow != null)
+            {
+                if (photoIndexEditorWindow.IsVisible)
+                {
+                    photoIndexEditorWindow.Activate();
+                    return;
+                }
+                photoIndexEditorWindow = null;
+            }
 
             try
             {
@@ -7985,6 +8167,7 @@ WHERE root = $root AND game_id = $oldGameId;";
                 Grid.SetRow(footerGrid, 2);
                 bodyGrid.Children.Add(footerGrid);
 
+                photoIndexEditorWindow = editorWindow;
                 editorWindow.Content = root;
 
                 bool dirty = false;
@@ -8175,12 +8358,17 @@ WHERE root = $root AND game_id = $oldGameId;";
                         MessageBox.Show("Could not save the photo index." + Environment.NewLine + Environment.NewLine + saveEx.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
                     }
                 };
-                editorWindow.Closed += delegate { status.Text = "Ready"; };
+                editorWindow.Closed += delegate
+                {
+                    if (ReferenceEquals(photoIndexEditorWindow, editorWindow)) photoIndexEditorWindow = null;
+                    status.Text = "Ready";
+                };
 
                 refreshGrid();
                 status.Text = "Photo index ready";
                 Log("Opened photo index editor.");
-                editorWindow.ShowDialog();
+                editorWindow.Show();
+                editorWindow.Activate();
             }
             catch (Exception ex)
             {
@@ -8195,6 +8383,15 @@ WHERE root = $root AND game_id = $oldGameId;";
             {
                 MessageBox.Show("Library folder not found. Check Settings before opening the game index.", "PixelVault");
                 return;
+            }
+            if (gameIndexEditorWindow != null)
+            {
+                if (gameIndexEditorWindow.IsVisible)
+                {
+                    gameIndexEditorWindow.Activate();
+                    return;
+                }
+                gameIndexEditorWindow = null;
             }
 
             try
@@ -8332,6 +8529,7 @@ WHERE root = $root AND game_id = $oldGameId;";
                 Grid.SetRow(footerGrid, 2);
                 bodyGrid.Children.Add(footerGrid);
 
+                gameIndexEditorWindow = editorWindow;
                 editorWindow.Content = root;
 
                 bool dirty = false;
@@ -8495,12 +8693,17 @@ WHERE root = $root AND game_id = $oldGameId;";
                         MessageBox.Show("Could not save the game index." + Environment.NewLine + Environment.NewLine + saveEx.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
                     }
                 };
-                editorWindow.Closed += delegate { status.Text = "Ready"; };
+                editorWindow.Closed += delegate
+                {
+                    if (ReferenceEquals(gameIndexEditorWindow, editorWindow)) gameIndexEditorWindow = null;
+                    status.Text = "Ready";
+                };
 
                 refreshGrid();
                 status.Text = "Game index ready";
                 Log("Opened game index editor.");
-                editorWindow.ShowDialog();
+                editorWindow.Show();
+                editorWindow.Activate();
             }
             catch (Exception ex)
             {
