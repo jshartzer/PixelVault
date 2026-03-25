@@ -6,6 +6,12 @@ The live app line is based in:
 
 - `C:\Codex`
 
+Important workspace note:
+
+- work out of `C:\Codex`
+- if a tool session ever starts in `A:\Codex`, treat that as an environment quirk, not the real project root
+- `C:\Codex` is the source of truth for code, builds, docs, and shared app data
+
 Current published build:
 
 - `C:\Codex\dist\PixelVault-0.757\PixelVault.exe`

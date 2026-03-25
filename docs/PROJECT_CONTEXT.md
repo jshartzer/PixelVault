@@ -8,6 +8,11 @@ The current live app line is based in:
 
 - `C:\Codex`
 
+Workspace note:
+
+- the live project root is `C:\Codex`
+- if a tool session starts in `A:\Codex`, continue treating `C:\Codex` as the real workspace
+
 The app now runs from packaged builds under `C:\Codex\dist\PixelVault-x.xxx`, with shared persistent data stored outside the versioned build folders in `C:\Codex\PixelVaultData`.
 
 ## Current Published State

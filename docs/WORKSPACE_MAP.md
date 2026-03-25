@@ -1,5 +1,10 @@
 # PixelVault Workspace Map
 
+Active workspace note:
+
+- use `C:\Codex` as the real workspace root
+- ignore `A:\Codex` if it appears in a shell or session context
+
 ## Active Development
 
 - `C:\Codex\src\PixelVault.Native`: live PixelVault app source and SDK project

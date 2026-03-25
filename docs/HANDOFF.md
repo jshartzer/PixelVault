@@ -8,6 +8,12 @@ Work out of:
 
 Treat `C:\Codex` as the only live source of truth for code, builds, docs, and shared app data.
 
+Important:
+
+- work out of `C:\Codex`
+- if a session or app shell reports `A:\Codex`, ignore that and continue using `C:\Codex`
+- do not treat `A:\` as the active project drive
+
 Current live build source:
 
 - `C:\Codex\src\PixelVault.Native\PixelVault.Native.cs`

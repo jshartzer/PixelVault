@@ -21,6 +21,10 @@ Current active workspace:
 
 Treat `C:\Codex` as the only live workspace for the active PixelVault line.
 
+If any shell, app thread, or tool session reports `A:\Codex`, treat that as a runtime/environment quirk only.
+
+The active project workspace remains `C:\Codex`.
+
 Live packaged builds are published under:
 
 - `C:\Codex\dist\PixelVault-x.xxx`
