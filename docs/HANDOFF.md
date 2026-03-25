@@ -43,11 +43,11 @@ This handoff is the short current-state summary.
 
 Current live build:
 
-- `0.757`
+- `0.758`
 
 Current executable:
 
-- `C:\Codex\dist\PixelVault-0.757\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.758\PixelVault.exe`
 
 Current build pointer:
 
@@ -96,7 +96,7 @@ Behavior summary:
 
 ## Recent Shipped State
 
-Recent important published changes in the current `0.724` to `0.757` line:
+Recent important published changes in the current `0.724` to `0.758` line:
 
 - intake preview/process/manual flows now reuse shared source inventories instead of rescanning the same roots repeatedly
 - metadata writes run with bounded parallel `ExifTool` workers
@@ -129,6 +129,7 @@ Recent important published changes in the current `0.724` to `0.757` line:
 - the Library index buttons now sit centered between Search and Sort with a smaller light-purple treatment, and the `Edit IDs` dialog is taller with a cleaner action row
 - the `Edit IDs` Save and Cancel buttons now share the same vertical alignment and margin treatment so the action row sits level
 - Library-driven imports now skip the Settings-only preview repaint path when that preview control is not present, which fixes the shared workflow null reference after sort
+- completed import runs now open a dark themed summary window that matches the other status monitors and shows rename, metadata, move, sort, and unmatched-item totals
 
 See `C:\Codex\docs\CHANGELOG.md` for the detailed version history.
 
@@ -156,15 +157,15 @@ This was a data-only maintenance pass, not a new app build.
 
 ## Current Stop Point
 
-The current live build is `0.757`, and the latest work fixes the remaining Library import null reference:
+The current live build is `0.758`, and the latest work adds a proper import summary window to the shared intake workflow:
 
-1. Library imports still run through the shared intake pipeline, but the preview renderer now safely no-ops when the Settings preview surface is absent
-2. the folder `Edit IDs...` dialog still has the taller body and level Save/Cancel buttons
-3. the earlier modeless index editors, Library-side ID edit flow, SQLite migration, and provider-init fixes remain part of the current line
+1. standard imports and Manual Intake now end on a dedicated summary screen styled like the scan and cover-refresh status windows
+2. the shared import steps now return explicit rename, delete, metadata, move, and sort counts for that summary surface
+3. the earlier Library import null-reference fix, modeless index editors, Library-side ID edit flow, SQLite migration, and provider-init fixes remain part of the current line
 
 The most likely next product step is:
 
-1. rerun a Library import on `0.757` to confirm the old post-sort null-reference popup is gone
+1. smoke-test the new import summary from both the Library and Settings surfaces to confirm the owner window and counts feel right in normal use
 2. decide whether the legacy tracked `game-index-*.cache` and `library-metadata-index-*.cache` snapshots should remain in git as historical artifacts or be retired now that SQLite is the live runtime store
 3. consider adding lightweight index-health tooling such as row counts, rebuild/migrate status, and vacuum/backup actions if library scale keeps growing
 

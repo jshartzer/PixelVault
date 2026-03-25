@@ -140,6 +140,39 @@ namespace PixelVaultNative
         public string CurrentPath;
     }
 
+    sealed class RenameStepResult
+    {
+        public int Renamed;
+        public int Skipped;
+    }
+
+    sealed class DeleteStepResult
+    {
+        public int Deleted;
+        public int Skipped;
+    }
+
+    sealed class MetadataStepResult
+    {
+        public int Updated;
+        public int Skipped;
+    }
+
+    sealed class MoveStepResult
+    {
+        public int Moved;
+        public int Skipped;
+        public int RenamedOnConflict;
+        public List<UndoImportEntry> Entries = new List<UndoImportEntry>();
+    }
+
+    sealed class SortStepResult
+    {
+        public int Sorted;
+        public int FoldersCreated;
+        public int RenamedOnConflict;
+    }
+
     sealed class SourceInventory
     {
         public List<string> TopLevelMediaFiles = new List<string>();
@@ -234,7 +267,7 @@ namespace PixelVaultNative
 
     public sealed class MainWindow : Window
     {
-        const string AppVersion = "0.757";
+        const string AppVersion = "0.758";
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
         const int MaxImageCacheEntries = 240;
@@ -949,6 +982,123 @@ namespace PixelVaultNative
             window.Content = root;
             window.ShowDialog();
         }
+
+        Window ResolveStatusWindowOwner()
+        {
+            var activeWindow = Application.Current == null
+                ? null
+                : Application.Current.Windows.OfType<Window>().FirstOrDefault(window => window != null && window.IsVisible && window.IsActive);
+            if (activeWindow != null) return activeWindow;
+            return IsLoaded && IsVisible ? this : null;
+        }
+
+        List<string> BuildImportSummaryLines(string workflowLabel, bool usedReview, RenameStepResult renameResult, DeleteStepResult deleteResult, MetadataStepResult metadataResult, MoveStepResult moveResult, SortStepResult sortResult, int manualItemsLeft)
+        {
+            var lines = new List<string>();
+            lines.Add("Workflow: " + workflowLabel + (usedReview ? " with review window." : "."));
+            lines.Add("Rename summary: renamed " + (renameResult == null ? 0 : renameResult.Renamed) + ", skipped " + (renameResult == null ? 0 : renameResult.Skipped) + ".");
+            if (deleteResult != null && (usedReview || deleteResult.Deleted > 0 || deleteResult.Skipped > 0))
+            {
+                lines.Add("Delete summary: deleted " + deleteResult.Deleted + ", skipped " + deleteResult.Skipped + ".");
+            }
+            lines.Add("Metadata summary: updated " + (metadataResult == null ? 0 : metadataResult.Updated) + ", skipped " + (metadataResult == null ? 0 : metadataResult.Skipped) + ".");
+            lines.Add("Move summary: moved " + (moveResult == null ? 0 : moveResult.Moved) + ", skipped " + (moveResult == null ? 0 : moveResult.Skipped) + ", renamed-on-conflict " + (moveResult == null ? 0 : moveResult.RenamedOnConflict) + ".");
+            if (sortResult == null)
+            {
+                lines.Add("Sort summary: skipped because no files were imported into the destination root.");
+            }
+            else
+            {
+                lines.Add("Sort summary: sorted " + sortResult.Sorted + ", folders created " + sortResult.FoldersCreated + ", renamed-on-conflict " + sortResult.RenamedOnConflict + ".");
+            }
+            if (manualItemsLeft > 0)
+            {
+                lines.Add("Manual Intake queue: left " + manualItemsLeft + " unmatched image(s) untouched.");
+            }
+            else
+            {
+                lines.Add("Manual Intake queue: no unmatched image(s) waiting.");
+            }
+            return lines;
+        }
+
+        void ShowImportSummaryWindow(string title, string meta, IEnumerable<string> lines)
+        {
+            var owner = ResolveStatusWindowOwner();
+            var summaryWindow = new Window
+            {
+                Title = "PixelVault " + AppVersion + " " + title,
+                Width = 900,
+                Height = 580,
+                MinWidth = 780,
+                MinHeight = 520,
+                WindowStartupLocation = owner == null ? WindowStartupLocation.CenterScreen : WindowStartupLocation.CenterOwner,
+                Background = Brush("#0F1519")
+            };
+            if (owner != null) summaryWindow.Owner = owner;
+
+            var root = new Grid { Margin = new Thickness(18) };
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+            var summaryTitle = new TextBlock
+            {
+                Text = title,
+                FontSize = 24,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = Brushes.White,
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+            var summaryMeta = new TextBlock
+            {
+                Text = string.IsNullOrWhiteSpace(meta) ? "Import work completed." : meta,
+                Foreground = Brush("#B7C6C0"),
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 0, 0, 14)
+            };
+            var summaryLog = new TextBox
+            {
+                IsReadOnly = true,
+                AcceptsReturn = true,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                TextWrapping = TextWrapping.Wrap,
+                Background = Brush("#12191E"),
+                Foreground = Brush("#F1E9DA"),
+                BorderBrush = Brush("#2B3A44"),
+                BorderThickness = new Thickness(1),
+                FontFamily = new FontFamily("Cascadia Mono"),
+                Text = string.Join(Environment.NewLine, (lines ?? Enumerable.Empty<string>()).Where(line => !string.IsNullOrWhiteSpace(line)).ToArray())
+            };
+            var closeButton = Btn("Close", null, "#334249", Brushes.White);
+            closeButton.Margin = new Thickness(0);
+            closeButton.HorizontalAlignment = HorizontalAlignment.Right;
+            closeButton.Click += delegate { summaryWindow.Close(); };
+
+            root.Children.Add(summaryTitle);
+            Grid.SetRow(summaryMeta, 1);
+            root.Children.Add(summaryMeta);
+
+            var logBorder = new Border
+            {
+                Background = Brush("#12191E"),
+                CornerRadius = new CornerRadius(14),
+                Padding = new Thickness(12),
+                BorderBrush = Brush("#26363F"),
+                BorderThickness = new Thickness(1),
+                Child = summaryLog
+            };
+            Grid.SetRow(logBorder, 2);
+            root.Children.Add(logBorder);
+
+            Grid.SetRow(closeButton, 3);
+            root.Children.Add(closeButton);
+
+            summaryWindow.Content = root;
+            summaryWindow.ShowDialog();
+        }
+
         TextBox SettingsTextBox(Grid panel, int row, string label, string value)
         {
             while (panel.RowDefinitions.Count <= row) panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -1325,7 +1475,7 @@ namespace PixelVaultNative
                 EnsureExifTool();
                 Directory.CreateDirectory(destinationRoot);
                 var renameInventory = BuildSourceInventory(recurseBox != null && recurseBox.IsChecked == true);
-                RunRename(renameInventory.RenameScopeFiles);
+                var renameResult = RunRename(renameInventory.RenameScopeFiles);
                 var inventory = BuildSourceInventory(false);
                 var reviewItems = BuildReviewItems(inventory.TopLevelMediaFiles);
                 var recognizedPaths = new HashSet<string>(reviewItems.Select(i => i.FilePath), StringComparer.OrdinalIgnoreCase);
@@ -1347,13 +1497,14 @@ namespace PixelVaultNative
                 {
                     Log("No metadata review items found. Continuing without review comments.");
                 }
-                RunDelete(reviewItems);
-                RunMetadata(reviewItems);
-                var imported = RunMove(inventory.TopLevelMediaFiles, manualPaths);
-                if (imported.Count > 0)
+                var deleteResult = RunDelete(reviewItems);
+                var metadataResult = RunMetadata(reviewItems);
+                var moveResult = RunMove(inventory.TopLevelMediaFiles, manualPaths);
+                SortStepResult sortResult = null;
+                if (moveResult.Moved > 0)
                 {
-                    SaveUndoManifest(imported);
-                    SortDestinationFoldersCore(false);
+                    SaveUndoManifest(moveResult.Entries);
+                    sortResult = SortDestinationFoldersCore(false);
                 }
                 if (manualItems.Count > 0)
                 {
@@ -1362,6 +1513,9 @@ namespace PixelVaultNative
                 RefreshPreview();
                 status.Text = "Workflow complete";
                 Log("Workflow complete.");
+                var summaryLines = BuildImportSummaryLines("Import", withReview, renameResult, deleteResult, metadataResult, moveResult, sortResult, manualItems.Count);
+                var summaryMeta = moveResult.Moved + " file(s) imported | " + metadataResult.Updated + " metadata update(s)" + (manualItems.Count > 0 ? " | " + manualItems.Count + " unmatched left" : string.Empty);
+                ShowImportSummaryWindow(withReview ? "Import and Comment Summary" : "Import Summary", summaryMeta, summaryLines);
             }
             catch (Exception ex)
             {
@@ -1400,17 +1554,21 @@ namespace PixelVaultNative
                     return;
                 }
 
-                RunManualRename(manualItems);
-                RunManualMetadata(manualItems);
-                var imported = RunMoveFiles(manualItems.Select(i => i.FilePath), "Manual move summary");
-                if (imported.Count > 0)
+                var renameResult = RunManualRename(manualItems);
+                var metadataResult = RunManualMetadata(manualItems);
+                var moveResult = RunMoveFiles(manualItems.Select(i => i.FilePath), "Manual move summary");
+                SortStepResult sortResult = null;
+                if (moveResult.Moved > 0)
                 {
-                    SaveUndoManifest(imported);
-                    SortDestinationFoldersCore(false);
+                    SaveUndoManifest(moveResult.Entries);
+                    sortResult = SortDestinationFoldersCore(false);
                 }
                 RefreshPreview();
                 status.Text = "Manual intake complete";
                 Log("Manual intake workflow complete.");
+                var summaryLines = BuildImportSummaryLines("Manual Intake", false, renameResult, null, metadataResult, moveResult, sortResult, 0);
+                var summaryMeta = moveResult.Moved + " file(s) imported | " + metadataResult.Updated + " metadata update(s)";
+                ShowImportSummaryWindow("Manual Intake Summary", summaryMeta, summaryLines);
             }
             catch (Exception ex)
             {
@@ -1420,12 +1578,12 @@ namespace PixelVaultNative
             }
         }
 
-        void RunRename()
+        RenameStepResult RunRename()
         {
-            RunRename(BuildSourceInventory(recurseBox != null && recurseBox.IsChecked == true).RenameScopeFiles);
+            return RunRename(BuildSourceInventory(recurseBox != null && recurseBox.IsChecked == true).RenameScopeFiles);
         }
 
-        void RunRename(IEnumerable<string> sourceFiles)
+        RenameStepResult RunRename(IEnumerable<string> sourceFiles)
         {
             int renamed = 0, skipped = 0;
             var recordedSteamAppIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -1445,6 +1603,7 @@ namespace PixelVaultNative
                 Log("Renamed: " + Path.GetFileName(file) + " -> " + Path.GetFileName(target));
             }
             Log("Rename summary: renamed " + renamed + ", skipped " + skipped + ".");
+            return new RenameStepResult { Renamed = renamed, Skipped = skipped };
         }
 
         List<ReviewItem> BuildReviewItems()
@@ -2828,7 +2987,7 @@ namespace PixelVaultNative
             progressWindow.ShowDialog();
         }
 
-        void RunManualRename(List<ManualMetadataItem> items, Action<int, int, string> progress = null)
+        RenameStepResult RunManualRename(List<ManualMetadataItem> items, Action<int, int, string> progress = null)
         {
             int renamed = 0, skipped = 0;
             var total = items == null ? 0 : items.Count;
@@ -2872,9 +3031,10 @@ namespace PixelVaultNative
             }
             if (progress != null) progress(total, total, "Rename step complete: renamed " + renamed + ", skipped " + skipped + ".");
             if (renamed > 0 || skipped > 0) Log("Manual rename summary: renamed " + renamed + ", skipped " + skipped + ".");
+            return new RenameStepResult { Renamed = renamed, Skipped = skipped };
         }
 
-        void RunManualMetadata(List<ManualMetadataItem> items, Action<int, int, string> progress = null)
+        MetadataStepResult RunManualMetadata(List<ManualMetadataItem> items, Action<int, int, string> progress = null)
         {
             int updated = 0, skipped = 0;
             var total = items == null ? 0 : items.Count;
@@ -2934,8 +3094,9 @@ namespace PixelVaultNative
             foreach (var item in itemsToReset) item.ForceTagMetadataWrite = false;
             if (progress != null) progress(total, total, "Metadata step complete: updated " + updated + ", skipped " + skipped + ".");
             Log("Manual metadata summary: updated " + updated + ", skipped " + skipped + ".");
+            return new MetadataStepResult { Updated = updated, Skipped = skipped };
         }
-        void RunDelete(List<ReviewItem> reviewItems)
+        DeleteStepResult RunDelete(List<ReviewItem> reviewItems)
         {
             int deleted = 0, skipped = 0;
             foreach (var item in reviewItems.Where(i => i.DeleteBeforeProcessing))
@@ -2946,6 +3107,7 @@ namespace PixelVaultNative
                 Log("Deleted before processing: " + item.FileName);
             }
             if (deleted > 0 || skipped > 0) Log("Delete summary: deleted " + deleted + ", skipped " + skipped + ".");
+            return new DeleteStepResult { Deleted = deleted, Skipped = skipped };
         }
 
         int RunExifWriteRequests(List<ExifWriteRequest> requests, int totalCount, int alreadyCompleted, Action<int, int, string> progress = null)
@@ -2985,7 +3147,7 @@ namespace PixelVaultNative
             return workItems.Count;
         }
 
-        void RunMetadata(List<ReviewItem> reviewItems)
+        MetadataStepResult RunMetadata(List<ReviewItem> reviewItems)
         {
             int updated = 0, skipped = 0;
             var requests = new List<ExifWriteRequest>();
@@ -3033,19 +3195,20 @@ namespace PixelVaultNative
             }
             updated = RunExifWriteRequests(requests, requests.Count + skipped, skipped, null);
             Log("Metadata summary: updated " + updated + ", skipped " + skipped + ".");
+            return new MetadataStepResult { Updated = updated, Skipped = skipped };
         }
 
-        List<UndoImportEntry> RunMove()
+        MoveStepResult RunMove()
         {
             return RunMove(BuildSourceInventory(false).TopLevelMediaFiles, null);
         }
 
-        List<UndoImportEntry> RunMove(HashSet<string> skipFiles)
+        MoveStepResult RunMove(HashSet<string> skipFiles)
         {
             return RunMove(BuildSourceInventory(false).TopLevelMediaFiles, skipFiles);
         }
 
-        List<UndoImportEntry> RunMove(IEnumerable<string> sourceFiles, HashSet<string> skipFiles)
+        MoveStepResult RunMove(IEnumerable<string> sourceFiles, HashSet<string> skipFiles)
         {
             var files = (sourceFiles ?? Enumerable.Empty<string>())
                 .Where(File.Exists)
@@ -3053,7 +3216,7 @@ namespace PixelVaultNative
             return RunMoveFiles(files, "Move summary");
         }
 
-        List<UndoImportEntry> RunMoveFiles(IEnumerable<string> files, string summaryLabel)
+        MoveStepResult RunMoveFiles(IEnumerable<string> files, string summaryLabel)
         {
             int moved = 0, skipped = 0, renamedConflict = 0;
             var entries = new List<UndoImportEntry>();
@@ -3076,7 +3239,7 @@ namespace PixelVaultNative
                 Log("Moved: " + Path.GetFileName(file) + " -> " + target);
             }
             Log(summaryLabel + ": moved " + moved + ", skipped " + skipped + ", renamed-on-conflict " + renamedConflict + ".");
-            return entries;
+            return new MoveStepResult { Moved = moved, Skipped = skipped, RenamedOnConflict = renamedConflict, Entries = entries };
         }
 
         string CurrentConflictMode()
@@ -3099,7 +3262,7 @@ namespace PixelVaultNative
             }
         }
 
-        void SortDestinationFoldersCore(bool interactive)
+        SortStepResult SortDestinationFoldersCore(bool interactive)
         {
             EnsureDir(destinationRoot, "Destination folder");
             var files = Directory.EnumerateFiles(destinationRoot, "*", SearchOption.TopDirectoryOnly).Where(IsMedia).ToList();
@@ -3108,7 +3271,7 @@ namespace PixelVaultNative
                 status.Text = "Nothing to sort";
                 Log("Sort destination found no root-level media files to organize.");
                 if (interactive) MessageBox.Show("There are no root-level media files in the destination folder to sort right now.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
+                return new SortStepResult();
             }
 
             int moved = 0, created = 0, renamedConflict = 0;
@@ -3141,6 +3304,7 @@ namespace PixelVaultNative
             status.Text = "Destination sorted";
             Log("Sort summary: sorted " + moved + ", folders created " + created + ", renamed-on-conflict " + renamedConflict + ".");
             RefreshPreview();
+            return new SortStepResult { Sorted = moved, FoldersCreated = created, RenamedOnConflict = renamedConflict };
         }
 
         void UndoLastImport()

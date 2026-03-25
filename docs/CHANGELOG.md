@@ -1,3 +1,7 @@
+## 0.758
+- Added a new import summary screen for both the standard import flow and Manual Intake, using the same dark status-window styling as the Library scan and cover-refresh monitors.
+- The import pipeline now captures explicit rename, delete, metadata, move, and sort counts so the summary window can show a reliable end-of-run breakdown instead of making users infer results from the main log.
+
 ## 0.757
 - Fixed a Library-surface import null reference by making the shared preview renderer no-op when the Settings preview box is not present. Library imports now complete without trying to repaint the Settings-only preview control.
 
