@@ -174,14 +174,14 @@ This was a data-only maintenance pass, not a new app build.
 The current live build is `0.778`, and the latest shipped work now tightens the metadata editor experience:
 
 1. the metadata edit title picker now shows `Game Name | Console`, so typing the game name works naturally with the dropdown instead of being awkwardly driven by the console prefix
-2. the metadata edit window is taller, and library-edit startup now batches ExifTool metadata reads so opening the form should feel snappier on larger folders
+2. the metadata edit window is taller, and library-edit startup now batches ExifTool metadata reads for tags, comments, and capture times so opening the form should feel snappier on larger folders
 3. the app still ships as one desktop executable with one shared runtime data model, and each release still carries a version-local source snapshot inside `dist\PixelVault-x.xxx`
 4. release docs, current-build markers, and the desktop shortcut now point at the new `0.778` published build
 
 The most likely next product step is:
 
 1. expand FFmpeg-backed video handling beyond poster generation and make clips feel more first-class in the Library workflow
-2. stress-test the new Library virtualization and lazy-loading paths on large mixed-media folders and resize-heavy sessions
+2. stress-test the new Library virtualization, metadata editor, and lazy-loading paths on large mixed-media folders and resize-heavy sessions
 3. keep an eye on any remaining UI-specific extraction opportunities after the current performance pass settles
 
 ## Important Expectations

@@ -65,11 +65,22 @@ Data-only cleanup work does not require a new build version unless app code chan
 
 PixelVault is a native Windows desktop app built in C# and WPF.
 
-The current live implementation is still centered in a single source file:
+The current live implementation is now a modular monolith rooted in:
+
+- `C:\Codex\src\PixelVault.Native`
+
+Key live source areas currently include:
 
 - `C:\Codex\src\PixelVault.Native\PixelVault.Native.cs`
+- `C:\Codex\src\PixelVault.Native\Indexing`
+- `C:\Codex\src\PixelVault.Native\Import`
+- `C:\Codex\src\PixelVault.Native\MediaTools`
+- `C:\Codex\src\PixelVault.Native\Metadata`
+- `C:\Codex\src\PixelVault.Native\Models`
+- `C:\Codex\src\PixelVault.Native\Storage`
+- `C:\Codex\src\PixelVault.Native\UI`
 
-The SDK build project for that file lives at:
+The SDK build project for that source tree lives at:
 
 - `C:\Codex\src\PixelVault.Native\PixelVault.Native.csproj`
 
@@ -77,7 +88,7 @@ Published builds should still carry a version-local source snapshot in:
 
 - `C:\Codex\dist\PixelVault-x.xxx\PixelVault.Native.cs`
 
-That is acceptable for the current line, but any future refactor should preserve the behavioral contracts below.
+The modular extraction is acceptable as long as the behavioral contracts below remain stable.
 
 ## Form Responsibilities
 
@@ -157,6 +168,7 @@ Behavior contract:
 - file metadata writes are driven by the form values
 - the photo index must mirror the applied form values immediately after save
 - new game-index rows should only be created through explicit confirmation
+- game-title choices should be searchable by game name while still showing console context in the picker
 
 ### Library Edit Metadata form
 
@@ -175,6 +187,7 @@ Behavior contract:
 - tag removals must remove tags from the file itself, not just the index
 - tag changes must be written both to the file and to the photo index
 - console tags must be interpreted consistently from the final saved tag set
+- library-edit startup should favor batched metadata reads over per-file tool launches when practical
 
 ### Game Index editor
 

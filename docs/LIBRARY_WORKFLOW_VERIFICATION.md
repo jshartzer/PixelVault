@@ -1,6 +1,6 @@
 # Library Workflow Verification
 
-Use this checklist when touching Library regrouping, deletion, comment editing, or thumbnail/cache invalidation behavior.
+Use this checklist when touching Library regrouping, deletion, comment editing, metadata-editor UX, or thumbnail/cache invalidation behavior.
 
 ## Seed Data
 
@@ -55,6 +55,41 @@ Expected:
 
 - the comment box stays blank after reopening
 - the old embedded comment does not come back
+
+## Metadata Editor Picker
+
+1. Open `Edit Metadata` on a folder with a known saved game such as `Beta Zone`.
+2. Click into the game-title dropdown.
+3. Start typing the game name only, without the console prefix.
+
+Expected:
+
+- the dropdown filters and autofills from the game name text
+- the choice still shows console context in the list as `Game Name | Console`
+- selecting a choice writes back only the canonical game name, not the display suffix
+
+## Video Custom Time Reopen
+
+1. Open `Edit Metadata` on a video capture that writes to an `.xmp` sidecar.
+2. Enable `Use custom date/time`, choose a different time, and save.
+3. Reopen `Edit Metadata` on the same video.
+
+Expected:
+
+- the metadata editor reopens with the updated custom time
+- the edited video does not fall back to the old pre-edit timestamp
+- comment and tag values still reopen correctly on the same item
+
+## Editor Open Speed
+
+1. Open `Edit Metadata` on a larger mixed folder with images and videos.
+2. Close it and reopen it once or twice.
+
+Expected:
+
+- the form opens noticeably faster than the old per-file read path
+- initial fields populate without a long stall before the window appears
+- video-backed items populate without the editor freezing per file
 
 ## Partial Delete
 

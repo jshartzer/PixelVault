@@ -8,6 +8,13 @@ Active workspace note:
 ## Active Development
 
 - `C:\Codex\src\PixelVault.Native`: live PixelVault app source and SDK project
+- `C:\Codex\src\PixelVault.Native\Indexing`: game-index, folder-cache, and library-index logic
+- `C:\Codex\src\PixelVault.Native\Import`: intake, rename, metadata, move, and undo workflow logic
+- `C:\Codex\src\PixelVault.Native\MediaTools`: ExifTool and FFmpeg execution helpers
+- `C:\Codex\src\PixelVault.Native\Metadata`: shared metadata builders and library-edit helpers
+- `C:\Codex\src\PixelVault.Native\Models`: import and index model types
+- `C:\Codex\src\PixelVault.Native\Storage`: SQLite/cache path and persistence helpers
+- `C:\Codex\src\PixelVault.Native\UI`: Library virtualization and other UI-specific helpers
 - `C:\Codex\scripts`: developer scripts, including release publishing
 - `C:\Codex\assets`: shared branding and interface assets
 - `C:\Codex\tools`: bundled runtime tools such as `ExifTool` and `FFmpeg`
@@ -19,6 +26,7 @@ Active workspace note:
 - `C:\Codex\docs\PROJECT_CONTEXT.md`: broader architecture and product context
 - `C:\Codex\docs\CHANGELOG.md`: published version history
 - `C:\Codex\docs\CURRENT_BUILD.txt`: path pointer to the live published executable
+- `C:\Codex\docs\LIBRARY_WORKFLOW_VERIFICATION.md`: repeatable checks for Library regrouping, delete, and metadata-editor behavior
 
 ## Runtime And Releases
 

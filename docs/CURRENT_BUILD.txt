@@ -1,3 +1,7 @@
+Current PixelVault version:
+
+0.778
+
 Current PixelVault build:
 
 C:\Codex\dist\PixelVault-0.778\PixelVault.exe

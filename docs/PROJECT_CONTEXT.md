@@ -92,9 +92,9 @@ Tool dependency:
 
 ## Current Architecture
 
-The app is still implemented primarily in one native source file.
+The app now lives as a modular monolith under `C:\Codex\src\PixelVault.Native`.
 
-That file now builds directly through the SDK-style project under `C:\Codex\src\PixelVault.Native`, and each published dist folder keeps a version-local `PixelVault.Native.cs` snapshot for traceability.
+The current line still keeps `PixelVault.Native.cs` as the main window/orchestration surface, but backend and UI helpers have been pulled into dedicated folders so storage, indexing, import, metadata, media-tool, model, and UI-specific code are no longer all packed into one file.
 
 Major subsystems inside the current line include:
 
@@ -114,6 +114,16 @@ Major subsystems inside the current line include:
 - cover-art cache
 - thumbnail cache
 - undo-last-import support
+
+Current source layout highlights:
+
+- `C:\Codex\src\PixelVault.Native\Indexing`
+- `C:\Codex\src\PixelVault.Native\Import`
+- `C:\Codex\src\PixelVault.Native\MediaTools`
+- `C:\Codex\src\PixelVault.Native\Metadata`
+- `C:\Codex\src\PixelVault.Native\Models`
+- `C:\Codex\src\PixelVault.Native\Storage`
+- `C:\Codex\src\PixelVault.Native\UI`
 
 ## Current Window Model
 
@@ -250,6 +260,8 @@ Recent published lines introduced:
 - Steam cover-refresh timeout protection and better scoped-refresh deduping
 - `STID` persistence in the Game Index
 - Game Index save-time game-ID remapping and canonical folder renaming/moves
+- row-windowed Library folder virtualization plus lazy-loaded detail rows
+- game-name-first metadata picker choices and faster batched metadata-editor startup
 
 ## Recent Non-Build Maintenance
 
@@ -272,4 +284,4 @@ Use these documents together:
 
 ## Immediate Next Step
 
-The next likely milestone is to keep polishing the Library browse surface while continuing the SteamGridDB backfill and validating the `STID`-first cover workflow against real library folders.
+The next likely milestone is to keep polishing the Library browse surface and metadata editor on real mixed-media folders while moving on to broader FFmpeg-backed video handling beyond poster generation.
