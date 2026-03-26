@@ -138,6 +138,30 @@ namespace PixelVaultNative
             RunExe(exifToolPath, new[] { "-ver" }, Path.GetDirectoryName(exifToolPath), false);
         }
 
+        void RunExifToolBatch(IReadOnlyList<ExifWriteRequest> requests)
+        {
+            if (requests == null || requests.Count == 0) return;
+
+            var argFile = Path.Combine(cacheRoot, "exiftool-batch-write-" + Guid.NewGuid().ToString("N") + ".args");
+            try
+            {
+                var argLines = new List<string> { "-stay_open", "True" };
+                foreach (var request in requests.Where(entry => entry != null && entry.Arguments != null && entry.Arguments.Length > 0))
+                {
+                    argLines.AddRange(request.Arguments);
+                    argLines.Add("-execute");
+                }
+                argLines.Add("-stay_open");
+                argLines.Add("False");
+                File.WriteAllLines(argFile, argLines.ToArray(), Encoding.UTF8);
+                RunExe(exifToolPath, new[] { "-@", argFile }, Path.GetDirectoryName(exifToolPath), false);
+            }
+            finally
+            {
+                if (File.Exists(argFile)) File.Delete(argFile);
+            }
+        }
+
         void RunExe(string file, string[] args, string cwd, bool logOutput)
         {
             RunExeCapture(file, args, cwd, logOutput);

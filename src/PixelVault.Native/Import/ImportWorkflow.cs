@@ -300,28 +300,55 @@ namespace PixelVaultNative
             var completed = alreadyCompleted;
             var failures = new ConcurrentQueue<Exception>();
             var workerCount = GetMetadataWorkerCount(workItems.Count);
-            Log("Running metadata writes with " + workerCount + " worker(s) for " + workItems.Count + " file(s).");
+            var batchSize = Math.Max(1, Math.Min(24, (int)Math.Ceiling((double)workItems.Count / workerCount)));
+            var batches = workItems.Chunk(batchSize).ToList();
+            Log("Running metadata writes with " + workerCount + " worker(s) across " + batches.Count + " ExifTool batch(es) for " + workItems.Count + " file(s).");
 
-            Parallel.ForEach(workItems, new ParallelOptions { MaxDegreeOfParallelism = workerCount }, delegate(ExifWriteRequest request)
+            Action<ExifWriteRequest> finalizeRequest = delegate(ExifWriteRequest request)
+            {
+                if (request.RestoreFileTimes)
+                {
+                    if (request.OriginalCreateTime != DateTime.MinValue) File.SetCreationTime(request.FilePath, request.OriginalCreateTime);
+                    if (request.OriginalWriteTime != DateTime.MinValue) File.SetLastWriteTime(request.FilePath, request.OriginalWriteTime);
+                }
+                if (progress != null)
+                {
+                    var current = Interlocked.Increment(ref completed);
+                    var remaining = Math.Max(totalCount - current, 0);
+                    progress(current, totalCount, "Updated metadata " + current + " of " + totalCount + " | " + remaining + " remaining | " + request.SuccessDetail);
+                }
+            };
+
+            Action<ExifWriteRequest> runSingleRequest = delegate(ExifWriteRequest request)
+            {
+                RunExe(exifToolPath, request.Arguments, Path.GetDirectoryName(exifToolPath), false);
+                finalizeRequest(request);
+            };
+
+            Parallel.ForEach(batches, new ParallelOptions { MaxDegreeOfParallelism = workerCount }, delegate(ExifWriteRequest[] batch)
             {
                 try
                 {
-                    RunExe(exifToolPath, request.Arguments, Path.GetDirectoryName(exifToolPath), false);
-                    if (request.RestoreFileTimes)
+                    RunExifToolBatch(batch);
+                    foreach (var request in batch)
                     {
-                        if (request.OriginalCreateTime != DateTime.MinValue) File.SetCreationTime(request.FilePath, request.OriginalCreateTime);
-                        if (request.OriginalWriteTime != DateTime.MinValue) File.SetLastWriteTime(request.FilePath, request.OriginalWriteTime);
-                    }
-                    if (progress != null)
-                    {
-                        var current = Interlocked.Increment(ref completed);
-                        var remaining = Math.Max(totalCount - current, 0);
-                        progress(current, totalCount, "Updated metadata " + current + " of " + totalCount + " | " + remaining + " remaining | " + request.SuccessDetail);
+                        finalizeRequest(request);
                     }
                 }
                 catch (Exception ex)
                 {
-                    failures.Enqueue(new InvalidOperationException("Metadata update failed for " + request.FileName + ". " + ex.Message, ex));
+                    Log("Metadata batch fallback: " + ex.Message);
+                    foreach (var request in batch)
+                    {
+                        try
+                        {
+                            runSingleRequest(request);
+                        }
+                        catch (Exception itemEx)
+                        {
+                            failures.Enqueue(new InvalidOperationException("Metadata update failed for " + request.FileName + ". " + itemEx.Message, itemEx));
+                        }
+                    }
                 }
             });
 
