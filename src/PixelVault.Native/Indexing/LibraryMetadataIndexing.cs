@@ -1,12 +1,40 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace PixelVaultNative
 {
     public sealed partial class MainWindow
     {
+        bool IsNetworkPath(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path)) return false;
+            try
+            {
+                if (path.StartsWith(@"\\", StringComparison.OrdinalIgnoreCase)) return true;
+                var root = Path.GetPathRoot(path);
+                if (string.IsNullOrWhiteSpace(root)) return false;
+                var drive = new DriveInfo(root);
+                return drive.DriveType == DriveType.Network;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        int GetLibraryScanWorkerCount(int batchCount, string pathHint)
+        {
+            if (batchCount <= 1) return 1;
+            var maxWorkers = IsNetworkPath(pathHint)
+                ? 2
+                : Math.Min(Math.Max(Environment.ProcessorCount, 1), 4);
+            return Math.Max(1, Math.Min(batchCount, maxWorkers));
+        }
+
         string BuildLibraryMetadataStamp(string file)
         {
             var info = new FileInfo(file);
@@ -133,37 +161,61 @@ namespace PixelVaultNative
             }
 
             const int batchSize = 250;
-            int processed = 0;
             int batchCount = pendingFiles.Count == 0 ? 0 : (int)Math.Ceiling((double)pendingFiles.Count / batchSize);
-            for (int offset = 0; offset < pendingFiles.Count; offset += batchSize)
+            var batches = pendingFiles
+                .Chunk(batchSize)
+                .Select((files, index) => Tuple.Create(index + 1, files))
+                .ToList();
+            var batchTagsByFile = new ConcurrentDictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
+            var scanWorkerCount = GetLibraryScanWorkerCount(batches.Count, string.IsNullOrWhiteSpace(folderPath) ? root : folderPath);
+            if (batches.Count > 0)
             {
-                if (isCancellationRequested != null && isCancellationRequested()) throw new OperationCanceledException("Library scan cancelled.");
-                var batch = pendingFiles.Skip(offset).Take(batchSize).ToList();
-                var batchNumber = (offset / batchSize) + 1;
-                if (progress != null) progress(unchanged + processed, fileList.Count, "Reading embedded tags in batch " + batchNumber + " of " + batchCount + " (" + batch.Count + " file(s)).");
-                var batchTags = ReadEmbeddedKeywordTagsBatch(batch);
-                foreach (var file in batch)
+                Log("Running library metadata scan with " + scanWorkerCount + " worker(s) across " + batches.Count + " ExifTool read batch(es) for " + pendingFiles.Count + " changed file(s).");
+            }
+            try
+            {
+                Parallel.ForEach(batches, new ParallelOptions { MaxDegreeOfParallelism = scanWorkerCount }, delegate(Tuple<int, string[]> batch)
                 {
                     if (isCancellationRequested != null && isCancellationRequested()) throw new OperationCanceledException("Library scan cancelled.");
-                    string[] tags;
-                    if (!batchTags.TryGetValue(file, out tags)) tags = new string[0];
-                    var platformLabel = DetermineConsoleLabelFromTags(tags);
-                    var existingGameId = index.ContainsKey(file) && index[file] != null ? index[file].GameId : string.Empty;
-                    index[file] = new LibraryMetadataIndexEntry
+                    if (progress != null) progress(unchanged, fileList.Count, "Reading embedded tags in batch " + batch.Item1 + " of " + batchCount + " (" + batch.Item2.Length + " file(s)).");
+                    var batchTags = ReadEmbeddedKeywordTagsBatch(batch.Item2);
+                    foreach (var file in batch.Item2)
                     {
-                        FilePath = file,
-                        Stamp = pendingStamps[file],
-                        GameId = ResolveGameIdForIndexedFile(root, file, platformLabel, tags, index, gameRows, existingGameId),
-                        ConsoleLabel = platformLabel,
-                        TagText = string.Join(", ", tags)
-                    };
-                    fileTagCache[file] = tags;
-                    fileTagCacheStamp[file] = MetadataCacheStamp(file);
-                    updated++;
-                    processed++;
-                    var remaining = fileList.Count - (unchanged + processed);
-                    if (progress != null) progress(unchanged + processed, fileList.Count, "Indexed " + (unchanged + processed) + " of " + fileList.Count + " | " + remaining + " remaining | " + file);
-                }
+                        string[] tags;
+                        if (!batchTags.TryGetValue(file, out tags)) tags = new string[0];
+                        batchTagsByFile[file] = tags;
+                    }
+                });
+            }
+            catch (AggregateException ex)
+            {
+                var cancellation = ex.Flatten().InnerExceptions.OfType<OperationCanceledException>().FirstOrDefault();
+                if (cancellation != null) throw cancellation;
+                throw;
+            }
+
+            int processed = 0;
+            foreach (var file in pendingFiles)
+            {
+                if (isCancellationRequested != null && isCancellationRequested()) throw new OperationCanceledException("Library scan cancelled.");
+                string[] tags;
+                if (!batchTagsByFile.TryGetValue(file, out tags)) tags = new string[0];
+                var platformLabel = DetermineConsoleLabelFromTags(tags);
+                var existingGameId = index.ContainsKey(file) && index[file] != null ? index[file].GameId : string.Empty;
+                index[file] = new LibraryMetadataIndexEntry
+                {
+                    FilePath = file,
+                    Stamp = pendingStamps[file],
+                    GameId = ResolveGameIdForIndexedFile(root, file, platformLabel, tags, index, gameRows, existingGameId),
+                    ConsoleLabel = platformLabel,
+                    TagText = string.Join(", ", tags)
+                };
+                fileTagCache[file] = tags;
+                fileTagCacheStamp[file] = MetadataCacheStamp(file);
+                updated++;
+                processed++;
+                var remaining = fileList.Count - (unchanged + processed);
+                if (progress != null) progress(unchanged + processed, fileList.Count, "Indexed " + (unchanged + processed) + " of " + fileList.Count + " | " + remaining + " remaining | " + file);
             }
             SaveLibraryMetadataIndex(root, index);
             RebuildLibraryFolderCache(root, index);
