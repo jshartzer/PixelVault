@@ -39,7 +39,7 @@ namespace PixelVaultNative
 
     public sealed partial class MainWindow : Window
     {
-        const string AppVersion = "0.775";
+        const string AppVersion = "0.776";
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
         const string ClearedExternalIdSentinel = "__PV_CLEARED__";
@@ -2823,9 +2823,8 @@ namespace PixelVaultNative
                 Grid.SetRow(filterGrid, 1);
                 leftGrid.Children.Add(filterGrid);
 
-                var tileScroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Margin = new Thickness(0, 16, 0, 0) };
-                var tilePanel = new StackPanel();
-                tileScroll.Content = tilePanel;
+                var tileRows = CreateVirtualizedRowHost(new Thickness(0, 16, 0, 0), null);
+                var tileScroll = tileRows.ScrollViewer;
                 Grid.SetRow(tileScroll, 2);
                 leftGrid.Children.Add(tileScroll);
                 Grid.SetRow(status, 3);
@@ -2932,6 +2931,10 @@ namespace PixelVaultNative
                 Action openSelectedLibraryMetadataEditor = null;
                 var selectedDetailFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 var detailTiles = new List<Border>();
+                var pendingDetailRows = new Queue<Action>();
+                bool detailRowsQueued = false;
+                Action queueDetailRows = null;
+                Action loadPendingDetailRows = null;
 
                 Func<List<string>> getSelectedDetailFiles = delegate
                 {
@@ -2983,6 +2986,34 @@ namespace PixelVaultNative
                     }
                     deleteSelectedButton.IsEnabled = current != null && selectedFiles.Count > 0;
                     thumbLabel.Text = selectedFiles.Count > 0 ? selectedFiles.Count + " selected" : "All captures";
+                };
+
+                loadPendingDetailRows = delegate
+                {
+                    if (detailRowsQueued) return;
+                    if (pendingDetailRows.Count == 0) return;
+                    detailRowsQueued = true;
+                    thumbScroll.Dispatcher.BeginInvoke(new Action(delegate
+                    {
+                        detailRowsQueued = false;
+                        if (pendingDetailRows.Count == 0) return;
+                        int rowsToAppend = Math.Max(4, (int)Math.Ceiling((thumbScroll.ViewportHeight > 0 ? thumbScroll.ViewportHeight : 900) / 420));
+                        for (int i = 0; i < rowsToAppend && pendingDetailRows.Count > 0; i++)
+                        {
+                            pendingDetailRows.Dequeue()();
+                        }
+                        if (refreshDetailSelectionUi != null) refreshDetailSelectionUi();
+                    }), DispatcherPriority.Background);
+                };
+
+                queueDetailRows = delegate
+                {
+                    if (pendingDetailRows.Count == 0) return;
+                    var remainingHeight = thumbScroll.ExtentHeight - (thumbScroll.VerticalOffset + thumbScroll.ViewportHeight);
+                    if (thumbScroll.ViewportHeight <= 0 || remainingHeight <= Math.Max(640, thumbScroll.ViewportHeight * 1.25d))
+                    {
+                        loadPendingDetailRows();
+                    }
                 };
 
                 openSingleFileMetadataEditor = delegate(string filePath)
@@ -3132,6 +3163,8 @@ namespace PixelVaultNative
                 {
                     detailTiles.Clear();
                     thumbContent.Children.Clear();
+                    pendingDetailRows.Clear();
+                    detailRowsQueued = false;
                     if (current == null)
                     {
                         selectedDetailFiles.Clear();
@@ -3154,328 +3187,48 @@ namespace PixelVaultNative
                         if (refreshDetailSelectionUi != null) refreshDetailSelectionUi();
                         return;
                     }
+                    var detailColumns = CalculateVirtualizedTileColumns(thumbScroll, size, 10, 32);
                     foreach (var group in groups)
                     {
-                        thumbContent.Children.Add(new TextBlock
+                        var groupDate = group.Key;
+                        var groupFiles = group.ToList();
+                        pendingDetailRows.Enqueue(delegate
                         {
-                            Text = group.Key.ToString("MMMM d, yyyy"),
-                            FontSize = 16,
-                            FontWeight = FontWeights.SemiBold,
-                            Foreground = Brush("#F1E9DA"),
-                            Margin = new Thickness(0, 0, 0, 10)
+                            thumbContent.Children.Add(new TextBlock
+                            {
+                                Text = groupDate.ToString("MMMM d, yyyy"),
+                                FontSize = 16,
+                                FontWeight = FontWeights.SemiBold,
+                                Foreground = Brush("#F1E9DA"),
+                                Margin = new Thickness(0, 0, 0, 10)
+                            });
                         });
-                        var wrap = new WrapPanel { Margin = new Thickness(0, 0, 0, 12) };
-                        foreach (var file in group)
+                        for (int rowStart = 0; rowStart < groupFiles.Count; rowStart += detailColumns)
                         {
-                            var tile = new Border
+                            var rowFiles = groupFiles.Skip(rowStart).Take(detailColumns).ToList();
+                            pendingDetailRows.Enqueue(delegate
                             {
-                                Width = size,
-                                Margin = new Thickness(0, 0, 10, 10),
-                                Padding = new Thickness(0),
-                                Background = Brush("#10181D"),
-                                BorderBrush = Brush("#2B3A44"),
-                                BorderThickness = new Thickness(1),
-                                CornerRadius = new CornerRadius(10),
-                                Cursor = System.Windows.Input.Cursors.Hand,
-                                Tag = file
-                            };
-                            var presenter = new Grid();
-                            var placeholder = new TextBlock { Text = Path.GetFileName(file), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(8), Foreground = Brush("#F1E9DA"), TextAlignment = TextAlignment.Center };
-                            var image = new Image { Width = size, Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Center, Visibility = Visibility.Collapsed };
-                            MediaElement videoPreviewMedia = null;
-                            TextBlock videoPreviewStatus = null;
-                            Border videoPreviewHint = null;
-                            DispatcherTimer videoPreviewStopTimer = null;
-                            bool videoPreviewReady = false;
-                            bool videoPreviewHovered = false;
-                            bool videoPreviewOpeningStarted = false;
-                            presenter.Children.Add(placeholder);
-                            presenter.Children.Add(image);
-                            if (IsVideo(file))
-                            {
-                                videoPreviewMedia = new MediaElement
+                                var wrap = new WrapPanel { Margin = new Thickness(0, 0, 0, 12) };
+                                var renderFolder = current;
+                                foreach (var file in rowFiles)
                                 {
-                                    LoadedBehavior = MediaState.Manual,
-                                    UnloadedBehavior = MediaState.Manual,
-                                    Stretch = Stretch.Uniform,
-                                    HorizontalAlignment = HorizontalAlignment.Center,
-                                    VerticalAlignment = VerticalAlignment.Center,
-                                    IsMuted = true,
-                                    Volume = 0,
-                                    Visibility = Visibility.Hidden,
-                                    IsHitTestVisible = false
-                                };
-                                videoPreviewStatus = new TextBlock
-                                {
-                                    Text = "Loading preview...",
-                                    Foreground = Brushes.White,
-                                    Background = Brush("#8A10181D"),
-                                    Padding = new Thickness(10, 4, 10, 4),
-                                    HorizontalAlignment = HorizontalAlignment.Center,
-                                    VerticalAlignment = VerticalAlignment.Center,
-                                    Visibility = Visibility.Collapsed
-                                };
-                                presenter.Children.Add(videoPreviewMedia);
-                                presenter.Children.Add(videoPreviewStatus);
-                                presenter.Children.Add(new Border
-                                {
-                                    Width = 34,
-                                    Height = 34,
-                                    Background = Brush("#AA234A63"),
-                                    BorderBrush = Brush("#7AB4E3"),
-                                    BorderThickness = new Thickness(1),
-                                    CornerRadius = new CornerRadius(17),
-                                    HorizontalAlignment = HorizontalAlignment.Right,
-                                    VerticalAlignment = VerticalAlignment.Top,
-                                    Margin = new Thickness(0, 8, 8, 0),
-                                    Child = new TextBlock
-                                    {
-                                        Text = "▶",
-                                        Foreground = Brushes.White,
-                                        FontSize = 16,
-                                        FontWeight = FontWeights.Bold,
-                                        HorizontalAlignment = HorizontalAlignment.Center,
-                                        VerticalAlignment = VerticalAlignment.Center,
-                                        TextAlignment = TextAlignment.Center,
-                                        Margin = new Thickness(2, -1, 0, 0)
-                                    }
-                                });
-                                videoPreviewHint = new Border
-                                {
-                                    HorizontalAlignment = HorizontalAlignment.Right,
-                                    VerticalAlignment = VerticalAlignment.Bottom,
-                                    Margin = new Thickness(0, 0, 8, 8),
-                                    Background = Brush("#9C0F151A"),
-                                    CornerRadius = new CornerRadius(8),
-                                    Padding = new Thickness(8, 4, 8, 4),
-                                    Child = new TextBlock
-                                    {
-                                        Text = "Hover to preview",
-                                        Foreground = Brush("#DCE8EF"),
-                                        FontSize = 10.5,
-                                        FontWeight = FontWeights.SemiBold
-                                    }
-                                };
-                                presenter.Children.Add(videoPreviewHint);
-                                videoPreviewStopTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(10) };
-                                try
-                                {
-                                    videoPreviewMedia.Source = new Uri(file);
-                                    videoPreviewOpeningStarted = true;
-                                    videoPreviewMedia.Play();
+                                    var tile = CreateLibraryDetailTile(
+                                        file,
+                                        size,
+                                        delegate { return SameLibraryFolderSelection(current, renderFolder); },
+                                        openSingleFileMetadataEditor,
+                                        updateDetailSelection,
+                                        selectedDetailFiles,
+                                        refreshDetailSelectionUi);
+                                    detailTiles.Add(tile);
+                                    wrap.Children.Add(tile);
                                 }
-                                catch
-                                {
-                                    videoPreviewOpeningStarted = false;
-                                }
-                            }
-                            tile.Child = presenter;
-                            detailTiles.Add(tile);
-                            var renderFolder = current;
-                            QueueImageLoad(image, file, size * 2, delegate(BitmapImage loaded)
-                            {
-                                image.Source = loaded;
-                                image.Visibility = Visibility.Visible;
-                                placeholder.Visibility = Visibility.Collapsed;
-                            }, false, delegate { return SameLibraryFolderSelection(current, renderFolder); });
-                            tile.MouseLeftButtonDown += delegate(object sender, System.Windows.Input.MouseButtonEventArgs e)
-                            {
-                                var clicked = sender as Border;
-                                var clickedFile = clicked == null ? string.Empty : clicked.Tag as string;
-                                var additive = (System.Windows.Input.Keyboard.Modifiers & System.Windows.Input.ModifierKeys.Control) == System.Windows.Input.ModifierKeys.Control;
-                                updateDetailSelection(clickedFile, additive, additive);
-                                if (e.ClickCount >= 2)
-                                {
-                                    if (!string.IsNullOrWhiteSpace(clickedFile)) OpenWithShell(clickedFile);
-                                }
-                            };
-                            tile.MouseRightButtonDown += delegate(object sender, System.Windows.Input.MouseButtonEventArgs e)
-                            {
-                                var clicked = sender as Border;
-                                var clickedFile = clicked == null ? string.Empty : clicked.Tag as string;
-                                var additive = (System.Windows.Input.Keyboard.Modifiers & System.Windows.Input.ModifierKeys.Control) == System.Windows.Input.ModifierKeys.Control;
-                                if (!string.IsNullOrWhiteSpace(clickedFile))
-                                {
-                                    if (selectedDetailFiles.Contains(clickedFile))
-                                    {
-                                        if (refreshDetailSelectionUi != null) refreshDetailSelectionUi();
-                                    }
-                                    else
-                                    {
-                                        updateDetailSelection(clickedFile, additive, additive);
-                                    }
-                                }
-                            };
-                            tile.MouseEnter += delegate
-                            {
-                                if (!IsVideo(file)) return;
-                                if (videoPreviewMedia == null || videoPreviewStatus == null) return;
-                                videoPreviewHovered = true;
-                                videoPreviewStopTimer.Stop();
-                                videoPreviewHint.Visibility = Visibility.Collapsed;
-                                if (videoPreviewReady)
-                                {
-                                    videoPreviewStatus.Visibility = Visibility.Collapsed;
-                                    videoPreviewMedia.Visibility = Visibility.Visible;
-                                    try
-                                    {
-                                        videoPreviewMedia.Play();
-                                        videoPreviewStopTimer.Start();
-                                    }
-                                    catch
-                                    {
-                                        videoPreviewMedia.Visibility = Visibility.Collapsed;
-                                        videoPreviewHint.Visibility = Visibility.Visible;
-                                    }
-                                }
-                                else
-                                {
-                                    videoPreviewStatus.Visibility = Visibility.Visible;
-                                    if (!videoPreviewOpeningStarted)
-                                    {
-                                        try
-                                        {
-                                            videoPreviewMedia.Source = new Uri(file);
-                                            videoPreviewOpeningStarted = true;
-                                            videoPreviewMedia.Play();
-                                        }
-                                        catch
-                                        {
-                                            videoPreviewStatus.Visibility = Visibility.Collapsed;
-                                            videoPreviewHint.Visibility = Visibility.Visible;
-                                        }
-                                    }
-                                }
-                            };
-                            tile.MouseLeave += delegate
-                            {
-                                if (!IsVideo(file)) return;
-                                if (videoPreviewMedia == null || videoPreviewStatus == null) return;
-                                videoPreviewHovered = false;
-                                videoPreviewStopTimer.Stop();
-                                videoPreviewStatus.Visibility = Visibility.Collapsed;
-                                videoPreviewMedia.Visibility = Visibility.Collapsed;
-                                videoPreviewHint.Visibility = Visibility.Visible;
-                                try
-                                {
-                                    videoPreviewMedia.Pause();
-                                    videoPreviewMedia.Position = TimeSpan.FromMilliseconds(250);
-                                }
-                                catch
-                                {
-                                }
-                            };
-                            if (videoPreviewMedia != null && videoPreviewStatus != null && videoPreviewHint != null && videoPreviewStopTimer != null)
-                            {
-                                videoPreviewStopTimer.Tick += delegate
-                                {
-                                    videoPreviewStopTimer.Stop();
-                                    videoPreviewHovered = false;
-                                    videoPreviewStatus.Visibility = Visibility.Collapsed;
-                                    videoPreviewMedia.Visibility = Visibility.Collapsed;
-                                    videoPreviewHint.Visibility = Visibility.Visible;
-                                    try
-                                    {
-                                        videoPreviewMedia.Pause();
-                                        videoPreviewMedia.Position = TimeSpan.FromMilliseconds(250);
-                                    }
-                                    catch
-                                    {
-                                    }
-                                };
-                                videoPreviewMedia.MediaOpened += delegate
-                                {
-                                    videoPreviewReady = true;
-                                    try
-                                    {
-                                        videoPreviewMedia.Position = TimeSpan.FromMilliseconds(250);
-                                        if (videoPreviewHovered) videoPreviewMedia.Play();
-                                        else videoPreviewMedia.Pause();
-                                    }
-                                    catch
-                                    {
-                                    }
-                                    if (videoPreviewHovered)
-                                    {
-                                        videoPreviewStatus.Visibility = Visibility.Collapsed;
-                                        videoPreviewMedia.Visibility = Visibility.Visible;
-                                        videoPreviewHint.Visibility = Visibility.Collapsed;
-                                        videoPreviewStopTimer.Stop();
-                                        videoPreviewStopTimer.Start();
-                                        try
-                                        {
-                                            videoPreviewMedia.Play();
-                                        }
-                                        catch
-                                        {
-                                            videoPreviewStatus.Visibility = Visibility.Collapsed;
-                                            videoPreviewMedia.Visibility = Visibility.Collapsed;
-                                            videoPreviewHint.Visibility = Visibility.Visible;
-                                        }
-                                    }
-                                    else
-                                    {
-                                        videoPreviewStatus.Visibility = Visibility.Collapsed;
-                                        videoPreviewMedia.Visibility = Visibility.Hidden;
-                                        videoPreviewHint.Visibility = Visibility.Visible;
-                                    }
-                                };
-                                videoPreviewMedia.MediaEnded += delegate
-                                {
-                                    try
-                                    {
-                                        videoPreviewMedia.Position = TimeSpan.FromMilliseconds(250);
-                                        if (videoPreviewHovered) videoPreviewMedia.Play();
-                                    }
-                                    catch
-                                    {
-                                        videoPreviewStopTimer.Stop();
-                                        videoPreviewStatus.Visibility = Visibility.Collapsed;
-                                        videoPreviewMedia.Visibility = Visibility.Hidden;
-                                        videoPreviewHint.Visibility = Visibility.Visible;
-                                    }
-                                };
-                                videoPreviewMedia.MediaFailed += delegate
-                                {
-                                    videoPreviewReady = false;
-                                    videoPreviewOpeningStarted = false;
-                                    videoPreviewHovered = false;
-                                    videoPreviewStopTimer.Stop();
-                                    videoPreviewStatus.Visibility = Visibility.Collapsed;
-                                    videoPreviewMedia.Visibility = Visibility.Hidden;
-                                    videoPreviewHint.Visibility = Visibility.Visible;
-                                    try
-                                    {
-                                        videoPreviewMedia.Stop();
-                                    }
-                                    catch
-                                    {
-                                    }
-                                };
-                            }
-                            var contextMenu = new ContextMenu();
-                            var openItem = new MenuItem { Header = "Open" };
-                            openItem.Click += delegate { OpenWithShell(file); };
-                            var openFolderItem = new MenuItem { Header = "Open Folder" };
-                            openFolderItem.Click += delegate { OpenFolder(Path.GetDirectoryName(file) ?? string.Empty); };
-                            var editItem = new MenuItem { Header = "Edit Metadata" };
-                            editItem.Click += delegate { openSingleFileMetadataEditor(file); };
-                            var copyPathItem = new MenuItem { Header = "Copy File Path" };
-                            copyPathItem.Click += delegate
-                            {
-                                try { Clipboard.SetText(file); } catch { }
-                            };
-                            contextMenu.Items.Add(openItem);
-                            contextMenu.Items.Add(openFolderItem);
-                            contextMenu.Items.Add(editItem);
-                            contextMenu.Items.Add(new Separator());
-                            contextMenu.Items.Add(copyPathItem);
-                            tile.ContextMenu = contextMenu;
-                            wrap.Children.Add(tile);
+                                thumbContent.Children.Add(wrap);
+                            });
                         }
-                        thumbContent.Children.Add(wrap);
                     }
-                    if (refreshDetailSelectionUi != null) refreshDetailSelectionUi();
+                    loadPendingDetailRows();
+                    queueDetailRows();
                 };
 
                 Func<LibraryFolderInfo, int, int, bool, Button> buildFolderTile = delegate(LibraryFolderInfo folder, int tileWidth, int tileHeight, bool showPlatformBadge)
@@ -3483,6 +3236,7 @@ namespace PixelVaultNative
                     var tile = new Button
                     {
                         Width = tileWidth,
+                        Height = tileHeight + 82,
                         Margin = new Thickness(0, 0, 14, 14),
                         Padding = new Thickness(0),
                         Background = Brush("#1A2329"),
@@ -3531,8 +3285,8 @@ namespace PixelVaultNative
                             new Thickness(0));
                     }
                     tileStack.Children.Add(imageBorder);
-                    tileStack.Children.Add(new TextBlock { Text = folder.Name, TextWrapping = TextWrapping.Wrap, Foreground = Brushes.White, Margin = new Thickness(12, 12, 12, 4), FontWeight = FontWeights.SemiBold, FontSize = 13 });
-                    tileStack.Children.Add(new TextBlock { Text = folder.FileCount + " item(s) | " + folder.PlatformLabel, Foreground = Brush("#B7C6C0"), Margin = new Thickness(12, 0, 12, 12), FontSize = 10.5 });
+                    tileStack.Children.Add(new TextBlock { Text = folder.Name, TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.CharacterEllipsis, Foreground = Brushes.White, Margin = new Thickness(12, 12, 12, 4), FontWeight = FontWeights.SemiBold, FontSize = 13, Height = 34 });
+                    tileStack.Children.Add(new TextBlock { Text = folder.FileCount + " item(s) | " + folder.PlatformLabel, Foreground = Brush("#B7C6C0"), Margin = new Thickness(12, 0, 12, 12), FontSize = 10.5, Height = 16 });
                     tile.Content = tileStack;
                     tile.Click += delegate { showFolder(folder); };
                     var contextMenu = new ContextMenu();
@@ -3663,20 +3417,45 @@ namespace PixelVaultNative
                         renderSelectedFolder();
                     }
 
-                    tilePanel.Children.Clear();
+                    var folderCardHeight = tileHeight + 82;
+                    var folderRowHeight = folderCardHeight + 14;
+                    var folderColumns = CalculateVirtualizedTileColumns(tileScroll, tileWidth, 14, flattenGroups ? 28 : 56);
+                    var virtualRows = new List<VirtualizedRowDefinition>();
                     if (orderedVisibleFolders.Count == 0)
                     {
-                        tilePanel.Children.Add(new TextBlock { Text = string.IsNullOrWhiteSpace(searchText) ? "No library folders found." : "No folders match the current search.", Foreground = Brush("#A7B5BD"), Margin = new Thickness(0, 12, 0, 0) });
+                        virtualRows.Add(new VirtualizedRowDefinition
+                        {
+                            Height = 44,
+                            Build = delegate
+                            {
+                                return new TextBlock
+                                {
+                                    Text = string.IsNullOrWhiteSpace(searchText) ? "No library folders found." : "No folders match the current search.",
+                                    Foreground = Brush("#A7B5BD"),
+                                    Margin = new Thickness(0, 12, 0, 0)
+                                };
+                            }
+                        });
+                        SetVirtualizedRows(tileRows, virtualRows, true);
                         return;
                     }
                     if (flattenGroups)
                     {
-                        var flatWrap = new WrapPanel { Margin = new Thickness(0, 14, 0, 0) };
-                        foreach (var folder in orderedVisibleFolders)
+                        for (int rowStart = 0; rowStart < orderedVisibleFolders.Count; rowStart += folderColumns)
                         {
-                            flatWrap.Children.Add(buildFolderTile(folder, tileWidth, tileHeight, true));
+                            var rowFolders = orderedVisibleFolders.Skip(rowStart).Take(folderColumns).ToList();
+                            virtualRows.Add(new VirtualizedRowDefinition
+                            {
+                                Height = folderRowHeight,
+                                Build = delegate
+                                {
+                                    var flatWrap = new WrapPanel { Margin = new Thickness(0, 14, 0, 0) };
+                                    foreach (var folder in rowFolders) flatWrap.Children.Add(buildFolderTile(folder, tileWidth, tileHeight, true));
+                                    return flatWrap;
+                                }
+                            });
                         }
-                        tilePanel.Children.Add(flatWrap);
+                        SetVirtualizedRows(tileRows, virtualRows, true);
                         return;
                     }
 
@@ -3687,26 +3466,41 @@ namespace PixelVaultNative
                         .ToList();
                     foreach (var folderGroup in folderGroups)
                     {
-                        var groupWrap = new WrapPanel { Margin = new Thickness(0, 14, 0, 0) };
-                        foreach (var folder in folderGroup)
+                        var groupFolders = folderGroup.ToList();
+                        var groupLabel = folderGroup.Key;
+                        virtualRows.Add(new VirtualizedRowDefinition
                         {
-                            groupWrap.Children.Add(buildFolderTile(folder, tileWidth, tileHeight, false));
+                            Height = 82,
+                            Build = delegate
+                            {
+                                return new Border
+                                {
+                                    Margin = new Thickness(0, 0, 0, 14),
+                                    Background = Brush("#161F24"),
+                                    BorderBrush = Brush("#26363F"),
+                                    BorderThickness = new Thickness(1),
+                                    CornerRadius = new CornerRadius(10),
+                                    Padding = new Thickness(14, 10, 14, 12),
+                                    Child = BuildLibrarySectionHeader(groupLabel, groupFolders.Count)
+                                };
+                            }
+                        });
+                        for (int rowStart = 0; rowStart < groupFolders.Count; rowStart += folderColumns)
+                        {
+                            var rowFolders = groupFolders.Skip(rowStart).Take(folderColumns).ToList();
+                            virtualRows.Add(new VirtualizedRowDefinition
+                            {
+                                Height = folderRowHeight,
+                                Build = delegate
+                                {
+                                    var groupWrap = new WrapPanel { Margin = new Thickness(0, 0, 0, 14) };
+                                    foreach (var folder in rowFolders) groupWrap.Children.Add(buildFolderTile(folder, tileWidth, tileHeight, false));
+                                    return groupWrap;
+                                }
+                            });
                         }
-
-                        var expander = new Expander
-                        {
-                            Header = BuildLibrarySectionHeader(folderGroup.Key, folderGroup.Count()),
-                            IsExpanded = true,
-                            Margin = new Thickness(0, 0, 0, 14),
-                            Foreground = Brushes.White,
-                            Background = Brush("#161F24"),
-                            BorderBrush = Brush("#26363F"),
-                            BorderThickness = new Thickness(1),
-                            Padding = new Thickness(14, 10, 14, 12),
-                            Content = groupWrap
-                        };
-                        tilePanel.Children.Add(expander);
                     }
+                    SetVirtualizedRows(tileRows, virtualRows, true);
                 };
 
                 runLibraryScan = delegate(string folderPath, bool forceRescan)
@@ -4121,6 +3915,25 @@ namespace PixelVaultNative
                 editMetadataButton.Click += delegate { openSelectedLibraryMetadataEditor(); };
                 deleteSelectedButton.Click += delegate { deleteSelectedLibraryFiles(); };
                 thumbSizeSlider.ValueChanged += delegate { if (current != null) renderSelectedFolder(); };
+                thumbScroll.ScrollChanged += delegate(object sender, ScrollChangedEventArgs e)
+                {
+                    if (Math.Abs(e.VerticalChange) > 0.1 || Math.Abs(e.ViewportHeightChange) > 0.1) queueDetailRows();
+                };
+                thumbScroll.SizeChanged += delegate(object sender, SizeChangedEventArgs e)
+                {
+                    if (Math.Abs(e.PreviousSize.Width - e.NewSize.Width) > 8)
+                    {
+                        if (current != null) renderSelectedFolder();
+                    }
+                    else
+                    {
+                        queueDetailRows();
+                    }
+                };
+                tileScroll.SizeChanged += delegate(object sender, SizeChangedEventArgs e)
+                {
+                    if (Math.Abs(e.PreviousSize.Width - e.NewSize.Width) > 8) renderTiles(false);
+                };
                 folderTileSizeSlider.ValueChanged += delegate
                 {
                     libraryFolderTileSize = NormalizeLibraryFolderTileSize((int)Math.Round(folderTileSizeSlider.Value));

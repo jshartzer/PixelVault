@@ -1,3 +1,7 @@
+## 0.776
+- Virtualized the Library folder browser into row-based windowed rendering so the left-side game grid no longer builds every section and folder tile up front on large libraries.
+- Changed the Library detail pane to lazy-load capture rows as you scroll, keeping thumbnail/video preview work focused on the visible portion of the current folder instead of materializing the whole folder immediately.
+
 ## 0.775
 - Continued the modular-monolith refactor by moving storage, indexing, media-tool, import, and metadata/library-edit helper slices out of the main window source file into dedicated source files without changing app behavior.
 - Kept the app as one desktop executable and verified the extraction work with clean Release builds so the shipped codebase is easier to extend for later batching, indexing, and media-tool improvements.

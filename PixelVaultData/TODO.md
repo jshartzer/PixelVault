@@ -1,11 +1,11 @@
 # PixelVault To Do
 
 ## Current Priority
-1. Virtualize and lazy-load the Library UI.
-- Include background thumbnail and video poster generation so browsing stays responsive with large libraries.
-
-2. Expand FFmpeg-backed video handling.
+1. Expand FFmpeg-backed video handling.
 - Move beyond poster generation and make clips a more first-class library workflow.
+
+2. Stress-test the Library virtualization and lazy-loading paths.
+- Exercise large folder lists, large mixed-media folders, slider resize behavior, and scroll-triggered lazy rendering so the new Library UI changes settle in cleanly.
 
 ## Refactor Order
 - Pure models and helpers first.

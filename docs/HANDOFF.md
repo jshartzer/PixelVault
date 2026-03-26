@@ -43,11 +43,11 @@ This handoff is the short current-state summary.
 
 Current live build:
 
-- `0.775`
+- `0.776`
 
 Current executable:
 
-- `C:\Codex\dist\PixelVault-0.775\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.776\PixelVault.exe`
 
 Current build pointer:
 
@@ -96,7 +96,7 @@ Behavior summary:
 
 ## Recent Shipped State
 
-Recent important published changes in the current `0.724` to `0.775` line:
+Recent important published changes in the current `0.724` to `0.776` line:
 
 - intake preview/process/manual flows now reuse shared source inventories instead of rescanning the same roots repeatedly
 - metadata writes run with bounded parallel `ExifTool` workers
@@ -171,18 +171,18 @@ This was a data-only maintenance pass, not a new app build.
 
 ## Current Stop Point
 
-The current live build is `0.775`, and the latest shipped work now extends the modular-refactor baseline by extracting more backend responsibilities out of the monolith while keeping the existing Library behavior intact:
+The current live build is `0.776`, and the latest shipped work now shifts from backend extraction into Library browsing performance:
 
-1. `MainWindow` is now a much thinner partial class, with dedicated source files for storage, indexing, media-tool helpers, import workflow, shared metadata helpers, and library-metadata editing helpers
-2. the shipped app behavior is intentionally unchanged; this release is about creating safer seams for later work such as ExifTool batching, scan concurrency, and further indexing cleanup
+1. the left-side Library folder browser now uses row-windowed rendering, so large folder lists no longer instantiate every section and card up front
+2. the right-side folder detail view now lazy-loads capture rows on scroll, which limits thumbnail and video-preview work to the portion of the folder the user is actively approaching
 3. the app still ships as one desktop executable with one shared runtime data model, and each release still carries a version-local source snapshot inside `dist\PixelVault-x.xxx`
-4. release docs, current-build markers, and the desktop shortcut now point at the new `0.775` published build
+4. release docs, current-build markers, and the desktop shortcut now point at the new `0.776` published build
 
 The most likely next product step is:
 
-1. keep peeling the remaining indexing and metadata/game-assignment helpers out of `PixelVault.Native.cs` in the same low-risk style
-2. add stronger verification around Library regrouping, delete, and thumbnail-preservation paths so the refactor stays behavior-safe
-3. start the next performance-facing slice by batching `ExifTool` metadata writes now that the media-tool seam is cleaner
+1. expand FFmpeg-backed video handling beyond poster generation and make clips feel more first-class in the Library workflow
+2. stress-test the new Library virtualization and lazy-loading paths on large mixed-media folders and resize-heavy sessions
+3. keep an eye on any remaining UI-specific extraction opportunities after the current performance pass settles
 
 ## Important Expectations
 
