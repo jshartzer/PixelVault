@@ -43,11 +43,11 @@ This handoff is the short current-state summary.
 
 Current live build:
 
-- `0.776`
+- `0.777`
 
 Current executable:
 
-- `C:\Codex\dist\PixelVault-0.776\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.777\PixelVault.exe`
 
 Current build pointer:
 
@@ -96,7 +96,7 @@ Behavior summary:
 
 ## Recent Shipped State
 
-Recent important published changes in the current `0.724` to `0.776` line:
+Recent important published changes in the current `0.724` to `0.777` line:
 
 - intake preview/process/manual flows now reuse shared source inventories instead of rescanning the same roots repeatedly
 - metadata writes run with bounded parallel `ExifTool` workers
@@ -171,12 +171,12 @@ This was a data-only maintenance pass, not a new app build.
 
 ## Current Stop Point
 
-The current live build is `0.776`, and the latest shipped work now shifts from backend extraction into Library browsing performance:
+The current live build is `0.777`, and the latest shipped work now extends the Library-performance pass with a small import/parser follow-up:
 
-1. the left-side Library folder browser now uses row-windowed rendering, so large folder lists no longer instantiate every section and card up front
-2. the right-side folder detail view now lazy-loads capture rows on scroll, which limits thumbnail and video-preview work to the portion of the folder the user is actively approaching
+1. the left-side Library folder browser still uses row-windowed rendering, but the row containers now align more closely with the virtualization spacer math to reduce visible scroll jitter
+2. Steam clip exports named like `clip_<unix-ms>.mp4` are now recognized as Steam imports, and their filename timestamp is parsed as local time before metadata and rename handling
 3. the app still ships as one desktop executable with one shared runtime data model, and each release still carries a version-local source snapshot inside `dist\PixelVault-x.xxx`
-4. release docs, current-build markers, and the desktop shortcut now point at the new `0.776` published build
+4. release docs, current-build markers, and the desktop shortcut now point at the new `0.777` published build
 
 The most likely next product step is:
 

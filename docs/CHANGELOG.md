@@ -1,3 +1,7 @@
+## 0.777
+- Tightened the Library folder-row virtualization geometry so the rendered row heights now match the spacer math more closely, which should reduce the scroll jitter that could show up in the new virtualized folder browser.
+- Added support for Steam clip exports named like `clip_<unix-ms>.mp4`, parsing the filename timestamp as local time so import metadata and appended rename timestamps follow the captured time instead of the filesystem fallback.
+
 ## 0.776
 - Virtualized the Library folder browser into row-based windowed rendering so the left-side game grid no longer builds every section and folder tile up front on large libraries.
 - Changed the Library detail pane to lazy-load capture rows as you scroll, keeping thumbnail/video preview work focused on the visible portion of the current folder instead of materializing the whole folder immediately.

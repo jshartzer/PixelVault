@@ -39,7 +39,7 @@ namespace PixelVaultNative
 
     public sealed partial class MainWindow : Window
     {
-        const string AppVersion = "0.776";
+        const string AppVersion = "0.777";
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
         const string ClearedExternalIdSentinel = "__PV_CLEARED__";
@@ -3449,9 +3449,9 @@ namespace PixelVaultNative
                                 Height = folderRowHeight,
                                 Build = delegate
                                 {
-                                    var flatWrap = new WrapPanel { Margin = new Thickness(0, 14, 0, 0) };
+                                    var flatWrap = new WrapPanel();
                                     foreach (var folder in rowFolders) flatWrap.Children.Add(buildFolderTile(folder, tileWidth, tileHeight, true));
-                                    return flatWrap;
+                                    return new Border { Height = folderRowHeight, Background = Brushes.Transparent, Child = flatWrap };
                                 }
                             });
                         }
@@ -3475,7 +3475,7 @@ namespace PixelVaultNative
                             {
                                 return new Border
                                 {
-                                    Margin = new Thickness(0, 0, 0, 14),
+                                    Height = 82,
                                     Background = Brush("#161F24"),
                                     BorderBrush = Brush("#26363F"),
                                     BorderThickness = new Thickness(1),
@@ -3493,9 +3493,9 @@ namespace PixelVaultNative
                                 Height = folderRowHeight,
                                 Build = delegate
                                 {
-                                    var groupWrap = new WrapPanel { Margin = new Thickness(0, 0, 0, 14) };
+                                    var groupWrap = new WrapPanel();
                                     foreach (var folder in rowFolders) groupWrap.Children.Add(buildFolderTile(folder, tileWidth, tileHeight, false));
-                                    return groupWrap;
+                                    return new Border { Height = folderRowHeight, Background = Brushes.Transparent, Child = groupWrap };
                                 }
                             });
                         }
@@ -5307,6 +5307,22 @@ namespace PixelVaultNative
             {
                 var raw = b.Groups[1].Value + b.Groups[2].Value + b.Groups[3].Value + b.Groups[4].Value + b.Groups[5].Value + b.Groups[6].Value;
                 if (DateTime.TryParseExact(raw, "yyyyMMddHHmmss", null, System.Globalization.DateTimeStyles.None, out d)) return d;
+            }
+            var steamClipUnix = Regex.Match(file, @"^clip_(?<stamp>[\d,]{13,17})(?=\.[^.]+$)", RegexOptions.IgnoreCase);
+            if (steamClipUnix.Success)
+            {
+                long unixMilliseconds;
+                var rawStamp = steamClipUnix.Groups["stamp"].Value.Replace(",", string.Empty);
+                if (long.TryParse(rawStamp, out unixMilliseconds))
+                {
+                    try
+                    {
+                        return DateTimeOffset.FromUnixTimeMilliseconds(unixMilliseconds).ToLocalTime().DateTime;
+                    }
+                    catch
+                    {
+                    }
+                }
             }
             return null;
         }

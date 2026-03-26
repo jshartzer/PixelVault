@@ -354,6 +354,10 @@ namespace PixelVaultNative
             {
                 tags.Add("Steam");
             }
+            else if (Regex.IsMatch(file, @"^clip_[\d,]{13,17}\.(mp4|mkv|avi|mov|wmv|webm)$", RegexOptions.IgnoreCase))
+            {
+                tags.Add("Steam");
+            }
             else if (Regex.IsMatch(file, @"^.+_\d{14}\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$", RegexOptions.IgnoreCase))
             {
                 tags.Add("PS5");

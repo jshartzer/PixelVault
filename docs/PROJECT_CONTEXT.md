@@ -19,11 +19,11 @@ The app now runs from packaged builds under `C:\Codex\dist\PixelVault-x.xxx`, wi
 
 Current published build:
 
-- `0.776`
+- `0.777`
 
 Current executable:
 
-- `C:\Codex\dist\PixelVault-0.776\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.777\PixelVault.exe`
 
 Desktop shortcut:
 
