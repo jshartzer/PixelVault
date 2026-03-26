@@ -1,3 +1,7 @@
+## 0.775
+- Continued the modular-monolith refactor by moving storage, indexing, media-tool, import, and metadata/library-edit helper slices out of the main window source file into dedicated source files without changing app behavior.
+- Kept the app as one desktop executable and verified the extraction work with clean Release builds so the shipped codebase is easier to extend for later batching, indexing, and media-tool improvements.
+
 ## 0.774
 - Reverted Library hover preview back to the original direct-video playback method instead of the cached preview-clip path, since the earlier method felt much more immediate in practice.
 - Kept the newer inline-tile rendering and aspect-ratio fix, so hover preview should now behave more like the old fast popup path without stretching the playing frame into a square.

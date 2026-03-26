@@ -43,11 +43,11 @@ This handoff is the short current-state summary.
 
 Current live build:
 
-- `0.774`
+- `0.775`
 
 Current executable:
 
-- `C:\Codex\dist\PixelVault-0.774\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.775\PixelVault.exe`
 
 Current build pointer:
 
@@ -96,7 +96,7 @@ Behavior summary:
 
 ## Recent Shipped State
 
-Recent important published changes in the current `0.724` to `0.774` line:
+Recent important published changes in the current `0.724` to `0.775` line:
 
 - intake preview/process/manual flows now reuse shared source inventories instead of rescanning the same roots repeatedly
 - metadata writes run with bounded parallel `ExifTool` workers
@@ -143,6 +143,7 @@ Recent important published changes in the current `0.724` to `0.774` line:
 - inline video hover playback now preloads each visible clip source and reuses the existing poster bounds, which makes hover start faster and preserves the video aspect ratio instead of forcing a square playback surface
 - Library video hover now prefers a lightweight cached 10-second preview clip generated with FFmpeg, and visible video tiles warm those preview clips in the background to reduce hover startup lag
 - Library hover preview has been switched back to the original direct-video playback method because it felt materially faster than the preview-clip path, while keeping the newer inline-tile aspect-ratio fix
+- the live source has now pushed the modular refactor much further by extracting storage, indexing, media-tool, import, and metadata/library-edit helper slices into dedicated files while keeping the shipped behavior and one-executable packaging model intact
 
 See `C:\Codex\docs\CHANGELOG.md` for the detailed version history.
 
@@ -170,27 +171,18 @@ This was a data-only maintenance pass, not a new app build.
 
 ## Current Stop Point
 
-The current live build is `0.774`, and the latest work now layers real library-side selection/delete behavior plus a grouping fix on top of the modular-refactor baseline:
+The current live build is `0.775`, and the latest shipped work now extends the modular-refactor baseline by extracting more backend responsibilities out of the monolith while keeping the existing Library behavior intact:
 
-1. Library detail view supports multi-select capture actions, with right-click respecting the selected set and `Edit Metadata` working on the current selection
-2. permanent delete now lives on the Library capture viewer, where it removes the files from disk and clears their photo-index entries; Photo Index row removal is only a temporary `Forget Row`
-3. Library metadata edits now reassign grouping when the game title or platform identity changes, so renamed titles can move into the correct existing group or a new one
-4. post-edit and post-delete Library refresh now uses the rebuilt cache directly, avoiding the temporary full-grid thumbnail unload seen after deleting the last file from a folder
-5. right-click folder cover refresh now forces a new pull for cached auto-downloaded art without changing the toolbar-wide refresh behavior
-6. thumbnail reuse is now stickier across folder revisits because the image cache is recent-use instead of FIFO and on-disk thumbnails share normalized size buckets
-7. manual AppID/STID clears from `Edit IDs...` are now respected by later cover-refresh and resolver flows instead of being auto-filled again
-8. regroup, delete, and folder-align actions now preserve the rest of the live Library thumbnails by evicting only affected cache entries instead of globally clearing the image cache
-9. Library video captures now default to larger `500`-pixel detail tiles, retry real FFmpeg frame thumbs when older fallback cards exist, and can play a muted 10-second hover preview in the detail pane
-10. Library tiles now reuse cached thumbs immediately on startup, and video hover playback happens inline in the existing tile rather than in a popup surface
-11. inline hover preview now preloads the local media source and keeps the video constrained to the poster’s existing layout, improving hover responsiveness and preserving aspect ratio during playback
-12. video hover playback now uses and warms a short cached preview clip rather than the full source file, with the goal of making large local captures start much faster on hover
-13. hover preview now uses the original direct playback path again, but still renders inline inside the tile and preserves the thumbnail aspect ratio while playing
+1. `MainWindow` is now a much thinner partial class, with dedicated source files for storage, indexing, media-tool helpers, import workflow, shared metadata helpers, and library-metadata editing helpers
+2. the shipped app behavior is intentionally unchanged; this release is about creating safer seams for later work such as ExifTool batching, scan concurrency, and further indexing cleanup
+3. the app still ships as one desktop executable with one shared runtime data model, and each release still carries a version-local source snapshot inside `dist\PixelVault-x.xxx`
+4. release docs, current-build markers, and the desktop shortcut now point at the new `0.775` published build
 
 The most likely next product step is:
 
-1. keep peeling code out of `PixelVault.Native.cs` in low-risk slices, with SQLite/indexing still the next best extraction target
-2. exercise the new Library capture selection/delete path and the metadata regrouping fix against a few live title edge cases such as punctuation and trademark variants
-3. decide whether the legacy tracked `game-index-*.cache` and `library-metadata-index-*.cache` snapshots should remain in git as historical artifacts or be retired now that SQLite is the live runtime store
+1. keep peeling the remaining indexing and metadata/game-assignment helpers out of `PixelVault.Native.cs` in the same low-risk style
+2. add stronger verification around Library regrouping, delete, and thumbnail-preservation paths so the refactor stays behavior-safe
+3. start the next performance-facing slice by batching `ExifTool` metadata writes now that the media-tool seam is cleaner
 
 ## Important Expectations
 

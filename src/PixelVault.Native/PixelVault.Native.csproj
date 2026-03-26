@@ -18,8 +18,16 @@
 
   <ItemGroup>
     <Compile Include="Infrastructure\TimeoutWebClient.cs" />
+    <Compile Include="Indexing\GameIndexCore.cs" />
+    <Compile Include="Indexing\GameIndexFolderAlignment.cs" />
+    <Compile Include="Indexing\LibraryMetadataIndexing.cs" />
+    <Compile Include="Import\ImportWorkflow.cs" />
+    <Compile Include="MediaTools\MediaToolHelpers.cs" />
+    <Compile Include="Metadata\LibraryMetadataEditing.cs" />
+    <Compile Include="Metadata\MetadataHelpers.cs" />
     <Compile Include="Models\ImportModels.cs" />
     <Compile Include="Models\IndexModels.cs" />
+    <Compile Include="Storage\IndexDatabaseStorage.cs" />
     <Compile Include="PixelVault.Native.cs" />
   </ItemGroup>
 

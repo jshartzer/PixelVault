@@ -1,19 +1,29 @@
 # PixelVault To Do
 
-## Open
-- Batch ExifTool metadata writes for imports and library edits so metadata updates run through fewer external tool calls.
-- Add bounded parallel library scan workers so the app uses more of the host PC without overwhelming the NAS.
-- Virtualize and lazy-load the library UI, including background thumbnail and video poster generation, so browsing stays responsive with large libraries.
-- Expand FFmpeg-backed video handling so clip support goes beyond poster generation and becomes a first-class library workflow.
+## Current Priority
+1. Continue the modular refactor with the next backend slice.
+- Finish peeling remaining indexing and metadata/game-assignment helpers out of `C:\Codex\src\PixelVault.Native\PixelVault.Native.cs`.
+- Keep each extraction behavior-preserving and low risk.
 
-## Modular Refactor
-- Split the live app into a modular monolith while keeping one desktop executable and one shared runtime data model.
-- Extract `PixelVault.UI` responsibilities so windows, controls, and interaction wiring stop living directly inside `MainWindow`.
-- Extract `PixelVault.Import` responsibilities for rename, review, move, sort, and undo workflow orchestration.
-- Extract `PixelVault.Metadata` responsibilities for tag parsing, platform detection, capture-time rules, and shared metadata models.
-- Extract `PixelVault.MediaTools` wrappers for `ExifTool` and `FFmpeg` execution so external process handling is isolated.
-- Extract `PixelVault.Indexing` responsibilities for game-index, photo-index, rebuild, and folder-grouping logic.
-- Extract `PixelVault.Storage` responsibilities for SQLite access, settings persistence, cache paths, and filesystem-backed state.
-- Extract `PixelVault.Covers` responsibilities for Steam and SteamGridDB lookups, cover-fetching, and cache behavior.
-- Refactor in safe order: pure models and helpers first, then storage/indexing, then media-tool wrappers, then import orchestration, and UI wiring last.
+2. Add verification around Library regrouping and delete flows.
+- Focus on selection-aware metadata edits, permanent delete, regrouping, and thumbnail preservation.
+
+3. Batch ExifTool metadata writes.
+- Apply this to imports and library edits once the wrapper seam exists.
+
+4. Add bounded parallel library scan workers.
+- Improve throughput without overwhelming the NAS.
+
+5. Virtualize and lazy-load the Library UI.
+- Include background thumbnail and video poster generation so browsing stays responsive with large libraries.
+
+6. Expand FFmpeg-backed video handling.
+- Move beyond poster generation and make clips a more first-class library workflow.
+
+## Refactor Order
+- Pure models and helpers first.
+- Storage and indexing second.
+- Media-tool wrappers third.
+- Import orchestration fourth.
+- UI wiring last.
 
