@@ -19,7 +19,9 @@
   <ItemGroup>
     <Compile Include="Infrastructure\TimeoutWebClient.cs" />
     <Compile Include="Indexing\GameIndexCore.cs" />
+    <Compile Include="Indexing\GameIndexEditorOperations.cs" />
     <Compile Include="Indexing\GameIndexFolderAlignment.cs" />
+    <Compile Include="Indexing\LibraryFolderIndexing.cs" />
     <Compile Include="Indexing\LibraryMetadataIndexing.cs" />
     <Compile Include="Import\ImportWorkflow.cs" />
     <Compile Include="MediaTools\MediaToolHelpers.cs" />

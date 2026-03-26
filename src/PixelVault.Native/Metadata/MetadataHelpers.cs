@@ -60,17 +60,33 @@ namespace PixelVaultNative
                 }
             }
             var cleanedComment = CleanComment(comment);
-            if (writeCommentMetadata && !string.IsNullOrWhiteSpace(cleanedComment))
+            if (writeCommentMetadata)
             {
-                args.Add("-XMP-dc:Description-x-default=" + cleanedComment);
-                args.Add("-XMP-dc:Description=" + cleanedComment);
-                args.Add("-XMP-exif:UserComment=" + cleanedComment);
-                if (!IsVideo(file))
+                if (!string.IsNullOrWhiteSpace(cleanedComment))
                 {
-                    args.Add("-EXIF:ImageDescription=" + cleanedComment);
-                    args.Add("-EXIF:UserComment=" + cleanedComment);
-                    args.Add("-IPTC:Caption-Abstract=" + cleanedComment);
-                    if (ext == ".png") args.Add("-PNG:Comment=" + cleanedComment);
+                    args.Add("-XMP-dc:Description-x-default=" + cleanedComment);
+                    args.Add("-XMP-dc:Description=" + cleanedComment);
+                    args.Add("-XMP-exif:UserComment=" + cleanedComment);
+                    if (!IsVideo(file))
+                    {
+                        args.Add("-EXIF:ImageDescription=" + cleanedComment);
+                        args.Add("-EXIF:UserComment=" + cleanedComment);
+                        args.Add("-IPTC:Caption-Abstract=" + cleanedComment);
+                        if (ext == ".png") args.Add("-PNG:Comment=" + cleanedComment);
+                    }
+                }
+                else
+                {
+                    args.Add("-XMP-dc:Description-x-default=");
+                    args.Add("-XMP-dc:Description=");
+                    args.Add("-XMP-exif:UserComment=");
+                    if (!IsVideo(file))
+                    {
+                        args.Add("-EXIF:ImageDescription=");
+                        args.Add("-EXIF:UserComment=");
+                        args.Add("-IPTC:Caption-Abstract=");
+                        if (ext == ".png") args.Add("-PNG:Comment=");
+                    }
                 }
             }
             if (writeTagMetadata)
