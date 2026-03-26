@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -188,6 +189,63 @@ namespace PixelVaultNative
                 .Select(CleanComment)
                 .FirstOrDefault(line => !string.IsNullOrWhiteSpace(line))
                 ?? string.Empty;
+        }
+
+        static DateTime? ParseEmbeddedMetadataDateValue(string value)
+        {
+            var cleaned = CleanComment(value);
+            if (string.IsNullOrWhiteSpace(cleaned) || cleaned == "-") return null;
+
+            DateTimeOffset dto;
+            if (DateTimeOffset.TryParse(cleaned, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out dto))
+                return dto.LocalDateTime;
+
+            DateTime dt;
+            var exactFormats = new[]
+            {
+                "yyyy:MM:dd HH:mm:ss",
+                "yyyy:MM:dd HH:mm:ssK",
+                "yyyy:MM:dd HH:mm:sszzz",
+                "yyyyMMdd HH:mm:ss",
+                "yyyy-MM-dd HH:mm:ss",
+                "yyyy-MM-ddTHH:mm:ss",
+                "yyyy-MM-ddTHH:mm:ssK",
+                "yyyy-MM-ddTHH:mm:sszzz"
+            };
+            if (DateTime.TryParseExact(cleaned, exactFormats, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out dt))
+                return DateTime.SpecifyKind(dt, DateTimeKind.Local);
+            if (DateTime.TryParse(cleaned, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out dt))
+                return DateTime.SpecifyKind(dt, DateTimeKind.Local);
+            return null;
+        }
+
+        DateTime? ReadEmbeddedCaptureDateDirect(string file)
+        {
+            if (string.IsNullOrWhiteSpace(file) || !File.Exists(file)) return null;
+            if (string.IsNullOrWhiteSpace(exifToolPath) || !File.Exists(exifToolPath)) return null;
+            var readTarget = MetadataReadPath(file);
+            if (string.IsNullOrWhiteSpace(readTarget) || !File.Exists(readTarget)) return null;
+            var output = RunExeCapture(
+                exifToolPath,
+                new[]
+                {
+                    "-s3",
+                    "-XMP:DateTimeOriginal",
+                    "-XMP:CreateDate",
+                    "-XMP:ModifyDate",
+                    "-EXIF:DateTimeOriginal",
+                    "-EXIF:CreateDate",
+                    "-EXIF:ModifyDate",
+                    "-QuickTime:CreateDate",
+                    "-QuickTime:ModifyDate",
+                    readTarget
+                },
+                Path.GetDirectoryName(exifToolPath),
+                false);
+            return output
+                .Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(ParseEmbeddedMetadataDateValue)
+                .FirstOrDefault(parsed => parsed.HasValue);
         }
 
         string NormalizeConsoleLabel(string label)

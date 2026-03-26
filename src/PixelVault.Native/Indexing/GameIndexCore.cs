@@ -50,7 +50,7 @@ namespace PixelVaultNative
         {
             var normalizedName = NormalizeGameIndexName(name);
             if (string.IsNullOrWhiteSpace(normalizedName)) return string.Empty;
-            return NormalizeConsoleLabel(string.IsNullOrWhiteSpace(platformLabel) ? "Other" : platformLabel).PadRight(12) + " | " + normalizedName;
+            return normalizedName + " | " + NormalizeConsoleLabel(string.IsNullOrWhiteSpace(platformLabel) ? "Other" : platformLabel);
         }
 
         string ExtractGameNameFromChoiceLabel(string value)
@@ -58,8 +58,8 @@ namespace PixelVaultNative
             var cleaned = CleanTag(value);
             if (string.IsNullOrWhiteSpace(cleaned)) return string.Empty;
             var separatorIndex = cleaned.IndexOf(" | ", StringComparison.Ordinal);
-            return separatorIndex >= 0 && separatorIndex + 3 < cleaned.Length
-                ? CleanTag(cleaned.Substring(separatorIndex + 3))
+            return separatorIndex > 0
+                ? CleanTag(cleaned.Substring(0, separatorIndex))
                 : cleaned;
         }
 

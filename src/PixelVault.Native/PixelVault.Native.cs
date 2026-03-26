@@ -39,7 +39,7 @@ namespace PixelVaultNative
 
     public sealed partial class MainWindow : Window
     {
-        const string AppVersion = "0.777";
+        const string AppVersion = "0.778";
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
         const string ClearedExternalIdSentinel = "__PV_CLEARED__";
@@ -1728,8 +1728,8 @@ namespace PixelVaultNative
             var windowLabel = libraryMode ? "Edit Library Metadata" : "Missing Data";
             var headerTitleText = libraryMode ? "Edit library metadata" : "Add missing metadata";
             var headerDescriptionText = libraryMode
-                ? items.Count + " image(s) from " + contextLabel + " are ready for metadata edits. Select one or more files, update the game title prefix, tags, one console tag, an optional capture date/time, and an optional comment. Files can also be reorganized into the proper game folder when the title changes."
-                : items.Count + " image(s) were left in intake because they did not match a known format. Select one or more files, add a game title prefix, tags, one console tag, an optional capture date/time, and an optional comment before sending them to the destination.";
+                ? items.Count + " capture(s) from " + contextLabel + " are ready for metadata edits. Select one or more files, update the game title prefix, tags, one console tag, an optional capture date/time, and an optional comment. Files can also be reorganized into the proper game folder when the title changes."
+                : items.Count + " capture(s) were left in intake because they did not match a known format. Select one or more files, add a game title prefix, tags, one console tag, an optional capture date/time, and an optional comment before sending them to the destination.";
             var leaveButtonText = libraryMode ? "Close" : "Leave Unchanged";
             var finishButtonText = libraryMode ? "Apply Changes" : "Apply and Send";
             var emptySelectionText = libraryMode ? "Choose one or more library images to edit." : "Choose unmatched intake images to add metadata.";
@@ -1744,9 +1744,9 @@ namespace PixelVaultNative
             {
                 Title = "PixelVault " + AppVersion + " " + windowLabel,
                 Width = 1220,
-                Height = 900,
+                Height = 1040,
                 MinWidth = 1040,
-                MinHeight = 760,
+                MinHeight = 920,
                 Owner = this,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
                 Background = Brush("#0F1519")
@@ -1796,7 +1796,7 @@ namespace PixelVaultNative
             detailScroll.Content = detailStack;
             detailCard.Child = detailScroll;
 
-            var selectedTitle = new TextBlock { Text = "Select one or more images", FontSize = 24, FontWeight = FontWeights.SemiBold, Foreground = Brush("#1F2A30"), TextWrapping = TextWrapping.Wrap };
+            var selectedTitle = new TextBlock { Text = "Select one or more captures", FontSize = 24, FontWeight = FontWeights.SemiBold, Foreground = Brush("#1F2A30"), TextWrapping = TextWrapping.Wrap };
             var selectedMeta = new TextBlock { Text = emptySelectionText, Foreground = Brush("#5F6970"), Margin = new Thickness(0, 8, 0, 12), TextWrapping = TextWrapping.Wrap };
             var previewBorder = new Border { Background = Brush("#EAF0F5"), CornerRadius = new CornerRadius(16), Padding = new Thickness(12), Margin = new Thickness(0, 0, 0, 16), BorderBrush = Brush("#D7E1E8"), BorderThickness = new Thickness(1) };
             var previewImage = new Image { Stretch = Stretch.Uniform, Height = 320 };
@@ -2066,7 +2066,7 @@ namespace PixelVaultNative
             {
                 if (selectedItems.Count == 0)
                 {
-                    selectedTitle.Text = "Select one or more images";
+                    selectedTitle.Text = "Select one or more captures";
                     selectedMeta.Text = emptySelectionText;
                     guessText.Text = "Best Guess | No confident match";
                     previewBorder.Child = buildMultiPreview(0);
@@ -2105,7 +2105,7 @@ namespace PixelVaultNative
                 }
                 else
                 {
-                    selectedTitle.Text = selectedItems.Count + " images selected";
+                    selectedTitle.Text = selectedItems.Count + " captures selected";
                     selectedMeta.Text = "Edits here apply to all selected files. Mixed values show as blank or indeterminate.";
                     guessText.Text = sharedFilenameGuess(selectedItems);
                     previewBorder.Child = buildMultiPreview(selectedItems.Count);
@@ -2477,13 +2477,13 @@ namespace PixelVaultNative
                 var items = BuildLibraryMetadataItems(folder);
                 if (items.Count == 0)
                 {
-                    status.Text = "No library images to edit";
-                    Log("Library metadata editor opened, but no image files were found in " + folder.FolderPath + ".");
-                    MessageBox.Show("There are no image files in this folder yet.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
+                    status.Text = "No library captures to edit";
+                    Log("Library metadata editor opened, but no media files were found in " + folder.FolderPath + ".");
+                    MessageBox.Show("There are no capture files in this folder yet.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
                     return;
                 }
                 status.Text = "Editing library metadata";
-                Log("Opening library metadata editor for " + items.Count + " image(s) in " + folder.Name + ".");
+                Log("Opening library metadata editor for " + items.Count + " capture(s) in " + folder.Name + ".");
                 if (!ShowManualMetadataWindow(items, true, folder.Name))
                 {
                     status.Text = "Library metadata unchanged";
@@ -2519,7 +2519,7 @@ namespace PixelVaultNative
             progressRoot.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
             progressRoot.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             var progressTitle = new TextBlock { Text = "Applying library metadata", FontSize = 24, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, Margin = new Thickness(0, 0, 0, 8) };
-            var progressMeta = new TextBlock { Text = "Preparing " + items.Count + " image(s)...", Foreground = Brush("#B7C6C0"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 14) };
+            var progressMeta = new TextBlock { Text = "Preparing " + items.Count + " capture(s)...", Foreground = Brush("#B7C6C0"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 14) };
             var totalPerStage = Math.Max(items.Count, 1);
             var totalWork = totalPerStage * 3;
             var progressBar = new ProgressBar { Height = 18, Minimum = 0, Maximum = totalWork, Value = 0, IsIndeterminate = false, Margin = new Thickness(0, 0, 0, 14) };
@@ -2560,7 +2560,7 @@ namespace PixelVaultNative
             progressWindow.Content = progressRoot;
 
             status.Text = "Applying library metadata";
-            appendProgress("Starting library metadata apply for " + items.Count + " image(s) in " + folder.Name + ".");
+            appendProgress("Starting library metadata apply for " + items.Count + " capture(s) in " + folder.Name + ".");
             Action<int, string> updateProgress = delegate(int completed, string detail)
             {
                 var safeCompleted = Math.Max(0, Math.Min(completed, totalWork));
@@ -2598,11 +2598,11 @@ namespace PixelVaultNative
                 progressWindow.Dispatcher.BeginInvoke(new Action(delegate
                 {
                     progressFinished = true;
-                    updateProgress(totalWork, "Library metadata apply complete for " + folder.Name + ". Edited " + items.Count + " image(s); reorganized " + moved + ".");
+                    updateProgress(totalWork, "Library metadata apply complete for " + folder.Name + ". Edited " + items.Count + " capture(s); reorganized " + moved + ".");
                     status.Text = moved > 0 ? "Library metadata updated and organized" : "Library metadata updated";
 
                     if (refreshLibrary != null) refreshLibrary();
-                    Log("Library metadata apply complete for " + folder.Name + ". Edited " + items.Count + " image(s); reorganized " + moved + ".");
+                    Log("Library metadata apply complete for " + folder.Name + ". Edited " + items.Count + " capture(s); reorganized " + moved + ".");
                     closeButton.IsEnabled = true;
                 }));
             }).ContinueWith(delegate(System.Threading.Tasks.Task task)

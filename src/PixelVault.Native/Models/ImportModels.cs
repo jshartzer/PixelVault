@@ -109,4 +109,11 @@ namespace PixelVaultNative
         public DateTime OriginalWriteTime;
         public string SuccessDetail;
     }
+
+    sealed class EmbeddedMetadataSnapshot
+    {
+        public string[] Tags = new string[0];
+        public string Comment = string.Empty;
+        public DateTime? CaptureTime;
+    }
 }

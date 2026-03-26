@@ -1,3 +1,7 @@
+## 0.778
+- Changed the metadata edit game-title picker to show choices as `Game Name | Console`, so typing the game name now drives the dropdown/autofill more naturally instead of effectively keying off the console prefix first.
+- Made the metadata edit window taller and batched the upfront ExifTool metadata reads for library edits, which should reduce the need to scroll immediately and make the form open faster on larger folders.
+
 ## 0.777
 - Tightened the Library folder-row virtualization geometry so the rendered row heights now match the spacer math more closely, which should reduce the scroll jitter that could show up in the new virtualized folder browser.
 - Added support for Steam clip exports named like `clip_<unix-ms>.mp4`, parsing the filename timestamp as local time so import metadata and appended rename timestamps follow the captured time instead of the filesystem fallback.

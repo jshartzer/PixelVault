@@ -11,12 +11,16 @@ namespace PixelVaultNative
         {
             var items = new List<ManualMetadataItem>();
             if (folder == null || string.IsNullOrWhiteSpace(folder.FolderPath) || !Directory.Exists(folder.FolderPath)) return items;
-            foreach (var file in GetFilesForLibraryFolderEntry(folder, false).OrderByDescending(GetLibraryDate).ThenBy(Path.GetFileName))
+            var files = GetFilesForLibraryFolderEntry(folder, false).OrderByDescending(GetLibraryDate).ThenBy(Path.GetFileName).ToList();
+            var metadataSnapshots = ReadEmbeddedMetadataBatch(files);
+            foreach (var file in files)
             {
                 var fileName = Path.GetFileName(file);
                 var indexEntry = TryGetLibraryMetadataIndexEntry(libraryRoot, file, null);
-                var tags = GetEmbeddedKeywordTags(file);
-                var consoleTags = GetConsolePlatformTagsForFile(file);
+                EmbeddedMetadataSnapshot snapshot;
+                if (!metadataSnapshots.TryGetValue(file, out snapshot) || snapshot == null) snapshot = new EmbeddedMetadataSnapshot();
+                var tags = snapshot.Tags ?? new string[0];
+                var consoleTags = ExtractConsolePlatformFamilies(tags);
                 var customPlatform = tags.FirstOrDefault(tag => tag.StartsWith(CustomPlatformPrefix, StringComparison.OrdinalIgnoreCase));
                 var customPlatformName = string.IsNullOrWhiteSpace(customPlatform) ? string.Empty : CleanTag(customPlatform.Substring(CustomPlatformPrefix.Length));
                 var normalizedCustomPlatform = NormalizeConsoleLabel(customPlatformName);
@@ -27,8 +31,8 @@ namespace PixelVaultNative
                     && !string.Equals(normalizedCustomPlatform, "Xbox", StringComparison.OrdinalIgnoreCase)
                     && !string.Equals(normalizedCustomPlatform, "Other", StringComparison.OrdinalIgnoreCase)
                     && !string.Equals(normalizedCustomPlatform, "Multiple Tags", StringComparison.OrdinalIgnoreCase);
-                var captureTime = GetLibraryDate(file);
-                var currentComment = ReadEmbeddedCommentDirect(file);
+                var captureTime = snapshot.CaptureTime ?? GetLibraryDate(file);
+                var currentComment = snapshot.Comment ?? string.Empty;
                 var filteredTagText = string.Join(", ", tags.Where(tag =>
                     !string.Equals(tag, "Game Capture", StringComparison.OrdinalIgnoreCase) &&
                     !string.Equals(tag, GamePhotographyTag, StringComparison.OrdinalIgnoreCase) &&
