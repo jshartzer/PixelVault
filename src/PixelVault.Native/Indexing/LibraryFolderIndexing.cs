@@ -260,6 +260,7 @@ namespace PixelVaultNative
                     PreviewImagePath = groupFiles.FirstOrDefault(IsImage) ?? groupFiles.FirstOrDefault(),
                     PlatformLabel = platformLabel,
                     FilePaths = groupFiles,
+                    NewestCaptureUtcTicks = groupFiles.Length > 0 ? GetLibraryDate(groupFiles[0]).ToUniversalTime().Ticks : 0,
                     SteamAppId = saved != null && (saved.SuppressSteamAppIdAutoResolve || !string.IsNullOrWhiteSpace(saved.SteamAppId))
                         ? (saved.SteamAppId ?? string.Empty)
                         : ResolveLibraryFolderSteamAppId(platformLabel, groupFiles),

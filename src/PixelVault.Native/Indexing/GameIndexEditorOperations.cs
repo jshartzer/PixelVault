@@ -70,7 +70,7 @@ namespace PixelVaultNative
             SaveSavedGameIndexRows(root, normalizedRows);
             if (aliasMap.Count > 0)
             {
-                RewriteGameIdAliasesInLibraryMetadataIndexFile(root, aliasMap);
+                indexPersistenceService.ApplyGameIdAliases(root, aliasMap);
                 RewriteGameIdAliasesInLibraryFolderCacheFile(root, aliasMap);
             }
             RefreshCachedLibraryFoldersFromGameIndex(root);

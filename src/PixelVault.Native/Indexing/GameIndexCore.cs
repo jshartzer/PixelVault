@@ -270,186 +270,20 @@ namespace PixelVaultNative
                 row != null && string.Equals(BuildGameIndexIdentity(row.Name, row.PlatformLabel), wantedIdentity, StringComparison.OrdinalIgnoreCase));
         }
 
-        List<GameIndexEditorRow> ReadSavedGameIndexRowsFile(string root)
-        {
-            var path = GameIndexPath(root);
-            if (!File.Exists(path)) return new List<GameIndexEditorRow>();
-            var lines = File.ReadAllLines(path);
-            if (lines.Length < 1) return new List<GameIndexEditorRow>();
-            if (!string.Equals(lines[0], root, StringComparison.OrdinalIgnoreCase)) return new List<GameIndexEditorRow>();
-            var list = new List<GameIndexEditorRow>();
-            foreach (var line in lines.Skip(1))
-            {
-                var parts = line.Split('\t');
-                if (parts.Length >= 9)
-                {
-                    list.Add(new GameIndexEditorRow
-                    {
-                        GameId = parts[0],
-                        FolderPath = parts[1],
-                        Name = parts[2],
-                        PlatformLabel = parts[3],
-                        SteamAppId = parts[4],
-                        SteamGridDbId = parts[5],
-                        FileCount = parts.Length > 6 ? ParseInt(parts[6]) : 0,
-                        PreviewImagePath = parts.Length > 7 ? parts[7] : string.Empty,
-                        FilePaths = parts.Length > 8 && !string.IsNullOrWhiteSpace(parts[8])
-                            ? parts[8].Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries).Where(File.Exists).ToArray()
-                            : new string[0]
-                    });
-                }
-                else if (parts.Length >= 8)
-                {
-                    list.Add(new GameIndexEditorRow
-                    {
-                        GameId = parts[0],
-                        FolderPath = parts[1],
-                        Name = parts[2],
-                        PlatformLabel = parts[3],
-                        SteamAppId = parts[4],
-                        SteamGridDbId = string.Empty,
-                        FileCount = parts.Length > 5 ? ParseInt(parts[5]) : 0,
-                        PreviewImagePath = parts.Length > 6 ? parts[6] : string.Empty,
-                        FilePaths = parts.Length > 7 && !string.IsNullOrWhiteSpace(parts[7])
-                            ? parts[7].Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries).Where(File.Exists).ToArray()
-                            : new string[0]
-                    });
-                }
-                else if (parts.Length >= 4)
-                {
-                    list.Add(new GameIndexEditorRow
-                    {
-                        GameId = string.Empty,
-                        FolderPath = parts[0],
-                        Name = parts[1],
-                        PlatformLabel = parts[2],
-                        SteamAppId = parts[3],
-                        SteamGridDbId = string.Empty,
-                        FileCount = parts.Length > 4 ? ParseInt(parts[4]) : 0,
-                        PreviewImagePath = parts.Length > 5 ? parts[5] : string.Empty,
-                        FilePaths = parts.Length > 6 && !string.IsNullOrWhiteSpace(parts[6])
-                            ? parts[6].Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries).Where(File.Exists).ToArray()
-                            : new string[0]
-                    });
-                }
-            }
-            return list;
-        }
-
-        void WriteSavedGameIndexRowsFile(string root, IEnumerable<GameIndexEditorRow> rows)
-        {
-            var path = GameIndexPath(root);
-            var lines = new List<string>();
-            lines.Add(root);
-            foreach (var row in rows.Where(row => row != null))
-            {
-                lines.Add(string.Join("\t", new[]
-                {
-                    NormalizeGameId(row.GameId),
-                    row.FolderPath ?? string.Empty,
-                    row.Name ?? string.Empty,
-                    row.PlatformLabel ?? string.Empty,
-                    row.SteamAppId ?? string.Empty,
-                    row.SteamGridDbId ?? string.Empty,
-                    row.FileCount.ToString(),
-                    row.PreviewImagePath ?? string.Empty,
-                    string.Join("|", (row.FilePaths ?? new string[0]).Where(File.Exists))
-                }));
-            }
-            File.WriteAllLines(path, lines.ToArray());
-        }
-
         Dictionary<string, string> BuildSavedGameIdAliasMapFromFile(string root)
         {
-            var databasePath = IndexDatabasePath(root);
-            if (File.Exists(databasePath))
-            {
-                using (var connection = OpenIndexDatabase(root))
-                {
-                    var rows = ReadSavedGameIndexRowsFromDatabase(root, connection);
-                    return BuildGameIdAliasMap(rows, rows);
-                }
-            }
-            var rawRows = ReadSavedGameIndexRowsFile(root);
-            if (rawRows.Count == 0) return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            var normalizedRows = MergeGameIndexRows(rawRows);
-            return BuildGameIdAliasMap(rawRows, normalizedRows);
+            return indexPersistenceService.BuildSavedGameIdAliasMap(root);
         }
 
-        void RewriteGameIdAliasesInLibraryMetadataIndexFile(string root, Dictionary<string, string> aliasMap)
+        void ApplyGameIdAliasesToCachedMetadataIndex(string root, Dictionary<string, string> aliasMap)
         {
             if (aliasMap == null || aliasMap.Count == 0) return;
-            var databasePath = IndexDatabasePath(root);
-            if (File.Exists(databasePath))
+            if (!string.Equals(libraryMetadataIndexRoot, root, StringComparison.OrdinalIgnoreCase)) return;
+            foreach (var entry in libraryMetadataIndex.Values.Where(entry => entry != null))
             {
-                using (var connection = OpenIndexDatabase(root))
-                using (var transaction = connection.BeginTransaction())
-                {
-                    foreach (var pair in aliasMap.Where(pair => !string.IsNullOrWhiteSpace(NormalizeGameId(pair.Key)) && !string.IsNullOrWhiteSpace(NormalizeGameId(pair.Value))))
-                    {
-                        using (var update = connection.CreateCommand())
-                        {
-                            update.Transaction = transaction;
-                            update.CommandText = @"
-UPDATE photo_index
-SET game_id = $newGameId
-WHERE root = $root AND game_id = $oldGameId;";
-                            update.Parameters.AddWithValue("$root", root ?? string.Empty);
-                            update.Parameters.AddWithValue("$oldGameId", NormalizeGameId(pair.Key));
-                            update.Parameters.AddWithValue("$newGameId", NormalizeGameId(pair.Value));
-                            update.ExecuteNonQuery();
-                        }
-                    }
-                    transaction.Commit();
-                }
-                if (string.Equals(libraryMetadataIndexRoot, root, StringComparison.OrdinalIgnoreCase))
-                {
-                    foreach (var entry in libraryMetadataIndex.Values.Where(entry => entry != null))
-                    {
-                        var currentGameId = NormalizeGameId(entry.GameId);
-                        string mappedGameId;
-                        if (!string.IsNullOrWhiteSpace(currentGameId) && aliasMap.TryGetValue(currentGameId, out mappedGameId)) entry.GameId = mappedGameId;
-                    }
-                }
-                return;
-            }
-            var path = LibraryMetadataIndexPath(root);
-            if (!File.Exists(path)) return;
-            var lines = File.ReadAllLines(path);
-            if (lines.Length < 2) return;
-            bool changed = false;
-            var rewritten = new List<string> { lines[0] };
-            foreach (var line in lines.Skip(1))
-            {
-                var parts = line.Split('\t');
-                if (parts.Length >= 5)
-                {
-                    string mappedGameId;
-                    var currentGameId = NormalizeGameId(parts[2]);
-                    if (!string.IsNullOrWhiteSpace(currentGameId) && aliasMap.TryGetValue(currentGameId, out mappedGameId) && !string.Equals(parts[2], mappedGameId, StringComparison.Ordinal))
-                    {
-                        parts[2] = mappedGameId;
-                        changed = true;
-                    }
-                    rewritten.Add(string.Join("\t", new[] { parts[0], parts[1], parts[2], parts[3], parts[4] }));
-                }
-                else
-                {
-                    rewritten.Add(line);
-                }
-            }
-            if (changed)
-            {
-                File.WriteAllLines(path, rewritten.ToArray());
-                if (string.Equals(libraryMetadataIndexRoot, root, StringComparison.OrdinalIgnoreCase))
-                {
-                    foreach (var entry in libraryMetadataIndex.Values.Where(entry => entry != null))
-                    {
-                        var currentGameId = NormalizeGameId(entry.GameId);
-                        string mappedGameId;
-                        if (!string.IsNullOrWhiteSpace(currentGameId) && aliasMap.TryGetValue(currentGameId, out mappedGameId)) entry.GameId = mappedGameId;
-                    }
-                }
+                var currentGameId = NormalizeGameId(entry.GameId);
+                string mappedGameId;
+                if (!string.IsNullOrWhiteSpace(currentGameId) && aliasMap.TryGetValue(currentGameId, out mappedGameId)) entry.GameId = mappedGameId;
             }
         }
 
@@ -486,36 +320,13 @@ WHERE root = $root AND game_id = $oldGameId;";
 
         List<GameIndexEditorRow> LoadSavedGameIndexRows(string root)
         {
-            List<GameIndexEditorRow> rawRows;
-            using (var connection = OpenIndexDatabase(root))
-            {
-                rawRows = ReadSavedGameIndexRowsFromDatabase(root, connection);
-                var normalizedRows = MergeGameIndexRows(rawRows);
-                var aliasMap = BuildGameIdAliasMap(rawRows, normalizedRows);
-                if (rawRows.Count > 0 && (HasGameIdAliasChanges(aliasMap) || normalizedRows.Count != rawRows.Count || rawRows.Any(row => string.IsNullOrWhiteSpace(row.GameId))))
-                {
-                    WriteSavedGameIndexRowsToDatabase(root, normalizedRows, connection);
-                    RewriteGameIdAliasesInLibraryMetadataIndexFile(root, aliasMap);
-                    RewriteGameIdAliasesInLibraryFolderCacheFile(root, aliasMap);
-                }
-                return normalizedRows;
-            }
+            return indexPersistenceService.LoadSavedGameIndexRows(root);
         }
 
         void SaveSavedGameIndexRows(string root, IEnumerable<GameIndexEditorRow> rows)
         {
             var sourceRows = (rows ?? Enumerable.Empty<GameIndexEditorRow>()).Where(row => row != null).Select(CloneGameIndexEditorRow).ToList();
-            var mergedRows = MergeGameIndexRows(sourceRows);
-            var aliasMap = BuildGameIdAliasMap(sourceRows, mergedRows);
-            using (var connection = OpenIndexDatabase(root))
-            {
-                WriteSavedGameIndexRowsToDatabase(root, mergedRows, connection);
-            }
-            if (HasGameIdAliasChanges(aliasMap))
-            {
-                RewriteGameIdAliasesInLibraryMetadataIndexFile(root, aliasMap);
-                RewriteGameIdAliasesInLibraryFolderCacheFile(root, aliasMap);
-            }
+            indexPersistenceService.SaveSavedGameIndexRows(root, sourceRows);
         }
 
         List<GameIndexEditorRow> BuildGameIndexRowsFromFolders(IEnumerable<LibraryFolderInfo> folders)

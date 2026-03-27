@@ -38,216 +38,12 @@ namespace PixelVaultNative
 
         Dictionary<string, string[]> ReadEmbeddedKeywordTagsBatch(IEnumerable<string> files)
         {
-            var result = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
-            var sourceFiles = (files ?? Enumerable.Empty<string>())
-                .Where(file => !string.IsNullOrWhiteSpace(file) && File.Exists(file))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList();
-            foreach (var file in sourceFiles) result[file] = new string[0];
-            if (sourceFiles.Count == 0) return result;
-            if (string.IsNullOrWhiteSpace(exifToolPath) || !File.Exists(exifToolPath)) return result;
-
-            var readTargets = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            var targetToSource = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var file in sourceFiles)
-            {
-                var readTarget = MetadataReadPath(file);
-                if (string.IsNullOrWhiteSpace(readTarget) || !File.Exists(readTarget)) continue;
-                readTargets[file] = readTarget;
-                targetToSource[NormalizeExifToolPathKey(readTarget)] = file;
-            }
-            if (readTargets.Count == 0) return result;
-            var orderedReadTargets = readTargets
-                .OrderBy(pair => pair.Value, StringComparer.OrdinalIgnoreCase)
-                .ToList();
-
-            var argFile = Path.Combine(cacheRoot, "exiftool-batch-read-" + Guid.NewGuid().ToString("N") + ".args");
-            try
-            {
-                var argLines = new List<string>
-                {
-                    "-T",
-                    "-sep",
-                    "||",
-                    "-Directory",
-                    "-FileName",
-                    "-XMP-digiKam:TagsList",
-                    "-XMP-lr:HierarchicalSubject",
-                    "-XMP-dc:Subject",
-                    "-XMP:Subject",
-                    "-XMP:TagsList",
-                    "-IPTC:Keywords"
-                };
-                argLines.AddRange(orderedReadTargets.Select(pair => pair.Value));
-                File.WriteAllLines(argFile, argLines.ToArray(), Encoding.UTF8);
-                var output = RunExeCapture(exifToolPath, new[] { "-@", argFile }, Path.GetDirectoryName(exifToolPath), false);
-                var matchedFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                var outputLines = output.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
-                for (int lineIndex = 0; lineIndex < outputLines.Length; lineIndex++)
-                {
-                    var line = outputLines[lineIndex];
-                    var parts = line.Split('\t');
-                    if (parts.Length < 2) continue;
-                    var directoryPart = parts[0] == "-" ? string.Empty : parts[0];
-                    var fileNamePart = parts[1] == "-" ? string.Empty : parts[1];
-                    var exifPath = NormalizeExifToolPathKey(Path.Combine(directoryPart, fileNamePart));
-                    string sourceFile;
-                    if (!targetToSource.TryGetValue(exifPath, out sourceFile))
-                    {
-                        if (lineIndex >= orderedReadTargets.Count) continue;
-                        sourceFile = orderedReadTargets[lineIndex].Key;
-                    }
-                    var tags = new List<string>();
-                    for (int i = 2; i < parts.Length; i++)
-                    {
-                        foreach (var value in parts[i].Split(new[] { "||" }, StringSplitOptions.RemoveEmptyEntries))
-                        {
-                            var tag = CleanTag(value);
-                            if (!string.IsNullOrWhiteSpace(tag) && tag != "-") tags.Add(tag);
-                        }
-                    }
-                    result[sourceFile] = tags.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-                    matchedFiles.Add(sourceFile);
-                }
-                foreach (var pair in readTargets)
-                {
-                    if (matchedFiles.Contains(pair.Key)) continue;
-                    result[pair.Key] = ReadEmbeddedKeywordTagsDirect(pair.Key);
-                }
-            }
-            finally
-            {
-                if (File.Exists(argFile)) File.Delete(argFile);
-            }
-            return result;
+            return metadataService.ReadEmbeddedKeywordTagsBatch(files);
         }
 
         Dictionary<string, EmbeddedMetadataSnapshot> ReadEmbeddedMetadataBatch(IEnumerable<string> files)
         {
-            var result = new Dictionary<string, EmbeddedMetadataSnapshot>(StringComparer.OrdinalIgnoreCase);
-            var sourceFiles = (files ?? Enumerable.Empty<string>())
-                .Where(file => !string.IsNullOrWhiteSpace(file) && File.Exists(file))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList();
-            foreach (var file in sourceFiles) result[file] = new EmbeddedMetadataSnapshot();
-            if (sourceFiles.Count == 0) return result;
-            if (string.IsNullOrWhiteSpace(exifToolPath) || !File.Exists(exifToolPath)) return result;
-
-            var readTargets = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            var targetToSource = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var file in sourceFiles)
-            {
-                var readTarget = MetadataReadPath(file);
-                if (string.IsNullOrWhiteSpace(readTarget) || !File.Exists(readTarget)) continue;
-                readTargets[file] = readTarget;
-                targetToSource[NormalizeExifToolPathKey(readTarget)] = file;
-            }
-            if (readTargets.Count == 0) return result;
-            var orderedReadTargets = readTargets
-                .OrderBy(pair => pair.Value, StringComparer.OrdinalIgnoreCase)
-                .ToList();
-
-            var argFile = Path.Combine(cacheRoot, "exiftool-batch-metadata-" + Guid.NewGuid().ToString("N") + ".args");
-            try
-            {
-                var argLines = new List<string>
-                {
-                    "-T",
-                    "-sep",
-                    "||",
-                    "-Directory",
-                    "-FileName",
-                    "-XMP-digiKam:TagsList",
-                    "-XMP-lr:HierarchicalSubject",
-                    "-XMP-dc:Subject",
-                    "-XMP:Subject",
-                    "-XMP:TagsList",
-                    "-IPTC:Keywords",
-                    "-XMP-dc:Description-x-default",
-                    "-XMP-dc:Description",
-                    "-XMP-exif:UserComment",
-                    "-EXIF:ImageDescription",
-                    "-EXIF:UserComment",
-                    "-IPTC:Caption-Abstract",
-                    "-PNG:Comment",
-                    "-XMP:DateTimeOriginal",
-                    "-XMP:CreateDate",
-                    "-XMP:ModifyDate",
-                    "-EXIF:DateTimeOriginal",
-                    "-EXIF:CreateDate",
-                    "-EXIF:ModifyDate",
-                    "-QuickTime:CreateDate",
-                    "-QuickTime:ModifyDate"
-                };
-                argLines.AddRange(orderedReadTargets.Select(pair => pair.Value));
-                File.WriteAllLines(argFile, argLines.ToArray(), Encoding.UTF8);
-                var output = RunExeCapture(exifToolPath, new[] { "-@", argFile }, Path.GetDirectoryName(exifToolPath), false);
-                var matchedFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                var outputLines = output.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
-                for (int lineIndex = 0; lineIndex < outputLines.Length; lineIndex++)
-                {
-                    var line = outputLines[lineIndex];
-                    var parts = line.Split('\t');
-                    if (parts.Length < 2) continue;
-                    var directoryPart = parts[0] == "-" ? string.Empty : parts[0];
-                    var fileNamePart = parts[1] == "-" ? string.Empty : parts[1];
-                    var exifPath = NormalizeExifToolPathKey(Path.Combine(directoryPart, fileNamePart));
-                    string sourceFile;
-                    if (!targetToSource.TryGetValue(exifPath, out sourceFile))
-                    {
-                        if (lineIndex >= orderedReadTargets.Count) continue;
-                        sourceFile = orderedReadTargets[lineIndex].Key;
-                    }
-
-                    var snapshot = new EmbeddedMetadataSnapshot();
-                    var tags = new List<string>();
-                    for (int i = 2; i <= 7 && i < parts.Length; i++)
-                    {
-                        foreach (var value in parts[i].Split(new[] { "||" }, StringSplitOptions.RemoveEmptyEntries))
-                        {
-                            var tag = CleanTag(value);
-                            if (!string.IsNullOrWhiteSpace(tag) && tag != "-") tags.Add(tag);
-                        }
-                    }
-                    snapshot.Tags = tags.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-
-                    for (int i = 8; i <= 14 && i < parts.Length; i++)
-                    {
-                        var comment = CleanComment(parts[i]);
-                        if (string.IsNullOrWhiteSpace(comment) || comment == "-") continue;
-                        snapshot.Comment = comment;
-                        break;
-                    }
-
-                    for (int i = 15; i <= 21 && i < parts.Length; i++)
-                    {
-                        var parsed = ParseEmbeddedMetadataDateValue(parts[i]);
-                        if (!parsed.HasValue) continue;
-                        snapshot.CaptureTime = parsed.Value;
-                        break;
-                    }
-
-                    result[sourceFile] = snapshot;
-                    matchedFiles.Add(sourceFile);
-                }
-
-                foreach (var pair in readTargets)
-                {
-                    if (matchedFiles.Contains(pair.Key)) continue;
-                    result[pair.Key] = new EmbeddedMetadataSnapshot
-                    {
-                        Tags = ReadEmbeddedKeywordTagsDirect(pair.Key),
-                        Comment = ReadEmbeddedCommentDirect(pair.Key),
-                        CaptureTime = ReadEmbeddedCaptureDateDirect(pair.Key)
-                    };
-                }
-            }
-            finally
-            {
-                if (File.Exists(argFile)) File.Delete(argFile);
-            }
-
-            return result;
+            return metadataService.ReadEmbeddedMetadataBatch(files);
         }
 
         void MoveMetadataSidecarIfPresent(string sourceFile, string targetFile)
@@ -262,34 +58,12 @@ namespace PixelVaultNative
 
         void EnsureExifTool()
         {
-            if (!File.Exists(exifToolPath)) throw new InvalidOperationException("ExifTool not found: " + exifToolPath);
-            var support = Path.Combine(Path.GetDirectoryName(exifToolPath), "exiftool_files");
-            if (Path.GetFileName(exifToolPath).Equals("exiftool.exe", StringComparison.OrdinalIgnoreCase) && !Directory.Exists(support)) throw new InvalidOperationException("ExifTool support folder missing: " + support);
-            RunExe(exifToolPath, new[] { "-ver" }, Path.GetDirectoryName(exifToolPath), false);
+            metadataService.EnsureExifTool();
         }
 
         void RunExifToolBatch(IReadOnlyList<ExifWriteRequest> requests)
         {
-            if (requests == null || requests.Count == 0) return;
-
-            var argFile = Path.Combine(cacheRoot, "exiftool-batch-write-" + Guid.NewGuid().ToString("N") + ".args");
-            try
-            {
-                var argLines = new List<string> { "-stay_open", "True" };
-                foreach (var request in requests.Where(entry => entry != null && entry.Arguments != null && entry.Arguments.Length > 0))
-                {
-                    argLines.AddRange(request.Arguments);
-                    argLines.Add("-execute");
-                }
-                argLines.Add("-stay_open");
-                argLines.Add("False");
-                File.WriteAllLines(argFile, argLines.ToArray(), Encoding.UTF8);
-                RunExe(exifToolPath, new[] { "-@", argFile }, Path.GetDirectoryName(exifToolPath), false);
-            }
-            finally
-            {
-                if (File.Exists(argFile)) File.Delete(argFile);
-            }
+            metadataService.RunExifToolBatch(requests);
         }
 
         void RunExe(string file, string[] args, string cwd, bool logOutput)

@@ -11,6 +11,7 @@ namespace PixelVaultNative
         public string PreviewImagePath;
         public string PlatformLabel;
         public string[] FilePaths;
+        public long NewestCaptureUtcTicks;
         public string SteamAppId;
         public string SteamGridDbId;
         public bool SuppressSteamAppIdAutoResolve;

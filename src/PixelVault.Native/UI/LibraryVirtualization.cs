@@ -28,6 +28,8 @@ namespace PixelVaultNative
             public int FirstVisibleIndex = -1;
             public int LastVisibleIndex = -1;
             public double ViewportHeightFallback = 720;
+            public Action BeforeVisibleRowsRebuilt;
+            public Action AfterVisibleRowsRebuilt;
         }
 
         VirtualizedRowHost CreateVirtualizedRowHost(Thickness margin, Brush background)
@@ -91,11 +93,13 @@ namespace PixelVaultNative
             var rows = host.Rows ?? new List<VirtualizedRowDefinition>();
             if (rows.Count == 0)
             {
+                if (host.BeforeVisibleRowsRebuilt != null) host.BeforeVisibleRowsRebuilt();
                 host.TopSpacer.Height = 0;
                 host.BottomSpacer.Height = 0;
                 host.VisibleRowsPanel.Children.Clear();
                 host.FirstVisibleIndex = -1;
                 host.LastVisibleIndex = -1;
+                if (host.AfterVisibleRowsRebuilt != null) host.AfterVisibleRowsRebuilt();
                 return;
             }
 
@@ -139,6 +143,7 @@ namespace PixelVaultNative
 
             host.FirstVisibleIndex = firstIndex;
             host.LastVisibleIndex = lastIndex;
+            if (host.BeforeVisibleRowsRebuilt != null) host.BeforeVisibleRowsRebuilt();
             host.VisibleRowsPanel.Children.Clear();
 
             double renderedHeight = 0;
@@ -154,6 +159,7 @@ namespace PixelVaultNative
 
             host.TopSpacer.Height = topHeight;
             host.BottomSpacer.Height = Math.Max(0, totalHeight - topHeight - renderedHeight);
+            if (host.AfterVisibleRowsRebuilt != null) host.AfterVisibleRowsRebuilt();
         }
 
         int CalculateVirtualizedTileColumns(ScrollViewer scrollViewer, int tileWidth, double horizontalGap, double widthAllowance)

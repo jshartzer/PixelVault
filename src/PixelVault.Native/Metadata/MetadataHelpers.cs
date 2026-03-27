@@ -11,105 +11,17 @@ namespace PixelVaultNative
     {
         string[] BuildExifArgs(string file, DateTime dt, string[] platformTags, bool preserveFileTimes, string comment, bool addPhotographyTag)
         {
-            return BuildExifArgs(file, dt, platformTags, null, preserveFileTimes, comment, addPhotographyTag, true, true, true);
+            return metadataService.BuildExifArgs(file, dt, platformTags, preserveFileTimes, comment, addPhotographyTag);
         }
 
         string[] BuildExifArgs(string file, DateTime dt, string[] platformTags, IEnumerable<string> extraTags, bool preserveFileTimes, string comment, bool addPhotographyTag)
         {
-            return BuildExifArgs(file, dt, platformTags, extraTags, preserveFileTimes, comment, addPhotographyTag, true, true, true);
+            return metadataService.BuildExifArgs(file, dt, platformTags, extraTags, preserveFileTimes, comment, addPhotographyTag);
         }
 
         string[] BuildExifArgs(string file, DateTime dt, string[] platformTags, IEnumerable<string> extraTags, bool preserveFileTimes, string comment, bool addPhotographyTag, bool writeDateMetadata, bool writeCommentMetadata, bool writeTagMetadata)
         {
-            var ext = Path.GetExtension(file).ToLowerInvariant();
-            var targetPath = IsVideo(file) ? MetadataSidecarPath(file) : file;
-            var args = new List<string>();
-            var png = dt.ToString("yyyy:MM:dd HH:mm:ss");
-            var std = dt.ToString("yyyyMMdd HH:mm:ss");
-            if (writeDateMetadata)
-            {
-                if (IsVideo(file))
-                {
-                    args.Add("-XMP:DateTimeOriginal=" + std);
-                    args.Add("-XMP:CreateDate=" + std);
-                    args.Add("-XMP:ModifyDate=" + std);
-                    args.Add("-XMP:MetadataDate=" + std);
-                }
-                else if (ext == ".png")
-                {
-                    args.Add("-PNG:CreationTime=" + png);
-                    args.Add("-PNG:ModifyDate=" + png);
-                    args.Add("-XMP:DateTimeOriginal=" + std);
-                    args.Add("-XMP:CreateDate=" + std);
-                    args.Add("-XMP:ModifyDate=" + std);
-                    args.Add("-XMP:MetadataDate=" + std);
-                }
-                else
-                {
-                    args.Add("-EXIF:DateTimeOriginal=" + std);
-                    args.Add("-EXIF:CreateDate=" + std);
-                    args.Add("-EXIF:ModifyDate=" + std);
-                    args.Add("-XMP:DateTimeOriginal=" + std);
-                    args.Add("-XMP:CreateDate=" + std);
-                    args.Add("-XMP:ModifyDate=" + std);
-                    args.Add("-XMP:MetadataDate=" + std);
-                }
-                if (!preserveFileTimes && !IsVideo(file))
-                {
-                    args.Add("-File:FileCreateDate=" + std);
-                    args.Add("-File:FileModifyDate=" + std);
-                }
-            }
-            var cleanedComment = CleanComment(comment);
-            if (writeCommentMetadata)
-            {
-                if (!string.IsNullOrWhiteSpace(cleanedComment))
-                {
-                    args.Add("-XMP-dc:Description-x-default=" + cleanedComment);
-                    args.Add("-XMP-dc:Description=" + cleanedComment);
-                    args.Add("-XMP-exif:UserComment=" + cleanedComment);
-                    if (!IsVideo(file))
-                    {
-                        args.Add("-EXIF:ImageDescription=" + cleanedComment);
-                        args.Add("-EXIF:UserComment=" + cleanedComment);
-                        args.Add("-IPTC:Caption-Abstract=" + cleanedComment);
-                        if (ext == ".png") args.Add("-PNG:Comment=" + cleanedComment);
-                    }
-                }
-                else
-                {
-                    args.Add("-XMP-dc:Description-x-default=");
-                    args.Add("-XMP-dc:Description=");
-                    args.Add("-XMP-exif:UserComment=");
-                    if (!IsVideo(file))
-                    {
-                        args.Add("-EXIF:ImageDescription=");
-                        args.Add("-EXIF:UserComment=");
-                        args.Add("-IPTC:Caption-Abstract=");
-                        if (ext == ".png") args.Add("-PNG:Comment=");
-                    }
-                }
-            }
-            if (writeTagMetadata)
-            {
-                var tags = BuildMetadataTagSet(platformTags, extraTags, addPhotographyTag);
-                var serializedTags = string.Join("||", tags);
-                args.Add("-sep");
-                args.Add("||");
-                args.Add("-XMP:Subject=" + serializedTags);
-                args.Add("-XMP-dc:Subject=" + serializedTags);
-                args.Add("-XMP:TagsList=" + serializedTags);
-                args.Add("-XMP-digiKam:TagsList=" + serializedTags);
-                args.Add("-XMP-lr:HierarchicalSubject=" + serializedTags);
-                if (!IsVideo(file))
-                {
-                    args.Add("-IPTC:Keywords=" + serializedTags);
-                    args.Add("-Keywords=" + serializedTags);
-                }
-            }
-            args.Add("-overwrite_original");
-            args.Add(targetPath);
-            return args.ToArray();
+            return metadataService.BuildExifArgs(file, dt, platformTags, extraTags, preserveFileTimes, comment, addPhotographyTag, writeDateMetadata, writeCommentMetadata, writeTagMetadata);
         }
 
         bool ShouldIncludeGameCaptureKeywords()
@@ -150,45 +62,12 @@ namespace PixelVaultNative
 
         string[] ReadEmbeddedKeywordTagsDirect(string file)
         {
-            if (string.IsNullOrWhiteSpace(file) || !File.Exists(file)) return new string[0];
-            if (string.IsNullOrWhiteSpace(exifToolPath) || !File.Exists(exifToolPath)) return new string[0];
-            var readTarget = MetadataReadPath(file);
-            if (string.IsNullOrWhiteSpace(readTarget) || !File.Exists(readTarget)) return new string[0];
-            var output = RunExeCapture(exifToolPath, new[] { "-s3", "-XMP-digiKam:TagsList", "-XMP-lr:HierarchicalSubject", "-XMP-dc:Subject", "-XMP:Subject", "-XMP:TagsList", "-IPTC:Keywords", readTarget }, Path.GetDirectoryName(exifToolPath), false);
-            return output
-                .Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries)
-                .SelectMany(ParseTagText)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToArray();
+            return metadataService.ReadEmbeddedKeywordTagsDirect(file);
         }
 
         string ReadEmbeddedCommentDirect(string file)
         {
-            if (string.IsNullOrWhiteSpace(file) || !File.Exists(file)) return string.Empty;
-            if (string.IsNullOrWhiteSpace(exifToolPath) || !File.Exists(exifToolPath)) return string.Empty;
-            var readTarget = MetadataReadPath(file);
-            if (string.IsNullOrWhiteSpace(readTarget) || !File.Exists(readTarget)) return string.Empty;
-            var output = RunExeCapture(
-                exifToolPath,
-                new[]
-                {
-                    "-s3",
-                    "-XMP-dc:Description-x-default",
-                    "-XMP-dc:Description",
-                    "-XMP-exif:UserComment",
-                    "-EXIF:ImageDescription",
-                    "-EXIF:UserComment",
-                    "-IPTC:Caption-Abstract",
-                    "-PNG:Comment",
-                    readTarget
-                },
-                Path.GetDirectoryName(exifToolPath),
-                false);
-            return output
-                .Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries)
-                .Select(CleanComment)
-                .FirstOrDefault(line => !string.IsNullOrWhiteSpace(line))
-                ?? string.Empty;
+            return metadataService.ReadEmbeddedCommentDirect(file);
         }
 
         static DateTime? ParseEmbeddedMetadataDateValue(string value)
@@ -221,31 +100,7 @@ namespace PixelVaultNative
 
         DateTime? ReadEmbeddedCaptureDateDirect(string file)
         {
-            if (string.IsNullOrWhiteSpace(file) || !File.Exists(file)) return null;
-            if (string.IsNullOrWhiteSpace(exifToolPath) || !File.Exists(exifToolPath)) return null;
-            var readTarget = MetadataReadPath(file);
-            if (string.IsNullOrWhiteSpace(readTarget) || !File.Exists(readTarget)) return null;
-            var output = RunExeCapture(
-                exifToolPath,
-                new[]
-                {
-                    "-s3",
-                    "-XMP:DateTimeOriginal",
-                    "-XMP:CreateDate",
-                    "-XMP:ModifyDate",
-                    "-EXIF:DateTimeOriginal",
-                    "-EXIF:CreateDate",
-                    "-EXIF:ModifyDate",
-                    "-QuickTime:CreateDate",
-                    "-QuickTime:ModifyDate",
-                    readTarget
-                },
-                Path.GetDirectoryName(exifToolPath),
-                false);
-            return output
-                .Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries)
-                .Select(ParseEmbeddedMetadataDateValue)
-                .FirstOrDefault(parsed => parsed.HasValue);
+            return metadataService.ReadEmbeddedCaptureDateDirect(file);
         }
 
         string NormalizeConsoleLabel(string label)

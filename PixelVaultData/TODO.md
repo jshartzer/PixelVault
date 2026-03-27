@@ -13,12 +13,19 @@ For longer-term sequencing and major priorities, use:
 
 - `C:\Codex\docs\ROADMAP.md`
 
+For the focused performance backlog, use:
+
+- `C:\Codex\docs\PERFORMANCE_TODO.md`
+
 ## Current Focus
 1. Build the Phase 1 safety net from the roadmap.
 - Add a small test project and cover the highest-value pure/storage logic first.
 
 2. Keep an eye on thread-blocking or long-operation rough edges as they come up.
 - Especially around cover fetches, refresh/rebuild flows, and any `TimeoutWebClient` usage.
+
+3. Pull performance-specific work from the dedicated backlog instead of mixing it into this general list.
+- Start with capture virtualization, cached sort keys, and debounced Library search.
 
 ## As I Think Of It
 - Remove the duplicated `refreshButton.IsEnabled = false;` line in the Library refresh block.

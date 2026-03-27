@@ -46,13 +46,9 @@ namespace PixelVaultNative
             if (!forceDiskReload && string.Equals(libraryMetadataIndexRoot, root, StringComparison.OrdinalIgnoreCase) && libraryMetadataIndex.Count > 0) return libraryMetadataIndex;
             libraryMetadataIndex.Clear();
             libraryMetadataIndexRoot = root;
-            var aliasMap = BuildSavedGameIdAliasMapFromFile(root);
-            using (var connection = OpenIndexDatabase(root))
+            foreach (var pair in indexPersistenceService.LoadLibraryMetadataIndexEntries(root))
             {
-                foreach (var pair in ReadLibraryMetadataIndexFromDatabase(root, connection, aliasMap))
-                {
-                    libraryMetadataIndex[pair.Key] = pair.Value;
-                }
+                libraryMetadataIndex[pair.Key] = pair.Value;
             }
             return libraryMetadataIndex;
         }
@@ -60,10 +56,7 @@ namespace PixelVaultNative
         void SaveLibraryMetadataIndex(string root, Dictionary<string, LibraryMetadataIndexEntry> index)
         {
             var savedEntries = index.Values.Where(v => v != null && !string.IsNullOrWhiteSpace(v.FilePath) && File.Exists(v.FilePath)).OrderBy(v => v.FilePath, StringComparer.OrdinalIgnoreCase).ToList();
-            using (var connection = OpenIndexDatabase(root))
-            {
-                WriteLibraryMetadataIndexToDatabase(root, savedEntries.ToDictionary(entry => entry.FilePath, entry => entry, StringComparer.OrdinalIgnoreCase), connection);
-            }
+            indexPersistenceService.SaveLibraryMetadataIndexEntries(root, savedEntries.ToDictionary(entry => entry.FilePath, entry => entry, StringComparer.OrdinalIgnoreCase));
             libraryMetadataIndex.Clear();
             libraryMetadataIndexRoot = root;
             foreach (var entry in savedEntries)

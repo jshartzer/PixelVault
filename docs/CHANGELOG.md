@@ -1,3 +1,8 @@
+## 0.781
+- Continued the performance/maintainability pass by extracting cover, metadata, and index-persistence work into dedicated services, so the UI and indexing flows no longer own the full SteamGridDB/ExifTool/database implementation details directly.
+- Moved import/manual-intake metadata work, intake preview refresh, and Game Index external-ID resolution further away from the UI thread with progress-backed background execution and added more targeted performance logging around slow network and preview-build paths.
+- Finished the first round of Library scalability improvements by virtualizing the capture pane, caching `Recently Added` sort keys, debouncing Library search, and adding instrumentation for folder-cache, folder-render, and selected-folder render timings.
+
 ## 0.780
 - Added a new Library upload-queue review button beside `Fetch Covers`, with an unread-style badge that shows how many top-level intake items are waiting in the upload folder.
 - Reworked the intake preview from the old plain text report into a dedicated window with grouped console sections, summary cards, manual-intake visibility, and source-folder notes so queue review is easier to scan before import.
