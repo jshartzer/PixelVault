@@ -186,50 +186,20 @@ namespace PixelVaultNative
             var image = new Image { Width = size, Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Center, Visibility = Visibility.Collapsed };
             MediaElement videoPreviewMedia = null;
             TextBlock videoPreviewStatus = null;
-            Border videoPreviewHint = null;
             Border videoDurationBadge = null;
-            Border videoInfoBadge = null;
             TextBlock videoDurationText = null;
-            TextBlock videoInfoText = null;
             DispatcherTimer videoPreviewStopTimer = null;
             bool videoPreviewReady = false;
             bool videoPreviewHovered = false;
             bool videoPreviewOpeningStarted = false;
             Action<VideoClipInfo> applyVideoInfo = delegate(VideoClipInfo info)
             {
-                var fileName = System.IO.Path.GetFileName(file);
-                if (!isVideoFile)
-                {
-                    tile.ToolTip = fileName + Environment.NewLine + GetLibraryDate(file).ToString("yyyy-MM-dd h:mm:ss tt");
-                    return;
-                }
-
                 if (videoDurationBadge != null && videoDurationText != null)
                 {
                     var durationLabel = info == null ? string.Empty : FormatVideoDuration(info.DurationSeconds);
                     videoDurationText.Text = durationLabel;
                     videoDurationBadge.Visibility = string.IsNullOrWhiteSpace(durationLabel) ? Visibility.Collapsed : Visibility.Visible;
                 }
-
-                if (videoInfoBadge != null && videoInfoText != null)
-                {
-                    var detailParts = new List<string>();
-                    if (info != null && info.Width > 0 && info.Height > 0) detailParts.Add(info.Width + "x" + info.Height);
-                    if (info != null && info.FrameRate > 0) detailParts.Add(FormatVideoFrameRate(info.FrameRate));
-                    if (info != null && info.HasAudio) detailParts.Add("Audio");
-                    videoInfoText.Text = string.Join(" | ", detailParts);
-                    videoInfoBadge.Visibility = string.IsNullOrWhiteSpace(videoInfoText.Text) ? Visibility.Collapsed : Visibility.Visible;
-                }
-
-                var toolTipParts = new List<string>
-                {
-                    fileName,
-                    GetLibraryDate(file).ToString("yyyy-MM-dd h:mm:ss tt")
-                };
-                var summary = FormatVideoClipInfoSummary(info);
-                if (!string.IsNullOrWhiteSpace(summary)) toolTipParts.Add("Clip: " + summary);
-                if (info != null && !string.IsNullOrWhiteSpace(info.VideoCodec)) toolTipParts.Add("Codec: " + info.VideoCodec);
-                tile.ToolTip = string.Join(Environment.NewLine, toolTipParts.Where(part => !string.IsNullOrWhiteSpace(part)).ToArray());
             };
             presenter.Children.Add(placeholder);
             presenter.Children.Add(image);
@@ -298,41 +268,6 @@ namespace PixelVaultNative
                     Child = videoDurationText
                 };
                 presenter.Children.Add(videoDurationBadge);
-                videoInfoText = new TextBlock
-                {
-                    Foreground = Brush("#DCE8EF"),
-                    FontSize = 10,
-                    FontWeight = FontWeights.SemiBold
-                };
-                videoInfoBadge = new Border
-                {
-                    HorizontalAlignment = HorizontalAlignment.Right,
-                    VerticalAlignment = VerticalAlignment.Bottom,
-                    Margin = new Thickness(0, 0, 8, 8),
-                    Background = Brush("#A6141C21"),
-                    CornerRadius = new CornerRadius(8),
-                    Padding = new Thickness(8, 4, 8, 4),
-                    Visibility = Visibility.Collapsed,
-                    Child = videoInfoText
-                };
-                presenter.Children.Add(videoInfoBadge);
-                videoPreviewHint = new Border
-                {
-                    HorizontalAlignment = HorizontalAlignment.Right,
-                    VerticalAlignment = VerticalAlignment.Bottom,
-                    Margin = new Thickness(0, 0, 8, 38),
-                    Background = Brush("#9C0F151A"),
-                    CornerRadius = new CornerRadius(8),
-                    Padding = new Thickness(8, 4, 8, 4),
-                    Child = new TextBlock
-                    {
-                        Text = "Hover to preview",
-                        Foreground = Brush("#DCE8EF"),
-                        FontSize = 10.5,
-                        FontWeight = FontWeights.SemiBold
-                    }
-                };
-                presenter.Children.Add(videoPreviewHint);
                 videoPreviewStopTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(10) };
                 applyVideoInfo(TryLoadCachedVideoClipInfo(file));
                 WarmVideoClipInfo(file, delegate(VideoClipInfo info)
@@ -355,10 +290,7 @@ namespace PixelVaultNative
                     videoPreviewOpeningStarted = false;
                 }
             }
-            else
-            {
-                applyVideoInfo(null);
-            }
+            else applyVideoInfo(null);
             tile.Child = presenter;
             QueueImageLoad(image, file, size * 2, delegate(BitmapImage loaded)
             {
@@ -395,7 +327,6 @@ namespace PixelVaultNative
                 if (videoPreviewMedia == null || videoPreviewStatus == null) return;
                 videoPreviewHovered = true;
                 videoPreviewStopTimer.Stop();
-                videoPreviewHint.Visibility = Visibility.Collapsed;
                 if (videoPreviewReady)
                 {
                     videoPreviewStatus.Visibility = Visibility.Collapsed;
@@ -408,7 +339,6 @@ namespace PixelVaultNative
                     catch
                     {
                         videoPreviewMedia.Visibility = Visibility.Collapsed;
-                        videoPreviewHint.Visibility = Visibility.Visible;
                     }
                 }
                 else
@@ -425,7 +355,6 @@ namespace PixelVaultNative
                         catch
                         {
                             videoPreviewStatus.Visibility = Visibility.Collapsed;
-                            videoPreviewHint.Visibility = Visibility.Visible;
                         }
                     }
                 }
@@ -438,7 +367,6 @@ namespace PixelVaultNative
                 videoPreviewStopTimer.Stop();
                 videoPreviewStatus.Visibility = Visibility.Collapsed;
                 videoPreviewMedia.Visibility = Visibility.Collapsed;
-                videoPreviewHint.Visibility = Visibility.Visible;
                 try
                 {
                     videoPreviewMedia.Pause();
@@ -448,7 +376,7 @@ namespace PixelVaultNative
                 {
                 }
             };
-            if (videoPreviewMedia != null && videoPreviewStatus != null && videoPreviewHint != null && videoPreviewStopTimer != null)
+            if (videoPreviewMedia != null && videoPreviewStatus != null && videoPreviewStopTimer != null)
             {
                 videoPreviewStopTimer.Tick += delegate
                 {
@@ -456,7 +384,6 @@ namespace PixelVaultNative
                     videoPreviewHovered = false;
                     videoPreviewStatus.Visibility = Visibility.Collapsed;
                     videoPreviewMedia.Visibility = Visibility.Collapsed;
-                    videoPreviewHint.Visibility = Visibility.Visible;
                     try
                     {
                         videoPreviewMedia.Pause();
@@ -482,7 +409,6 @@ namespace PixelVaultNative
                     {
                         videoPreviewStatus.Visibility = Visibility.Collapsed;
                         videoPreviewMedia.Visibility = Visibility.Visible;
-                        videoPreviewHint.Visibility = Visibility.Collapsed;
                         videoPreviewStopTimer.Stop();
                         videoPreviewStopTimer.Start();
                         try
@@ -493,14 +419,12 @@ namespace PixelVaultNative
                         {
                             videoPreviewStatus.Visibility = Visibility.Collapsed;
                             videoPreviewMedia.Visibility = Visibility.Collapsed;
-                            videoPreviewHint.Visibility = Visibility.Visible;
                         }
                     }
                     else
                     {
                         videoPreviewStatus.Visibility = Visibility.Collapsed;
                         videoPreviewMedia.Visibility = Visibility.Hidden;
-                        videoPreviewHint.Visibility = Visibility.Visible;
                     }
                 };
                 videoPreviewMedia.MediaEnded += delegate
@@ -515,7 +439,6 @@ namespace PixelVaultNative
                         videoPreviewStopTimer.Stop();
                         videoPreviewStatus.Visibility = Visibility.Collapsed;
                         videoPreviewMedia.Visibility = Visibility.Hidden;
-                        videoPreviewHint.Visibility = Visibility.Visible;
                     }
                 };
                 videoPreviewMedia.MediaFailed += delegate
@@ -526,7 +449,6 @@ namespace PixelVaultNative
                     videoPreviewStopTimer.Stop();
                     videoPreviewStatus.Visibility = Visibility.Collapsed;
                     videoPreviewMedia.Visibility = Visibility.Hidden;
-                    videoPreviewHint.Visibility = Visibility.Visible;
                     try
                     {
                         videoPreviewMedia.Stop();

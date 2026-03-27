@@ -99,6 +99,20 @@ namespace PixelVaultNative
         public List<string> RenameScopeFiles = new List<string>();
     }
 
+    sealed class IntakePreviewSummary
+    {
+        public List<string> SourceRoots = new List<string>();
+        public int RenameScopeCount;
+        public int RenameCandidateCount;
+        public int TopLevelMediaCount;
+        public int MetadataCandidateCount;
+        public int MoveCandidateCount;
+        public int ManualItemCount;
+        public int ConflictCount;
+        public List<ReviewItem> ReviewItems = new List<ReviewItem>();
+        public List<ManualMetadataItem> ManualItems = new List<ManualMetadataItem>();
+    }
+
     sealed class ExifWriteRequest
     {
         public string FilePath;

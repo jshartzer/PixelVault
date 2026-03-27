@@ -39,7 +39,7 @@ namespace PixelVaultNative
 
     public sealed partial class MainWindow : Window
     {
-        const string AppVersion = "0.779";
+        const string AppVersion = "0.780";
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
         const string ClearedExternalIdSentinel = "__PV_CLEARED__";
@@ -224,7 +224,7 @@ namespace PixelVaultNative
             leftStack.Children.Add(new TextBlock { Text = "Utility actions", FontSize = 14, FontWeight = FontWeights.SemiBold, Foreground = Brush("#1F2A30"), Margin = new Thickness(0, 0, 0, 6) });
             leftStack.Children.Add(new TextBlock { Text = "Preview the next run and jump directly to the intake or destination folders when you need them.", Foreground = Brush("#5F6970"), Margin = new Thickness(0, 0, 0, 10), TextWrapping = TextWrapping.Wrap });
             var openRow = new WrapPanel { Margin = new Thickness(0, 0, 0, 10), ItemHeight = 48 };
-            openRow.Children.Add(Btn("Preview Intake", delegate { RefreshPreview(); }, "#DCEEFF", Brush("#174A73")));
+            openRow.Children.Add(Btn("Preview Intake", delegate { ShowIntakePreviewWindow(recurseBox != null && recurseBox.IsChecked == true); }, "#DCEEFF", Brush("#174A73")));
             openRow.Children.Add(Btn("Open Sources", delegate { OpenSourceFolders(); }, "#EEF2F5", Brush("#33424D")));
             openRow.Children.Add(Btn("Open Destination", delegate { OpenFolder(destinationRoot); }, "#EEF2F5", Brush("#33424D")));
             leftStack.Children.Add(openRow);
@@ -273,6 +273,63 @@ namespace PixelVaultNative
         Border Card() { return new Border { Background = Brushes.White, BorderBrush = Brush("#D7E1E8"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(18), Padding = new Thickness(18), Effect = new DropShadowEffect { Color = Color.FromArgb(20, 17, 27, 35), BlurRadius = 18, ShadowDepth = 2, Direction = 270, Opacity = 0.4 } }; }
         TextBlock TitleBlock(string t) { return new TextBlock { Text = t, FontSize = 19, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 14), Foreground = Brush("#1F2A30") }; }
         SolidColorBrush Brush(string hex) { return new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex)); }
+        FrameworkElement BuildGamepadGlyph(Brush stroke, double strokeThickness, double width, double height)
+        {
+            var art = new Canvas { Width = 108, Height = 48 };
+            art.Children.Add(new System.Windows.Shapes.Path
+            {
+                Data = Geometry.Parse("M 12 42 C 8 42 5 39 4 33 C 1 23 6 15 12 10 C 17 6 25 4 34 4 L 41 4 C 42 4 43 5 44 6 C 45 7 46 8 48 8 L 60 8 C 62 8 63 7 64 6 C 65 5 66 4 67 4 L 74 4 C 83 4 91 6 96 10 C 102 15 107 23 104 33 C 103 39 100 42 96 42 C 90 42 84 39 78 32 L 69 22 C 66 19 64 18 60 18 L 48 18 C 44 18 42 19 39 22 L 30 32 C 24 39 18 42 12 42 Z"),
+                Stroke = stroke,
+                StrokeThickness = strokeThickness,
+                Fill = Brushes.Transparent,
+                StrokeLineJoin = PenLineJoin.Round,
+                StrokeStartLineCap = PenLineCap.Round,
+                StrokeEndLineCap = PenLineCap.Round
+            });
+            art.Children.Add(new System.Windows.Shapes.Path
+            {
+                Data = Geometry.Parse("M 28 40 L 40 28 C 44 24 47 22 52 22 L 56 22 C 61 22 64 24 68 28 L 80 40"),
+                Stroke = stroke,
+                StrokeThickness = strokeThickness,
+                Fill = Brushes.Transparent,
+                StrokeLineJoin = PenLineJoin.Round,
+                StrokeStartLineCap = PenLineCap.Round,
+                StrokeEndLineCap = PenLineCap.Round
+            });
+            return new Viewbox
+            {
+                Width = width,
+                Height = height,
+                Stretch = Stretch.Uniform,
+                Child = art
+            };
+        }
+        string IntakeBadgeCountText(int count)
+        {
+            if (count <= 0) return string.Empty;
+            if (count > 99) return "99+";
+            return count.ToString();
+        }
+        Border BuildIntakeMetricCard(string label, string value, string detail, string backgroundHex, string borderHex, string valueHex)
+        {
+            var stack = new StackPanel();
+            stack.Children.Add(new TextBlock { Text = label, Foreground = Brush("#A7B5BD"), FontSize = 12, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 8) });
+            stack.Children.Add(new TextBlock { Text = value, Foreground = Brush(valueHex), FontSize = 28, FontWeight = FontWeights.SemiBold });
+            if (!string.IsNullOrWhiteSpace(detail))
+            {
+                stack.Children.Add(new TextBlock { Text = detail, Foreground = Brush("#C9D4DB"), FontSize = 12, Margin = new Thickness(0, 8, 0, 0), TextWrapping = TextWrapping.Wrap });
+            }
+            return new Border
+            {
+                Background = Brush(backgroundHex),
+                BorderBrush = Brush(borderHex),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(18),
+                Padding = new Thickness(18),
+                Margin = new Thickness(0, 0, 14, 0),
+                Child = stack
+            };
+        }
         double PreferredLibraryWindowWidth()
         {
             var available = Math.Max(1200, SystemParameters.WorkArea.Width - 24);
@@ -1294,25 +1351,44 @@ namespace PixelVaultNative
         {
             foreach (var root in GetSourceRoots()) OpenFolder(root);
         }
+        IntakePreviewSummary BuildIntakePreviewSummary(bool recurseRename)
+        {
+            EnsureSourceFolders();
+            var inventory = BuildSourceInventory(recurseRename);
+            var rename = inventory.RenameScopeFiles;
+            var move = inventory.TopLevelMediaFiles;
+            var reviewItems = BuildReviewItems(move);
+            var recognizedPaths = new HashSet<string>(reviewItems.Select(i => i.FilePath), StringComparer.OrdinalIgnoreCase);
+            var manualItems = BuildManualMetadataItems(move, recognizedPaths);
+            var manualPaths = new HashSet<string>(manualItems.Select(i => i.FilePath), StringComparer.OrdinalIgnoreCase);
+            var moveCandidates = move.Where(f => !manualPaths.Contains(f)).ToList();
+            return new IntakePreviewSummary
+            {
+                SourceRoots = GetSourceRoots(),
+                RenameScopeCount = rename.Count,
+                RenameCandidateCount = rename.Count(f => !string.IsNullOrWhiteSpace(GuessSteamAppIdFromFileName(f))),
+                TopLevelMediaCount = move.Count,
+                MetadataCandidateCount = reviewItems.Count,
+                MoveCandidateCount = moveCandidates.Count,
+                ManualItemCount = manualItems.Count,
+                ConflictCount = Directory.Exists(destinationRoot) ? moveCandidates.Count(f => File.Exists(Path.Combine(destinationRoot, Path.GetFileName(f)))) : 0,
+                ReviewItems = reviewItems,
+                ManualItems = manualItems
+            };
+        }
+        void LogPreviewSummary(IntakePreviewSummary summary)
+        {
+            if (summary == null) return;
+            Log("Preview refreshed. Sources=" + (summary.SourceRoots.Count == 0 ? "(none)" : string.Join(" | ", summary.SourceRoots.ToArray())) + "; RenameCandidates=" + summary.RenameCandidateCount + "; MetadataCandidates=" + summary.MetadataCandidateCount + "; MoveCandidates=" + summary.MoveCandidateCount + "; ManualCandidates=" + summary.ManualItemCount + ".");
+        }
         void RefreshPreview()
         {
             try
             {
-                EnsureSourceFolders();
-                var inventory = BuildSourceInventory(recurseBox != null && recurseBox.IsChecked == true);
-                var rename = inventory.RenameScopeFiles;
-                var move = inventory.TopLevelMediaFiles;
-                var reviewItems = BuildReviewItems(move);
-                var recognizedPaths = new HashSet<string>(reviewItems.Select(i => i.FilePath), StringComparer.OrdinalIgnoreCase);
-                var manualItems = BuildManualMetadataItems(move, recognizedPaths);
-                var manualPaths = new HashSet<string>(manualItems.Select(i => i.FilePath), StringComparer.OrdinalIgnoreCase);
-                var moveCandidates = move.Where(f => !manualPaths.Contains(f)).ToList();
-                int renameCandidates = rename.Count(f => !string.IsNullOrWhiteSpace(GuessSteamAppIdFromFileName(f)));
-                int metaCandidates = reviewItems.Count;
-                int conflicts = Directory.Exists(destinationRoot) ? moveCandidates.Count(f => File.Exists(Path.Combine(destinationRoot, Path.GetFileName(f)))) : 0;
-                RenderPreview(rename.Count, renameCandidates, move.Count, metaCandidates, moveCandidates, manualItems, conflicts);
+                var summary = BuildIntakePreviewSummary(recurseBox != null && recurseBox.IsChecked == true);
+                RenderPreview(summary);
                 status.Text = "Preview ready";
-                Log("Preview refreshed. Sources=" + SourceRootsSummary() + "; RenameCandidates=" + renameCandidates + "; MetadataCandidates=" + metaCandidates + "; MoveCandidates=" + moveCandidates.Count + "; ManualCandidates=" + manualItems.Count + ".");
+                LogPreviewSummary(summary);
             }
             catch (Exception ex)
             {
@@ -1322,37 +1398,340 @@ namespace PixelVaultNative
             }
         }
 
-        void RenderPreview(int renameTotal, int renameCandidates, int metaTotal, int metaCandidates, List<string> moveFiles, List<ManualMetadataItem> manualItems, int conflicts)
+        void ShowIntakePreviewWindow(bool recurseRename)
+        {
+            Window previewWindow = null;
+            TextBlock headerMeta = null;
+            Grid statsGrid = null;
+            StackPanel autoReadyPanel = null;
+            StackPanel sidePanel = null;
+            Button manualButton = null;
+            Action renderWindow = null;
+            try
+            {
+                previewWindow = new Window
+                {
+                    Title = "PixelVault " + AppVersion + " Intake Preview",
+                    Width = 1400,
+                    Height = 920,
+                    MinWidth = 1160,
+                    MinHeight = 760,
+                    Owner = this,
+                    WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                    Background = Brush("#081015")
+                };
+
+                var root = new Grid { Margin = new Thickness(20) };
+                root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+
+                var header = new Border
+                {
+                    Background = new LinearGradientBrush((Color)ColorConverter.ConvertFromString("#16222A"), (Color)ColorConverter.ConvertFromString("#0D161D"), new Point(0, 0), new Point(1, 1)),
+                    BorderBrush = Brush("#2D3E48"),
+                    BorderThickness = new Thickness(1),
+                    CornerRadius = new CornerRadius(24),
+                    Padding = new Thickness(24),
+                    Effect = new DropShadowEffect { Color = Color.FromArgb(48, 5, 10, 14), BlurRadius = 22, ShadowDepth = 6, Direction = 270, Opacity = 0.55 }
+                };
+                var headerGrid = new Grid();
+                headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                var iconShell = new Border
+                {
+                    Width = 74,
+                    Height = 74,
+                    Background = Brush("#0E171C"),
+                    BorderBrush = Brush("#344851"),
+                    BorderThickness = new Thickness(1),
+                    CornerRadius = new CornerRadius(22),
+                    Padding = new Thickness(14),
+                    Margin = new Thickness(0, 0, 18, 0),
+                    Child = BuildGamepadGlyph(Brush("#F5F7FA"), 2.2, 42, 28)
+                };
+                headerGrid.Children.Add(iconShell);
+                var headerStack = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+                headerStack.Children.Add(new TextBlock { Text = "Upload queue preview", FontSize = 30, FontWeight = FontWeights.SemiBold, Foreground = Brush("#F5EFE4") });
+                headerMeta = new TextBlock { Foreground = Brush("#AAB9C2"), FontSize = 14, Margin = new Thickness(0, 8, 0, 0), TextWrapping = TextWrapping.Wrap };
+                headerStack.Children.Add(headerMeta);
+                Grid.SetColumn(headerStack, 1);
+                headerGrid.Children.Add(headerStack);
+                var actionRow = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+                var openSourcesButton = Btn("Open Uploads", null, "#20343A", Brushes.White);
+                openSourcesButton.Width = 152;
+                openSourcesButton.Height = 42;
+                openSourcesButton.Margin = new Thickness(12, 0, 0, 0);
+                openSourcesButton.Click += delegate { OpenSourceFolders(); };
+                var refreshButton = Btn("Refresh", null, "#275D47", Brushes.White);
+                refreshButton.Width = 128;
+                refreshButton.Height = 42;
+                refreshButton.Margin = new Thickness(12, 0, 0, 0);
+                manualButton = Btn("Manual Intake", null, "#7C5A34", Brushes.White);
+                manualButton.Width = 154;
+                manualButton.Height = 42;
+                manualButton.Margin = new Thickness(12, 0, 0, 0);
+                actionRow.Children.Add(openSourcesButton);
+                actionRow.Children.Add(refreshButton);
+                actionRow.Children.Add(manualButton);
+                Grid.SetColumn(actionRow, 2);
+                headerGrid.Children.Add(actionRow);
+                header.Child = headerGrid;
+                root.Children.Add(header);
+
+                statsGrid = new Grid { Margin = new Thickness(0, 16, 0, 16) };
+                for (int i = 0; i < 4; i++) statsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                Grid.SetRow(statsGrid, 1);
+                root.Children.Add(statsGrid);
+
+                var body = new Grid();
+                body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.45, GridUnitType.Star) });
+                body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                Grid.SetRow(body, 2);
+                root.Children.Add(body);
+
+                var autoReadyCard = new Border { Background = Brush("#10181D"), BorderBrush = Brush("#24333D"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(22), Padding = new Thickness(18), Margin = new Thickness(0, 0, 16, 0) };
+                var autoReadyGrid = new Grid();
+                autoReadyGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                autoReadyGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+                autoReadyGrid.Children.Add(new TextBlock { Text = "Ready by console", FontSize = 19, FontWeight = FontWeights.SemiBold, Foreground = Brush("#F5EFE4"), Margin = new Thickness(0, 0, 0, 12) });
+                var autoReadyScroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+                autoReadyPanel = new StackPanel();
+                autoReadyScroll.Content = autoReadyPanel;
+                Grid.SetRow(autoReadyScroll, 1);
+                autoReadyGrid.Children.Add(autoReadyScroll);
+                autoReadyCard.Child = autoReadyGrid;
+                body.Children.Add(autoReadyCard);
+
+                var sideScroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+                Grid.SetColumn(sideScroll, 1);
+                sidePanel = new StackPanel();
+                sideScroll.Content = sidePanel;
+                body.Children.Add(sideScroll);
+                previewWindow.Content = root;
+
+                renderWindow = delegate
+                {
+                    try
+                    {
+                        var summary = BuildIntakePreviewSummary(recurseRename);
+                        RenderPreview(summary);
+                        status.Text = "Preview ready";
+                        LogPreviewSummary(summary);
+
+                        headerMeta.Text = summary.TopLevelMediaCount == 0
+                            ? "No media files are waiting in the upload queue right now."
+                            : summary.TopLevelMediaCount + " item(s) are waiting across " + summary.SourceRoots.Count + " upload folder(s). Automatic matches stay grouped by console, and anything unmatched stays in Manual Intake.";
+
+                        statsGrid.Children.Clear();
+                        var statCards = new[]
+                        {
+                            BuildIntakeMetricCard("Queue", summary.TopLevelMediaCount.ToString(), "Top-level media items currently waiting.", "#111B21", "#263842", "#F5EFE4"),
+                            BuildIntakeMetricCard("Auto-ready", summary.MoveCandidateCount.ToString(), "Files that can move straight through metadata and import.", "#101923", "#244153", "#7DD3FC"),
+                            BuildIntakeMetricCard("Manual", summary.ManualItemCount.ToString(), "Items that still need console or game context.", "#201912", "#5A3E24", "#F6C47A"),
+                            BuildIntakeMetricCard("Conflicts", summary.ConflictCount.ToString(), "Destination filename collisions if moved right now.", "#1B1518", "#4A2A34", "#F88CA2")
+                        };
+                        for (int i = 0; i < statCards.Length; i++)
+                        {
+                            if (i == statCards.Length - 1) statCards[i].Margin = new Thickness(0);
+                            Grid.SetColumn(statCards[i], i);
+                            statsGrid.Children.Add(statCards[i]);
+                        }
+
+                        autoReadyPanel.Children.Clear();
+                        if (summary.ReviewItems.Count == 0)
+                        {
+                            autoReadyPanel.Children.Add(new Border
+                            {
+                                Background = Brush("#121E24"),
+                                BorderBrush = Brush("#243741"),
+                                BorderThickness = new Thickness(1),
+                                CornerRadius = new CornerRadius(18),
+                                Padding = new Thickness(20),
+                                Child = new TextBlock { Text = "No auto-ready captures are waiting. New uploads will show up here grouped by console.", Foreground = Brush("#A7B5BD"), TextWrapping = TextWrapping.Wrap }
+                            });
+                        }
+                        else
+                        {
+                            var groupedReviewItems = summary.ReviewItems.GroupBy(item => item.PlatformLabel).OrderBy(group => PlatformGroupOrder(group.Key)).ThenBy(group => group.Key);
+                            foreach (var group in groupedReviewItems)
+                            {
+                                var accent = PreviewBadgeBrush(group.Key);
+                                var section = new Border { Background = Brush("#121B21"), BorderBrush = accent, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(18), Padding = new Thickness(16), Margin = new Thickness(0, 0, 0, 14) };
+                                var sectionStack = new StackPanel();
+                                var sectionHeader = new DockPanel { Margin = new Thickness(0, 0, 0, 12) };
+                                sectionHeader.Children.Add(new TextBlock { Text = group.Key, Foreground = Brush("#F5EFE4"), FontSize = 17, FontWeight = FontWeights.SemiBold });
+                                var pill = new Border
+                                {
+                                    Background = accent,
+                                    CornerRadius = new CornerRadius(999),
+                                    Padding = new Thickness(10, 4, 10, 4),
+                                    HorizontalAlignment = HorizontalAlignment.Right,
+                                    Child = new TextBlock { Text = group.Count() + " ready", Foreground = Brush("#081015"), FontWeight = FontWeights.SemiBold, FontSize = 11 }
+                                };
+                                DockPanel.SetDock(pill, Dock.Right);
+                                sectionHeader.Children.Add(pill);
+                                sectionStack.Children.Add(sectionHeader);
+                                foreach (var item in group)
+                                {
+                                    var row = new Border { Background = Brush("#0D1419"), BorderBrush = Brush("#1C2B34"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(14), Padding = new Thickness(12, 10, 12, 10), Margin = new Thickness(0, 0, 0, 8) };
+                                    var rowGrid = new Grid();
+                                    rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                                    rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                                    var rowText = new StackPanel();
+                                    rowText.Children.Add(new TextBlock { Text = item.FileName, Foreground = Brush("#F4F7FA"), FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis });
+                                    rowText.Children.Add(new TextBlock { Text = "Captured " + FormatFriendlyTimestamp(item.CaptureTime), Foreground = Brush("#8FA1AD"), FontSize = 11, Margin = new Thickness(0, 4, 0, 0) });
+                                    rowGrid.Children.Add(rowText);
+                                    var typePill = new Border
+                                    {
+                                        Background = item.PreserveFileTimes ? Brush("#1C2E39") : Brush("#173127"),
+                                        BorderBrush = item.PreserveFileTimes ? Brush("#3E6C88") : Brush("#3B7F5C"),
+                                        BorderThickness = new Thickness(1),
+                                        CornerRadius = new CornerRadius(999),
+                                        Padding = new Thickness(10, 5, 10, 5),
+                                        Margin = new Thickness(12, 0, 0, 0),
+                                        Child = new TextBlock { Text = item.PreserveFileTimes ? "Preserve file time" : "Auto metadata", Foreground = Brush("#E6EEF5"), FontSize = 11, FontWeight = FontWeights.SemiBold }
+                                    };
+                                    Grid.SetColumn(typePill, 1);
+                                    rowGrid.Children.Add(typePill);
+                                    row.Child = rowGrid;
+                                    sectionStack.Children.Add(row);
+                                }
+                                section.Child = sectionStack;
+                                autoReadyPanel.Children.Add(section);
+                            }
+                        }
+
+                        sidePanel.Children.Clear();
+                        var manualCard = new Border { Background = Brush("#1A1511"), BorderBrush = Brush("#5F4527"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(22), Padding = new Thickness(18), Margin = new Thickness(0, 0, 0, 14) };
+                        var manualStack = new StackPanel();
+                        manualStack.Children.Add(new TextBlock { Text = "Manual Intake", FontSize = 19, FontWeight = FontWeights.SemiBold, Foreground = Brush("#F8E7CF") });
+                        manualStack.Children.Add(new TextBlock { Text = summary.ManualItemCount == 0 ? "Nothing is blocked in manual review right now." : summary.ManualItemCount + " item(s) need a game or platform decision before import.", Foreground = Brush("#D8C2A0"), Margin = new Thickness(0, 8, 0, 12), TextWrapping = TextWrapping.Wrap });
+                        if (summary.ManualItems.Count == 0)
+                        {
+                            manualStack.Children.Add(new Border
+                            {
+                                Background = Brush("#120F0C"),
+                                BorderBrush = Brush("#4A3821"),
+                                BorderThickness = new Thickness(1),
+                                CornerRadius = new CornerRadius(16),
+                                Padding = new Thickness(14),
+                                Child = new TextBlock { Text = "Unmatched uploads will land here when PixelVault cannot confidently place them.", Foreground = Brush("#BFA98A"), TextWrapping = TextWrapping.Wrap }
+                            });
+                        }
+                        else
+                        {
+                            foreach (var item in summary.ManualItems)
+                            {
+                                var row = new Border { Background = Brush("#120F0C"), BorderBrush = Brush("#4A3821"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(14), Padding = new Thickness(12, 10, 12, 10), Margin = new Thickness(0, 0, 0, 8) };
+                                var rowStack = new StackPanel();
+                                rowStack.Children.Add(new TextBlock { Text = item.FileName, Foreground = Brush("#FFF1DE"), FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis });
+                                rowStack.Children.Add(new TextBlock { Text = "Best guess: " + FilenameGuessLabel(item.FileName), Foreground = Brush("#D1B385"), FontSize = 11, Margin = new Thickness(0, 4, 0, 0) });
+                                rowStack.Children.Add(new TextBlock { Text = "Captured " + FormatFriendlyTimestamp(item.CaptureTime), Foreground = Brush("#B59E81"), FontSize = 11, Margin = new Thickness(0, 2, 0, 0) });
+                                row.Child = rowStack;
+                                manualStack.Children.Add(row);
+                            }
+                        }
+                        manualCard.Child = manualStack;
+                        sidePanel.Children.Add(manualCard);
+
+                        var notesCard = new Border { Background = Brush("#11181D"), BorderBrush = Brush("#243742"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(22), Padding = new Thickness(18), Margin = new Thickness(0, 0, 0, 14) };
+                        var notesStack = new StackPanel();
+                        notesStack.Children.Add(new TextBlock { Text = "Pipeline notes", FontSize = 19, FontWeight = FontWeights.SemiBold, Foreground = Brush("#F5EFE4") });
+                        notesStack.Children.Add(new TextBlock { Text = "Rename scope: " + summary.RenameCandidateCount + " confident rename candidate(s) across " + summary.RenameScopeCount + " file(s) checked.", Foreground = Brush("#A7B5BD"), Margin = new Thickness(0, 10, 0, 0), TextWrapping = TextWrapping.Wrap });
+                        notesStack.Children.Add(new TextBlock { Text = "Metadata-ready: " + summary.MetadataCandidateCount + " file(s) can carry tags and comments automatically.", Foreground = Brush("#A7B5BD"), Margin = new Thickness(0, 8, 0, 0), TextWrapping = TextWrapping.Wrap });
+                        notesStack.Children.Add(new TextBlock
+                        {
+                            Text = summary.ConflictCount == 0 ? "Move conflicts: none detected in the destination library." : "Move conflicts: " + summary.ConflictCount + " filename collision(s) need the current conflict rule.",
+                            Foreground = summary.ConflictCount == 0 ? Brush("#98C7A2") : Brush("#F3A9B8"),
+                            Margin = new Thickness(0, 8, 0, 0),
+                            TextWrapping = TextWrapping.Wrap
+                        });
+                        notesCard.Child = notesStack;
+                        sidePanel.Children.Add(notesCard);
+
+                        var sourcesCard = new Border { Background = Brush("#10181D"), BorderBrush = Brush("#243742"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(22), Padding = new Thickness(18) };
+                        var sourcesStack = new StackPanel();
+                        sourcesStack.Children.Add(new TextBlock { Text = "Upload folders", FontSize = 19, FontWeight = FontWeights.SemiBold, Foreground = Brush("#F5EFE4") });
+                        foreach (var rootPath in summary.SourceRoots)
+                        {
+                            sourcesStack.Children.Add(new Border
+                            {
+                                Background = Brush("#0C1317"),
+                                BorderBrush = Brush("#1D2A32"),
+                                BorderThickness = new Thickness(1),
+                                CornerRadius = new CornerRadius(14),
+                                Padding = new Thickness(12, 10, 12, 10),
+                                Margin = new Thickness(0, 10, 0, 0),
+                                Child = new TextBlock { Text = rootPath, Foreground = Brush("#B5C2CA"), TextWrapping = TextWrapping.Wrap }
+                            });
+                        }
+                        sourcesCard.Child = sourcesStack;
+                        sidePanel.Children.Add(sourcesCard);
+
+                        manualButton.IsEnabled = summary.ManualItemCount > 0;
+                    }
+                    catch (Exception ex)
+                    {
+                        if (previewWindow != null) previewWindow.Close();
+                        RenderPreviewError(ex.Message);
+                        status.Text = "Preview failed";
+                        Log(ex.Message);
+                        MessageBox.Show(ex.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                };
+
+                refreshButton.Click += delegate { renderWindow(); };
+                manualButton.Click += delegate
+                {
+                    OpenManualIntakeWindow();
+                    renderWindow();
+                };
+
+                renderWindow();
+                previewWindow.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                if (previewWindow != null) previewWindow.Close();
+                RenderPreviewError(ex.Message);
+                status.Text = "Preview failed";
+                Log(ex.Message);
+                MessageBox.Show(ex.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        void RenderPreview(IntakePreviewSummary summary)
         {
             if (previewBox == null) return;
-            var doc = new FlowDocument { PagePadding = new Thickness(0), FontFamily = new FontFamily("Cascadia Mono"), FontSize = 14, Background = Brushes.White };
-            doc.Blocks.Add(new Paragraph(new Run("Rename: " + renameCandidates + " candidate(s) out of " + renameTotal)) { Margin = new Thickness(0) });
-            doc.Blocks.Add(new Paragraph(new Run("Metadata: " + metaCandidates + " candidate(s) out of " + metaTotal)) { Margin = new Thickness(0) });
-            doc.Blocks.Add(new Paragraph(new Run("Move: " + moveFiles.Count + " candidate(s)")) { Margin = new Thickness(0) });
-            doc.Blocks.Add(new Paragraph(new Run("Manual Intake: " + manualItems.Count + " unmatched image(s) waiting")) { Margin = new Thickness(0) });
-            doc.Blocks.Add(new Paragraph(new Run("Move conflicts: " + conflicts)) { Margin = new Thickness(0, 0, 0, 10) });
+            var doc = new FlowDocument { PagePadding = new Thickness(0), FontFamily = new FontFamily("Cascadia Mono"), FontSize = 13.5, Background = Brushes.White };
+            doc.Blocks.Add(new Paragraph(new Run("Queue: " + summary.TopLevelMediaCount + " top-level media item(s) waiting")) { Margin = new Thickness(0), FontWeight = FontWeights.SemiBold });
+            doc.Blocks.Add(new Paragraph(new Run("Rename: " + summary.RenameCandidateCount + " candidate(s) out of " + summary.RenameScopeCount)) { Margin = new Thickness(0, 2, 0, 0) });
+            doc.Blocks.Add(new Paragraph(new Run("Auto-ready: " + summary.MoveCandidateCount + " candidate(s)")) { Margin = new Thickness(0, 2, 0, 0) });
+            doc.Blocks.Add(new Paragraph(new Run("Manual Intake: " + summary.ManualItemCount + " unmatched item(s) waiting")) { Margin = new Thickness(0, 2, 0, 0) });
+            doc.Blocks.Add(new Paragraph(new Run("Move conflicts: " + summary.ConflictCount)) { Margin = new Thickness(0, 2, 0, 10) });
             doc.Blocks.Add(new Paragraph(new Run("Files by console:")) { Margin = new Thickness(0, 0, 0, 6), FontWeight = FontWeights.SemiBold });
-            var files = moveFiles.OrderBy(Path.GetFileName).ToList();
-            if (files.Count == 0)
+            if (summary.ReviewItems.Count == 0)
             {
-                doc.Blocks.Add(new Paragraph(new Run("No matching media files found.")) { Margin = new Thickness(0) });
+                doc.Blocks.Add(new Paragraph(new Run("No auto-ready media files found.")) { Margin = new Thickness(0) });
             }
             else
             {
-                var grouped = files.GroupBy(f => PrimaryPlatformLabel(Path.GetFileName(f))).OrderBy(g => PlatformGroupOrder(g.Key)).ThenBy(g => g.Key);
+                var grouped = summary.ReviewItems.GroupBy(item => item.PlatformLabel).OrderBy(group => PlatformGroupOrder(group.Key)).ThenBy(group => group.Key);
                 foreach (var group in grouped)
                 {
                     doc.Blocks.Add(new Paragraph(new Run(group.Key + " (" + group.Count() + ")")) { Margin = new Thickness(0, 6, 0, 4), FontWeight = FontWeights.SemiBold, Foreground = PreviewBadgeBrush(group.Key) });
-                    foreach (var file in group)
+                    foreach (var item in group)
                     {
-                        doc.Blocks.Add(new Paragraph(new Run(Path.GetFileName(file)) { Foreground = Brush("#1F2A30") }) { Margin = new Thickness(12, 0, 0, 2) });
+                        doc.Blocks.Add(new Paragraph(new Run(item.FileName) { Foreground = Brush("#1F2A30") }) { Margin = new Thickness(12, 0, 0, 2) });
                     }
                 }
             }
-            if (manualItems.Count > 0)
+            if (summary.ManualItems.Count > 0)
             {
                 doc.Blocks.Add(new Paragraph(new Run("Unmatched files waiting for Manual Intake:")) { Margin = new Thickness(0, 12, 0, 6), FontWeight = FontWeights.SemiBold, Foreground = Brush("#A16C2E") });
-                foreach (var item in manualItems.OrderBy(i => i.FileName))
+                foreach (var item in summary.ManualItems.OrderBy(i => i.FileName))
                 {
                     doc.Blocks.Add(new Paragraph(new Run(item.FileName) { Foreground = Brush("#5B5048") }) { Margin = new Thickness(12, 0, 0, 2) });
                 }
@@ -2668,6 +3047,10 @@ namespace PixelVaultNative
             {
                 EnsureDir(libraryRoot, "Library folder");
                 var folders = LoadLibraryFoldersCached(libraryRoot, false);
+                Button intakeReviewButton = null;
+                Border intakeReviewBadge = null;
+                TextBlock intakeReviewBadgeText = null;
+                Action refreshIntakeReviewBadge = null;
                 var libraryWindow = reuseMainWindow
                     ? this
                     : new Window
@@ -2736,10 +3119,45 @@ namespace PixelVaultNative
                 refreshButton.Margin = new Thickness(8, 0, 0, 0);
                 rebuildLibraryButton.Margin = new Thickness(8, 0, 0, 0);
                 fetchButton.Margin = new Thickness(8, 0, 0, 0);
+                intakeReviewButton = Btn(string.Empty, null, "#152028", Brushes.White);
+                intakeReviewButton.Width = 68;
+                intakeReviewButton.Height = 48;
+                intakeReviewButton.Padding = new Thickness(10, 6, 10, 6);
+                intakeReviewButton.Margin = new Thickness(8, 0, 0, 0);
+                intakeReviewButton.ToolTip = "Preview upload queue";
+                var intakeReviewContent = new Grid();
+                intakeReviewContent.Children.Add(BuildGamepadGlyph(Brush("#F5F7FA"), 2.15, 34, 22));
+                intakeReviewBadgeText = new TextBlock
+                {
+                    Foreground = Brushes.White,
+                    FontSize = 10,
+                    FontWeight = FontWeights.Bold,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    TextAlignment = TextAlignment.Center
+                };
+                intakeReviewBadge = new Border
+                {
+                    MinWidth = 22,
+                    Height = 22,
+                    Background = Brush("#FF453A"),
+                    BorderBrush = Brush("#FFD6D2"),
+                    BorderThickness = new Thickness(1),
+                    CornerRadius = new CornerRadius(11),
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    VerticalAlignment = VerticalAlignment.Top,
+                    Margin = new Thickness(0, -6, -8, 0),
+                    Padding = new Thickness(6, 0, 6, 0),
+                    Visibility = Visibility.Collapsed,
+                    Child = intakeReviewBadgeText
+                };
+                intakeReviewContent.Children.Add(intakeReviewBadge);
+                intakeReviewButton.Content = intakeReviewContent;
                 var headerActions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) };
                 headerActions.Children.Add(refreshButton);
                 headerActions.Children.Add(rebuildLibraryButton);
                 headerActions.Children.Add(fetchButton);
+                headerActions.Children.Add(intakeReviewButton);
                 Grid.SetColumn(headerActions, 2);
                 leftHeader.Children.Add(headerActions);
                 leftGrid.Children.Add(leftHeader);
@@ -2930,6 +3348,7 @@ namespace PixelVaultNative
                 Action refreshDetailSelectionUi = null;
                 Action deleteSelectedLibraryFiles = null;
                 Action openSelectedLibraryMetadataEditor = null;
+                int intakeBadgeRefreshVersion = 0;
                 bool preserveDetailScrollOnNextRender = false;
                 double preservedDetailScrollOffset = 0;
                 bool preserveFolderScrollOnNextRender = false;
@@ -3035,6 +3454,43 @@ namespace PixelVaultNative
                     {
                         loadPendingDetailRows();
                     }
+                };
+
+                refreshIntakeReviewBadge = delegate
+                {
+                    if (intakeReviewButton == null || intakeReviewBadge == null || intakeReviewBadgeText == null) return;
+                    var refreshVersion = ++intakeBadgeRefreshVersion;
+                    System.Threading.Tasks.Task.Factory.StartNew(delegate
+                    {
+                        try
+                        {
+                            EnsureSourceFolders();
+                            return BuildSourceInventory(false).TopLevelMediaFiles.Count;
+                        }
+                        catch
+                        {
+                            return -1;
+                        }
+                    }).ContinueWith(delegate(System.Threading.Tasks.Task<int> badgeTask)
+                    {
+                        libraryWindow.Dispatcher.BeginInvoke(new Action(delegate
+                        {
+                            if (refreshVersion != intakeBadgeRefreshVersion) return;
+                            var count = badgeTask.Status == TaskStatus.RanToCompletion ? badgeTask.Result : -1;
+                            if (count > 0)
+                            {
+                                intakeReviewBadgeText.Text = IntakeBadgeCountText(count);
+                                intakeReviewBadge.Visibility = Visibility.Visible;
+                                intakeReviewButton.ToolTip = count + " intake item(s) waiting";
+                            }
+                            else
+                            {
+                                intakeReviewBadgeText.Text = string.Empty;
+                                intakeReviewBadge.Visibility = Visibility.Collapsed;
+                                intakeReviewButton.ToolTip = count == 0 ? "No intake items waiting" : "Preview upload queue";
+                            }
+                        }));
+                    }, TaskScheduler.Default);
                 };
 
                 openSingleFileMetadataEditor = delegate(string filePath)
@@ -3686,7 +4142,7 @@ namespace PixelVaultNative
                                     appendProgress("Scan finished successfully.");
                                     if (string.IsNullOrWhiteSpace(folderPath)) current = null;
                                     else current = new LibraryFolderInfo { FolderPath = folderPath, PlatformLabel = current == null ? string.Empty : current.PlatformLabel, Name = current == null ? string.Empty : current.Name };
-                                    renderTiles(true);
+                                    renderTiles(false);
                                 }
                                 if (actionButton != null)
                                 {
@@ -3906,13 +4362,18 @@ namespace PixelVaultNative
 
                 refreshButton.Click += delegate { runLibraryScan(null, false); };
                 rebuildLibraryButton.Click += delegate { runLibraryScan(null, true); };
-                settingsButton.Click += delegate { ShowSettingsWindow(); };
+                settingsButton.Click += delegate { ShowSettingsWindow(); if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge(); };
                 gameIndexButton.Click += delegate { OpenGameIndexEditor(); };
                 photoIndexButton.Click += delegate { OpenPhotoIndexEditor(); };
-                importButton.Click += delegate { RunWorkflow(false); };
-                importCommentsButton.Click += delegate { RunWorkflow(true); };
-                manualImportButton.Click += delegate { OpenManualIntakeWindow(); };
+                importButton.Click += delegate { RunWorkflow(false); if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge(); };
+                importCommentsButton.Click += delegate { RunWorkflow(true); if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge(); };
+                manualImportButton.Click += delegate { OpenManualIntakeWindow(); if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge(); };
                 fetchButton.Click += delegate { runCoverRefresh(); };
+                intakeReviewButton.Click += delegate
+                {
+                    ShowIntakePreviewWindow(false);
+                    if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge();
+                };
                 openFolderButton.Click += delegate { if (current != null) OpenFolder(current.FolderPath); };
                 scanFolderButton.Click += delegate
                 {
@@ -3997,8 +4458,13 @@ namespace PixelVaultNative
                     renderTiles(false);
                 };
                 searchBox.TextChanged += delegate { renderTiles(false); };
+                libraryWindow.Activated += delegate
+                {
+                    if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge();
+                };
 
                 renderTiles(false);
+                if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge();
                 if (!reuseMainWindow) libraryWindow.Show();
             }
             catch (Exception ex)

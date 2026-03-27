@@ -1,3 +1,9 @@
+## 0.780
+- Added a new Library upload-queue review button beside `Fetch Covers`, with an unread-style badge that shows how many top-level intake items are waiting in the upload folder.
+- Reworked the intake preview from the old plain text report into a dedicated window with grouped console sections, summary cards, manual-intake visibility, and source-folder notes so queue review is easier to scan before import.
+- Simplified Library video tiles by removing the hover tooltip and extra preview chrome, keeping the `CLIP` badge and duration bubble while reducing visual noise.
+- Avoided a redundant second full folder-cache rebuild after library scans by reusing the freshly rebuilt cache for the tile refresh, and added timing logs around the folder-cache rebuild step to make future scan slowness easier to trace.
+
 ## 0.779
 - Expanded FFmpeg-backed clip handling beyond poster generation by probing and caching clip metadata for Library tiles, surfacing duration, resolution, frame-rate, and audio details inline, and adding direct `Open 10s Preview Clip` / `Copy Clip Details` actions for video captures.
 - Hardened Library virtualization and lazy-loading for resize-heavy browsing by preserving folder-grid and detail-pane scroll positions across layout-only rerenders instead of snapping back to the top.
