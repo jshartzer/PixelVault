@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -59,17 +61,28 @@ namespace PixelVaultNative
             return host;
         }
 
-        void SetVirtualizedRows(VirtualizedRowHost host, IEnumerable<VirtualizedRowDefinition> rows, bool resetScroll = false)
+        void SetVirtualizedRows(VirtualizedRowHost host, IEnumerable<VirtualizedRowDefinition> rows, bool resetScroll = false, double? restoreOffset = null)
         {
             if (host == null) return;
             host.Rows = rows == null ? new List<VirtualizedRowDefinition>() : new List<VirtualizedRowDefinition>(rows);
             host.FirstVisibleIndex = -1;
             host.LastVisibleIndex = -1;
-            if (resetScroll && host.ScrollViewer != null)
+            if (host.ScrollViewer != null)
             {
-                host.ScrollViewer.ScrollToVerticalOffset(0);
+                if (resetScroll) host.ScrollViewer.ScrollToVerticalOffset(0);
+                else if (restoreOffset.HasValue) host.ScrollViewer.ScrollToVerticalOffset(Math.Max(0, restoreOffset.Value));
             }
             RefreshVirtualizedRowHost(host);
+            if (!resetScroll && restoreOffset.HasValue && host.ScrollViewer != null)
+            {
+                var wantedOffset = Math.Max(0, restoreOffset.Value);
+                host.ScrollViewer.Dispatcher.BeginInvoke(new Action(delegate
+                {
+                    var maxOffset = Math.Max(0, host.ScrollViewer.ExtentHeight - host.ScrollViewer.ViewportHeight);
+                    host.ScrollViewer.ScrollToVerticalOffset(Math.Min(wantedOffset, maxOffset));
+                    RefreshVirtualizedRowHost(host);
+                }), DispatcherPriority.Background);
+            }
         }
 
         void RefreshVirtualizedRowHost(VirtualizedRowHost host)
@@ -155,6 +168,7 @@ namespace PixelVaultNative
 
         Border CreateLibraryDetailTile(string file, int size, Func<bool> shouldLoad, Action<string> openSingleFileMetadataEditor, Action<string, bool, bool> updateDetailSelection, HashSet<string> selectedDetailFiles, Action refreshDetailSelectionUi)
         {
+            var isVideoFile = IsVideo(file);
             var tile = new Border
             {
                 Width = size,
@@ -173,13 +187,53 @@ namespace PixelVaultNative
             MediaElement videoPreviewMedia = null;
             TextBlock videoPreviewStatus = null;
             Border videoPreviewHint = null;
+            Border videoDurationBadge = null;
+            Border videoInfoBadge = null;
+            TextBlock videoDurationText = null;
+            TextBlock videoInfoText = null;
             DispatcherTimer videoPreviewStopTimer = null;
             bool videoPreviewReady = false;
             bool videoPreviewHovered = false;
             bool videoPreviewOpeningStarted = false;
+            Action<VideoClipInfo> applyVideoInfo = delegate(VideoClipInfo info)
+            {
+                var fileName = System.IO.Path.GetFileName(file);
+                if (!isVideoFile)
+                {
+                    tile.ToolTip = fileName + Environment.NewLine + GetLibraryDate(file).ToString("yyyy-MM-dd h:mm:ss tt");
+                    return;
+                }
+
+                if (videoDurationBadge != null && videoDurationText != null)
+                {
+                    var durationLabel = info == null ? string.Empty : FormatVideoDuration(info.DurationSeconds);
+                    videoDurationText.Text = durationLabel;
+                    videoDurationBadge.Visibility = string.IsNullOrWhiteSpace(durationLabel) ? Visibility.Collapsed : Visibility.Visible;
+                }
+
+                if (videoInfoBadge != null && videoInfoText != null)
+                {
+                    var detailParts = new List<string>();
+                    if (info != null && info.Width > 0 && info.Height > 0) detailParts.Add(info.Width + "x" + info.Height);
+                    if (info != null && info.FrameRate > 0) detailParts.Add(FormatVideoFrameRate(info.FrameRate));
+                    if (info != null && info.HasAudio) detailParts.Add("Audio");
+                    videoInfoText.Text = string.Join(" | ", detailParts);
+                    videoInfoBadge.Visibility = string.IsNullOrWhiteSpace(videoInfoText.Text) ? Visibility.Collapsed : Visibility.Visible;
+                }
+
+                var toolTipParts = new List<string>
+                {
+                    fileName,
+                    GetLibraryDate(file).ToString("yyyy-MM-dd h:mm:ss tt")
+                };
+                var summary = FormatVideoClipInfoSummary(info);
+                if (!string.IsNullOrWhiteSpace(summary)) toolTipParts.Add("Clip: " + summary);
+                if (info != null && !string.IsNullOrWhiteSpace(info.VideoCodec)) toolTipParts.Add("Codec: " + info.VideoCodec);
+                tile.ToolTip = string.Join(Environment.NewLine, toolTipParts.Where(part => !string.IsNullOrWhiteSpace(part)).ToArray());
+            };
             presenter.Children.Add(placeholder);
             presenter.Children.Add(image);
-            if (IsVideo(file))
+            if (isVideoFile)
             {
                 videoPreviewMedia = new MediaElement
                 {
@@ -207,32 +261,66 @@ namespace PixelVaultNative
                 presenter.Children.Add(videoPreviewStatus);
                 presenter.Children.Add(new Border
                 {
-                    Width = 34,
-                    Height = 34,
                     Background = Brush("#AA234A63"),
                     BorderBrush = Brush("#7AB4E3"),
                     BorderThickness = new Thickness(1),
-                    CornerRadius = new CornerRadius(17),
-                    HorizontalAlignment = HorizontalAlignment.Right,
+                    CornerRadius = new CornerRadius(11),
+                    HorizontalAlignment = HorizontalAlignment.Left,
                     VerticalAlignment = VerticalAlignment.Top,
-                    Margin = new Thickness(0, 8, 8, 0),
+                    Margin = new Thickness(8, 8, 0, 0),
+                    Padding = new Thickness(10, 5, 10, 5),
                     Child = new TextBlock
                     {
-                        Text = "▶",
+                        Text = "CLIP",
                         Foreground = Brushes.White,
-                        FontSize = 16,
-                        FontWeight = FontWeights.Bold,
+                        FontSize = 10.5,
+                        FontWeight = FontWeights.SemiBold,
                         HorizontalAlignment = HorizontalAlignment.Center,
                         VerticalAlignment = VerticalAlignment.Center,
-                        TextAlignment = TextAlignment.Center,
-                        Margin = new Thickness(2, -1, 0, 0)
+                        TextAlignment = TextAlignment.Center
                     }
                 });
-                videoPreviewHint = new Border
+                videoDurationText = new TextBlock
+                {
+                    Foreground = Brush("#F5FBFF"),
+                    FontSize = 10.5,
+                    FontWeight = FontWeights.SemiBold
+                };
+                videoDurationBadge = new Border
+                {
+                    HorizontalAlignment = HorizontalAlignment.Left,
+                    VerticalAlignment = VerticalAlignment.Bottom,
+                    Margin = new Thickness(8, 0, 0, 8),
+                    Background = Brush("#A6141C21"),
+                    CornerRadius = new CornerRadius(8),
+                    Padding = new Thickness(8, 4, 8, 4),
+                    Visibility = Visibility.Collapsed,
+                    Child = videoDurationText
+                };
+                presenter.Children.Add(videoDurationBadge);
+                videoInfoText = new TextBlock
+                {
+                    Foreground = Brush("#DCE8EF"),
+                    FontSize = 10,
+                    FontWeight = FontWeights.SemiBold
+                };
+                videoInfoBadge = new Border
                 {
                     HorizontalAlignment = HorizontalAlignment.Right,
                     VerticalAlignment = VerticalAlignment.Bottom,
                     Margin = new Thickness(0, 0, 8, 8),
+                    Background = Brush("#A6141C21"),
+                    CornerRadius = new CornerRadius(8),
+                    Padding = new Thickness(8, 4, 8, 4),
+                    Visibility = Visibility.Collapsed,
+                    Child = videoInfoText
+                };
+                presenter.Children.Add(videoInfoBadge);
+                videoPreviewHint = new Border
+                {
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    VerticalAlignment = VerticalAlignment.Bottom,
+                    Margin = new Thickness(0, 0, 8, 38),
                     Background = Brush("#9C0F151A"),
                     CornerRadius = new CornerRadius(8),
                     Padding = new Thickness(8, 4, 8, 4),
@@ -246,6 +334,16 @@ namespace PixelVaultNative
                 };
                 presenter.Children.Add(videoPreviewHint);
                 videoPreviewStopTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(10) };
+                applyVideoInfo(TryLoadCachedVideoClipInfo(file));
+                WarmVideoClipInfo(file, delegate(VideoClipInfo info)
+                {
+                    tile.Dispatcher.BeginInvoke(new Action(delegate
+                    {
+                        if (!string.Equals(tile.Tag as string, file, StringComparison.OrdinalIgnoreCase)) return;
+                        applyVideoInfo(info);
+                    }), DispatcherPriority.Background);
+                });
+                WarmVideoPreviewClip(file, Math.Max(640, size * 2));
                 try
                 {
                     videoPreviewMedia.Source = new Uri(file);
@@ -256,6 +354,10 @@ namespace PixelVaultNative
                 {
                     videoPreviewOpeningStarted = false;
                 }
+            }
+            else
+            {
+                applyVideoInfo(null);
             }
             tile.Child = presenter;
             QueueImageLoad(image, file, size * 2, delegate(BitmapImage loaded)
@@ -289,7 +391,7 @@ namespace PixelVaultNative
             };
             tile.MouseEnter += delegate
             {
-                if (!IsVideo(file)) return;
+                if (!isVideoFile) return;
                 if (videoPreviewMedia == null || videoPreviewStatus == null) return;
                 videoPreviewHovered = true;
                 videoPreviewStopTimer.Stop();
@@ -330,7 +432,7 @@ namespace PixelVaultNative
             };
             tile.MouseLeave += delegate
             {
-                if (!IsVideo(file)) return;
+                if (!isVideoFile) return;
                 if (videoPreviewMedia == null || videoPreviewStatus == null) return;
                 videoPreviewHovered = false;
                 videoPreviewStopTimer.Stop();
@@ -447,6 +549,62 @@ namespace PixelVaultNative
                 try { Clipboard.SetText(file); } catch { }
             };
             contextMenu.Items.Add(openItem);
+            if (isVideoFile)
+            {
+                var openPreviewClipItem = new MenuItem { Header = "Open 10s Preview Clip" };
+                openPreviewClipItem.Click += async delegate
+                {
+                    openPreviewClipItem.IsEnabled = false;
+                    if (status != null) status.Text = "Generating clip preview";
+                    try
+                    {
+                        var previewPath = await Task.Run(delegate { return EnsureVideoPreviewClip(file, Math.Max(640, size * 2)); });
+                        if (!string.IsNullOrWhiteSpace(previewPath) && System.IO.File.Exists(previewPath))
+                        {
+                            OpenWithShell(previewPath);
+                            if (status != null) status.Text = "Opened clip preview";
+                        }
+                        else
+                        {
+                            if (status != null) status.Text = "Clip preview unavailable";
+                            MessageBox.Show("PixelVault could not generate a preview clip for this video. Check the FFmpeg path in Path Settings and try again.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        if (status != null) status.Text = "Clip preview unavailable";
+                        MessageBox.Show("PixelVault could not generate a preview clip for this video." + Environment.NewLine + Environment.NewLine + ex.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    }
+                    finally
+                    {
+                        openPreviewClipItem.IsEnabled = true;
+                    }
+                };
+                var copyClipDetailsItem = new MenuItem { Header = "Copy Clip Details" };
+                copyClipDetailsItem.Click += delegate
+                {
+                    try
+                    {
+                        var info = EnsureVideoClipInfo(file);
+                        var lines = new List<string>
+                        {
+                            System.IO.Path.GetFileName(file),
+                            file,
+                            "Captured: " + GetLibraryDate(file).ToString("yyyy-MM-dd h:mm:ss tt")
+                        };
+                        var summary = FormatVideoClipInfoSummary(info);
+                        if (!string.IsNullOrWhiteSpace(summary)) lines.Add("Clip: " + summary);
+                        if (info != null && !string.IsNullOrWhiteSpace(info.VideoCodec)) lines.Add("Codec: " + info.VideoCodec);
+                        Clipboard.SetText(string.Join(Environment.NewLine, lines.Where(line => !string.IsNullOrWhiteSpace(line)).ToArray()));
+                        if (status != null) status.Text = "Clip details copied";
+                    }
+                    catch
+                    {
+                    }
+                };
+                contextMenu.Items.Add(openPreviewClipItem);
+                contextMenu.Items.Add(copyClipDetailsItem);
+            }
             contextMenu.Items.Add(openFolderItem);
             contextMenu.Items.Add(editItem);
             contextMenu.Items.Add(new Separator());

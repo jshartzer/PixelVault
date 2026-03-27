@@ -39,7 +39,7 @@ namespace PixelVaultNative
 
     public sealed partial class MainWindow : Window
     {
-        const string AppVersion = "0.778";
+        const string AppVersion = "0.779";
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
         const string ClearedExternalIdSentinel = "__PV_CLEARED__";
@@ -66,6 +66,7 @@ namespace PixelVaultNative
         readonly SemaphoreSlim priorityImageLoadLimiter = new SemaphoreSlim(Math.Max(1, Math.Min(Environment.ProcessorCount, 3)));
         readonly HashSet<string> failedFfmpegPosterKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         readonly ConcurrentDictionary<string, byte> activeVideoPreviewGenerations = new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
+        readonly ConcurrentDictionary<string, byte> activeVideoInfoGenerations = new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
         readonly Dictionary<string, List<string>> folderImageCache = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
         readonly Dictionary<string, long> folderImageCacheStamp = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
         readonly Dictionary<string, string[]> fileTagCache = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
@@ -2929,9 +2930,14 @@ namespace PixelVaultNative
                 Action refreshDetailSelectionUi = null;
                 Action deleteSelectedLibraryFiles = null;
                 Action openSelectedLibraryMetadataEditor = null;
+                bool preserveDetailScrollOnNextRender = false;
+                double preservedDetailScrollOffset = 0;
+                bool preserveFolderScrollOnNextRender = false;
+                double preservedFolderScrollOffset = 0;
                 var selectedDetailFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 var detailTiles = new List<Border>();
                 var pendingDetailRows = new Queue<Action>();
+                int estimatedDetailRowHeight = 420;
                 bool detailRowsQueued = false;
                 Action queueDetailRows = null;
                 Action loadPendingDetailRows = null;
@@ -2997,12 +3003,27 @@ namespace PixelVaultNative
                     {
                         detailRowsQueued = false;
                         if (pendingDetailRows.Count == 0) return;
-                        int rowsToAppend = Math.Max(4, (int)Math.Ceiling((thumbScroll.ViewportHeight > 0 ? thumbScroll.ViewportHeight : 900) / 420));
+                        var viewportHeight = thumbScroll.ViewportHeight > 0 ? thumbScroll.ViewportHeight : 900;
+                        int rowsToAppend = Math.Max(4, (int)Math.Ceiling(viewportHeight / 420));
+                        if (preserveDetailScrollOnNextRender)
+                        {
+                            rowsToAppend = Math.Max(rowsToAppend, (int)Math.Ceiling((preservedDetailScrollOffset + viewportHeight + estimatedDetailRowHeight) / Math.Max(220, estimatedDetailRowHeight)));
+                        }
                         for (int i = 0; i < rowsToAppend && pendingDetailRows.Count > 0; i++)
                         {
                             pendingDetailRows.Dequeue()();
                         }
                         if (refreshDetailSelectionUi != null) refreshDetailSelectionUi();
+                        if (preserveDetailScrollOnNextRender)
+                        {
+                            var targetOffset = Math.Max(0, preservedDetailScrollOffset);
+                            preserveDetailScrollOnNextRender = false;
+                            thumbScroll.Dispatcher.BeginInvoke(new Action(delegate
+                            {
+                                thumbScroll.ScrollToVerticalOffset(targetOffset);
+                                queueDetailRows();
+                            }), DispatcherPriority.Background);
+                        }
                     }), DispatcherPriority.Background);
                 };
 
@@ -3161,6 +3182,7 @@ namespace PixelVaultNative
 
                 Action renderSelectedFolder = delegate
                 {
+                    if (!preserveDetailScrollOnNextRender) preservedDetailScrollOffset = 0;
                     detailTiles.Clear();
                     thumbContent.Children.Clear();
                     pendingDetailRows.Clear();
@@ -3173,6 +3195,7 @@ namespace PixelVaultNative
                     }
                     var size = (int)thumbSizeSlider.Value;
                     sizeValue.Text = size.ToString();
+                    estimatedDetailRowHeight = Math.Max(220, size + 96);
                     var groups = GetFilesForLibraryFolderEntry(current, false)
                         .OrderByDescending(GetLibraryDate)
                         .GroupBy(f => GetLibraryDate(f).Date)
@@ -3348,6 +3371,9 @@ namespace PixelVaultNative
                 showFolder = delegate(LibraryFolderInfo info)
                 {
                     if (!SameLibraryFolderSelection(current, info)) selectedDetailFiles.Clear();
+                    preserveDetailScrollOnNextRender = false;
+                    preservedDetailScrollOffset = 0;
+                    thumbScroll.ScrollToVerticalOffset(0);
                     current = info;
                     detailTitle.Text = info.Name;
                     detailMeta.Text = info.FileCount + " item(s) | " + info.PlatformLabel + " | " + info.FolderPath;
@@ -3367,6 +3393,9 @@ namespace PixelVaultNative
 
                 renderTiles = delegate(bool forceRefresh)
                 {
+                    var restoreFolderScrollOffset = preserveFolderScrollOnNextRender ? Math.Max(0, preservedFolderScrollOffset) : 0;
+                    var shouldRestoreFolderScroll = preserveFolderScrollOnNextRender && restoreFolderScrollOffset > 0.1d;
+                    preserveFolderScrollOnNextRender = false;
                     folders = LoadLibraryFoldersCached(libraryRoot, forceRefresh);
                     var sortMode = NormalizeLibraryFolderSortMode(libraryFolderSortMode);
                     var flattenGroups = !string.Equals(sortMode, "platform", StringComparison.OrdinalIgnoreCase);
@@ -3436,7 +3465,7 @@ namespace PixelVaultNative
                                 };
                             }
                         });
-                        SetVirtualizedRows(tileRows, virtualRows, true);
+                        SetVirtualizedRows(tileRows, virtualRows, true, null);
                         return;
                     }
                     if (flattenGroups)
@@ -3455,7 +3484,7 @@ namespace PixelVaultNative
                                 }
                             });
                         }
-                        SetVirtualizedRows(tileRows, virtualRows, true);
+                        SetVirtualizedRows(tileRows, virtualRows, !shouldRestoreFolderScroll, shouldRestoreFolderScroll ? (double?)restoreFolderScrollOffset : null);
                         return;
                     }
 
@@ -3500,7 +3529,7 @@ namespace PixelVaultNative
                             });
                         }
                     }
-                    SetVirtualizedRows(tileRows, virtualRows, true);
+                    SetVirtualizedRows(tileRows, virtualRows, !shouldRestoreFolderScroll, shouldRestoreFolderScroll ? (double?)restoreFolderScrollOffset : null);
                 };
 
                 runLibraryScan = delegate(string folderPath, bool forceRescan)
@@ -3914,7 +3943,13 @@ namespace PixelVaultNative
                 };
                 editMetadataButton.Click += delegate { openSelectedLibraryMetadataEditor(); };
                 deleteSelectedButton.Click += delegate { deleteSelectedLibraryFiles(); };
-                thumbSizeSlider.ValueChanged += delegate { if (current != null) renderSelectedFolder(); };
+                thumbSizeSlider.ValueChanged += delegate
+                {
+                    if (current == null) return;
+                    preservedDetailScrollOffset = thumbScroll.VerticalOffset;
+                    preserveDetailScrollOnNextRender = preservedDetailScrollOffset > 0.1d;
+                    renderSelectedFolder();
+                };
                 thumbScroll.ScrollChanged += delegate(object sender, ScrollChangedEventArgs e)
                 {
                     if (Math.Abs(e.VerticalChange) > 0.1 || Math.Abs(e.ViewportHeightChange) > 0.1) queueDetailRows();
@@ -3923,7 +3958,12 @@ namespace PixelVaultNative
                 {
                     if (Math.Abs(e.PreviousSize.Width - e.NewSize.Width) > 8)
                     {
-                        if (current != null) renderSelectedFolder();
+                        if (current != null)
+                        {
+                            preservedDetailScrollOffset = thumbScroll.VerticalOffset;
+                            preserveDetailScrollOnNextRender = preservedDetailScrollOffset > 0.1d;
+                            renderSelectedFolder();
+                        }
                     }
                     else
                     {
@@ -3932,13 +3972,20 @@ namespace PixelVaultNative
                 };
                 tileScroll.SizeChanged += delegate(object sender, SizeChangedEventArgs e)
                 {
-                    if (Math.Abs(e.PreviousSize.Width - e.NewSize.Width) > 8) renderTiles(false);
+                    if (Math.Abs(e.PreviousSize.Width - e.NewSize.Width) > 8)
+                    {
+                        preservedFolderScrollOffset = tileScroll.VerticalOffset;
+                        preserveFolderScrollOnNextRender = preservedFolderScrollOffset > 0.1d;
+                        renderTiles(false);
+                    }
                 };
                 folderTileSizeSlider.ValueChanged += delegate
                 {
                     libraryFolderTileSize = NormalizeLibraryFolderTileSize((int)Math.Round(folderTileSizeSlider.Value));
                     if (folderTileSizeValue != null) folderTileSizeValue.Text = libraryFolderTileSize.ToString();
                     SaveSettings();
+                    preservedFolderScrollOffset = tileScroll.VerticalOffset;
+                    preserveFolderScrollOnNextRender = preservedFolderScrollOffset > 0.1d;
                     renderTiles(false);
                 };
                 sortModeBox.SelectionChanged += delegate

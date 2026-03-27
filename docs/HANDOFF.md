@@ -43,11 +43,11 @@ This handoff is the short current-state summary.
 
 Current live build:
 
-- `0.778`
+- `0.779`
 
 Current executable:
 
-- `C:\Codex\dist\PixelVault-0.778\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.779\PixelVault.exe`
 
 Current build pointer:
 
@@ -96,7 +96,7 @@ Behavior summary:
 
 ## Recent Shipped State
 
-Recent important published changes in the current `0.724` to `0.778` line:
+Recent important published changes in the current `0.724` to `0.779` line:
 
 - intake preview/process/manual flows now reuse shared source inventories instead of rescanning the same roots repeatedly
 - metadata writes run with bounded parallel `ExifTool` workers
@@ -171,18 +171,21 @@ This was a data-only maintenance pass, not a new app build.
 
 ## Current Stop Point
 
-The current live build is `0.778`, and the latest shipped work now tightens the metadata editor experience:
+The current live build is `0.779`, and the latest shipped work now extends clip handling and hardens the Library browse surface:
 
-1. the metadata edit title picker now shows `Game Name | Console`, so typing the game name works naturally with the dropdown instead of being awkwardly driven by the console prefix
-2. the metadata edit window is taller, and library-edit startup now batches ExifTool metadata reads for tags, comments, and capture times so opening the form should feel snappier on larger folders
-3. the app still ships as one desktop executable with one shared runtime data model, and each release still carries a version-local source snapshot inside `dist\PixelVault-x.xxx`
-4. release docs, current-build markers, and the desktop shortcut now point at the new `0.778` published build
+1. FFmpeg-backed clip handling now probes and caches video metadata for Library tiles, surfaces richer clip details inline, and exposes direct preview/detail actions for video captures
+2. the Library folder grid and detail pane now preserve scroll position more reliably across layout-only resize and tile-size rerenders, which makes large mixed-media browsing less jumpy
+3. the repo now includes a dedicated large-library stress-data generator and verification checklist for future virtualization and lazy-loading checks
+4. the app still ships as one desktop executable with one shared runtime data model, and each release still carries a version-local source snapshot inside `dist\PixelVault-x.xxx`
 
 The most likely next product step is:
 
-1. expand FFmpeg-backed video handling beyond poster generation and make clips feel more first-class in the Library workflow
-2. stress-test the new Library virtualization, metadata editor, and lazy-loading paths on large mixed-media folders and resize-heavy sessions
-3. keep an eye on any remaining UI-specific extraction opportunities after the current performance pass settles
+1. keep an eye on any remaining UI-specific extraction opportunities after the current performance pass settles
+
+Most recent in-progress milestone completion:
+
+1. FFmpeg-backed clip handling now goes beyond poster generation by probing and caching clip metadata for the Library tiles, surfacing duration/resolution/audio details inline, and exposing a real `Open 10s Preview Clip` action plus `Copy Clip Details` directly from video tiles
+2. Library virtualization and lazy-loading have now been hardened for resize-heavy sessions by preserving folder-grid and detail-pane scroll positions across layout-only rerenders, and the repo now includes a dedicated `New-LibraryVirtualizationStressData.ps1` generator plus `LIBRARY_VIRTUALIZATION_STRESS_TEST.md` checklist for large mixed-media verification
 
 ## Important Expectations
 

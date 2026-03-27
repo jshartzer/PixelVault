@@ -1,3 +1,8 @@
+## 0.779
+- Expanded FFmpeg-backed clip handling beyond poster generation by probing and caching clip metadata for Library tiles, surfacing duration, resolution, frame-rate, and audio details inline, and adding direct `Open 10s Preview Clip` / `Copy Clip Details` actions for video captures.
+- Hardened Library virtualization and lazy-loading for resize-heavy browsing by preserving folder-grid and detail-pane scroll positions across layout-only rerenders instead of snapping back to the top.
+- Added a dedicated Library virtualization stress-data generator plus a matching verification checklist so large mixed-media browse sessions can be reproduced more easily during future performance and UI checks.
+
 ## 0.778
 - Changed the metadata edit game-title picker to show choices as `Game Name | Console`, so typing the game name now drives the dropdown/autofill more naturally instead of effectively keying off the console prefix first.
 - Made the metadata edit window taller and batched the upfront ExifTool metadata reads for library edits, which should reduce the need to scroll immediately and make the form open faster on larger folders.

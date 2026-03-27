@@ -49,4 +49,14 @@ namespace PixelVaultNative
         public string ConsoleLabel;
         public string TagText;
     }
+
+    sealed class VideoClipInfo
+    {
+        public double DurationSeconds;
+        public int Width;
+        public int Height;
+        public double FrameRate;
+        public bool HasAudio;
+        public string VideoCodec;
+    }
 }
