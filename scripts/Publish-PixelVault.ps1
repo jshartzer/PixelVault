@@ -4,6 +4,7 @@ param(
     [string]$Configuration = "Release",
     [string]$RuntimeIdentifier = "win-x64",
     [string]$OutputRoot,
+    [int]$KeepLatest = 10,
     [switch]$SelfContained,
     [switch]$IncludeBootstrapSettings,
     [switch]$Force
@@ -45,6 +46,7 @@ if ([string]::IsNullOrWhiteSpace($Version))
     $Version = $versionMatch.Matches[0].Groups[1].Value
 }
 
+$currentLinkDir = Join-Path $OutputRoot "PixelVault-current"
 $outputDir = Join-Path $OutputRoot ("PixelVault-" + $Version)
 
 if (Test-Path $outputDir)
@@ -86,6 +88,40 @@ if ($IncludeBootstrapSettings -and (Test-Path $settingsPath))
     Copy-Item $settingsPath (Join-Path $outputDir "PixelVault.settings.ini") -Force
 }
 
+if (Test-Path $currentLinkDir)
+{
+    Remove-Item $currentLinkDir -Recurse -Force
+}
+
+New-Item -ItemType Junction -Path $currentLinkDir -Target $outputDir | Out-Null
+
+if ($KeepLatest -gt 0)
+{
+    $releaseDirs = Get-ChildItem $OutputRoot -Directory -Filter "PixelVault-*" |
+        Where-Object { $_.Name -ne "PixelVault-current" } |
+        ForEach-Object {
+            $versionText = $_.Name.Substring("PixelVault-".Length)
+            $parsedVersion = $null
+            if ([version]::TryParse($versionText, [ref]$parsedVersion))
+            {
+                [PSCustomObject]@{
+                    Directory = $_
+                    Version = $parsedVersion
+                }
+            }
+        } |
+        Where-Object { $_ -ne $null } |
+        Sort-Object Version -Descending
+
+    $oldReleases = @($releaseDirs | Select-Object -Skip $KeepLatest)
+    foreach ($release in $oldReleases)
+    {
+        if ($null -eq $release -or $null -eq $release.Directory) { continue }
+        Remove-Item $release.Directory.FullName -Recurse -Force
+        Write-Host "Removed older release folder: $($release.Directory.FullName)"
+    }
+}
+
 $expectedChangelogHeader = "## " + $Version
 if (-not (Select-String -Path $changelogPath -Pattern ([regex]::Escape($expectedChangelogHeader)) -Quiet))
 {
@@ -94,3 +130,4 @@ if (-not (Select-String -Path $changelogPath -Pattern ([regex]::Escape($expected
 
 Write-Host "Published PixelVault $Version"
 Write-Host "Exe: $(Join-Path $outputDir 'PixelVault.exe')"
+Write-Host "Current: $currentLinkDir"
