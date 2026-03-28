@@ -25,8 +25,12 @@ Recommended shape: a small "filename intelligence" layer
 1) Single entry point, rich result
 
 Introduce something like `FilenameParseResult` (or split into
-`FilenameClassification` + `FilenameDateHints`) produced by one API, e.g.
-`ImportFilenameParser.Parse(string fullPath)` or `ParseFileName(string fileName)`.
+`FilenameClassification` + `FilenameDateHints`) produced by one public API:
+`ImportFilenameParser.Parse(string fullPath)`.
+
+If a caller only has a basename, it should still call `Parse(...)` and pass the
+basename with no directory. That keeps one public entry point and avoids
+separate `ParseFileName(...)` behavior drifting over time.
 
 Rule of the road for inputs:
 - The parser should accept the full path so future folder-level defaults can
@@ -61,6 +65,11 @@ conflict rules. Recommended default:
 - Tags may be unioned from multiple passes only when they are additive and
   non-conflicting; otherwise the winning convention owns them too.
 
+Example default:
+- `PS5` + `PlayStation` is additive and OK.
+- `Steam` + `Xbox` from different matches is conflicting and should not be
+  merged unless an explicit rule says both are valid for that pattern.
+
 That supports detection based on known filename conventions and is easy to
 extend (`Switch 2`, `GeForce Experience`, `OBS`, etc.) without touching WPF.
 
@@ -90,6 +99,10 @@ DateTime / timezone rule:
   `DateTimeKind.Local` so they line up with `GetLibraryDate` ordering, UI
   display, and EXIF writes. If a rule parses UTC or epoch-based values, convert
   them to local time before returning the final parse result.
+- In .NET terms, `DateTime.TryParseExact(...)` often returns
+  `DateTimeKind.Unspecified`, so the implementation should explicitly apply
+  `DateTime.SpecifyKind(parsedValue, DateTimeKind.Local)` for local filename
+  stamps before they are persisted or mixed with EXIF/tool output.
 
 
 4) Storing "example filenames" and desired classification
@@ -120,6 +133,10 @@ after built-in conventions by convention id. "Merge" here should mean:
   that id for the whole result, not just one field.
 - If power-user overrides are needed later, model them as full-rule
   replacement rather than per-field merging.
+- If the custom-rule store contains multiple rows with the same convention id,
+  do not leave the result order-dependent. Recommended default: reject or
+  collapse duplicates on save so runtime load sees at most one custom row per
+  convention id.
 
 For PixelVault specifically, prefer the same persistence pattern as the
 existing game/photo index runtime store: built-in defaults in code, custom
