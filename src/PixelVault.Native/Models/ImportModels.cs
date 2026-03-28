@@ -22,6 +22,7 @@ namespace PixelVaultNative
     sealed class ManualMetadataItem
     {
         public string GameId;
+        public string SteamAppId;
         public string FilePath;
         public string FileName;
         public string OriginalFileName;
@@ -39,6 +40,7 @@ namespace PixelVaultNative
         public bool TagOther;
         public string CustomPlatformTag;
         public string OriginalGameId;
+        public string OriginalSteamAppId;
         public DateTime OriginalCaptureTime;
         public bool OriginalUseCustomCaptureTime;
         public string OriginalGameName;

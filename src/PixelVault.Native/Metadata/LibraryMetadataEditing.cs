@@ -52,6 +52,7 @@ namespace PixelVaultNative
                 items.Add(new ManualMetadataItem
                 {
                     GameId = indexEntry == null ? (folder == null ? string.Empty : folder.GameId) : indexEntry.GameId,
+                    SteamAppId = folder == null ? string.Empty : (folder.SteamAppId ?? string.Empty),
                     FilePath = file,
                     FileName = fileName,
                     OriginalFileName = fileName,
@@ -68,6 +69,7 @@ namespace PixelVaultNative
                     TagOther = useCustomPlatform,
                     CustomPlatformTag = customPlatformValue,
                     OriginalGameId = indexEntry == null ? (folder == null ? string.Empty : folder.GameId) : indexEntry.GameId,
+                    OriginalSteamAppId = folder == null ? string.Empty : (folder.SteamAppId ?? string.Empty),
                     OriginalCaptureTime = captureTime,
                     OriginalUseCustomCaptureTime = false,
                     OriginalGameName = folder.Name ?? string.Empty,

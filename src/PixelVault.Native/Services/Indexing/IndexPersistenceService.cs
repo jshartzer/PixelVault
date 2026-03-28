@@ -10,7 +10,11 @@ namespace PixelVaultNative
     {
         void ApplyGameIdAliases(string root, Dictionary<string, string> aliasMap);
         Dictionary<string, string> BuildSavedGameIdAliasMap(string root);
+        List<FilenameConventionRule> LoadFilenameConventions(string root);
+        List<FilenameConventionSample> LoadFilenameConventionSamples(string root, int maxCount);
         List<GameIndexEditorRow> LoadSavedGameIndexRows(string root);
+        void RecordFilenameConventionSample(string root, string fileName, FilenameParseResult parseResult);
+        void SaveFilenameConventions(string root, IEnumerable<FilenameConventionRule> rules);
         void SaveSavedGameIndexRows(string root, IEnumerable<GameIndexEditorRow> rows);
         Dictionary<string, LibraryMetadataIndexEntry> LoadLibraryMetadataIndexEntries(string root);
         void SaveLibraryMetadataIndexEntries(string root, Dictionary<string, LibraryMetadataIndexEntry> index);
@@ -140,6 +144,8 @@ namespace PixelVaultNative
         {
             using (var pragma = connection.CreateCommand())
             {
+                // We keep foreign keys off here because the index tables are cache-style mirrors that are rebuilt
+                // and migrated in broad replacement passes rather than maintained as a relational source of truth.
                 pragma.CommandText = "PRAGMA journal_mode=WAL; PRAGMA foreign_keys=OFF;";
                 pragma.ExecuteNonQuery();
             }
@@ -171,6 +177,36 @@ CREATE TABLE IF NOT EXISTS photo_index (
     PRIMARY KEY (root, file_path)
 );
 CREATE INDEX IF NOT EXISTS idx_photo_index_root_game ON photo_index(root, game_id);
+CREATE TABLE IF NOT EXISTS filename_convention (
+    root TEXT NOT NULL,
+    convention_id TEXT NOT NULL,
+    name TEXT NOT NULL DEFAULT '',
+    enabled INTEGER NOT NULL DEFAULT 1,
+    priority INTEGER NOT NULL DEFAULT 0,
+    pattern TEXT NOT NULL DEFAULT '',
+    platform_label TEXT NOT NULL DEFAULT '',
+    platform_tags_text TEXT NOT NULL DEFAULT '',
+    steam_app_id_group TEXT NOT NULL DEFAULT '',
+    title_group TEXT NOT NULL DEFAULT '',
+    timestamp_group TEXT NOT NULL DEFAULT '',
+    timestamp_format TEXT NOT NULL DEFAULT '',
+    preserve_file_times INTEGER NOT NULL DEFAULT 0,
+    routes_to_manual_when_missing_steam_app_id INTEGER NOT NULL DEFAULT 0,
+    confidence_label TEXT NOT NULL DEFAULT '',
+    PRIMARY KEY (root, convention_id)
+);
+CREATE INDEX IF NOT EXISTS idx_filename_convention_root_priority ON filename_convention(root, priority DESC, convention_id COLLATE NOCASE);
+CREATE TABLE IF NOT EXISTS filename_convention_sample (
+    sample_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    root TEXT NOT NULL,
+    file_name TEXT NOT NULL,
+    suggested_platform_label TEXT NOT NULL DEFAULT '',
+    suggested_convention_id TEXT NOT NULL DEFAULT '',
+    first_seen_utc_ticks INTEGER NOT NULL DEFAULT 0,
+    last_seen_utc_ticks INTEGER NOT NULL DEFAULT 0,
+    occurrence_count INTEGER NOT NULL DEFAULT 0
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_filename_convention_sample_root_file ON filename_convention_sample(root, file_name);
 ";
                 command.ExecuteNonQuery();
             }
@@ -337,6 +373,158 @@ VALUES ($root, $filePath, $stamp, $gameId, $consoleLabel, $tagText);";
                 }
 
                 transaction.Commit();
+            }
+        }
+
+        List<FilenameConventionRule> ReadFilenameConventionsFromDatabase(string root, SqliteConnection connection)
+        {
+            var rules = new List<FilenameConventionRule>();
+            using (var command = connection.CreateCommand())
+            {
+                command.CommandText = @"
+SELECT convention_id, name, enabled, priority, pattern, platform_label, platform_tags_text, steam_app_id_group, title_group, timestamp_group, timestamp_format, preserve_file_times, routes_to_manual_when_missing_steam_app_id, confidence_label
+FROM filename_convention
+WHERE root = $root
+ORDER BY priority DESC, convention_id COLLATE NOCASE;";
+                command.Parameters.AddWithValue("$root", root ?? string.Empty);
+                using (var reader = command.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        rules.Add(new FilenameConventionRule
+                        {
+                            ConventionId = reader.IsDBNull(0) ? string.Empty : reader.GetString(0),
+                            Name = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
+                            Enabled = !reader.IsDBNull(2) && reader.GetInt32(2) != 0,
+                            Priority = reader.IsDBNull(3) ? 0 : reader.GetInt32(3),
+                            Pattern = reader.IsDBNull(4) ? string.Empty : reader.GetString(4),
+                            PlatformLabel = reader.IsDBNull(5) ? string.Empty : reader.GetString(5),
+                            PlatformTagsText = reader.IsDBNull(6) ? string.Empty : reader.GetString(6),
+                            SteamAppIdGroup = reader.IsDBNull(7) ? string.Empty : reader.GetString(7),
+                            TitleGroup = reader.IsDBNull(8) ? string.Empty : reader.GetString(8),
+                            TimestampGroup = reader.IsDBNull(9) ? string.Empty : reader.GetString(9),
+                            TimestampFormat = reader.IsDBNull(10) ? string.Empty : reader.GetString(10),
+                            PreserveFileTimes = !reader.IsDBNull(11) && reader.GetInt32(11) != 0,
+                            RoutesToManualWhenMissingSteamAppId = !reader.IsDBNull(12) && reader.GetInt32(12) != 0,
+                            ConfidenceLabel = reader.IsDBNull(13) ? string.Empty : reader.GetString(13),
+                            IsBuiltIn = false
+                        });
+                    }
+                }
+            }
+            return rules;
+        }
+
+        void WriteFilenameConventionsToDatabase(string root, IEnumerable<FilenameConventionRule> rules, SqliteConnection connection)
+        {
+            using (var transaction = connection.BeginTransaction())
+            {
+                using (var delete = connection.CreateCommand())
+                {
+                    delete.Transaction = transaction;
+                    delete.CommandText = "DELETE FROM filename_convention WHERE root = $root;";
+                    delete.Parameters.AddWithValue("$root", root ?? string.Empty);
+                    delete.ExecuteNonQuery();
+                }
+
+                foreach (var rule in (rules ?? Enumerable.Empty<FilenameConventionRule>()).Where(rule => rule != null))
+                {
+                    using (var insert = connection.CreateCommand())
+                    {
+                        insert.Transaction = transaction;
+                        insert.CommandText = @"
+INSERT INTO filename_convention (root, convention_id, name, enabled, priority, pattern, platform_label, platform_tags_text, steam_app_id_group, title_group, timestamp_group, timestamp_format, preserve_file_times, routes_to_manual_when_missing_steam_app_id, confidence_label)
+VALUES ($root, $conventionId, $name, $enabled, $priority, $pattern, $platformLabel, $platformTagsText, $steamAppIdGroup, $titleGroup, $timestampGroup, $timestampFormat, $preserveFileTimes, $routesToManualWhenMissingSteamAppId, $confidenceLabel);";
+                        insert.Parameters.AddWithValue("$root", root ?? string.Empty);
+                        insert.Parameters.AddWithValue("$conventionId", rule.ConventionId ?? string.Empty);
+                        insert.Parameters.AddWithValue("$name", rule.Name ?? string.Empty);
+                        insert.Parameters.AddWithValue("$enabled", rule.Enabled ? 1 : 0);
+                        insert.Parameters.AddWithValue("$priority", rule.Priority);
+                        insert.Parameters.AddWithValue("$pattern", rule.Pattern ?? string.Empty);
+                        insert.Parameters.AddWithValue("$platformLabel", rule.PlatformLabel ?? string.Empty);
+                        insert.Parameters.AddWithValue("$platformTagsText", rule.PlatformTagsText ?? string.Empty);
+                        insert.Parameters.AddWithValue("$steamAppIdGroup", rule.SteamAppIdGroup ?? string.Empty);
+                        insert.Parameters.AddWithValue("$titleGroup", rule.TitleGroup ?? string.Empty);
+                        insert.Parameters.AddWithValue("$timestampGroup", rule.TimestampGroup ?? string.Empty);
+                        insert.Parameters.AddWithValue("$timestampFormat", rule.TimestampFormat ?? string.Empty);
+                        insert.Parameters.AddWithValue("$preserveFileTimes", rule.PreserveFileTimes ? 1 : 0);
+                        insert.Parameters.AddWithValue("$routesToManualWhenMissingSteamAppId", rule.RoutesToManualWhenMissingSteamAppId ? 1 : 0);
+                        insert.Parameters.AddWithValue("$confidenceLabel", rule.ConfidenceLabel ?? string.Empty);
+                        insert.ExecuteNonQuery();
+                    }
+                }
+
+                transaction.Commit();
+            }
+        }
+
+        List<FilenameConventionSample> ReadFilenameConventionSamplesFromDatabase(string root, int maxCount, SqliteConnection connection)
+        {
+            var samples = new List<FilenameConventionSample>();
+            using (var command = connection.CreateCommand())
+            {
+                command.CommandText = @"
+SELECT sample_id, file_name, suggested_platform_label, suggested_convention_id, first_seen_utc_ticks, last_seen_utc_ticks, occurrence_count
+FROM filename_convention_sample
+WHERE root = $root
+ORDER BY last_seen_utc_ticks DESC, file_name COLLATE NOCASE
+LIMIT $maxCount;";
+                command.Parameters.AddWithValue("$root", root ?? string.Empty);
+                command.Parameters.AddWithValue("$maxCount", Math.Max(1, maxCount));
+                using (var reader = command.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        samples.Add(new FilenameConventionSample
+                        {
+                            SampleId = reader.IsDBNull(0) ? 0L : reader.GetInt64(0),
+                            FileName = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
+                            SuggestedPlatformLabel = reader.IsDBNull(2) ? string.Empty : reader.GetString(2),
+                            SuggestedConventionId = reader.IsDBNull(3) ? string.Empty : reader.GetString(3),
+                            FirstSeenUtcTicks = reader.IsDBNull(4) ? 0L : reader.GetInt64(4),
+                            LastSeenUtcTicks = reader.IsDBNull(5) ? 0L : reader.GetInt64(5),
+                            OccurrenceCount = reader.IsDBNull(6) ? 0 : reader.GetInt32(6)
+                        });
+                    }
+                }
+            }
+            return samples;
+        }
+
+        void UpsertFilenameConventionSample(string root, string fileName, FilenameParseResult parseResult, SqliteConnection connection)
+        {
+            if (string.IsNullOrWhiteSpace(root) || string.IsNullOrWhiteSpace(fileName)) return;
+            var nowUtcTicks = DateTime.UtcNow.Ticks;
+            using (var update = connection.CreateCommand())
+            {
+                update.CommandText = @"
+UPDATE filename_convention_sample
+SET suggested_platform_label = $platformLabel,
+    suggested_convention_id = $conventionId,
+    last_seen_utc_ticks = $lastSeenUtcTicks,
+    occurrence_count = occurrence_count + 1
+WHERE root = $root AND file_name = $fileName;";
+                update.Parameters.AddWithValue("$root", root ?? string.Empty);
+                update.Parameters.AddWithValue("$fileName", fileName ?? string.Empty);
+                update.Parameters.AddWithValue("$platformLabel", parseResult == null ? string.Empty : (parseResult.PlatformLabel ?? string.Empty));
+                update.Parameters.AddWithValue("$conventionId", parseResult == null ? string.Empty : (parseResult.ConventionId ?? string.Empty));
+                update.Parameters.AddWithValue("$lastSeenUtcTicks", nowUtcTicks);
+                var affected = update.ExecuteNonQuery();
+                if (affected > 0) return;
+            }
+
+            using (var insert = connection.CreateCommand())
+            {
+                insert.CommandText = @"
+INSERT INTO filename_convention_sample (root, file_name, suggested_platform_label, suggested_convention_id, first_seen_utc_ticks, last_seen_utc_ticks, occurrence_count)
+VALUES ($root, $fileName, $platformLabel, $conventionId, $firstSeenUtcTicks, $lastSeenUtcTicks, 1);";
+                insert.Parameters.AddWithValue("$root", root ?? string.Empty);
+                insert.Parameters.AddWithValue("$fileName", fileName ?? string.Empty);
+                insert.Parameters.AddWithValue("$platformLabel", parseResult == null ? string.Empty : (parseResult.PlatformLabel ?? string.Empty));
+                insert.Parameters.AddWithValue("$conventionId", parseResult == null ? string.Empty : (parseResult.ConventionId ?? string.Empty));
+                insert.Parameters.AddWithValue("$firstSeenUtcTicks", nowUtcTicks);
+                insert.Parameters.AddWithValue("$lastSeenUtcTicks", nowUtcTicks);
+                insert.ExecuteNonQuery();
             }
         }
 
@@ -573,6 +761,22 @@ WHERE root = $root AND game_id = $oldGameId;";
             }
         }
 
+        public List<FilenameConventionRule> LoadFilenameConventions(string root)
+        {
+            using (var connection = OpenIndexDatabase(root))
+            {
+                return ReadFilenameConventionsFromDatabase(root, connection);
+            }
+        }
+
+        public List<FilenameConventionSample> LoadFilenameConventionSamples(string root, int maxCount)
+        {
+            using (var connection = OpenIndexDatabase(root))
+            {
+                return ReadFilenameConventionSamplesFromDatabase(root, maxCount, connection);
+            }
+        }
+
         public void SaveSavedGameIndexRows(string root, IEnumerable<GameIndexEditorRow> rows)
         {
             var sourceRows = (rows ?? Enumerable.Empty<GameIndexEditorRow>()).Where(row => row != null).ToList();
@@ -590,6 +794,22 @@ WHERE root = $root AND game_id = $oldGameId;";
             {
                 if (dependencies.RewriteGameIdAliasesInLibraryFolderCacheFile != null) dependencies.RewriteGameIdAliasesInLibraryFolderCacheFile(root, aliasMap);
                 if (dependencies.ApplyGameIdAliasesToCachedMetadataIndex != null) dependencies.ApplyGameIdAliasesToCachedMetadataIndex(root, aliasMap);
+            }
+        }
+
+        public void SaveFilenameConventions(string root, IEnumerable<FilenameConventionRule> rules)
+        {
+            using (var connection = OpenIndexDatabase(root))
+            {
+                WriteFilenameConventionsToDatabase(root, rules, connection);
+            }
+        }
+
+        public void RecordFilenameConventionSample(string root, string fileName, FilenameParseResult parseResult)
+        {
+            using (var connection = OpenIndexDatabase(root))
+            {
+                UpsertFilenameConventionSample(root, fileName, parseResult, connection);
             }
         }
 

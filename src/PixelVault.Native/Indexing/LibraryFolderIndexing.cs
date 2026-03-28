@@ -278,9 +278,7 @@ namespace PixelVaultNative
 
         string GuessSteamAppIdFromFileName(string file)
         {
-            var baseName = Path.GetFileNameWithoutExtension(file ?? string.Empty);
-            var match = Regex.Match(baseName, @"^(?<id>\d{3,})_(?<ts>\d{14})(?:[_-]\d+)?$", RegexOptions.IgnoreCase);
-            return match.Success ? match.Groups["id"].Value : string.Empty;
+            return ParseFilename(file).SteamAppId;
         }
 
         string ResolveLibraryFolderSteamAppId(string platformLabel, IEnumerable<string> files)

@@ -4,6 +4,11 @@ Strategic roadmap for the live native WPF app under `C:\Codex\src\PixelVault.Nat
 
 This document is the long-term planning layer.
 
+Documentation sync rule:
+
+- keep roadmap phase status aligned with the matching Notion roadmap entries
+- use `C:\Codex\docs\DOC_SYNC_POLICY.md` when release, milestone, or workflow changes affect both sides
+
 Use it for:
 
 - sequencing major improvements

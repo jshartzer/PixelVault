@@ -1,3 +1,20 @@
+## 0.785
+- Centralized filename parsing behind a shared service and added a dedicated Filename Rules editor so built-in conventions, custom DB-backed overrides, and repeated unmatched samples can all be managed from one place.
+- Improved sample-to-rule promotion by recognizing more timestamp/title filename shapes, supporting starter rules from recent unmatched samples, and adding a faster `Promote Frequent` path for repeated misses.
+- Added test coverage for filename parser behavior plus filename convention persistence/sample accumulation so future convention changes have a stronger safety net.
+
+## 0.784
+- Polished the Steam match picker footer by aligning the `Cancel` and `Use Match` buttons on a fixed right-aligned grid instead of letting the shared button margins push them out of line.
+
+## 0.783
+- Tightened Library detail-grid spacing by switching the virtualized capture rows to balanced row gutters, so the gaps between screenshots stay even horizontally and vertically instead of drifting into oversized blank bands.
+- Upgraded Manual Intake Steam lookup to fetch multiple possible store matches and open a picker window, so date-only Steam exports can be assigned the correct AppID even when the typed game name is not an exact match.
+
+## 0.782
+- Fixed a pair of Library/intake regressions by removing oversized gaps between virtualized capture rows and making the new intake preview wait until the window is actually loaded before applying its first async refresh.
+- Tuned the upload-queue review button and preview styling by giving the controller badge more room, removing the oval pill chrome from the `Ready by console` list, and hiding the `Preserve file time` label from general intake UI.
+- Added Manual Intake support for Steam’s date-only manual exports like `20200525124119_1.jpg`, including a Steam lookup box that searches by game name, fills the AppID before import, and carries that AppID into the saved game index.
+
 ## 0.781
 - Continued the performance/maintainability pass by extracting cover, metadata, and index-persistence work into dedicated services, so the UI and indexing flows no longer own the full SteamGridDB/ExifTool/database implementation details directly.
 - Moved import/manual-intake metadata work, intake preview refresh, and Game Index external-ID resolution further away from the UI thread with progress-backed background execution and added more targeted performance logging around slow network and preview-build paths.

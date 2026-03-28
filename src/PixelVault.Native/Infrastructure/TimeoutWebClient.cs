@@ -7,6 +7,7 @@ using System.Threading;
 
 namespace PixelVaultNative
 {
+    // Synchronous wrapper kept for legacy call sites. Any heavy use of this type must stay off the WPF UI thread.
     sealed class TimeoutWebClient : IDisposable
     {
         readonly HttpClientHandler handler = new HttpClientHandler();

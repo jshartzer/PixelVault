@@ -39,7 +39,7 @@ namespace PixelVaultNative
 
     public sealed partial class MainWindow : Window
     {
-        const string AppVersion = "0.781";
+        const string AppVersion = "0.785";
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
         const string ClearedExternalIdSentinel = "__PV_CLEARED__";
@@ -87,8 +87,11 @@ namespace PixelVaultNative
         ComboBox conflictBox;
         Window photoIndexEditorWindow;
         Window gameIndexEditorWindow;
+        Window filenameConventionEditorWindow;
         int previewRefreshVersion;
+        CancellationTokenSource previewRefreshCancellation;
         readonly ICoverService coverService;
+        readonly IFilenameParserService filenameParserService;
         readonly IIndexPersistenceService indexPersistenceService;
         readonly IMetadataService metadataService;
 
@@ -133,6 +136,13 @@ namespace PixelVaultNative
                 DetermineConsoleLabelFromTags = delegate(IEnumerable<string> tags) { return DetermineConsoleLabelFromTags(tags); },
                 RewriteGameIdAliasesInLibraryFolderCacheFile = delegate(string root, Dictionary<string, string> aliasMap) { RewriteGameIdAliasesInLibraryFolderCacheFile(root, aliasMap); },
                 ApplyGameIdAliasesToCachedMetadataIndex = delegate(string root, Dictionary<string, string> aliasMap) { ApplyGameIdAliasesToCachedMetadataIndex(root, aliasMap); }
+            });
+            filenameParserService = new FilenameParserService(new FilenameParserServiceDependencies
+            {
+                LoadCustomConventions = delegate(string root) { return indexPersistenceService.LoadFilenameConventions(root); },
+                ParseTagText = delegate(string value) { return ParseTagText(value); },
+                IsVideo = delegate(string file) { return IsVideo(file); },
+                NormalizeConsoleLabel = delegate(string value) { return NormalizeConsoleLabel(value); }
             });
             metadataService = new MetadataService(new MetadataServiceDependencies
             {
@@ -206,6 +216,8 @@ namespace PixelVaultNative
             gameIndexTopButton.Margin = new Thickness(0, 0, 12, 0);
             var photoIndexTopButton = Btn("Photo Index", delegate { OpenPhotoIndexEditor(); }, "#20343A", Brushes.White);
             photoIndexTopButton.Margin = new Thickness(0, 0, 12, 0);
+            var filenameRulesTopButton = Btn("Filename Rules", delegate { OpenFilenameConventionEditor(); }, "#20343A", Brushes.White);
+            filenameRulesTopButton.Margin = new Thickness(0, 0, 12, 0);
             var changelogTopButton = Btn("Changelog", delegate { ShowChangelogWindow(); }, "#20343A", Brushes.White);
             changelogTopButton.Margin = new Thickness(0, 0, 12, 0);
             var sp = new Border { Child = status, Background = Brush("#20343A"), CornerRadius = new CornerRadius(12), Padding = new Thickness(14, 10, 14, 10) };
@@ -213,6 +225,7 @@ namespace PixelVaultNative
             headerRight.Children.Add(viewLogsTopButton);
             headerRight.Children.Add(gameIndexTopButton);
             headerRight.Children.Add(photoIndexTopButton);
+            headerRight.Children.Add(filenameRulesTopButton);
             headerRight.Children.Add(changelogTopButton);
             headerRight.Children.Add(sp);
             hg.Children.Add(hs);
@@ -1436,16 +1449,17 @@ namespace PixelVaultNative
         {
             foreach (var root in GetSourceRoots()) OpenFolder(root);
         }
-        void LoadIntakePreviewSummaryAsync(bool recurseRename, Action<IntakePreviewSummary> onSuccess, Action<Exception> onError)
+        void LoadIntakePreviewSummaryAsync(bool recurseRename, CancellationToken cancellationToken, Action<IntakePreviewSummary> onSuccess, Action<Exception> onError)
         {
             Task.Factory.StartNew(delegate
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var stopwatch = Stopwatch.StartNew();
-                var summary = BuildIntakePreviewSummary(recurseRename);
+                var summary = BuildIntakePreviewSummary(recurseRename, cancellationToken);
                 stopwatch.Stop();
                 LogPerformanceSample("IntakePreviewBuild", stopwatch, "recurseRename=" + recurseRename + "; topLevel=" + summary.TopLevelMediaCount + "; reviewItems=" + summary.MetadataCandidateCount + "; manualItems=" + summary.ManualItemCount + "; conflicts=" + summary.ConflictCount, 40);
                 return summary;
-            }).ContinueWith(delegate(Task<IntakePreviewSummary> summaryTask)
+            }, cancellationToken).ContinueWith(delegate(Task<IntakePreviewSummary> summaryTask)
             {
                 Dispatcher.BeginInvoke(new Action(delegate
                 {
@@ -1465,15 +1479,18 @@ namespace PixelVaultNative
                 }));
             }, TaskScheduler.Default);
         }
-        IntakePreviewSummary BuildIntakePreviewSummary(bool recurseRename)
+        IntakePreviewSummary BuildIntakePreviewSummary(bool recurseRename, CancellationToken cancellationToken = default(CancellationToken))
         {
+            cancellationToken.ThrowIfCancellationRequested();
             EnsureSourceFolders();
             var inventory = BuildSourceInventory(recurseRename);
+            cancellationToken.ThrowIfCancellationRequested();
             var rename = inventory.RenameScopeFiles;
             var move = inventory.TopLevelMediaFiles;
-            var reviewItems = BuildReviewItems(move);
+            var reviewItems = BuildReviewItems(move, cancellationToken);
             var recognizedPaths = new HashSet<string>(reviewItems.Select(i => i.FilePath), StringComparer.OrdinalIgnoreCase);
-            var manualItems = BuildManualMetadataItems(move, recognizedPaths);
+            var manualItems = BuildManualMetadataItems(move, recognizedPaths, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
             var manualPaths = new HashSet<string>(manualItems.Select(i => i.FilePath), StringComparer.OrdinalIgnoreCase);
             var moveCandidates = move.Where(f => !manualPaths.Contains(f)).ToList();
             return new IntakePreviewSummary
@@ -1499,9 +1516,16 @@ namespace PixelVaultNative
         {
             var refreshVersion = ++previewRefreshVersion;
             var recurseRename = recurseBox != null && recurseBox.IsChecked == true;
+            if (previewRefreshCancellation != null)
+            {
+                previewRefreshCancellation.Cancel();
+                previewRefreshCancellation.Dispose();
+            }
+            previewRefreshCancellation = new CancellationTokenSource();
+            var refreshCancellationToken = previewRefreshCancellation.Token;
             status.Text = "Refreshing preview";
             RenderPreviewLoading("Refreshing upload preview...");
-            LoadIntakePreviewSummaryAsync(recurseRename, delegate(IntakePreviewSummary summary)
+            LoadIntakePreviewSummaryAsync(recurseRename, refreshCancellationToken, delegate(IntakePreviewSummary summary)
             {
                 if (refreshVersion != previewRefreshVersion) return;
                 RenderPreview(summary);
@@ -1510,6 +1534,7 @@ namespace PixelVaultNative
             }, delegate(Exception ex)
             {
                 if (refreshVersion != previewRefreshVersion) return;
+                if (ex is OperationCanceledException) return;
                 RenderPreviewError(ex.Message);
                 status.Text = "Preview failed";
                 Log(ex.Message);
@@ -1527,6 +1552,7 @@ namespace PixelVaultNative
             Button refreshButton = null;
             Action renderWindow = null;
             int previewWindowRefreshVersion = 0;
+            CancellationTokenSource previewWindowRefreshCancellation = null;
             try
             {
                 previewWindow = new Window
@@ -1634,6 +1660,13 @@ namespace PixelVaultNative
                 renderWindow = delegate
                 {
                     var refreshVersion = ++previewWindowRefreshVersion;
+                    if (previewWindowRefreshCancellation != null)
+                    {
+                        previewWindowRefreshCancellation.Cancel();
+                        previewWindowRefreshCancellation.Dispose();
+                    }
+                    previewWindowRefreshCancellation = new CancellationTokenSource();
+                    var refreshCancellationToken = previewWindowRefreshCancellation.Token;
                     headerMeta.Text = "Refreshing the upload queue snapshot...";
                     statsGrid.Children.Clear();
                     for (int i = 0; i < 4; i++)
@@ -1667,7 +1700,7 @@ namespace PixelVaultNative
                     if (manualButton != null) manualButton.IsEnabled = false;
                     status.Text = "Refreshing preview";
 
-                    LoadIntakePreviewSummaryAsync(recurseRename, delegate(IntakePreviewSummary summary)
+                    LoadIntakePreviewSummaryAsync(recurseRename, refreshCancellationToken, delegate(IntakePreviewSummary summary)
                     {
                         if (previewWindow == null || !previewWindow.IsVisible) return;
                         if (refreshVersion != previewWindowRefreshVersion) return;
@@ -1717,40 +1750,25 @@ namespace PixelVaultNative
                                 var sectionStack = new StackPanel();
                                 var sectionHeader = new DockPanel { Margin = new Thickness(0, 0, 0, 12) };
                                 sectionHeader.Children.Add(new TextBlock { Text = group.Key, Foreground = Brush("#F5EFE4"), FontSize = 17, FontWeight = FontWeights.SemiBold });
-                                var pill = new Border
+                                var countLabel = new TextBlock
                                 {
-                                    Background = accent,
-                                    CornerRadius = new CornerRadius(999),
-                                    Padding = new Thickness(10, 4, 10, 4),
+                                    Text = group.Count() + " ready",
+                                    Foreground = accent,
+                                    FontSize = 12,
+                                    FontWeight = FontWeights.SemiBold,
                                     HorizontalAlignment = HorizontalAlignment.Right,
-                                    Child = new TextBlock { Text = group.Count() + " ready", Foreground = Brush("#081015"), FontWeight = FontWeights.SemiBold, FontSize = 11 }
+                                    VerticalAlignment = VerticalAlignment.Center
                                 };
-                                DockPanel.SetDock(pill, Dock.Right);
-                                sectionHeader.Children.Add(pill);
+                                DockPanel.SetDock(countLabel, Dock.Right);
+                                sectionHeader.Children.Add(countLabel);
                                 sectionStack.Children.Add(sectionHeader);
                                 foreach (var item in group)
                                 {
                                     var row = new Border { Background = Brush("#0D1419"), BorderBrush = Brush("#1C2B34"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(14), Padding = new Thickness(12, 10, 12, 10), Margin = new Thickness(0, 0, 0, 8) };
-                                    var rowGrid = new Grid();
-                                    rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                                    rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
                                     var rowText = new StackPanel();
                                     rowText.Children.Add(new TextBlock { Text = item.FileName, Foreground = Brush("#F4F7FA"), FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis });
                                     rowText.Children.Add(new TextBlock { Text = "Captured " + FormatFriendlyTimestamp(item.CaptureTime), Foreground = Brush("#8FA1AD"), FontSize = 11, Margin = new Thickness(0, 4, 0, 0) });
-                                    rowGrid.Children.Add(rowText);
-                                    var typePill = new Border
-                                    {
-                                        Background = item.PreserveFileTimes ? Brush("#1C2E39") : Brush("#173127"),
-                                        BorderBrush = item.PreserveFileTimes ? Brush("#3E6C88") : Brush("#3B7F5C"),
-                                        BorderThickness = new Thickness(1),
-                                        CornerRadius = new CornerRadius(999),
-                                        Padding = new Thickness(10, 5, 10, 5),
-                                        Margin = new Thickness(12, 0, 0, 0),
-                                        Child = new TextBlock { Text = item.PreserveFileTimes ? "Preserve file time" : "Auto metadata", Foreground = Brush("#E6EEF5"), FontSize = 11, FontWeight = FontWeights.SemiBold }
-                                    };
-                                    Grid.SetColumn(typePill, 1);
-                                    rowGrid.Children.Add(typePill);
-                                    row.Child = rowGrid;
+                                    row.Child = rowText;
                                     sectionStack.Children.Add(row);
                                 }
                                 section.Child = sectionStack;
@@ -1831,6 +1849,7 @@ namespace PixelVaultNative
                     {
                         if (previewWindow == null || !previewWindow.IsVisible) return;
                         if (refreshVersion != previewWindowRefreshVersion) return;
+                        if (ex is OperationCanceledException) return;
                         RenderPreviewError(ex.Message);
                         status.Text = "Preview failed";
                         Log(ex.Message);
@@ -1868,7 +1887,19 @@ namespace PixelVaultNative
                     renderWindow();
                 };
 
-                renderWindow();
+                previewWindow.Loaded += delegate
+                {
+                    renderWindow();
+                };
+                previewWindow.Closed += delegate
+                {
+                    if (previewWindowRefreshCancellation != null)
+                    {
+                        previewWindowRefreshCancellation.Cancel();
+                        previewWindowRefreshCancellation.Dispose();
+                        previewWindowRefreshCancellation = null;
+                    }
+                };
                 previewWindow.ShowDialog();
             }
             catch (Exception ex)
@@ -1939,21 +1970,23 @@ namespace PixelVaultNative
             return BuildReviewItems(BuildSourceInventory(false).TopLevelMediaFiles);
         }
 
-        List<ReviewItem> BuildReviewItems(IEnumerable<string> sourceFiles)
+        List<ReviewItem> BuildReviewItems(IEnumerable<string> sourceFiles, CancellationToken cancellationToken = default(CancellationToken))
         {
             var items = new List<ReviewItem>();
             foreach (var file in (sourceFiles ?? Enumerable.Empty<string>()).Where(File.Exists).Distinct(StringComparer.OrdinalIgnoreCase))
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var fileName = Path.GetFileName(file);
                 if (!CanUpdateMetadata(fileName)) continue;
-                var platformTags = DetectPlatformTags(fileName);
-                bool preserveFileTimes = platformTags.Contains("Xbox") || IsVideo(file);
-                DateTime dt = preserveFileTimes ? GetLibraryDate(file) : (ParseCaptureDate(fileName) ?? GetLibraryDate(file));
+                var parsed = ParseFilename(fileName);
+                var platformTags = parsed.PlatformTags;
+                bool preserveFileTimes = parsed.PreserveFileTimes || platformTags.Contains("Xbox") || IsVideo(file);
+                DateTime dt = preserveFileTimes ? GetLibraryDate(file) : (parsed.CaptureTime ?? GetLibraryDate(file));
                 items.Add(new ReviewItem
                 {
                     FilePath = file,
                     FileName = fileName,
-                    PlatformLabel = PrimaryPlatformLabel(fileName),
+                    PlatformLabel = parsed.PlatformLabel,
                     PlatformTags = platformTags,
                     CaptureTime = dt,
                     PreserveFileTimes = preserveFileTimes,
@@ -1974,19 +2007,24 @@ namespace PixelVaultNative
             return BuildManualMetadataItems(BuildSourceInventory(false).TopLevelMediaFiles, recognizedPaths);
         }
 
-        List<ManualMetadataItem> BuildManualMetadataItems(IEnumerable<string> sourceFiles, HashSet<string> recognizedPaths)
+        List<ManualMetadataItem> BuildManualMetadataItems(IEnumerable<string> sourceFiles, HashSet<string> recognizedPaths, CancellationToken cancellationToken = default(CancellationToken))
         {
             var items = new List<ManualMetadataItem>();
             var known = recognizedPaths ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var file in (sourceFiles ?? Enumerable.Empty<string>()).Where(File.Exists).Distinct(StringComparer.OrdinalIgnoreCase))
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (known.Contains(file)) continue;
                 var fileName = Path.GetFileName(file);
                 if (CanUpdateMetadata(fileName)) continue;
-                var captureTime = GetLibraryDate(file);
+                var parsed = ParseFilename(fileName);
+                var captureTime = parsed.CaptureTime ?? GetLibraryDate(file);
+                var guessedPlatform = parsed.PlatformLabel;
+                indexPersistenceService.RecordFilenameConventionSample(libraryRoot, fileName, parsed);
                 items.Add(new ManualMetadataItem
                 {
                     GameId = string.Empty,
+                    SteamAppId = parsed.SteamAppId,
                     FilePath = file,
                     FileName = fileName,
                     OriginalFileName = fileName,
@@ -1996,23 +2034,24 @@ namespace PixelVaultNative
                     Comment = string.Empty,
                     TagText = string.Empty,
                     AddPhotographyTag = false,
-                    TagSteam = false,
-                    TagPs5 = false,
-                    TagXbox = false,
-                    TagPc = false,
+                    TagSteam = string.Equals(guessedPlatform, "Steam", StringComparison.OrdinalIgnoreCase),
+                    TagPs5 = string.Equals(guessedPlatform, "PS5", StringComparison.OrdinalIgnoreCase),
+                    TagXbox = string.Equals(guessedPlatform, "Xbox", StringComparison.OrdinalIgnoreCase),
+                    TagPc = string.Equals(guessedPlatform, "PC", StringComparison.OrdinalIgnoreCase),
                     TagOther = false,
                     CustomPlatformTag = string.Empty,
                     OriginalGameId = string.Empty,
+                    OriginalSteamAppId = parsed.SteamAppId,
                     OriginalCaptureTime = captureTime,
                     OriginalUseCustomCaptureTime = false,
                     OriginalGameName = string.Empty,
                     OriginalComment = string.Empty,
                     OriginalTagText = string.Empty,
                     OriginalAddPhotographyTag = false,
-                    OriginalTagSteam = false,
-                    OriginalTagPc = false,
-                    OriginalTagPs5 = false,
-                    OriginalTagXbox = false,
+                    OriginalTagSteam = string.Equals(guessedPlatform, "Steam", StringComparison.OrdinalIgnoreCase),
+                    OriginalTagPc = string.Equals(guessedPlatform, "PC", StringComparison.OrdinalIgnoreCase),
+                    OriginalTagPs5 = string.Equals(guessedPlatform, "PS5", StringComparison.OrdinalIgnoreCase),
+                    OriginalTagXbox = string.Equals(guessedPlatform, "Xbox", StringComparison.OrdinalIgnoreCase),
                     OriginalTagOther = false,
                     OriginalCustomPlatformTag = string.Empty
                 });
@@ -2370,6 +2409,23 @@ namespace PixelVaultNative
             var guessCallout = new Border { Background = Brush("#F4F7F9"), BorderBrush = Brush("#D7E1E8"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(12), Padding = new Thickness(12, 10, 12, 10), Margin = new Thickness(0, 0, 0, 16) };
             var guessText = new TextBlock { Text = "Best Guess | No confident match", FontSize = 13, Foreground = Brush("#8B98A3"), TextWrapping = TextWrapping.Wrap };
             guessCallout.Child = guessText;
+            var steamLookupLabel = new TextBlock { Text = "Steam lookup", FontSize = 16, FontWeight = FontWeights.SemiBold, Foreground = Brush("#1F2A30") };
+            var steamLookupGrid = new Grid { Margin = new Thickness(0, 8, 0, 14) };
+            steamLookupGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            steamLookupGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            steamLookupGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(140) });
+            var steamSearchBox = new TextBox { Margin = new Thickness(0, 0, 12, 0), Background = Brushes.White, BorderBrush = Brush("#D7E1E8"), BorderThickness = new Thickness(1), Padding = new Thickness(12, 8, 12, 8), FontSize = 14 };
+            var steamSearchButton = Btn("Search Steam", null, "#174A73", Brushes.White);
+            steamSearchButton.Width = 150;
+            steamSearchButton.Height = 40;
+            steamSearchButton.Margin = new Thickness(0, 0, 12, 0);
+            var steamAppIdBox = new TextBox { Background = Brushes.White, BorderBrush = Brush("#D7E1E8"), BorderThickness = new Thickness(1), Padding = new Thickness(12, 8, 12, 8), FontSize = 14 };
+            steamLookupGrid.Children.Add(steamSearchBox);
+            Grid.SetColumn(steamSearchButton, 1);
+            steamLookupGrid.Children.Add(steamSearchButton);
+            Grid.SetColumn(steamAppIdBox, 2);
+            steamLookupGrid.Children.Add(steamAppIdBox);
+            var steamLookupStatus = new TextBlock { Text = "Search by game name to fetch a Steam AppID, or paste one directly.", Foreground = Brush("#5F6970"), Margin = new Thickness(0, 0, 0, 16), TextWrapping = TextWrapping.Wrap };
             var knownGameChoices = new List<string>();
             var knownGameChoiceSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var knownGameChoiceNameMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -2425,6 +2481,9 @@ namespace PixelVaultNative
             detailStack.Children.Add(selectedMeta);
             detailStack.Children.Add(previewBorder);
             detailStack.Children.Add(guessCallout);
+            detailStack.Children.Add(steamLookupLabel);
+            detailStack.Children.Add(steamLookupGrid);
+            detailStack.Children.Add(steamLookupStatus);
             detailStack.Children.Add(new TextBlock { Text = "Game title to prepend", FontSize = 16, FontWeight = FontWeights.SemiBold, Foreground = Brush("#1F2A30") });
             detailStack.Children.Add(gameNameBox);
             detailStack.Children.Add(new TextBlock { Text = "Additional tags", FontSize = 16, FontWeight = FontWeights.SemiBold, Foreground = Brush("#1F2A30") });
@@ -2443,6 +2502,7 @@ namespace PixelVaultNative
             var tileBorders = new Dictionary<ManualMetadataItem, Border>();
             var selectedItems = new List<ManualMetadataItem>();
             Action refreshSelectionStatus = null;
+            Action syncSelectedSteamAppIds = null;
             Action refreshGameTitleChoices = delegate
             {
                 var currentText = gameNameBox.Text;
@@ -2487,6 +2547,33 @@ namespace PixelVaultNative
                 if (knownGameChoiceNameMap.TryGetValue(selectedTitleText, out mappedName)) selectedTitleText = mappedName;
                 else selectedTitleText = ExtractGameNameFromChoiceLabel(selectedTitleText);
                 foreach (var item in selectedItems) item.GameName = selectedTitleText;
+                refreshSelectionStatus();
+            };
+            syncSelectedSteamAppIds = delegate
+            {
+                if (suppressSync || selectedItems.Count == 0) return;
+                var cleanedAppId = Regex.Replace((steamAppIdBox.Text ?? string.Empty).Trim(), @"[^\d]", string.Empty);
+                if (!string.Equals(steamAppIdBox.Text ?? string.Empty, cleanedAppId, StringComparison.Ordinal))
+                {
+                    suppressSync = true;
+                    steamAppIdBox.Text = cleanedAppId;
+                    steamAppIdBox.SelectionStart = steamAppIdBox.Text.Length;
+                    suppressSync = false;
+                }
+                foreach (var item in selectedItems) item.SteamAppId = cleanedAppId;
+                if (!string.IsNullOrWhiteSpace(cleanedAppId))
+                {
+                    foreach (var item in selectedItems)
+                    {
+                        item.TagSteam = true;
+                        item.TagPc = false;
+                        item.TagPs5 = false;
+                        item.TagXbox = false;
+                        item.TagOther = false;
+                        item.CustomPlatformTag = string.Empty;
+                        item.ForceTagMetadataWrite = true;
+                    }
+                }
                 refreshSelectionStatus();
             };
 
@@ -2614,6 +2701,7 @@ namespace PixelVaultNative
                 var notes = new List<string>();
                 if (selectedItems.Count > 1) notes.Add(selectedItems.Count + " files selected");
                 if (!string.IsNullOrWhiteSpace(gameNameBox.Text)) notes.Add("rename prefix ready");
+                if (!string.IsNullOrWhiteSpace(steamAppIdBox.Text)) notes.Add("Steam AppID " + steamAppIdBox.Text);
                 if (!string.IsNullOrWhiteSpace(commentBox.Text)) notes.Add("comment saved");
                 var tagCount = ParseTagText(tagsBox.Text).Length;
                 if (tagCount > 0) notes.Add(tagCount + " extra tag(s)");
@@ -2638,6 +2726,9 @@ namespace PixelVaultNative
                     guessText.Text = "Best Guess | No confident match";
                     previewBorder.Child = buildMultiPreview(0);
                     suppressSync = true;
+                    steamSearchBox.Text = string.Empty;
+                    steamAppIdBox.Text = string.Empty;
+                    steamLookupStatus.Text = "Search by game name to fetch a Steam AppID, or paste one directly.";
                     gameNameBox.Text = string.Empty;
                     tagsBox.Text = string.Empty;
                     commentBox.Text = string.Empty;
@@ -2667,6 +2758,9 @@ namespace PixelVaultNative
                     selectedTitle.Text = item.FileName;
                     selectedMeta.Text = singleSelectionMetaPrefix + FormatFriendlyTimestamp(GetLibraryDate(item.FilePath));
                     guessText.Text = sharedFilenameGuess(selectedItems);
+                    steamLookupStatus.Text = string.IsNullOrWhiteSpace(item.SteamAppId)
+                        ? (IsSteamManualExportWithoutAppId(item.FileName) ? "Steam-style export detected. Search the game name to attach its AppID before import." : "Search by game name to fetch a Steam AppID, or paste one directly.")
+                        : "Steam AppID " + item.SteamAppId + " will be saved with this import.";
                     previewBorder.Child = previewImage;
                     previewImage.Source = LoadImageSource(item.FilePath, 1600);
                 }
@@ -2675,9 +2769,15 @@ namespace PixelVaultNative
                     selectedTitle.Text = selectedItems.Count + " captures selected";
                     selectedMeta.Text = "Edits here apply to all selected files. Mixed values show as blank or indeterminate.";
                     guessText.Text = sharedFilenameGuess(selectedItems);
+                    steamLookupStatus.Text = "Search by game name to apply one Steam AppID to the selected captures, or paste it directly.";
                     previewBorder.Child = buildMultiPreview(selectedItems.Count);
                 }
 
+                steamSearchBox.Text = sharedText(selectedItems, delegate(ManualMetadataItem item)
+                {
+                    return item.GameName;
+                });
+                steamAppIdBox.Text = sharedText(selectedItems, delegate(ManualMetadataItem item) { return item.SteamAppId; });
                 gameNameBox.Text = sharedText(selectedItems, delegate(ManualMetadataItem item)
                 {
                     var displayLabel = BuildGameTitleChoiceLabel(item.GameName, DetermineManualMetadataPlatformLabel(item));
@@ -2737,6 +2837,105 @@ namespace PixelVaultNative
             {
                 syncSelectedGameNames();
             }));
+            steamAppIdBox.TextChanged += delegate
+            {
+                syncSelectedSteamAppIds();
+            };
+            steamAppIdBox.LostKeyboardFocus += delegate
+            {
+                syncSelectedSteamAppIds();
+            };
+            steamSearchButton.Click += delegate
+            {
+                if (selectedItems.Count == 0)
+                {
+                    MessageBox.Show("Select one or more captures before searching Steam.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+                var query = CleanTag(steamSearchBox.Text);
+                string mappedName;
+                if (knownGameChoiceNameMap.TryGetValue(query, out mappedName)) query = mappedName;
+                else query = ExtractGameNameFromChoiceLabel(query);
+                if (string.IsNullOrWhiteSpace(query))
+                {
+                    query = CleanTag(gameNameBox.Text);
+                    if (knownGameChoiceNameMap.TryGetValue(query, out mappedName)) query = mappedName;
+                    else query = ExtractGameNameFromChoiceLabel(query);
+                }
+                if (string.IsNullOrWhiteSpace(query))
+                {
+                    var firstItem = selectedItems[0];
+                    if (firstItem != null && !string.IsNullOrWhiteSpace(firstItem.GameName)) query = CleanTag(firstItem.GameName);
+                }
+                if (string.IsNullOrWhiteSpace(query))
+                {
+                    MessageBox.Show("Enter a game name first, then search Steam for its AppID.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                steamSearchButton.IsEnabled = false;
+                steamLookupStatus.Text = "Searching Steam for \"" + query + "\"...";
+                var searchQuery = query;
+                Task.Factory.StartNew(delegate
+                {
+                    return Tuple.Create(searchQuery, SearchSteamAppMatches(searchQuery));
+                }).ContinueWith(delegate(Task<Tuple<string, List<Tuple<string, string>>>> searchTask)
+                {
+                    Dispatcher.BeginInvoke(new Action(delegate
+                    {
+                        steamSearchButton.IsEnabled = true;
+                        if (searchTask.IsFaulted || searchTask.IsCanceled)
+                        {
+                            steamLookupStatus.Text = "Steam lookup failed. Try again or paste the AppID directly.";
+                            return;
+                        }
+                        var result = searchTask.Result;
+                        var matches = result == null || result.Item2 == null ? new List<Tuple<string, string>>() : result.Item2;
+                        if (matches.Count == 0)
+                        {
+                            steamLookupStatus.Text = "No Steam AppID match found for \"" + searchQuery + "\".";
+                            return;
+                        }
+
+                        var chosenMatch = matches.Count == 1 ? matches[0] : ShowSteamAppMatchWindow(searchQuery, matches);
+                        if (chosenMatch == null)
+                        {
+                            steamLookupStatus.Text = "Steam search canceled. Pick a match or paste the AppID directly.";
+                            return;
+                        }
+
+                        var resolvedAppId = chosenMatch.Item1 ?? string.Empty;
+                        var resolvedTitle = chosenMatch.Item2 ?? string.Empty;
+
+                        suppressSync = true;
+                        steamSearchBox.Text = string.IsNullOrWhiteSpace(resolvedTitle) ? searchQuery : resolvedTitle;
+                        steamAppIdBox.Text = resolvedAppId;
+                        suppressSync = false;
+                        foreach (var item in selectedItems)
+                        {
+                            item.SteamAppId = resolvedAppId;
+                            if (!string.IsNullOrWhiteSpace(resolvedTitle)) item.GameName = resolvedTitle;
+                        }
+                        applyConsoleSelection(selectedItems, "Steam");
+                        refreshTileBadges();
+                        if (!string.IsNullOrWhiteSpace(resolvedTitle))
+                        {
+                            if (knownGameChoiceSet.Add(BuildGameTitleChoiceLabel(resolvedTitle, "Steam"))) knownGameChoices.Add(BuildGameTitleChoiceLabel(resolvedTitle, "Steam"));
+                            refreshGameTitleChoices();
+                            suppressSync = true;
+                            gameNameBox.Text = resolvedTitle;
+                            suppressSync = false;
+                            syncSelectedGameNames();
+                        }
+                        else
+                        {
+                            steamLookupStatus.Text = "Selected Steam AppID " + resolvedAppId + ".";
+                            refreshSelectionStatus();
+                        }
+                        refreshSelectionUi();
+                    }));
+                }, TaskScheduler.Default);
+            };
             tagsBox.TextChanged += delegate
             {
                 if (suppressSync || selectedItems.Count == 0) return;
@@ -2993,7 +3192,15 @@ namespace PixelVaultNative
                     var preferredGameId = ManualMetadataChangesGroupingIdentity(item) ? string.Empty : item.GameId;
                     var resolvedRow = ResolveExistingGameIndexRowForAssignment(gameRows, item.GameName, DetermineManualMetadataPlatformLabel(item), preferredGameId);
                     item.GameId = resolvedRow == null ? string.Empty : resolvedRow.GameId;
-                    if (resolvedRow != null && !string.IsNullOrWhiteSpace(resolvedRow.Name)) item.GameName = resolvedRow.Name;
+                    if (resolvedRow != null)
+                    {
+                        if (!string.IsNullOrWhiteSpace(resolvedRow.Name)) item.GameName = resolvedRow.Name;
+                        if (!string.IsNullOrWhiteSpace(item.SteamAppId))
+                        {
+                            resolvedRow.SteamAppId = item.SteamAppId;
+                            resolvedRow.SuppressSteamAppIdAutoResolve = false;
+                        }
+                    }
                 }
                 SaveSavedGameIndexRows(libraryRoot, gameRows);
                 items.Clear();
@@ -3192,23 +3399,14 @@ namespace PixelVaultNative
             progressWindow.ShowDialog();
         }
 
+        FilenameParseResult ParseFilename(string file)
+        {
+            return filenameParserService.Parse(file, libraryRoot);
+        }
+
         string GetGameNameFromFileName(string baseName)
         {
-            var match = Regex.Match(baseName, "^(?<game>.+?)_(?<ts>\\d{14})(?:[_-]\\d+)?$");
-            if (match.Success) return match.Groups["game"].Value;
-
-            match = Regex.Match(baseName, "^(?<game>.+?)_(?<ts>\\d{8,})(?:[_-]\\d+)?$");
-            if (match.Success) return match.Groups["game"].Value;
-
-            match = Regex.Match(baseName, "^(?<game>.+?)-(?<year>20\\d{2})[_-](?<mon>\\d{2})[_-](?<day>\\d{2}).*$");
-            if (match.Success) return match.Groups["game"].Value;
-
-            if (baseName.Contains("_")) return baseName.Split('_')[0];
-
-            match = Regex.Match(baseName, "^(?<game>.+?)-20\\d{2}.*$");
-            if (match.Success) return match.Groups["game"].Value;
-
-            return baseName;
+            return filenameParserService.GetGameTitleHint(baseName, libraryRoot);
         }
 
         string GetSafeGameFolderName(string name)
@@ -3307,13 +3505,21 @@ namespace PixelVaultNative
                 rebuildLibraryButton.Margin = new Thickness(8, 0, 0, 0);
                 fetchButton.Margin = new Thickness(8, 0, 0, 0);
                 intakeReviewButton = Btn(string.Empty, null, "#152028", Brushes.White);
-                intakeReviewButton.Width = 68;
-                intakeReviewButton.Height = 48;
-                intakeReviewButton.Padding = new Thickness(10, 6, 10, 6);
+                intakeReviewButton.Width = 76;
+                intakeReviewButton.Height = 56;
+                intakeReviewButton.Padding = new Thickness(0);
                 intakeReviewButton.Margin = new Thickness(8, 0, 0, 0);
                 intakeReviewButton.ToolTip = "Preview upload queue";
                 var intakeReviewContent = new Grid();
-                intakeReviewContent.Children.Add(BuildGamepadGlyph(Brush("#F5F7FA"), 2.15, 34, 22));
+                intakeReviewContent.Children.Add(new Viewbox
+                {
+                    Width = 42,
+                    Height = 28,
+                    Stretch = Stretch.Uniform,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Child = BuildGamepadGlyph(Brush("#F5F7FA"), 2.15, 42, 28)
+                });
                 intakeReviewBadgeText = new TextBlock
                 {
                     Foreground = Brushes.White,
@@ -3333,7 +3539,7 @@ namespace PixelVaultNative
                     CornerRadius = new CornerRadius(11),
                     HorizontalAlignment = HorizontalAlignment.Right,
                     VerticalAlignment = VerticalAlignment.Top,
-                    Margin = new Thickness(0, -6, -8, 0),
+                    Margin = new Thickness(0, -4, -4, 0),
                     Padding = new Thickness(6, 0, 6, 0),
                     Visibility = Visibility.Collapsed,
                     Child = intakeReviewBadgeText
@@ -3372,6 +3578,11 @@ namespace PixelVaultNative
                 photoIndexButton.Height = 36;
                 photoIndexButton.FontSize = 12;
                 photoIndexButton.Margin = new Thickness(0);
+                var filenameRulesButton = Btn("Filename Rules", null, "#E4D7FB", Brush("#2E2547"));
+                filenameRulesButton.Width = 134;
+                filenameRulesButton.Height = 36;
+                filenameRulesButton.FontSize = 12;
+                filenameRulesButton.Margin = new Thickness(10, 0, 0, 0);
                 var indexButtonsPanel = new StackPanel
                 {
                     Orientation = Orientation.Horizontal,
@@ -3381,6 +3592,7 @@ namespace PixelVaultNative
                 };
                 indexButtonsPanel.Children.Add(gameIndexButton);
                 indexButtonsPanel.Children.Add(photoIndexButton);
+                indexButtonsPanel.Children.Add(filenameRulesButton);
                 Grid.SetColumn(indexButtonsPanel, 1);
                 filterGrid.Children.Add(indexButtonsPanel);
                 var sortPanel = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(18, 0, 0, 0) };
@@ -3833,7 +4045,8 @@ namespace PixelVaultNative
                         LogPerformanceSample("LibraryDetailRender", renderStopwatch, "folder=" + (current.Name ?? current.FolderPath ?? "(unknown)") + "; rows=1; files=0; size=" + size, 40);
                         return;
                     }
-                    var detailColumns = CalculateVirtualizedTileColumns(thumbScroll, size, 10, 32);
+                    const int detailTileGap = 8;
+                    var detailColumns = CalculateVirtualizedTileColumns(thumbScroll, size, detailTileGap, 32);
                     var virtualRows = new List<VirtualizedRowDefinition>();
                     foreach (var group in groups)
                     {
@@ -3862,10 +4075,11 @@ namespace PixelVaultNative
                                 Height = estimatedDetailRowHeight,
                                 Build = delegate
                                 {
-                                    var wrap = new WrapPanel { Margin = new Thickness(0, 0, 0, 12) };
+                                    var rowPanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, detailTileGap) };
                                     var renderFolder = current;
-                                    foreach (var file in rowFiles)
+                                    for (int fileIndex = 0; fileIndex < rowFiles.Count; fileIndex++)
                                     {
+                                        var file = rowFiles[fileIndex];
                                         var tile = CreateLibraryDetailTile(
                                             file,
                                             size,
@@ -3874,10 +4088,11 @@ namespace PixelVaultNative
                                             updateDetailSelection,
                                             selectedDetailFiles,
                                             refreshDetailSelectionUi);
+                                        tile.Margin = new Thickness(0, 0, fileIndex < rowFiles.Count - 1 ? detailTileGap : 0, 0);
                                         detailTiles.Add(tile);
-                                        wrap.Children.Add(tile);
+                                        rowPanel.Children.Add(tile);
                                     }
-                                    return new Border { Height = estimatedDetailRowHeight, Background = Brushes.Transparent, Child = wrap };
+                                    return rowPanel;
                                 }
                             });
                         }
@@ -4562,6 +4777,7 @@ namespace PixelVaultNative
                 settingsButton.Click += delegate { ShowSettingsWindow(); if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge(); };
                 gameIndexButton.Click += delegate { OpenGameIndexEditor(); };
                 photoIndexButton.Click += delegate { OpenPhotoIndexEditor(); };
+                filenameRulesButton.Click += delegate { OpenFilenameConventionEditor(); };
                 importButton.Click += delegate { RunWorkflow(false); if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge(); };
                 importCommentsButton.Click += delegate { RunWorkflow(true); if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge(); };
                 manualImportButton.Click += delegate { OpenManualIntakeWindow(); if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge(); };
@@ -5261,30 +5477,6 @@ namespace PixelVaultNative
                 && string.Equals(left.Name ?? string.Empty, right.Name ?? string.Empty, StringComparison.OrdinalIgnoreCase);
         }
 
-        TimeoutWebClient CreateSteamWebClient()
-        {
-            return new TimeoutWebClient
-            {
-                Encoding = Encoding.UTF8,
-                TimeoutMilliseconds = SteamRequestTimeoutMilliseconds
-            };
-        }
-
-        TimeoutWebClient CreateSteamGridDbWebClient()
-        {
-            var token = CurrentSteamGridDbApiToken();
-            if (string.IsNullOrWhiteSpace(token)) return null;
-            var client = new TimeoutWebClient
-            {
-                Encoding = Encoding.UTF8,
-                TimeoutMilliseconds = SteamRequestTimeoutMilliseconds
-            };
-            client.Headers[HttpRequestHeader.Authorization] = "Bearer " + token;
-            client.Headers[HttpRequestHeader.Accept] = "application/json";
-            client.Headers[HttpRequestHeader.UserAgent] = "PixelVault/" + AppVersion;
-            return client;
-        }
-
         string ParseSteamGridDbIdFromGamePayload(string json)
         {
             if (string.IsNullOrWhiteSpace(json)) return null;
@@ -5733,6 +5925,11 @@ namespace PixelVaultNative
             return coverService.TryResolveSteamAppId(title);
         }
 
+        List<Tuple<string, string>> SearchSteamAppMatches(string title)
+        {
+            return coverService.SearchSteamAppMatches(title) ?? new List<Tuple<string, string>>();
+        }
+
         BitmapImage LoadImageSource(string path, int decodePixelWidth)
         {
             try
@@ -5778,16 +5975,142 @@ namespace PixelVaultNative
             return coverService.SteamName(appId);
         }
 
+        Tuple<string, string> ShowSteamAppMatchWindow(string query, List<Tuple<string, string>> matches)
+        {
+            var candidates = (matches ?? new List<Tuple<string, string>>()).Where(match => match != null && !string.IsNullOrWhiteSpace(match.Item1) && !string.IsNullOrWhiteSpace(match.Item2)).Take(24).ToList();
+            if (candidates.Count == 0) return null;
+
+            Tuple<string, string> selected = null;
+            var wanted = NormalizeTitle(query);
+            var pickerWindow = new Window
+            {
+                Title = "PixelVault " + AppVersion + " Steam Matches",
+                Width = 760,
+                Height = 720,
+                MinWidth = 680,
+                MinHeight = 560,
+                Owner = this,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Background = Brush("#0F1519")
+            };
+
+            var root = new Grid { Margin = new Thickness(18) };
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+            var header = new Border { Background = Brush("#161C20"), CornerRadius = new CornerRadius(18), Padding = new Thickness(18), Margin = new Thickness(0, 0, 0, 14) };
+            var headerStack = new StackPanel();
+            headerStack.Children.Add(new TextBlock { Text = "Choose the Steam match", FontSize = 24, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White });
+            headerStack.Children.Add(new TextBlock { Text = "Results for \"" + query + "\". Pick the right game and PixelVault will save its AppID before import.", Margin = new Thickness(0, 8, 0, 0), Foreground = Brush("#B7C6C0"), FontSize = 14, TextWrapping = TextWrapping.Wrap });
+            header.Child = headerStack;
+            root.Children.Add(header);
+
+            var list = new ListBox
+            {
+                Background = Brush("#12191E"),
+                BorderBrush = Brush("#243139"),
+                BorderThickness = new Thickness(1),
+                Foreground = Brushes.White,
+                Padding = new Thickness(12),
+                HorizontalContentAlignment = HorizontalAlignment.Stretch
+            };
+            Grid.SetRow(list, 1);
+            root.Children.Add(list);
+
+            var selectedIndex = 0;
+            for (int i = 0; i < candidates.Count; i++)
+            {
+                var match = candidates[i];
+                var isExact = NormalizeTitle(match.Item2) == wanted;
+                if (isExact) selectedIndex = i;
+                var item = new ListBoxItem { Tag = match, Padding = new Thickness(0), Margin = new Thickness(0, 0, 0, 10), BorderThickness = new Thickness(0), Background = Brushes.Transparent };
+                var border = new Border
+                {
+                    Background = isExact ? Brush("#183A30") : Brush("#1A2329"),
+                    BorderBrush = isExact ? Brush("#3FAE7C") : Brush("#243139"),
+                    BorderThickness = new Thickness(1),
+                    CornerRadius = new CornerRadius(12),
+                    Padding = new Thickness(14, 12, 14, 12)
+                };
+                var stack = new StackPanel();
+                stack.Children.Add(new TextBlock { Text = match.Item2, Foreground = Brushes.White, FontSize = 16, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap });
+                stack.Children.Add(new TextBlock { Text = "Steam AppID " + match.Item1 + (isExact ? " | exact title match" : string.Empty), Foreground = isExact ? Brush("#BEE8D3") : Brush("#9FB0BA"), Margin = new Thickness(0, 6, 0, 0), TextWrapping = TextWrapping.Wrap });
+                border.Child = stack;
+                item.Content = border;
+                list.Items.Add(item);
+            }
+
+            var buttons = new Grid { HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 14, 0, 0) };
+            buttons.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            buttons.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            var cancelButton = Btn("Cancel", null, "#334249", Brushes.White);
+            cancelButton.Margin = new Thickness(0);
+            var selectButton = Btn("Use Match", null, "#275D47", Brushes.White);
+            selectButton.Margin = new Thickness(12, 0, 0, 0);
+            selectButton.IsEnabled = candidates.Count > 0;
+            buttons.Children.Add(cancelButton);
+            Grid.SetColumn(selectButton, 1);
+            buttons.Children.Add(selectButton);
+            Grid.SetRow(buttons, 2);
+            root.Children.Add(buttons);
+
+            Action<bool> closeWindow = delegate(bool accept)
+            {
+                if (accept)
+                {
+                    var selectedItem = list.SelectedItem as ListBoxItem;
+                    if (selectedItem == null || !(selectedItem.Tag is Tuple<string, string>)) return;
+                    selected = (Tuple<string, string>)selectedItem.Tag;
+                    pickerWindow.DialogResult = true;
+                }
+                else
+                {
+                    pickerWindow.DialogResult = false;
+                }
+                pickerWindow.Close();
+            };
+
+            list.SelectionChanged += delegate
+            {
+                selectButton.IsEnabled = list.SelectedItem is ListBoxItem;
+            };
+            list.MouseDoubleClick += delegate
+            {
+                if (list.SelectedItem is ListBoxItem) closeWindow(true);
+            };
+            cancelButton.Click += delegate { closeWindow(false); };
+            selectButton.Click += delegate { closeWindow(true); };
+            if (list.Items.Count > 0) list.SelectedIndex = selectedIndex;
+
+            pickerWindow.Content = root;
+            return pickerWindow.ShowDialog() == true ? selected : null;
+        }
+
         string PrimaryPlatformLabel(string file)
         {
-            var tags = DetectPlatformTags(file);
-            return tags.FirstOrDefault(t => t == "Xbox" || t == "Steam" || t == "PS5" || t == "PlayStation" || t == "PC") ?? "Other";
+            return ParseFilename(file).PlatformLabel;
         }
 
         string FilenameGuessLabel(string file)
         {
-            var label = PrimaryPlatformLabel(file);
+            var parsed = ParseFilename(file);
+            var appId = parsed.SteamAppId;
+            if (!string.IsNullOrWhiteSpace(appId)) return "Steam AppID " + appId;
+            if (parsed.RoutesToManualWhenMissingSteamAppId) return "Steam export | AppID needed";
+            var label = parsed.PlatformLabel;
             return string.Equals(label, "Other", StringComparison.OrdinalIgnoreCase) ? "No confident match" : label;
+        }
+
+        bool IsSteamManualExportWithoutAppId(string file)
+        {
+            var parsed = ParseFilename(file);
+            return parsed.RoutesToManualWhenMissingSteamAppId && string.IsNullOrWhiteSpace(parsed.SteamAppId);
+        }
+
+        DateTime? ParseSteamManualExportCaptureDate(string file)
+        {
+            return IsSteamManualExportWithoutAppId(file) ? ParseFilename(file).CaptureTime : (DateTime?)null;
         }
 
         int PlatformGroupOrder(string label)
@@ -5841,14 +6164,13 @@ namespace PixelVaultNative
         static bool IsVideo(string p) { var e = Path.GetExtension(p).ToLowerInvariant(); return e == ".mp4" || e == ".mkv" || e == ".avi" || e == ".mov" || e == ".wmv" || e == ".webm"; }
         static bool IsMedia(string p) { var e = Path.GetExtension(p).ToLowerInvariant(); return new[] { ".jpg", ".jpeg", ".png", ".webp", ".mp4", ".mkv", ".avi", ".mov", ".wmv", ".webm" }.Contains(e); }
         static string Quote(string s) { return s.Contains(" ") ? "\"" + s.Replace("\"", "\\\"") + "\"" : s; }
-        static DateTime GetLibraryDate(string file)
+        DateTime GetLibraryDate(string file)
         {
-            var name = Path.GetFileName(file);
-            var tags = DetectPlatformTags(name);
+            var parsed = ParseFilename(file);
+            var tags = parsed.PlatformTags ?? new string[0];
             if (!tags.Contains("Xbox"))
             {
-                var parsed = ParseCaptureDate(name);
-                if (parsed.HasValue) return parsed.Value;
+                if (parsed.CaptureTime.HasValue) return parsed.CaptureTime.Value;
             }
             var created = File.GetCreationTime(file);
             var modified = File.GetLastWriteTime(file);
@@ -5857,40 +6179,9 @@ namespace PixelVaultNative
             return created < modified ? created : modified;
         }
 
-        static DateTime? ParseCaptureDate(string file)
+        DateTime? ParseCaptureDate(string file)
         {
-            DateTime d;
-            var a = Regex.Match(file, @"_(\d{14})(?:_|(?=\.[^.]+$))");
-            if (a.Success && DateTime.TryParseExact(a.Groups[1].Value, "yyyyMMddHHmmss", null, System.Globalization.DateTimeStyles.None, out d)) return d;
-            var steamLegacy = Regex.Match(file, @"_(\d{4})-(\d{2})-(\d{2})(?:_|(?=\.[^.]+$))");
-            if (steamLegacy.Success)
-            {
-                var raw = steamLegacy.Groups[1].Value + steamLegacy.Groups[2].Value + steamLegacy.Groups[3].Value;
-                if (DateTime.TryParseExact(raw, "yyyyMMdd", null, System.Globalization.DateTimeStyles.None, out d)) return d;
-            }
-            var b = Regex.Match(file, @"-(\d{4})_(\d{2})_(\d{2})[-_](\d{2})[-_](\d{2})[-_](\d{2})");
-            if (b.Success)
-            {
-                var raw = b.Groups[1].Value + b.Groups[2].Value + b.Groups[3].Value + b.Groups[4].Value + b.Groups[5].Value + b.Groups[6].Value;
-                if (DateTime.TryParseExact(raw, "yyyyMMddHHmmss", null, System.Globalization.DateTimeStyles.None, out d)) return d;
-            }
-            var steamClipUnix = Regex.Match(file, @"^clip_(?<stamp>[\d,]{13,17})(?=\.[^.]+$)", RegexOptions.IgnoreCase);
-            if (steamClipUnix.Success)
-            {
-                long unixMilliseconds;
-                var rawStamp = steamClipUnix.Groups["stamp"].Value.Replace(",", string.Empty);
-                if (long.TryParse(rawStamp, out unixMilliseconds))
-                {
-                    try
-                    {
-                        return DateTimeOffset.FromUnixTimeMilliseconds(unixMilliseconds).ToLocalTime().DateTime;
-                    }
-                    catch
-                    {
-                    }
-                }
-            }
-            return null;
+            return ParseFilename(file).CaptureTime;
         }
 
         string SafeCacheName(string title) { return Regex.Replace(NormalizeTitle(title), @"\s+", "_"); }
@@ -6716,21 +7007,25 @@ namespace PixelVaultNative
                             "Resolving external game IDs",
                             "Preparing game index rows...",
                             "Resolving game index IDs",
+                            "Game index resolve canceled",
                             "Starting external game ID resolution for " + rowsToResolve.Count + " row(s).",
                             "Game index resolve failed",
                             totalWork,
-                            delegate(Action<int, string> reportProgress)
+                            delegate(Action<int, string> reportProgress, CancellationToken cancellationToken)
                             {
                                 var appIdOffset = 0;
                                 var steamGridDbOffset = appIdTargets;
+                                ThrowIfWorkflowCancellationRequested(cancellationToken, "Game index resolve");
                                 var resolvedAppIds = ResolveMissingGameIndexSteamAppIds(libraryRoot, rowsToResolve, delegate(int current, int total, string detail)
                                 {
                                     reportProgress(appIdOffset + current, detail);
                                 });
+                                ThrowIfWorkflowCancellationRequested(cancellationToken, "Game index resolve");
                                 var resolvedSteamGridDbIds = ResolveMissingGameIndexSteamGridDbIds(libraryRoot, rowsToResolve, delegate(int current, int total, string detail)
                                 {
                                     reportProgress(steamGridDbOffset + current, detail);
                                 });
+                                ThrowIfWorkflowCancellationRequested(cancellationToken, "Game index resolve");
                                 reportProgress(totalWork, "Game index ID resolution complete.");
                                 return new[] { resolvedAppIds, resolvedSteamGridDbIds };
                             },

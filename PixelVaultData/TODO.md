@@ -18,16 +18,18 @@ For the focused performance backlog, use:
 - `C:\Codex\docs\PERFORMANCE_TODO.md`
 
 ## Current Focus
-1. Build the Phase 1 safety net from the roadmap.
-- Add a small test project and cover the highest-value pure/storage logic first.
+1. Keep moving through Phase 2 UI-thread responsiveness and cancellation work.
+- Finish the remaining cancellation and long-operation consistency cleanup before deeper scanner/service work.
 
-2. Keep an eye on thread-blocking or long-operation rough edges as they come up.
-- Especially around cover fetches, refresh/rebuild flows, and any `TimeoutWebClient` usage.
+2. Keep repo docs and Notion in sync when releases, phase status, or workflow rules change.
+- Follow `C:\Codex\docs\DOC_SYNC_POLICY.md` instead of relying on memory.
 
 3. Pull performance-specific work from the dedicated backlog instead of mixing it into this general list.
 - Start with capture virtualization, cached sort keys, and debounced Library search.
 
 ## As I Think Of It
+- Add a recurring automation that checks repo docs vs Notion for drift:
+  current build/version, release entry coverage, roadmap phase status, and handoff/current-build mismatches.
 - Remove the duplicated `refreshButton.IsEnabled = false;` line in the Library refresh block.
 - Add a short comment near the SQLite `PRAGMA foreign_keys=OFF` line explaining the intentional tradeoff.
 - Do a targeted audit of `TimeoutWebClient` call sites and note which ones are guaranteed off the UI thread.

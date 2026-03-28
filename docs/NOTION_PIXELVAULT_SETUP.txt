@@ -1,0 +1,109 @@
+PixelVault Notion workspace setup
+
+Use one top-level page called `PixelVault HQ`, with five databases under it.
+
+Core Setup
+
+1. Backlog
+Purpose: everything you might build, polish, or revisit.
+
+Properties:
+- Name (title)
+- Status (Inbox, Planned, In Progress, Blocked, Done)
+- Priority (P0, P1, P2, P3)
+- Area (Library, Import, Metadata, Covers, Performance, UI, Docs)
+- Type (Feature, Cleanup, Bug, Refactor, Research)
+- Target Release (relation to Releases)
+- Notes (rich text)
+
+Views:
+- Inbox
+- Now
+- By Area
+- Done Recently
+
+2. Roadmap
+Purpose: the bigger phased work, not tiny tasks.
+
+Properties:
+- Initiative (title)
+- Phase (Now, Next, Later)
+- Goal (rich text)
+- Why It Matters (rich text)
+- Status (Planned, Active, Paused, Complete)
+- Related Tasks (relation to Backlog)
+- Related Bugs (relation to Bugs / QA)
+
+Views:
+- Timeline
+- Current Phase
+- By Status
+
+3. Bugs / QA
+Purpose: regressions, repros, test notes, and “verified in build X”.
+
+Properties:
+- Title (title)
+- Status (Open, Investigating, Fixed, Verified, Closed)
+- Severity (Critical, High, Medium, Low)
+- Area (Library, Import, Metadata, Covers, UI, Performance)
+- Build Found (relation to Releases)
+- Build Fixed (relation to Releases)
+- Repro Steps (rich text)
+- Expected
+- Actual
+- Dataset / Folder
+- Notes
+
+Views:
+- Open Bugs
+- Needs Verification
+- By Severity
+- Library Issues
+
+4. Releases
+Purpose: every publish, what changed, and what still needs checking.
+
+Properties:
+- Version (title)
+- Date
+- Status (Draft, Published, Retired)
+- Highlights (rich text)
+- Known Issues (relation to Bugs / QA)
+- Included Work (relation to Backlog)
+- Smoke Tested (checkbox)
+
+Views:
+- All Releases
+- Published
+- Needs Smoke Test
+
+5. Project Wiki
+Purpose: stable documentation.
+
+Suggested pages inside:
+- Architecture
+- Import Rules
+- Library Behavior
+- Publish Process
+- Tooling
+- Known Edge Cases
+- Dataset Notes
+
+Best Way To Use It
+
+- Put quick ideas in Backlog.
+- Put big multi-step efforts in Roadmap.
+- Put every bug and regression in Bugs / QA.
+- Log every publish in Releases.
+- Keep durable process knowledge in Project Wiki.
+
+What I’d prioritize first
+
+1. Bugs / QA
+2. Releases
+3. Backlog
+4. Roadmap
+5. Project Wiki
+
+That order gives immediate value without a lot of setup overhead.

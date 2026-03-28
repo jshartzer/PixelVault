@@ -23,7 +23,7 @@ namespace PixelVaultNative
         Dictionary<string, EmbeddedMetadataSnapshot> ReadEmbeddedMetadataBatch(IEnumerable<string> files);
         void EnsureExifTool();
         void RunExifToolBatch(IReadOnlyList<ExifWriteRequest> requests);
-        int RunExifWriteRequests(List<ExifWriteRequest> requests, int totalCount, int alreadyCompleted, Action<int, int, string> progress = null);
+        int RunExifWriteRequests(List<ExifWriteRequest> requests, int totalCount, int alreadyCompleted, Action<int, int, string> progress = null, CancellationToken cancellationToken = default(CancellationToken));
     }
 
     sealed class MetadataServiceDependencies
@@ -530,10 +530,11 @@ namespace PixelVaultNative
             }
         }
 
-        public int RunExifWriteRequests(List<ExifWriteRequest> requests, int totalCount, int alreadyCompleted, Action<int, int, string> progress = null)
+        public int RunExifWriteRequests(List<ExifWriteRequest> requests, int totalCount, int alreadyCompleted, Action<int, int, string> progress = null, CancellationToken cancellationToken = default(CancellationToken))
         {
             var workItems = requests ?? new List<ExifWriteRequest>();
             if (workItems.Count == 0) return 0;
+            cancellationToken.ThrowIfCancellationRequested();
 
             var completed = alreadyCompleted;
             var failures = new ConcurrentQueue<Exception>();
@@ -559,12 +560,14 @@ namespace PixelVaultNative
 
             Action<ExifWriteRequest> runSingleRequest = delegate(ExifWriteRequest request)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 RunExe(ExifToolPath, request.Arguments, Path.GetDirectoryName(ExifToolPath), false);
                 finalizeRequest(request);
             };
 
-            Parallel.ForEach(batches, new ParallelOptions { MaxDegreeOfParallelism = workerCount }, delegate(ExifWriteRequest[] batch)
+            Parallel.ForEach(batches, new ParallelOptions { MaxDegreeOfParallelism = workerCount, CancellationToken = cancellationToken }, delegate(ExifWriteRequest[] batch)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 try
                 {
                     RunExifToolBatch(batch);

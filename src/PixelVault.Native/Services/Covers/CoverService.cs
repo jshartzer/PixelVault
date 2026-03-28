@@ -14,6 +14,7 @@ namespace PixelVaultNative
     {
         string TryResolveSteamGridDbIdBySteamAppId(string steamAppId);
         string TryResolveSteamGridDbIdByName(string title);
+        List<Tuple<string, string>> SearchSteamAppMatches(string title);
         string TryResolveSteamAppId(string title);
         string SteamName(string appId);
         string CustomCoverPath(LibraryFolderInfo folder);
@@ -47,6 +48,7 @@ namespace PixelVaultNative
         readonly CoverServiceDependencies dependencies;
         readonly Dictionary<string, string> steamCache = new Dictionary<string, string>();
         readonly Dictionary<string, string> steamSearchCache = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        readonly Dictionary<string, List<Tuple<string, string>>> steamSearchResultsCache = new Dictionary<string, List<Tuple<string, string>>>(StringComparer.OrdinalIgnoreCase);
         readonly Dictionary<string, string> steamGridDbSearchCache = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         readonly Dictionary<string, string> steamGridDbPlatformCache = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
@@ -126,6 +128,21 @@ namespace PixelVaultNative
                     || wanted.Contains(normalized);
             }).ToList();
             return loose.Count == 1 ? loose[0].Item1 : null;
+        }
+
+        List<Tuple<string, string>> ParseSteamSearchResults(string html)
+        {
+            var results = new List<Tuple<string, string>>();
+            if (string.IsNullOrWhiteSpace(html)) return results;
+            var seenIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (Match match in Regex.Matches(html, @"https://store\.steampowered\.com/app/(?<id>\d+)/[^""']+.*?<div class=""match_name"">(?<name>.*?)</div>", RegexOptions.Singleline))
+            {
+                var id = match.Groups["id"].Value;
+                var name = WebUtility.HtmlDecode(StripTags(match.Groups["name"].Value));
+                if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(name) || !seenIds.Add(id)) continue;
+                results.Add(Tuple.Create(id, name.Trim()));
+            }
+            return results;
         }
 
         string NormalizeTitle(string title)
@@ -228,27 +245,24 @@ namespace PixelVaultNative
             return null;
         }
 
-        public string TryResolveSteamAppId(string title)
+        public List<Tuple<string, string>> SearchSteamAppMatches(string title)
         {
-            string cached;
-            if (steamSearchCache.TryGetValue(title, out cached)) return cached;
+            var query = (title ?? string.Empty).Trim();
+            List<Tuple<string, string>> cached;
+            if (steamSearchResultsCache.TryGetValue(query, out cached))
+            {
+                return cached == null ? new List<Tuple<string, string>>() : new List<Tuple<string, string>>(cached);
+            }
             var stopwatch = Stopwatch.StartNew();
+            var results = new List<Tuple<string, string>>();
             try
             {
-                using (var wc = CreateSteamWebClient())
+                if (!string.IsNullOrWhiteSpace(query))
                 {
-                    var html = wc.DownloadString("https://store.steampowered.com/search/suggest?term=" + Uri.EscapeDataString(title) + "&f=games&cc=US&l=english");
-                    var matches = Regex.Matches(html, @"https://store\.steampowered\.com/app/(?<id>\d+)/[^""']+.*?<div class=""match_name"">(?<name>.*?)</div>", RegexOptions.Singleline);
-                    var wanted = NormalizeTitle(title);
-                    foreach (Match match in matches)
+                    using (var wc = CreateSteamWebClient())
                     {
-                        var candidate = NormalizeTitle(WebUtility.HtmlDecode(StripTags(match.Groups["name"].Value)));
-                        if (candidate == wanted)
-                        {
-                            cached = match.Groups["id"].Value;
-                            steamSearchCache[title] = cached;
-                            return cached;
-                        }
+                        var html = wc.DownloadString("https://store.steampowered.com/search/suggest?term=" + Uri.EscapeDataString(query) + "&f=games&cc=US&l=english");
+                        results = ParseSteamSearchResults(html);
                     }
                 }
             }
@@ -258,7 +272,24 @@ namespace PixelVaultNative
             finally
             {
                 stopwatch.Stop();
-                LogPerformanceSample("SteamSearch", stopwatch, "title=" + title, 120);
+                LogPerformanceSample("SteamSearch", stopwatch, "title=" + query + "; results=" + results.Count, 120);
+            }
+            steamSearchResultsCache[query] = new List<Tuple<string, string>>(results);
+            return results;
+        }
+
+        public string TryResolveSteamAppId(string title)
+        {
+            string cached;
+            if (steamSearchCache.TryGetValue(title, out cached)) return cached;
+            foreach (var match in SearchSteamAppMatches(title))
+            {
+                if (NormalizeTitle(match.Item2) == NormalizeTitle(title))
+                {
+                    cached = match.Item1;
+                    steamSearchCache[title] = cached;
+                    return cached;
+                }
             }
             steamSearchCache[title] = null;
             return null;

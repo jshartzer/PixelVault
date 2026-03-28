@@ -1,0 +1,124 @@
+PixelVault — Filename parsing: extraction, conventions, and user rules
+========================================================================
+
+Context (current codebase)
+--------------------------
+Filename and capture-time logic is split across PixelVault.Native.cs and
+MetadataHelpers.cs, with GuessSteamAppIdFromFileName duplicated in
+LibraryFolderIndexing.cs.
+
+- Game title from basename: GetGameNameFromFileName (regex on game_timestamp
+  shapes, etc.).
+- Platform / “review vs manual” routing: DetectPlatformTags + CanUpdateMetadata
+  + PrimaryPlatformLabel / FilenameGuessLabel.
+- Capture time: ParseCaptureDate (Steam/Xbox/clip patterns on the filename) plus
+  ParseSteamManualExportCaptureDate for the bare yyyyMMddHHmmss Steam export case
+  used in manual import.
+
+Pulling this into one place is justified: one home for rules, one result type,
+and no duplicate Steam App ID logic.
+
+
+Recommended shape: a small “filename intelligence” layer
+--------------------------------------------------------
+
+1) Single entry point, rich result
+
+Introduce something like FilenameParseResult (or split into
+FilenameClassification + FilenameDateHints) produced by one API, e.g.
+ImportFilenameParser.Parse(string fullPath) or ParseFileName(string fileName):
+
+- Convention id(s) — e.g. SteamScreenshot, SteamManualExport, Ps5Share,
+  XboxClip, Unknown.
+- Platform tags — same semantics as today’s DetectPlatformTags.
+- Optional DateTime? — best guess from the basename (see below).
+- Optional SteamAppId, optional game title hint (from the same rules that drive
+  GetGameNameFromFileName).
+- Confidence / source — e.g. ExplicitPattern vs Heuristic so the UI can say
+  “guessed from filename” vs “user rule”.
+
+Call sites (BuildReviewItems, BuildManualMetadataItems, library indexing,
+folder naming) should only consume this result, not own regex.
+
+
+2) Ordered “conventions,” not one giant regex block
+
+Model each known pattern as a small class or delegate: name, priority,
+TryMatch(fileName, out …). Run them in priority order (or merge non-conflicting
+signals). That supports detection based on known filename conventions and is
+easy to extend (Switch 2, GeForce Experience, OBS, etc.) without touching WPF.
+
+
+3) Date/time: one general pass, separate from platform
+
+Today, date extraction is effectively platform-coupled (patterns live next to
+Steam/Xbox tag detection). A cleaner approach:
+
+- Add a FilenameDateExtractor (or a second phase inside the same parser) that
+  tries generic patterns in a fixed order, for example:
+  - yyyyMMddHHmmss as a token (Steam manual export already does this).
+  - yyyy-MM-dd / yyyy_MM_dd with optional time segments.
+  - ISO-8601–like fragments in the middle of names.
+  - Unix ms/us in the basename (Steam clip_ already).
+
+Then choose one “best” timestamp with simple rules: prefer full date+time over
+date-only; prefer anchored tokens (e.g. _stamp_) over random 14-digit
+substrings; optional sanity window (not year 2099, etc.).
+
+Platform tags can still set behavior (e.g. Xbox “preserve filesystem time”)
+without owning how the date string is parsed.
+
+
+4) Storing “example filenames” and desired classification
+
+Pure “example → classify” matching is fuzzy and brittle unless you constrain
+it. Practical tiers:
+
+A) User rules file (JSON next to app data): regex or glob + fields (PlatformTags,
+   Convention, optional date group names)
+   - Pros: precise, versionable, testable
+   - Cons: needs a minimal format doc
+
+B) “Rule from example” in UI
+   - User pastes Game_20240315_001.png; app suggests a regex with capture
+     groups they can edit
+   - Cons: one-time UI effort
+
+C) Per-source-folder defaults
+   - e.g. everything under D:\Switch\Album → tag Nintendo
+   - Cons: doesn’t help mixed folders
+
+Best default: A + optional B. Store rules as data, load at startup, merge after
+built-in conventions (or before, with OverridesBuiltin: true for power users).
+
+
+5) Tests
+
+Add FilenameParserTests (or golden JSON) with one row per basename: expected
+tags, date, Steam id, game hint. Fastest way to extend conventions without
+regressions.
+
+
+6) Migration path
+
+1. Add Import/FilenameParsing/ (or Services/Import/) with parser + result types
+   + built-in rules moved verbatim from PixelVault.Native.cs and
+   MetadataHelpers.cs.
+2. Replace GuessSteamAppIdFromFileName in LibraryFolderIndexing.cs with the
+   shared helper.
+3. Unify ParseSteamManualExportCaptureDate into the general date phase so any
+   matching yyyyMMddHHmmss basename gets the same treatment, not only the manual
+   export branch.
+4. Optionally add filename-rules.json once the API is stable.
+
+
+Bottom line
+-----------
+Treat filename parsing as a data-driven pipeline (ordered convention matchers +
+a separate date extraction pass + optional user rules), expose a single result
+DTO, and lock behavior with table-driven tests. That gives separation from the UI,
+general date detection, and a clear place to plug in “examples” as explicit rules
+rather than implicit fuzzy matching.
+
+Open choice for implementation: rules in JSON under AppData vs embedded defaults
+plus optional override file — align with existing PixelVault config patterns.

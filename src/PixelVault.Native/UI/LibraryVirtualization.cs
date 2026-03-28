@@ -146,6 +146,9 @@ namespace PixelVaultNative
             if (host.BeforeVisibleRowsRebuilt != null) host.BeforeVisibleRowsRebuilt();
             host.VisibleRowsPanel.Children.Clear();
 
+            var measureWidth = host.ScrollViewer.ViewportWidth;
+            if (measureWidth <= 0) measureWidth = host.ScrollViewer.ActualWidth;
+            bool rowHeightChanged = false;
             double renderedHeight = 0;
             for (int i = firstIndex; i <= lastIndex; i++)
             {
@@ -154,12 +157,31 @@ namespace PixelVaultNative
                 var element = row.Build();
                 if (element == null) continue;
                 host.VisibleRowsPanel.Children.Add(element);
+                if (measureWidth > 0)
+                {
+                    element.Measure(new Size(measureWidth, double.PositiveInfinity));
+                    var measuredHeight = Math.Max(1, Math.Ceiling(element.DesiredSize.Height));
+                    if (Math.Abs(measuredHeight - Math.Max(1, row.Height)) > 1)
+                    {
+                        row.Height = measuredHeight;
+                        rowHeightChanged = true;
+                    }
+                }
                 renderedHeight += Math.Max(1, row.Height);
             }
 
             host.TopSpacer.Height = topHeight;
             host.BottomSpacer.Height = Math.Max(0, totalHeight - topHeight - renderedHeight);
             if (host.AfterVisibleRowsRebuilt != null) host.AfterVisibleRowsRebuilt();
+            if (rowHeightChanged)
+            {
+                host.FirstVisibleIndex = -1;
+                host.LastVisibleIndex = -1;
+                host.ScrollViewer.Dispatcher.BeginInvoke(new Action(delegate
+                {
+                    RefreshVirtualizedRowHost(host);
+                }), DispatcherPriority.Background);
+            }
         }
 
         int CalculateVirtualizedTileColumns(ScrollViewer scrollViewer, int tileWidth, double horizontalGap, double widthAllowance)
@@ -178,7 +200,7 @@ namespace PixelVaultNative
             var tile = new Border
             {
                 Width = size,
-                Margin = new Thickness(0, 0, 10, 10),
+                Margin = new Thickness(0),
                 Padding = new Thickness(0),
                 Background = Brush("#10181D"),
                 BorderBrush = Brush("#2B3A44"),

@@ -134,7 +134,15 @@ namespace PixelVaultNative
             }
         }
 
-        void RunBackgroundWorkflowWithProgress<TResult>(string windowTitle, string progressTitleText, string initialMetaText, string startStatusText, string startLogLine, string failureStatusText, int totalWork, Func<Action<int, string>, TResult> backgroundWork, Action<TResult> onSuccess)
+        void ThrowIfWorkflowCancellationRequested(CancellationToken cancellationToken, string operationLabel)
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                throw new OperationCanceledException((operationLabel ?? "Workflow") + " cancelled.", cancellationToken);
+            }
+        }
+
+        void RunBackgroundWorkflowWithProgress<TResult>(string windowTitle, string progressTitleText, string initialMetaText, string startStatusText, string canceledStatusText, string startLogLine, string failureStatusText, int totalWork, Func<Action<int, string>, CancellationToken, TResult> backgroundWork, Action<TResult> onSuccess, Action onCanceled = null)
         {
             var progressWindow = new Window
             {
@@ -157,12 +165,13 @@ namespace PixelVaultNative
             var effectiveTotalWork = Math.Max(totalWork, 1);
             var progressBar = new ProgressBar { Height = 18, Minimum = 0, Maximum = effectiveTotalWork, Value = 0, IsIndeterminate = totalWork <= 0, Margin = new Thickness(0, 0, 0, 14) };
             var progressLog = new TextBox { IsReadOnly = true, AcceptsReturn = true, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, TextWrapping = TextWrapping.Wrap, Background = Brush("#12191E"), Foreground = Brush("#F1E9DA"), BorderBrush = Brush("#2B3A44"), BorderThickness = new Thickness(1), FontFamily = new FontFamily("Cascadia Mono") };
-            var closeButton = Btn("Close", null, "#334249", Brushes.White);
+            var closeButton = Btn("Cancel", null, "#334249", Brushes.White);
             closeButton.Margin = new Thickness(0);
             closeButton.HorizontalAlignment = HorizontalAlignment.Right;
-            closeButton.IsEnabled = false;
             var progressLines = new List<string>();
             bool progressFinished = false;
+            bool cancellationRequested = false;
+            var workflowCancellation = new CancellationTokenSource();
             Action<string> appendProgress = delegate(string line)
             {
                 if (string.IsNullOrWhiteSpace(line)) return;
@@ -173,7 +182,16 @@ namespace PixelVaultNative
             };
             closeButton.Click += delegate
             {
-                if (!progressFinished) return;
+                if (!progressFinished)
+                {
+                    if (cancellationRequested) return;
+                    cancellationRequested = true;
+                    workflowCancellation.Cancel();
+                    closeButton.IsEnabled = false;
+                    progressMeta.Text = "Cancelling workflow...";
+                    appendProgress("Cancellation requested.");
+                    return;
+                }
                 progressWindow.Close();
             };
             progressRoot.Children.Add(progressTitle);
@@ -218,13 +236,22 @@ namespace PixelVaultNative
 
             Task.Factory.StartNew(delegate
             {
-                return backgroundWork(reportProgress);
-            }).ContinueWith(delegate(Task<TResult> workflowTask)
+                return backgroundWork(reportProgress, workflowCancellation.Token);
+            }, workflowCancellation.Token).ContinueWith(delegate(Task<TResult> workflowTask)
             {
                 progressWindow.Dispatcher.BeginInvoke(new Action(delegate
                 {
                     progressFinished = true;
+                    closeButton.Content = "Close";
                     closeButton.IsEnabled = true;
+                    if (workflowTask.IsCanceled || (workflowTask.IsFaulted && workflowTask.Exception != null && workflowTask.Exception.Flatten().InnerExceptions.Any(ex => ex is OperationCanceledException)))
+                    {
+                        status.Text = canceledStatusText;
+                        progressMeta.Text = "Workflow cancelled.";
+                        appendProgress("Workflow cancelled.");
+                        if (onCanceled != null) onCanceled();
+                        return;
+                    }
                     if (workflowTask.IsFaulted)
                     {
                         var flattened = workflowTask.Exception == null ? null : workflowTask.Exception.Flatten();
@@ -257,7 +284,7 @@ namespace PixelVaultNative
                         MessageBox.Show(ex.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
                     }
                 }));
-            });
+            }, TaskScheduler.Default);
 
             progressWindow.ShowDialog();
         }
@@ -278,10 +305,11 @@ namespace PixelVaultNative
                 withReview ? "Importing captures with review comments" : "Importing captures",
                 "Preparing intake workflow...",
                 withReview ? "Running import and comment workflow" : "Running import workflow",
+                withReview ? "Import and comment canceled" : "Import canceled",
                 "Starting " + workflowLabel + " workflow.",
                 withReview ? "Import and comment failed" : "Import failed",
                 totalWork,
-                delegate(Action<int, string> reportProgress)
+                delegate(Action<int, string> reportProgress, CancellationToken cancellationToken)
                 {
                     var renameOffset = 0;
                     var deleteOffset = renameOffset + renameTotal;
@@ -289,29 +317,35 @@ namespace PixelVaultNative
                     var moveOffset = metadataOffset + metadataTotal;
                     var sortOffset = moveOffset + moveTotal;
 
+                    ThrowIfWorkflowCancellationRequested(cancellationToken, "Import workflow");
                     var renameResult = RunRename(renameInventory == null ? new List<string>() : renameInventory.RenameScopeFiles, delegate(int current, int total, string detail)
                     {
                         reportProgress(renameOffset + current, detail);
-                    });
+                    }, cancellationToken);
+                    ThrowIfWorkflowCancellationRequested(cancellationToken, "Import workflow");
                     var deleteResult = RunDelete(reviewItems, delegate(int current, int total, string detail)
                     {
                         reportProgress(deleteOffset + current, detail);
-                    });
+                    }, cancellationToken);
+                    ThrowIfWorkflowCancellationRequested(cancellationToken, "Import workflow");
                     var metadataResult = RunMetadata(reviewItems, delegate(int current, int total, string detail)
                     {
                         reportProgress(metadataOffset + current, detail);
-                    });
+                    }, cancellationToken);
+                    ThrowIfWorkflowCancellationRequested(cancellationToken, "Import workflow");
                     var moveResult = RunMove(inventory == null ? new List<string>() : inventory.TopLevelMediaFiles, manualPaths, delegate(int current, int total, string detail)
                     {
                         reportProgress(moveOffset + current, detail);
-                    });
+                    }, cancellationToken);
                     SortStepResult sortResult = null;
                     if (moveResult != null && moveResult.Moved > 0)
                     {
+                        ThrowIfWorkflowCancellationRequested(cancellationToken, "Import workflow");
                         SaveUndoManifest(moveResult.Entries);
                         reportProgress(sortOffset, "Sorting imported captures into game folders...");
-                        sortResult = SortDestinationFoldersCore(false, false);
+                        sortResult = SortDestinationFoldersCore(false, false, cancellationToken);
                     }
+                    ThrowIfWorkflowCancellationRequested(cancellationToken, "Import workflow");
                     reportProgress(totalWork, "Import workflow complete.");
                     return new ImportWorkflowExecutionResult
                     {
@@ -337,6 +371,11 @@ namespace PixelVaultNative
                     var metadataUpdated = result.MetadataResult == null ? 0 : result.MetadataResult.Updated;
                     var summaryMeta = movedCount + " file(s) imported | " + metadataUpdated + " metadata update(s)" + (result.ManualItemsLeft > 0 ? " | " + result.ManualItemsLeft + " unmatched left" : string.Empty);
                     ShowImportSummaryWindow(withReview ? "Import and Comment Summary" : "Import Summary", summaryMeta, summaryLines);
+                },
+                delegate
+                {
+                    RefreshPreview();
+                    Log("Import workflow canceled.");
                 });
         }
 
@@ -352,35 +391,41 @@ namespace PixelVaultNative
                 "Importing manual intake items",
                 "Preparing manual intake workflow...",
                 "Running manual intake workflow",
+                "Manual intake canceled",
                 "Starting manual intake workflow.",
                 "Manual intake failed",
                 totalWork,
-                delegate(Action<int, string> reportProgress)
+                delegate(Action<int, string> reportProgress, CancellationToken cancellationToken)
                 {
                     var renameOffset = 0;
                     var metadataOffset = renameOffset + renameTotal;
                     var moveOffset = metadataOffset + metadataTotal;
                     var sortOffset = moveOffset + moveTotal;
 
+                    ThrowIfWorkflowCancellationRequested(cancellationToken, "Manual intake workflow");
                     var renameResult = RunManualRename(manualItems, delegate(int current, int total, string detail)
                     {
                         reportProgress(renameOffset + current, detail);
-                    });
+                    }, cancellationToken);
+                    ThrowIfWorkflowCancellationRequested(cancellationToken, "Manual intake workflow");
                     var metadataResult = RunManualMetadata(manualItems, delegate(int current, int total, string detail)
                     {
                         reportProgress(metadataOffset + current, detail);
-                    });
+                    }, cancellationToken);
+                    ThrowIfWorkflowCancellationRequested(cancellationToken, "Manual intake workflow");
                     var moveResult = RunMoveFiles(manualItems.Select(item => item.FilePath), "Manual move summary", delegate(int current, int total, string detail)
                     {
                         reportProgress(moveOffset + current, detail);
-                    });
+                    }, cancellationToken);
                     SortStepResult sortResult = null;
                     if (moveResult != null && moveResult.Moved > 0)
                     {
+                        ThrowIfWorkflowCancellationRequested(cancellationToken, "Manual intake workflow");
                         SaveUndoManifest(moveResult.Entries);
                         reportProgress(sortOffset, "Sorting imported captures into game folders...");
-                        sortResult = SortDestinationFoldersCore(false, false);
+                        sortResult = SortDestinationFoldersCore(false, false, cancellationToken);
                     }
+                    ThrowIfWorkflowCancellationRequested(cancellationToken, "Manual intake workflow");
                     reportProgress(totalWork, "Manual intake workflow complete.");
                     return new ManualIntakeExecutionResult
                     {
@@ -400,6 +445,11 @@ namespace PixelVaultNative
                     var metadataUpdated = result.MetadataResult == null ? 0 : result.MetadataResult.Updated;
                     var summaryMeta = movedCount + " file(s) imported | " + metadataUpdated + " metadata update(s)";
                     ShowImportSummaryWindow("Manual Intake Summary", summaryMeta, summaryLines);
+                },
+                delegate
+                {
+                    RefreshPreview();
+                    Log("Manual intake workflow canceled.");
                 });
         }
 
@@ -408,7 +458,7 @@ namespace PixelVaultNative
             return RunRename(BuildSourceInventory(recurseBox != null && recurseBox.IsChecked == true).RenameScopeFiles);
         }
 
-        RenameStepResult RunRename(IEnumerable<string> sourceFiles, Action<int, int, string> progress = null)
+        RenameStepResult RunRename(IEnumerable<string> sourceFiles, Action<int, int, string> progress = null, CancellationToken cancellationToken = default(CancellationToken))
         {
             int renamed = 0, skipped = 0;
             var recordedSteamAppIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -417,6 +467,7 @@ namespace PixelVaultNative
             if (progress != null) progress(0, total, "Starting rename step for " + total + " file(s).");
             for (int i = 0; i < total; i++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var file = files[i];
                 var remaining = total - (i + 1);
                 var appId = GuessSteamAppIdFromFileName(file);
@@ -448,13 +499,14 @@ namespace PixelVaultNative
             return new RenameStepResult { Renamed = renamed, Skipped = skipped };
         }
 
-        RenameStepResult RunManualRename(List<ManualMetadataItem> items, Action<int, int, string> progress = null)
+        RenameStepResult RunManualRename(List<ManualMetadataItem> items, Action<int, int, string> progress = null, CancellationToken cancellationToken = default(CancellationToken))
         {
             int renamed = 0, skipped = 0;
             var total = items == null ? 0 : items.Count;
             if (progress != null) progress(0, total, "Starting rename step for " + total + " image(s).");
             for (int i = 0; i < total; i++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var item = items[i];
                 var remaining = total - (i + 1);
                 if (!File.Exists(item.FilePath))
@@ -495,7 +547,7 @@ namespace PixelVaultNative
             return new RenameStepResult { Renamed = renamed, Skipped = skipped };
         }
 
-        MetadataStepResult RunManualMetadata(List<ManualMetadataItem> items, Action<int, int, string> progress = null)
+        MetadataStepResult RunManualMetadata(List<ManualMetadataItem> items, Action<int, int, string> progress = null, CancellationToken cancellationToken = default(CancellationToken))
         {
             int updated = 0, skipped = 0;
             var total = items == null ? 0 : items.Count;
@@ -504,6 +556,7 @@ namespace PixelVaultNative
             if (progress != null) progress(0, total, "Starting metadata step for " + total + " image(s).");
             for (int i = 0; i < total; i++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var item = items[i];
                 var file = item.FilePath;
                 var remaining = total - (i + 1);
@@ -551,14 +604,14 @@ namespace PixelVaultNative
                 });
                 itemsToReset.Add(item);
             }
-            updated = RunExifWriteRequests(requests, total, skipped, progress);
+            updated = RunExifWriteRequests(requests, total, skipped, progress, cancellationToken);
             foreach (var item in itemsToReset) item.ForceTagMetadataWrite = false;
             if (progress != null) progress(total, total, "Metadata step complete: updated " + updated + ", skipped " + skipped + ".");
             Log("Manual metadata summary: updated " + updated + ", skipped " + skipped + ".");
             return new MetadataStepResult { Updated = updated, Skipped = skipped };
         }
 
-        DeleteStepResult RunDelete(List<ReviewItem> reviewItems, Action<int, int, string> progress = null)
+        DeleteStepResult RunDelete(List<ReviewItem> reviewItems, Action<int, int, string> progress = null, CancellationToken cancellationToken = default(CancellationToken))
         {
             int deleted = 0, skipped = 0;
             var targets = (reviewItems ?? new List<ReviewItem>()).Where(i => i != null && i.DeleteBeforeProcessing).ToList();
@@ -566,6 +619,7 @@ namespace PixelVaultNative
             if (progress != null) progress(0, total, "Starting delete step for " + total + " file(s).");
             for (int i = 0; i < total; i++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var item = targets[i];
                 var remaining = total - (i + 1);
                 if (!File.Exists(item.FilePath))
@@ -584,12 +638,12 @@ namespace PixelVaultNative
             return new DeleteStepResult { Deleted = deleted, Skipped = skipped };
         }
 
-        int RunExifWriteRequests(List<ExifWriteRequest> requests, int totalCount, int alreadyCompleted, Action<int, int, string> progress = null)
+        int RunExifWriteRequests(List<ExifWriteRequest> requests, int totalCount, int alreadyCompleted, Action<int, int, string> progress = null, CancellationToken cancellationToken = default(CancellationToken))
         {
-            return metadataService.RunExifWriteRequests(requests, totalCount, alreadyCompleted, progress);
+            return metadataService.RunExifWriteRequests(requests, totalCount, alreadyCompleted, progress, cancellationToken);
         }
 
-        MetadataStepResult RunMetadata(List<ReviewItem> reviewItems, Action<int, int, string> progress = null)
+        MetadataStepResult RunMetadata(List<ReviewItem> reviewItems, Action<int, int, string> progress = null, CancellationToken cancellationToken = default(CancellationToken))
         {
             int updated = 0, skipped = 0;
             var requests = new List<ExifWriteRequest>();
@@ -598,6 +652,7 @@ namespace PixelVaultNative
             if (progress != null) progress(0, total, "Starting metadata step for " + total + " file(s).");
             for (int i = 0; i < total; i++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var item = items[i];
                 var remaining = total - (i + 1);
                 if (item.DeleteBeforeProcessing)
@@ -650,7 +705,7 @@ namespace PixelVaultNative
                     SuccessDetail = item.FileName
                 });
             }
-            updated = RunExifWriteRequests(requests, requests.Count + skipped, skipped, progress);
+            updated = RunExifWriteRequests(requests, requests.Count + skipped, skipped, progress, cancellationToken);
             if (progress != null) progress(total, total, "Metadata step complete: updated " + updated + ", skipped " + skipped + ".");
             Log("Metadata summary: updated " + updated + ", skipped " + skipped + ".");
             return new MetadataStepResult { Updated = updated, Skipped = skipped };
@@ -666,15 +721,15 @@ namespace PixelVaultNative
             return RunMove(BuildSourceInventory(false).TopLevelMediaFiles, skipFiles);
         }
 
-        MoveStepResult RunMove(IEnumerable<string> sourceFiles, HashSet<string> skipFiles, Action<int, int, string> progress = null)
+        MoveStepResult RunMove(IEnumerable<string> sourceFiles, HashSet<string> skipFiles, Action<int, int, string> progress = null, CancellationToken cancellationToken = default(CancellationToken))
         {
             var files = (sourceFiles ?? Enumerable.Empty<string>())
                 .Where(File.Exists)
                 .Where(file => skipFiles == null || !skipFiles.Contains(file));
-            return RunMoveFiles(files, "Move summary", progress);
+            return RunMoveFiles(files, "Move summary", progress, cancellationToken);
         }
 
-        MoveStepResult RunMoveFiles(IEnumerable<string> files, string summaryLabel, Action<int, int, string> progress = null)
+        MoveStepResult RunMoveFiles(IEnumerable<string> files, string summaryLabel, Action<int, int, string> progress = null, CancellationToken cancellationToken = default(CancellationToken))
         {
             int moved = 0, skipped = 0, renamedConflict = 0;
             var entries = new List<UndoImportEntry>();
@@ -683,6 +738,7 @@ namespace PixelVaultNative
             if (progress != null) progress(0, total, "Starting move step for " + total + " file(s).");
             for (int i = 0; i < total; i++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var file = fileList[i];
                 var remaining = total - (i + 1);
                 var sourceDirectory = Path.GetDirectoryName(file);
@@ -732,7 +788,7 @@ namespace PixelVaultNative
             }
         }
 
-        SortStepResult SortDestinationFoldersCore(bool interactive, bool updateUi = true)
+        SortStepResult SortDestinationFoldersCore(bool interactive, bool updateUi = true, CancellationToken cancellationToken = default(CancellationToken))
         {
             EnsureDir(destinationRoot, "Destination folder");
             var files = Directory.EnumerateFiles(destinationRoot, "*", SearchOption.TopDirectoryOnly).Where(IsMedia).ToList();
@@ -748,6 +804,7 @@ namespace PixelVaultNative
             var indexedTargets = new List<string>();
             foreach (var file in files)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var folderName = GetSafeGameFolderName(GetGameNameFromFileName(Path.GetFileNameWithoutExtension(file)));
                 var targetDirectory = Path.Combine(destinationRoot, folderName);
                 if (!Directory.Exists(targetDirectory))

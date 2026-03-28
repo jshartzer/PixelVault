@@ -27,6 +27,7 @@ Published `dist\PixelVault-x.xxx\PixelVault.Native.cs` files are version snapsho
 Before making app changes, read:
 
 - `C:\Codex\docs\POLICY.md`
+- `C:\Codex\docs\DOC_SYNC_POLICY.md`
 
 That file now holds the durable working rules for:
 
@@ -43,11 +44,11 @@ This handoff is the short current-state summary.
 
 Current live build:
 
-- `0.779`
+- `0.785`
 
 Current executable:
 
-- `C:\Codex\dist\PixelVault-0.779\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.785\PixelVault.exe`
 
 Current build pointer:
 
@@ -56,6 +57,18 @@ Current build pointer:
 Desktop shortcut that must always follow the newest published build:
 
 - `C:\Codex\PixelVault.lnk`
+
+## Documentation Sync
+
+Keep repo docs and Notion aligned using:
+
+- `C:\Codex\docs\DOC_SYNC_POLICY.md`
+
+Practical rule:
+
+- repo docs own technical/runtime facts
+- Notion owns planning, release tracking, QA status, and roadmap status
+- milestone completions, publishes, and workflow-rule changes should update both before work is considered finished
 
 ## Current App Shape
 

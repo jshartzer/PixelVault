@@ -254,32 +254,15 @@ namespace PixelVaultNative
                 || (item.UseCustomCaptureTime && item.CaptureTime != item.OriginalCaptureTime);
         }
 
-        static bool CanUpdateMetadata(string file) { return IsVideo(file) || DetectPlatformTags(file).Contains("Xbox") || ParseCaptureDate(file).HasValue; }
-
-        static string[] DetectPlatformTags(string file)
+        bool CanUpdateMetadata(string file)
         {
-            var tags = new List<string>();
-            if (Regex.IsMatch(file, @"^.+_\d{14}_\d+\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$", RegexOptions.IgnoreCase))
-            {
-                tags.Add("Steam");
-            }
-            else if (Regex.IsMatch(file, @"^.+_\d{4}-\d{2}-\d{2}_\d+\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$", RegexOptions.IgnoreCase))
-            {
-                tags.Add("Steam");
-            }
-            else if (Regex.IsMatch(file, @"^clip_[\d,]{13,17}\.(mp4|mkv|avi|mov|wmv|webm)$", RegexOptions.IgnoreCase))
-            {
-                tags.Add("Steam");
-            }
-            else if (Regex.IsMatch(file, @"^.+_\d{14}\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$", RegexOptions.IgnoreCase))
-            {
-                tags.Add("PS5");
-                tags.Add("PlayStation");
-            }
-            if (Regex.IsMatch(file, @".+[-â€“â€”]\d{4}_\d{2}_\d{2}[-_]\d{2}[-_]\d{2}[-_]\d{2}\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$", RegexOptions.IgnoreCase)) tags.Add("Xbox");
-            if (file.IndexOf("PS5", StringComparison.OrdinalIgnoreCase) >= 0) { tags.Add("PS5"); tags.Add("PlayStation"); }
-            else if (file.IndexOf("PlayStation", StringComparison.OrdinalIgnoreCase) >= 0) tags.Add("PlayStation");
-            return tags.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+            var parsed = ParseFilename(file);
+            return IsVideo(file) || parsed.PlatformTags.Contains("Xbox") || parsed.CaptureTime.HasValue;
+        }
+
+        string[] DetectPlatformTags(string file)
+        {
+            return ParseFilename(file).PlatformTags;
         }
     }
 }
