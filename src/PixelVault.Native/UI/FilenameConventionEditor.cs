@@ -631,49 +631,70 @@ namespace PixelVaultNative
 
                 promoteSamples = delegate(IEnumerable<FilenameConventionSample> sourceSamples, string successMessage)
                 {
-                    var added = 0;
-                    foreach (var sample in (sourceSamples ?? Enumerable.Empty<FilenameConventionSample>()).Where(item => item != null))
+                    try
                     {
-                        var candidate = BuildCustomFilenameConventionFromSample(sample);
-                        if (candidate == null || string.IsNullOrWhiteSpace(candidate.Pattern)) continue;
-                        if (customRules.Any(rule => rule != null && string.Equals(rule.Pattern, candidate.Pattern, StringComparison.OrdinalIgnoreCase))) continue;
-                        customRules.Insert(0, candidate);
-                        added++;
-                    }
+                        var added = 0;
+                        foreach (var sample in (sourceSamples ?? Enumerable.Empty<FilenameConventionSample>()).Where(item => item != null))
+                        {
+                            var candidate = BuildCustomFilenameConventionFromSample(sample);
+                            if (candidate == null || string.IsNullOrWhiteSpace(candidate.Pattern)) continue;
+                            if (customRules.Any(rule => rule != null && string.Equals(rule.Pattern, candidate.Pattern, StringComparison.OrdinalIgnoreCase))) continue;
+                            customRules.Insert(0, candidate);
+                            added++;
+                        }
 
-                    if (added <= 0)
+                        if (added <= 0)
+                        {
+                            MessageBox.Show("No new starter rules were added. The matching pattern may already exist in your custom rules.", "PixelVault");
+                            return;
+                        }
+
+                        dirty = true;
+                        refreshUi();
+                        if (customRules.Count > 0)
+                        {
+                            customGrid.SelectedItem = customRules[0];
+                            customGrid.ScrollIntoView(customRules[0]);
+                        }
+                        status.Text = successMessage + " (" + added + " added)";
+                    }
+                    catch (Exception promoteEx)
                     {
-                        MessageBox.Show("No new starter rules were added. The matching pattern may already exist in your custom rules.", "PixelVault");
-                        return;
+                        status.Text = "Filename rule suggestion failed";
+                        Log("Failed to promote filename rule sample. " + promoteEx.Message);
+                        MessageBox.Show("Could not build a starter rule from the selected sample(s)." + Environment.NewLine + Environment.NewLine + promoteEx.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
                     }
-
-                    dirty = true;
-                    refreshUi();
-                    customGrid.SelectedIndex = 0;
-                    customGrid.ScrollIntoView(customGrid.SelectedItem);
-                    status.Text = successMessage + " (" + added + " added)";
                 };
 
                 addRuleButton.Click += delegate
                 {
-                    var newRule = new FilenameConventionRule
+                    try
                     {
-                        ConventionId = "custom_" + Guid.NewGuid().ToString("N").Substring(0, 10),
-                        Name = "Custom Rule",
-                        Enabled = true,
-                        Priority = 1200,
-                        Pattern = @"^.+\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$",
-                        PlatformLabel = "Other",
-                        PlatformTagsText = string.Empty,
-                        ConfidenceLabel = "CustomRule",
-                        IsBuiltIn = false
-                    };
-                    customRules.Insert(0, newRule);
-                    dirty = true;
-                    refreshUi();
-                    customGrid.SelectedItem = newRule;
-                    customGrid.ScrollIntoView(newRule);
-                    status.Text = "New filename rule added";
+                        var newRule = new FilenameConventionRule
+                        {
+                            ConventionId = "custom_" + Guid.NewGuid().ToString("N").Substring(0, 10),
+                            Name = "Custom Rule",
+                            Enabled = true,
+                            Priority = 1200,
+                            Pattern = @"^.+\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$",
+                            PlatformLabel = "Other",
+                            PlatformTagsText = string.Empty,
+                            ConfidenceLabel = "CustomRule",
+                            IsBuiltIn = false
+                        };
+                        customRules.Insert(0, newRule);
+                        dirty = true;
+                        refreshUi();
+                        customGrid.SelectedItem = newRule;
+                        customGrid.ScrollIntoView(newRule);
+                        status.Text = "New filename rule added";
+                    }
+                    catch (Exception addEx)
+                    {
+                        status.Text = "Filename rule add failed";
+                        Log("Failed to add a new filename rule. " + addEx.Message);
+                        MessageBox.Show("Could not add a new filename rule." + Environment.NewLine + Environment.NewLine + addEx.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
                 };
 
                 sampleRuleButton.Click += delegate

@@ -1,3 +1,7 @@
+## 0.787
+- Fixed the Filename Rules editor bindings by converting the filename parsing models to bindable CLR properties, so built-in and custom rules now render correctly in the grids.
+- Hardened `Add Rule`, sample promotion, and frequent-promotion flows to show validation errors instead of crashing the app when a starter rule cannot be built safely.
+
 ## 0.786
 - Published a follow-up build after the filename parsing architecture/spec refinements so the current release line stays aligned with the documented parser defaults and edge-case rules.
 
