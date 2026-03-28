@@ -398,6 +398,7 @@ ORDER BY priority DESC, convention_id COLLATE NOCASE;";
                             Enabled = !reader.IsDBNull(2) && reader.GetInt32(2) != 0,
                             Priority = reader.IsDBNull(3) ? 0 : reader.GetInt32(3),
                             Pattern = reader.IsDBNull(4) ? string.Empty : reader.GetString(4),
+                            PatternText = reader.IsDBNull(4) ? string.Empty : reader.GetString(4),
                             PlatformLabel = reader.IsDBNull(5) ? string.Empty : reader.GetString(5),
                             PlatformTagsText = reader.IsDBNull(6) ? string.Empty : reader.GetString(6),
                             SteamAppIdGroup = reader.IsDBNull(7) ? string.Empty : reader.GetString(7),
@@ -440,7 +441,7 @@ VALUES ($root, $conventionId, $name, $enabled, $priority, $pattern, $platformLab
                         insert.Parameters.AddWithValue("$name", rule.Name ?? string.Empty);
                         insert.Parameters.AddWithValue("$enabled", rule.Enabled ? 1 : 0);
                         insert.Parameters.AddWithValue("$priority", rule.Priority);
-                        insert.Parameters.AddWithValue("$pattern", rule.Pattern ?? string.Empty);
+                        insert.Parameters.AddWithValue("$pattern", string.IsNullOrWhiteSpace(rule.Pattern) ? (rule.PatternText ?? string.Empty) : rule.Pattern);
                         insert.Parameters.AddWithValue("$platformLabel", rule.PlatformLabel ?? string.Empty);
                         insert.Parameters.AddWithValue("$platformTagsText", rule.PlatformTagsText ?? string.Empty);
                         insert.Parameters.AddWithValue("$steamAppIdGroup", rule.SteamAppIdGroup ?? string.Empty);

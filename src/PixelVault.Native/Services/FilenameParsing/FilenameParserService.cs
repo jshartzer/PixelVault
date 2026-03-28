@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace PixelVaultNative
@@ -42,8 +43,9 @@ namespace PixelVaultNative
             var result = new FilenameParseResult();
             foreach (var rule in GetRules(root))
             {
-                if (!rule.Enabled || string.IsNullOrWhiteSpace(rule.Pattern)) continue;
-                var match = GetRegex(rule.Pattern).Match(fileName);
+                var storedPattern = NormalizePatternTextForStorage(rule.PatternText ?? rule.Pattern);
+                if (!rule.Enabled || string.IsNullOrWhiteSpace(storedPattern)) continue;
+                var match = GetRegex(storedPattern, rule.TimestampGroup).Match(fileName);
                 if (!match.Success) continue;
                 result.MatchedConvention = true;
                 result.ConventionId = rule.ConventionId ?? string.Empty;
@@ -94,6 +96,7 @@ namespace PixelVaultNative
                     Enabled = rule.Enabled,
                     Priority = rule.Priority,
                     Pattern = rule.Pattern,
+                    PatternText = GetPatternEditorText(rule.PatternText ?? rule.Pattern),
                     PlatformLabel = rule.PlatformLabel,
                     PlatformTagsText = rule.PlatformTagsText,
                     SteamAppIdGroup = rule.SteamAppIdGroup,
@@ -180,14 +183,15 @@ namespace PixelVaultNative
             }
         }
 
-        Regex GetRegex(string pattern)
+        Regex GetRegex(string patternText, string timestampGroup)
         {
+            var compiledPattern = BuildRegexPattern(patternText, timestampGroup);
             lock (sync)
             {
                 Regex cached;
-                if (regexCache.TryGetValue(pattern, out cached)) return cached;
-                cached = new Regex(pattern, RegexOptions.IgnoreCase | RegexOptions.Compiled);
-                regexCache[pattern] = cached;
+                if (regexCache.TryGetValue(compiledPattern, out cached)) return cached;
+                cached = new Regex(compiledPattern, RegexOptions.IgnoreCase | RegexOptions.Compiled);
+                regexCache[compiledPattern] = cached;
                 return cached;
             }
         }
@@ -201,7 +205,8 @@ namespace PixelVaultNative
                     ConventionId = "steam_screenshot_appid",
                     Name = "Steam Screenshot (AppID + Timestamp)",
                     Priority = 1000,
-                    Pattern = @"^(?<appid>\d{3,})_(?<stamp>\d{14})(?:[_-]\d+)?\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$",
+                    Pattern = "[appid]_[yyyy][MM][dd][HH][mm][ss][opt-counter].[ext:media]",
+                    PatternText = "[appid]_[yyyy][MM][dd][HH][mm][ss][opt-counter].[ext:media]",
                     PlatformLabel = "Steam",
                     PlatformTagsText = "Steam",
                     SteamAppIdGroup = "appid",
@@ -215,7 +220,8 @@ namespace PixelVaultNative
                     ConventionId = "steam_manual_export",
                     Name = "Steam Manual Export",
                     Priority = 950,
-                    Pattern = @"^(?<stamp>\d{14})(?:[_-]\d+)?\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$",
+                    Pattern = "[yyyy][MM][dd][HH][mm][ss][opt-counter].[ext:media]",
+                    PatternText = "[yyyy][MM][dd][HH][mm][ss][opt-counter].[ext:media]",
                     PlatformLabel = "Steam",
                     PlatformTagsText = "Steam",
                     TimestampGroup = "stamp",
@@ -229,7 +235,8 @@ namespace PixelVaultNative
                     ConventionId = "steam_legacy_date",
                     Name = "Steam Screenshot (Legacy Date)",
                     Priority = 900,
-                    Pattern = @"^(?<title>.+?)_(?<stamp>\d{4}-\d{2}-\d{2})_\d+\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$",
+                    Pattern = "[title]_[yyyy]-[MM]-[dd]_[counter].[ext:media]",
+                    PatternText = "[title]_[yyyy]-[MM]-[dd]_[counter].[ext:media]",
                     PlatformLabel = "Steam",
                     PlatformTagsText = "Steam",
                     TitleGroup = "title",
@@ -243,7 +250,8 @@ namespace PixelVaultNative
                     ConventionId = "steam_clip_unix",
                     Name = "Steam Clip",
                     Priority = 890,
-                    Pattern = @"^clip_(?<stamp>[\d,]{13,17})\.(mp4|mkv|avi|mov|wmv|webm)$",
+                    Pattern = "clip_[unixms].[ext:video]",
+                    PatternText = "clip_[unixms].[ext:video]",
                     PlatformLabel = "Steam",
                     PlatformTagsText = "Steam",
                     TimestampGroup = "stamp",
@@ -256,7 +264,8 @@ namespace PixelVaultNative
                     ConventionId = "ps5_share",
                     Name = "PS5 Share",
                     Priority = 850,
-                    Pattern = @"^(?<title>.+?)_(?<stamp>\d{14})\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$",
+                    Pattern = "[title]_[yyyy][MM][dd][HH][mm][ss].[ext:media]",
+                    PatternText = "[title]_[yyyy][MM][dd][HH][mm][ss].[ext:media]",
                     PlatformLabel = "PS5",
                     PlatformTagsText = "PS5;PlayStation",
                     TitleGroup = "title",
@@ -270,7 +279,8 @@ namespace PixelVaultNative
                     ConventionId = "xbox_capture",
                     Name = "Xbox Capture",
                     Priority = 840,
-                    Pattern = @"^(?<title>.+?)[-–—](?<stamp>\d{4}_\d{2}_\d{2}[-_]\d{2}[-_]\d{2}[-_]\d{2})\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$",
+                    Pattern = "[title]-[yyyy]_[MM]_[dd]-[HH]_[mm]_[ss].[ext:media]",
+                    PatternText = "[title]-[yyyy]_[MM]_[dd]-[HH]_[mm]_[ss].[ext:media]",
                     PlatformLabel = "Xbox",
                     PlatformTagsText = "Xbox",
                     TitleGroup = "title",
@@ -285,7 +295,8 @@ namespace PixelVaultNative
                     ConventionId = "ps5_literal_token",
                     Name = "PS5 Token",
                     Priority = 120,
-                    Pattern = @".*PS5.*",
+                    Pattern = "[contains:PS5]",
+                    PatternText = "[contains:PS5]",
                     PlatformLabel = "PS5",
                     PlatformTagsText = "PS5;PlayStation",
                     ConfidenceLabel = "Heuristic",
@@ -296,7 +307,8 @@ namespace PixelVaultNative
                     ConventionId = "playstation_literal_token",
                     Name = "PlayStation Token",
                     Priority = 110,
-                    Pattern = @".*PlayStation.*",
+                    Pattern = "[contains:PlayStation]",
+                    PatternText = "[contains:PlayStation]",
                     PlatformLabel = "PlayStation",
                     PlatformTagsText = "PlayStation",
                     ConfidenceLabel = "Heuristic",
@@ -406,6 +418,255 @@ namespace PixelVaultNative
             }
 
             return null;
+        }
+
+        internal static string GetPatternEditorText(string pattern)
+        {
+            var trimmed = (pattern ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(trimmed)) return string.Empty;
+            string readable;
+            if (KnownRegexPatterns.TryGetValue(trimmed, out readable)) return readable;
+            return trimmed;
+        }
+
+        internal static string NormalizePatternTextForStorage(string patternText)
+        {
+            return (patternText ?? string.Empty).Trim();
+        }
+
+        internal static string BuildRegexPattern(string patternText, string timestampGroup)
+        {
+            var trimmed = NormalizePatternTextForStorage(patternText);
+            if (string.IsNullOrWhiteSpace(trimmed)) return string.Empty;
+            if (!LooksLikeReadablePattern(trimmed)) return trimmed;
+
+            var containsMatch = Regex.Match(trimmed, @"^\[contains:(?<value>.+)\]$", RegexOptions.IgnoreCase);
+            if (containsMatch.Success)
+            {
+                return ".*" + Regex.Escape(containsMatch.Groups["value"].Value) + ".*";
+            }
+
+            var segments = TokenizeReadablePattern(trimmed);
+            var builder = new StringBuilder("^");
+            var stampGroupName = string.IsNullOrWhiteSpace(timestampGroup) ? "stamp" : timestampGroup.Trim();
+            var stampOpen = false;
+
+            for (var i = 0; i < segments.Count; i++)
+            {
+                var segment = segments[i];
+                if (segment.IsToken)
+                {
+                    if (IsTimestampToken(segment.Value))
+                    {
+                        if (!stampOpen)
+                        {
+                            builder.Append("(?<").Append(stampGroupName).Append(">");
+                            stampOpen = true;
+                        }
+                        builder.Append(RegexForToken(segment.Value));
+                        if (!NextSegmentKeepsTimestampOpen(segments, i + 1))
+                        {
+                            builder.Append(")");
+                            stampOpen = false;
+                        }
+                        continue;
+                    }
+
+                    if (stampOpen)
+                    {
+                        builder.Append(")");
+                        stampOpen = false;
+                    }
+
+                    builder.Append(RegexForToken(segment.Value));
+                    continue;
+                }
+
+                if (stampOpen && IsTimestampSeparator(segment.Value) && NextSegmentStartsTimestamp(segments, i + 1))
+                {
+                    builder.Append(Regex.Escape(segment.Value));
+                    continue;
+                }
+
+                if (stampOpen)
+                {
+                    builder.Append(")");
+                    stampOpen = false;
+                }
+
+                builder.Append(Regex.Escape(segment.Value));
+            }
+
+            if (stampOpen) builder.Append(")");
+            builder.Append("$");
+            return builder.ToString();
+        }
+
+        static bool LooksLikeReadablePattern(string patternText)
+        {
+            if (string.IsNullOrWhiteSpace(patternText)) return false;
+            if (patternText.StartsWith("^", StringComparison.Ordinal) || patternText.Contains("(?<") || patternText.Contains(@"\d") || patternText.Contains(@".*"))
+            {
+                return false;
+            }
+
+            var segments = TokenizeReadablePattern(patternText);
+            return segments.Any(segment => segment.IsToken)
+                && segments
+                    .Where(segment => segment.IsToken)
+                    .All(segment => IsKnownReadableToken(segment.Value));
+        }
+
+        static List<ReadablePatternSegment> TokenizeReadablePattern(string patternText)
+        {
+            var segments = new List<ReadablePatternSegment>();
+            var index = 0;
+            while (index < patternText.Length)
+            {
+                if (patternText[index] == '[')
+                {
+                    var closeIndex = patternText.IndexOf(']', index + 1);
+                    if (closeIndex > index)
+                    {
+                        segments.Add(new ReadablePatternSegment(true, patternText.Substring(index + 1, closeIndex - index - 1)));
+                        index = closeIndex + 1;
+                        continue;
+                    }
+                }
+
+                var nextToken = patternText.IndexOf('[', index);
+                if (nextToken < 0) nextToken = patternText.Length;
+                segments.Add(new ReadablePatternSegment(false, patternText.Substring(index, nextToken - index)));
+                index = nextToken;
+            }
+
+            return segments;
+        }
+
+        static bool IsTimestampToken(string token)
+        {
+            switch ((token ?? string.Empty).Trim())
+            {
+                case "yyyy":
+                case "MM":
+                case "dd":
+                case "HH":
+                case "hh":
+                case "mm":
+                case "ss":
+                case "tt":
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        static bool IsTimestampSeparator(string value)
+        {
+            return !string.IsNullOrEmpty(value) && value.All(ch => ch == '-' || ch == '_' || ch == ':' || ch == ' ' || ch == 'T');
+        }
+
+        static bool NextSegmentStartsTimestamp(List<ReadablePatternSegment> segments, int startIndex)
+        {
+            for (var i = startIndex; i < segments.Count; i++)
+            {
+                var segment = segments[i];
+                if (segment.IsToken) return IsTimestampToken(segment.Value);
+                if (!string.IsNullOrEmpty(segment.Value)) return false;
+            }
+            return false;
+        }
+
+        static bool NextSegmentKeepsTimestampOpen(List<ReadablePatternSegment> segments, int startIndex)
+        {
+            if (startIndex >= segments.Count) return false;
+            var next = segments[startIndex];
+            if (next.IsToken) return IsTimestampToken(next.Value);
+            return IsTimestampSeparator(next.Value) && NextSegmentStartsTimestamp(segments, startIndex + 1);
+        }
+
+        static string RegexForToken(string token)
+        {
+            switch ((token ?? string.Empty).Trim())
+            {
+                case "appid":
+                    return @"(?<appid>\d{3,})";
+                case "title":
+                    return @"(?<title>.+?)";
+                case "counter":
+                    return @"\d+";
+                case "opt-counter":
+                    return @"(?:[_-]\d+)?";
+                case "unixms":
+                    return @"[\d,]{13,17}";
+                case "yyyy":
+                    return @"\d{4}";
+                case "MM":
+                case "dd":
+                case "HH":
+                case "hh":
+                case "mm":
+                case "ss":
+                    return @"\d{2}";
+                case "tt":
+                    return @"[AP]M";
+                case "ext:media":
+                case "ext":
+                    return @"(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)";
+                case "ext:image":
+                    return @"(png|jpe?g)";
+                case "ext:video":
+                    return @"(mp4|mkv|avi|mov|wmv|webm)";
+                default:
+                    throw new InvalidOperationException("Unknown filename-rule token [" + token + "].");
+            }
+        }
+
+        static bool IsKnownReadableToken(string token)
+        {
+            var trimmed = (token ?? string.Empty).Trim();
+            return trimmed.StartsWith("contains:", StringComparison.OrdinalIgnoreCase)
+                || trimmed == "appid"
+                || trimmed == "title"
+                || trimmed == "counter"
+                || trimmed == "opt-counter"
+                || trimmed == "unixms"
+                || trimmed == "yyyy"
+                || trimmed == "MM"
+                || trimmed == "dd"
+                || trimmed == "HH"
+                || trimmed == "hh"
+                || trimmed == "mm"
+                || trimmed == "ss"
+                || trimmed == "tt"
+                || trimmed == "ext"
+                || trimmed == "ext:media"
+                || trimmed == "ext:image"
+                || trimmed == "ext:video";
+        }
+
+        static readonly Dictionary<string, string> KnownRegexPatterns = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            { @"^(?<appid>\d{3,})_(?<stamp>\d{14})(?:[_-]\d+)?\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$", "[appid]_[yyyy][MM][dd][HH][mm][ss][opt-counter].[ext:media]" },
+            { @"^(?<stamp>\d{14})(?:[_-]\d+)?\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$", "[yyyy][MM][dd][HH][mm][ss][opt-counter].[ext:media]" },
+            { @"^(?<title>.+?)_(?<stamp>\d{4}-\d{2}-\d{2})_\d+\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$", "[title]_[yyyy]-[MM]-[dd]_[counter].[ext:media]" },
+            { @"^clip_(?<stamp>[\d,]{13,17})\.(mp4|mkv|avi|mov|wmv|webm)$", "clip_[unixms].[ext:video]" },
+            { @"^(?<title>.+?)_(?<stamp>\d{14})\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$", "[title]_[yyyy][MM][dd][HH][mm][ss].[ext:media]" },
+            { @"^(?<title>.+?)[-–—](?<stamp>\d{4}_\d{2}_\d{2}[-_]\d{2}[-_]\d{2}[-_]\d{2})\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$", "[title]-[yyyy]_[MM]_[dd]-[HH]_[mm]_[ss].[ext:media]" },
+            { @".*PS5.*", "[contains:PS5]" },
+            { @".*PlayStation.*", "[contains:PlayStation]" }
+        };
+
+        readonly struct ReadablePatternSegment
+        {
+            public ReadablePatternSegment(bool isToken, string value)
+            {
+                IsToken = isToken;
+                Value = value ?? string.Empty;
+            }
+
+            public bool IsToken { get; }
+            public string Value { get; }
         }
     }
 }

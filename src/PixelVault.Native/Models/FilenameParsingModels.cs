@@ -9,6 +9,7 @@ namespace PixelVaultNative
         public bool Enabled { get; set; } = true;
         public int Priority { get; set; }
         public string Pattern { get; set; }
+        public string PatternText { get; set; }
         public string PlatformLabel { get; set; }
         public string PlatformTagsText { get; set; }
         public string SteamAppIdGroup { get; set; }
@@ -45,5 +46,14 @@ namespace PixelVaultNative
         public long FirstSeenUtcTicks { get; set; }
         public long LastSeenUtcTicks { get; set; }
         public int OccurrenceCount { get; set; }
+        public string LastSeenUtcText
+        {
+            get
+            {
+                return LastSeenUtcTicks > 0
+                    ? new DateTime(LastSeenUtcTicks, DateTimeKind.Utc).ToString("yyyy-MM-dd HH:mm:ss")
+                    : string.Empty;
+            }
+        }
     }
 }

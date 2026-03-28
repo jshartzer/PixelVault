@@ -1,3 +1,7 @@
+## 0.788
+- Made filename rules human-readable by shipping token-style rule text like `[title]_[yyyy][MM][dd][HH][mm][ss].[ext:media]` while still compiling those rules down to regex internally for matching.
+- Improved the Filename Rules editor so the grids surface readable rule text, sample rows bind directly, selection-driven actions enable correctly, and add/promote/disable flows jump straight into editable custom rules instead of feeling inert.
+
 ## 0.787
 - Fixed the Filename Rules editor bindings by converting the filename parsing models to bindable CLR properties, so built-in and custom rules now render correctly in the grids.
 - Hardened `Add Rule`, sample promotion, and frequent-promotion flows to show validation errors instead of crashing the app when a starter rule cannot be built safely.

@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Threading;
 
 namespace PixelVaultNative
 {
@@ -53,6 +54,35 @@ namespace PixelVaultNative
             return @"(?:[_\-\s]+" + Regex.Escape(cleaned).Replace(@"\ ", @"\s+") + ")?";
         }
 
+        string BuildFilenameConventionSuffixTokenText(string suffix)
+        {
+            var cleaned = TrimFilenameConventionSeparatorText(suffix);
+            if (string.IsNullOrWhiteSpace(cleaned)) return string.Empty;
+            if (Regex.IsMatch(cleaned, @"^\d+$")) return "[opt-counter]";
+            return "_" + cleaned;
+        }
+
+        string FilenameTimestampTokenTextForFormat(string format)
+        {
+            switch ((format ?? string.Empty).Trim())
+            {
+                case "yyyyMMddHHmmss":
+                    return "[yyyy][MM][dd][HH][mm][ss]";
+                case "yyyy-MM-dd hh-mm-ss tt":
+                    return "[yyyy]-[MM]-[dd] [hh]-[mm]-[ss] [tt]";
+                case "yyyy-MM-dd HH-mm-ss":
+                    return "[yyyy]-[MM]-[dd] [HH]-[mm]-[ss]";
+                case "yyyy-MM-dd":
+                    return "[yyyy]-[MM]-[dd]";
+                case "yyyyMMdd":
+                    return "[yyyy][MM][dd]";
+                case "unix-ms":
+                    return "[unixms]";
+                default:
+                    return string.Empty;
+            }
+        }
+
         string DefaultPlatformTagsTextForLabel(string platformLabel)
         {
             var normalized = NormalizeConsoleLabel(platformLabel);
@@ -88,7 +118,8 @@ namespace PixelVaultNative
 
             if (string.IsNullOrWhiteSpace(fileName))
             {
-                rule.Pattern = @"^.+\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$";
+                rule.PatternText = "[title].[ext:media]";
+                rule.Pattern = rule.PatternText;
                 return rule;
             }
 
@@ -97,7 +128,8 @@ namespace PixelVaultNative
                 rule.Name = "Custom: Steam Screenshot";
                 rule.PlatformLabel = "Steam";
                 rule.PlatformTagsText = "Steam";
-                rule.Pattern = @"^(?<appid>\d{3,})_(?<stamp>\d{14})(?:[_-]\d+)?\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$";
+                rule.PatternText = "[appid]_[yyyy][MM][dd][HH][mm][ss][opt-counter].[ext:media]";
+                rule.Pattern = rule.PatternText;
                 rule.SteamAppIdGroup = "appid";
                 rule.TimestampGroup = "stamp";
                 rule.TimestampFormat = "yyyyMMddHHmmss";
@@ -109,7 +141,8 @@ namespace PixelVaultNative
                 rule.Name = "Custom: Steam Manual Export";
                 rule.PlatformLabel = "Steam";
                 rule.PlatformTagsText = "Steam";
-                rule.Pattern = @"^(?<stamp>\d{14})(?:[_-]\d+)?\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$";
+                rule.PatternText = "[yyyy][MM][dd][HH][mm][ss][opt-counter].[ext:media]";
+                rule.Pattern = rule.PatternText;
                 rule.TimestampGroup = "stamp";
                 rule.TimestampFormat = "yyyyMMddHHmmss";
                 rule.RoutesToManualWhenMissingSteamAppId = true;
@@ -121,7 +154,8 @@ namespace PixelVaultNative
                 rule.Name = "Custom: Steam Clip";
                 rule.PlatformLabel = "Steam";
                 rule.PlatformTagsText = "Steam";
-                rule.Pattern = @"^clip_(?<stamp>[\d,]{13,17})\.(mp4|mkv|avi|mov|wmv|webm)$";
+                rule.PatternText = "clip_[unixms].[ext:video]";
+                rule.Pattern = rule.PatternText;
                 rule.TimestampGroup = "stamp";
                 rule.TimestampFormat = "unix-ms";
                 return rule;
@@ -132,7 +166,8 @@ namespace PixelVaultNative
                 rule.Name = "Custom: Xbox Capture";
                 rule.PlatformLabel = "Xbox";
                 rule.PlatformTagsText = "Xbox";
-                rule.Pattern = @"^(?<title>.+?)\s*-\s*(?<stamp>\d{4}-\d{2}-\d{2}\s+\d{2}-\d{2}-\d{2}\s+[AP]M)\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$";
+                rule.PatternText = "[title] - [yyyy]-[MM]-[dd] [hh]-[mm]-[ss] [tt].[ext:media]";
+                rule.Pattern = rule.PatternText;
                 rule.TitleGroup = "title";
                 rule.TimestampGroup = "stamp";
                 rule.TimestampFormat = "yyyy-MM-dd hh-mm-ss tt";
@@ -143,7 +178,8 @@ namespace PixelVaultNative
             if (Regex.IsMatch(fileName, @"^.+?_\d{14}\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$", RegexOptions.IgnoreCase))
             {
                 rule.Name = "Custom: Title And Timestamp";
-                rule.Pattern = @"^(?<title>.+?)_(?<stamp>\d{14})\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$";
+                rule.PatternText = "[title]_[yyyy][MM][dd][HH][mm][ss].[ext:media]";
+                rule.Pattern = rule.PatternText;
                 rule.TitleGroup = "title";
                 rule.TimestampGroup = "stamp";
                 rule.TimestampFormat = "yyyyMMddHHmmss";
@@ -166,7 +202,11 @@ namespace PixelVaultNative
                 if (appIdAndTitlePrefix.Success)
                 {
                     rule.Name = "Custom: AppID, Title, And Timestamp";
+                    var tokenTime = FilenameTimestampTokenTextForFormat(timestampFormat);
                     rule.Pattern = @"^(?<appid>\d{3,})[_\-\s]+(?<title>.+?)[_\-\s]+(?<stamp>" + timestampPattern + @")" + suffixPattern + extPattern;
+                    rule.PatternText = string.IsNullOrWhiteSpace(tokenTime)
+                        ? rule.Pattern
+                        : "[appid]_[title]_" + tokenTime + BuildFilenameConventionSuffixTokenText(suffix) + ".[ext:media]";
                     rule.SteamAppIdGroup = "appid";
                     rule.TitleGroup = "title";
                     rule.TimestampGroup = "stamp";
@@ -179,7 +219,11 @@ namespace PixelVaultNative
                     rule.Name = "Custom: AppID And Timestamp";
                     rule.PlatformLabel = "Steam";
                     rule.PlatformTagsText = "Steam";
+                    var tokenTime = FilenameTimestampTokenTextForFormat(timestampFormat);
                     rule.Pattern = @"^(?<appid>\d{3,})[_\-\s]+(?<stamp>" + timestampPattern + @")" + suffixPattern + extPattern;
+                    rule.PatternText = string.IsNullOrWhiteSpace(tokenTime)
+                        ? rule.Pattern
+                        : "[appid]_" + tokenTime + BuildFilenameConventionSuffixTokenText(suffix) + ".[ext:media]";
                     rule.SteamAppIdGroup = "appid";
                     rule.TimestampGroup = "stamp";
                     rule.TimestampFormat = timestampFormat;
@@ -189,7 +233,11 @@ namespace PixelVaultNative
                 if (!string.IsNullOrWhiteSpace(prefixClean))
                 {
                     rule.Name = "Custom: Title And Timestamp";
+                    var tokenTime = FilenameTimestampTokenTextForFormat(timestampFormat);
                     rule.Pattern = @"^(?<title>.+?)[_\-\s]+(?<stamp>" + timestampPattern + @")" + suffixPattern + extPattern;
+                    rule.PatternText = string.IsNullOrWhiteSpace(tokenTime)
+                        ? rule.Pattern
+                        : "[title]_" + tokenTime + BuildFilenameConventionSuffixTokenText(suffix) + ".[ext:media]";
                     rule.TitleGroup = "title";
                     rule.TimestampGroup = "stamp";
                     rule.TimestampFormat = timestampFormat;
@@ -216,6 +264,7 @@ namespace PixelVaultNative
                 }
             }
             rule.Pattern = "^" + escapedPattern + "$";
+            rule.PatternText = FilenameParserService.GetPatternEditorText(rule.Pattern);
             return rule;
         }
 
@@ -264,7 +313,7 @@ namespace PixelVaultNative
                 var headerStack = new StackPanel();
                 headerStack.Children.Add(new TextBlock { Text = "Filename Rules", FontSize = 30, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White });
                 headerStack.Children.Add(new TextBlock { Text = "Centralize filename parsing here. Built-in rules stay as shipped defaults, while custom rules in the index database can extend or override them as conventions drift over time.", Margin = new Thickness(0, 8, 0, 0), FontSize = 14, Foreground = Brush("#B7C6C0"), TextWrapping = TextWrapping.Wrap });
-                headerStack.Children.Add(new TextBlock { Text = "Recent unmatched filenames are captured below so we can turn repeat misses into explicit rules instead of scattering regex logic across import paths.", Margin = new Thickness(0, 10, 0, 0), FontSize = 13, Foreground = Brush("#D8C7A4"), TextWrapping = TextWrapping.Wrap });
+                headerStack.Children.Add(new TextBlock { Text = "Use readable tokens like [title]_[yyyy][MM][dd][HH][mm][ss].[ext:media] or [appid]_[yyyy][MM][dd][HH][mm][ss][opt-counter].[ext:media]. Raw regex still works, but token rules are easier to read and maintain.", Margin = new Thickness(0, 10, 0, 0), FontSize = 13, Foreground = Brush("#D8C7A4"), TextWrapping = TextWrapping.Wrap });
                 header.Child = headerStack;
                 root.Children.Add(header);
 
@@ -292,12 +341,15 @@ namespace PixelVaultNative
                 addRuleButton.Width = 138;
                 addRuleButton.Height = 42;
                 addRuleButton.Margin = new Thickness(0, 0, 10, 0);
+                addRuleButton.ToolTip = "Add a blank custom rule and jump into editing it.";
                 controlGrid.Children.Add(addRuleButton);
 
                 var sampleRuleButton = Btn("Rule From Sample", null, "#275D47", Brushes.White);
                 sampleRuleButton.Width = 180;
                 sampleRuleButton.Height = 42;
                 sampleRuleButton.Margin = new Thickness(0, 0, 10, 0);
+                sampleRuleButton.IsEnabled = false;
+                sampleRuleButton.ToolTip = "Turn the selected unmatched sample into a starter rule.";
                 Grid.SetColumn(sampleRuleButton, 1);
                 controlGrid.Children.Add(sampleRuleButton);
 
@@ -305,6 +357,8 @@ namespace PixelVaultNative
                 disableBuiltInButton.Width = 180;
                 disableBuiltInButton.Height = 42;
                 disableBuiltInButton.Margin = new Thickness(0, 0, 10, 0);
+                disableBuiltInButton.IsEnabled = false;
+                disableBuiltInButton.ToolTip = "Create a custom override that disables the selected built-in rule.";
                 Grid.SetColumn(disableBuiltInButton, 2);
                 controlGrid.Children.Add(disableBuiltInButton);
 
@@ -312,6 +366,8 @@ namespace PixelVaultNative
                 promoteFrequentButton.Width = 170;
                 promoteFrequentButton.Height = 42;
                 promoteFrequentButton.Margin = new Thickness(0, 0, 10, 0);
+                promoteFrequentButton.IsEnabled = false;
+                promoteFrequentButton.ToolTip = "Promote the selected sample or the most repeated misses into starter rules.";
                 Grid.SetColumn(promoteFrequentButton, 3);
                 controlGrid.Children.Add(promoteFrequentButton);
 
@@ -319,6 +375,7 @@ namespace PixelVaultNative
                 reloadButton.Width = 132;
                 reloadButton.Height = 42;
                 reloadButton.Margin = new Thickness(0, 0, 10, 0);
+                reloadButton.ToolTip = "Reload saved custom rules and recent unmatched samples from disk.";
                 Grid.SetColumn(reloadButton, 4);
                 controlGrid.Children.Add(reloadButton);
 
@@ -337,6 +394,7 @@ namespace PixelVaultNative
                 saveTopButton.Width = 150;
                 saveTopButton.Height = 42;
                 saveTopButton.Margin = new Thickness(0);
+                saveTopButton.ToolTip = "Validate the readable rules and save them into the library index database.";
                 Grid.SetColumn(saveTopButton, 6);
                 controlGrid.Children.Add(saveTopButton);
                 bodyGrid.Children.Add(controlGrid);
@@ -369,13 +427,14 @@ namespace PixelVaultNative
                     BorderThickness = new Thickness(1),
                     BorderBrush = Brush("#D7E1E8"),
                     Background = Brushes.White,
+                    Foreground = Brush("#1F2A30"),
                     AlternatingRowBackground = Brush("#F7FAFC"),
                     RowHeaderWidth = 0
                 };
                 customGrid.Columns.Add(new DataGridTextColumn { Header = "Name", Binding = new System.Windows.Data.Binding("Name") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus }, Width = 200 });
                 customGrid.Columns.Add(new DataGridCheckBoxColumn { Header = "On", Binding = new System.Windows.Data.Binding("Enabled"), Width = 56 });
                 customGrid.Columns.Add(new DataGridTextColumn { Header = "Priority", Binding = new System.Windows.Data.Binding("Priority") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus }, Width = 72 });
-                customGrid.Columns.Add(new DataGridTextColumn { Header = "Pattern", Binding = new System.Windows.Data.Binding("Pattern") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus }, Width = new DataGridLength(1.8, DataGridLengthUnitType.Star) });
+                customGrid.Columns.Add(new DataGridTextColumn { Header = "Rule", Binding = new System.Windows.Data.Binding("PatternText") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus }, Width = new DataGridLength(2.2, DataGridLengthUnitType.Star) });
                 customGrid.Columns.Add(new DataGridTextColumn { Header = "Platform", Binding = new System.Windows.Data.Binding("PlatformLabel") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus }, Width = 110 });
                 customGrid.Columns.Add(new DataGridTextColumn { Header = "Tags", Binding = new System.Windows.Data.Binding("PlatformTagsText") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus }, Width = 150 });
                 customGrid.Columns.Add(new DataGridTextColumn { Header = "AppID Group", Binding = new System.Windows.Data.Binding("SteamAppIdGroup") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus }, Width = 90 });
@@ -412,6 +471,7 @@ namespace PixelVaultNative
                     BorderThickness = new Thickness(1),
                     BorderBrush = Brush("#D7E1E8"),
                     Background = Brushes.White,
+                    Foreground = Brush("#1F2A30"),
                     AlternatingRowBackground = Brush("#F7FAFC"),
                     RowHeaderWidth = 0
                 };
@@ -419,7 +479,7 @@ namespace PixelVaultNative
                 builtInGrid.Columns.Add(new DataGridCheckBoxColumn { Header = "On", Binding = new System.Windows.Data.Binding("Enabled"), Width = 56 });
                 builtInGrid.Columns.Add(new DataGridTextColumn { Header = "Priority", Binding = new System.Windows.Data.Binding("Priority"), Width = 72 });
                 builtInGrid.Columns.Add(new DataGridTextColumn { Header = "Platform", Binding = new System.Windows.Data.Binding("PlatformLabel"), Width = 105 });
-                builtInGrid.Columns.Add(new DataGridTextColumn { Header = "Pattern", Binding = new System.Windows.Data.Binding("Pattern"), Width = new DataGridLength(1.2, DataGridLengthUnitType.Star) });
+                builtInGrid.Columns.Add(new DataGridTextColumn { Header = "Rule", Binding = new System.Windows.Data.Binding("PatternText"), Width = new DataGridLength(1.4, DataGridLengthUnitType.Star) });
                 Grid.SetRow(builtInGrid, 1);
                 builtInPanel.Children.Add(builtInGrid);
 
@@ -451,6 +511,7 @@ namespace PixelVaultNative
                     BorderThickness = new Thickness(1),
                     BorderBrush = Brush("#D7E1E8"),
                     Background = Brushes.White,
+                    Foreground = Brush("#1F2A30"),
                     AlternatingRowBackground = Brush("#F7FAFC"),
                     RowHeaderWidth = 0
                 };
@@ -458,7 +519,7 @@ namespace PixelVaultNative
                 sampleGrid.Columns.Add(new DataGridTextColumn { Header = "Suggested Platform", Binding = new System.Windows.Data.Binding("SuggestedPlatformLabel"), Width = 130 });
                 sampleGrid.Columns.Add(new DataGridTextColumn { Header = "Suggested Rule", Binding = new System.Windows.Data.Binding("SuggestedConventionId"), Width = 160 });
                 sampleGrid.Columns.Add(new DataGridTextColumn { Header = "Count", Binding = new System.Windows.Data.Binding("OccurrenceCount"), Width = 68 });
-                sampleGrid.Columns.Add(new DataGridTextColumn { Header = "Last Seen (UTC)", Binding = new System.Windows.Data.Binding("LastSeenUtcTicks"), Width = 160 });
+                sampleGrid.Columns.Add(new DataGridTextColumn { Header = "Last Seen (UTC)", Binding = new System.Windows.Data.Binding("LastSeenUtcText"), Width = 160 });
                 Grid.SetRow(sampleGrid, 2);
                 samplePanel.Children.Add(sampleGrid);
 
@@ -493,6 +554,23 @@ namespace PixelVaultNative
                 Action refreshUi = null;
                 Action saveRules = null;
                 Action<IEnumerable<FilenameConventionSample>, string> promoteSamples = null;
+                Action<FilenameConventionRule, int> focusCustomRule = null;
+
+                focusCustomRule = delegate(FilenameConventionRule rule, int columnIndex)
+                {
+                    if (rule == null) return;
+                    editorWindow.Dispatcher.BeginInvoke(new Action(delegate
+                    {
+                        if (!customRules.Contains(rule)) return;
+                        customGrid.SelectedItem = rule;
+                        customGrid.ScrollIntoView(rule);
+                        customGrid.Focus();
+                        customGrid.UpdateLayout();
+                        var safeColumnIndex = Math.Max(0, Math.Min(columnIndex, customGrid.Columns.Count - 1));
+                        customGrid.CurrentCell = new DataGridCellInfo(rule, customGrid.Columns[safeColumnIndex]);
+                        customGrid.BeginEdit();
+                    }), DispatcherPriority.Background);
+                };
 
                 loadState = delegate
                 {
@@ -506,6 +584,7 @@ namespace PixelVaultNative
                             Enabled = rule.Enabled,
                             Priority = rule.Priority,
                             Pattern = rule.Pattern,
+                            PatternText = FilenameParserService.GetPatternEditorText(rule.PatternText ?? rule.Pattern),
                             PlatformLabel = rule.PlatformLabel,
                             PlatformTagsText = rule.PlatformTagsText,
                             SteamAppIdGroup = rule.SteamAppIdGroup,
@@ -529,6 +608,7 @@ namespace PixelVaultNative
                             Enabled = rule.Enabled,
                             Priority = rule.Priority,
                             Pattern = rule.Pattern,
+                            PatternText = FilenameParserService.GetPatternEditorText(rule.PatternText ?? rule.Pattern),
                             PlatformLabel = rule.PlatformLabel,
                             PlatformTagsText = rule.PlatformTagsText,
                             SteamAppIdGroup = rule.SteamAppIdGroup,
@@ -556,20 +636,14 @@ namespace PixelVaultNative
                     builtInGrid.ItemsSource = null;
                     builtInGrid.ItemsSource = builtInRules;
                     sampleGrid.ItemsSource = null;
-                    sampleGrid.ItemsSource = samples.Select(sample => new
-                    {
-                        sample.SampleId,
-                        sample.FileName,
-                        sample.SuggestedPlatformLabel,
-                        sample.SuggestedConventionId,
-                        sample.OccurrenceCount,
-                        LastSeenUtcTicks = sample.LastSeenUtcTicks > 0 ? new DateTime(sample.LastSeenUtcTicks, DateTimeKind.Utc).ToString("yyyy-MM-dd HH:mm:ss") : string.Empty
-                    }).ToList();
+                    sampleGrid.ItemsSource = samples;
 
                     var summary = customRules.Count + " custom | " + builtInRules.Count + " built-in | " + samples.Count + " sample(s) | " + (dirty ? "Unsaved changes" : "Saved");
                     var selectedCustom = customGrid.SelectedItem as FilenameConventionRule;
                     var selectedBuiltIn = builtInGrid.SelectedItem as FilenameConventionRule;
-                    var selectedSample = sampleGrid.SelectedIndex >= 0 && sampleGrid.SelectedIndex < samples.Count ? samples[sampleGrid.SelectedIndex] : null;
+                    var selectedSample = sampleGrid.SelectedItem as FilenameConventionSample;
+                    sampleRuleButton.IsEnabled = selectedSample != null;
+                    disableBuiltInButton.IsEnabled = selectedBuiltIn != null;
                     promoteFrequentButton.IsEnabled = selectedSample != null || samples.Any(sample => sample.OccurrenceCount >= 2);
                     if (selectedCustom != null) summary += " | Editing " + (selectedCustom.Name ?? selectedCustom.ConventionId ?? "custom rule");
                     else if (selectedBuiltIn != null) summary += " | Built-in " + (selectedBuiltIn.Name ?? selectedBuiltIn.ConventionId ?? "rule");
@@ -591,9 +665,10 @@ namespace PixelVaultNative
                             rule.Name = CleanTag(rule.Name);
                             if (string.IsNullOrWhiteSpace(rule.Name)) rule.Name = "Custom Rule";
                             rule.Priority = Math.Max(-100000, Math.Min(100000, rule.Priority));
-                            rule.Pattern = (rule.Pattern ?? string.Empty).Trim();
-                            if (string.IsNullOrWhiteSpace(rule.Pattern)) throw new InvalidOperationException("Each custom filename rule needs a regex pattern before it can be saved.");
-                            _ = new Regex(rule.Pattern, RegexOptions.IgnoreCase);
+                            rule.PatternText = FilenameParserService.NormalizePatternTextForStorage(rule.PatternText ?? rule.Pattern);
+                            if (string.IsNullOrWhiteSpace(rule.PatternText)) throw new InvalidOperationException("Each custom filename rule needs a readable rule pattern before it can be saved.");
+                            rule.Pattern = rule.PatternText;
+                            _ = new Regex(FilenameParserService.BuildRegexPattern(rule.PatternText, rule.TimestampGroup), RegexOptions.IgnoreCase);
                             rule.PlatformLabel = NormalizeConsoleLabel(string.IsNullOrWhiteSpace(rule.PlatformLabel) ? "Other" : rule.PlatformLabel);
                             var defaultTags = string.IsNullOrWhiteSpace(rule.PlatformTagsText) ? DefaultPlatformTagsTextForLabel(rule.PlatformLabel) : rule.PlatformTagsText;
                             rule.PlatformTagsText = string.Join("; ", ParseTagText(defaultTags));
@@ -637,8 +712,9 @@ namespace PixelVaultNative
                         foreach (var sample in (sourceSamples ?? Enumerable.Empty<FilenameConventionSample>()).Where(item => item != null))
                         {
                             var candidate = BuildCustomFilenameConventionFromSample(sample);
-                            if (candidate == null || string.IsNullOrWhiteSpace(candidate.Pattern)) continue;
-                            if (customRules.Any(rule => rule != null && string.Equals(rule.Pattern, candidate.Pattern, StringComparison.OrdinalIgnoreCase))) continue;
+                            if (candidate == null || string.IsNullOrWhiteSpace(candidate.PatternText ?? candidate.Pattern)) continue;
+                            var candidatePattern = FilenameParserService.NormalizePatternTextForStorage(candidate.PatternText ?? candidate.Pattern);
+                            if (customRules.Any(rule => rule != null && string.Equals(FilenameParserService.NormalizePatternTextForStorage(rule.PatternText ?? rule.Pattern), candidatePattern, StringComparison.OrdinalIgnoreCase))) continue;
                             customRules.Insert(0, candidate);
                             added++;
                         }
@@ -653,8 +729,7 @@ namespace PixelVaultNative
                         refreshUi();
                         if (customRules.Count > 0)
                         {
-                            customGrid.SelectedItem = customRules[0];
-                            customGrid.ScrollIntoView(customRules[0]);
+                            focusCustomRule(customRules[0], 3);
                         }
                         status.Text = successMessage + " (" + added + " added)";
                     }
@@ -676,7 +751,8 @@ namespace PixelVaultNative
                             Name = "Custom Rule",
                             Enabled = true,
                             Priority = 1200,
-                            Pattern = @"^.+\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$",
+                            Pattern = "[title].[ext:media]",
+                            PatternText = "[title].[ext:media]",
                             PlatformLabel = "Other",
                             PlatformTagsText = string.Empty,
                             ConfidenceLabel = "CustomRule",
@@ -685,8 +761,7 @@ namespace PixelVaultNative
                         customRules.Insert(0, newRule);
                         dirty = true;
                         refreshUi();
-                        customGrid.SelectedItem = newRule;
-                        customGrid.ScrollIntoView(newRule);
+                        focusCustomRule(newRule, 3);
                         status.Text = "New filename rule added";
                     }
                     catch (Exception addEx)
@@ -699,7 +774,7 @@ namespace PixelVaultNative
 
                 sampleRuleButton.Click += delegate
                 {
-                    var selectedSample = sampleGrid.SelectedIndex >= 0 && sampleGrid.SelectedIndex < samples.Count ? samples[sampleGrid.SelectedIndex] : null;
+                    var selectedSample = sampleGrid.SelectedItem as FilenameConventionSample;
                     if (selectedSample == null)
                     {
                         MessageBox.Show("Select a recent unmatched sample first.", "PixelVault");
@@ -726,6 +801,7 @@ namespace PixelVaultNative
                             Enabled = false,
                             Priority = selected.Priority,
                             Pattern = selected.Pattern,
+                            PatternText = FilenameParserService.GetPatternEditorText(selected.PatternText ?? selected.Pattern),
                             PlatformLabel = selected.PlatformLabel,
                             PlatformTagsText = selected.PlatformTagsText,
                             SteamAppIdGroup = selected.SteamAppIdGroup,
@@ -746,8 +822,7 @@ namespace PixelVaultNative
                     }
                     dirty = true;
                     refreshUi();
-                    customGrid.SelectedItem = existingOverride;
-                    customGrid.ScrollIntoView(existingOverride);
+                    focusCustomRule(existingOverride, 3);
                     status.Text = "Built-in rule disabled through a custom override";
                 };
 
@@ -768,7 +843,7 @@ namespace PixelVaultNative
 
                 promoteFrequentButton.Click += delegate
                 {
-                    var selectedSample = sampleGrid.SelectedIndex >= 0 && sampleGrid.SelectedIndex < samples.Count ? samples[sampleGrid.SelectedIndex] : null;
+                    var selectedSample = sampleGrid.SelectedItem as FilenameConventionSample;
                     var frequentSamples = samples
                         .Where(sample => sample != null && sample.OccurrenceCount >= 2)
                         .OrderByDescending(sample => sample.OccurrenceCount)
@@ -792,7 +867,7 @@ namespace PixelVaultNative
                 sampleGrid.SelectionChanged += delegate { refreshUi(); };
                 sampleGrid.MouseDoubleClick += delegate
                 {
-                    var selectedSample = sampleGrid.SelectedIndex >= 0 && sampleGrid.SelectedIndex < samples.Count ? samples[sampleGrid.SelectedIndex] : null;
+                    var selectedSample = sampleGrid.SelectedItem as FilenameConventionSample;
                     if (selectedSample != null) promoteSamples(new[] { selectedSample }, "Created a starter rule from the selected sample");
                 };
                 customGrid.CellEditEnding += delegate { dirty = true; };

@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Text.RegularExpressions;
 using SQLitePCL;
 using Xunit;
@@ -67,7 +68,8 @@ public sealed class FilenameParserServiceTests
                     Name = "Switch Album",
                     Enabled = true,
                     Priority = 1400,
-                    Pattern = @"^Switch_(?<title>.+?)_(?<stamp>\d{8})\.png$",
+                    Pattern = "Switch_[title]_[yyyy][MM][dd].[ext:image]",
+                    PatternText = "Switch_[title]_[yyyy][MM][dd].[ext:image]",
                     PlatformLabel = "Switch",
                     PlatformTagsText = "Switch;Nintendo",
                     TitleGroup = "title",
@@ -88,6 +90,16 @@ public sealed class FilenameParserServiceTests
         Assert.Equal(new DateTime(2026, 3, 27), parsed.CaptureTime);
         Assert.Equal("switch_album", parsed.ConventionId);
         Assert.Equal("UserRule", parsed.ConfidenceLabel);
+    }
+
+    [Fact]
+    public void GetConventionRules_BuiltInsExposeReadablePatternText()
+    {
+        var parser = CreateParser();
+
+        var steamRule = parser.GetConventionRules(string.Empty).First(rule => rule.ConventionId == "steam_screenshot_appid");
+
+        Assert.Equal("[appid]_[yyyy][MM][dd][HH][mm][ss][opt-counter].[ext:media]", steamRule.PatternText);
     }
 
     static FilenameParserService CreateParser(Func<string, List<FilenameConventionRule>>? loadCustomConventions = null)

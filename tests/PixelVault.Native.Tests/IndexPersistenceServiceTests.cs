@@ -189,7 +189,8 @@ public sealed class IndexPersistenceServiceTests
                     Name = "Steam Manual Override",
                     Enabled = false,
                     Priority = 1200,
-                    Pattern = @"^(?<stamp>\d{14})\.(png|jpe?g)$",
+                    Pattern = "[yyyy][MM][dd][HH][mm][ss].[ext:image]",
+                    PatternText = "[yyyy][MM][dd][HH][mm][ss].[ext:image]",
                     PlatformLabel = "Steam",
                     PlatformTagsText = "Steam",
                     TimestampGroup = "stamp",
@@ -208,6 +209,7 @@ public sealed class IndexPersistenceServiceTests
         Assert.Equal(1200, rule.Priority);
         Assert.Equal("Steam", rule.PlatformLabel);
         Assert.Equal("Steam", rule.PlatformTagsText);
+        Assert.Equal("[yyyy][MM][dd][HH][mm][ss].[ext:image]", rule.Pattern);
         Assert.Equal("stamp", rule.TimestampGroup);
         Assert.Equal("yyyyMMddHHmmss", rule.TimestampFormat);
         Assert.True(rule.RoutesToManualWhenMissingSteamAppId);
