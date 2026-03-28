@@ -1,3 +1,6 @@
+## 0.786
+- Published a follow-up build after the filename parsing architecture/spec refinements so the current release line stays aligned with the documented parser defaults and edge-case rules.
+
 ## 0.785
 - Centralized filename parsing behind a shared service and added a dedicated Filename Rules editor so built-in conventions, custom DB-backed overrides, and repeated unmatched samples can all be managed from one place.
 - Improved sample-to-rule promotion by recognizing more timestamp/title filename shapes, supporting starter rules from recent unmatched samples, and adding a faster `Promote Frequent` path for repeated misses.
