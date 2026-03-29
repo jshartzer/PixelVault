@@ -23,6 +23,7 @@ public sealed class FilenameParserServiceTests
         Assert.Contains("Steam", parsed.PlatformTags);
         Assert.Equal("2561580", parsed.SteamAppId);
         Assert.Equal(new DateTime(2026, 3, 26, 22, 13, 06), parsed.CaptureTime);
+        Assert.Equal(DateTimeKind.Local, parsed.CaptureTime!.Value.Kind);
         Assert.False(parsed.RoutesToManualWhenMissingSteamAppId);
     }
 
@@ -38,6 +39,7 @@ public sealed class FilenameParserServiceTests
         Assert.Equal(string.Empty, parsed.SteamAppId);
         Assert.True(parsed.RoutesToManualWhenMissingSteamAppId);
         Assert.Equal(new DateTime(2020, 5, 25, 12, 41, 19), parsed.CaptureTime);
+        Assert.Equal(DateTimeKind.Local, parsed.CaptureTime!.Value.Kind);
     }
 
     [Fact]
@@ -52,6 +54,7 @@ public sealed class FilenameParserServiceTests
         Assert.True(parsed.PreserveFileTimes);
         Assert.Equal("Halo Infinite", parsed.GameTitleHint);
         Assert.Equal(new DateTime(2024, 3, 12, 13, 4, 5), parsed.CaptureTime);
+        Assert.Equal(DateTimeKind.Local, parsed.CaptureTime!.Value.Kind);
     }
 
     [Fact]
@@ -88,6 +91,7 @@ public sealed class FilenameParserServiceTests
         Assert.Contains("Switch", parsed.PlatformTags);
         Assert.Equal("Mario Odyssey", parsed.GameTitleHint);
         Assert.Equal(new DateTime(2026, 3, 27), parsed.CaptureTime);
+        Assert.Equal(DateTimeKind.Local, parsed.CaptureTime!.Value.Kind);
         Assert.Equal("switch_album", parsed.ConventionId);
         Assert.Equal("UserRule", parsed.ConfidenceLabel);
     }

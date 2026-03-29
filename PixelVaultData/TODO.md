@@ -27,6 +27,9 @@ For the focused performance backlog, use:
 3. Pull performance-specific work from the dedicated backlog instead of mixing it into this general list.
 - Start with capture virtualization, cached sort keys, and debounced Library search.
 
+4. Rebuild the Filename Rules screen from a workflow spec instead of adding more controls to the current dense grid.
+- Use `C:\Codex\docs\FILENAME_RULES_FORM_SPEC.md` as the source of truth for the next UI pass.
+
 ## As I Think Of It
 - Add a recurring automation that checks repo docs vs Notion for drift:
   current build/version, release entry coverage, roadmap phase status, and handoff/current-build mismatches.

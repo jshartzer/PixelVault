@@ -44,11 +44,11 @@ This handoff is the short current-state summary.
 
 Current live build:
 
-- `0.788`
+- `0.809`
 
 Current executable:
 
-- `C:\Codex\dist\PixelVault-0.788\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.809\PixelVault.exe`
 
 Current build pointer:
 
@@ -184,21 +184,18 @@ This was a data-only maintenance pass, not a new app build.
 
 ## Current Stop Point
 
-The current live build is `0.779`, and the latest shipped work now extends clip handling and hardens the Library browse surface:
+The current live build is `0.809`.
 
-1. FFmpeg-backed clip handling now probes and caches video metadata for Library tiles, surfaces richer clip details inline, and exposes direct preview/detail actions for video captures
-2. the Library folder grid and detail pane now preserve scroll position more reliably across layout-only resize and tile-size rerenders, which makes large mixed-media browsing less jumpy
-3. the repo now includes a dedicated large-library stress-data generator and verification checklist for future virtualization and lazy-loading checks
-4. the app still ships as one desktop executable with one shared runtime data model, and each release still carries a version-local source snapshot inside `dist\PixelVault-x.xxx`
+Latest shipped work:
+
+1. the Library split now starts closer to the middle, making the first-open proportions feel more balanced.
+2. folder covers and right-side screenshots now use wider min/max size ranges so they can shrink and grow more naturally.
+3. pane resizing now uses stepped responsive size buckets with short coalesced refresh timers, which reduces drag lag while keeping the layout live.
+4. release docs now point at the live `0.809` build.
 
 The most likely next product step is:
 
-1. keep an eye on any remaining UI-specific extraction opportunities after the current performance pass settles
-
-Most recent in-progress milestone completion:
-
-1. FFmpeg-backed clip handling now goes beyond poster generation by probing and caching clip metadata for the Library tiles, surfacing duration/resolution/audio details inline, and exposing a real `Open 10s Preview Clip` action plus `Copy Clip Details` directly from video tiles
-2. Library virtualization and lazy-loading have now been hardened for resize-heavy sessions by preserving folder-grid and detail-pane scroll positions across layout-only rerenders, and the repo now includes a dedicated `New-LibraryVirtualizationStressData.ps1` generator plus `LIBRARY_VIRTUALIZATION_STRESS_TEST.md` checklist for large mixed-media verification
+1. keep peeling workflow services out of the monolith, especially around Library scanning and intake preview orchestration
 
 ## Important Expectations
 

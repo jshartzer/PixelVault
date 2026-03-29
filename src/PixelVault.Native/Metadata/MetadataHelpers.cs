@@ -257,6 +257,10 @@ namespace PixelVaultNative
         bool CanUpdateMetadata(string file)
         {
             var parsed = ParseFilename(file);
+            if (parsed.RoutesToManualWhenMissingSteamAppId && string.IsNullOrWhiteSpace(parsed.SteamAppId))
+            {
+                return false;
+            }
             return IsVideo(file) || parsed.PlatformTags.Contains("Xbox") || parsed.CaptureTime.HasValue;
         }
 

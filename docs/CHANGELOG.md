@@ -1,3 +1,67 @@
+## 0.804
+- Pushed the Library screen closer to the Figma reference with pill-style left-side controls, a more intentional selected-game hero card, and calmer right-side action buttons.
+- Added a framed cover treatment and stronger section hierarchy on the detail side so the Library reads more like a designed screen and less like a maintenance form.
+
+## 0.803
+- Added a gear icon to the Library `Settings` button and a refresh symbol to `Refresh` so the top action row reads more clearly at a glance.
+- Restyled the Library search and filter strip into a darker rounded control bar with tighter, cleaner filter buttons.
+- Rounded the outer corners of Library folder cards so the browse grid feels more cohesive with the rest of the new chrome.
+
+## 0.802
+- Restyled the Library top action row with a dedicated toolbar-button treatment so import and utility actions feel cleaner and less like generic app controls.
+- Removed the heavy default button shadows from the Library toolbar and replaced them with calmer dark utility chrome and richer primary action fills.
+
+## 0.801
+- Restored the Library window to the last known-good left/right browser-detail layout after the visual shell pass hid the left-side game list.
+- Removed the experimental top-level library shell composition so the browser pane is back on the reliable structure used before the redesign regression.
+
+## 0.800
+- Restored the Library browser to a safer two-pane layout after the visual overhaul regression that hid the left-side game list.
+- Fixed the top-bar column wiring so the new library header, import actions, and utility actions no longer compete for the same layout space.
+
+## 0.799
+- Gave the Library a cleaner split-pane shell with a dedicated top action bar, calmer panel chrome, and a more intentional selected-game presentation inspired by the Figma direction.
+- Restyled library folder cards to use a taller, image-led layout with quieter metadata so browsing feels calmer and more cover-first.
+
+## 0.798
+- Stopped normal SQLite index writes from invalidating the library folder cache stamp, reducing needless NAS-backed cache rebuilds on startup.
+- Persisted downloaded cover-art paths back into cached folder and game-index state so fetched covers stick across refreshes and restarts.
+
+## 0.797
+- Made the Filename Rules window scale more gracefully at smaller sizes with taller, scrollable editor and rules-list regions.
+- Saving a filename rule now clears the editor and deselects the lists so reopening a custom rule is a deliberate edit action, and double-clicking a custom rule loads it back into the editor.
+
+## 0.796
+- Removed the duplicate bottom Save and Close buttons from the Filename Rules window, leaving those actions only in the top toolbar.
+- Recent unmatched filename samples now leave the sample list once you create a rule from them, and the custom and built-in rule lists render as visible usable areas instead of header-only placeholders.
+
+## 0.795
+- Fixed the Library `Edit Metadata` window open path by deferring its initial selection until the dialog is loaded, preventing the closed-window exception that could block the form from opening at all.
+- Switched the metadata editor's first preview paint onto the shared async image loader so large NAS-backed captures no longer block the dialog before it appears.
+
+## 0.794
+- Added a migration safety net that backfills missing `Steam AppID` and `STID` values from the legacy flat cache into the shared SQLite game index, so half-migrated libraries can recover their external IDs instead of staying blank.
+
+## 0.793
+- Fixed the rebuilt Filename Rules form so built-in and custom selections swap cleanly, `Disable Built-In` acts on the actual selected built-in rule, and unsaved edits are protected even when the window is closed from the title-bar `X`.
+
+## 0.792
+- Hardened the shared-data-root behavior for published builds so running from `PixelVault-current` keeps using the persistent `PixelVaultData` store instead of drifting into per-build data under `dist`.
+- Changed `Fetch Covers` to refresh only the selected folder by default and require confirmation before running a full-library cover refresh, reducing the background Steam/SteamGridDB churn that was making the app feel sluggish.
+
+## 0.791
+- Restored shared launch behavior for current published builds and improved data-root migration so newer settings, cache, and log files move forward into the shared `PixelVaultData` store instead of only copying missing files.
+- Reduced accidental whole-library cover-refresh work by making single-folder cover fetches the default path whenever a folder is selected.
+
+## 0.790
+- Continued the service extraction work by pulling filename-rule loading, starter-rule creation, built-in disable overrides, validation, save, and reload behavior into a dedicated `FilenameRulesService`.
+- Normalized filename-derived capture timestamps to `DateTimeKind.Local` and rebuilt the Filename Rules window around the workflow spec so sample promotion and rule editing are less dependent on monolithic UI logic.
+
+## 0.789
+- Restored Steam manual-export routing so bare timestamp exports stay on manual intake when they still need a Steam AppID, even if the filename parser already found a capture time.
+- Reduced filename-rule sample noise by recording recent unmatched samples only for files that did not match an explicit convention, and now prefill manual-intake game names from parser title hints when available.
+- Added a dedicated Filename Rules form spec so the next UI pass can be rebuilt around a clear sample-to-rule workflow instead of the current dense grid.
+
 ## 0.788
 - Made filename rules human-readable by shipping token-style rule text like `[title]_[yyyy][MM][dd][HH][mm][ss].[ext:media]` while still compiling those rules down to regex internally for matching.
 - Improved the Filename Rules editor so the grids surface readable rule text, sample rows bind directly, selection-driven actions enable correctly, and add/promote/disable flows jump straight into editable custom rules instead of feeling inert.
@@ -536,3 +600,65 @@
 
 
 
+## 0.809
+- Moved the default Library split closer to center so the browser and detail panes start from a more balanced layout.
+- Expanded the responsive size ranges for folder covers and screenshot tiles so both sides can shrink and grow more naturally.
+- Reworked live pane resizing to use stepped responsive tile sizes plus short coalesced refresh timers, reducing drag lag while keeping the layout responsive.
+
+## 0.808
+- Switched the Library splitter to live resize mode so dragging updates both panes continuously instead of waiting for mouse-up.
+- Removed the extra `Grid` button from the screenshot header.
+- Tightened the pane-resize listeners and right-side tile width budget so folder covers and screenshot tiles resize in real time and stay within the visible pane.
+
+## 0.807
+- Fixed the center Library splitter so it is a real `GridSplitter` child of the main content grid and actually resizes the browser and detail panes.
+- Removed `Recently Played` from the Library filter strip to keep the top controls tighter and closer to the design reference.
+- Updated the release docs so `CURRENT_BUILD`, `HANDOFF`, and the changelog now point at the live `0.807` build.
+
+## 0.806
+- Moved `Game Index`, `Photo Index`, and `Filename Rules` into the top Library header and restyled them to match the main utility-button family.
+- Replaced the old Library sort dropdown with design-style sort buttons and removed the folder-size and capture-size sliders.
+- Made the center splitter drive real responsive sizing so the folder cards and screenshot tiles resize with the pane widths.
+
+## 0.805
+- Reworked the Library shell to match the Figma export more directly with a true full-width header, flatter split panes, and a visible center divider.
+- Reorganized the left browser pane so search, controls, and the gallery grid read like a proper library browser instead of a utility form.
+- Simplified the right detail pane into a cleaner showcase layout so the selected-game header and screenshot area feel much closer to the design reference.
+
+## 0.799
+- Gave the Library a cleaner split-pane shell with a dedicated top action bar, calmer panel chrome, and a visible draggable divider between the browser and detail views.
+- Restyled the selected-game header to feel more intentional and cover-first, with a stronger hero frame and cleaner supporting metadata/actions.
+- Updated the library folder cards to use a taller image-led presentation with quieter captions so the browse surface feels closer to the Figma design direction.
+
+## 0.798
+- Stopped normal SQLite index writes from invalidating the library folder cache stamp, so startup no longer needlessly triggers full NAS-backed folder-cache rebuilds.
+- Persisted downloaded cover-art paths back into cached folder info and saved game-index rows so fetched covers stick across refreshes and restarts.
+
+## 0.797
+- Made the Filename Rules window scale more gracefully at smaller sizes with taller, scrollable editor and rules-list regions.
+- Saving a filename rule now clears the editor and deselects the lists so reopening a custom rule is a deliberate edit action.
+- Double-clicking a custom rule now loads it back into the editor for follow-up edits.
+
+## 0.796
+- Removed the duplicate bottom Save and Close buttons from the Filename Rules window, leaving those actions only in the top toolbar.
+- Recent unmatched filename samples now leave the sample list once you create a rule from them.
+- Expanded the custom and built-in rule lists into usable visible areas instead of header-only placeholders.
+
+## 0.795
+- Fixed the Edit Metadata dialog open path so it no longer tries to do its initial selection and preview work before the window is shown.
+- Moved the first metadata preview decode onto the async image-loading path to avoid blocking the dialog while it opens.
+- Hardened the metadata dialog actions so it cannot close itself before the window is fully ready.
+
+## 0.794
+- Restored missing Steam AppIDs and SteamGridDB IDs in the shared SQLite game index from the legacy flat cache when available.
+- Added a safety backfill during index migration so partially populated SQLite game-index data can recover external IDs instead of keeping them blank forever.
+
+## 0.793
+- Fixed the Filename Rules editor so switching between built-in rules and custom drafts updates the active selection correctly.
+- Added consistent unsaved-change protection when closing the Filename Rules window, including the title-bar close button.
+- Verified the rules workflow end to end with a live click-through covering built-in selection, disable override, new rule drafts, sample promotion, reload, save, and close behavior.
+
+## 0.792
+- Fixed the persistent data-root resolver so `PixelVault-current` uses the shared `C:\Codex\PixelVaultData` store instead of drifting into per-build settings, cache, and index files.
+- Updated startup data migration to copy newer settings, cache, and log files forward into the shared data store instead of only filling missing files.
+- Changed `Fetch Covers` in the Library to refresh only the selected folder by default, with an explicit confirmation before running a full-library cover refresh.

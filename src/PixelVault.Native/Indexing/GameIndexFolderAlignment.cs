@@ -253,6 +253,11 @@ namespace PixelVaultNative
                     folder.SuppressSteamGridDbIdAutoResolve = false;
                     changed = true;
                 }
+                if (!string.IsNullOrWhiteSpace(saved.PreviewImagePath) && File.Exists(saved.PreviewImagePath) && !string.Equals(folder.PreviewImagePath ?? string.Empty, saved.PreviewImagePath ?? string.Empty, StringComparison.Ordinal))
+                {
+                    folder.PreviewImagePath = saved.PreviewImagePath;
+                    changed = true;
+                }
             }
             return changed;
         }

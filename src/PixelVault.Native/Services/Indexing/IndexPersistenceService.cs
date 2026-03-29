@@ -14,6 +14,7 @@ namespace PixelVaultNative
         List<FilenameConventionSample> LoadFilenameConventionSamples(string root, int maxCount);
         List<GameIndexEditorRow> LoadSavedGameIndexRows(string root);
         void RecordFilenameConventionSample(string root, string fileName, FilenameParseResult parseResult);
+        void DeleteFilenameConventionSamples(string root, IEnumerable<long> sampleIds);
         void SaveFilenameConventions(string root, IEnumerable<FilenameConventionRule> rules);
         void SaveSavedGameIndexRows(string root, IEnumerable<GameIndexEditorRow> rows);
         Dictionary<string, LibraryMetadataIndexEntry> LoadLibraryMetadataIndexEntries(string root);
@@ -715,6 +716,89 @@ WHERE root = $root AND game_id = $oldGameId;";
                 var legacyIndex = ReadLegacyLibraryMetadataIndexFile(root, aliasMap);
                 WriteLibraryMetadataIndexToDatabase(root, legacyIndex, connection);
             }
+
+            BackfillMissingGameIndexExternalIdsFromLegacy(root, connection);
+        }
+
+        string BuildLegacyRowMatchKey(GameIndexEditorRow row)
+        {
+            if (row == null) return string.Empty;
+            var folderPath = (row.FolderPath ?? string.Empty).Trim();
+            if (!string.IsNullOrWhiteSpace(folderPath)) return "folder|" + folderPath.ToLowerInvariant();
+            var gameId = NormalizeGameId(row.GameId);
+            if (!string.IsNullOrWhiteSpace(gameId)) return "game|" + gameId.ToLowerInvariant();
+            var name = (row.Name ?? string.Empty).Trim().ToLowerInvariant();
+            var platform = (row.PlatformLabel ?? string.Empty).Trim().ToLowerInvariant();
+            return "name|" + name + "|" + platform;
+        }
+
+        void BackfillMissingGameIndexExternalIdsFromLegacy(string root, SqliteConnection connection)
+        {
+            var dbRows = ReadSavedGameIndexRowsFromDatabase(root, connection);
+            if (dbRows.Count == 0) return;
+
+            var legacyRows = ReadSavedGameIndexRowsFile(root);
+            if (legacyRows.Count == 0) return;
+
+            var legacyByKey = new Dictionary<string, GameIndexEditorRow>(StringComparer.OrdinalIgnoreCase);
+            foreach (var legacyRow in legacyRows.Where(row => row != null))
+            {
+                var key = BuildLegacyRowMatchKey(legacyRow);
+                if (string.IsNullOrWhiteSpace(key)) continue;
+                GameIndexEditorRow existing;
+                if (legacyByKey.TryGetValue(key, out existing))
+                {
+                    if (string.IsNullOrWhiteSpace(existing.SteamAppId) && !string.IsNullOrWhiteSpace(legacyRow.SteamAppId)) existing.SteamAppId = legacyRow.SteamAppId;
+                    if (string.IsNullOrWhiteSpace(existing.SteamGridDbId) && !string.IsNullOrWhiteSpace(legacyRow.SteamGridDbId)) existing.SteamGridDbId = legacyRow.SteamGridDbId;
+                }
+                else
+                {
+                    legacyByKey[key] = new GameIndexEditorRow
+                    {
+                        GameId = legacyRow.GameId,
+                        FolderPath = legacyRow.FolderPath,
+                        Name = legacyRow.Name,
+                        PlatformLabel = legacyRow.PlatformLabel,
+                        SteamAppId = legacyRow.SteamAppId,
+                        SteamGridDbId = legacyRow.SteamGridDbId,
+                        SuppressSteamAppIdAutoResolve = legacyRow.SuppressSteamAppIdAutoResolve,
+                        SuppressSteamGridDbIdAutoResolve = legacyRow.SuppressSteamGridDbIdAutoResolve,
+                        FileCount = legacyRow.FileCount,
+                        PreviewImagePath = legacyRow.PreviewImagePath,
+                        FilePaths = legacyRow.FilePaths
+                    };
+                }
+            }
+
+            var changed = false;
+            foreach (var row in dbRows)
+            {
+                if (row == null) continue;
+                if ((!string.IsNullOrWhiteSpace(row.SteamAppId) || row.SuppressSteamAppIdAutoResolve)
+                    && (!string.IsNullOrWhiteSpace(row.SteamGridDbId) || row.SuppressSteamGridDbIdAutoResolve))
+                {
+                    continue;
+                }
+
+                GameIndexEditorRow legacy;
+                if (!legacyByKey.TryGetValue(BuildLegacyRowMatchKey(row), out legacy) || legacy == null) continue;
+
+                if (string.IsNullOrWhiteSpace(row.SteamAppId) && !row.SuppressSteamAppIdAutoResolve && !string.IsNullOrWhiteSpace(legacy.SteamAppId))
+                {
+                    row.SteamAppId = legacy.SteamAppId;
+                    changed = true;
+                }
+
+                if (string.IsNullOrWhiteSpace(row.SteamGridDbId) && !row.SuppressSteamGridDbIdAutoResolve && !string.IsNullOrWhiteSpace(legacy.SteamGridDbId))
+                {
+                    row.SteamGridDbId = legacy.SteamGridDbId;
+                    changed = true;
+                }
+            }
+
+            if (!changed) return;
+
+            WriteSavedGameIndexRowsToDatabase(root, dbRows, connection);
         }
 
         public Dictionary<string, string> BuildSavedGameIdAliasMap(string root)
@@ -811,6 +895,28 @@ WHERE root = $root AND game_id = $oldGameId;";
             using (var connection = OpenIndexDatabase(root))
             {
                 UpsertFilenameConventionSample(root, fileName, parseResult, connection);
+            }
+        }
+
+        public void DeleteFilenameConventionSamples(string root, IEnumerable<long> sampleIds)
+        {
+            var ids = (sampleIds ?? Enumerable.Empty<long>()).Where(id => id > 0).Distinct().ToList();
+            if (string.IsNullOrWhiteSpace(root) || ids.Count == 0) return;
+
+            using (var connection = OpenIndexDatabase(root))
+            {
+                foreach (var id in ids)
+                {
+                    using (var command = connection.CreateCommand())
+                    {
+                        command.CommandText = @"
+DELETE FROM filename_convention_sample
+WHERE root = $root AND sample_id = $sampleId;";
+                        command.Parameters.AddWithValue("$root", root ?? string.Empty);
+                        command.Parameters.AddWithValue("$sampleId", id);
+                        command.ExecuteNonQuery();
+                    }
+                }
             }
         }
 

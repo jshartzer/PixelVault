@@ -1,4 +1,6 @@
+using System;
 using System.IO;
+using System.Linq;
 
 namespace PixelVaultNative
 {
@@ -6,20 +8,25 @@ namespace PixelVaultNative
     {
         string BuildLibraryFolderInventoryStamp(string root)
         {
-            long latestDirTicks = 0;
-            int folderCount = 0;
-            foreach (var dir in Directory.EnumerateDirectories(root))
+            unchecked
             {
-                folderCount++;
-                var dirTicks = Directory.GetLastWriteTimeUtc(dir).Ticks;
-                if (dirTicks > latestDirTicks) latestDirTicks = dirTicks;
-            }
+                long latestDirTicks = 0;
+                int folderCount = 0;
+                int nameHash = 17;
 
-            var metadataPath = IndexDatabasePath(root);
-            if (!File.Exists(metadataPath)) metadataPath = LibraryMetadataIndexPath(root);
-            long metadataTicks = File.Exists(metadataPath) ? File.GetLastWriteTimeUtc(metadataPath).Ticks : 0;
-            long metadataLength = File.Exists(metadataPath) ? new FileInfo(metadataPath).Length : 0;
-            return folderCount + "|" + latestDirTicks + "|" + metadataTicks + "|" + metadataLength;
+                foreach (var dir in Directory.EnumerateDirectories(root).OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
+                {
+                    folderCount++;
+                    var dirTicks = Directory.GetLastWriteTimeUtc(dir).Ticks;
+                    if (dirTicks > latestDirTicks) latestDirTicks = dirTicks;
+                    nameHash = (nameHash * 31) + StringComparer.OrdinalIgnoreCase.GetHashCode(Path.GetFileName(dir) ?? string.Empty);
+                }
+
+                // Keep the startup cache stamp tied to the visible library folder inventory, not index-db writes.
+                // Import/scan flows explicitly rewrite the folder cache when they change the library, so folding the
+                // SQLite file timestamp into the stamp only causes unnecessary NAS-wide rebuilds on startup.
+                return folderCount + "|" + latestDirTicks + "|" + nameHash;
+            }
         }
 
         string LibraryFolderCachePath(string root)

@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Media;
 using System.Windows.Threading;
 
@@ -292,18 +293,100 @@ namespace PixelVaultNative
                 List<FilenameConventionRule> customRules = new List<FilenameConventionRule>();
                 List<FilenameConventionRule> builtInRules = new List<FilenameConventionRule>();
                 List<FilenameConventionSample> samples = new List<FilenameConventionSample>();
+                FilenameConventionRule editingRule = null;
+                bool editingBuiltIn = false;
+                bool dirty = false;
+                bool syncingEditor = false;
 
                 var editorWindow = new Window
                 {
                     Title = "PixelVault " + AppVersion + " Filename Rules",
-                    Width = 1560,
+                    Width = 1480,
                     Height = 980,
-                    MinWidth = 1260,
-                    MinHeight = 780,
+                    MinWidth = 1220,
+                    MinHeight = 820,
                     Owner = this,
                     WindowStartupLocation = WindowStartupLocation.CenterOwner,
                     Background = Brush("#F3EEE4")
                 };
+
+                Button MakeButton(string text, string background, Brush foreground, double width)
+                {
+                    var button = Btn(text, null, background, foreground);
+                    button.Width = width;
+                    button.Height = 42;
+                    button.Margin = new Thickness(0, 0, 10, 0);
+                    return button;
+                }
+
+                void SetButtonToolTip(Button button, string text)
+                {
+                    if (button == null) return;
+                    button.ToolTip = text ?? string.Empty;
+                }
+
+                TextBox MakeTextBox(bool readOnly = false, bool multiLine = false)
+                {
+                    return new TextBox
+                    {
+                        MinHeight = multiLine ? 74 : 34,
+                        Padding = new Thickness(10, 8, 10, 8),
+                        BorderBrush = Brush("#C6D2DB"),
+                        BorderThickness = new Thickness(1),
+                        Background = readOnly ? Brush("#EEF2F5") : Brushes.White,
+                        Foreground = Brush("#1B232B"),
+                        TextWrapping = multiLine ? TextWrapping.Wrap : TextWrapping.NoWrap,
+                        AcceptsReturn = multiLine,
+                        VerticalScrollBarVisibility = multiLine ? ScrollBarVisibility.Auto : ScrollBarVisibility.Disabled,
+                        IsReadOnly = readOnly
+                    };
+                }
+
+                ComboBox MakeCombo()
+                {
+                    return new ComboBox
+                    {
+                        MinHeight = 34,
+                        Padding = new Thickness(6, 4, 6, 4),
+                        BorderBrush = Brush("#C6D2DB"),
+                        BorderThickness = new Thickness(1),
+                        Background = Brushes.White,
+                        Foreground = Brush("#1B232B")
+                    };
+                }
+
+                FrameworkElement Labeled(string label, UIElement element, string help = null)
+                {
+                    var stack = new StackPanel { Margin = new Thickness(0, 0, 0, 14) };
+                    stack.Children.Add(new TextBlock { Text = label, FontWeight = FontWeights.SemiBold, Foreground = Brush("#21303A"), Margin = new Thickness(0, 0, 0, 6) });
+                    stack.Children.Add(element);
+                    if (!string.IsNullOrWhiteSpace(help))
+                    {
+                        stack.Children.Add(new TextBlock { Text = help, FontSize = 12, Foreground = Brush("#6A737B"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 6, 0, 0) });
+                    }
+                    return stack;
+                }
+
+                Border Card(string title, string subtitle, Thickness margin)
+                {
+                    var border = new Border
+                    {
+                        Background = Brush("#F7FAFC"),
+                        CornerRadius = new CornerRadius(16),
+                        BorderBrush = Brush("#D7E1E8"),
+                        BorderThickness = new Thickness(1),
+                        Padding = new Thickness(18),
+                        Margin = margin
+                    };
+                    var stack = new StackPanel();
+                    stack.Children.Add(new TextBlock { Text = title, FontSize = 18, FontWeight = FontWeights.SemiBold, Foreground = Brush("#182126") });
+                    if (!string.IsNullOrWhiteSpace(subtitle))
+                    {
+                        stack.Children.Add(new TextBlock { Text = subtitle, Margin = new Thickness(0, 6, 0, 12), Foreground = Brush("#6A737B"), FontSize = 13, TextWrapping = TextWrapping.Wrap });
+                    }
+                    border.Child = stack;
+                    return border;
+                }
 
                 var root = new Grid { Margin = new Thickness(24) };
                 root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -312,190 +395,84 @@ namespace PixelVaultNative
                 var header = new Border { Background = Brush("#161C20"), CornerRadius = new CornerRadius(20), Padding = new Thickness(24), Margin = new Thickness(0, 0, 0, 18) };
                 var headerStack = new StackPanel();
                 headerStack.Children.Add(new TextBlock { Text = "Filename Rules", FontSize = 30, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White });
-                headerStack.Children.Add(new TextBlock { Text = "Centralize filename parsing here. Built-in rules stay as shipped defaults, while custom rules in the index database can extend or override them as conventions drift over time.", Margin = new Thickness(0, 8, 0, 0), FontSize = 14, Foreground = Brush("#B7C6C0"), TextWrapping = TextWrapping.Wrap });
-                headerStack.Children.Add(new TextBlock { Text = "Use readable tokens like [title]_[yyyy][MM][dd][HH][mm][ss].[ext:media] or [appid]_[yyyy][MM][dd][HH][mm][ss][opt-counter].[ext:media]. Raw regex still works, but token rules are easier to read and maintain.", Margin = new Thickness(0, 10, 0, 0), FontSize = 13, Foreground = Brush("#D8C7A4"), TextWrapping = TextWrapping.Wrap });
+                headerStack.Children.Add(new TextBlock { Text = "Use recent unmatched samples to create readable rules, inspect the shipped built-ins, and save library-specific overrides with confidence.", Margin = new Thickness(0, 10, 0, 0), FontSize = 14, Foreground = Brush("#B7C6C0"), TextWrapping = TextWrapping.Wrap });
+                headerStack.Children.Add(new TextBlock { Text = "Readable rule examples: [appid]_[yyyy][MM][dd][HH][mm][ss][opt-counter].[ext:media], [title]_[yyyy][MM][dd].[ext:image], clip_[unixms].[ext:video], or [contains:PS5].", Margin = new Thickness(0, 10, 0, 0), FontSize = 13, Foreground = Brush("#D8C7A4"), TextWrapping = TextWrapping.Wrap });
                 header.Child = headerStack;
                 root.Children.Add(header);
 
-                var body = new Border { Background = Brushes.White, CornerRadius = new CornerRadius(18), Padding = new Thickness(18), BorderBrush = Brush("#D7E1E8"), BorderThickness = new Thickness(1) };
-                Grid.SetRow(body, 1);
-                root.Children.Add(body);
+                var shell = new Border { Background = Brushes.White, CornerRadius = new CornerRadius(18), Padding = new Thickness(18), BorderBrush = Brush("#D7E1E8"), BorderThickness = new Thickness(1) };
+                Grid.SetRow(shell, 1);
+                root.Children.Add(shell);
 
-                var bodyGrid = new Grid();
-                bodyGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-                bodyGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-                bodyGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(220) });
-                bodyGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-                body.Child = bodyGrid;
+                var body = new Grid();
+                body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                body.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+                body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                shell.Child = new ScrollViewer
+                {
+                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                    HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                    Content = body
+                };
 
-                var controlGrid = new Grid { Margin = new Thickness(0, 0, 0, 14) };
-                controlGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                controlGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                controlGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                controlGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                controlGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                controlGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                controlGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                var controlsRow = new Grid { Margin = new Thickness(0, 0, 0, 14) };
+                for (var i = 0; i < 5; i++) controlsRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                controlsRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                controlsRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                controlsRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                body.Children.Add(controlsRow);
 
-                var addRuleButton = Btn("Add Rule", null, "#8A5A17", Brushes.White);
-                addRuleButton.Width = 138;
-                addRuleButton.Height = 42;
-                addRuleButton.Margin = new Thickness(0, 0, 10, 0);
-                addRuleButton.ToolTip = "Add a blank custom rule and jump into editing it.";
-                controlGrid.Children.Add(addRuleButton);
+                var newRuleButton = MakeButton("New Rule", "#8A5A17", Brushes.White, 140);
+                SetButtonToolTip(newRuleButton, "Create a blank custom filename rule draft.");
+                controlsRow.Children.Add(newRuleButton);
 
-                var sampleRuleButton = Btn("Rule From Sample", null, "#275D47", Brushes.White);
-                sampleRuleButton.Width = 180;
-                sampleRuleButton.Height = 42;
-                sampleRuleButton.Margin = new Thickness(0, 0, 10, 0);
-                sampleRuleButton.IsEnabled = false;
-                sampleRuleButton.ToolTip = "Turn the selected unmatched sample into a starter rule.";
-                Grid.SetColumn(sampleRuleButton, 1);
-                controlGrid.Children.Add(sampleRuleButton);
+                var createRuleFromSampleButton = MakeButton("Create Rule From Sample", "#275D47", Brushes.White, 220);
+                SetButtonToolTip(createRuleFromSampleButton, "Turn the selected unmatched filename sample into an editable starter rule.");
+                Grid.SetColumn(createRuleFromSampleButton, 1);
+                controlsRow.Children.Add(createRuleFromSampleButton);
 
-                var disableBuiltInButton = Btn("Disable Built-In", null, "#A3473E", Brushes.White);
-                disableBuiltInButton.Width = 180;
-                disableBuiltInButton.Height = 42;
-                disableBuiltInButton.Margin = new Thickness(0, 0, 10, 0);
-                disableBuiltInButton.IsEnabled = false;
-                disableBuiltInButton.ToolTip = "Create a custom override that disables the selected built-in rule.";
-                Grid.SetColumn(disableBuiltInButton, 2);
-                controlGrid.Children.Add(disableBuiltInButton);
+                var promoteFrequentButton = MakeButton("Promote Frequent", "#355F93", Brushes.White, 180);
+                SetButtonToolTip(promoteFrequentButton, "Choose repeated unmatched samples and turn them into starter rule drafts.");
+                Grid.SetColumn(promoteFrequentButton, 2);
+                controlsRow.Children.Add(promoteFrequentButton);
 
-                var promoteFrequentButton = Btn("Promote Frequent", null, "#355F93", Brushes.White);
-                promoteFrequentButton.Width = 170;
-                promoteFrequentButton.Height = 42;
-                promoteFrequentButton.Margin = new Thickness(0, 0, 10, 0);
-                promoteFrequentButton.IsEnabled = false;
-                promoteFrequentButton.ToolTip = "Promote the selected sample or the most repeated misses into starter rules.";
-                Grid.SetColumn(promoteFrequentButton, 3);
-                controlGrid.Children.Add(promoteFrequentButton);
+                var disableBuiltInButton = MakeButton("Disable Built-In", "#A3473E", Brushes.White, 180);
+                SetButtonToolTip(disableBuiltInButton, "Create a library-specific override that disables the selected built-in rule.");
+                Grid.SetColumn(disableBuiltInButton, 3);
+                controlsRow.Children.Add(disableBuiltInButton);
 
-                var reloadButton = Btn("Reload", null, "#EEF2F5", Brush("#33424D"));
-                reloadButton.Width = 132;
-                reloadButton.Height = 42;
-                reloadButton.Margin = new Thickness(0, 0, 10, 0);
-                reloadButton.ToolTip = "Reload saved custom rules and recent unmatched samples from disk.";
+                var reloadButton = MakeButton("Reload", "#EEF2F5", Brush("#33424D"), 140);
+                SetButtonToolTip(reloadButton, "Discard unsaved changes and reload filename rules from disk.");
                 Grid.SetColumn(reloadButton, 4);
-                controlGrid.Children.Add(reloadButton);
+                controlsRow.Children.Add(reloadButton);
 
                 var helperText = new TextBlock
                 {
-                    Text = "Custom rules save into the library index DB. Use a built-in override to disable a shipped rule without deleting its definition.",
+                    Text = "Select a sample to draft a rule, or select a built-in to inspect and optionally disable it with a custom override.",
                     VerticalAlignment = VerticalAlignment.Center,
                     Foreground = Brush("#5F6970"),
                     TextWrapping = TextWrapping.Wrap,
-                    Margin = new Thickness(4, 0, 14, 0)
+                    Margin = new Thickness(12, 0, 18, 0)
                 };
                 Grid.SetColumn(helperText, 5);
-                controlGrid.Children.Add(helperText);
+                controlsRow.Children.Add(helperText);
 
-                var saveTopButton = Btn("Save Rules", null, "#275D47", Brushes.White);
-                saveTopButton.Width = 150;
-                saveTopButton.Height = 42;
-                saveTopButton.Margin = new Thickness(0);
-                saveTopButton.ToolTip = "Validate the readable rules and save them into the library index database.";
+                var saveTopButton = MakeButton("Save Rules", "#275D47", Brushes.White, 170);
+                SetButtonToolTip(saveTopButton, "Validate and save custom filename rules for this library.");
                 Grid.SetColumn(saveTopButton, 6);
-                controlGrid.Children.Add(saveTopButton);
-                bodyGrid.Children.Add(controlGrid);
+                controlsRow.Children.Add(saveTopButton);
 
-                var mainGrid = new Grid();
-                mainGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.35, GridUnitType.Star) });
-                mainGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(0.95, GridUnitType.Star) });
-                Grid.SetRow(mainGrid, 1);
-                bodyGrid.Children.Add(mainGrid);
+                var closeTopButton = MakeButton("Close", "#EEF2F5", Brush("#33424D"), 140);
+                SetButtonToolTip(closeTopButton, "Close the filename rules window.");
+                closeTopButton.Margin = new Thickness(0);
+                Grid.SetColumn(closeTopButton, 7);
+                controlsRow.Children.Add(closeTopButton);
 
-                var customBorder = new Border { BorderBrush = Brush("#D7E1E8"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(14), Background = Brush("#FAFCFD"), Padding = new Thickness(14), Margin = new Thickness(0, 0, 10, 14) };
-                var customPanel = new Grid();
-                customPanel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-                customPanel.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-                customBorder.Child = customPanel;
-                mainGrid.Children.Add(customBorder);
-
-                customPanel.Children.Add(new TextBlock { Text = "Custom Rules", FontSize = 19, FontWeight = FontWeights.SemiBold, Foreground = Brush("#1F2A30"), Margin = new Thickness(0, 0, 0, 10) });
-
-                var customGrid = new DataGrid
-                {
-                    AutoGenerateColumns = false,
-                    CanUserAddRows = false,
-                    CanUserDeleteRows = false,
-                    CanUserResizeRows = false,
-                    SelectionMode = DataGridSelectionMode.Single,
-                    SelectionUnit = DataGridSelectionUnit.FullRow,
-                    GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
-                    HeadersVisibility = DataGridHeadersVisibility.Column,
-                    BorderThickness = new Thickness(1),
-                    BorderBrush = Brush("#D7E1E8"),
-                    Background = Brushes.White,
-                    Foreground = Brush("#1F2A30"),
-                    AlternatingRowBackground = Brush("#F7FAFC"),
-                    RowHeaderWidth = 0
-                };
-                customGrid.Columns.Add(new DataGridTextColumn { Header = "Name", Binding = new System.Windows.Data.Binding("Name") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus }, Width = 200 });
-                customGrid.Columns.Add(new DataGridCheckBoxColumn { Header = "On", Binding = new System.Windows.Data.Binding("Enabled"), Width = 56 });
-                customGrid.Columns.Add(new DataGridTextColumn { Header = "Priority", Binding = new System.Windows.Data.Binding("Priority") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus }, Width = 72 });
-                customGrid.Columns.Add(new DataGridTextColumn { Header = "Rule", Binding = new System.Windows.Data.Binding("PatternText") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus }, Width = new DataGridLength(2.2, DataGridLengthUnitType.Star) });
-                customGrid.Columns.Add(new DataGridTextColumn { Header = "Platform", Binding = new System.Windows.Data.Binding("PlatformLabel") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus }, Width = 110 });
-                customGrid.Columns.Add(new DataGridTextColumn { Header = "Tags", Binding = new System.Windows.Data.Binding("PlatformTagsText") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus }, Width = 150 });
-                customGrid.Columns.Add(new DataGridTextColumn { Header = "AppID Group", Binding = new System.Windows.Data.Binding("SteamAppIdGroup") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus }, Width = 90 });
-                customGrid.Columns.Add(new DataGridTextColumn { Header = "Title Group", Binding = new System.Windows.Data.Binding("TitleGroup") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus }, Width = 90 });
-                customGrid.Columns.Add(new DataGridTextColumn { Header = "Time Group", Binding = new System.Windows.Data.Binding("TimestampGroup") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus }, Width = 90 });
-                customGrid.Columns.Add(new DataGridTextColumn { Header = "Time Format", Binding = new System.Windows.Data.Binding("TimestampFormat") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus }, Width = 120 });
-                customGrid.Columns.Add(new DataGridCheckBoxColumn { Header = "Keep File Time", Binding = new System.Windows.Data.Binding("PreserveFileTimes"), Width = 84 });
-                customGrid.Columns.Add(new DataGridCheckBoxColumn { Header = "Manual If No AppID", Binding = new System.Windows.Data.Binding("RoutesToManualWhenMissingSteamAppId"), Width = 96 });
-                customGrid.Columns.Add(new DataGridTextColumn { Header = "Confidence", Binding = new System.Windows.Data.Binding("ConfidenceLabel") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus }, Width = 110 });
-                Grid.SetRow(customGrid, 1);
-                customPanel.Children.Add(customGrid);
-
-                var builtInBorder = new Border { BorderBrush = Brush("#D7E1E8"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(14), Background = Brush("#FAFCFD"), Padding = new Thickness(14), Margin = new Thickness(10, 0, 0, 14) };
-                Grid.SetColumn(builtInBorder, 1);
-                var builtInPanel = new Grid();
-                builtInPanel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-                builtInPanel.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-                builtInBorder.Child = builtInPanel;
-                mainGrid.Children.Add(builtInBorder);
-
-                builtInPanel.Children.Add(new TextBlock { Text = "Built-In Rules", FontSize = 19, FontWeight = FontWeights.SemiBold, Foreground = Brush("#1F2A30"), Margin = new Thickness(0, 0, 0, 10) });
-
-                var builtInGrid = new DataGrid
-                {
-                    AutoGenerateColumns = false,
-                    CanUserAddRows = false,
-                    CanUserDeleteRows = false,
-                    CanUserResizeRows = false,
-                    IsReadOnly = true,
-                    SelectionMode = DataGridSelectionMode.Single,
-                    SelectionUnit = DataGridSelectionUnit.FullRow,
-                    GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
-                    HeadersVisibility = DataGridHeadersVisibility.Column,
-                    BorderThickness = new Thickness(1),
-                    BorderBrush = Brush("#D7E1E8"),
-                    Background = Brushes.White,
-                    Foreground = Brush("#1F2A30"),
-                    AlternatingRowBackground = Brush("#F7FAFC"),
-                    RowHeaderWidth = 0
-                };
-                builtInGrid.Columns.Add(new DataGridTextColumn { Header = "Name", Binding = new System.Windows.Data.Binding("Name"), Width = 170 });
-                builtInGrid.Columns.Add(new DataGridCheckBoxColumn { Header = "On", Binding = new System.Windows.Data.Binding("Enabled"), Width = 56 });
-                builtInGrid.Columns.Add(new DataGridTextColumn { Header = "Priority", Binding = new System.Windows.Data.Binding("Priority"), Width = 72 });
-                builtInGrid.Columns.Add(new DataGridTextColumn { Header = "Platform", Binding = new System.Windows.Data.Binding("PlatformLabel"), Width = 105 });
-                builtInGrid.Columns.Add(new DataGridTextColumn { Header = "Rule", Binding = new System.Windows.Data.Binding("PatternText"), Width = new DataGridLength(1.4, DataGridLengthUnitType.Star) });
-                Grid.SetRow(builtInGrid, 1);
-                builtInPanel.Children.Add(builtInGrid);
-
-                var samplesBorder = new Border { BorderBrush = Brush("#D7E1E8"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(14), Background = Brush("#FAFCFD"), Padding = new Thickness(14), Margin = new Thickness(0, 0, 0, 14) };
-                Grid.SetRow(samplesBorder, 2);
-                bodyGrid.Children.Add(samplesBorder);
-
-                var samplePanel = new Grid();
-                samplePanel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-                samplePanel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-                samplePanel.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-                samplesBorder.Child = samplePanel;
-                samplePanel.Children.Add(new TextBlock { Text = "Recent Unmatched Samples", FontSize = 19, FontWeight = FontWeights.SemiBold, Foreground = Brush("#1F2A30"), Margin = new Thickness(0, 0, 0, 6) });
-                var sampleHelpText = new TextBlock { Text = "Double-click a sample to turn it into a starter rule, or use Promote Frequent to seed rules from repeated misses.", FontSize = 12, Foreground = Brush("#5F6970"), Margin = new Thickness(0, 0, 0, 10) };
-                Grid.SetRow(sampleHelpText, 1);
-                samplePanel.Children.Add(sampleHelpText);
+                var sampleCard = Card("Recent Unmatched Samples", "This is the fastest path to a good rule. Select a sample, review what PixelVault noticed, then create a draft from it.", new Thickness(0, 0, 0, 14));
+                Grid.SetRow(sampleCard, 1);
+                body.Children.Add(sampleCard);
+                var sampleStack = (StackPanel)sampleCard.Child;
 
                 var sampleGrid = new DataGrid
                 {
@@ -506,192 +483,553 @@ namespace PixelVaultNative
                     IsReadOnly = true,
                     SelectionMode = DataGridSelectionMode.Single,
                     SelectionUnit = DataGridSelectionUnit.FullRow,
-                    GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
                     HeadersVisibility = DataGridHeadersVisibility.Column,
+                    GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
                     BorderThickness = new Thickness(1),
                     BorderBrush = Brush("#D7E1E8"),
                     Background = Brushes.White,
-                    Foreground = Brush("#1F2A30"),
-                    AlternatingRowBackground = Brush("#F7FAFC"),
-                    RowHeaderWidth = 0
+                    Foreground = Brush("#1B232B"),
+                    RowHeaderWidth = 0,
+                    Margin = new Thickness(0, 0, 0, 12),
+                    MinHeight = 38,
+                    MaxHeight = 162,
+                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto
                 };
-                sampleGrid.Columns.Add(new DataGridTextColumn { Header = "File Name", Binding = new System.Windows.Data.Binding("FileName"), Width = new DataGridLength(1.8, DataGridLengthUnitType.Star) });
-                sampleGrid.Columns.Add(new DataGridTextColumn { Header = "Suggested Platform", Binding = new System.Windows.Data.Binding("SuggestedPlatformLabel"), Width = 130 });
-                sampleGrid.Columns.Add(new DataGridTextColumn { Header = "Suggested Rule", Binding = new System.Windows.Data.Binding("SuggestedConventionId"), Width = 160 });
-                sampleGrid.Columns.Add(new DataGridTextColumn { Header = "Count", Binding = new System.Windows.Data.Binding("OccurrenceCount"), Width = 68 });
-                sampleGrid.Columns.Add(new DataGridTextColumn { Header = "Last Seen (UTC)", Binding = new System.Windows.Data.Binding("LastSeenUtcText"), Width = 160 });
-                Grid.SetRow(sampleGrid, 2);
-                samplePanel.Children.Add(sampleGrid);
+                sampleGrid.Columns.Add(new DataGridTextColumn { Header = "File Name", Binding = new Binding("FileName"), Width = new DataGridLength(2.6, DataGridLengthUnitType.Star) });
+                sampleGrid.Columns.Add(new DataGridTextColumn { Header = "Suggested Platform", Binding = new Binding("SuggestedPlatformLabel"), Width = 150 });
+                sampleGrid.Columns.Add(new DataGridTextColumn { Header = "Count", Binding = new Binding("OccurrenceCount"), Width = 80 });
+                sampleGrid.Columns.Add(new DataGridTextColumn { Header = "Last Seen (UTC)", Binding = new Binding("LastSeenUtcText"), Width = 170 });
+                sampleStack.Children.Add(sampleGrid);
 
-                var footerGrid = new Grid();
-                footerGrid.ColumnDefinitions.Add(new ColumnDefinition());
-                footerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                var sampleSummary = new TextBlock
+                {
+                    Text = "Select a recent unmatched sample to see more detail here.",
+                    Foreground = Brush("#33424D"),
+                    TextWrapping = TextWrapping.Wrap
+                };
+                sampleStack.Children.Add(new Border { Background = Brush("#EEF3F7"), BorderBrush = Brush("#D7E1E8"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(12), Padding = new Thickness(14), Child = sampleSummary });
+
+                var mainGrid = new Grid();
+                mainGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.15, GridUnitType.Star) });
+                mainGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(0.85, GridUnitType.Star) });
+                Grid.SetRow(mainGrid, 2);
+                body.Children.Add(mainGrid);
+
+                var editorCard = Card("Rule Editor", "Edit one draft at a time. Built-ins load here in read-only mode so you can understand them before overriding them.", new Thickness(0, 0, 12, 0));
+                mainGrid.Children.Add(editorCard);
+                var editorStack = (StackPanel)editorCard.Child;
+                editorCard.MinHeight = 520;
+                var editorHost = new Grid();
+                editorHost.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                editorHost.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+                editorStack.Children.Add(editorHost);
+
+                var editorInfo = new TextBlock { Foreground = Brush("#5F6970"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 12) };
+                editorHost.Children.Add(editorInfo);
+
+                var editorScroll = new ScrollViewer
+                {
+                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                    HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                    MinHeight = 430
+                };
+                Grid.SetRow(editorScroll, 1);
+                editorHost.Children.Add(editorScroll);
+                var editorFields = new StackPanel();
+                editorScroll.Content = editorFields;
+
+                var nameBox = MakeTextBox();
+                editorFields.Children.Add(Labeled("Rule Name", nameBox));
+
+                var topFields = new Grid();
+                topFields.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                topFields.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(140) });
+                topFields.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(200) });
+                var enabledBox = new CheckBox { Content = "Enabled", Foreground = Brush("#1B232B"), Margin = new Thickness(0, 8, 0, 0) };
+                topFields.Children.Add(Labeled("Status", enabledBox));
+                var priorityBox = MakeTextBox();
+                var priorityField = Labeled("Priority", priorityBox);
+                Grid.SetColumn(priorityField, 1);
+                topFields.Children.Add(priorityField);
+                var platformCombo = MakeCombo();
+                foreach (var item in new[] { "Other", "Steam", "Xbox", "PS5", "PlayStation", "PC" }) platformCombo.Items.Add(item);
+                var platformField = Labeled("Platform", platformCombo);
+                Grid.SetColumn(platformField, 2);
+                topFields.Children.Add(platformField);
+                editorFields.Children.Add(topFields);
+
+                var patternBox = MakeTextBox(multiLine: true);
+                editorFields.Children.Add(Labeled("How The Filename Is Shaped", patternBox, "Use readable token rules by default. Raw regex still works, but token rules are easier to recognize and maintain."));
+
+                var midFields = new Grid();
+                midFields.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                midFields.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                var tagsBox = MakeTextBox();
+                midFields.Children.Add(Labeled("Tags", tagsBox, "Semicolon-separated tags such as Steam;PlayStation;Nintendo."));
+                var missingAppIdCombo = MakeCombo();
+                missingAppIdCombo.Items.Add("Do nothing");
+                missingAppIdCombo.Items.Add("Send to manual intake");
+                var missingField = Labeled("When AppID Is Missing", missingAppIdCombo);
+                Grid.SetColumn(missingField, 1);
+                midFields.Children.Add(missingField);
+                editorFields.Children.Add(midFields);
+
+                var preserveFileTimesBox = new CheckBox { Content = "Preserve file time", Foreground = Brush("#1B232B"), Margin = new Thickness(0, 8, 0, 0) };
+                editorFields.Children.Add(Labeled("File Time Behavior", preserveFileTimesBox));
+
+                var advanced = new Expander { Header = "Advanced Parser Fields", IsExpanded = false, Margin = new Thickness(0, 4, 0, 0) };
+                var advancedStack = new StackPanel { Margin = new Thickness(0, 10, 0, 0) };
+                advanced.Content = advancedStack;
+                var conventionIdBox = MakeTextBox();
+                advancedStack.Children.Add(Labeled("Convention Id", conventionIdBox));
+                var advancedGroups = new Grid();
+                advancedGroups.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                advancedGroups.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                advancedGroups.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                var appIdGroupBox = MakeTextBox();
+                advancedGroups.Children.Add(Labeled("AppID Group", appIdGroupBox));
+                var titleGroupBox = MakeTextBox();
+                var titleGroupField = Labeled("Title Group", titleGroupBox);
+                Grid.SetColumn(titleGroupField, 1);
+                advancedGroups.Children.Add(titleGroupField);
+                var timestampGroupBox = MakeTextBox();
+                var timestampGroupField = Labeled("Timestamp Group", timestampGroupBox);
+                Grid.SetColumn(timestampGroupField, 2);
+                advancedGroups.Children.Add(timestampGroupField);
+                advancedStack.Children.Add(advancedGroups);
+                var timestampFormatBox = MakeTextBox();
+                advancedStack.Children.Add(Labeled("Timestamp Format", timestampFormatBox, "Examples: yyyyMMddHHmmss, yyyy-MM-dd, unix-ms"));
+                var regexPreviewBox = MakeTextBox(readOnly: true, multiLine: true);
+                advancedStack.Children.Add(Labeled("Raw Regex Preview", regexPreviewBox, "This is generated from the readable rule pattern. It is read-only."));
+                editorFields.Children.Add(advanced);
+
+                var listColumn = new Grid();
+                listColumn.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+                listColumn.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+                Grid.SetColumn(listColumn, 1);
+                mainGrid.Children.Add(listColumn);
+
+                var customCard = Card("Custom Rules", "Saved for this library. Click one to load it into the editor.", new Thickness(12, 0, 0, 12));
+                listColumn.Children.Add(customCard);
+                var customStack = (StackPanel)customCard.Child;
+                customCard.MinHeight = 270;
+                var customGrid = new DataGrid
+                {
+                    AutoGenerateColumns = false,
+                    CanUserAddRows = false,
+                    CanUserDeleteRows = false,
+                    CanUserResizeRows = false,
+                    IsReadOnly = true,
+                    SelectionMode = DataGridSelectionMode.Single,
+                    SelectionUnit = DataGridSelectionUnit.FullRow,
+                    HeadersVisibility = DataGridHeadersVisibility.Column,
+                    GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
+                    BorderThickness = new Thickness(1),
+                    BorderBrush = Brush("#D7E1E8"),
+                    Background = Brushes.White,
+                    Foreground = Brush("#1B232B"),
+                    RowHeaderWidth = 0,
+                    Height = 260,
+                    MinHeight = 260,
+                    MaxHeight = 360,
+                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto
+                };
+                customGrid.Columns.Add(new DataGridTextColumn { Header = "Name", Binding = new Binding("Name"), Width = new DataGridLength(1.2, DataGridLengthUnitType.Star) });
+                customGrid.Columns.Add(new DataGridCheckBoxColumn { Header = "On", Binding = new Binding("Enabled"), Width = 56 });
+                customGrid.Columns.Add(new DataGridTextColumn { Header = "Priority", Binding = new Binding("Priority"), Width = 80 });
+                customGrid.Columns.Add(new DataGridTextColumn { Header = "Platform", Binding = new Binding("PlatformLabel"), Width = 110 });
+                customGrid.Columns.Add(new DataGridTextColumn { Header = "Pattern Summary", Binding = new Binding("PatternText"), Width = new DataGridLength(1.8, DataGridLengthUnitType.Star) });
+                customStack.Children.Add(customGrid);
+
+                var builtInCard = Card("Built-In Rules", "Shipped defaults. Select one to inspect it, then disable it with a custom override if needed.", new Thickness(12, 12, 0, 0));
+                Grid.SetRow(builtInCard, 1);
+                listColumn.Children.Add(builtInCard);
+                var builtInStack = (StackPanel)builtInCard.Child;
+                builtInCard.MinHeight = 270;
+                var builtInGrid = new DataGrid
+                {
+                    AutoGenerateColumns = false,
+                    CanUserAddRows = false,
+                    CanUserDeleteRows = false,
+                    CanUserResizeRows = false,
+                    IsReadOnly = true,
+                    SelectionMode = DataGridSelectionMode.Single,
+                    SelectionUnit = DataGridSelectionUnit.FullRow,
+                    HeadersVisibility = DataGridHeadersVisibility.Column,
+                    GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
+                    BorderThickness = new Thickness(1),
+                    BorderBrush = Brush("#D7E1E8"),
+                    Background = Brushes.White,
+                    Foreground = Brush("#1B232B"),
+                    RowHeaderWidth = 0,
+                    Height = 260,
+                    MinHeight = 260,
+                    MaxHeight = 360,
+                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto
+                };
+                builtInGrid.Columns.Add(new DataGridTextColumn { Header = "Name", Binding = new Binding("Name"), Width = new DataGridLength(1.2, DataGridLengthUnitType.Star) });
+                builtInGrid.Columns.Add(new DataGridCheckBoxColumn { Header = "On", Binding = new Binding("Enabled"), Width = 56 });
+                builtInGrid.Columns.Add(new DataGridTextColumn { Header = "Priority", Binding = new Binding("Priority"), Width = 80 });
+                builtInGrid.Columns.Add(new DataGridTextColumn { Header = "Platform", Binding = new Binding("PlatformLabel"), Width = 110 });
+                builtInGrid.Columns.Add(new DataGridTextColumn { Header = "Pattern Summary", Binding = new Binding("PatternText"), Width = new DataGridLength(1.8, DataGridLengthUnitType.Star) });
+                builtInStack.Children.Add(builtInGrid);
+
+                var footerGrid = new Grid { Margin = new Thickness(0, 16, 0, 0) };
+                footerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                 Grid.SetRow(footerGrid, 3);
-                bodyGrid.Children.Add(footerGrid);
+                body.Children.Add(footerGrid);
 
                 var statusText = new TextBlock { Foreground = Brush("#5F6970"), VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap };
                 footerGrid.Children.Add(statusText);
 
-                var actionRow = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
-                var closeButton = Btn("Close", null, "#EEF2F5", Brush("#33424D"));
-                closeButton.Width = 128;
-                closeButton.Height = 44;
-                closeButton.Margin = new Thickness(0, 0, 10, 0);
-                var saveButton = Btn("Save Rules", null, "#275D47", Brushes.White);
-                saveButton.Width = 148;
-                saveButton.Height = 44;
-                saveButton.Margin = new Thickness(0);
-                actionRow.Children.Add(closeButton);
-                actionRow.Children.Add(saveButton);
-                Grid.SetColumn(actionRow, 1);
-                footerGrid.Children.Add(actionRow);
-
-                filenameConventionEditorWindow = editorWindow;
                 editorWindow.Content = root;
+                filenameConventionEditorWindow = editorWindow;
 
-                bool dirty = false;
-                Action loadState = null;
-                Action refreshUi = null;
-                Action saveRules = null;
-                Action<IEnumerable<FilenameConventionSample>, string> promoteSamples = null;
-                Action<FilenameConventionRule, int> focusCustomRule = null;
+                void ApplyLoadedState(FilenameRulesEditorState state)
+                {
+                    var snapshot = state ?? new FilenameRulesEditorState();
+                    customRules = snapshot.CustomRules ?? new List<FilenameConventionRule>();
+                    builtInRules = snapshot.BuiltInRules ?? new List<FilenameConventionRule>();
+                    samples = snapshot.Samples ?? new List<FilenameConventionSample>();
+                }
 
-                focusCustomRule = delegate(FilenameConventionRule rule, int columnIndex)
+                void SetEditorEnabled(bool editable)
+                {
+                    nameBox.IsReadOnly = !editable;
+                    priorityBox.IsReadOnly = !editable;
+                    patternBox.IsReadOnly = !editable;
+                    tagsBox.IsReadOnly = !editable;
+                    conventionIdBox.IsReadOnly = !editable;
+                    appIdGroupBox.IsReadOnly = !editable;
+                    titleGroupBox.IsReadOnly = !editable;
+                    timestampGroupBox.IsReadOnly = !editable;
+                    timestampFormatBox.IsReadOnly = !editable;
+                    platformCombo.IsEnabled = editable;
+                    missingAppIdCombo.IsEnabled = editable;
+                    enabledBox.IsEnabled = editable;
+                    preserveFileTimesBox.IsEnabled = editable;
+
+                    var background = editable ? Brushes.White : Brush("#EEF2F5");
+                    nameBox.Background = background;
+                    priorityBox.Background = background;
+                    patternBox.Background = background;
+                    tagsBox.Background = background;
+                    conventionIdBox.Background = background;
+                    appIdGroupBox.Background = background;
+                    titleGroupBox.Background = background;
+                    timestampGroupBox.Background = background;
+                    timestampFormatBox.Background = background;
+                    platformCombo.Background = background;
+                    missingAppIdCombo.Background = background;
+                }
+
+                void UpdateRegexPreview()
+                {
+                    if (syncingEditor) return;
+                    try
+                    {
+                        var patternText = FilenameParserService.NormalizePatternTextForStorage(patternBox.Text);
+                        regexPreviewBox.Text = string.IsNullOrWhiteSpace(patternText)
+                            ? string.Empty
+                            : FilenameParserService.BuildRegexPattern(patternText, CleanTag(timestampGroupBox.Text));
+                    }
+                    catch (Exception ex)
+                    {
+                        regexPreviewBox.Text = "Invalid pattern: " + ex.Message;
+                    }
+                }
+
+                void LoadRuleIntoEditor(FilenameConventionRule rule, bool readOnly)
+                {
+                    syncingEditor = true;
+                    try
+                    {
+                        editingRule = rule;
+                        editingBuiltIn = readOnly;
+                        if (rule == null)
+                        {
+                            editorInfo.Text = "Select an unmatched sample to create a draft, or choose a known rule to inspect it here.";
+                            nameBox.Text = string.Empty;
+                            priorityBox.Text = string.Empty;
+                            patternBox.Text = string.Empty;
+                            tagsBox.Text = string.Empty;
+                            conventionIdBox.Text = string.Empty;
+                            appIdGroupBox.Text = string.Empty;
+                            titleGroupBox.Text = string.Empty;
+                            timestampGroupBox.Text = string.Empty;
+                            timestampFormatBox.Text = string.Empty;
+                            regexPreviewBox.Text = string.Empty;
+                            platformCombo.SelectedItem = "Other";
+                            missingAppIdCombo.SelectedIndex = 0;
+                            enabledBox.IsChecked = true;
+                            preserveFileTimesBox.IsChecked = false;
+                            SetEditorEnabled(false);
+                            return;
+                        }
+
+                        editorInfo.Text = readOnly
+                            ? "You are viewing a built-in rule. Use Disable Built-In if you want a library-specific override."
+                            : "Editing a custom library rule. Changes stay local until you save them.";
+                        nameBox.Text = rule.Name ?? string.Empty;
+                        priorityBox.Text = rule.Priority.ToString();
+                        patternBox.Text = FilenameParserService.GetPatternEditorText(rule.PatternText ?? rule.Pattern);
+                        tagsBox.Text = rule.PlatformTagsText ?? string.Empty;
+                        conventionIdBox.Text = rule.ConventionId ?? string.Empty;
+                        appIdGroupBox.Text = rule.SteamAppIdGroup ?? string.Empty;
+                        titleGroupBox.Text = rule.TitleGroup ?? string.Empty;
+                        timestampGroupBox.Text = rule.TimestampGroup ?? string.Empty;
+                        timestampFormatBox.Text = rule.TimestampFormat ?? string.Empty;
+                        platformCombo.SelectedItem = NormalizeConsoleLabel(string.IsNullOrWhiteSpace(rule.PlatformLabel) ? "Other" : rule.PlatformLabel);
+                        missingAppIdCombo.SelectedIndex = rule.RoutesToManualWhenMissingSteamAppId ? 1 : 0;
+                        enabledBox.IsChecked = rule.Enabled;
+                        preserveFileTimesBox.IsChecked = rule.PreserveFileTimes;
+                        SetEditorEnabled(!readOnly);
+                    }
+                    finally
+                    {
+                        syncingEditor = false;
+                    }
+                    UpdateRegexPreview();
+                }
+
+                void UpdateSampleSummary()
+                {
+                    var sample = sampleGrid.SelectedItem as FilenameConventionSample;
+                    if (sample == null)
+                    {
+                        sampleSummary.Text = "Select a recent unmatched sample to see more detail here.";
+                        return;
+                    }
+                    sampleSummary.Text = "Selected sample: " + (sample.FileName ?? string.Empty)
+                        + Environment.NewLine + "Suggested platform: " + (string.IsNullOrWhiteSpace(sample.SuggestedPlatformLabel) ? "Other" : sample.SuggestedPlatformLabel)
+                        + " | Count: " + sample.OccurrenceCount
+                        + " | Last seen: " + (sample.LastSeenUtcText ?? string.Empty) + " UTC"
+                        + Environment.NewLine + "Next step: Create Rule From Sample to open a draft in the editor.";
+                }
+
+                string RuleSelectionKey(FilenameConventionRule rule)
+                {
+                    return rule == null ? string.Empty : ((rule.ConventionId ?? string.Empty) + "|" + (rule.Name ?? string.Empty));
+                }
+
+                void UpdateActionState()
+                {
+                    createRuleFromSampleButton.IsEnabled = sampleGrid.SelectedItem is FilenameConventionSample;
+                    disableBuiltInButton.IsEnabled = builtInGrid.SelectedItem is FilenameConventionRule;
+                    promoteFrequentButton.IsEnabled = samples.Any(sample => sample != null && sample.OccurrenceCount >= 2);
+                    saveTopButton.IsEnabled = !editingBuiltIn && editingRule != null;
+                }
+
+                void DismissSamples(IEnumerable<FilenameConventionSample> handledSamples)
+                {
+                    var ids = (handledSamples ?? Enumerable.Empty<FilenameConventionSample>())
+                        .Where(sample => sample != null && sample.SampleId > 0)
+                        .Select(sample => sample.SampleId)
+                        .Distinct()
+                        .ToList();
+
+                    if (ids.Count == 0) return;
+                    filenameRulesService.DismissSamples(libraryRoot, ids);
+                    samples = samples.Where(sample => sample == null || !ids.Contains(sample.SampleId)).ToList();
+                }
+
+                void RefreshLists(bool reloadSources = true)
+                {
+                    var selectedSampleId = (sampleGrid.SelectedItem as FilenameConventionSample)?.SampleId ?? -1L;
+                    var selectedCustomKey = RuleSelectionKey(customGrid.SelectedItem as FilenameConventionRule);
+                    var selectedBuiltInKey = RuleSelectionKey(builtInGrid.SelectedItem as FilenameConventionRule);
+
+                    if (reloadSources)
+                    {
+                        customGrid.ItemsSource = null;
+                        customGrid.ItemsSource = customRules;
+                        builtInGrid.ItemsSource = null;
+                        builtInGrid.ItemsSource = builtInRules;
+                        sampleGrid.ItemsSource = null;
+                        sampleGrid.ItemsSource = samples;
+
+                        if (selectedSampleId > 0)
+                        {
+                            var selectedSample = samples.FirstOrDefault(sample => sample != null && sample.SampleId == selectedSampleId);
+                            if (selectedSample != null) sampleGrid.SelectedItem = selectedSample;
+                        }
+
+                        if (!string.IsNullOrWhiteSpace(selectedCustomKey))
+                        {
+                            var selectedCustom = customRules.FirstOrDefault(rule => string.Equals(RuleSelectionKey(rule), selectedCustomKey, StringComparison.OrdinalIgnoreCase));
+                            if (selectedCustom != null) customGrid.SelectedItem = selectedCustom;
+                        }
+
+                        if (!string.IsNullOrWhiteSpace(selectedBuiltInKey))
+                        {
+                            var selectedBuiltIn = builtInRules.FirstOrDefault(rule => string.Equals(RuleSelectionKey(rule), selectedBuiltInKey, StringComparison.OrdinalIgnoreCase));
+                            if (selectedBuiltIn != null) builtInGrid.SelectedItem = selectedBuiltIn;
+                        }
+                    }
+
+                    var current = editingRule == null ? "No rule selected" : ((editingBuiltIn ? "Viewing built-in: " : "Editing custom: ") + (editingRule.Name ?? editingRule.ConventionId ?? "rule"));
+                    statusText.Text = customRules.Count + " custom | " + builtInRules.Count + " built-in | " + samples.Count + " sample(s) | " + (dirty ? "Unsaved changes" : "Saved") + " | " + current;
+                    UpdateActionState();
+                    UpdateSampleSummary();
+                }
+
+                void MarkDirty()
+                {
+                    if (syncingEditor || editingBuiltIn || editingRule == null) return;
+                    dirty = true;
+                    RefreshLists(false);
+                }
+
+                void PushEditorToRule()
+                {
+                    if (syncingEditor || editingBuiltIn || editingRule == null) return;
+                    editingRule.Name = CleanTag(nameBox.Text);
+                    editingRule.Enabled = enabledBox.IsChecked != false;
+                    int parsedPriority;
+                    editingRule.Priority = int.TryParse(priorityBox.Text, out parsedPriority) ? parsedPriority : 0;
+                    editingRule.PatternText = FilenameParserService.NormalizePatternTextForStorage(patternBox.Text);
+                    editingRule.Pattern = editingRule.PatternText;
+                    editingRule.PlatformLabel = NormalizeConsoleLabel(platformCombo.SelectedItem as string);
+                    editingRule.PlatformTagsText = CleanTag(tagsBox.Text);
+                    editingRule.ConventionId = CleanTag(conventionIdBox.Text);
+                    editingRule.SteamAppIdGroup = CleanTag(appIdGroupBox.Text);
+                    editingRule.TitleGroup = CleanTag(titleGroupBox.Text);
+                    editingRule.TimestampGroup = CleanTag(timestampGroupBox.Text);
+                    editingRule.TimestampFormat = CleanTag(timestampFormatBox.Text);
+                    editingRule.PreserveFileTimes = preserveFileTimesBox.IsChecked == true;
+                    editingRule.RoutesToManualWhenMissingSteamAppId = missingAppIdCombo.SelectedIndex == 1;
+                    editingRule.ConfidenceLabel = CleanTag(string.IsNullOrWhiteSpace(editingRule.ConfidenceLabel) ? "CustomRule" : editingRule.ConfidenceLabel);
+                    editingRule.IsBuiltIn = false;
+                    UpdateRegexPreview();
+                    MarkDirty();
+                }
+
+                void SelectCustomRule(FilenameConventionRule rule, bool focusPattern)
                 {
                     if (rule == null) return;
-                    editorWindow.Dispatcher.BeginInvoke(new Action(delegate
+                    builtInGrid.SelectedItem = null;
+                    customGrid.SelectedItem = rule;
+                    customGrid.ScrollIntoView(rule);
+                    LoadRuleIntoEditor(rule, false);
+                    RefreshLists();
+                    editorWindow.Dispatcher.BeginInvoke(new Action(delegate { if (focusPattern) patternBox.Focus(); else nameBox.Focus(); }), DispatcherPriority.Background);
+                }
+
+                void CreateRuleFromSample(FilenameConventionSample sample)
+                {
+                    if (sample == null)
                     {
-                        if (!customRules.Contains(rule)) return;
-                        customGrid.SelectedItem = rule;
-                        customGrid.ScrollIntoView(rule);
-                        customGrid.Focus();
-                        customGrid.UpdateLayout();
-                        var safeColumnIndex = Math.Max(0, Math.Min(columnIndex, customGrid.Columns.Count - 1));
-                        customGrid.CurrentCell = new DataGridCellInfo(rule, customGrid.Columns[safeColumnIndex]);
-                        customGrid.BeginEdit();
-                    }), DispatcherPriority.Background);
-                };
+                        MessageBox.Show("Select a recent unmatched sample first.", "PixelVault");
+                        return;
+                    }
+                    var candidate = filenameRulesService.CreateRuleFromSample(sample);
+                    if (candidate == null || string.IsNullOrWhiteSpace(candidate.PatternText ?? candidate.Pattern))
+                    {
+                        MessageBox.Show("Could not turn the selected sample into a starter rule.", "PixelVault");
+                        return;
+                    }
 
-                loadState = delegate
+                    customRules.Insert(0, candidate);
+                    DismissSamples(new[] { sample });
+                    dirty = true;
+                    RefreshLists(true);
+                    SelectCustomRule(candidate, true);
+                    status.Text = "Created starter rule from " + (sample.FileName ?? "sample");
+                }
+
+                FilenameConventionSample[] ShowPromoteChooser()
                 {
-                    var allRules = filenameParserService.GetConventionRules(libraryRoot);
-                    customRules = allRules
-                        .Where(rule => rule != null && !rule.IsBuiltIn)
-                        .Select(rule => new FilenameConventionRule
-                        {
-                            ConventionId = rule.ConventionId,
-                            Name = rule.Name,
-                            Enabled = rule.Enabled,
-                            Priority = rule.Priority,
-                            Pattern = rule.Pattern,
-                            PatternText = FilenameParserService.GetPatternEditorText(rule.PatternText ?? rule.Pattern),
-                            PlatformLabel = rule.PlatformLabel,
-                            PlatformTagsText = rule.PlatformTagsText,
-                            SteamAppIdGroup = rule.SteamAppIdGroup,
-                            TitleGroup = rule.TitleGroup,
-                            TimestampGroup = rule.TimestampGroup,
-                            TimestampFormat = rule.TimestampFormat,
-                            PreserveFileTimes = rule.PreserveFileTimes,
-                            RoutesToManualWhenMissingSteamAppId = rule.RoutesToManualWhenMissingSteamAppId,
-                            ConfidenceLabel = rule.ConfidenceLabel,
-                            IsBuiltIn = false
-                        })
-                        .OrderByDescending(rule => rule.Priority)
-                        .ThenBy(rule => rule.Name ?? string.Empty, StringComparer.OrdinalIgnoreCase)
-                        .ToList();
-                    builtInRules = allRules
-                        .Where(rule => rule != null && rule.IsBuiltIn)
-                        .Select(rule => new FilenameConventionRule
-                        {
-                            ConventionId = rule.ConventionId,
-                            Name = rule.Name,
-                            Enabled = rule.Enabled,
-                            Priority = rule.Priority,
-                            Pattern = rule.Pattern,
-                            PatternText = FilenameParserService.GetPatternEditorText(rule.PatternText ?? rule.Pattern),
-                            PlatformLabel = rule.PlatformLabel,
-                            PlatformTagsText = rule.PlatformTagsText,
-                            SteamAppIdGroup = rule.SteamAppIdGroup,
-                            TitleGroup = rule.TitleGroup,
-                            TimestampGroup = rule.TimestampGroup,
-                            TimestampFormat = rule.TimestampFormat,
-                            PreserveFileTimes = rule.PreserveFileTimes,
-                            RoutesToManualWhenMissingSteamAppId = rule.RoutesToManualWhenMissingSteamAppId,
-                            ConfidenceLabel = rule.ConfidenceLabel,
-                            IsBuiltIn = true
-                        })
-                        .OrderByDescending(rule => rule.Priority)
-                        .ThenBy(rule => rule.Name ?? string.Empty, StringComparer.OrdinalIgnoreCase)
-                        .ToList();
-                    samples = indexPersistenceService.LoadFilenameConventionSamples(libraryRoot, 80)
-                        .OrderByDescending(sample => sample.LastSeenUtcTicks)
-                        .ThenByDescending(sample => sample.OccurrenceCount)
-                        .ToList();
-                };
+                    var frequent = samples.Where(sample => sample != null && sample.OccurrenceCount >= 2).OrderByDescending(sample => sample.OccurrenceCount).ThenByDescending(sample => sample.LastSeenUtcTicks).Take(12).ToList();
+                    if (frequent.Count == 0) return new FilenameConventionSample[0];
 
-                refreshUi = delegate
+                    var chooser = new Window
+                    {
+                        Title = "Promote Frequent Samples",
+                        Width = 720,
+                        Height = 520,
+                        MinWidth = 620,
+                        MinHeight = 400,
+                        Owner = editorWindow,
+                        WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                        Background = Brush("#F3EEE4")
+                    };
+
+                    var chooserRoot = new Grid { Margin = new Thickness(20) };
+                    chooserRoot.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                    chooserRoot.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+                    chooserRoot.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                    chooser.Content = chooserRoot;
+
+                    chooserRoot.Children.Add(new TextBlock { Text = "Choose the repeated unmatched samples you want to turn into starter drafts.", FontSize = 15, FontWeight = FontWeights.SemiBold, Foreground = Brush("#182126"), Margin = new Thickness(0, 0, 0, 12), TextWrapping = TextWrapping.Wrap });
+                    var chooserScroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+                    Grid.SetRow(chooserScroll, 1);
+                    chooserRoot.Children.Add(chooserScroll);
+                    var chooserStack = new StackPanel();
+                    chooserScroll.Content = chooserStack;
+
+                    var selections = new List<Tuple<FilenameConventionSample, CheckBox>>();
+                    foreach (var sample in frequent)
+                    {
+                        var row = new Border { Background = Brushes.White, BorderBrush = Brush("#D7E1E8"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(12), Padding = new Thickness(14), Margin = new Thickness(0, 0, 0, 10) };
+                        var rowGrid = new Grid();
+                        rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                        rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                        var check = new CheckBox { IsChecked = true, Margin = new Thickness(0, 2, 12, 0) };
+                        rowGrid.Children.Add(check);
+                        var detail = new StackPanel();
+                        detail.Children.Add(new TextBlock { Text = sample.FileName ?? string.Empty, FontWeight = FontWeights.SemiBold, Foreground = Brush("#182126"), TextWrapping = TextWrapping.Wrap });
+                        detail.Children.Add(new TextBlock { Text = "Platform: " + (string.IsNullOrWhiteSpace(sample.SuggestedPlatformLabel) ? "Other" : sample.SuggestedPlatformLabel) + " | Count: " + sample.OccurrenceCount + " | Last seen: " + sample.LastSeenUtcText + " UTC", Foreground = Brush("#5F6970"), Margin = new Thickness(0, 4, 0, 0), TextWrapping = TextWrapping.Wrap });
+                        Grid.SetColumn(detail, 1);
+                        rowGrid.Children.Add(detail);
+                        row.Child = rowGrid;
+                        chooserStack.Children.Add(row);
+                        selections.Add(Tuple.Create(sample, check));
+                    }
+
+                    var chooserFooter = new Grid { Margin = new Thickness(0, 14, 0, 0) };
+                    chooserFooter.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                    chooserFooter.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                    chooserFooter.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                    Grid.SetRow(chooserFooter, 2);
+                    chooserRoot.Children.Add(chooserFooter);
+                    chooserFooter.Children.Add(new TextBlock { Text = "One starter rule will be created for each selected sample.", Foreground = Brush("#5F6970"), VerticalAlignment = VerticalAlignment.Center });
+                    var chooserCancel = MakeButton("Cancel", "#EEF2F5", Brush("#33424D"), 140);
+                    Grid.SetColumn(chooserCancel, 1);
+                    chooserFooter.Children.Add(chooserCancel);
+                    var chooserPromote = MakeButton("Promote", "#275D47", Brushes.White, 160);
+                    chooserPromote.Margin = new Thickness(0);
+                    Grid.SetColumn(chooserPromote, 2);
+                    chooserFooter.Children.Add(chooserPromote);
+
+                    List<FilenameConventionSample> chosen = null;
+                    chooserCancel.Click += delegate { chooser.DialogResult = false; chooser.Close(); };
+                    chooserPromote.Click += delegate
+                    {
+                        chosen = selections.Where(item => item.Item2.IsChecked == true).Select(item => item.Item1).ToList();
+                        chooser.DialogResult = true;
+                        chooser.Close();
+                    };
+
+                    return chooser.ShowDialog() == true && chosen != null ? chosen.ToArray() : new FilenameConventionSample[0];
+                }
+
+                void LoadState()
                 {
-                    customGrid.ItemsSource = null;
-                    customGrid.ItemsSource = customRules;
-                    builtInGrid.ItemsSource = null;
-                    builtInGrid.ItemsSource = builtInRules;
-                    sampleGrid.ItemsSource = null;
-                    sampleGrid.ItemsSource = samples;
+                    ApplyLoadedState(filenameRulesService.LoadState(libraryRoot));
+                }
 
-                    var summary = customRules.Count + " custom | " + builtInRules.Count + " built-in | " + samples.Count + " sample(s) | " + (dirty ? "Unsaved changes" : "Saved");
-                    var selectedCustom = customGrid.SelectedItem as FilenameConventionRule;
-                    var selectedBuiltIn = builtInGrid.SelectedItem as FilenameConventionRule;
-                    var selectedSample = sampleGrid.SelectedItem as FilenameConventionSample;
-                    sampleRuleButton.IsEnabled = selectedSample != null;
-                    disableBuiltInButton.IsEnabled = selectedBuiltIn != null;
-                    promoteFrequentButton.IsEnabled = selectedSample != null || samples.Any(sample => sample.OccurrenceCount >= 2);
-                    if (selectedCustom != null) summary += " | Editing " + (selectedCustom.Name ?? selectedCustom.ConventionId ?? "custom rule");
-                    else if (selectedBuiltIn != null) summary += " | Built-in " + (selectedBuiltIn.Name ?? selectedBuiltIn.ConventionId ?? "rule");
-                    else if (selectedSample != null) summary += " | Sample " + (selectedSample.FileName ?? string.Empty);
-                    statusText.Text = summary;
-                };
-
-                saveRules = delegate
+                void SaveRules()
                 {
                     try
                     {
-                        customGrid.CommitEdit(DataGridEditingUnit.Cell, true);
-                        customGrid.CommitEdit(DataGridEditingUnit.Row, true);
-
-                        foreach (var rule in customRules)
-                        {
-                            rule.ConventionId = CleanTag(rule.ConventionId);
-                            if (string.IsNullOrWhiteSpace(rule.ConventionId)) rule.ConventionId = "custom_" + Guid.NewGuid().ToString("N").Substring(0, 10);
-                            rule.Name = CleanTag(rule.Name);
-                            if (string.IsNullOrWhiteSpace(rule.Name)) rule.Name = "Custom Rule";
-                            rule.Priority = Math.Max(-100000, Math.Min(100000, rule.Priority));
-                            rule.PatternText = FilenameParserService.NormalizePatternTextForStorage(rule.PatternText ?? rule.Pattern);
-                            if (string.IsNullOrWhiteSpace(rule.PatternText)) throw new InvalidOperationException("Each custom filename rule needs a readable rule pattern before it can be saved.");
-                            rule.Pattern = rule.PatternText;
-                            _ = new Regex(FilenameParserService.BuildRegexPattern(rule.PatternText, rule.TimestampGroup), RegexOptions.IgnoreCase);
-                            rule.PlatformLabel = NormalizeConsoleLabel(string.IsNullOrWhiteSpace(rule.PlatformLabel) ? "Other" : rule.PlatformLabel);
-                            var defaultTags = string.IsNullOrWhiteSpace(rule.PlatformTagsText) ? DefaultPlatformTagsTextForLabel(rule.PlatformLabel) : rule.PlatformTagsText;
-                            rule.PlatformTagsText = string.Join("; ", ParseTagText(defaultTags));
-                            rule.SteamAppIdGroup = CleanTag(rule.SteamAppIdGroup);
-                            rule.TitleGroup = CleanTag(rule.TitleGroup);
-                            rule.TimestampGroup = CleanTag(rule.TimestampGroup);
-                            rule.TimestampFormat = CleanTag(rule.TimestampFormat);
-                            rule.ConfidenceLabel = CleanTag(string.IsNullOrWhiteSpace(rule.ConfidenceLabel) ? "CustomRule" : rule.ConfidenceLabel);
-                            rule.IsBuiltIn = false;
-                        }
-
-                        customRules = customRules
-                            .GroupBy(rule => rule.ConventionId ?? string.Empty, StringComparer.OrdinalIgnoreCase)
-                            .Select(group => group.First())
-                            .OrderByDescending(rule => rule.Priority)
-                            .ThenBy(rule => rule.Name ?? string.Empty, StringComparer.OrdinalIgnoreCase)
-                            .ToList();
-
-                        indexPersistenceService.SaveFilenameConventions(libraryRoot, customRules);
-                        filenameParserService.InvalidateRules(libraryRoot);
-                        loadState();
+                        PushEditorToRule();
+                        ApplyLoadedState(filenameRulesService.SaveRules(libraryRoot, customRules));
                         dirty = false;
-                        refreshUi();
+                        customGrid.SelectedItem = null;
+                        builtInGrid.SelectedItem = null;
+                        LoadRuleIntoEditor(null, false);
+                        RefreshLists(true);
+
                         if (previewBox != null) RefreshPreview();
                         status.Text = "Filename rules saved";
                         Log("Saved " + customRules.Count + " custom filename rule(s) to the index database.");
@@ -702,186 +1040,118 @@ namespace PixelVaultNative
                         Log("Failed to save filename rules. " + saveEx.Message);
                         MessageBox.Show("Could not save the filename rules." + Environment.NewLine + Environment.NewLine + saveEx.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
                     }
-                };
+                }
 
-                promoteSamples = delegate(IEnumerable<FilenameConventionSample> sourceSamples, string successMessage)
-                {
-                    try
-                    {
-                        var added = 0;
-                        foreach (var sample in (sourceSamples ?? Enumerable.Empty<FilenameConventionSample>()).Where(item => item != null))
-                        {
-                            var candidate = BuildCustomFilenameConventionFromSample(sample);
-                            if (candidate == null || string.IsNullOrWhiteSpace(candidate.PatternText ?? candidate.Pattern)) continue;
-                            var candidatePattern = FilenameParserService.NormalizePatternTextForStorage(candidate.PatternText ?? candidate.Pattern);
-                            if (customRules.Any(rule => rule != null && string.Equals(FilenameParserService.NormalizePatternTextForStorage(rule.PatternText ?? rule.Pattern), candidatePattern, StringComparison.OrdinalIgnoreCase))) continue;
-                            customRules.Insert(0, candidate);
-                            added++;
-                        }
-
-                        if (added <= 0)
-                        {
-                            MessageBox.Show("No new starter rules were added. The matching pattern may already exist in your custom rules.", "PixelVault");
-                            return;
-                        }
-
-                        dirty = true;
-                        refreshUi();
-                        if (customRules.Count > 0)
-                        {
-                            focusCustomRule(customRules[0], 3);
-                        }
-                        status.Text = successMessage + " (" + added + " added)";
-                    }
-                    catch (Exception promoteEx)
-                    {
-                        status.Text = "Filename rule suggestion failed";
-                        Log("Failed to promote filename rule sample. " + promoteEx.Message);
-                        MessageBox.Show("Could not build a starter rule from the selected sample(s)." + Environment.NewLine + Environment.NewLine + promoteEx.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
-                    }
-                };
-
-                addRuleButton.Click += delegate
-                {
-                    try
-                    {
-                        var newRule = new FilenameConventionRule
-                        {
-                            ConventionId = "custom_" + Guid.NewGuid().ToString("N").Substring(0, 10),
-                            Name = "Custom Rule",
-                            Enabled = true,
-                            Priority = 1200,
-                            Pattern = "[title].[ext:media]",
-                            PatternText = "[title].[ext:media]",
-                            PlatformLabel = "Other",
-                            PlatformTagsText = string.Empty,
-                            ConfidenceLabel = "CustomRule",
-                            IsBuiltIn = false
-                        };
-                        customRules.Insert(0, newRule);
-                        dirty = true;
-                        refreshUi();
-                        focusCustomRule(newRule, 3);
-                        status.Text = "New filename rule added";
-                    }
-                    catch (Exception addEx)
-                    {
-                        status.Text = "Filename rule add failed";
-                        Log("Failed to add a new filename rule. " + addEx.Message);
-                        MessageBox.Show("Could not add a new filename rule." + Environment.NewLine + Environment.NewLine + addEx.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
-                    }
-                };
-
-                sampleRuleButton.Click += delegate
-                {
-                    var selectedSample = sampleGrid.SelectedItem as FilenameConventionSample;
-                    if (selectedSample == null)
-                    {
-                        MessageBox.Show("Select a recent unmatched sample first.", "PixelVault");
-                        return;
-                    }
-                    promoteSamples(new[] { selectedSample }, "Created a starter rule from the selected sample");
-                };
-
-                disableBuiltInButton.Click += delegate
-                {
-                    var selected = builtInGrid.SelectedItem as FilenameConventionRule;
-                    if (selected == null)
-                    {
-                        MessageBox.Show("Select a built-in rule first.", "PixelVault");
-                        return;
-                    }
-                    var existingOverride = customRules.FirstOrDefault(rule => string.Equals(rule.ConventionId, selected.ConventionId, StringComparison.OrdinalIgnoreCase));
-                    if (existingOverride == null)
-                    {
-                        existingOverride = new FilenameConventionRule
-                        {
-                            ConventionId = selected.ConventionId,
-                            Name = selected.Name,
-                            Enabled = false,
-                            Priority = selected.Priority,
-                            Pattern = selected.Pattern,
-                            PatternText = FilenameParserService.GetPatternEditorText(selected.PatternText ?? selected.Pattern),
-                            PlatformLabel = selected.PlatformLabel,
-                            PlatformTagsText = selected.PlatformTagsText,
-                            SteamAppIdGroup = selected.SteamAppIdGroup,
-                            TitleGroup = selected.TitleGroup,
-                            TimestampGroup = selected.TimestampGroup,
-                            TimestampFormat = selected.TimestampFormat,
-                            PreserveFileTimes = selected.PreserveFileTimes,
-                            RoutesToManualWhenMissingSteamAppId = selected.RoutesToManualWhenMissingSteamAppId,
-                            ConfidenceLabel = "CustomOverride",
-                            IsBuiltIn = false
-                        };
-                        customRules.Insert(0, existingOverride);
-                    }
-                    else
-                    {
-                        existingOverride.Enabled = false;
-                        existingOverride.ConfidenceLabel = "CustomOverride";
-                    }
-                    dirty = true;
-                    refreshUi();
-                    focusCustomRule(existingOverride, 3);
-                    status.Text = "Built-in rule disabled through a custom override";
-                };
-
-                reloadButton.Click += delegate
+                void ReloadState()
                 {
                     if (dirty)
                     {
                         var choice = MessageBox.Show("Discard unsaved filename-rule edits and reload from disk?", "Reload Filename Rules", MessageBoxButton.OKCancel, MessageBoxImage.Question);
                         if (choice != MessageBoxResult.OK) return;
                     }
+
                     filenameParserService.InvalidateRules(libraryRoot);
-                    loadState();
+                    ApplyLoadedState(filenameRulesService.LoadState(libraryRoot));
                     dirty = false;
-                    refreshUi();
+                    LoadRuleIntoEditor(null, false);
+                    if (samples.Count > 0) sampleGrid.SelectedItem = samples[0];
+                    RefreshLists(true);
                     status.Text = "Filename rules reloaded";
                     Log("Reloaded filename rules and recent samples from the index database.");
-                };
+                }
 
+                foreach (var textBox in new[] { nameBox, priorityBox, patternBox, tagsBox, conventionIdBox, appIdGroupBox, titleGroupBox, timestampGroupBox, timestampFormatBox })
+                {
+                    textBox.TextChanged += delegate { PushEditorToRule(); };
+                }
+                platformCombo.SelectionChanged += delegate { PushEditorToRule(); };
+                missingAppIdCombo.SelectionChanged += delegate { PushEditorToRule(); };
+                enabledBox.Checked += delegate { PushEditorToRule(); };
+                enabledBox.Unchecked += delegate { PushEditorToRule(); };
+                preserveFileTimesBox.Checked += delegate { PushEditorToRule(); };
+                preserveFileTimesBox.Unchecked += delegate { PushEditorToRule(); };
+
+                newRuleButton.Click += delegate
+                {
+                    var rule = filenameRulesService.CreateNewRule();
+                    customRules.Insert(0, rule);
+                    dirty = true;
+                    RefreshLists(true);
+                    SelectCustomRule(rule, false);
+                    status.Text = "New rule draft created";
+                };
+                createRuleFromSampleButton.Click += delegate { CreateRuleFromSample(sampleGrid.SelectedItem as FilenameConventionSample); };
                 promoteFrequentButton.Click += delegate
                 {
-                    var selectedSample = sampleGrid.SelectedItem as FilenameConventionSample;
-                    var frequentSamples = samples
-                        .Where(sample => sample != null && sample.OccurrenceCount >= 2)
-                        .OrderByDescending(sample => sample.OccurrenceCount)
-                        .ThenByDescending(sample => sample.LastSeenUtcTicks)
-                        .Take(5)
-                        .ToList();
-                    if (selectedSample != null && !frequentSamples.Any(sample => sample.SampleId == selectedSample.SampleId))
+                    var chosen = ShowPromoteChooser();
+                    if (chosen.Length == 0)
                     {
-                        frequentSamples.Insert(0, selectedSample);
-                    }
-                    if (frequentSamples.Count == 0)
-                    {
-                        MessageBox.Show("There are no repeated unmatched samples yet. Select a sample and use Rule From Sample instead.", "PixelVault");
+                        if (!samples.Any(sample => sample != null && sample.OccurrenceCount >= 2)) MessageBox.Show("There are no repeated unmatched samples yet. Select a sample and use Create Rule From Sample instead.", "PixelVault");
                         return;
                     }
-                    promoteSamples(frequentSamples, "Promoted frequent unmatched samples into starter rules");
+                    foreach (var sample in chosen) CreateRuleFromSample(sample);
+                    status.Text = "Created " + chosen.Length + " starter rule(s) from repeated samples";
                 };
+                disableBuiltInButton.Click += delegate
+                {
+                    var builtInRule = builtInGrid.SelectedItem as FilenameConventionRule;
+                    if (builtInRule == null)
+                    {
+                        MessageBox.Show("Select a built-in rule first.", "PixelVault");
+                        return;
+                    }
 
-                customGrid.SelectionChanged += delegate { refreshUi(); };
-                builtInGrid.SelectionChanged += delegate { refreshUi(); };
-                sampleGrid.SelectionChanged += delegate { refreshUi(); };
+                    var overrideRule = filenameRulesService.EnsureDisabledOverride(builtInRule, customRules);
+
+                    dirty = true;
+                    RefreshLists(true);
+                    SelectCustomRule(overrideRule, false);
+                    MessageBox.Show("This does not delete the built-in rule. PixelVault saved a custom override for this library and marked it disabled. Save the rules to make that override active.", "PixelVault");
+                };
+                reloadButton.Click += delegate { ReloadState(); };
+                saveTopButton.Click += delegate { SaveRules(); };
+                closeTopButton.Click += delegate { editorWindow.Close(); };
+                sampleGrid.SelectionChanged += delegate
+                {
+                    UpdateSampleSummary();
+                    UpdateActionState();
+                };
                 sampleGrid.MouseDoubleClick += delegate
                 {
-                    var selectedSample = sampleGrid.SelectedItem as FilenameConventionSample;
-                    if (selectedSample != null) promoteSamples(new[] { selectedSample }, "Created a starter rule from the selected sample");
+                    var sample = sampleGrid.SelectedItem as FilenameConventionSample;
+                    if (sample != null) CreateRuleFromSample(sample);
                 };
-                customGrid.CellEditEnding += delegate { dirty = true; };
-                saveTopButton.Click += delegate { saveRules(); };
-                saveButton.Click += delegate { saveRules(); };
-
-                closeButton.Click += delegate
+                customGrid.SelectionChanged += delegate
                 {
-                    if (dirty)
+                    var selected = customGrid.SelectedItem as FilenameConventionRule;
+                    if (selected != null && !ReferenceEquals(editingRule, selected))
                     {
-                        var choice = MessageBox.Show("You have unsaved filename-rule changes." + Environment.NewLine + Environment.NewLine + "Close without saving?", "Close Filename Rules", MessageBoxButton.OKCancel, MessageBoxImage.Warning);
-                        if (choice != MessageBoxResult.OK) return;
+                        if (builtInGrid.SelectedItem != null) builtInGrid.SelectedItem = null;
+                        LoadRuleIntoEditor(selected, false);
                     }
-                    editorWindow.Close();
+                    RefreshLists(false);
+                };
+                customGrid.MouseDoubleClick += delegate
+                {
+                    var selected = customGrid.SelectedItem as FilenameConventionRule;
+                    if (selected != null) SelectCustomRule(selected, true);
+                };
+                builtInGrid.SelectionChanged += delegate
+                {
+                    var selected = builtInGrid.SelectedItem as FilenameConventionRule;
+                    if (selected != null && (!ReferenceEquals(editingRule, selected) || !editingBuiltIn))
+                    {
+                        if (customGrid.SelectedItem != null) customGrid.SelectedItem = null;
+                        LoadRuleIntoEditor(selected, true);
+                    }
+                    RefreshLists(false);
+                };
+
+                editorWindow.Closing += delegate(object sender, System.ComponentModel.CancelEventArgs args)
+                {
+                    if (!dirty) return;
+                    var choice = MessageBox.Show("You have unsaved filename-rule changes." + Environment.NewLine + Environment.NewLine + "Close without saving?", "Close Filename Rules", MessageBoxButton.OKCancel, MessageBoxImage.Warning);
+                    if (choice != MessageBoxResult.OK) args.Cancel = true;
                 };
 
                 editorWindow.Closed += delegate
@@ -890,8 +1160,10 @@ namespace PixelVaultNative
                     status.Text = "Ready";
                 };
 
-                loadState();
-                refreshUi();
+                LoadState();
+                LoadRuleIntoEditor(null, false);
+                if (samples.Count > 0) sampleGrid.SelectedItem = samples[0];
+                RefreshLists(true);
                 status.Text = "Filename rules ready";
                 Log("Opened filename rule editor.");
                 editorWindow.Show();

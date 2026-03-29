@@ -32,6 +32,7 @@
     <Compile Include="Models\IndexModels.cs" />
     <Compile Include="Services\Covers\CoverService.cs" />
     <Compile Include="Services\FilenameParsing\FilenameParserService.cs" />
+    <Compile Include="Services\FilenameRules\FilenameRulesService.cs" />
     <Compile Include="Services\Indexing\IndexPersistenceService.cs" />
     <Compile Include="Services\Metadata\MetadataService.cs" />
     <Compile Include="Storage\IndexDatabaseStorage.cs" />

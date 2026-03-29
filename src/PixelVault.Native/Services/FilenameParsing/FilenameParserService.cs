@@ -382,7 +382,7 @@ namespace PixelVaultNative
 
             DateTime parsed;
             return DateTime.TryParseExact(rawValue, format, CultureInfo.InvariantCulture, DateTimeStyles.None, out parsed)
-                ? parsed
+                ? DateTime.SpecifyKind(parsed, DateTimeKind.Local)
                 : (DateTime?)null;
         }
 
@@ -392,23 +392,23 @@ namespace PixelVaultNative
             var fullStamp = Regex.Match(fileName ?? string.Empty, @"(?:^|_)(?<stamp>\d{14})(?:[_-]|(?=\.[^.]+$))", RegexOptions.IgnoreCase);
             if (fullStamp.Success && DateTime.TryParseExact(fullStamp.Groups["stamp"].Value, "yyyyMMddHHmmss", CultureInfo.InvariantCulture, DateTimeStyles.None, out parsed))
             {
-                return parsed;
+                return DateTime.SpecifyKind(parsed, DateTimeKind.Local);
             }
 
             var dateOnly = Regex.Match(fileName ?? string.Empty, @"_(?<stamp>\d{4}-\d{2}-\d{2})(?:_|(?=\.[^.]+$))", RegexOptions.IgnoreCase);
             if (dateOnly.Success && DateTime.TryParseExact(dateOnly.Groups["stamp"].Value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out parsed))
             {
-                return parsed;
+                return DateTime.SpecifyKind(parsed, DateTimeKind.Local);
             }
 
             var xboxStamp = Regex.Match(fileName ?? string.Empty, @"[-–—](?<stamp>\d{4}_\d{2}_\d{2}[-_]\d{2}[-_]\d{2}[-_]\d{2})(?=\.[^.]+$)", RegexOptions.IgnoreCase);
             if (xboxStamp.Success && DateTime.TryParseExact(xboxStamp.Groups["stamp"].Value, "yyyy_MM_dd-HH_mm_ss", CultureInfo.InvariantCulture, DateTimeStyles.None, out parsed))
             {
-                return parsed;
+                return DateTime.SpecifyKind(parsed, DateTimeKind.Local);
             }
             if (xboxStamp.Success && DateTime.TryParseExact(xboxStamp.Groups["stamp"].Value, "yyyy_MM_dd_HH_mm_ss", CultureInfo.InvariantCulture, DateTimeStyles.None, out parsed))
             {
-                return parsed;
+                return DateTime.SpecifyKind(parsed, DateTimeKind.Local);
             }
 
             var steamClipUnix = Regex.Match(fileName ?? string.Empty, @"^clip_(?<stamp>[\d,]{13,17})(?=\.[^.]+$)", RegexOptions.IgnoreCase);
