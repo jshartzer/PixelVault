@@ -184,12 +184,23 @@ namespace PixelVaultNative
                 .Where(File.Exists)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
+            var filesMissingIndexEntries = allFiles
+                .Where(file =>
+                {
+                    LibraryMetadataIndexEntry entry;
+                    return !index.TryGetValue(file, out entry) || entry == null;
+                })
+                .ToList();
+            var missingEntryTags = filesMissingIndexEntries.Count == 0
+                ? new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
+                : ReadEmbeddedKeywordTagsBatch(filesMissingIndexEntries);
             foreach (var file in allFiles)
             {
                 LibraryMetadataIndexEntry entry;
                 if (!index.TryGetValue(file, out entry) || entry == null)
                 {
-                    var tags = ReadEmbeddedKeywordTagsDirect(file);
+                    string[] tags;
+                    if (!missingEntryTags.TryGetValue(file, out tags)) tags = new string[0];
                     var platformLabel = DetermineConsoleLabelFromTags(tags);
                     var gameId = ResolveGameIdForIndexedFile(root, file, platformLabel, tags, index, gameRows);
                     index[file] = new LibraryMetadataIndexEntry

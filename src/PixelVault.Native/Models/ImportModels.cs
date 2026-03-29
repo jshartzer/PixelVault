@@ -66,6 +66,7 @@ namespace PixelVaultNative
     {
         public int Renamed;
         public int Skipped;
+        public Dictionary<string, string> PathChanges = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
     }
 
     sealed class DeleteStepResult

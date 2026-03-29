@@ -142,6 +142,55 @@ namespace PixelVaultNative
             }
         }
 
+        void ApplyRenamePathChanges(RenameStepResult renameResult, SourceInventory inventory, List<ReviewItem> reviewItems, List<ManualMetadataItem> manualItems, HashSet<string> manualPaths)
+        {
+            var pathChanges = renameResult == null ? null : renameResult.PathChanges;
+            if (pathChanges == null || pathChanges.Count == 0) return;
+
+            Func<string, string> resolvePath = delegate(string path)
+            {
+                string updatedPath;
+                return !string.IsNullOrWhiteSpace(path) && pathChanges.TryGetValue(path, out updatedPath) ? updatedPath : path;
+            };
+
+            if (inventory != null)
+            {
+                inventory.TopLevelMediaFiles = (inventory.TopLevelMediaFiles ?? new List<string>())
+                    .Select(resolvePath)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                inventory.RenameScopeFiles = (inventory.RenameScopeFiles ?? new List<string>())
+                    .Select(resolvePath)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+            }
+
+            foreach (var item in reviewItems ?? new List<ReviewItem>())
+            {
+                if (item == null) continue;
+                var updatedPath = resolvePath(item.FilePath);
+                if (string.Equals(updatedPath, item.FilePath, StringComparison.OrdinalIgnoreCase)) continue;
+                item.FilePath = updatedPath;
+                item.FileName = Path.GetFileName(updatedPath);
+            }
+
+            foreach (var item in manualItems ?? new List<ManualMetadataItem>())
+            {
+                if (item == null) continue;
+                var updatedPath = resolvePath(item.FilePath);
+                if (string.Equals(updatedPath, item.FilePath, StringComparison.OrdinalIgnoreCase)) continue;
+                item.FilePath = updatedPath;
+                item.FileName = Path.GetFileName(updatedPath);
+            }
+
+            if (manualPaths != null && manualPaths.Count > 0)
+            {
+                var updatedManualPaths = manualPaths.Select(resolvePath).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+                manualPaths.Clear();
+                foreach (var path in updatedManualPaths) manualPaths.Add(path);
+            }
+        }
+
         void RunBackgroundWorkflowWithProgress<TResult>(string windowTitle, string progressTitleText, string initialMetaText, string startStatusText, string canceledStatusText, string startLogLine, string failureStatusText, int totalWork, Func<Action<int, string>, CancellationToken, TResult> backgroundWork, Action<TResult> onSuccess, Action onCanceled = null)
         {
             var progressWindow = new Window
@@ -322,6 +371,7 @@ namespace PixelVaultNative
                     {
                         reportProgress(renameOffset + current, detail);
                     }, cancellationToken);
+                    ApplyRenamePathChanges(renameResult, inventory, reviewItems, manualItems, manualPaths);
                     ThrowIfWorkflowCancellationRequested(cancellationToken, "Import workflow");
                     var deleteResult = RunDelete(reviewItems, delegate(int current, int total, string detail)
                     {
@@ -462,6 +512,7 @@ namespace PixelVaultNative
         {
             int renamed = 0, skipped = 0;
             var recordedSteamAppIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var pathChanges = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             var files = (sourceFiles ?? Enumerable.Empty<string>()).Where(File.Exists).ToList();
             var total = files.Count;
             if (progress != null) progress(0, total, "Starting rename step for " + total + " file(s).");
@@ -490,13 +541,14 @@ namespace PixelVaultNative
                 var target = Unique(Path.Combine(Path.GetDirectoryName(file), newBase + Path.GetExtension(file)));
                 File.Move(file, target);
                 MoveMetadataSidecarIfPresent(file, target);
+                pathChanges[file] = target;
                 renamed++;
                 Log("Renamed: " + Path.GetFileName(file) + " -> " + Path.GetFileName(target));
                 if (progress != null) progress(i + 1, total, "Renamed " + (i + 1) + " of " + total + " | " + remaining + " remaining | " + Path.GetFileName(target));
             }
             if (progress != null) progress(total, total, "Rename step complete: renamed " + renamed + ", skipped " + skipped + ".");
             Log("Rename summary: renamed " + renamed + ", skipped " + skipped + ".");
-            return new RenameStepResult { Renamed = renamed, Skipped = skipped };
+            return new RenameStepResult { Renamed = renamed, Skipped = skipped, PathChanges = pathChanges };
         }
 
         RenameStepResult RunManualRename(List<ManualMetadataItem> items, Action<int, int, string> progress = null, CancellationToken cancellationToken = default(CancellationToken))

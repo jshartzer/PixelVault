@@ -26,12 +26,7 @@ namespace PixelVaultNative
 
         bool ShouldIncludeGameCaptureKeywords()
         {
-            bool includeGameCaptureKeywords = true;
-            if (keywordsBox != null)
-            {
-                if (keywordsBox.Dispatcher.CheckAccess()) includeGameCaptureKeywords = keywordsBox.IsChecked == true;
-                else includeGameCaptureKeywords = (bool)keywordsBox.Dispatcher.Invoke(new Func<bool>(delegate { return keywordsBox.IsChecked == true; }));
-            }
+            if (keywordsBox != null && keywordsBox.Dispatcher.CheckAccess()) includeGameCaptureKeywords = keywordsBox.IsChecked == true;
             return includeGameCaptureKeywords;
         }
 
