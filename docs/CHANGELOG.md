@@ -1,3 +1,8 @@
+## 0.810
+- Fixed Steam intake so renamed screenshots keep their Steam classification during preview/import instead of dropping into `Other`.
+- Carried renamed file paths through the rest of the import workflow so Steam captures no longer get stuck on stale pre-rename paths.
+- Moved the Library splitter default to the right and lowered the four-cover breakpoint so the browser opens showing at least four covers per row.
+
 ## 0.804
 - Pushed the Library screen closer to the Figma reference with pill-style left-side controls, a more intentional selected-game hero card, and calmer right-side action buttons.
 - Added a framed cover treatment and stronger section hierarchy on the detail side so the Library reads more like a designed screen and less like a maintenance form.

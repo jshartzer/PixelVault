@@ -97,6 +97,46 @@ public sealed class FilenameParserServiceTests
     }
 
     [Fact]
+    public void Parse_RenamedSteamScreenshot_UsesKnownSteamGameIndexRow()
+    {
+        var parser = CreateParser();
+
+        var parsed = parser.Parse("Retro Rewind - Video Store Simulator_20260328191702_1.png", "library-root");
+
+        Assert.Equal("Steam", parsed.PlatformLabel);
+        Assert.Contains("Steam", parsed.PlatformTags);
+        Assert.Equal(string.Empty, parsed.SteamAppId);
+        Assert.Equal("steam_renamed_title_timestamp", parsed.ConventionId);
+        Assert.Equal("Heuristic", parsed.ConfidenceLabel);
+        Assert.Equal(new DateTime(2026, 3, 28, 19, 17, 02), parsed.CaptureTime);
+        Assert.Equal(DateTimeKind.Local, parsed.CaptureTime!.Value.Kind);
+    }
+
+    [Fact]
+    public void Parse_RenamedSteamScreenshot_WithKnownGameIndexRow_FillsSteamAppId()
+    {
+        var parser = CreateParser(
+            loadSavedGameIndexRows: _ => new List<GameIndexEditorRow>
+            {
+                new()
+                {
+                    GameId = "G00001",
+                    Name = "Retro Rewind - Video Store Simulator",
+                    PlatformLabel = "Steam",
+                    SteamAppId = "2561580"
+                }
+            });
+
+        var parsed = parser.Parse("Retro Rewind - Video Store Simulator_20260328191702_1.png", "library-root");
+
+        Assert.Equal("Steam", parsed.PlatformLabel);
+        Assert.Contains("Steam", parsed.PlatformTags);
+        Assert.Equal("2561580", parsed.SteamAppId);
+        Assert.Equal("steam_renamed_title_timestamp", parsed.ConventionId);
+        Assert.Equal("Heuristic", parsed.ConfidenceLabel);
+    }
+
+    [Fact]
     public void GetConventionRules_BuiltInsExposeReadablePatternText()
     {
         var parser = CreateParser();
@@ -106,11 +146,15 @@ public sealed class FilenameParserServiceTests
         Assert.Equal("[appid]_[yyyy][MM][dd][HH][mm][ss][opt-counter].[ext:media]", steamRule.PatternText);
     }
 
-    static FilenameParserService CreateParser(Func<string, List<FilenameConventionRule>>? loadCustomConventions = null)
+    static FilenameParserService CreateParser(
+        Func<string, List<FilenameConventionRule>>? loadCustomConventions = null,
+        Func<string, List<GameIndexEditorRow>>? loadSavedGameIndexRows = null)
     {
         return new FilenameParserService(new FilenameParserServiceDependencies
         {
             LoadCustomConventions = loadCustomConventions ?? (_ => new List<FilenameConventionRule>()),
+            LoadSavedGameIndexRows = loadSavedGameIndexRows ?? (_ => new List<GameIndexEditorRow>()),
+            NormalizeGameIndexName = value => Regex.Replace((value ?? string.Empty).Trim(), "\\s+", " "),
             ParseTagText = value => (value ?? string.Empty)
                 .Split(new[] { ',', ';', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
                 .Select(tag => Regex.Replace(tag, "\\s+", " ").Trim())

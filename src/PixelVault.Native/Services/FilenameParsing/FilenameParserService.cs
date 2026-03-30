@@ -19,6 +19,8 @@ namespace PixelVaultNative
     sealed class FilenameParserServiceDependencies
     {
         public Func<string, List<FilenameConventionRule>> LoadCustomConventions;
+        public Func<string, List<GameIndexEditorRow>> LoadSavedGameIndexRows;
+        public Func<string, string> NormalizeGameIndexName;
         public Func<string, IEnumerable<string>> ParseTagText;
         public Func<string, bool> IsVideo;
         public Func<string, string> NormalizeConsoleLabel;
@@ -70,6 +72,8 @@ namespace PixelVaultNative
             {
                 result.GameTitleHint = GetGameTitleHint(baseName, root);
             }
+
+            ApplyKnownSteamRenameFallback(result, fileName, root);
 
             if (string.IsNullOrWhiteSpace(result.PlatformLabel) || string.Equals(result.PlatformLabel, "Other", StringComparison.OrdinalIgnoreCase))
             {
@@ -247,6 +251,21 @@ namespace PixelVaultNative
                 },
                 new FilenameConventionRule
                 {
+                    ConventionId = "steam_renamed_title_timestamp",
+                    Name = "Steam Screenshot (Renamed Title + Timestamp)",
+                    Priority = 895,
+                    Pattern = "[title]_[yyyy][MM][dd][HH][mm][ss]_[counter].[ext:media]",
+                    PatternText = "[title]_[yyyy][MM][dd][HH][mm][ss]_[counter].[ext:media]",
+                    PlatformLabel = "Steam",
+                    PlatformTagsText = "Steam",
+                    TitleGroup = "title",
+                    TimestampGroup = "stamp",
+                    TimestampFormat = "yyyyMMddHHmmss",
+                    ConfidenceLabel = "Heuristic",
+                    IsBuiltIn = true
+                },
+                new FilenameConventionRule
+                {
                     ConventionId = "steam_clip_unix",
                     Name = "Steam Clip",
                     Priority = 890,
@@ -346,6 +365,80 @@ namespace PixelVaultNative
                 }
             }
             return string.IsNullOrWhiteSpace(normalizedExplicit) ? "Other" : normalizedExplicit;
+        }
+
+        void ApplyKnownSteamRenameFallback(FilenameParseResult result, string fileName, string root)
+        {
+            if (result == null) return;
+            if (string.IsNullOrWhiteSpace(root) || !result.CaptureTime.HasValue) return;
+            if (!LooksLikeRenamedSteamScreenshot(fileName)) return;
+
+            var resolvedPlatform = ResolvePrimaryPlatformLabel(result.PlatformLabel, result.PlatformTags);
+            var needsPlatformResolution = string.Equals(resolvedPlatform, "Other", StringComparison.OrdinalIgnoreCase);
+            var needsAppIdResolution = string.Equals(resolvedPlatform, "Steam", StringComparison.OrdinalIgnoreCase) && string.IsNullOrWhiteSpace(result.SteamAppId);
+            if (!needsPlatformResolution && !needsAppIdResolution) return;
+
+            var normalizedTitle = NormalizeGameIndexName(result.GameTitleHint);
+            if (string.IsNullOrWhiteSpace(normalizedTitle)) return;
+
+            var savedRows = LoadSavedGameIndexRows(root);
+            var matchingRows = savedRows
+                .Where(row => row != null && string.Equals(NormalizeGameIndexName(row.Name), normalizedTitle, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            if (matchingRows.Count == 0) return;
+
+            var steamRow = matchingRows.FirstOrDefault(IsKnownSteamRow);
+            if (steamRow == null) return;
+            if (matchingRows.Any(row => row != null && !IsKnownSteamRow(row) && !string.Equals(NormalizeConsoleLabel(row.PlatformLabel), "Other", StringComparison.OrdinalIgnoreCase))) return;
+
+            if (needsPlatformResolution)
+            {
+                result.MatchedConvention = true;
+                result.ConventionId = "steam_known_title_timestamp";
+                result.ConventionName = "Steam Screenshot (Known Title + Timestamp)";
+                result.ConfidenceLabel = "KnownGameIndex";
+                result.PlatformLabel = "Steam";
+                result.PlatformTags = MergePlatformTags(result.PlatformTags, "Steam");
+            }
+
+            if (needsAppIdResolution && string.IsNullOrWhiteSpace(result.SteamAppId))
+            {
+                result.SteamAppId = steamRow.SteamAppId ?? string.Empty;
+            }
+        }
+
+        List<GameIndexEditorRow> LoadSavedGameIndexRows(string root)
+        {
+            if (dependencies.LoadSavedGameIndexRows == null) return new List<GameIndexEditorRow>();
+            return dependencies.LoadSavedGameIndexRows(root ?? string.Empty) ?? new List<GameIndexEditorRow>();
+        }
+
+        string NormalizeGameIndexName(string value)
+        {
+            if (dependencies.NormalizeGameIndexName != null) return dependencies.NormalizeGameIndexName(value ?? string.Empty);
+            return Regex.Replace((value ?? string.Empty).Trim(), "\\s+", " ");
+        }
+
+        bool IsKnownSteamRow(GameIndexEditorRow row)
+        {
+            if (row == null) return false;
+            return string.Equals(NormalizeConsoleLabel(row.PlatformLabel), "Steam", StringComparison.OrdinalIgnoreCase)
+                || !string.IsNullOrWhiteSpace(row.SteamAppId);
+        }
+
+        static bool LooksLikeRenamedSteamScreenshot(string fileName)
+        {
+            var baseName = Path.GetFileNameWithoutExtension(fileName ?? string.Empty);
+            return Regex.IsMatch(baseName, "^.+?_\\d{14}(?:[_-]\\d+)?$", RegexOptions.CultureInvariant);
+        }
+
+        static string[] MergePlatformTags(IEnumerable<string> tags, params string[] additionalTags)
+        {
+            return (tags ?? Enumerable.Empty<string>())
+                .Concat(additionalTags ?? Array.Empty<string>())
+                .Where(tag => !string.IsNullOrWhiteSpace(tag))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
         }
 
         string NormalizeConsoleLabel(string value)

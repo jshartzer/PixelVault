@@ -44,11 +44,11 @@ This handoff is the short current-state summary.
 
 Current live build:
 
-- `0.809`
+- `0.810`
 
 Current executable:
 
-- `C:\Codex\dist\PixelVault-0.809\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.810\PixelVault.exe`
 
 Current build pointer:
 
@@ -184,14 +184,14 @@ This was a data-only maintenance pass, not a new app build.
 
 ## Current Stop Point
 
-The current live build is `0.809`.
+The current live build is `0.810`.
 
 Latest shipped work:
 
-1. the Library split now starts closer to the middle, making the first-open proportions feel more balanced.
-2. folder covers and right-side screenshots now use wider min/max size ranges so they can shrink and grow more naturally.
-3. pane resizing now uses stepped responsive size buckets with short coalesced refresh timers, which reduces drag lag while keeping the layout live.
-4. release docs now point at the live `0.809` build.
+1. Steam imports now keep their Steam classification after rename, including the app's renamed `title_timestamp_counter` filename shape, so they no longer fall into `Other` on first import.
+2. the import workflow now carries renamed paths forward through the rest of intake, preventing renamed Steam captures from getting stuck in the queue on stale pre-rename paths.
+3. the Library browser now opens with a wider default split and a four-cover default row layout on the left pane.
+4. the live build docs and shortcut now point at `0.810`.
 
 The most likely next product step is:
 

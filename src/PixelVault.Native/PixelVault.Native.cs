@@ -39,7 +39,7 @@ namespace PixelVaultNative
 
     public sealed partial class MainWindow : Window
     {
-        const string AppVersion = "0.794";
+        const string AppVersion = "0.810";
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
         const string ClearedExternalIdSentinel = "__PV_CLEARED__";
@@ -141,6 +141,8 @@ namespace PixelVaultNative
             filenameParserService = new FilenameParserService(new FilenameParserServiceDependencies
             {
                 LoadCustomConventions = delegate(string root) { return indexPersistenceService.LoadFilenameConventions(root); },
+                LoadSavedGameIndexRows = delegate(string root) { return indexPersistenceService.LoadSavedGameIndexRows(root); },
+                NormalizeGameIndexName = delegate(string value) { return NormalizeGameIndexName(value); },
                 ParseTagText = delegate(string value) { return ParseTagText(value); },
                 IsVideo = delegate(string file) { return IsVideo(file); },
                 NormalizeConsoleLabel = delegate(string value) { return NormalizeConsoleLabel(value); }
@@ -767,7 +769,7 @@ namespace PixelVaultNative
             var viewportWidth = scrollViewer == null ? 0 : scrollViewer.ViewportWidth;
             if (viewportWidth <= 0 && scrollViewer != null) viewportWidth = scrollViewer.ActualWidth;
             viewportWidth = Math.Max(280, viewportWidth - 18);
-            var columns = viewportWidth >= 1080 ? 4 : (viewportWidth >= 720 ? 3 : (viewportWidth >= 460 ? 2 : 1));
+            var columns = viewportWidth >= 800 ? 4 : (viewportWidth >= 600 ? 3 : (viewportWidth >= 400 ? 2 : 1));
             var tileWidth = (int)Math.Floor((viewportWidth - ((columns - 1) * 14)) / columns);
             tileWidth = Math.Max(140, Math.Min(360, tileWidth));
             tileWidth = Math.Max(140, Math.Min(360, (int)(Math.Round(tileWidth / 16d) * 16)));
@@ -3792,9 +3794,9 @@ namespace PixelVaultNative
                 root.Children.Add(navBar);
 
                 var contentGrid = new Grid();
-                contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(42, GridUnitType.Star) });
+                contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(55, GridUnitType.Star) });
                 contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(58, GridUnitType.Star) });
+                contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(45, GridUnitType.Star) });
                 Grid.SetRow(contentGrid, 1);
                 root.Children.Add(contentGrid);
 
