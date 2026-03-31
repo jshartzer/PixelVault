@@ -1,3 +1,23 @@
+## 0.815
+- Cut the biggest Library responsiveness bottlenecks by caching parser and saved-game-index lookups, moving detail-date grouping off the UI thread, gating startup rebuilds, and debouncing folder search against a committed term.
+- Reduced background churn in the Library by stopping off-screen tile work, batching missing metadata tag reads during folder and index rebuilds, and avoiding full-folder rescans when backfilling cached sort keys.
+- Added in-flight cancellation to manual Steam metadata search so lookups can be stopped directly from the editor instead of waiting for the current provider request to finish.
+
+## 0.814
+- Stopped the Library from auto-selecting and rendering the first folder during startup cache prefill, so the left folder grid can paint immediately instead of stalling behind an expensive first-detail render on the network library.
+
+## 0.813
+- Kept the Library window on the fast window-first startup path while moving the cached folder snapshot load to its own async prefill step, so startup no longer regresses into a pre-window block.
+- Left the full library refresh async behind that snapshot prefill, which keeps the EXE responsive while older cached folders appear first and fresh data swaps in afterward.
+
+## 0.812
+- Prefilled the Library from the last saved folder-cache snapshot on startup so the current EXE shows existing folders immediately instead of an empty pane while the background refresh runs.
+- Removed eager `File.Exists` checks from cached folder-path parsing so startup cache loads stay fast on the network library.
+
+## 0.811
+- Stopped the main Library window from blocking on the full folder-cache load before first paint, so the published EXE opens immediately again instead of appearing hung on startup.
+- Moved the initial library-folder refresh onto the existing async path and reused that same path for post-edit and post-scan library reloads.
+
 ## 0.810
 - Fixed Steam intake so renamed screenshots keep their Steam classification during preview/import instead of dropping into `Other`.
 - Carried renamed file paths through the rest of the import workflow so Steam captures no longer get stuck on stale pre-rename paths.

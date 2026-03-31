@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace PixelVaultNative
@@ -81,7 +82,7 @@ namespace PixelVaultNative
             return entry;
         }
 
-        int ScanLibraryMetadataIndex(string root, string folderPath, bool forceRescan, Action<int, int, string> progress, Func<bool> isCancellationRequested)
+        int ScanLibraryMetadataIndex(string root, string folderPath, bool forceRescan, Action<int, int, string> progress, CancellationToken cancellationToken = default(CancellationToken))
         {
             EnsureDir(root, "Library folder");
             EnsureExifTool();
@@ -108,7 +109,7 @@ namespace PixelVaultNative
             {
                 foreach (var stale in index.Keys.Where(key => !targetSet.Contains(key) || !File.Exists(key)).ToList())
                 {
-                    if (isCancellationRequested != null && isCancellationRequested()) throw new OperationCanceledException("Library scan cancelled.");
+                    cancellationToken.ThrowIfCancellationRequested();
                     index.Remove(stale);
                     removed++;
                 }
@@ -122,7 +123,7 @@ namespace PixelVaultNative
                         && (!targetSet.Contains(key) || !File.Exists(key));
                 }).ToList())
                 {
-                    if (isCancellationRequested != null && isCancellationRequested()) throw new OperationCanceledException("Library scan cancelled.");
+                    cancellationToken.ThrowIfCancellationRequested();
                     index.Remove(stale);
                     removed++;
                 }
@@ -133,7 +134,7 @@ namespace PixelVaultNative
             var pendingStamps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             foreach (var file in fileList)
             {
-                if (isCancellationRequested != null && isCancellationRequested()) throw new OperationCanceledException("Library scan cancelled.");
+                cancellationToken.ThrowIfCancellationRequested();
                 var stamp = BuildLibraryMetadataStamp(file);
                 LibraryMetadataIndexEntry existing;
                 if (!forceRescan && index.TryGetValue(file, out existing) && string.Equals(existing.Stamp, stamp, StringComparison.Ordinal))
@@ -167,11 +168,11 @@ namespace PixelVaultNative
             }
             try
             {
-                Parallel.ForEach(batches, new ParallelOptions { MaxDegreeOfParallelism = scanWorkerCount }, delegate(Tuple<int, string[]> batch)
+                Parallel.ForEach(batches, new ParallelOptions { MaxDegreeOfParallelism = scanWorkerCount, CancellationToken = cancellationToken }, delegate(Tuple<int, string[]> batch)
                 {
-                    if (isCancellationRequested != null && isCancellationRequested()) throw new OperationCanceledException("Library scan cancelled.");
+                    cancellationToken.ThrowIfCancellationRequested();
                     if (progress != null) progress(unchanged, fileList.Count, "Reading embedded tags in batch " + batch.Item1 + " of " + batchCount + " (" + batch.Item2.Length + " file(s)).");
-                    var batchTags = ReadEmbeddedKeywordTagsBatch(batch.Item2);
+                    var batchTags = ReadEmbeddedKeywordTagsBatch(batch.Item2, cancellationToken);
                     foreach (var file in batch.Item2)
                     {
                         string[] tags;
@@ -190,7 +191,7 @@ namespace PixelVaultNative
             int processed = 0;
             foreach (var file in pendingFiles)
             {
-                if (isCancellationRequested != null && isCancellationRequested()) throw new OperationCanceledException("Library scan cancelled.");
+                cancellationToken.ThrowIfCancellationRequested();
                 string[] tags;
                 if (!batchTagsByFile.TryGetValue(file, out tags)) tags = new string[0];
                 var platformLabel = DetermineConsoleLabelFromTags(tags);
@@ -220,6 +221,47 @@ namespace PixelVaultNative
             return updated;
         }
 
+        Dictionary<string, string[]> ReadEmbeddedKeywordTagsForFiles(IEnumerable<string> files, CancellationToken cancellationToken = default(CancellationToken))
+        {
+            var result = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
+            var sourceFiles = (files ?? Enumerable.Empty<string>())
+                .Where(file => !string.IsNullOrWhiteSpace(file) && File.Exists(file))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (sourceFiles.Count == 0) return result;
+
+            var stampsByFile = sourceFiles.ToDictionary(file => file, MetadataCacheStamp, StringComparer.OrdinalIgnoreCase);
+            var pendingFiles = new List<string>();
+            foreach (var file in sourceFiles)
+            {
+                string[] cachedTags;
+                long cachedStamp;
+                if (fileTagCache.TryGetValue(file, out cachedTags)
+                    && fileTagCacheStamp.TryGetValue(file, out cachedStamp)
+                    && cachedStamp == stampsByFile[file])
+                {
+                    result[file] = cachedTags ?? new string[0];
+                }
+                else
+                {
+                    pendingFiles.Add(file);
+                }
+            }
+
+            if (pendingFiles.Count == 0) return result;
+
+            var batchTags = ReadEmbeddedKeywordTagsBatch(pendingFiles, cancellationToken);
+            foreach (var file in pendingFiles)
+            {
+                string[] tags;
+                if (!batchTags.TryGetValue(file, out tags)) tags = new string[0];
+                result[file] = tags;
+                fileTagCache[file] = tags;
+                fileTagCacheStamp[file] = stampsByFile[file];
+            }
+            return result;
+        }
+
         void UpsertLibraryMetadataIndexEntries(IEnumerable<string> files, string root)
         {
             if (string.IsNullOrWhiteSpace(root)) return;
@@ -227,9 +269,11 @@ namespace PixelVaultNative
             if (fileList.Count == 0) return;
             var index = LoadLibraryMetadataIndex(root, true);
             var gameRows = LoadSavedGameIndexRows(root);
+            var tagsByFile = ReadEmbeddedKeywordTagsForFiles(fileList);
             foreach (var file in fileList)
             {
-                var tags = ReadEmbeddedKeywordTagsDirect(file);
+                string[] tags;
+                if (!tagsByFile.TryGetValue(file, out tags)) tags = new string[0];
                 var platformLabel = DetermineConsoleLabelFromTags(tags);
                 var existingGameId = index.ContainsKey(file) && index[file] != null ? index[file].GameId : string.Empty;
                 index[file] = new LibraryMetadataIndexEntry
@@ -240,8 +284,6 @@ namespace PixelVaultNative
                     ConsoleLabel = platformLabel,
                     TagText = string.Join(", ", tags)
                 };
-                fileTagCache[file] = tags;
-                fileTagCacheStamp[file] = MetadataCacheStamp(file);
             }
             SaveLibraryMetadataIndex(root, index);
             RebuildLibraryFolderCache(root, index);

@@ -16,11 +16,11 @@ namespace PixelVaultNative
         string[] BuildExifArgs(string file, DateTime dt, string[] platformTags, bool preserveFileTimes, string comment, bool addPhotographyTag);
         string[] BuildExifArgs(string file, DateTime dt, string[] platformTags, IEnumerable<string> extraTags, bool preserveFileTimes, string comment, bool addPhotographyTag);
         string[] BuildExifArgs(string file, DateTime dt, string[] platformTags, IEnumerable<string> extraTags, bool preserveFileTimes, string comment, bool addPhotographyTag, bool writeDateMetadata, bool writeCommentMetadata, bool writeTagMetadata);
-        string[] ReadEmbeddedKeywordTagsDirect(string file);
-        string ReadEmbeddedCommentDirect(string file);
-        DateTime? ReadEmbeddedCaptureDateDirect(string file);
-        Dictionary<string, string[]> ReadEmbeddedKeywordTagsBatch(IEnumerable<string> files);
-        Dictionary<string, EmbeddedMetadataSnapshot> ReadEmbeddedMetadataBatch(IEnumerable<string> files);
+        string[] ReadEmbeddedKeywordTagsDirect(string file, CancellationToken cancellationToken = default(CancellationToken));
+        string ReadEmbeddedCommentDirect(string file, CancellationToken cancellationToken = default(CancellationToken));
+        DateTime? ReadEmbeddedCaptureDateDirect(string file, CancellationToken cancellationToken = default(CancellationToken));
+        Dictionary<string, string[]> ReadEmbeddedKeywordTagsBatch(IEnumerable<string> files, CancellationToken cancellationToken = default(CancellationToken));
+        Dictionary<string, EmbeddedMetadataSnapshot> ReadEmbeddedMetadataBatch(IEnumerable<string> files, CancellationToken cancellationToken = default(CancellationToken));
         void EnsureExifTool();
         void RunExifToolBatch(IReadOnlyList<ExifWriteRequest> requests);
         int RunExifWriteRequests(List<ExifWriteRequest> requests, int totalCount, int alreadyCompleted, Action<int, int, string> progress = null, CancellationToken cancellationToken = default(CancellationToken));
@@ -40,7 +40,7 @@ namespace PixelVaultNative
         public Func<int, int> GetMetadataWorkerCount;
         public Action<string> Log;
         public Action<string, string[], string, bool> RunExe;
-        public Func<string, string[], string, bool, string> RunExeCapture;
+        public Func<string, string[], string, bool, CancellationToken, string> RunExeCapture;
     }
 
     sealed class MetadataService : IMetadataService
@@ -92,9 +92,9 @@ namespace PixelVaultNative
             if (dependencies.RunExe != null) dependencies.RunExe(file, args, cwd, logOutput);
         }
 
-        string RunExeCapture(string file, string[] args, string cwd, bool logOutput)
+        string RunExeCapture(string file, string[] args, string cwd, bool logOutput, CancellationToken cancellationToken = default(CancellationToken))
         {
-            return dependencies.RunExeCapture == null ? string.Empty : dependencies.RunExeCapture(file, args, cwd, logOutput);
+            return dependencies.RunExeCapture == null ? string.Empty : dependencies.RunExeCapture(file, args, cwd, logOutput, cancellationToken);
         }
 
         string NormalizeExifToolPathKey(string path)
@@ -216,13 +216,14 @@ namespace PixelVaultNative
             return args.ToArray();
         }
 
-        public string[] ReadEmbeddedKeywordTagsDirect(string file)
+        public string[] ReadEmbeddedKeywordTagsDirect(string file, CancellationToken cancellationToken = default(CancellationToken))
         {
             if (string.IsNullOrWhiteSpace(file) || !File.Exists(file)) return new string[0];
             if (string.IsNullOrWhiteSpace(ExifToolPath) || !File.Exists(ExifToolPath)) return new string[0];
             var readTarget = MetadataReadPath(file);
             if (string.IsNullOrWhiteSpace(readTarget) || !File.Exists(readTarget)) return new string[0];
-            var output = RunExeCapture(ExifToolPath, new[] { "-s3", "-XMP-digiKam:TagsList", "-XMP-lr:HierarchicalSubject", "-XMP-dc:Subject", "-XMP:Subject", "-XMP:TagsList", "-IPTC:Keywords", readTarget }, Path.GetDirectoryName(ExifToolPath), false);
+            cancellationToken.ThrowIfCancellationRequested();
+            var output = RunExeCapture(ExifToolPath, new[] { "-s3", "-XMP-digiKam:TagsList", "-XMP-lr:HierarchicalSubject", "-XMP-dc:Subject", "-XMP:Subject", "-XMP:TagsList", "-IPTC:Keywords", readTarget }, Path.GetDirectoryName(ExifToolPath), false, cancellationToken);
             return output
                 .Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries)
                 .SelectMany(ParseTagText)
@@ -230,12 +231,13 @@ namespace PixelVaultNative
                 .ToArray();
         }
 
-        public string ReadEmbeddedCommentDirect(string file)
+        public string ReadEmbeddedCommentDirect(string file, CancellationToken cancellationToken = default(CancellationToken))
         {
             if (string.IsNullOrWhiteSpace(file) || !File.Exists(file)) return string.Empty;
             if (string.IsNullOrWhiteSpace(ExifToolPath) || !File.Exists(ExifToolPath)) return string.Empty;
             var readTarget = MetadataReadPath(file);
             if (string.IsNullOrWhiteSpace(readTarget) || !File.Exists(readTarget)) return string.Empty;
+            cancellationToken.ThrowIfCancellationRequested();
             var output = RunExeCapture(
                 ExifToolPath,
                 new[]
@@ -251,7 +253,8 @@ namespace PixelVaultNative
                     readTarget
                 },
                 Path.GetDirectoryName(ExifToolPath),
-                false);
+                false,
+                cancellationToken);
             return output
                 .Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries)
                 .Select(CleanComment)
@@ -259,12 +262,13 @@ namespace PixelVaultNative
                 ?? string.Empty;
         }
 
-        public DateTime? ReadEmbeddedCaptureDateDirect(string file)
+        public DateTime? ReadEmbeddedCaptureDateDirect(string file, CancellationToken cancellationToken = default(CancellationToken))
         {
             if (string.IsNullOrWhiteSpace(file) || !File.Exists(file)) return null;
             if (string.IsNullOrWhiteSpace(ExifToolPath) || !File.Exists(ExifToolPath)) return null;
             var readTarget = MetadataReadPath(file);
             if (string.IsNullOrWhiteSpace(readTarget) || !File.Exists(readTarget)) return null;
+            cancellationToken.ThrowIfCancellationRequested();
             var output = RunExeCapture(
                 ExifToolPath,
                 new[]
@@ -281,14 +285,15 @@ namespace PixelVaultNative
                     readTarget
                 },
                 Path.GetDirectoryName(ExifToolPath),
-                false);
+                false,
+                cancellationToken);
             return output
                 .Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries)
                 .Select(ParseEmbeddedMetadataDateValue)
                 .FirstOrDefault(parsed => parsed.HasValue);
         }
 
-        public Dictionary<string, string[]> ReadEmbeddedKeywordTagsBatch(IEnumerable<string> files)
+        public Dictionary<string, string[]> ReadEmbeddedKeywordTagsBatch(IEnumerable<string> files, CancellationToken cancellationToken = default(CancellationToken))
         {
             var result = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
             var sourceFiles = (files ?? Enumerable.Empty<string>())
@@ -314,6 +319,7 @@ namespace PixelVaultNative
             var argFile = Path.Combine(dependencies.CacheRoot, "exiftool-batch-read-" + Guid.NewGuid().ToString("N") + ".args");
             try
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var argLines = new List<string>
                 {
                     "-T",
@@ -330,11 +336,12 @@ namespace PixelVaultNative
                 };
                 argLines.AddRange(orderedReadTargets.Select(pair => pair.Value));
                 File.WriteAllLines(argFile, argLines.ToArray(), Encoding.UTF8);
-                var output = RunExeCapture(ExifToolPath, new[] { "-@", argFile }, Path.GetDirectoryName(ExifToolPath), false);
+                var output = RunExeCapture(ExifToolPath, new[] { "-@", argFile }, Path.GetDirectoryName(ExifToolPath), false, cancellationToken);
                 var matchedFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 var outputLines = output.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
                 for (int lineIndex = 0; lineIndex < outputLines.Length; lineIndex++)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     var line = outputLines[lineIndex];
                     var parts = line.Split('\t');
                     if (parts.Length < 2) continue;
@@ -362,7 +369,7 @@ namespace PixelVaultNative
                 foreach (var pair in readTargets)
                 {
                     if (matchedFiles.Contains(pair.Key)) continue;
-                    result[pair.Key] = ReadEmbeddedKeywordTagsDirect(pair.Key);
+                    result[pair.Key] = ReadEmbeddedKeywordTagsDirect(pair.Key, cancellationToken);
                 }
             }
             finally
@@ -372,7 +379,7 @@ namespace PixelVaultNative
             return result;
         }
 
-        public Dictionary<string, EmbeddedMetadataSnapshot> ReadEmbeddedMetadataBatch(IEnumerable<string> files)
+        public Dictionary<string, EmbeddedMetadataSnapshot> ReadEmbeddedMetadataBatch(IEnumerable<string> files, CancellationToken cancellationToken = default(CancellationToken))
         {
             var result = new Dictionary<string, EmbeddedMetadataSnapshot>(StringComparer.OrdinalIgnoreCase);
             var sourceFiles = (files ?? Enumerable.Empty<string>())
@@ -398,6 +405,7 @@ namespace PixelVaultNative
             var argFile = Path.Combine(dependencies.CacheRoot, "exiftool-batch-metadata-" + Guid.NewGuid().ToString("N") + ".args");
             try
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var argLines = new List<string>
                 {
                     "-T",
@@ -429,11 +437,12 @@ namespace PixelVaultNative
                 };
                 argLines.AddRange(orderedReadTargets.Select(pair => pair.Value));
                 File.WriteAllLines(argFile, argLines.ToArray(), Encoding.UTF8);
-                var output = RunExeCapture(ExifToolPath, new[] { "-@", argFile }, Path.GetDirectoryName(ExifToolPath), false);
+                var output = RunExeCapture(ExifToolPath, new[] { "-@", argFile }, Path.GetDirectoryName(ExifToolPath), false, cancellationToken);
                 var matchedFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 var outputLines = output.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
                 for (int lineIndex = 0; lineIndex < outputLines.Length; lineIndex++)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     var line = outputLines[lineIndex];
                     var parts = line.Split('\t');
                     if (parts.Length < 2) continue;
@@ -484,9 +493,9 @@ namespace PixelVaultNative
                     if (matchedFiles.Contains(pair.Key)) continue;
                     result[pair.Key] = new EmbeddedMetadataSnapshot
                     {
-                        Tags = ReadEmbeddedKeywordTagsDirect(pair.Key),
-                        Comment = ReadEmbeddedCommentDirect(pair.Key),
-                        CaptureTime = ReadEmbeddedCaptureDateDirect(pair.Key)
+                        Tags = ReadEmbeddedKeywordTagsDirect(pair.Key, cancellationToken),
+                        Comment = ReadEmbeddedCommentDirect(pair.Key, cancellationToken),
+                        CaptureTime = ReadEmbeddedCaptureDateDirect(pair.Key, cancellationToken)
                     };
                 }
             }

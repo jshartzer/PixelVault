@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Threading;
 
 namespace PixelVaultNative
 {
@@ -60,14 +61,14 @@ namespace PixelVaultNative
             return extraTags;
         }
 
-        string[] ReadEmbeddedKeywordTagsDirect(string file)
+        string[] ReadEmbeddedKeywordTagsDirect(string file, CancellationToken cancellationToken = default(CancellationToken))
         {
-            return metadataService.ReadEmbeddedKeywordTagsDirect(file);
+            return metadataService.ReadEmbeddedKeywordTagsDirect(file, cancellationToken);
         }
 
-        string ReadEmbeddedCommentDirect(string file)
+        string ReadEmbeddedCommentDirect(string file, CancellationToken cancellationToken = default(CancellationToken))
         {
-            return metadataService.ReadEmbeddedCommentDirect(file);
+            return metadataService.ReadEmbeddedCommentDirect(file, cancellationToken);
         }
 
         static DateTime? ParseEmbeddedMetadataDateValue(string value)
@@ -98,9 +99,9 @@ namespace PixelVaultNative
             return null;
         }
 
-        DateTime? ReadEmbeddedCaptureDateDirect(string file)
+        DateTime? ReadEmbeddedCaptureDateDirect(string file, CancellationToken cancellationToken = default(CancellationToken))
         {
-            return metadataService.ReadEmbeddedCaptureDateDirect(file);
+            return metadataService.ReadEmbeddedCaptureDateDirect(file, cancellationToken);
         }
 
         string NormalizeConsoleLabel(string label)

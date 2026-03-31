@@ -137,6 +137,63 @@ public sealed class FilenameParserServiceTests
     }
 
     [Fact]
+    public void Parse_RenamedSteamScreenshot_CachesKnownSteamLookupPerRoot()
+    {
+        var loadCount = 0;
+        var parser = CreateParser(
+            loadSavedGameIndexRows: _ =>
+            {
+                loadCount++;
+                return new List<GameIndexEditorRow>
+                {
+                    new()
+                    {
+                        GameId = "G00001",
+                        Name = "Retro Rewind - Video Store Simulator",
+                        PlatformLabel = "Steam",
+                        SteamAppId = "2561580"
+                    }
+                };
+            });
+
+        var first = parser.Parse("Retro Rewind - Video Store Simulator_20260328191702_1.png", "library-root");
+        var second = parser.Parse("Retro Rewind - Video Store Simulator_20260329145155_1.png", "library-root");
+
+        Assert.Equal("2561580", first.SteamAppId);
+        Assert.Equal("2561580", second.SteamAppId);
+        Assert.Equal(1, loadCount);
+    }
+
+    [Fact]
+    public void InvalidateRules_ClearsKnownSteamLookupCache()
+    {
+        var loadCount = 0;
+        var parser = CreateParser(
+            loadSavedGameIndexRows: _ =>
+            {
+                loadCount++;
+                return new List<GameIndexEditorRow>
+                {
+                    new()
+                    {
+                        GameId = "G00001",
+                        Name = "Retro Rewind - Video Store Simulator",
+                        PlatformLabel = "Steam",
+                        SteamAppId = "2561580"
+                    }
+                };
+            });
+
+        var first = parser.Parse("Retro Rewind - Video Store Simulator_20260328191702_1.png", "library-root");
+        parser.InvalidateRules("library-root");
+        var second = parser.Parse("Retro Rewind - Video Store Simulator_20260329145155_1.png", "library-root");
+
+        Assert.Equal("2561580", first.SteamAppId);
+        Assert.Equal("2561580", second.SteamAppId);
+        Assert.Equal(2, loadCount);
+    }
+
+    [Fact]
     public void GetConventionRules_BuiltInsExposeReadablePatternText()
     {
         var parser = CreateParser();

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 
 namespace PixelVaultNative
 {
@@ -76,7 +77,7 @@ namespace PixelVaultNative
             RefreshCachedLibraryFoldersFromGameIndex(root);
         }
 
-        int ResolveMissingGameIndexSteamAppIds(string root, List<GameIndexEditorRow> rows, Action<int, int, string> progress)
+        int ResolveMissingGameIndexSteamAppIds(string root, List<GameIndexEditorRow> rows, Action<int, int, string> progress, CancellationToken cancellationToken = default(CancellationToken))
         {
             var allRows = rows ?? new List<GameIndexEditorRow>();
             var targets = allRows
@@ -88,6 +89,7 @@ namespace PixelVaultNative
             int resolved = 0;
             for (int i = 0; i < targets.Count; i++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var row = targets[i];
                 var detailPrefix = "Game " + (i + 1) + " of " + targets.Count + " | " + row.Name;
                 if (row.SuppressSteamAppIdAutoResolve)
@@ -112,7 +114,7 @@ namespace PixelVaultNative
                     SteamAppId = row.SteamAppId ?? string.Empty,
                     SteamGridDbId = row.SteamGridDbId ?? string.Empty
                 };
-                var appId = ResolveBestLibraryFolderSteamAppId(root, folder);
+                var appId = ResolveBestLibraryFolderSteamAppId(root, folder, true, cancellationToken);
                 if (!string.IsNullOrWhiteSpace(appId))
                 {
                     foreach (var match in allRows.Where(entry =>
@@ -132,7 +134,7 @@ namespace PixelVaultNative
             return resolved;
         }
 
-        int ResolveMissingGameIndexSteamGridDbIds(string root, List<GameIndexEditorRow> rows, Action<int, int, string> progress)
+        int ResolveMissingGameIndexSteamGridDbIds(string root, List<GameIndexEditorRow> rows, Action<int, int, string> progress, CancellationToken cancellationToken = default(CancellationToken))
         {
             if (!HasSteamGridDbApiToken())
             {
@@ -149,6 +151,7 @@ namespace PixelVaultNative
             int resolved = 0;
             for (int i = 0; i < targets.Count; i++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var row = targets[i];
                 var detailPrefix = "STID " + (i + 1) + " of " + targets.Count + " | " + row.Name;
                 if (row.SuppressSteamGridDbIdAutoResolve)
@@ -173,7 +176,7 @@ namespace PixelVaultNative
                     SteamAppId = row.SteamAppId ?? string.Empty,
                     SteamGridDbId = row.SteamGridDbId ?? string.Empty
                 };
-                var steamGridDbId = ResolveBestLibraryFolderSteamGridDbId(root, folder);
+                var steamGridDbId = ResolveBestLibraryFolderSteamGridDbId(root, folder, cancellationToken);
                 if (!string.IsNullOrWhiteSpace(steamGridDbId))
                 {
                     foreach (var match in allRows.Where(entry =>

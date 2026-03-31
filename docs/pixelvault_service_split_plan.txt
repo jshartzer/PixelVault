@@ -1,0 +1,292 @@
+PixelVault Service Split Plan for Codex
+======================================
+
+Goal
+----
+Break the current centralized app into smaller services without changing visible behavior. Keep the app working at every step. Prefer extraction and wiring changes over redesign.
+
+High-level targets
+------------------
+1. Move settings/config code out of MainWindow.
+2. Move metadata read/write logic out of MainWindow.
+3. Move library scan/index logic out of MainWindow.
+4. Move import/organize logic out of MainWindow.
+5. Move cover/integration logic out of MainWindow.
+6. Leave UI composition in MainWindow for now, but make it call services instead of owning the business logic.
+
+Guiding rules
+-------------
+- Do this in phases. Do not try to fully rewrite the app in one pass.
+- Keep behavior the same unless a step explicitly says otherwise.
+- Add one service at a time and compile after each phase.
+- Prefer thin interfaces and small, testable classes.
+- Do not remove ExifTool yet. First isolate it behind a service.
+- Avoid moving everything into giant “Manager” classes. Split by responsibility.
+- Keep file formats and saved data compatible unless there is a migration step.
+
+Recommended folder structure
+----------------------------
+/Models
+/Services/Config
+/Services/Metadata
+/Services/Library
+/Services/Import
+/Services/Covers
+/Infrastructure/Persistence
+/Infrastructure/IO
+/Infrastructure/Logging
+/UI
+
+Suggested service map
+---------------------
+1. ISettingsService / SettingsService
+   Responsibilities:
+   - Load and save app settings
+   - Validate configured paths
+   - Expose current settings values
+   - Handle defaults and missing values
+
+2. IMetadataService / ExifToolMetadataService
+   Responsibilities:
+   - Read file metadata in batch
+   - Write file metadata
+   - Build ExifTool arguments
+   - Normalize tags/comments/date fields by file type
+   - Handle sidecars for video where needed
+   - Restore file timestamps when requested
+
+3. ILibraryScanner / LibraryScanner
+   Responsibilities:
+   - Scan library roots
+   - Ask metadata service for tags/data
+   - Build or refresh photo-level index entries
+   - Build grouped library folder/game records
+   - Prune stale cache entries
+
+4. IGameIndexService / GameIndexService
+   Responsibilities:
+   - Load/save master game index
+   - Resolve and persist GameId mappings
+   - Merge or remap game records safely
+
+5. IPhotoIndexService / PhotoIndexService
+   Responsibilities:
+   - Load/save photo-level metadata index
+   - Update rows from file metadata
+   - Remove stale rows
+   - Support editor operations
+
+6. IImportService / ImportService
+   Responsibilities:
+   - Intake folder discovery
+   - Rename rules
+   - Destination path resolution
+   - File move/copy operations
+   - Undo manifest creation
+   - Organize imported files after metadata write
+
+7. ICoverService / CoverService
+   Responsibilities:
+   - Steam lookups
+   - SteamGridDB lookups
+   - Download cover art
+   - Cache cover results
+   - Handle timeout/retry logic
+
+8. IFileSystemService / FileSystemService
+   Responsibilities:
+   - Wrap file reads/writes, directory enumeration, existence checks, timestamp reads/writes
+   - Reduce direct System.IO calls in business logic
+
+9. ILogService / LogService
+   Responsibilities:
+   - Append log entries
+   - Create log files
+   - Centralize operational logging
+
+Immediate extraction order
+--------------------------
+Phase 1: Settings and configuration
+Why first:
+- Lowest risk
+- Creates a pattern for service extraction
+- Removes file-path/config noise from MainWindow
+
+Tasks:
+- Create a Settings model containing values currently read from the ini/settings file.
+- Create ISettingsService and SettingsService.
+- Move settings load/save/default logic into SettingsService.
+- Replace direct settings file reads/writes in MainWindow with calls to SettingsService.
+- Keep UI bindings and controls in MainWindow.
+
+Done criteria:
+- App compiles.
+- Settings still load and save correctly.
+- MainWindow no longer parses the settings file directly.
+
+Phase 2: Metadata service wrapper around existing ExifTool behavior
+Why second:
+- This is the foundation for replacing ExifTool later.
+- It isolates one of the most complex domains.
+
+Tasks:
+- Create metadata DTOs for read results and write requests.
+- Create IMetadataService.
+- Implement ExifToolMetadataService using the current argument-building and process execution logic.
+- Move ExifTool path validation and invocation into the service.
+- Move tag/date/comment normalization rules into the service.
+- Keep current behavior for images and video sidecars.
+- Update MainWindow to call IMetadataService instead of building ExifTool commands directly.
+
+Done criteria:
+- All current metadata reads/writes still work.
+- Library scan and metadata editor still behave the same.
+- MainWindow no longer owns ExifTool command construction.
+
+Phase 3: Index persistence split
+Why third:
+- The app appears to mix runtime UI state with index/cache persistence.
+- Separating this makes library logic much safer.
+
+Tasks:
+- Create PhotoIndexService for photo-level metadata index load/save/update.
+- Create GameIndexService for master game index load/save/update.
+- Move cache file parsing/serialization into these services.
+- Expose methods like Load, Save, UpdateFromFiles, RemoveMissing, and Rebuild.
+- Keep existing file formats for now.
+
+Done criteria:
+- Index editors still work.
+- Rebuild/reload flows still persist and reload data correctly.
+- MainWindow stops directly reading/writing index files.
+
+Phase 4: Library scanning and grouping
+Why fourth:
+- This is likely one of the biggest behavior zones.
+- It should use the metadata and index services created earlier.
+
+Tasks:
+- Create ILibraryScanner / LibraryScanner.
+- Move scan-folder, rebuild-library, regroup, and stale-prune logic into LibraryScanner.
+- Have LibraryScanner depend on IMetadataService, PhotoIndexService, and GameIndexService.
+- Return clean result models for UI consumption, such as folder cards, counts, and selected-folder details.
+- Keep sorting/filtering UI behavior intact.
+
+Done criteria:
+- Library rebuild, refresh, and scan folder behavior still work.
+- Grouped folders/games look the same as before.
+- MainWindow mostly triggers scanner methods and renders results.
+
+Phase 5: Import and organize flow
+Why fifth:
+- Import behavior has many moving parts and benefits from being isolated.
+
+Tasks:
+- Create IImportService / ImportService.
+- Move source inventory, rename, destination path building, file move/copy, and undo manifest logic into the service.
+- Let ImportService call IMetadataService for write operations when needed.
+- Keep current UI flow and dialogs in MainWindow.
+
+Done criteria:
+- Import, manual import, and import-and-comment still work.
+- Undo manifests still work.
+- MainWindow no longer owns the file move pipeline.
+
+Phase 6: Cover art and external providers
+Why sixth:
+- This is logically separate and easier to test once isolated.
+
+Tasks:
+- Create ICoverService / CoverService.
+- Move Steam/SteamGridDB HTTP logic, search caches, and cover download logic into the service.
+- Move timeout constants and retry handling into the service.
+- Return simple cover result models to UI.
+
+Done criteria:
+- Fetch Covers still works.
+- Cached cover behavior remains intact.
+- MainWindow no longer owns web request details.
+
+Phase 7: UI cleanup and composition root
+Why seventh:
+- By this point most business logic should already be moved.
+
+Tasks:
+- Add a simple composition root in Program.Main or a bootstrap helper.
+- Construct services once and pass them into MainWindow.
+- Reduce MainWindow to UI orchestration, event wiring, and view updates.
+- Split large UI helper regions into partial classes only if still needed.
+
+Done criteria:
+- MainWindow is substantially smaller.
+- Business logic mostly lives in services.
+- New work can target services instead of the main window class.
+
+Recommended data models to add early
+------------------------------------
+- AppSettings
+- MetadataReadResult
+- MetadataWritePlan
+- MetadataWriteOutcome
+- LibraryScanRequest
+- LibraryScanResult
+- GameIndexRecord
+- PhotoIndexRecord
+- ImportPlan
+- ImportResult
+- CoverLookupResult
+
+Cross-cutting improvements to do during the split
+-------------------------------------------------
+- Replace raw dictionaries with named model types where reasonable.
+- Centralize path building and file names.
+- Add cancellation token support to long-running scan/import/cover flows.
+- Add clear result objects instead of boolean-plus-log-text patterns.
+- Isolate timestamp restoration logic.
+- Prefer async methods for file/network/ExifTool operations that are already asynchronous in behavior.
+
+What NOT to do yet
+------------------
+- Do not switch away from ExifTool during the first extraction passes.
+- Do not change cache formats unless necessary.
+- Do not move to SQLite in the same pass as the service split.
+- Do not redesign the UI while also moving business logic.
+- Do not introduce a heavy DI framework unless needed; simple constructor injection is enough.
+
+Suggested Codex workflow
+------------------------
+For each phase:
+1. Identify all methods/fields in MainWindow tied to that responsibility.
+2. Create interface + implementation + models.
+3. Move logic with minimal behavior change.
+4. Update MainWindow to consume the new service.
+5. Compile and fix errors.
+6. Run a short regression checklist.
+7. Commit before starting the next phase.
+
+Regression checklist after each phase
+-------------------------------------
+- App launches.
+- Settings load and save.
+- Library opens.
+- Scan/rebuild works.
+- Metadata edit still writes expected tags/comments/dates.
+- Import flow still moves and organizes files correctly.
+- Cover fetch still works.
+- Existing indexes/caches still load.
+
+Good first Codex prompt
+-----------------------
+Refactor PixelVault in small safe steps. Start with Phase 1 only: extract settings/config logic from MainWindow into an ISettingsService and SettingsService, keep behavior unchanged, keep file format compatibility, wire the service back into MainWindow, and make the project compile. Do not change unrelated logic.
+
+Good second Codex prompt
+------------------------
+Now do Phase 2 only: extract all ExifTool metadata read/write logic behind an IMetadataService and ExifToolMetadataService. Preserve current behavior, including batch reads, write rules, sidecar handling, and timestamp restoration. Update MainWindow to call the service instead of building ExifTool commands directly. Do not attempt to replace ExifTool itself.
+
+Definition of success
+---------------------
+Success is not “the whole app is rewritten.” Success is:
+- MainWindow is smaller and easier to reason about.
+- Metadata, library, import, and cover logic each live in their own service areas.
+- The app still behaves the same.
+- Future work, including native metadata writes and SQLite migration, can happen inside isolated services instead of inside the UI shell.

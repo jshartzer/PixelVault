@@ -197,6 +197,11 @@ namespace PixelVaultNative
         Border CreateLibraryDetailTile(string file, int size, Func<bool> shouldLoad, Action<string> openSingleFileMetadataEditor, Action<string, bool, bool> updateDetailSelection, HashSet<string> selectedDetailFiles, Action refreshDetailSelectionUi)
         {
             var isVideoFile = IsVideo(file);
+            var tileIsActive = true;
+            Func<bool> shouldKeepLoading = delegate
+            {
+                return tileIsActive && (shouldLoad == null || shouldLoad());
+            };
             var tile = new Border
             {
                 Width = size,
@@ -302,21 +307,11 @@ namespace PixelVaultNative
                 {
                     tile.Dispatcher.BeginInvoke(new Action(delegate
                     {
+                        if (!shouldKeepLoading()) return;
                         if (!string.Equals(tile.Tag as string, file, StringComparison.OrdinalIgnoreCase)) return;
                         applyVideoInfo(info);
                     }), DispatcherPriority.Background);
-                });
-                WarmVideoPreviewClip(file, Math.Max(640, size * 2));
-                try
-                {
-                    videoPreviewMedia.Source = new Uri(file);
-                    videoPreviewOpeningStarted = true;
-                    videoPreviewMedia.Play();
-                }
-                catch
-                {
-                    videoPreviewOpeningStarted = false;
-                }
+                }, shouldKeepLoading);
             }
             else applyVideoInfo(null);
             tile.Child = presenter;
@@ -325,7 +320,7 @@ namespace PixelVaultNative
                 image.Source = loaded;
                 image.Visibility = Visibility.Visible;
                 placeholder.Visibility = Visibility.Collapsed;
-            }, false, shouldLoad);
+            }, false, shouldKeepLoading);
             tile.MouseLeftButtonDown += delegate(object sender, System.Windows.Input.MouseButtonEventArgs e)
             {
                 var clicked = sender as Border;
@@ -353,6 +348,7 @@ namespace PixelVaultNative
             {
                 if (!isVideoFile) return;
                 if (videoPreviewMedia == null || videoPreviewStatus == null) return;
+                if (!shouldKeepLoading()) return;
                 videoPreviewHovered = true;
                 videoPreviewStopTimer.Stop();
                 if (videoPreviewReady)
@@ -486,6 +482,26 @@ namespace PixelVaultNative
                     }
                 };
             }
+            tile.Unloaded += delegate
+            {
+                tileIsActive = false;
+                if (!isVideoFile) return;
+                if (videoPreviewStopTimer != null) videoPreviewStopTimer.Stop();
+                if (videoPreviewStatus != null) videoPreviewStatus.Visibility = Visibility.Collapsed;
+                if (videoPreviewMedia == null) return;
+                videoPreviewHovered = false;
+                videoPreviewReady = false;
+                videoPreviewOpeningStarted = false;
+                videoPreviewMedia.Visibility = Visibility.Hidden;
+                try
+                {
+                    videoPreviewMedia.Stop();
+                    videoPreviewMedia.Source = null;
+                }
+                catch
+                {
+                }
+            };
             var contextMenu = new ContextMenu();
             var openItem = new MenuItem { Header = "Open" };
             openItem.Click += delegate { OpenWithShell(file); };

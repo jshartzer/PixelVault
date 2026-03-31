@@ -7,24 +7,25 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 
 namespace PixelVaultNative
 {
     interface ICoverService
     {
-        string TryResolveSteamGridDbIdBySteamAppId(string steamAppId);
-        string TryResolveSteamGridDbIdByName(string title);
-        List<Tuple<string, string>> SearchSteamAppMatches(string title);
-        string TryResolveSteamAppId(string title);
-        string SteamName(string appId);
+        string TryResolveSteamGridDbIdBySteamAppId(string steamAppId, CancellationToken cancellationToken = default(CancellationToken));
+        string TryResolveSteamGridDbIdByName(string title, CancellationToken cancellationToken = default(CancellationToken));
+        List<Tuple<string, string>> SearchSteamAppMatches(string title, CancellationToken cancellationToken = default(CancellationToken));
+        string TryResolveSteamAppId(string title, CancellationToken cancellationToken = default(CancellationToken));
+        string SteamName(string appId, CancellationToken cancellationToken = default(CancellationToken));
         string CustomCoverPath(LibraryFolderInfo folder);
         void SaveCustomCover(LibraryFolderInfo folder, string sourcePath);
         void ClearCustomCover(LibraryFolderInfo folder);
         string CachedCoverPath(string title);
         void DeleteCachedCover(string title);
         bool HasDedicatedLibraryCover(LibraryFolderInfo folder);
-        string TryDownloadSteamCover(string title, string appId);
-        string TryDownloadSteamGridDbCover(string title, string steamGridDbId);
+        string TryDownloadSteamCover(string title, string appId, CancellationToken cancellationToken = default(CancellationToken));
+        string TryDownloadSteamGridDbCover(string title, string steamGridDbId, CancellationToken cancellationToken = default(CancellationToken));
     }
 
     sealed class CoverServiceDependencies
@@ -185,9 +186,10 @@ namespace PixelVaultNative
             if (dependencies.ClearImageCache != null) dependencies.ClearImageCache();
         }
 
-        public string TryResolveSteamGridDbIdBySteamAppId(string steamAppId)
+        public string TryResolveSteamGridDbIdBySteamAppId(string steamAppId, CancellationToken cancellationToken = default(CancellationToken))
         {
             if (string.IsNullOrWhiteSpace(steamAppId) || !HasSteamGridDbApiToken()) return null;
+            cancellationToken.ThrowIfCancellationRequested();
             string cached;
             if (steamGridDbPlatformCache.TryGetValue("steam:" + steamAppId, out cached)) return cached;
             var stopwatch = Stopwatch.StartNew();
@@ -196,11 +198,15 @@ namespace PixelVaultNative
                 using (var wc = CreateSteamGridDbWebClient())
                 {
                     if (wc == null) return null;
-                    var json = wc.DownloadString("https://www.steamgriddb.com/api/v2/games/steam/" + Uri.EscapeDataString(steamAppId));
+                    var json = wc.DownloadString("https://www.steamgriddb.com/api/v2/games/steam/" + Uri.EscapeDataString(steamAppId), cancellationToken);
                     cached = ParseSteamGridDbIdFromGamePayload(json);
                     steamGridDbPlatformCache["steam:" + steamAppId] = cached;
                     return cached;
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -215,9 +221,10 @@ namespace PixelVaultNative
             return null;
         }
 
-        public string TryResolveSteamGridDbIdByName(string title)
+        public string TryResolveSteamGridDbIdByName(string title, CancellationToken cancellationToken = default(CancellationToken))
         {
             if (string.IsNullOrWhiteSpace(title) || !HasSteamGridDbApiToken()) return null;
+            cancellationToken.ThrowIfCancellationRequested();
             string cached;
             if (steamGridDbSearchCache.TryGetValue(title, out cached)) return cached;
             var stopwatch = Stopwatch.StartNew();
@@ -226,11 +233,15 @@ namespace PixelVaultNative
                 using (var wc = CreateSteamGridDbWebClient())
                 {
                     if (wc == null) return null;
-                    var json = wc.DownloadString("https://www.steamgriddb.com/api/v2/search/autocomplete/" + Uri.EscapeDataString(title));
+                    var json = wc.DownloadString("https://www.steamgriddb.com/api/v2/search/autocomplete/" + Uri.EscapeDataString(title), cancellationToken);
                     cached = FindBestSteamGridDbSearchMatch(title, ParseSteamGridDbSearchResults(json));
                     steamGridDbSearchCache[title] = cached;
                     return cached;
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -245,9 +256,10 @@ namespace PixelVaultNative
             return null;
         }
 
-        public List<Tuple<string, string>> SearchSteamAppMatches(string title)
+        public List<Tuple<string, string>> SearchSteamAppMatches(string title, CancellationToken cancellationToken = default(CancellationToken))
         {
             var query = (title ?? string.Empty).Trim();
+            cancellationToken.ThrowIfCancellationRequested();
             List<Tuple<string, string>> cached;
             if (steamSearchResultsCache.TryGetValue(query, out cached))
             {
@@ -261,10 +273,14 @@ namespace PixelVaultNative
                 {
                     using (var wc = CreateSteamWebClient())
                     {
-                        var html = wc.DownloadString("https://store.steampowered.com/search/suggest?term=" + Uri.EscapeDataString(query) + "&f=games&cc=US&l=english");
+                        var html = wc.DownloadString("https://store.steampowered.com/search/suggest?term=" + Uri.EscapeDataString(query) + "&f=games&cc=US&l=english", cancellationToken);
                         results = ParseSteamSearchResults(html);
                     }
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch
             {
@@ -278,11 +294,11 @@ namespace PixelVaultNative
             return results;
         }
 
-        public string TryResolveSteamAppId(string title)
+        public string TryResolveSteamAppId(string title, CancellationToken cancellationToken = default(CancellationToken))
         {
             string cached;
             if (steamSearchCache.TryGetValue(title, out cached)) return cached;
-            foreach (var match in SearchSteamAppMatches(title))
+            foreach (var match in SearchSteamAppMatches(title, cancellationToken))
             {
                 if (NormalizeTitle(match.Item2) == NormalizeTitle(title))
                 {
@@ -295,16 +311,17 @@ namespace PixelVaultNative
             return null;
         }
 
-        public string SteamName(string appId)
+        public string SteamName(string appId, CancellationToken cancellationToken = default(CancellationToken))
         {
             string cached;
             if (steamCache.TryGetValue(appId, out cached)) return cached;
+            cancellationToken.ThrowIfCancellationRequested();
             var stopwatch = Stopwatch.StartNew();
             try
             {
                 using (var wc = CreateSteamWebClient())
                 {
-                    var json = wc.DownloadString("https://store.steampowered.com/api/appdetails?appids=" + appId + "&l=english");
+                    var json = wc.DownloadString("https://store.steampowered.com/api/appdetails?appids=" + appId + "&l=english", cancellationToken);
                     var match = Regex.Match(json, "\"name\"\\s*:\\s*\"(?<n>(?:\\\\.|[^\"])*)\"");
                     if (match.Success)
                     {
@@ -313,6 +330,10 @@ namespace PixelVaultNative
                         return cached;
                     }
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -415,9 +436,10 @@ namespace PixelVaultNative
             return !string.IsNullOrWhiteSpace(CustomCoverPath(folder)) || CachedCoverPath(folder.Name) != null;
         }
 
-        public string TryDownloadSteamCover(string title, string appId)
+        public string TryDownloadSteamCover(string title, string appId, CancellationToken cancellationToken = default(CancellationToken))
         {
             if (string.IsNullOrWhiteSpace(title) || string.IsNullOrWhiteSpace(appId)) return null;
+            cancellationToken.ThrowIfCancellationRequested();
             var stopwatch = Stopwatch.StartNew();
             try
             {
@@ -435,27 +457,36 @@ namespace PixelVaultNative
                     {
                         try
                         {
+                            cancellationToken.ThrowIfCancellationRequested();
                             var ext = Path.GetExtension(new Uri(portraitUrl).AbsolutePath);
                             if (string.IsNullOrWhiteSpace(ext)) ext = ".jpg";
                             var target = Path.Combine(dependencies.CoversRoot, SafeCacheName(title) + ext);
-                            wc.DownloadFile(portraitUrl, target);
+                            wc.DownloadFile(portraitUrl, target, cancellationToken);
                             if (File.Exists(target) && new FileInfo(target).Length > 0) return target;
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            throw;
                         }
                         catch
                         {
                         }
                     }
 
-                    var json = wc.DownloadString("https://store.steampowered.com/api/appdetails?appids=" + appId + "&l=english");
+                    var json = wc.DownloadString("https://store.steampowered.com/api/appdetails?appids=" + appId + "&l=english", cancellationToken);
                     var match = Regex.Match(json, "\"header_image\"\\s*:\\s*\"(?<u>(?:\\\\.|[^\"])*)\"");
                     if (!match.Success) return null;
                     var url = Regex.Unescape(match.Groups["u"].Value).Replace("\\/", "/");
                     var fallbackExt = Path.GetExtension(new Uri(url).AbsolutePath);
                     if (string.IsNullOrWhiteSpace(fallbackExt)) fallbackExt = ".jpg";
                     var fallbackTarget = Path.Combine(dependencies.CoversRoot, SafeCacheName(title) + fallbackExt);
-                    wc.DownloadFile(url, fallbackTarget);
+                    wc.DownloadFile(url, fallbackTarget, cancellationToken);
                     return File.Exists(fallbackTarget) ? fallbackTarget : null;
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch
             {
@@ -468,9 +499,10 @@ namespace PixelVaultNative
             return null;
         }
 
-        public string TryDownloadSteamGridDbCover(string title, string steamGridDbId)
+        public string TryDownloadSteamGridDbCover(string title, string steamGridDbId, CancellationToken cancellationToken = default(CancellationToken))
         {
             if (string.IsNullOrWhiteSpace(title) || string.IsNullOrWhiteSpace(steamGridDbId) || !HasSteamGridDbApiToken()) return null;
+            cancellationToken.ThrowIfCancellationRequested();
             var stopwatch = Stopwatch.StartNew();
             try
             {
@@ -478,16 +510,20 @@ namespace PixelVaultNative
                 using (var wc = CreateSteamGridDbWebClient())
                 {
                     if (wc == null) return null;
-                    var json = wc.DownloadString("https://www.steamgriddb.com/api/v2/grids/game/" + Uri.EscapeDataString(steamGridDbId) + "?dimensions=600x900,342x482,660x930&types=static&nsfw=false&humor=false&limit=1");
+                    var json = wc.DownloadString("https://www.steamgriddb.com/api/v2/grids/game/" + Uri.EscapeDataString(steamGridDbId) + "?dimensions=600x900,342x482,660x930&types=static&nsfw=false&humor=false&limit=1", cancellationToken);
                     var match = Regex.Match(json, "\"url\"\\s*:\\s*\"(?<u>(?:\\\\.|[^\"])*)\"");
                     if (!match.Success) return null;
                     var url = Regex.Unescape(match.Groups["u"].Value).Replace("\\/", "/");
                     var ext = Path.GetExtension(new Uri(url).AbsolutePath);
                     if (string.IsNullOrWhiteSpace(ext)) ext = ".png";
                     var target = Path.Combine(dependencies.CoversRoot, SafeCacheName(title) + ext);
-                    wc.DownloadFile(url, target);
+                    wc.DownloadFile(url, target, cancellationToken);
                     if (File.Exists(target) && new FileInfo(target).Length > 0) return target;
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch (Exception ex)
             {

@@ -39,7 +39,7 @@ namespace PixelVaultNative
 
     public sealed partial class MainWindow : Window
     {
-        const string AppVersion = "0.810";
+        const string AppVersion = "0.815";
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
         const string ClearedExternalIdSentinel = "__PV_CLEARED__";
@@ -60,6 +60,8 @@ namespace PixelVaultNative
         readonly object imageCacheSync = new object();
         readonly SemaphoreSlim imageLoadLimiter = new SemaphoreSlim(Math.Max(2, Math.Min(Environment.ProcessorCount, 6)));
         readonly SemaphoreSlim priorityImageLoadLimiter = new SemaphoreSlim(Math.Max(1, Math.Min(Environment.ProcessorCount, 3)));
+        readonly SemaphoreSlim videoClipInfoWarmLimiter = new SemaphoreSlim(2);
+        readonly SemaphoreSlim videoPreviewWarmLimiter = new SemaphoreSlim(1);
         readonly HashSet<string> failedFfmpegPosterKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         readonly ConcurrentDictionary<string, byte> activeVideoPreviewGenerations = new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
         readonly ConcurrentDictionary<string, byte> activeVideoInfoGenerations = new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
@@ -95,6 +97,18 @@ namespace PixelVaultNative
         readonly IFilenameRulesService filenameRulesService;
         readonly IIndexPersistenceService indexPersistenceService;
         readonly IMetadataService metadataService;
+
+        sealed class LibraryDetailRenderSnapshot
+        {
+            public List<LibraryDetailRenderGroup> Groups = new List<LibraryDetailRenderGroup>();
+            public List<string> VisibleFiles = new List<string>();
+        }
+
+        sealed class LibraryDetailRenderGroup
+        {
+            public DateTime CaptureDate;
+            public List<string> Files = new List<string>();
+        }
 
         public MainWindow()
         {
@@ -174,7 +188,7 @@ namespace PixelVaultNative
                 GetMetadataWorkerCount = delegate(int workItems) { return GetMetadataWorkerCount(workItems); },
                 Log = delegate(string message) { Log(message); },
                 RunExe = delegate(string file, string[] args, string cwd, bool logOutput) { RunExe(file, args, cwd, logOutput); },
-                RunExeCapture = delegate(string file, string[] args, string cwd, bool logOutput) { return RunExeCapture(file, args, cwd, logOutput); }
+                RunExeCapture = delegate(string file, string[] args, string cwd, bool logOutput, CancellationToken cancellationToken) { return RunExeCapture(file, args, cwd, logOutput, cancellationToken); }
             });
             Directory.CreateDirectory(dataRoot);
             Directory.CreateDirectory(logsRoot);
@@ -534,16 +548,13 @@ namespace PixelVaultNative
                     folder.NewestCaptureUtcTicks = 0;
                 }
             }
-            var files = (folder.FilePaths ?? new string[0]).Where(path => !string.IsNullOrWhiteSpace(path) && File.Exists(path)).ToArray();
-            DateTime newest = DateTime.MinValue;
-            if (files.Length == 0)
+            var newestSource = (folder.FilePaths ?? new string[0])
+                .FirstOrDefault(path => !string.IsNullOrWhiteSpace(path) && File.Exists(path));
+            if (string.IsNullOrWhiteSpace(newestSource) && !string.IsNullOrWhiteSpace(folder.PreviewImagePath) && File.Exists(folder.PreviewImagePath))
             {
-                if (!string.IsNullOrWhiteSpace(folder.PreviewImagePath) && File.Exists(folder.PreviewImagePath)) newest = GetLibraryDate(folder.PreviewImagePath);
+                newestSource = folder.PreviewImagePath;
             }
-            else
-            {
-                newest = files.Select(GetLibraryDate).DefaultIfEmpty(DateTime.MinValue).Max();
-            }
+            var newest = string.IsNullOrWhiteSpace(newestSource) ? DateTime.MinValue : GetLibraryDate(newestSource);
             if (newest > DateTime.MinValue) folder.NewestCaptureUtcTicks = newest.ToUniversalTime().Ticks;
             return newest;
         }
@@ -2672,6 +2683,8 @@ namespace PixelVaultNative
 
             bool suppressSync = false;
             bool dialogReady = false;
+            CancellationTokenSource steamSearchCancellation = null;
+            int steamSearchRequestVersion = 0;
             var badgeBlocks = new Dictionary<ManualMetadataItem, TextBlock>();
             var tileBorders = new Dictionary<ManualMetadataItem, Border>();
             var selectedItems = new List<ManualMetadataItem>();
@@ -3039,6 +3052,12 @@ namespace PixelVaultNative
             };
             steamSearchButton.Click += delegate
             {
+                if (steamSearchCancellation != null)
+                {
+                    steamLookupStatus.Text = "Canceling Steam search...";
+                    steamSearchCancellation.Cancel();
+                    return;
+                }
                 if (selectedItems.Count == 0)
                 {
                     MessageBox.Show("Select one or more captures before searching Steam.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -3065,18 +3084,33 @@ namespace PixelVaultNative
                     return;
                 }
 
-                steamSearchButton.IsEnabled = false;
                 steamLookupStatus.Text = "Searching Steam for \"" + query + "\"...";
                 var searchQuery = query;
+                var searchCancellation = new CancellationTokenSource();
+                steamSearchCancellation = searchCancellation;
+                var searchVersion = ++steamSearchRequestVersion;
+                steamSearchButton.Content = "Cancel Search";
                 Task.Factory.StartNew(delegate
                 {
-                    return Tuple.Create(searchQuery, SearchSteamAppMatches(searchQuery));
-                }).ContinueWith(delegate(Task<Tuple<string, List<Tuple<string, string>>>> searchTask)
+                    searchCancellation.Token.ThrowIfCancellationRequested();
+                    return Tuple.Create(searchQuery, SearchSteamAppMatches(searchQuery, searchCancellation.Token));
+                }, searchCancellation.Token).ContinueWith(delegate(Task<Tuple<string, List<Tuple<string, string>>>> searchTask)
                 {
                     Dispatcher.BeginInvoke(new Action(delegate
                     {
-                        steamSearchButton.IsEnabled = true;
-                        if (searchTask.IsFaulted || searchTask.IsCanceled)
+                        if (ReferenceEquals(steamSearchCancellation, searchCancellation))
+                        {
+                            steamSearchCancellation.Dispose();
+                            steamSearchCancellation = null;
+                        }
+                        steamSearchButton.Content = "Search Steam";
+                        if (!manualWindow.IsLoaded || searchVersion != steamSearchRequestVersion) return;
+                        if (searchTask.IsCanceled || searchCancellation.IsCancellationRequested)
+                        {
+                            steamLookupStatus.Text = "Steam search canceled. Pick a match or paste the AppID directly.";
+                            return;
+                        }
+                        if (searchTask.IsFaulted)
                         {
                             steamLookupStatus.Text = "Steam lookup failed. Try again or paste the AppID directly.";
                             return;
@@ -3409,6 +3443,13 @@ namespace PixelVaultNative
             };
 
             manualWindow.Content = root;
+            manualWindow.Closing += delegate
+            {
+                if (steamSearchCancellation != null && !steamSearchCancellation.IsCancellationRequested)
+                {
+                    steamSearchCancellation.Cancel();
+                }
+            };
             manualWindow.Loaded += delegate
             {
                 dialogReady = true;
@@ -3633,7 +3674,7 @@ namespace PixelVaultNative
             try
             {
                 EnsureDir(libraryRoot, "Library folder");
-                var folders = LoadLibraryFoldersCached(libraryRoot, false);
+                var folders = new List<LibraryFolderInfo>();
                 Button intakeReviewButton = null;
                 Border intakeReviewBadge = null;
                 TextBlock intakeReviewBadgeText = null;
@@ -4015,7 +4056,9 @@ namespace PixelVaultNative
                 Action<string, bool> runLibraryScan = null;
                 Action<LibraryFolderInfo> openLibraryMetadataEditor = null;
                 Action<string> openSingleFileMetadataEditor = null;
-                Action<bool> renderTiles = null;
+                Action renderTiles = null;
+                Action<bool> refreshLibraryFoldersAsync = null;
+                Action prefillLibraryFoldersFromSnapshotAsync = null;
                 Action applySearchFilter = null;
                 Action refreshSortButtons = null;
                 Action<string> setLibrarySortMode = null;
@@ -4029,10 +4072,15 @@ namespace PixelVaultNative
                 double preservedDetailScrollOffset = 0;
                 bool preserveFolderScrollOnNextRender = false;
                 double preservedFolderScrollOffset = 0;
+                string pendingLibrarySearchText = string.Empty;
+                string appliedLibrarySearchText = string.Empty;
                 int lastDetailTileSize = -1;
                 int lastDetailColumns = -1;
                 int lastFolderTileSize = -1;
                 int lastFolderColumns = -1;
+                bool libraryFoldersLoading = false;
+                int libraryFolderRefreshVersion = 0;
+                int detailRenderVersion = 0;
                 var selectedDetailFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 var detailTiles = new List<Border>();
                 int estimatedDetailRowHeight = 420;
@@ -4156,7 +4204,7 @@ namespace PixelVaultNative
                     {
                         libraryFolderSortMode = normalized;
                         SaveSettings();
-                        renderTiles(false);
+                        if (renderTiles != null) renderTiles();
                     }
                     refreshSortButtons();
                 };
@@ -4206,8 +4254,7 @@ namespace PixelVaultNative
                         current = string.IsNullOrWhiteSpace(currentFolderPath)
                             ? null
                             : new LibraryFolderInfo { FolderPath = currentFolderPath, PlatformLabel = currentPlatformLabel ?? string.Empty, Name = currentName ?? string.Empty };
-                        folders = LoadLibraryFoldersCached(libraryRoot, false);
-                        renderTiles(false);
+                        if (refreshLibraryFoldersAsync != null) refreshLibraryFoldersAsync(false);
                     });
                 };
 
@@ -4279,7 +4326,6 @@ namespace PixelVaultNative
                     }
                     foreach (var directory in touchedDirectories) TryDeleteEmptyDirectory(directory);
                     selectedDetailFiles.Clear();
-                    folders = LoadLibraryFoldersCached(libraryRoot, false);
                     current = string.IsNullOrWhiteSpace(current.FolderPath)
                         ? null
                         : new LibraryFolderInfo
@@ -4288,7 +4334,7 @@ namespace PixelVaultNative
                             PlatformLabel = current.PlatformLabel ?? string.Empty,
                             Name = current.Name ?? string.Empty
                         };
-                    renderTiles(false);
+                    if (refreshLibraryFoldersAsync != null) refreshLibraryFoldersAsync(false);
                     status.Text = removedFiles.Count == 0
                         ? "No captures deleted"
                         : (failures.Count == 0
@@ -4307,6 +4353,7 @@ namespace PixelVaultNative
                 Action renderSelectedFolder = delegate
                 {
                     var renderStopwatch = Stopwatch.StartNew();
+                    var renderVersion = ++detailRenderVersion;
                     if (!preserveDetailScrollOnNextRender) preservedDetailScrollOffset = 0;
                     detailTiles.Clear();
                     if (current == null)
@@ -4324,92 +4371,150 @@ namespace PixelVaultNative
                     lastDetailColumns = targetDetailColumns;
                     lastDetailTileSize = size;
                     estimatedDetailRowHeight = Math.Max(200, size + 96);
-                    var datedFiles = GetFilesForLibraryFolderEntry(current, false)
-                        .Select(file => new { FilePath = file, CaptureDate = GetLibraryDate(file) })
-                        .OrderByDescending(entry => entry.CaptureDate)
-                        .ToList();
-                    var groups = datedFiles
-                        .GroupBy(entry => entry.CaptureDate.Date)
-                        .OrderByDescending(g => g.Key)
-                        .ToList();
-                    var visibleFiles = groups.SelectMany(group => group.Select(entry => entry.FilePath)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-                    var visibleSet = new HashSet<string>(visibleFiles, StringComparer.OrdinalIgnoreCase);
-                    foreach (var stale in selectedDetailFiles.Where(path => !visibleSet.Contains(path)).ToList()) selectedDetailFiles.Remove(stale);
                     var shouldRestoreDetailScroll = preserveDetailScrollOnNextRender && preservedDetailScrollOffset > 0.1d;
                     preserveDetailScrollOnNextRender = false;
-                    if (groups.Count == 0)
+                    var renderFolder = current;
+                    SetVirtualizedRows(detailRows, new[]
                     {
-                        SetVirtualizedRows(detailRows, new[]
+                        new VirtualizedRowDefinition
                         {
-                            new VirtualizedRowDefinition
-                            {
-                                Height = 44,
-                                Build = delegate
-                                {
-                                    return new TextBlock { Text = "No captures found in this folder.", Foreground = Brush("#A7B5BD") };
-                                }
-                            }
-                        }, !shouldRestoreDetailScroll, shouldRestoreDetailScroll ? (double?)preservedDetailScrollOffset : null);
-                        if (refreshDetailSelectionUi != null) refreshDetailSelectionUi();
-                        renderStopwatch.Stop();
-                        LogPerformanceSample("LibraryDetailRender", renderStopwatch, "folder=" + (current.Name ?? current.FolderPath ?? "(unknown)") + "; rows=1; files=0; size=" + size, 40);
-                        return;
-                    }
-                    const int detailTileGap = 8;
-                    var detailColumns = targetDetailColumns;
-                    var virtualRows = new List<VirtualizedRowDefinition>();
-                    foreach (var group in groups)
-                    {
-                        var groupDate = group.Key;
-                        var groupFiles = group.Select(entry => entry.FilePath).ToList();
-                        virtualRows.Add(new VirtualizedRowDefinition
-                        {
-                            Height = 34,
+                            Height = 44,
                             Build = delegate
                             {
-                                return new TextBlock
-                                {
-                                    Text = groupDate.ToString("MMMM d, yyyy"),
-                                    FontSize = 16,
-                                    FontWeight = FontWeights.SemiBold,
-                                    Foreground = Brush("#F1E9DA"),
-                                    Margin = new Thickness(0, 0, 0, 10)
-                                };
+                                return new TextBlock { Text = "Loading captures...", Foreground = Brush("#A7B5BD") };
                             }
-                        });
-                        for (int rowStart = 0; rowStart < groupFiles.Count; rowStart += detailColumns)
+                        }
+                    }, true, null);
+                    if (refreshDetailSelectionUi != null) refreshDetailSelectionUi();
+                    Task.Run(delegate
+                    {
+                        var datedFiles = GetFilesForLibraryFolderEntry(renderFolder, false)
+                            .Select(file => new { FilePath = file, CaptureDate = GetLibraryDate(file) })
+                            .OrderByDescending(entry => entry.CaptureDate)
+                            .ThenBy(entry => entry.FilePath, StringComparer.OrdinalIgnoreCase)
+                            .ToList();
+                        var snapshot = new LibraryDetailRenderSnapshot
                         {
-                            var rowFiles = groupFiles.Skip(rowStart).Take(detailColumns).ToList();
-                            virtualRows.Add(new VirtualizedRowDefinition
+                            VisibleFiles = datedFiles.Select(entry => entry.FilePath).Distinct(StringComparer.OrdinalIgnoreCase).ToList()
+                        };
+                        foreach (var group in datedFiles
+                            .GroupBy(entry => entry.CaptureDate.Date)
+                            .OrderByDescending(group => group.Key))
+                        {
+                            snapshot.Groups.Add(new LibraryDetailRenderGroup
                             {
-                                Height = estimatedDetailRowHeight,
-                                Build = delegate
-                                {
-                                    var rowPanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, detailTileGap) };
-                                    var renderFolder = current;
-                                    for (int fileIndex = 0; fileIndex < rowFiles.Count; fileIndex++)
-                                    {
-                                        var file = rowFiles[fileIndex];
-                                        var tile = CreateLibraryDetailTile(
-                                            file,
-                                            size,
-                                            delegate { return SameLibraryFolderSelection(current, renderFolder); },
-                                            openSingleFileMetadataEditor,
-                                            updateDetailSelection,
-                                            selectedDetailFiles,
-                                            refreshDetailSelectionUi);
-                                        tile.Margin = new Thickness(0, 0, fileIndex < rowFiles.Count - 1 ? detailTileGap : 0, 0);
-                                        detailTiles.Add(tile);
-                                        rowPanel.Children.Add(tile);
-                                    }
-                                    return rowPanel;
-                                }
+                                CaptureDate = group.Key,
+                                Files = group.Select(entry => entry.FilePath).ToList()
                             });
                         }
-                    }
-                    SetVirtualizedRows(detailRows, virtualRows, !shouldRestoreDetailScroll, shouldRestoreDetailScroll ? (double?)preservedDetailScrollOffset : null);
-                    renderStopwatch.Stop();
-                    LogPerformanceSample("LibraryDetailRender", renderStopwatch, "folder=" + (current.Name ?? current.FolderPath ?? "(unknown)") + "; groups=" + groups.Count + "; files=" + visibleFiles.Count + "; rows=" + virtualRows.Count + "; columns=" + detailColumns + "; size=" + size, 40);
+                        return snapshot;
+                    }).ContinueWith(delegate(Task<LibraryDetailRenderSnapshot> loadTask)
+                    {
+                        libraryWindow.Dispatcher.BeginInvoke(new Action(delegate
+                        {
+                            if (renderVersion != detailRenderVersion) return;
+                            if (!SameLibraryFolderSelection(current, renderFolder)) return;
+                            if (loadTask.IsFaulted)
+                            {
+                                var flattened = loadTask.Exception == null ? null : loadTask.Exception.Flatten();
+                                var renderError = flattened == null ? new Exception("Capture render failed.") : flattened.InnerExceptions.First();
+                                SetVirtualizedRows(detailRows, new[]
+                                {
+                                    new VirtualizedRowDefinition
+                                    {
+                                        Height = 44,
+                                        Build = delegate
+                                        {
+                                            return new TextBlock { Text = "Failed to load captures.", Foreground = Brush("#D9A3A3") };
+                                        }
+                                    }
+                                }, true, null);
+                                if (refreshDetailSelectionUi != null) refreshDetailSelectionUi();
+                                Log("Library detail render failed for " + (renderFolder.Name ?? renderFolder.FolderPath ?? "(unknown)") + ". " + renderError.Message);
+                                renderStopwatch.Stop();
+                                return;
+                            }
+
+                            var snapshot = loadTask.Result ?? new LibraryDetailRenderSnapshot();
+                            var visibleFiles = snapshot.VisibleFiles ?? new List<string>();
+                            var visibleSet = new HashSet<string>(visibleFiles, StringComparer.OrdinalIgnoreCase);
+                            foreach (var stale in selectedDetailFiles.Where(path => !visibleSet.Contains(path)).ToList()) selectedDetailFiles.Remove(stale);
+                            if (snapshot.Groups.Count == 0)
+                            {
+                                SetVirtualizedRows(detailRows, new[]
+                                {
+                                    new VirtualizedRowDefinition
+                                    {
+                                        Height = 44,
+                                        Build = delegate
+                                        {
+                                            return new TextBlock { Text = "No captures found in this folder.", Foreground = Brush("#A7B5BD") };
+                                        }
+                                    }
+                                }, !shouldRestoreDetailScroll, shouldRestoreDetailScroll ? (double?)preservedDetailScrollOffset : null);
+                                if (refreshDetailSelectionUi != null) refreshDetailSelectionUi();
+                                renderStopwatch.Stop();
+                                LogPerformanceSample("LibraryDetailRender", renderStopwatch, "folder=" + (renderFolder.Name ?? renderFolder.FolderPath ?? "(unknown)") + "; rows=1; files=0; size=" + size, 40);
+                                return;
+                            }
+
+                            const int detailTileGap = 8;
+                            var detailColumns = targetDetailColumns;
+                            var virtualRows = new List<VirtualizedRowDefinition>();
+                            foreach (var group in snapshot.Groups)
+                            {
+                                var groupDate = group.CaptureDate;
+                                var groupFiles = group.Files ?? new List<string>();
+                                virtualRows.Add(new VirtualizedRowDefinition
+                                {
+                                    Height = 34,
+                                    Build = delegate
+                                    {
+                                        return new TextBlock
+                                        {
+                                            Text = groupDate.ToString("MMMM d, yyyy"),
+                                            FontSize = 16,
+                                            FontWeight = FontWeights.SemiBold,
+                                            Foreground = Brush("#F1E9DA"),
+                                            Margin = new Thickness(0, 0, 0, 10)
+                                        };
+                                    }
+                                });
+                                for (int rowStart = 0; rowStart < groupFiles.Count; rowStart += detailColumns)
+                                {
+                                    var rowFiles = groupFiles.Skip(rowStart).Take(detailColumns).ToList();
+                                    virtualRows.Add(new VirtualizedRowDefinition
+                                    {
+                                        Height = estimatedDetailRowHeight,
+                                        Build = delegate
+                                        {
+                                            var rowPanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, detailTileGap) };
+                                            for (int fileIndex = 0; fileIndex < rowFiles.Count; fileIndex++)
+                                            {
+                                                var file = rowFiles[fileIndex];
+                                                var tile = CreateLibraryDetailTile(
+                                                    file,
+                                                    size,
+                                                    delegate { return SameLibraryFolderSelection(current, renderFolder); },
+                                                    openSingleFileMetadataEditor,
+                                                    updateDetailSelection,
+                                                    selectedDetailFiles,
+                                                    refreshDetailSelectionUi);
+                                                tile.Margin = new Thickness(0, 0, fileIndex < rowFiles.Count - 1 ? detailTileGap : 0, 0);
+                                                detailTiles.Add(tile);
+                                                rowPanel.Children.Add(tile);
+                                            }
+                                            return rowPanel;
+                                        }
+                                    });
+                                }
+                            }
+                            SetVirtualizedRows(detailRows, virtualRows, !shouldRestoreDetailScroll, shouldRestoreDetailScroll ? (double?)preservedDetailScrollOffset : null);
+                            if (refreshDetailSelectionUi != null) refreshDetailSelectionUi();
+                            renderStopwatch.Stop();
+                            LogPerformanceSample("LibraryDetailRender", renderStopwatch, "folder=" + (renderFolder.Name ?? renderFolder.FolderPath ?? "(unknown)") + "; groups=" + snapshot.Groups.Count + "; files=" + visibleFiles.Count + "; rows=" + virtualRows.Count + "; columns=" + detailColumns + "; size=" + size, 40);
+                        }));
+                    }, TaskScheduler.Default);
                 };
 
                 Func<LibraryFolderInfo, int, int, bool, Button> buildFolderTile = delegate(LibraryFolderInfo folder, int tileWidth, int tileHeight, bool showPlatformBadge)
@@ -4480,7 +4585,7 @@ namespace PixelVaultNative
                         if (string.IsNullOrWhiteSpace(pickedCover)) return;
                         SaveCustomCover(folder, pickedCover);
                         showFolder(folder);
-                        renderTiles(false);
+                        if (renderTiles != null) renderTiles();
                         Log("Custom cover set for " + folder.Name + " | " + folder.PlatformLabel + ".");
                     };
                     var clearCoverItem = new MenuItem { Header = "Clear Custom Cover", IsEnabled = !string.IsNullOrWhiteSpace(CustomCoverPath(folder)) };
@@ -4488,7 +4593,7 @@ namespace PixelVaultNative
                     {
                         ClearCustomCover(folder);
                         showFolder(folder);
-                        renderTiles(false);
+                        if (renderTiles != null) renderTiles();
                         Log("Custom cover cleared for " + folder.Name + " | " + folder.PlatformLabel + ".");
                     };
                     var openFolderItem = new MenuItem { Header = "Open Folder" };
@@ -4501,7 +4606,7 @@ namespace PixelVaultNative
                         OpenLibraryFolderIdEditor(folder, delegate
                         {
                             showFolder(folder);
-                            renderTiles(false);
+                            if (renderTiles != null) renderTiles();
                         });
                     };
                     var refreshFolderItem = new MenuItem { Header = "Refresh Folder" };
@@ -4551,18 +4656,15 @@ namespace PixelVaultNative
                     renderSelectedFolder();
                 };
 
-                renderTiles = delegate(bool forceRefresh)
+                renderTiles = delegate
                 {
                     var renderStopwatch = Stopwatch.StartNew();
                     var restoreFolderScrollOffset = preserveFolderScrollOnNextRender ? Math.Max(0, preservedFolderScrollOffset) : 0;
                     var shouldRestoreFolderScroll = preserveFolderScrollOnNextRender && restoreFolderScrollOffset > 0.1d;
                     preserveFolderScrollOnNextRender = false;
-                    var folderLoadStopwatch = Stopwatch.StartNew();
-                    folders = LoadLibraryFoldersCached(libraryRoot, forceRefresh);
-                    folderLoadStopwatch.Stop();
                     var sortMode = NormalizeLibraryFolderSortMode(libraryFolderSortMode);
                     var flattenGroups = !string.Equals(sortMode, "platform", StringComparison.OrdinalIgnoreCase);
-                    var searchText = string.IsNullOrWhiteSpace(searchBox.Text) ? string.Empty : searchBox.Text.Trim();
+                    var searchText = appliedLibrarySearchText;
                     var filterSortStopwatch = Stopwatch.StartNew();
                     var visibleFolders = string.IsNullOrWhiteSpace(searchText)
                         ? folders
@@ -4588,20 +4690,15 @@ namespace PixelVaultNative
                     lastFolderTileSize = tileWidth;
                     var tileHeight = (int)Math.Round(tileWidth * 1.5d);
                     LibraryFolderInfo selectedFolder = null;
-                    if (orderedVisibleFolders.Count > 0 && current == null) selectedFolder = orderedVisibleFolders[0];
-                    else if (current != null)
+                    if (current != null)
                     {
                         selectedFolder = folders.FirstOrDefault(f => f.FolderPath == current.FolderPath && string.Equals(f.PlatformLabel, current.PlatformLabel, StringComparison.OrdinalIgnoreCase));
                         if (selectedFolder == null) selectedFolder = folders.FirstOrDefault(f => f.FolderPath == current.FolderPath);
                     }
                     if (selectedFolder != null)
                     {
-                        if (forceRefresh || !SameLibraryFolderSelection(current, selectedFolder)) showFolder(selectedFolder);
+                        if (!SameLibraryFolderSelection(current, selectedFolder)) showFolder(selectedFolder);
                         else current = selectedFolder;
-                    }
-                    else if (orderedVisibleFolders.Count > 0)
-                    {
-                        showFolder(orderedVisibleFolders[0]);
                     }
                     else
                     {
@@ -4627,7 +4724,9 @@ namespace PixelVaultNative
                             {
                                 return new TextBlock
                                 {
-                                    Text = string.IsNullOrWhiteSpace(searchText) ? "No library folders found." : "No folders match the current search.",
+                                    Text = libraryFoldersLoading
+                                        ? "Loading library folders..."
+                                        : (string.IsNullOrWhiteSpace(searchText) ? "No library folders found." : "No folders match the current search."),
                                     Foreground = Brush("#A7B5BD"),
                                     Margin = new Thickness(0, 12, 0, 0)
                                 };
@@ -4635,7 +4734,7 @@ namespace PixelVaultNative
                         });
                         SetVirtualizedRows(tileRows, virtualRows, true, null);
                         renderStopwatch.Stop();
-                        LogPerformanceSample("LibraryFolderRender", renderStopwatch, "mode=empty; forceRefresh=" + forceRefresh + "; foldersLoaded=" + folders.Count + "; visible=0; search=" + (string.IsNullOrWhiteSpace(searchText) ? "(none)" : searchText) + "; sort=" + sortMode + "; loadMs=" + folderLoadStopwatch.ElapsedMilliseconds + "; filterMs=" + filterSortStopwatch.ElapsedMilliseconds, 40);
+                        LogPerformanceSample("LibraryFolderRender", renderStopwatch, "mode=" + (libraryFoldersLoading ? "loading" : "empty") + "; foldersLoaded=" + folders.Count + "; visible=0; search=" + (string.IsNullOrWhiteSpace(searchText) ? "(none)" : searchText) + "; sort=" + sortMode + "; loadMs=0; filterMs=" + filterSortStopwatch.ElapsedMilliseconds, 40);
                         return;
                     }
                     if (flattenGroups)
@@ -4656,7 +4755,7 @@ namespace PixelVaultNative
                         }
                         SetVirtualizedRows(tileRows, virtualRows, !shouldRestoreFolderScroll, shouldRestoreFolderScroll ? (double?)restoreFolderScrollOffset : null);
                         renderStopwatch.Stop();
-                        LogPerformanceSample("LibraryFolderRender", renderStopwatch, "mode=flat; forceRefresh=" + forceRefresh + "; foldersLoaded=" + folders.Count + "; visible=" + orderedVisibleFolders.Count + "; rows=" + virtualRows.Count + "; columns=" + folderColumns + "; search=" + (string.IsNullOrWhiteSpace(searchText) ? "(none)" : searchText) + "; sort=" + sortMode + "; loadMs=" + folderLoadStopwatch.ElapsedMilliseconds + "; filterMs=" + filterSortStopwatch.ElapsedMilliseconds, 40);
+                        LogPerformanceSample("LibraryFolderRender", renderStopwatch, "mode=flat; foldersLoaded=" + folders.Count + "; visible=" + orderedVisibleFolders.Count + "; rows=" + virtualRows.Count + "; columns=" + folderColumns + "; search=" + (string.IsNullOrWhiteSpace(searchText) ? "(none)" : searchText) + "; sort=" + sortMode + "; loadMs=0; filterMs=" + filterSortStopwatch.ElapsedMilliseconds, 40);
                         return;
                     }
 
@@ -4703,7 +4802,66 @@ namespace PixelVaultNative
                     }
                     SetVirtualizedRows(tileRows, virtualRows, !shouldRestoreFolderScroll, shouldRestoreFolderScroll ? (double?)restoreFolderScrollOffset : null);
                     renderStopwatch.Stop();
-                    LogPerformanceSample("LibraryFolderRender", renderStopwatch, "mode=grouped; forceRefresh=" + forceRefresh + "; foldersLoaded=" + folders.Count + "; visible=" + orderedVisibleFolders.Count + "; rows=" + virtualRows.Count + "; columns=" + folderColumns + "; search=" + (string.IsNullOrWhiteSpace(searchText) ? "(none)" : searchText) + "; sort=" + sortMode + "; loadMs=" + folderLoadStopwatch.ElapsedMilliseconds + "; filterMs=" + filterSortStopwatch.ElapsedMilliseconds, 40);
+                    LogPerformanceSample("LibraryFolderRender", renderStopwatch, "mode=grouped; foldersLoaded=" + folders.Count + "; visible=" + orderedVisibleFolders.Count + "; rows=" + virtualRows.Count + "; columns=" + folderColumns + "; search=" + (string.IsNullOrWhiteSpace(searchText) ? "(none)" : searchText) + "; sort=" + sortMode + "; loadMs=0; filterMs=" + filterSortStopwatch.ElapsedMilliseconds, 40);
+                };
+
+                refreshLibraryFoldersAsync = delegate(bool forceRefresh)
+                {
+                    var refreshVersion = ++libraryFolderRefreshVersion;
+                    var loadingStatusText = forceRefresh || folders.Count > 0
+                        ? "Refreshing library folders..."
+                        : "Loading library folders...";
+                    libraryFoldersLoading = true;
+                    if (status != null) status.Text = loadingStatusText;
+                    if (renderTiles != null) renderTiles();
+                    System.Threading.Tasks.Task.Factory.StartNew(delegate
+                    {
+                        return LoadLibraryFoldersCached(libraryRoot, forceRefresh);
+                    }).ContinueWith(delegate(System.Threading.Tasks.Task<List<LibraryFolderInfo>> loadTask)
+                    {
+                        libraryWindow.Dispatcher.BeginInvoke(new Action(delegate
+                        {
+                            if (refreshVersion != libraryFolderRefreshVersion) return;
+                            libraryFoldersLoading = false;
+                            if (loadTask.IsFaulted)
+                            {
+                                var flattened = loadTask.Exception == null ? null : loadTask.Exception.Flatten();
+                                var loadError = flattened == null ? new Exception("Library load failed.") : flattened.InnerExceptions.First();
+                                if (status != null && string.Equals(status.Text, loadingStatusText, StringComparison.Ordinal)) status.Text = "Library load failed";
+                                Log(loadError.ToString());
+                                if (renderTiles != null) renderTiles();
+                                MessageBox.Show(loadError.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
+                                return;
+                            }
+
+                            folders = loadTask.Status == TaskStatus.RanToCompletion && loadTask.Result != null
+                                ? loadTask.Result
+                                : new List<LibraryFolderInfo>();
+                            if (status != null && string.Equals(status.Text, loadingStatusText, StringComparison.Ordinal)) status.Text = "Library ready";
+                            if (renderTiles != null) renderTiles();
+                        }));
+                    }, TaskScheduler.Default);
+                };
+
+                prefillLibraryFoldersFromSnapshotAsync = delegate
+                {
+                    System.Threading.Tasks.Task.Factory.StartNew(delegate
+                    {
+                        return LoadLibraryFolderCacheSnapshot(libraryRoot);
+                    }).ContinueWith(delegate(System.Threading.Tasks.Task<List<LibraryFolderInfo>> snapshotTask)
+                    {
+                        libraryWindow.Dispatcher.BeginInvoke(new Action(delegate
+                        {
+                            if (snapshotTask.IsFaulted || folders.Count > 0) return;
+                            var snapshotFolders = snapshotTask.Status == TaskStatus.RanToCompletion && snapshotTask.Result != null
+                                ? snapshotTask.Result
+                                : null;
+                            if (snapshotFolders == null || snapshotFolders.Count == 0) return;
+                            folders = snapshotFolders;
+                            if (status != null) status.Text = "Library ready";
+                            if (renderTiles != null) renderTiles();
+                        }));
+                    }, TaskScheduler.Default);
                 };
 
                 runLibraryScan = delegate(string folderPath, bool forceRescan)
@@ -4714,8 +4872,8 @@ namespace PixelVaultNative
                     ProgressBar progressBar = null;
                     TextBox progressLog = null;
                     Button actionButton = null;
-                    bool cancelRequested = false;
                     bool scanFinished = false;
+                    CancellationTokenSource scanCancellation = null;
                     var progressLines = new List<string>();
                     Action<string> appendProgress = delegate(string line)
                     {
@@ -4768,10 +4926,10 @@ namespace PixelVaultNative
                         {
                             if (!scanFinished)
                             {
-                                cancelRequested = true;
+                                if (scanCancellation != null && !scanCancellation.IsCancellationRequested) scanCancellation.Cancel();
                                 actionButton.IsEnabled = false;
-                                if (progressMeta != null) progressMeta.Text = "Cancel requested. Waiting for the current file to finish...";
-                                appendProgress("Cancel requested. Waiting for the current file to finish.");
+                                if (progressMeta != null) progressMeta.Text = "Cancel requested. Stopping the current metadata read...";
+                                appendProgress("Cancel requested. Stopping the current metadata read.");
                             }
                             else if (progressWindow != null)
                             {
@@ -4808,6 +4966,7 @@ namespace PixelVaultNative
                         System.Windows.Input.Mouse.OverrideCursor = System.Windows.Input.Cursors.Wait;
                         var capturedFolderPath = folderPath;
                         var capturedForceRescan = forceRescan;
+                        scanCancellation = new CancellationTokenSource();
                         System.Threading.Tasks.Task.Factory.StartNew(delegate
                         {
                             return ScanLibraryMetadataIndex(libraryRoot, capturedFolderPath, capturedForceRescan, delegate(int currentCount, int totalCount, string detail)
@@ -4830,12 +4989,17 @@ namespace PixelVaultNative
                                     }
                                     appendProgress(detail);
                                 }));
-                            }, delegate { return cancelRequested; });
+                            }, scanCancellation.Token);
                         }).ContinueWith(delegate(System.Threading.Tasks.Task<int> scanTask)
                         {
                             libraryWindow.Dispatcher.BeginInvoke(new Action(delegate
                             {
                                 scanFinished = true;
+                                if (scanCancellation != null)
+                                {
+                                    scanCancellation.Dispose();
+                                    scanCancellation = null;
+                                }
                                 finishButtons();
                                 if (scanTask.IsCanceled || (scanTask.IsFaulted && scanTask.Exception != null && scanTask.Exception.Flatten().InnerExceptions.Any(ex => ex is OperationCanceledException)))
                                 {
@@ -4860,7 +5024,7 @@ namespace PixelVaultNative
                                     appendProgress("Scan finished successfully.");
                                     if (string.IsNullOrWhiteSpace(folderPath)) current = null;
                                     else current = new LibraryFolderInfo { FolderPath = folderPath, PlatformLabel = current == null ? string.Empty : current.PlatformLabel, Name = current == null ? string.Empty : current.Name };
-                                    renderTiles(false);
+                                    if (refreshLibraryFoldersAsync != null) refreshLibraryFoldersAsync(false);
                                 }
                                 if (actionButton != null)
                                 {
@@ -4873,6 +5037,11 @@ namespace PixelVaultNative
                     catch (Exception ex)
                     {
                         scanFinished = true;
+                        if (scanCancellation != null)
+                        {
+                            scanCancellation.Dispose();
+                            scanCancellation = null;
+                        }
                         finishButtons();
                         status.Text = "Library scan failed";
                         Log(ex.ToString());
@@ -4901,8 +5070,8 @@ namespace PixelVaultNative
                     ProgressBar progressBar = null;
                     TextBox progressLog = null;
                     Button actionButton = null;
-                    bool cancelRequested = false;
                     bool refreshFinished = false;
+                    CancellationTokenSource refreshCancellation = null;
                     var progressLines = new List<string>();
                     Action<string> appendProgress = delegate(string line)
                     {
@@ -4953,10 +5122,10 @@ namespace PixelVaultNative
                         {
                             if (!refreshFinished)
                             {
-                                cancelRequested = true;
+                                if (refreshCancellation != null && !refreshCancellation.IsCancellationRequested) refreshCancellation.Cancel();
                                 actionButton.IsEnabled = false;
-                                if (progressMeta != null) progressMeta.Text = "Cancel requested. Waiting for the current title to finish...";
-                                appendProgress("Cancel requested. Waiting for the current title to finish.");
+                                if (progressMeta != null) progressMeta.Text = "Cancel requested. Stopping the current lookup or download...";
+                                appendProgress("Cancel requested. Stopping the current lookup or download.");
                             }
                             else if (progressWindow != null)
                             {
@@ -4990,6 +5159,7 @@ namespace PixelVaultNative
                         importCommentsButton.IsEnabled = false;
                         manualImportButton.IsEnabled = false;
                         System.Windows.Input.Mouse.OverrideCursor = System.Windows.Input.Cursors.Wait;
+                        refreshCancellation = new CancellationTokenSource();
                         System.Threading.Tasks.Task.Factory.StartNew(delegate
                         {
                             int resolved = 0;
@@ -5014,13 +5184,18 @@ namespace PixelVaultNative
                                     }
                                     appendProgress(detail);
                                 }));
-                            }, delegate { return cancelRequested; }, forceRefreshExistingCovers, out resolved, out coversReady);
+                            }, refreshCancellation.Token, forceRefreshExistingCovers, out resolved, out coversReady);
                             return new[] { resolved, coversReady };
                         }).ContinueWith(delegate(System.Threading.Tasks.Task<int[]> refreshTask)
                         {
                             libraryWindow.Dispatcher.BeginInvoke(new Action(delegate
                             {
                                 refreshFinished = true;
+                                if (refreshCancellation != null)
+                                {
+                                    refreshCancellation.Dispose();
+                                    refreshCancellation = null;
+                                }
                                 finishButtons();
                                 if (refreshTask.IsCanceled || (refreshTask.IsFaulted && refreshTask.Exception != null && refreshTask.Exception.Flatten().InnerExceptions.Any(ex => ex is OperationCanceledException)))
                                 {
@@ -5045,7 +5220,7 @@ namespace PixelVaultNative
                                     status.Text = targetFolders.Count == 1 ? "Folder cover refresh complete" : "Cover refresh complete";
                                     if (progressMeta != null) progressMeta.Text += " | complete";
                                     appendProgress("Cover refresh finished successfully.");
-                                    renderTiles(false);
+                                    if (refreshLibraryFoldersAsync != null) refreshLibraryFoldersAsync(false);
                                     Log((targetFolders.Count == 1 ? "Folder" : "Library") + " cover art refresh complete for " + resolvedScopeLabel + ". Resolved " + resolved + " external ID entr" + (resolved == 1 ? "y" : "ies") + "; " + coversReady + " title" + (coversReady == 1 ? " has" : "s have") + " cover art ready.");
                                 }
                                 if (actionButton != null)
@@ -5059,6 +5234,11 @@ namespace PixelVaultNative
                     catch (Exception ex)
                     {
                         refreshFinished = true;
+                        if (refreshCancellation != null)
+                        {
+                            refreshCancellation.Dispose();
+                            refreshCancellation = null;
+                        }
                         finishButtons();
                         status.Text = "Cover refresh failed";
                         Log(ex.ToString());
@@ -5080,7 +5260,9 @@ namespace PixelVaultNative
                 applySearchFilter = delegate
                 {
                     searchDebounceTimer.Stop();
-                    renderTiles(false);
+                    if (string.Equals(appliedLibrarySearchText, pendingLibrarySearchText, StringComparison.OrdinalIgnoreCase)) return;
+                    appliedLibrarySearchText = pendingLibrarySearchText;
+                    if (renderTiles != null) renderTiles();
                 };
                 searchDebounceTimer.Tick += delegate
                 {
@@ -5141,8 +5323,7 @@ namespace PixelVaultNative
                     RunLibraryMetadataEdit(focusFolder, delegate
                     {
                         current = string.IsNullOrWhiteSpace(focusFolderPath) ? null : new LibraryFolderInfo { FolderPath = focusFolderPath, PlatformLabel = focusPlatformLabel ?? string.Empty, Name = focusName ?? string.Empty };
-                        folders = LoadLibraryFoldersCached(libraryRoot, false);
-                        renderTiles(false);
+                        if (refreshLibraryFoldersAsync != null) refreshLibraryFoldersAsync(false);
                     });
                 };
                 editMetadataButton.Click += delegate { openSelectedLibraryMetadataEditor(); };
@@ -5167,7 +5348,7 @@ namespace PixelVaultNative
                     if (layout.Columns == lastFolderColumns && layout.TileSize == lastFolderTileSize) return;
                     preservedFolderScrollOffset = tileScroll.VerticalOffset;
                     preserveFolderScrollOnNextRender = preservedFolderScrollOffset > 0.1d;
-                    renderTiles(false);
+                    if (renderTiles != null) renderTiles();
                 };
                 thumbScroll.SizeChanged += delegate(object sender, SizeChangedEventArgs e)
                 {
@@ -5190,18 +5371,22 @@ namespace PixelVaultNative
                 };
                 searchBox.TextChanged += delegate
                 {
+                    pendingLibrarySearchText = string.IsNullOrWhiteSpace(searchBox.Text) ? string.Empty : searchBox.Text.Trim();
                     searchDebounceTimer.Stop();
+                    if (string.Equals(pendingLibrarySearchText, appliedLibrarySearchText, StringComparison.OrdinalIgnoreCase)) return;
                     searchDebounceTimer.Start();
                 };
                 searchBox.KeyDown += delegate(object sender, System.Windows.Input.KeyEventArgs e)
                 {
                     if (e.Key != System.Windows.Input.Key.Enter) return;
-                    applySearchFilter();
+                    pendingLibrarySearchText = string.IsNullOrWhiteSpace(searchBox.Text) ? string.Empty : searchBox.Text.Trim();
+                    if (!string.Equals(pendingLibrarySearchText, appliedLibrarySearchText, StringComparison.OrdinalIgnoreCase)) applySearchFilter();
                     e.Handled = true;
                 };
                 searchBox.LostKeyboardFocus += delegate
                 {
-                    if (searchDebounceTimer.IsEnabled) applySearchFilter();
+                    pendingLibrarySearchText = string.IsNullOrWhiteSpace(searchBox.Text) ? string.Empty : searchBox.Text.Trim();
+                    if (searchDebounceTimer.IsEnabled || !string.Equals(pendingLibrarySearchText, appliedLibrarySearchText, StringComparison.OrdinalIgnoreCase)) applySearchFilter();
                 };
                 libraryWindow.Activated += delegate
                 {
@@ -5209,9 +5394,13 @@ namespace PixelVaultNative
                 };
 
                 refreshSortButtons();
-                renderTiles(false);
-                if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge();
                 if (!reuseMainWindow) libraryWindow.Show();
+                if (renderTiles != null) renderTiles();
+                if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge();
+                var autoRefreshLibraryFoldersOnStartup = !HasLibraryFolderCacheSnapshot(libraryRoot);
+                if (!autoRefreshLibraryFoldersOnStartup && status != null) status.Text = "Loading cached library folders...";
+                if (prefillLibraryFoldersFromSnapshotAsync != null) prefillLibraryFoldersFromSnapshotAsync();
+                if (refreshLibraryFoldersAsync != null && autoRefreshLibraryFoldersOnStartup) refreshLibraryFoldersAsync(false);
             }
             catch (Exception ex)
             {
@@ -5627,6 +5816,21 @@ namespace PixelVaultNative
             if (File.Exists(path)) File.Delete(path);
         }
 
+        bool HasLibraryFolderCacheSnapshot(string root)
+        {
+            var path = LibraryFolderCachePath(root);
+            if (!File.Exists(path)) return false;
+            try
+            {
+                var header = File.ReadLines(path).Take(2).ToArray();
+                return header.Length >= 2 && string.Equals(header[0], root, StringComparison.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         List<LibraryFolderInfo> LoadLibraryFolderCache(string root, string stamp)
         {
             var path = LibraryFolderCachePath(root);
@@ -5635,6 +5839,21 @@ namespace PixelVaultNative
             if (lines.Length < 2) return null;
             if (!string.Equals(lines[0], root, StringComparison.OrdinalIgnoreCase)) return null;
             if (!string.Equals(lines[1], stamp, StringComparison.Ordinal)) return null;
+            return ParseLibraryFolderCacheLines(root, lines);
+        }
+
+        List<LibraryFolderInfo> LoadLibraryFolderCacheSnapshot(string root)
+        {
+            var path = LibraryFolderCachePath(root);
+            if (!File.Exists(path)) return null;
+            var lines = File.ReadAllLines(path);
+            if (lines.Length < 2) return null;
+            if (!string.Equals(lines[0], root, StringComparison.OrdinalIgnoreCase)) return null;
+            return ParseLibraryFolderCacheLines(root, lines);
+        }
+
+        List<LibraryFolderInfo> ParseLibraryFolderCacheLines(string root, string[] lines)
+        {
             var aliasMap = BuildSavedGameIdAliasMapFromFile(root);
             var list = new List<LibraryFolderInfo>();
             foreach (var line in lines.Skip(2))
@@ -5652,7 +5871,7 @@ namespace PixelVaultNative
                         PreviewImagePath = parts[4],
                         PlatformLabel = parts[5],
                         FilePaths = parts.Length > 6 && !string.IsNullOrWhiteSpace(parts[6])
-                            ? parts[6].Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries).Where(File.Exists).ToArray()
+                            ? parts[6].Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries).Distinct(StringComparer.OrdinalIgnoreCase).ToArray()
                             : new string[0],
                         NewestCaptureUtcTicks = parts.Length > 9 ? ParseLong(parts[9]) : 0,
                         SteamAppId = parts.Length > 7 ? parts[7] : string.Empty,
@@ -5670,7 +5889,7 @@ namespace PixelVaultNative
                         PreviewImagePath = parts[4],
                         PlatformLabel = parts[5],
                         FilePaths = parts.Length > 6 && !string.IsNullOrWhiteSpace(parts[6])
-                            ? parts[6].Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries).Where(File.Exists).ToArray()
+                            ? parts[6].Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries).Distinct(StringComparer.OrdinalIgnoreCase).ToArray()
                             : new string[0],
                         NewestCaptureUtcTicks = 0,
                         SteamAppId = parts.Length > 7 ? parts[7] : string.Empty,
@@ -5688,7 +5907,7 @@ namespace PixelVaultNative
                         PreviewImagePath = parts[3],
                         PlatformLabel = parts[4],
                         FilePaths = parts.Length > 5 && !string.IsNullOrWhiteSpace(parts[5])
-                            ? parts[5].Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries).Where(File.Exists).ToArray()
+                            ? parts[5].Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries).Distinct(StringComparer.OrdinalIgnoreCase).ToArray()
                             : new string[0],
                         NewestCaptureUtcTicks = 0,
                         SteamAppId = parts.Length > 6 ? parts[6] : string.Empty,
@@ -5843,21 +6062,22 @@ namespace PixelVaultNative
             return loose.Count == 1 ? loose[0].Item1 : null;
         }
 
-        string TryResolveSteamGridDbIdBySteamAppId(string steamAppId)
+        string TryResolveSteamGridDbIdBySteamAppId(string steamAppId, CancellationToken cancellationToken = default(CancellationToken))
         {
-            return coverService.TryResolveSteamGridDbIdBySteamAppId(steamAppId);
+            return coverService.TryResolveSteamGridDbIdBySteamAppId(steamAppId, cancellationToken);
         }
 
-        string TryResolveSteamGridDbIdByName(string title)
+        string TryResolveSteamGridDbIdByName(string title, CancellationToken cancellationToken = default(CancellationToken))
         {
-            return coverService.TryResolveSteamGridDbIdByName(title);
+            return coverService.TryResolveSteamGridDbIdByName(title, cancellationToken);
         }
 
-        string ResolveBestLibraryFolderSteamGridDbId(string root, LibraryFolderInfo folder)
+        string ResolveBestLibraryFolderSteamGridDbId(string root, LibraryFolderInfo folder, CancellationToken cancellationToken = default(CancellationToken))
         {
             if (folder == null || string.IsNullOrWhiteSpace(folder.Name) || !HasSteamGridDbApiToken()) return string.Empty;
             if (folder.SuppressSteamGridDbIdAutoResolve) return string.Empty;
             if (!string.IsNullOrWhiteSpace(folder.SteamGridDbId)) return folder.SteamGridDbId;
+            cancellationToken.ThrowIfCancellationRequested();
             var saved = FindSavedGameIndexRow(LoadSavedGameIndexRows(root), folder);
             if (saved != null && saved.SuppressSteamGridDbIdAutoResolve)
             {
@@ -5871,12 +6091,12 @@ namespace PixelVaultNative
                 folder.SuppressSteamGridDbIdAutoResolve = false;
                 return folder.SteamGridDbId;
             }
-            var steamGridDbId = TryResolveSteamGridDbIdByName(folder.Name);
+            var steamGridDbId = TryResolveSteamGridDbIdByName(folder.Name, cancellationToken);
             if (string.IsNullOrWhiteSpace(steamGridDbId) && ShouldUseSteamStoreLookups(folder))
             {
-                var appId = ResolveBestLibraryFolderSteamAppId(root, folder);
+                var appId = ResolveBestLibraryFolderSteamAppId(root, folder, true, cancellationToken);
                 steamGridDbId = !string.IsNullOrWhiteSpace(appId)
-                    ? TryResolveSteamGridDbIdBySteamAppId(appId)
+                    ? TryResolveSteamGridDbIdBySteamAppId(appId, cancellationToken)
                     : null;
             }
             if (!string.IsNullOrWhiteSpace(steamGridDbId))
@@ -5887,11 +6107,12 @@ namespace PixelVaultNative
             return folder.SteamGridDbId ?? string.Empty;
         }
 
-        string ResolveBestLibraryFolderSteamAppId(string root, LibraryFolderInfo folder, bool allowLookup = true)
+        string ResolveBestLibraryFolderSteamAppId(string root, LibraryFolderInfo folder, bool allowLookup = true, CancellationToken cancellationToken = default(CancellationToken))
         {
             if (folder == null || string.IsNullOrWhiteSpace(folder.Name)) return string.Empty;
             if (folder.SuppressSteamAppIdAutoResolve) return string.Empty;
             if (!string.IsNullOrWhiteSpace(folder.SteamAppId)) return folder.SteamAppId;
+            cancellationToken.ThrowIfCancellationRequested();
             var saved = FindSavedGameIndexRow(LoadSavedGameIndexRows(root), folder);
             if (saved != null && saved.SuppressSteamAppIdAutoResolve)
             {
@@ -5908,7 +6129,7 @@ namespace PixelVaultNative
             if (!ShouldUseSteamStoreLookups(folder)) return string.Empty;
             if (!allowLookup) return folder.SteamAppId ?? string.Empty;
             var appId = ResolveLibraryFolderSteamAppId(folder.PlatformLabel, folder.FilePaths ?? new string[0]);
-            if (string.IsNullOrWhiteSpace(appId)) appId = TryResolveSteamAppId(folder.Name);
+            if (string.IsNullOrWhiteSpace(appId)) appId = TryResolveSteamAppId(folder.Name, cancellationToken);
             if (!string.IsNullOrWhiteSpace(appId))
             {
                 folder.SteamAppId = appId;
@@ -5973,7 +6194,7 @@ namespace PixelVaultNative
             coverService.DeleteCachedCover(title);
         }
 
-        string ForceRefreshLibraryArt(LibraryFolderInfo folder)
+        string ForceRefreshLibraryArt(LibraryFolderInfo folder, CancellationToken cancellationToken = default(CancellationToken))
         {
             if (folder == null) return null;
             var custom = CustomCoverPath(folder);
@@ -5990,14 +6211,14 @@ namespace PixelVaultNative
                 }
 
                 DeleteCachedCover(folder.Name);
-                var steamGridDbDownloaded = TryDownloadSteamGridDbCover(folder);
+                var steamGridDbDownloaded = TryDownloadSteamGridDbCover(folder, cancellationToken);
                 if (!string.IsNullOrWhiteSpace(steamGridDbDownloaded) && File.Exists(steamGridDbDownloaded))
                 {
                     if (!string.IsNullOrWhiteSpace(backupPath) && File.Exists(backupPath)) File.Delete(backupPath);
                     return steamGridDbDownloaded;
                 }
 
-                var steamDownloaded = TryDownloadSteamCover(folder);
+                var steamDownloaded = TryDownloadSteamCover(folder, cancellationToken);
                 if (!string.IsNullOrWhiteSpace(steamDownloaded) && File.Exists(steamDownloaded))
                 {
                     if (!string.IsNullOrWhiteSpace(backupPath) && File.Exists(backupPath)) File.Delete(backupPath);
@@ -6037,7 +6258,7 @@ namespace PixelVaultNative
             return CachedCoverPath(folder.Name);
         }
 
-        void RefreshLibraryCovers(string root, List<LibraryFolderInfo> folders, Action<int, int, string> progress, Func<bool> isCancellationRequested, bool forceRefreshExistingCovers, out int resolvedIds, out int coversReady)
+        void RefreshLibraryCovers(string root, List<LibraryFolderInfo> folders, Action<int, int, string> progress, CancellationToken cancellationToken, bool forceRefreshExistingCovers, out int resolvedIds, out int coversReady)
         {
             resolvedIds = 0;
             coversReady = 0;
@@ -6056,13 +6277,13 @@ namespace PixelVaultNative
             var completed = 0;
             for (int i = 0; i < targetFolders.Count; i++)
             {
-                if (isCancellationRequested != null && isCancellationRequested()) throw new OperationCanceledException("Cover refresh cancelled.");
+                cancellationToken.ThrowIfCancellationRequested();
                 var folder = targetFolders[i];
                 var itemLabel = "Game " + (i + 1) + " of " + targetFolders.Count + " | " + folder.Name;
                 var hadAppId = !string.IsNullOrWhiteSpace(folder.SteamAppId);
                 var hadSteamGridDbId = !string.IsNullOrWhiteSpace(folder.SteamGridDbId);
-                var steamGridDbId = ResolveBestLibraryFolderSteamGridDbId(root, folder);
-                var appId = ResolveBestLibraryFolderSteamAppId(root, folder, string.IsNullOrWhiteSpace(steamGridDbId));
+                var steamGridDbId = ResolveBestLibraryFolderSteamGridDbId(root, folder, cancellationToken);
+                var appId = ResolveBestLibraryFolderSteamAppId(root, folder, string.IsNullOrWhiteSpace(steamGridDbId), cancellationToken);
                 if ((!hadAppId && !string.IsNullOrWhiteSpace(appId)) || (!hadSteamGridDbId && !string.IsNullOrWhiteSpace(steamGridDbId)))
                 {
                     resolvedIds++;
@@ -6080,14 +6301,14 @@ namespace PixelVaultNative
                         ? "STID " + steamGridDbId
                         : (!string.IsNullOrWhiteSpace(appId) ? "AppID " + appId : "no external ID"));
                 if (progress != null) progress(completed, totalWork, itemLabel + " | " + idDetail);
-                if (isCancellationRequested != null && isCancellationRequested()) throw new OperationCanceledException("Cover refresh cancelled.");
+                cancellationToken.ThrowIfCancellationRequested();
                 var hasCustomCover = !string.IsNullOrWhiteSpace(CustomCoverPath(folder));
                 var hadCachedCover = CachedCoverPath(folder.Name) != null;
                 var coverReady = hasCustomCover || hadCachedCover;
                 var coverDetail = coverReady ? "cover already present" : "cover missing";
                 if (forceRefreshExistingCovers && hadCachedCover && !hasCustomCover)
                 {
-                    var refreshedCover = ForceRefreshLibraryArt(folder);
+                    var refreshedCover = ForceRefreshLibraryArt(folder, cancellationToken);
                     coverReady = !string.IsNullOrWhiteSpace(refreshedCover) && File.Exists(refreshedCover);
                     coverDetail = coverReady ? "cover refreshed" : "cover refresh not available";
                 }
@@ -6097,7 +6318,7 @@ namespace PixelVaultNative
                 }
                 else if (!coverReady)
                 {
-                    ResolveLibraryArt(folder, true);
+                    ResolveLibraryArt(folder, true, cancellationToken);
                     coverReady = HasDedicatedLibraryCover(folder);
                     coverDetail = coverReady ? "cover ready" : "cover not available";
                 }
@@ -6130,7 +6351,7 @@ namespace PixelVaultNative
             SaveLibraryFolderCache(root, stamp, cached);
         }
 
-        string ResolveLibraryArt(LibraryFolderInfo folder, bool allowDownload)
+        string ResolveLibraryArt(LibraryFolderInfo folder, bool allowDownload, CancellationToken cancellationToken = default(CancellationToken))
         {
             var custom = CustomCoverPath(folder);
             if (!string.IsNullOrWhiteSpace(custom)) return custom;
@@ -6138,9 +6359,9 @@ namespace PixelVaultNative
             if (cached != null) return cached;
             if (allowDownload)
             {
-                var steamGridDbDownloaded = TryDownloadSteamGridDbCover(folder);
+                var steamGridDbDownloaded = TryDownloadSteamGridDbCover(folder, cancellationToken);
                 if (steamGridDbDownloaded != null) return steamGridDbDownloaded;
-                var downloaded = TryDownloadSteamCover(folder);
+                var downloaded = TryDownloadSteamCover(folder, cancellationToken);
                 if (downloaded != null) return downloaded;
             }
             return folder.PreviewImagePath;
@@ -6184,13 +6405,13 @@ namespace PixelVaultNative
             return coverService.CachedCoverPath(title);
         }
 
-        string TryDownloadSteamCover(LibraryFolderInfo folder)
+        string TryDownloadSteamCover(LibraryFolderInfo folder, CancellationToken cancellationToken = default(CancellationToken))
         {
             if (folder == null) return null;
             try
             {
-                var appId = ResolveBestLibraryFolderSteamAppId(libraryRoot, folder, string.IsNullOrWhiteSpace(folder.SteamGridDbId));
-                var downloaded = coverService.TryDownloadSteamCover(folder.Name, appId);
+                var appId = ResolveBestLibraryFolderSteamAppId(libraryRoot, folder, string.IsNullOrWhiteSpace(folder.SteamGridDbId), cancellationToken);
+                var downloaded = coverService.TryDownloadSteamCover(folder.Name, appId, cancellationToken);
                 if (!string.IsNullOrWhiteSpace(downloaded) && File.Exists(downloaded))
                 {
                     folder.PreviewImagePath = downloaded;
@@ -6198,23 +6419,31 @@ namespace PixelVaultNative
                     return downloaded;
                 }
             }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
             catch { }
             return null;
         }
 
-        string TryDownloadSteamGridDbCover(LibraryFolderInfo folder)
+        string TryDownloadSteamGridDbCover(LibraryFolderInfo folder, CancellationToken cancellationToken = default(CancellationToken))
         {
             if (folder == null || !HasSteamGridDbApiToken()) return null;
             try
             {
-                var steamGridDbId = ResolveBestLibraryFolderSteamGridDbId(libraryRoot, folder);
-                var downloaded = coverService.TryDownloadSteamGridDbCover(folder.Name, steamGridDbId);
+                var steamGridDbId = ResolveBestLibraryFolderSteamGridDbId(libraryRoot, folder, cancellationToken);
+                var downloaded = coverService.TryDownloadSteamGridDbCover(folder.Name, steamGridDbId, cancellationToken);
                 if (!string.IsNullOrWhiteSpace(downloaded) && File.Exists(downloaded))
                 {
                     folder.PreviewImagePath = downloaded;
                     UpdateCachedLibraryFolderInfo(libraryRoot, folder);
                     return downloaded;
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -6253,14 +6482,14 @@ namespace PixelVaultNative
             UpsertSavedGameIndexRow(root, folder);
         }
 
-        string TryResolveSteamAppId(string title)
+        string TryResolveSteamAppId(string title, CancellationToken cancellationToken = default(CancellationToken))
         {
-            return coverService.TryResolveSteamAppId(title);
+            return coverService.TryResolveSteamAppId(title, cancellationToken);
         }
 
-        List<Tuple<string, string>> SearchSteamAppMatches(string title)
+        List<Tuple<string, string>> SearchSteamAppMatches(string title, CancellationToken cancellationToken = default(CancellationToken))
         {
-            return coverService.SearchSteamAppMatches(title) ?? new List<Tuple<string, string>>();
+            return coverService.SearchSteamAppMatches(title, cancellationToken) ?? new List<Tuple<string, string>>();
         }
 
         BitmapImage LoadImageSource(string path, int decodePixelWidth)
@@ -6303,9 +6532,9 @@ namespace PixelVaultNative
             }
         }
 
-        string SteamName(string appId)
+        string SteamName(string appId, CancellationToken cancellationToken = default(CancellationToken))
         {
-            return coverService.SteamName(appId);
+            return coverService.SteamName(appId, cancellationToken);
         }
 
         Tuple<string, string> ShowSteamAppMatchWindow(string query, List<Tuple<string, string>> matches)
@@ -6657,6 +6886,18 @@ namespace PixelVaultNative
                         || string.Equals(currentDir.Name, "PixelVault-current", StringComparison.OrdinalIgnoreCase)))
                 {
                     return Path.Combine(currentDir.Parent.Parent.FullName, "PixelVaultData");
+                }
+
+                var probe = currentDir;
+                while (probe != null)
+                {
+                    var pixelVaultDataPath = Path.Combine(probe.FullName, "PixelVaultData");
+                    var sourceProjectPath = Path.Combine(probe.FullName, "src", "PixelVault.Native");
+                    if (Directory.Exists(pixelVaultDataPath) && Directory.Exists(sourceProjectPath))
+                    {
+                        return pixelVaultDataPath;
+                    }
+                    probe = probe.Parent;
                 }
             }
             catch { }
@@ -7364,12 +7605,12 @@ namespace PixelVaultNative
                                 var resolvedAppIds = ResolveMissingGameIndexSteamAppIds(libraryRoot, rowsToResolve, delegate(int current, int total, string detail)
                                 {
                                     reportProgress(appIdOffset + current, detail);
-                                });
+                                }, cancellationToken);
                                 ThrowIfWorkflowCancellationRequested(cancellationToken, "Game index resolve");
                                 var resolvedSteamGridDbIds = ResolveMissingGameIndexSteamGridDbIds(libraryRoot, rowsToResolve, delegate(int current, int total, string detail)
                                 {
                                     reportProgress(steamGridDbOffset + current, detail);
-                                });
+                                }, cancellationToken);
                                 ThrowIfWorkflowCancellationRequested(cancellationToken, "Game index resolve");
                                 reportProgress(totalWork, "Game index ID resolution complete.");
                                 return new[] { resolvedAppIds, resolvedSteamGridDbIds };

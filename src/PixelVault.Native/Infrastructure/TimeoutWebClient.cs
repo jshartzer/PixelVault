@@ -36,41 +36,78 @@ namespace PixelVaultNative
             return request;
         }
 
-        public string DownloadString(string address)
+        CancellationTokenSource CreateRequestCancellation(CancellationToken cancellationToken)
         {
-            using (var request = BuildRequest(HttpMethod.Get, address))
-            using (var cts = new CancellationTokenSource(TimeoutMilliseconds))
-            using (var response = client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cts.Token).GetAwaiter().GetResult())
+            if (TimeoutMilliseconds > 0)
             {
-                response.EnsureSuccessStatusCode();
-                var bytes = response.Content.ReadAsByteArrayAsync().GetAwaiter().GetResult();
-                var charset = response.Content.Headers.ContentType == null ? null : response.Content.Headers.ContentType.CharSet;
-                if (!string.IsNullOrWhiteSpace(charset))
-                {
-                    try
-                    {
-                        return System.Text.Encoding.GetEncoding(charset).GetString(bytes);
-                    }
-                    catch
-                    {
-                    }
-                }
-
-                return (Encoding ?? System.Text.Encoding.UTF8).GetString(bytes);
+                var linked = cancellationToken.CanBeCanceled
+                    ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken)
+                    : new CancellationTokenSource();
+                linked.CancelAfter(TimeoutMilliseconds);
+                return linked;
             }
+
+            return cancellationToken.CanBeCanceled
+                ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken)
+                : null;
         }
 
-        public void DownloadFile(string address, string filePath)
+        static CancellationToken ResolveRequestToken(CancellationTokenSource requestCancellation, CancellationToken fallbackToken)
+        {
+            return requestCancellation == null ? fallbackToken : requestCancellation.Token;
+        }
+
+        public string DownloadString(string address, CancellationToken cancellationToken = default(CancellationToken))
         {
             using (var request = BuildRequest(HttpMethod.Get, address))
-            using (var cts = new CancellationTokenSource(TimeoutMilliseconds))
-            using (var response = client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cts.Token).GetAwaiter().GetResult())
+            using (var requestCancellation = CreateRequestCancellation(cancellationToken))
+            using (var response = client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ResolveRequestToken(requestCancellation, cancellationToken)).GetAwaiter().GetResult())
             {
                 response.EnsureSuccessStatusCode();
                 using (var stream = response.Content.ReadAsStreamAsync().GetAwaiter().GetResult())
-                using (var target = File.Create(filePath))
+                using (var buffer = new MemoryStream())
                 {
-                    stream.CopyTo(target);
+                    stream.CopyToAsync(buffer, 81920, ResolveRequestToken(requestCancellation, cancellationToken)).GetAwaiter().GetResult();
+                    var bytes = buffer.ToArray();
+                    var charset = response.Content.Headers.ContentType == null ? null : response.Content.Headers.ContentType.CharSet;
+                    if (!string.IsNullOrWhiteSpace(charset))
+                    {
+                        try
+                        {
+                            return System.Text.Encoding.GetEncoding(charset).GetString(bytes);
+                        }
+                        catch
+                        {
+                        }
+                    }
+
+                    return (Encoding ?? System.Text.Encoding.UTF8).GetString(bytes);
+                }
+            }
+        }
+
+        public void DownloadFile(string address, string filePath, CancellationToken cancellationToken = default(CancellationToken))
+        {
+            using (var request = BuildRequest(HttpMethod.Get, address))
+            using (var requestCancellation = CreateRequestCancellation(cancellationToken))
+            using (var response = client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ResolveRequestToken(requestCancellation, cancellationToken)).GetAwaiter().GetResult())
+            {
+                response.EnsureSuccessStatusCode();
+                try
+                {
+                    using (var stream = response.Content.ReadAsStreamAsync().GetAwaiter().GetResult())
+                    using (var target = File.Create(filePath))
+                    {
+                        stream.CopyToAsync(target, 81920, ResolveRequestToken(requestCancellation, cancellationToken)).GetAwaiter().GetResult();
+                    }
+                }
+                catch
+                {
+                    if (!string.IsNullOrWhiteSpace(filePath) && File.Exists(filePath))
+                    {
+                        try { File.Delete(filePath); } catch { }
+                    }
+                    throw;
                 }
             }
         }

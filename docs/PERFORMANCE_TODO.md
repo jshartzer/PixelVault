@@ -18,29 +18,36 @@ Source notes folded into this list:
 - Replace the current `thumbScroll` + `thumbContent` queued row append model with a bounded viewport-driven list.
 - Goal: a folder with thousands of captures should not leave thousands of tiles alive in the visual tree.
 - This is the clearest highest-impact Library performance win.
+Status: landed; keep validating scroll stability and off-screen work cancellation on mixed media folders.
 
 2. Cache folder sort keys during library cache/index builds.
 - Add a stored `NewestCaptureUtc`-style field to folder models/cache data.
 - Stop recomputing newest-file timestamps during every `renderTiles` pass, especially for `Recently Added`.
 - Goal: make sort changes, refreshes, and search rerenders avoid repeated file-system walks.
+Status: landed for current cache/index paths; legacy cache fill now uses the ordered cached file list instead of rescanning whole folders.
 
 3. Debounce Library search input.
 - Add a short debounce window around `searchBox.TextChanged` before calling `renderTiles`.
 - Goal: prevent large libraries from re-filtering and re-sorting on every keystroke.
+Status: landed; Library filtering now uses a committed debounced search term so still-typing and case-only changes do not trigger pointless rerenders.
 
 4. Add a small Library performance instrumentation pass.
 - Log timing for folder-cache rebuild, folder sorting, search/filter passes, and selected-folder capture rendering.
 - Goal: make future regressions easier to spot before they become “the Library feels slow.”
+Status: mostly in place; extend only if the next debounce pass needs more visibility.
 
 ## Next
 
 5. Audit long-running UI workflows for real background execution.
 - Review scan/rebuild, import/manual import, and cover-fetch paths for any work that can still block the UI thread.
 - Keep the current progress-window pattern, but tighten where work starts and where dispatcher marshaling happens.
+Status: next.
 
 6. Add cancellation-token support across long-running workflows.
 - Start with library scan, cover fetch, and import-related work where cancellation already exists conceptually.
+- Cover refresh, game-index Steam/SteamGridDB resolution, and library metadata scan now cancel active provider or ExifTool work; remaining work is the manual search/provider paths that still only stop between work items.
 - Goal: make cancellation more uniform and reduce “wait for current file/batch” rough edges.
+Status: landed for the currently known paths, including manual Steam search in the metadata editor.
 
 7. Isolate metadata and library scan work behind services.
 - Prioritize `IMetadataService` and `ILibraryScanner` extractions from the service split plan.

@@ -10,7 +10,19 @@ Use this after touching import, indexing, metadata persistence, or Library behav
 - Keep one small known-good intake sample ready.
 - Keep the NAS-backed test export folder available at `Y:\PixelVault-Test-Exports`.
 
-## Golden Path
+## Minimum Pass
+
+Run this short path after any risky change before moving on to broader manual QA.
+
+1. Launch PixelVault and open the Library.
+2. Run a Library refresh or targeted rescan.
+3. Import one known-good file through the normal intake path.
+4. Confirm the file lands in the expected destination folder and the SQLite-backed data still matches it.
+5. Close and reopen the Library, then verify the imported file still appears in the right folder.
+
+If this path fails, stop and fix that first before spending time on deeper spot checks.
+
+## Expanded Checks
 
 1. Launch PixelVault and open the Library.
 2. Run a Library refresh or targeted rescan.

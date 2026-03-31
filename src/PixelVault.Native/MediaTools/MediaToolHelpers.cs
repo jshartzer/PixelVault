@@ -7,6 +7,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
@@ -36,14 +37,14 @@ namespace PixelVaultNative
             }
         }
 
-        Dictionary<string, string[]> ReadEmbeddedKeywordTagsBatch(IEnumerable<string> files)
+        Dictionary<string, string[]> ReadEmbeddedKeywordTagsBatch(IEnumerable<string> files, CancellationToken cancellationToken = default(CancellationToken))
         {
-            return metadataService.ReadEmbeddedKeywordTagsBatch(files);
+            return metadataService.ReadEmbeddedKeywordTagsBatch(files, cancellationToken);
         }
 
-        Dictionary<string, EmbeddedMetadataSnapshot> ReadEmbeddedMetadataBatch(IEnumerable<string> files)
+        Dictionary<string, EmbeddedMetadataSnapshot> ReadEmbeddedMetadataBatch(IEnumerable<string> files, CancellationToken cancellationToken = default(CancellationToken))
         {
-            return metadataService.ReadEmbeddedMetadataBatch(files);
+            return metadataService.ReadEmbeddedMetadataBatch(files, cancellationToken);
         }
 
         void MoveMetadataSidecarIfPresent(string sourceFile, string targetFile)
@@ -71,7 +72,7 @@ namespace PixelVaultNative
             RunExeCapture(file, args, cwd, logOutput);
         }
 
-        string RunExeCapture(string file, string[] args, string cwd, bool logOutput)
+        string RunExeCapture(string file, string[] args, string cwd, bool logOutput, CancellationToken cancellationToken = default(CancellationToken))
         {
             var psi = new ProcessStartInfo
             {
@@ -85,9 +86,27 @@ namespace PixelVaultNative
             };
             using (var p = Process.Start(psi))
             {
-                var stdout = p.StandardOutput.ReadToEnd();
-                var stderr = p.StandardError.ReadToEnd();
-                p.WaitForExit();
+                var stdoutTask = p.StandardOutput.ReadToEndAsync();
+                var stderrTask = p.StandardError.ReadToEndAsync();
+                try
+                {
+                    p.WaitForExitAsync(cancellationToken).GetAwaiter().GetResult();
+                }
+                catch (OperationCanceledException)
+                {
+                    try
+                    {
+                        if (!p.HasExited) p.Kill(true);
+                    }
+                    catch
+                    {
+                    }
+                    try { p.WaitForExit(); } catch { }
+                    try { Task.WhenAll(stdoutTask, stderrTask).GetAwaiter().GetResult(); } catch { }
+                    throw;
+                }
+                var stdout = stdoutTask.GetAwaiter().GetResult();
+                var stderr = stderrTask.GetAwaiter().GetResult();
                 if (logOutput)
                 {
                     foreach (var line in (stdout + Environment.NewLine + stderr).Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries)) Log(line);
@@ -427,7 +446,7 @@ namespace PixelVaultNative
             return info;
         }
 
-        void WarmVideoClipInfo(string videoPath, Action<VideoClipInfo> onCompleted = null)
+        void WarmVideoClipInfo(string videoPath, Action<VideoClipInfo> onCompleted = null, Func<bool> shouldContinue = null)
         {
             if (string.IsNullOrWhiteSpace(videoPath) || !File.Exists(videoPath)) return;
             var cached = TryLoadCachedVideoClipInfo(videoPath);
@@ -441,8 +460,13 @@ namespace PixelVaultNative
             Task.Run(delegate
             {
                 VideoClipInfo loaded = null;
+                var lockAcquired = false;
                 try
                 {
+                    if (shouldContinue != null && !shouldContinue()) return;
+                    videoClipInfoWarmLimiter.Wait();
+                    lockAcquired = true;
+                    if (shouldContinue != null && !shouldContinue()) return;
                     loaded = EnsureVideoClipInfo(videoPath);
                 }
                 catch
@@ -450,6 +474,7 @@ namespace PixelVaultNative
                 }
                 finally
                 {
+                    if (lockAcquired) videoClipInfoWarmLimiter.Release();
                     byte _;
                     activeVideoInfoGenerations.TryRemove(cachePath, out _);
                 }
@@ -635,15 +660,20 @@ namespace PixelVaultNative
             return null;
         }
 
-        void WarmVideoPreviewClip(string videoPath, int decodePixelWidth)
+        void WarmVideoPreviewClip(string videoPath, int decodePixelWidth, Func<bool> shouldContinue = null)
         {
             var previewPath = VideoPreviewClipPath(videoPath, decodePixelWidth);
             if (string.IsNullOrWhiteSpace(previewPath) || File.Exists(previewPath)) return;
             if (!activeVideoPreviewGenerations.TryAdd(previewPath, 0)) return;
             Task.Run(delegate
             {
+                var lockAcquired = false;
                 try
                 {
+                    if (shouldContinue != null && !shouldContinue()) return;
+                    videoPreviewWarmLimiter.Wait();
+                    lockAcquired = true;
+                    if (shouldContinue != null && !shouldContinue()) return;
                     EnsureVideoPreviewClip(videoPath, decodePixelWidth);
                 }
                 catch
@@ -651,6 +681,7 @@ namespace PixelVaultNative
                 }
                 finally
                 {
+                    if (lockAcquired) videoPreviewWarmLimiter.Release();
                     byte _;
                     activeVideoPreviewGenerations.TryRemove(previewPath, out _);
                 }

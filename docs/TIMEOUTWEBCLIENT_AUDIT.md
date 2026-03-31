@@ -2,6 +2,8 @@
 
 Audit date: 2026-03-27
 
+Updated: 2026-03-29
+
 Scope:
 
 - `C:\Codex\src\PixelVault.Native\Infrastructure\TimeoutWebClient.cs`
@@ -16,6 +18,12 @@ It wraps `HttpClient`, but both `DownloadString` and `DownloadFile` block with `
 That means the core rule is:
 
 - do not call `TimeoutWebClient` work directly from the WPF UI thread
+
+What changed on March 29, 2026:
+
+- `TimeoutWebClient` now accepts a `CancellationToken`
+- cover-refresh and game-index ID-resolution workflows now pass their workflow tokens into Steam and SteamGridDB requests
+- canceling those workflows can stop the active lookup or download instead of waiting only for the next title boundary
 
 ## Audited Call Paths
 
@@ -56,6 +64,7 @@ Status:
 Reason:
 
 - the refresh workflow runs in a background task with progress marshaled back to the UI
+- the cover-refresh cancel action now cancels the active Steam / SteamGridDB request as well as the outer loop
 
 ### Game Index `Resolve IDs`
 
@@ -75,6 +84,7 @@ Status:
 Reason:
 
 - the resolve workflow is already backgrounded and returns only progress / completion state to the UI
+- the workflow cancellation token now reaches the in-flight Steam / SteamGridDB request path
 
 ## Important Non-Issues
 
@@ -97,14 +107,13 @@ Reason:
 - It looks simple to call, but it is still blocking.
 - The new comment in `TimeoutWebClient.cs` should help, but this remains a convention risk.
 
-2. `ResolveLibraryArt(folder, true)` would block if reused on the UI thread
+2. Manual Steam search still has no user-driven cancel affordance
+- The manual Steam AppID search runs on a background task, which keeps the UI responsive.
+- It still does not expose a cancel path to the user if a provider call stalls or they change their mind mid-search.
+
+3. `ResolveLibraryArt(folder, true)` would block if reused on the UI thread
 - Current audited usages are backgrounded.
 - Future callers should not use the download-enabled path from direct UI rendering or click handlers without a worker/task boundary.
-
-3. There are unused local helper constructors still sitting in `PixelVault.Native.cs`
-- `CreateSteamWebClient()`
-- `CreateSteamGridDbWebClient()`
-- These are not part of the current audited live paths, but they are worth removing later so nobody accidentally revives direct in-window network calls.
 
 ## Conclusion
 
@@ -112,13 +121,14 @@ No current high-priority UI-thread blocking issue was found in the audited `Time
 
 The current risk is not “this is still blocking the UI today.”
 
-The real risk is:
+The remaining risk is:
 
 - future direct calls from UI code
 - download-enabled helper paths being reused without a background task boundary
+- long-running workflows that still have cancellation only around the outer loop rather than the active provider call
 
 ## Suggested Follow-Up
 
-1. Remove the unused `CreateSteamWebClient` and `CreateSteamGridDbWebClient` helpers from `PixelVault.Native.cs`
-2. Keep new Steam / cover call sites inside background workflows only
+1. Keep new Steam / cover call sites inside background workflows only
+2. Extend the same request-level cancellation pattern to the remaining provider-backed workflows that still only poll between work items
 3. If the web layer gets touched again, prefer introducing async-first service APIs behind `CoverService`

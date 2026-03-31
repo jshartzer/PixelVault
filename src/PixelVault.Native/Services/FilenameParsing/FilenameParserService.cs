@@ -30,6 +30,7 @@ namespace PixelVaultNative
     {
         readonly FilenameParserServiceDependencies dependencies;
         readonly Dictionary<string, List<FilenameConventionRule>> ruleCache = new Dictionary<string, List<FilenameConventionRule>>(StringComparer.OrdinalIgnoreCase);
+        readonly Dictionary<string, Dictionary<string, KnownSteamRenameLookupEntry>> knownSteamRenameCache = new Dictionary<string, Dictionary<string, KnownSteamRenameLookupEntry>>(StringComparer.OrdinalIgnoreCase);
         readonly Dictionary<string, Regex> regexCache = new Dictionary<string, Regex>(StringComparer.Ordinal);
         readonly object sync = new object();
 
@@ -121,6 +122,7 @@ namespace PixelVaultNative
             lock (sync)
             {
                 ruleCache.Remove(cacheKey);
+                knownSteamRenameCache.Remove(cacheKey);
             }
         }
 
@@ -381,15 +383,10 @@ namespace PixelVaultNative
             var normalizedTitle = NormalizeGameIndexName(result.GameTitleHint);
             if (string.IsNullOrWhiteSpace(normalizedTitle)) return;
 
-            var savedRows = LoadSavedGameIndexRows(root);
-            var matchingRows = savedRows
-                .Where(row => row != null && string.Equals(NormalizeGameIndexName(row.Name), normalizedTitle, StringComparison.OrdinalIgnoreCase))
-                .ToList();
-            if (matchingRows.Count == 0) return;
-
-            var steamRow = matchingRows.FirstOrDefault(IsKnownSteamRow);
-            if (steamRow == null) return;
-            if (matchingRows.Any(row => row != null && !IsKnownSteamRow(row) && !string.Equals(NormalizeConsoleLabel(row.PlatformLabel), "Other", StringComparison.OrdinalIgnoreCase))) return;
+            var knownSteamRows = GetKnownSteamRenameLookup(root);
+            KnownSteamRenameLookupEntry lookupEntry;
+            if (!knownSteamRows.TryGetValue(normalizedTitle, out lookupEntry)) return;
+            if (lookupEntry.HasConflictingPlatform || !lookupEntry.HasSteamMatch) return;
 
             if (needsPlatformResolution)
             {
@@ -403,7 +400,47 @@ namespace PixelVaultNative
 
             if (needsAppIdResolution && string.IsNullOrWhiteSpace(result.SteamAppId))
             {
-                result.SteamAppId = steamRow.SteamAppId ?? string.Empty;
+                result.SteamAppId = lookupEntry.SteamAppId ?? string.Empty;
+            }
+        }
+
+        Dictionary<string, KnownSteamRenameLookupEntry> GetKnownSteamRenameLookup(string root)
+        {
+            var cacheKey = root ?? string.Empty;
+            lock (sync)
+            {
+                Dictionary<string, KnownSteamRenameLookupEntry> cached;
+                if (knownSteamRenameCache.TryGetValue(cacheKey, out cached)) return cached;
+            }
+
+            var lookup = new Dictionary<string, KnownSteamRenameLookupEntry>(StringComparer.OrdinalIgnoreCase);
+            foreach (var row in LoadSavedGameIndexRows(root).Where(row => row != null))
+            {
+                var normalizedTitle = NormalizeGameIndexName(row.Name);
+                if (string.IsNullOrWhiteSpace(normalizedTitle)) continue;
+
+                KnownSteamRenameLookupEntry existing;
+                lookup.TryGetValue(normalizedTitle, out existing);
+                var updated = existing;
+                if (IsKnownSteamRow(row))
+                {
+                    updated.HasSteamMatch = true;
+                    if (string.IsNullOrWhiteSpace(updated.SteamAppId) && !string.IsNullOrWhiteSpace(row.SteamAppId))
+                    {
+                        updated.SteamAppId = row.SteamAppId ?? string.Empty;
+                    }
+                }
+                else if (!string.Equals(NormalizeConsoleLabel(row.PlatformLabel), "Other", StringComparison.OrdinalIgnoreCase))
+                {
+                    updated.HasConflictingPlatform = true;
+                }
+                lookup[normalizedTitle] = updated;
+            }
+
+            lock (sync)
+            {
+                knownSteamRenameCache[cacheKey] = lookup;
+                return lookup;
             }
         }
 
@@ -760,6 +797,13 @@ namespace PixelVaultNative
 
             public bool IsToken { get; }
             public string Value { get; }
+        }
+
+        struct KnownSteamRenameLookupEntry
+        {
+            public bool HasSteamMatch;
+            public bool HasConflictingPlatform;
+            public string SteamAppId;
         }
     }
 }

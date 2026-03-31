@@ -184,12 +184,21 @@ namespace PixelVaultNative
                 .Where(File.Exists)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
+            var missingFiles = allFiles
+                .Where(file =>
+                {
+                    LibraryMetadataIndexEntry entry;
+                    return !index.TryGetValue(file, out entry) || entry == null;
+                })
+                .ToList();
+            var missingTagsByFile = ReadEmbeddedKeywordTagsForFiles(missingFiles);
             foreach (var file in allFiles)
             {
                 LibraryMetadataIndexEntry entry;
                 if (!index.TryGetValue(file, out entry) || entry == null)
                 {
-                    var tags = ReadEmbeddedKeywordTagsDirect(file);
+                    string[] tags;
+                    if (!missingTagsByFile.TryGetValue(file, out tags)) tags = new string[0];
                     var platformLabel = DetermineConsoleLabelFromTags(tags);
                     var gameId = ResolveGameIdForIndexedFile(root, file, platformLabel, tags, index, gameRows);
                     index[file] = new LibraryMetadataIndexEntry
@@ -201,8 +210,6 @@ namespace PixelVaultNative
                         TagText = string.Join(", ", tags)
                     };
                     entry = index[file];
-                    fileTagCache[file] = tags;
-                    fileTagCacheStamp[file] = MetadataCacheStamp(file);
                     indexChanged = true;
                     gameRowsChanged = true;
                 }

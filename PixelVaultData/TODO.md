@@ -19,13 +19,16 @@ For the focused performance backlog, use:
 
 ## Current Focus
 1. Keep moving through Phase 2 UI-thread responsiveness and cancellation work.
-- Finish the remaining cancellation and long-operation consistency cleanup before deeper scanner/service work.
+- Cover refresh, game-index ID resolution, and library scan now cancel active provider or ExifTool work instead of waiting only between titles or batches.
+- Debounced Library search is in and the quick live validation pass looked good.
+- Manual Steam search now supports in-flight cancellation from the metadata editor.
+- Next cleanup: audit the remaining scan/rebuild/import/manual-import paths for work that still starts too close to the UI thread.
 
 2. Keep repo docs and Notion in sync when releases, phase status, or workflow rules change.
 - Follow `C:\Codex\docs\DOC_SYNC_POLICY.md` instead of relying on memory.
 
 3. Pull performance-specific work from the dedicated backlog instead of mixing it into this general list.
-- Start with capture virtualization, cached sort keys, and debounced Library search.
+- Capture virtualization, cached sort keys, debounced Library search, and the remaining manual provider-search cancellation cleanup are in; next up is the broader background-thread audit.
 
 4. Rebuild the Filename Rules screen from a workflow spec instead of adding more controls to the current dense grid.
 - Use `C:\Codex\docs\FILENAME_RULES_FORM_SPEC.md` as the source of truth for the next UI pass.
@@ -36,8 +39,6 @@ For the focused performance backlog, use:
 - Remove the duplicated `refreshButton.IsEnabled = false;` line in the Library refresh block.
 - Add a short comment near the SQLite `PRAGMA foreign_keys=OFF` line explaining the intentional tradeoff.
 - Do a targeted audit of `TimeoutWebClient` call sites and note which ones are guaranteed off the UI thread.
-- Start a manual golden-path checklist for risky changes:
-  Library -> Refresh -> Import one file -> verify SQLite row -> reopen Library
 - When adding new extracted services or helper-heavy files, consider enabling nullable for those files/projects first instead of waiting for a repo-wide pass.
 - If more WinForms usage gets added beyond the current narrow cases, reassess whether that stack should be consolidated.
 
