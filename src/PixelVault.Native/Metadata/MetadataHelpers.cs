@@ -146,14 +146,9 @@ namespace PixelVaultNative
             if (string.IsNullOrWhiteSpace(file) || !File.Exists(file)) return new string[0];
             var stamp = MetadataCacheStamp(file);
             string[] cachedTags;
-            long cachedStamp;
-            if (fileTagCache.TryGetValue(file, out cachedTags) && fileTagCacheStamp.TryGetValue(file, out cachedStamp) && cachedStamp == stamp)
-            {
-                return cachedTags;
-            }
+            if (TryGetCachedFileTags(file, stamp, out cachedTags)) return cachedTags;
             var tags = ReadEmbeddedKeywordTagsDirect(file);
-            fileTagCache[file] = tags;
-            fileTagCacheStamp[file] = stamp;
+            SetCachedFileTags(file, tags, stamp);
             return tags;
         }
 
@@ -162,7 +157,7 @@ namespace PixelVaultNative
             return ExtractConsolePlatformFamilies(GetEmbeddedKeywordTags(file));
         }
 
-        string DetermineFolderPlatform(List<string> files, Dictionary<string, LibraryMetadataIndexEntry> index)
+        string DetermineFolderPlatform(List<string> files, Dictionary<string, LibraryMetadataIndexEntry> index, string root = null)
         {
             var labels = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var file in files)
@@ -171,7 +166,9 @@ namespace PixelVaultNative
                 string indexedLabel;
                 if (index != null && index.TryGetValue(file, out entry))
                 {
-                    indexedLabel = NormalizeConsoleLabel(DetermineConsoleLabelFromTags(ParseTagText(entry.TagText)));
+                    indexedLabel = string.IsNullOrWhiteSpace(entry.ConsoleLabel)
+                        ? NormalizeConsoleLabel(DetermineConsoleLabelFromTags(ParseTagText(entry.TagText)))
+                        : NormalizeConsoleLabel(entry.ConsoleLabel);
                 }
                 else
                 {

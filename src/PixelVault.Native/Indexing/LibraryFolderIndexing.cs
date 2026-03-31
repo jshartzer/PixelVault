@@ -205,9 +205,7 @@ namespace PixelVaultNative
                     var rebuiltEntry = BuildResolvedLibraryMetadataIndexEntry(root, file, stamp, snapshot, entry, index, gameRows);
                     index[file] = rebuiltEntry;
                     entry = rebuiltEntry;
-                    var tags = ParseTagText(rebuiltEntry.TagText);
-                    fileTagCache[file] = tags;
-                    fileTagCacheStamp[file] = MetadataCacheStamp(file);
+                    SetCachedFileTags(file, ParseTagText(rebuiltEntry.TagText), MetadataCacheStamp(file));
                     indexChanged = true;
                     if (!string.Equals(previousGameId, NormalizeGameId(rebuiltEntry.GameId), StringComparison.OrdinalIgnoreCase)
                         || !string.Equals(previousConsole, NormalizeConsoleLabel(rebuiltEntry.ConsoleLabel), StringComparison.OrdinalIgnoreCase))
@@ -218,23 +216,12 @@ namespace PixelVaultNative
                 else if (string.IsNullOrWhiteSpace(entry.GameId))
                 {
                     var tags = ParseTagText(entry.TagText);
-                    entry.GameId = ResolveGameIdForIndexedFile(root, file, DetermineConsoleLabelFromTags(tags), tags, index, gameRows);
+                    var platformLabel = string.IsNullOrWhiteSpace(entry.ConsoleLabel)
+                        ? NormalizeConsoleLabel(DetermineConsoleLabelFromTags(tags))
+                        : NormalizeConsoleLabel(entry.ConsoleLabel);
+                    entry.GameId = ResolveGameIdForIndexedFile(root, file, platformLabel, tags, index, gameRows);
                     indexChanged = true;
                     gameRowsChanged = true;
-                }
-                else
-                {
-                    var tags = ParseTagText(entry.TagText);
-                    var platformLabel = DetermineConsoleLabelFromTags(tags);
-                    var resolvedGameId = ResolveGameIdForIndexedFile(root, file, platformLabel, tags, index, gameRows, entry.GameId);
-                    if (!string.Equals(NormalizeGameId(entry.GameId), NormalizeGameId(resolvedGameId), StringComparison.OrdinalIgnoreCase)
-                        || !string.Equals(NormalizeConsoleLabel(entry.ConsoleLabel), NormalizeConsoleLabel(platformLabel), StringComparison.OrdinalIgnoreCase))
-                    {
-                        entry.GameId = resolvedGameId;
-                        entry.ConsoleLabel = platformLabel;
-                        indexChanged = true;
-                        gameRowsChanged = true;
-                    }
                 }
             }
             var groupedFiles = allFiles
@@ -305,12 +292,12 @@ namespace PixelVaultNative
 
         string ResolveLibraryFolderSteamAppId(string platformLabel, IEnumerable<string> files)
         {
-            if (!string.Equals(NormalizeConsoleLabel(platformLabel), "Steam", StringComparison.OrdinalIgnoreCase)) return string.Empty;
             foreach (var file in files ?? Enumerable.Empty<string>())
             {
                 var appId = GuessSteamAppIdFromFileName(file);
                 if (!string.IsNullOrWhiteSpace(appId)) return appId;
             }
+            if (!string.Equals(NormalizeConsoleLabel(platformLabel), "Steam", StringComparison.OrdinalIgnoreCase)) return string.Empty;
             return string.Empty;
         }
     }

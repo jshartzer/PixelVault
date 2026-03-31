@@ -10,18 +10,21 @@ namespace PixelVaultNative
     {
         void RebuildLibraryFolderCache(string root, Dictionary<string, LibraryMetadataIndexEntry> index)
         {
-            if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root))
+            lock (libraryMaintenanceSync)
             {
-                ClearLibraryFolderCache(root);
-                return;
+                if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root))
+                {
+                    ClearLibraryFolderCache(root);
+                    return;
+                }
+                var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+                Log("Rebuilding library folder cache.");
+                var fresh = LoadLibraryFolders(root, index);
+                ApplySavedGameIndexRows(root, fresh);
+                SaveLibraryFolderCache(root, BuildLibraryFolderInventoryStamp(root), fresh);
+                stopwatch.Stop();
+                Log("Library folder cache rebuild complete in " + stopwatch.ElapsedMilliseconds + " ms for " + fresh.Count + " folder(s).");
             }
-            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-            Log("Rebuilding library folder cache.");
-            var fresh = LoadLibraryFolders(root, index);
-            ApplySavedGameIndexRows(root, fresh);
-            SaveLibraryFolderCache(root, BuildLibraryFolderInventoryStamp(root), fresh);
-            stopwatch.Stop();
-            Log("Library folder cache rebuild complete in " + stopwatch.ElapsedMilliseconds + " ms for " + fresh.Count + " folder(s).");
         }
 
         List<GameIndexEditorRow> LoadGameIndexEditorRows(string root)

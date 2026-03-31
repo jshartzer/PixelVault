@@ -1,3 +1,28 @@
+## 0.821
+- Hardened shared log-file access so PixelVault reads and appends `PixelVault-native.log` with shared file access and short retries instead of letting a transient log-file race block startup.
+- This prevents the current build from failing to open just because another PixelVault process or thread touched the shared log at the same moment.
+
+## 0.820
+- Moved the remaining manual metadata rebuild controls out of the main Library view and into Settings, including selected-folder rebuilds, so everyday browsing stays focused on refresh, covers, and editing.
+- Changed the Library `Refresh` and folder `Refresh Folder` actions to stay lightweight and refresh folder/cache state without launching metadata scans or rewriting metadata.
+- Serialized library maintenance work that mutates the shared metadata and tag caches, which prevents the rebuild/refresh overlap that was throwing collection-corruption exceptions during large library scans.
+
+## 0.819
+- Restored the Library `Fetch Covers` button to full-library refresh behavior instead of limiting it to the currently selected game.
+- Changed cover download order to prefer Steam portrait art first, then fall back to SteamGridDB via STID when Steam does not have a usable portrait cover.
+- Always allow Steam AppID lookup during cover refresh so Steam portrait fallback still works even when a title already has an STID cached.
+
+## 0.818
+- Fixed shared SQLite metadata-index loads so stored `console_label` values survive restart instead of being recomputed from sparse tags and collapsing Steam files back to `Other`.
+- Normalized folder-derived game names by stripping repeated platform suffixes like `- Steam` and `- PS5` before they reach the saved game index.
+- Pruned stale zero-file `Other` rows when a live platform-specific row already exists for the same game, which stops duplicate `Other` entries from resurfacing in Game Index.
+
+## 0.817
+- Stopped library scans and folder-cache rebuilds from re-parsing filenames to change stored game or platform assignments after import, so the saved photo/game index stays authoritative unless the user edits it.
+- Reused per-file intake analysis across the review queue and manual queue builders so upload-queue preview generation no longer repeats the same parse and capture-date work for the same files.
+- Kept Steam AppID and cover-ID recovery available for stale library rows by allowing ID lookups from filename/title hints without rewriting the stored game or platform labels.
+- Hardened published-build data migration so stale cache files inside older `dist` releases can no longer overwrite the shared `PixelVaultData` index on startup.
+
 ## 0.816
 - Cached capture timestamps in the library metadata index so folder ordering and grouped Library detail renders can reuse indexed times instead of deriving capture dates file-by-file every time.
 - Added an in-place SQLite upgrade for `photo_index` plus background backfill of missing capture timestamps during folder rebuilds and first detail selection, which cuts the first-click cost on laggy folders without requiring a cache reset.

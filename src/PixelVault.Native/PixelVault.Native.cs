@@ -39,7 +39,7 @@ namespace PixelVaultNative
 
     public sealed partial class MainWindow : Window
     {
-        const string AppVersion = "0.816";
+        const string AppVersion = "0.821";
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
         const string ClearedExternalIdSentinel = "__PV_CLEARED__";
@@ -69,8 +69,12 @@ namespace PixelVaultNative
         readonly Dictionary<string, long> folderImageCacheStamp = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
         readonly Dictionary<string, string[]> fileTagCache = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
         readonly Dictionary<string, long> fileTagCacheStamp = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+        readonly object fileTagCacheSync = new object();
 
         readonly Dictionary<string, LibraryMetadataIndexEntry> libraryMetadataIndex = new Dictionary<string, LibraryMetadataIndexEntry>(StringComparer.OrdinalIgnoreCase);
+        readonly object libraryMetadataIndexSync = new object();
+        readonly object libraryMaintenanceSync = new object();
+        readonly object logFileSync = new object();
         string libraryMetadataIndexRoot;
 
         string sourceRoot;
@@ -81,6 +85,8 @@ namespace PixelVaultNative
         string steamGridDbApiToken;
         int libraryFolderTileSize = 240;
         string libraryFolderSortMode = "platform";
+        Action<bool> activeLibraryFolderRefresh;
+        LibraryFolderInfo activeSelectedLibraryFolder;
 
         RichTextBox previewBox;
         TextBox logBox;
@@ -108,6 +114,81 @@ namespace PixelVaultNative
         {
             public DateTime CaptureDate;
             public List<string> Files = new List<string>();
+        }
+
+        LibraryMetadataIndexEntry CloneLibraryMetadataIndexEntry(LibraryMetadataIndexEntry entry)
+        {
+            if (entry == null) return null;
+            return new LibraryMetadataIndexEntry
+            {
+                FilePath = entry.FilePath,
+                Stamp = entry.Stamp,
+                GameId = NormalizeGameId(entry.GameId),
+                ConsoleLabel = entry.ConsoleLabel,
+                TagText = entry.TagText,
+                CaptureUtcTicks = entry.CaptureUtcTicks
+            };
+        }
+
+        Dictionary<string, LibraryMetadataIndexEntry> CloneLibraryMetadataIndexEntries(IEnumerable<KeyValuePair<string, LibraryMetadataIndexEntry>> entries)
+        {
+            var clone = new Dictionary<string, LibraryMetadataIndexEntry>(StringComparer.OrdinalIgnoreCase);
+            foreach (var pair in entries ?? Enumerable.Empty<KeyValuePair<string, LibraryMetadataIndexEntry>>())
+            {
+                if (string.IsNullOrWhiteSpace(pair.Key) || pair.Value == null) continue;
+                clone[pair.Key] = CloneLibraryMetadataIndexEntry(pair.Value);
+            }
+            return clone;
+        }
+
+        LibraryFolderInfo CloneLibraryFolderInfo(LibraryFolderInfo folder)
+        {
+            if (folder == null) return null;
+            return new LibraryFolderInfo
+            {
+                GameId = folder.GameId,
+                Name = folder.Name,
+                FolderPath = folder.FolderPath,
+                FileCount = folder.FileCount,
+                PreviewImagePath = folder.PreviewImagePath,
+                PlatformLabel = folder.PlatformLabel,
+                FilePaths = folder.FilePaths == null ? null : folder.FilePaths.ToArray(),
+                NewestCaptureUtcTicks = folder.NewestCaptureUtcTicks,
+                SteamAppId = folder.SteamAppId,
+                SteamGridDbId = folder.SteamGridDbId,
+                SuppressSteamAppIdAutoResolve = folder.SuppressSteamAppIdAutoResolve,
+                SuppressSteamGridDbIdAutoResolve = folder.SuppressSteamGridDbIdAutoResolve
+            };
+        }
+
+        bool TryGetCachedFileTags(string file, long expectedStamp, out string[] tags)
+        {
+            tags = null;
+            if (string.IsNullOrWhiteSpace(file)) return false;
+            lock (fileTagCacheSync)
+            {
+                string[] cachedTags;
+                long cachedStamp;
+                if (!fileTagCache.TryGetValue(file, out cachedTags) || !fileTagCacheStamp.TryGetValue(file, out cachedStamp) || cachedStamp != expectedStamp) return false;
+                tags = cachedTags ?? new string[0];
+                return true;
+            }
+        }
+
+        void SetCachedFileTags(string file, IEnumerable<string> tags, long stamp)
+        {
+            if (string.IsNullOrWhiteSpace(file)) return;
+            var normalizedTags = (tags ?? Enumerable.Empty<string>())
+                .Where(tag => !string.IsNullOrWhiteSpace(tag))
+                .Select(CleanTag)
+                .Where(tag => !string.IsNullOrWhiteSpace(tag))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            lock (fileTagCacheSync)
+            {
+                fileTagCache[file] = normalizedTags;
+                fileTagCacheStamp[file] = stamp;
+            }
         }
 
         public MainWindow()
@@ -306,10 +387,44 @@ namespace PixelVaultNative
             leftStack.Children.Add(processRow);
 
             leftStack.Children.Add(new TextBlock { Text = "Library maintenance", FontSize = 14, FontWeight = FontWeights.SemiBold, Foreground = Brush("#1F2A30"), Margin = new Thickness(0, 0, 0, 6) });
-            leftStack.Children.Add(new TextBlock { Text = "Organize the destination, reverse the most recent import, and manage supporting library data from the top buttons.", Foreground = Brush("#5F6970"), Margin = new Thickness(0, 0, 0, 10), TextWrapping = TextWrapping.Wrap });
+            leftStack.Children.Add(new TextBlock { Text = "Organize the destination, reverse the most recent import, and keep heavier metadata rebuilds tucked here when you actually need them.", Foreground = Brush("#5F6970"), Margin = new Thickness(0, 0, 0, 10), TextWrapping = TextWrapping.Wrap });
             var libraryRow = new WrapPanel { Margin = new Thickness(0, 0, 0, 12), ItemHeight = 48 };
             libraryRow.Children.Add(Btn("Sort Destination", delegate { SortDestinationFolders(); }, "#E9EEF3", Brush("#33424D")));
             libraryRow.Children.Add(Btn("Undo Last Import", delegate { UndoLastImport(); }, "#FFF1E2", Brush("#7A4B12")));
+            var rebuildSelectedFolderButton = Btn("Rebuild Selected Folder", delegate
+            {
+                var selectedFolder = CloneLibraryFolderInfo(activeSelectedLibraryFolder);
+                if (selectedFolder == null || string.IsNullOrWhiteSpace(selectedFolder.FolderPath))
+                {
+                    MessageBox.Show("Choose a library folder first, then open Settings to rebuild just that folder.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+                var choice = MessageBox.Show(
+                    "Rebuild metadata for the selected folder only?\n\n" + selectedFolder.Name + " | " + selectedFolder.PlatformLabel,
+                    "PixelVault",
+                    MessageBoxButton.OKCancel,
+                    MessageBoxImage.Warning);
+                if (choice != MessageBoxResult.OK) return;
+                ShowLibraryMetadataScanWindow(ResolveStatusWindowOwner(), libraryRoot, selectedFolder.FolderPath, true, null, delegate
+                {
+                    RefreshActiveLibraryFolders(false);
+                });
+            }, "#EAE6F9", Brush("#4B3E78"));
+            rebuildSelectedFolderButton.IsEnabled = activeSelectedLibraryFolder != null && !string.IsNullOrWhiteSpace(activeSelectedLibraryFolder.FolderPath);
+            libraryRow.Children.Add(rebuildSelectedFolderButton);
+            libraryRow.Children.Add(Btn("Rebuild Library Metadata", delegate
+            {
+                var choice = MessageBox.Show(
+                    "Rebuild the library metadata index from scratch? This fully rescans embedded metadata and can take a while.",
+                    "PixelVault",
+                    MessageBoxButton.OKCancel,
+                    MessageBoxImage.Warning);
+                if (choice != MessageBoxResult.OK) return;
+                ShowLibraryMetadataScanWindow(ResolveStatusWindowOwner(), libraryRoot, null, true, null, delegate
+                {
+                    RefreshActiveLibraryFolders(false);
+                });
+            }, "#F4E8D9", Brush("#6D4A1D")));
             leftStack.Children.Add(libraryRow);
 
             leftStack.Children.Add(new TextBlock { Text = "Utility actions", FontSize = 14, FontWeight = FontWeights.SemiBold, Foreground = Brush("#1F2A30"), Margin = new Thickness(0, 0, 0, 6) });
@@ -1123,6 +1238,222 @@ namespace PixelVaultNative
             return IsLoaded && IsVisible ? this : null;
         }
 
+        void RefreshActiveLibraryFolders(bool forceRefresh)
+        {
+            var refresh = activeLibraryFolderRefresh;
+            if (refresh != null) refresh(forceRefresh);
+        }
+
+        void ShowLibraryMetadataScanWindow(Window owner, string root, string folderPath, bool forceRescan, Action<bool> setBusyState = null, Action onSuccess = null)
+        {
+            if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root))
+            {
+                MessageBox.Show("Library folder not found. Check Settings before running a metadata rebuild.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            Window progressWindow = null;
+            TextBlock progressMeta = null;
+            ProgressBar progressBar = null;
+            TextBox progressLog = null;
+            Button actionButton = null;
+            bool scanFinished = false;
+            CancellationTokenSource scanCancellation = null;
+            var progressLines = new List<string>();
+            Action<string> appendProgress = delegate(string line)
+            {
+                if (string.IsNullOrWhiteSpace(line) || progressLog == null) return;
+                progressLines.Add(line);
+                while (progressLines.Count > 180) progressLines.RemoveAt(0);
+                progressLog.Text = string.Join(Environment.NewLine, progressLines.ToArray());
+                progressLog.ScrollToEnd();
+            };
+            Action finishButtons = delegate
+            {
+                if (setBusyState != null) setBusyState(false);
+                System.Windows.Input.Mouse.OverrideCursor = null;
+            };
+
+            try
+            {
+                var resolvedOwner = owner != null && owner.IsVisible ? owner : ResolveStatusWindowOwner();
+                var scopeLabel = string.IsNullOrWhiteSpace(folderPath)
+                    ? (forceRescan ? "full library rebuild" : "full library refresh")
+                    : ((Path.GetFileName(folderPath) ?? "selected folder") + (forceRescan ? " rebuild" : " refresh"));
+                progressWindow = new Window
+                {
+                    Title = "PixelVault Scan Monitor",
+                    Width = 900,
+                    Height = 580,
+                    MinWidth = 780,
+                    MinHeight = 520,
+                    Owner = resolvedOwner,
+                    WindowStartupLocation = resolvedOwner == null ? WindowStartupLocation.CenterScreen : WindowStartupLocation.CenterOwner,
+                    Background = Brush("#0F1519")
+                };
+                var progressRoot = new Grid { Margin = new Thickness(18) };
+                progressRoot.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                progressRoot.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                progressRoot.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+                progressRoot.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                var progressTitle = new TextBlock
+                {
+                    Text = string.IsNullOrWhiteSpace(folderPath)
+                        ? (forceRescan ? "Rebuilding library metadata index" : "Refreshing library metadata index")
+                        : (forceRescan ? "Rebuilding folder metadata index" : "Refreshing folder metadata index"),
+                    FontSize = 24,
+                    FontWeight = FontWeights.SemiBold,
+                    Foreground = Brushes.White,
+                    Margin = new Thickness(0, 0, 0, 8)
+                };
+                progressMeta = new TextBlock
+                {
+                    Text = "Building file list...",
+                    Foreground = Brush("#B7C6C0"),
+                    TextWrapping = TextWrapping.Wrap,
+                    Margin = new Thickness(0, 0, 0, 14)
+                };
+                progressBar = new ProgressBar { Height = 18, Minimum = 0, Maximum = 1, Value = 0, IsIndeterminate = true, Margin = new Thickness(0, 0, 0, 14) };
+                progressLog = new TextBox { IsReadOnly = true, AcceptsReturn = true, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, TextWrapping = TextWrapping.Wrap, Background = Brush("#12191E"), Foreground = Brush("#F1E9DA"), BorderBrush = Brush("#2B3A44"), BorderThickness = new Thickness(1), FontFamily = new FontFamily("Cascadia Mono") };
+                actionButton = Btn("Cancel Scan", null, "#7A2F2F", Brushes.White);
+                actionButton.Margin = new Thickness(0);
+                actionButton.HorizontalAlignment = HorizontalAlignment.Right;
+                actionButton.Click += delegate
+                {
+                    if (!scanFinished)
+                    {
+                        if (scanCancellation != null && !scanCancellation.IsCancellationRequested) scanCancellation.Cancel();
+                        actionButton.IsEnabled = false;
+                        if (progressMeta != null) progressMeta.Text = "Cancel requested. Stopping the current metadata read...";
+                        appendProgress("Cancel requested. Stopping the current metadata read.");
+                    }
+                    else if (progressWindow != null)
+                    {
+                        progressWindow.Close();
+                    }
+                };
+                progressRoot.Children.Add(progressTitle);
+                Grid.SetRow(progressMeta, 1);
+                progressRoot.Children.Add(progressMeta);
+                var centerPanel = new Grid();
+                centerPanel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                centerPanel.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+                centerPanel.Children.Add(progressBar);
+                var logBorder = new Border { Background = Brush("#12191E"), CornerRadius = new CornerRadius(14), Padding = new Thickness(12), BorderBrush = Brush("#26363F"), BorderThickness = new Thickness(1), Child = progressLog, Margin = new Thickness(0, 14, 0, 0) };
+                Grid.SetRow(logBorder, 1);
+                centerPanel.Children.Add(logBorder);
+                Grid.SetRow(centerPanel, 2);
+                progressRoot.Children.Add(centerPanel);
+                Grid.SetRow(actionButton, 3);
+                progressRoot.Children.Add(actionButton);
+                progressWindow.Content = progressRoot;
+                progressWindow.Show();
+
+                appendProgress("Starting scan for " + scopeLabel + ".");
+                if (status != null)
+                {
+                    status.Text = string.IsNullOrWhiteSpace(folderPath)
+                        ? (forceRescan ? "Rebuilding library metadata index" : "Refreshing library metadata index")
+                        : (forceRescan ? "Rebuilding folder metadata index" : "Refreshing folder metadata index");
+                }
+                if (setBusyState != null) setBusyState(true);
+                System.Windows.Input.Mouse.OverrideCursor = System.Windows.Input.Cursors.Wait;
+
+                var capturedFolderPath = folderPath;
+                var capturedForceRescan = forceRescan;
+                scanCancellation = new CancellationTokenSource();
+                System.Threading.Tasks.Task.Factory.StartNew(delegate
+                {
+                    return ScanLibraryMetadataIndex(root, capturedFolderPath, capturedForceRescan, delegate(int currentCount, int totalCount, string detail)
+                    {
+                        if (progressWindow == null) return;
+                        progressWindow.Dispatcher.BeginInvoke(new Action(delegate
+                        {
+                            if (progressBar == null || progressMeta == null) return;
+                            progressBar.IsIndeterminate = totalCount <= 0;
+                            if (totalCount > 0)
+                            {
+                                progressBar.Maximum = totalCount;
+                                progressBar.Value = Math.Min(currentCount, totalCount);
+                                var remaining = Math.Max(totalCount - currentCount, 0);
+                                progressMeta.Text = currentCount + " of " + totalCount + " processed | " + remaining + " remaining";
+                            }
+                            else
+                            {
+                                progressMeta.Text = detail;
+                            }
+                            appendProgress(detail);
+                        }));
+                    }, scanCancellation.Token);
+                }).ContinueWith(delegate(System.Threading.Tasks.Task<int> scanTask)
+                {
+                    Dispatcher.BeginInvoke(new Action(delegate
+                    {
+                        scanFinished = true;
+                        if (scanCancellation != null)
+                        {
+                            scanCancellation.Dispose();
+                            scanCancellation = null;
+                        }
+                        finishButtons();
+                        if (scanTask.IsCanceled || (scanTask.IsFaulted && scanTask.Exception != null && scanTask.Exception.Flatten().InnerExceptions.Any(ex => ex is OperationCanceledException)))
+                        {
+                            if (status != null) status.Text = "Library scan cancelled";
+                            if (progressMeta != null) progressMeta.Text = "Scan cancelled before completion.";
+                            appendProgress("Scan cancelled.");
+                        }
+                        else if (scanTask.IsFaulted)
+                        {
+                            if (status != null) status.Text = "Library scan failed";
+                            var flattened = scanTask.Exception == null ? null : scanTask.Exception.Flatten();
+                            var scanError = flattened == null ? new Exception("Library scan failed.") : flattened.InnerExceptions.First();
+                            if (progressMeta != null) progressMeta.Text = scanError.Message;
+                            appendProgress("ERROR: " + scanError.Message);
+                            Log(scanError.ToString());
+                            MessageBox.Show(scanError.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
+                        }
+                        else
+                        {
+                            if (status != null)
+                            {
+                                status.Text = string.IsNullOrWhiteSpace(folderPath)
+                                    ? (forceRescan ? "Library metadata index rebuilt" : "Library metadata index refreshed")
+                                    : (forceRescan ? "Folder metadata index rebuilt" : "Folder metadata index refreshed");
+                            }
+                            if (progressMeta != null) progressMeta.Text += " | complete";
+                            appendProgress("Scan finished successfully.");
+                            if (onSuccess != null) onSuccess();
+                        }
+                        if (actionButton != null)
+                        {
+                            actionButton.IsEnabled = true;
+                            actionButton.Content = "Close";
+                        }
+                    }));
+                }, TaskScheduler.Default);
+            }
+            catch (Exception ex)
+            {
+                scanFinished = true;
+                if (scanCancellation != null)
+                {
+                    scanCancellation.Dispose();
+                    scanCancellation = null;
+                }
+                finishButtons();
+                if (status != null) status.Text = "Library scan failed";
+                Log(ex.ToString());
+                if (progressMeta != null) progressMeta.Text = ex.Message;
+                appendProgress("ERROR: " + ex.Message);
+                if (actionButton != null)
+                {
+                    actionButton.IsEnabled = true;
+                    actionButton.Content = "Close";
+                }
+                MessageBox.Show(ex.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
         List<string> BuildImportSummaryLines(string workflowLabel, bool usedReview, RenameStepResult renameResult, DeleteStepResult deleteResult, MetadataStepResult metadataResult, MoveStepResult moveResult, SortStepResult sortResult, int manualItemsLeft)
         {
             var lines = new List<string>();
@@ -1458,10 +1789,13 @@ namespace PixelVaultNative
                     }),
                 StringComparer.OrdinalIgnoreCase);
             if (normalizedPaths.Count == 0) return;
-            foreach (var file in normalizedPaths)
+            lock (fileTagCacheSync)
             {
-                fileTagCache.Remove(file);
-                fileTagCacheStamp.Remove(file);
+                foreach (var file in normalizedPaths)
+                {
+                    fileTagCache.Remove(file);
+                    fileTagCacheStamp.Remove(file);
+                }
             }
         }
 
@@ -1667,9 +2001,10 @@ namespace PixelVaultNative
             cancellationToken.ThrowIfCancellationRequested();
             var rename = inventory.RenameScopeFiles;
             var move = inventory.TopLevelMediaFiles;
-            var reviewItems = BuildReviewItems(move, cancellationToken);
+            var previewAnalysis = AnalyzeIntakePreviewFiles(move, cancellationToken);
+            var reviewItems = BuildReviewItems(move, previewAnalysis, cancellationToken);
             var recognizedPaths = new HashSet<string>(reviewItems.Select(i => i.FilePath), StringComparer.OrdinalIgnoreCase);
-            var manualItems = BuildManualMetadataItems(move, recognizedPaths, cancellationToken);
+            var manualItems = BuildManualMetadataItems(move, recognizedPaths, previewAnalysis, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             var manualPaths = new HashSet<string>(manualItems.Select(i => i.FilePath), StringComparer.OrdinalIgnoreCase);
             var moveCandidates = move.Where(f => !manualPaths.Contains(f)).ToList();
@@ -2145,6 +2480,42 @@ namespace PixelVaultNative
             previewBox.Document = doc;
         }
 
+        sealed class IntakePreviewFileAnalysis
+        {
+            public string FilePath = string.Empty;
+            public string FileName = string.Empty;
+            public FilenameParseResult Parsed = new FilenameParseResult();
+            public bool CanUpdateMetadata;
+            public bool PreserveFileTimes;
+            public DateTime CaptureTime;
+        }
+
+        Dictionary<string, IntakePreviewFileAnalysis> AnalyzeIntakePreviewFiles(IEnumerable<string> sourceFiles, CancellationToken cancellationToken = default(CancellationToken))
+        {
+            var analysis = new Dictionary<string, IntakePreviewFileAnalysis>(StringComparer.OrdinalIgnoreCase);
+            foreach (var file in (sourceFiles ?? Enumerable.Empty<string>()).Where(File.Exists).Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var fileName = Path.GetFileName(file);
+                var parsed = ParseFilename(fileName);
+                var platformTags = parsed.PlatformTags ?? new string[0];
+                var isVideo = IsVideo(file);
+                var preserveFileTimes = parsed.PreserveFileTimes || platformTags.Contains("Xbox") || isVideo;
+                var canUpdateMetadata = !(parsed.RoutesToManualWhenMissingSteamAppId && string.IsNullOrWhiteSpace(parsed.SteamAppId))
+                    && (isVideo || platformTags.Contains("Xbox") || parsed.CaptureTime.HasValue);
+                analysis[file] = new IntakePreviewFileAnalysis
+                {
+                    FilePath = file,
+                    FileName = fileName,
+                    Parsed = parsed,
+                    CanUpdateMetadata = canUpdateMetadata,
+                    PreserveFileTimes = preserveFileTimes,
+                    CaptureTime = preserveFileTimes ? GetLibraryDate(file) : (parsed.CaptureTime ?? GetLibraryDate(file))
+                };
+            }
+            return analysis;
+        }
+
         List<ReviewItem> BuildReviewItems()
         {
             return BuildReviewItems(BuildSourceInventory(false).TopLevelMediaFiles);
@@ -2152,24 +2523,27 @@ namespace PixelVaultNative
 
         List<ReviewItem> BuildReviewItems(IEnumerable<string> sourceFiles, CancellationToken cancellationToken = default(CancellationToken))
         {
+            return BuildReviewItems(sourceFiles, AnalyzeIntakePreviewFiles(sourceFiles, cancellationToken), cancellationToken);
+        }
+
+        List<ReviewItem> BuildReviewItems(IEnumerable<string> sourceFiles, Dictionary<string, IntakePreviewFileAnalysis> analysis, CancellationToken cancellationToken = default(CancellationToken))
+        {
             var items = new List<ReviewItem>();
             foreach (var file in (sourceFiles ?? Enumerable.Empty<string>()).Where(File.Exists).Distinct(StringComparer.OrdinalIgnoreCase))
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var fileName = Path.GetFileName(file);
-                if (!CanUpdateMetadata(fileName)) continue;
-                var parsed = ParseFilename(fileName);
-                var platformTags = parsed.PlatformTags;
-                bool preserveFileTimes = parsed.PreserveFileTimes || platformTags.Contains("Xbox") || IsVideo(file);
-                DateTime dt = preserveFileTimes ? GetLibraryDate(file) : (parsed.CaptureTime ?? GetLibraryDate(file));
+                IntakePreviewFileAnalysis fileAnalysis;
+                if (analysis == null || !analysis.TryGetValue(file, out fileAnalysis) || fileAnalysis == null || !fileAnalysis.CanUpdateMetadata) continue;
+                var parsed = fileAnalysis.Parsed ?? new FilenameParseResult();
+                var platformTags = parsed.PlatformTags ?? new string[0];
                 items.Add(new ReviewItem
                 {
                     FilePath = file,
-                    FileName = fileName,
+                    FileName = fileAnalysis.FileName,
                     PlatformLabel = parsed.PlatformLabel,
                     PlatformTags = platformTags,
-                    CaptureTime = dt,
-                    PreserveFileTimes = preserveFileTimes,
+                    CaptureTime = fileAnalysis.CaptureTime,
+                    PreserveFileTimes = fileAnalysis.PreserveFileTimes,
                     Comment = string.Empty,
                     AddPhotographyTag = false,
                     DeleteBeforeProcessing = false
@@ -2189,20 +2563,25 @@ namespace PixelVaultNative
 
         List<ManualMetadataItem> BuildManualMetadataItems(IEnumerable<string> sourceFiles, HashSet<string> recognizedPaths, CancellationToken cancellationToken = default(CancellationToken))
         {
+            return BuildManualMetadataItems(sourceFiles, recognizedPaths, AnalyzeIntakePreviewFiles(sourceFiles, cancellationToken), cancellationToken);
+        }
+
+        List<ManualMetadataItem> BuildManualMetadataItems(IEnumerable<string> sourceFiles, HashSet<string> recognizedPaths, Dictionary<string, IntakePreviewFileAnalysis> analysis, CancellationToken cancellationToken = default(CancellationToken))
+        {
             var items = new List<ManualMetadataItem>();
             var known = recognizedPaths ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var file in (sourceFiles ?? Enumerable.Empty<string>()).Where(File.Exists).Distinct(StringComparer.OrdinalIgnoreCase))
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (known.Contains(file)) continue;
-                var fileName = Path.GetFileName(file);
-                if (CanUpdateMetadata(fileName)) continue;
-                var parsed = ParseFilename(fileName);
-                var captureTime = parsed.CaptureTime ?? GetLibraryDate(file);
+                IntakePreviewFileAnalysis fileAnalysis;
+                if (analysis == null || !analysis.TryGetValue(file, out fileAnalysis) || fileAnalysis == null || fileAnalysis.CanUpdateMetadata) continue;
+                var parsed = fileAnalysis.Parsed ?? new FilenameParseResult();
+                var captureTime = fileAnalysis.CaptureTime;
                 var guessedPlatform = parsed.PlatformLabel;
                 if (!parsed.MatchedConvention)
                 {
-                    indexPersistenceService.RecordFilenameConventionSample(libraryRoot, fileName, parsed);
+                    indexPersistenceService.RecordFilenameConventionSample(libraryRoot, fileAnalysis.FileName, parsed);
                 }
                 var titleHint = parsed.GameTitleHint ?? string.Empty;
                 items.Add(new ManualMetadataItem
@@ -2210,8 +2589,8 @@ namespace PixelVaultNative
                     GameId = string.Empty,
                     SteamAppId = parsed.SteamAppId,
                     FilePath = file,
-                    FileName = fileName,
-                    OriginalFileName = fileName,
+                    FileName = fileAnalysis.FileName,
+                    OriginalFileName = fileAnalysis.FileName,
                     CaptureTime = captureTime,
                     UseCustomCaptureTime = false,
                     GameName = titleHint,
@@ -3477,8 +3856,11 @@ namespace PixelVaultNative
         {
             folderImageCache.Clear();
             folderImageCacheStamp.Clear();
-            fileTagCache.Clear();
-            fileTagCacheStamp.Clear();
+            lock (fileTagCacheSync)
+            {
+                fileTagCache.Clear();
+                fileTagCacheStamp.Clear();
+            }
             ClearImageCache();
         }
         void RunLibraryMetadataEdit(LibraryFolderInfo folder, Action refreshLibrary)
@@ -3647,6 +4029,11 @@ namespace PixelVaultNative
             return filenameParserService.Parse(file, libraryRoot);
         }
 
+        FilenameParseResult ParseFilename(string file, string root)
+        {
+            return filenameParserService.Parse(file, string.IsNullOrWhiteSpace(root) ? libraryRoot : root);
+        }
+
         string GetGameNameFromFileName(string baseName)
         {
             return filenameParserService.GetGameTitleHint(baseName, libraryRoot);
@@ -3765,16 +4152,12 @@ namespace PixelVaultNative
                 filenameRulesButton.Margin = new Thickness(0, 0, 12, 0);
                 ApplyLibraryToolbarChrome(filenameRulesButton, "#18242B", "#24353F", "#22323C", "#131D23");
                 var refreshButton = Btn("Refresh", null, "#20343A", Brushes.White);
-                var rebuildLibraryButton = Btn("Rebuild", null, "#2E4751", Brushes.White);
                 var fetchButton = Btn("Fetch Covers", null, "#275D47", Brushes.White);
                 refreshButton.Width = 122;
-                rebuildLibraryButton.Width = 118;
                 fetchButton.Width = 136;
                 refreshButton.Margin = new Thickness(8, 0, 0, 0);
-                rebuildLibraryButton.Margin = new Thickness(8, 0, 0, 0);
                 fetchButton.Margin = new Thickness(8, 0, 0, 0);
                 ApplyLibraryToolbarChrome(refreshButton, "#18242B", "#24353F", "#22323C", "#131D23");
-                ApplyLibraryToolbarChrome(rebuildLibraryButton, "#203440", "#314D5C", "#2A4350", "#182934");
                 ApplyLibraryToolbarChrome(fetchButton, "#234E3B", "#2F6950", "#2C604A", "#1B3F31");
                 refreshButton.Content = BuildToolbarButtonContent("\uE72C", "Refresh");
                 intakeReviewButton = Btn(string.Empty, null, "#152028", Brushes.White);
@@ -3826,7 +4209,6 @@ namespace PixelVaultNative
                 headerActions.Children.Add(photoIndexButton);
                 headerActions.Children.Add(filenameRulesButton);
                 headerActions.Children.Add(refreshButton);
-                headerActions.Children.Add(rebuildLibraryButton);
                 headerActions.Children.Add(fetchButton);
                 headerActions.Children.Add(intakeReviewButton);
                 Grid.SetColumn(headerActions, 2);
@@ -3980,27 +4362,19 @@ namespace PixelVaultNative
                 var detailTitle = new TextBlock { Text = "Select a folder", FontSize = 28, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White };
                 var detailMeta = new TextBlock { Text = "Browse the library you chose in Settings.", Foreground = Brush("#9CB1BC"), Margin = new Thickness(0, 8, 0, 14), TextWrapping = TextWrapping.Wrap, FontSize = 13.5 };
                 var openFolderButton = Btn("Open Folder", null, "#275D47", Brushes.White);
-                var scanFolderButton = Btn("Scan Folder", null, "#20343A", Brushes.White);
                 var editMetadataButton = Btn("Edit Metadata", null, "#20343A", Brushes.White);
                 openFolderButton.Content = BuildToolbarButtonContent("\uE8B7", "Open Folder");
-                scanFolderButton.Content = BuildToolbarButtonContent("\uE7C3", "Scan Folder");
                 ApplyLibraryPillChrome(openFolderButton, "#1F3340", "#314754", "#29424F", "#172630");
-                ApplyLibraryPillChrome(scanFolderButton, "#1C2A32", "#2A3C46", "#22323C", "#141E24");
                 ApplyLibraryPillChrome(editMetadataButton, "#1C2A32", "#2A3C46", "#22323C", "#141E24");
                 openFolderButton.Height = 38;
-                scanFolderButton.Height = 38;
                 editMetadataButton.Height = 38;
                 openFolderButton.Margin = new Thickness(0, 0, 12, 0);
-                scanFolderButton.Margin = new Thickness(0, 0, 12, 0);
                 editMetadataButton.Margin = new Thickness(0);
                 var bannerButtonRow = new Grid { Margin = new Thickness(0, 8, 0, 0), HorizontalAlignment = HorizontalAlignment.Left };
                 bannerButtonRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
                 bannerButtonRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                bannerButtonRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
                 bannerButtonRow.Children.Add(openFolderButton);
-                Grid.SetColumn(scanFolderButton, 1);
-                bannerButtonRow.Children.Add(scanFolderButton);
-                Grid.SetColumn(editMetadataButton, 2);
+                Grid.SetColumn(editMetadataButton, 1);
                 bannerButtonRow.Children.Add(editMetadataButton);
                 textStack.Children.Add(detailEyebrow);
                 textStack.Children.Add(detailTitle);
@@ -4054,6 +4428,7 @@ namespace PixelVaultNative
 
                 LibraryFolderInfo current = null;
                 Action<string, bool> runLibraryScan = null;
+                Action<bool> setLibraryBusyState = null;
                 Action<LibraryFolderInfo> openLibraryMetadataEditor = null;
                 Action<string> openSingleFileMetadataEditor = null;
                 Action renderTiles = null;
@@ -4422,8 +4797,7 @@ namespace PixelVaultNative
                                     var previousConsole = existingEntry == null ? string.Empty : NormalizeConsoleLabel(existingEntry.ConsoleLabel);
                                     var rebuiltEntry = BuildResolvedLibraryMetadataIndexEntry(libraryRoot, file, stamp, metadataSnapshot, existingEntry, metadataIndex, savedGameRows);
                                     metadataIndex[file] = rebuiltEntry;
-                                    fileTagCache[file] = ParseTagText(rebuiltEntry.TagText);
-                                    fileTagCacheStamp[file] = MetadataCacheStamp(file);
+                                    SetCachedFileTags(file, ParseTagText(rebuiltEntry.TagText), MetadataCacheStamp(file));
                                     indexChanged = true;
                                     if (!string.Equals(previousGameId, NormalizeGameId(rebuiltEntry.GameId), StringComparison.OrdinalIgnoreCase)
                                         || !string.Equals(previousConsole, NormalizeConsoleLabel(rebuiltEntry.ConsoleLabel), StringComparison.OrdinalIgnoreCase))
@@ -4657,9 +5031,11 @@ namespace PixelVaultNative
                         });
                     };
                     var refreshFolderItem = new MenuItem { Header = "Refresh Folder" };
-                    refreshFolderItem.Click += delegate { runLibraryScan(folder.FolderPath, false); };
-                    var rebuildFolderItem = new MenuItem { Header = "Rebuild Folder" };
-                    rebuildFolderItem.Click += delegate { runLibraryScan(folder.FolderPath, true); };
+                    refreshFolderItem.Click += delegate
+                    {
+                        showFolder(folder);
+                        if (refreshLibraryFoldersAsync != null) refreshLibraryFoldersAsync(false);
+                    };
                     var fetchFolderCoverItem = new MenuItem { Header = "Fetch Cover Art" };
                     fetchFolderCoverItem.Click += delegate
                     {
@@ -4671,7 +5047,6 @@ namespace PixelVaultNative
                     contextMenu.Items.Add(editIdsItem);
                     contextMenu.Items.Add(new Separator());
                     contextMenu.Items.Add(refreshFolderItem);
-                    contextMenu.Items.Add(rebuildFolderItem);
                     contextMenu.Items.Add(fetchFolderCoverItem);
                     contextMenu.Items.Add(new Separator());
                     contextMenu.Items.Add(setCoverItem);
@@ -4687,6 +5062,7 @@ namespace PixelVaultNative
                     preservedDetailScrollOffset = 0;
                     thumbScroll.ScrollToVerticalOffset(0);
                     current = info;
+                    activeSelectedLibraryFolder = CloneLibraryFolderInfo(info);
                     detailTitle.Text = info.Name;
                     detailMeta.Text = info.FileCount + " item(s) | " + info.PlatformLabel + " | " + info.FolderPath;
                     var artPath = ResolveLibraryArt(info, false);
@@ -4750,6 +5126,7 @@ namespace PixelVaultNative
                     else
                     {
                         current = null;
+                        activeSelectedLibraryFolder = null;
                         selectedDetailFiles.Clear();
                         detailTitle.Text = "Select a folder";
                         detailMeta.Text = "Browse the library you chose in Settings.";
@@ -4889,6 +5266,15 @@ namespace PixelVaultNative
                         }));
                     }, TaskScheduler.Default);
                 };
+                activeLibraryFolderRefresh = refreshLibraryFoldersAsync;
+                if (!reuseMainWindow)
+                {
+                    libraryWindow.Closed += delegate
+                    {
+                        if (activeLibraryFolderRefresh == refreshLibraryFoldersAsync) activeLibraryFolderRefresh = null;
+                        activeSelectedLibraryFolder = null;
+                    };
+                }
 
                 prefillLibraryFoldersFromSnapshotAsync = delegate
                 {
@@ -4910,197 +5296,25 @@ namespace PixelVaultNative
                         }));
                     }, TaskScheduler.Default);
                 };
+                setLibraryBusyState = delegate(bool isBusy)
+                {
+                    refreshButton.IsEnabled = !isBusy;
+                    editMetadataButton.IsEnabled = !isBusy;
+                    fetchButton.IsEnabled = !isBusy;
+                    importButton.IsEnabled = !isBusy;
+                    importCommentsButton.IsEnabled = !isBusy;
+                    manualImportButton.IsEnabled = !isBusy;
+                    if (intakeReviewButton != null) intakeReviewButton.IsEnabled = !isBusy;
+                };
 
                 runLibraryScan = delegate(string folderPath, bool forceRescan)
                 {
-                    Window progressWindow = null;
-                    TextBlock progressTitle = null;
-                    TextBlock progressMeta = null;
-                    ProgressBar progressBar = null;
-                    TextBox progressLog = null;
-                    Button actionButton = null;
-                    bool scanFinished = false;
-                    CancellationTokenSource scanCancellation = null;
-                    var progressLines = new List<string>();
-                    Action<string> appendProgress = delegate(string line)
+                    ShowLibraryMetadataScanWindow(libraryWindow, libraryRoot, folderPath, forceRescan, setLibraryBusyState, delegate
                     {
-                        if (string.IsNullOrWhiteSpace(line) || progressLog == null) return;
-                        progressLines.Add(line);
-                        while (progressLines.Count > 180) progressLines.RemoveAt(0);
-                        progressLog.Text = string.Join(Environment.NewLine, progressLines.ToArray());
-                        progressLog.ScrollToEnd();
-                    };
-                    Action finishButtons = delegate
-                    {
-                        refreshButton.IsEnabled = true;
-                        refreshButton.IsEnabled = true;
-                        rebuildLibraryButton.IsEnabled = true;
-                        scanFolderButton.IsEnabled = true;
-                        editMetadataButton.IsEnabled = true;
-                        fetchButton.IsEnabled = true;
-                        importButton.IsEnabled = true;
-                        importCommentsButton.IsEnabled = true;
-                        manualImportButton.IsEnabled = true;
-                        System.Windows.Input.Mouse.OverrideCursor = null;
-                    };
-                    try
-                    {
-                        var scopeLabel = string.IsNullOrWhiteSpace(folderPath) ? (forceRescan ? "full library rebuild" : "full library refresh") : ((Path.GetFileName(folderPath) ?? "selected folder") + (forceRescan ? " rebuild" : " refresh"));
-                        progressWindow = new Window
-                        {
-                            Title = "PixelVault Scan Monitor",
-                            Width = 900,
-                            Height = 580,
-                            MinWidth = 780,
-                            MinHeight = 520,
-                            Owner = libraryWindow,
-                            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-                            Background = Brush("#0F1519")
-                        };
-                        var progressRoot = new Grid { Margin = new Thickness(18) };
-                        progressRoot.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-                        progressRoot.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-                        progressRoot.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-                        progressRoot.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-                        progressTitle = new TextBlock { Text = string.IsNullOrWhiteSpace(folderPath) ? (forceRescan ? "Rebuilding library metadata index" : "Refreshing library metadata index") : (forceRescan ? "Rebuilding folder metadata index" : "Refreshing folder metadata index"), FontSize = 24, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, Margin = new Thickness(0, 0, 0, 8) };
-                        progressMeta = new TextBlock { Text = "Building file list...", Foreground = Brush("#B7C6C0"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 14) };
-                        progressBar = new ProgressBar { Height = 18, Minimum = 0, Maximum = 1, Value = 0, IsIndeterminate = true, Margin = new Thickness(0, 0, 0, 14) };
-                        progressLog = new TextBox { IsReadOnly = true, AcceptsReturn = true, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, TextWrapping = TextWrapping.Wrap, Background = Brush("#12191E"), Foreground = Brush("#F1E9DA"), BorderBrush = Brush("#2B3A44"), BorderThickness = new Thickness(1), FontFamily = new FontFamily("Cascadia Mono") };
-                        actionButton = Btn("Cancel Scan", null, "#7A2F2F", Brushes.White);
-                        actionButton.Margin = new Thickness(0);
-                        actionButton.HorizontalAlignment = HorizontalAlignment.Right;
-                        actionButton.Click += delegate
-                        {
-                            if (!scanFinished)
-                            {
-                                if (scanCancellation != null && !scanCancellation.IsCancellationRequested) scanCancellation.Cancel();
-                                actionButton.IsEnabled = false;
-                                if (progressMeta != null) progressMeta.Text = "Cancel requested. Stopping the current metadata read...";
-                                appendProgress("Cancel requested. Stopping the current metadata read.");
-                            }
-                            else if (progressWindow != null)
-                            {
-                                progressWindow.Close();
-                            }
-                        };
-                        progressRoot.Children.Add(progressTitle);
-                        Grid.SetRow(progressMeta, 1);
-                        progressRoot.Children.Add(progressMeta);
-                        var centerPanel = new Grid();
-                        centerPanel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-                        centerPanel.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-                        centerPanel.Children.Add(progressBar);
-                        var logBorder = new Border { Background = Brush("#12191E"), CornerRadius = new CornerRadius(14), Padding = new Thickness(12), BorderBrush = Brush("#26363F"), BorderThickness = new Thickness(1), Child = progressLog, Margin = new Thickness(0, 14, 0, 0) };
-                        Grid.SetRow(logBorder, 1);
-                        centerPanel.Children.Add(logBorder);
-                        Grid.SetRow(centerPanel, 2);
-                        progressRoot.Children.Add(centerPanel);
-                        Grid.SetRow(actionButton, 3);
-                        progressRoot.Children.Add(actionButton);
-                        progressWindow.Content = progressRoot;
-                        progressWindow.Show();
-                        appendProgress("Starting scan for " + scopeLabel + ".");
-                        status.Text = string.IsNullOrWhiteSpace(folderPath) ? (forceRescan ? "Rebuilding library metadata index" : "Refreshing library metadata index") : (forceRescan ? "Rebuilding folder metadata index" : "Refreshing folder metadata index");
-                        refreshButton.IsEnabled = false;
-                        refreshButton.IsEnabled = false;
-                        rebuildLibraryButton.IsEnabled = false;
-                        scanFolderButton.IsEnabled = false;
-                        editMetadataButton.IsEnabled = false;
-                        fetchButton.IsEnabled = false;
-                        importButton.IsEnabled = false;
-                        importCommentsButton.IsEnabled = false;
-                        manualImportButton.IsEnabled = false;
-                        System.Windows.Input.Mouse.OverrideCursor = System.Windows.Input.Cursors.Wait;
-                        var capturedFolderPath = folderPath;
-                        var capturedForceRescan = forceRescan;
-                        scanCancellation = new CancellationTokenSource();
-                        System.Threading.Tasks.Task.Factory.StartNew(delegate
-                        {
-                            return ScanLibraryMetadataIndex(libraryRoot, capturedFolderPath, capturedForceRescan, delegate(int currentCount, int totalCount, string detail)
-                            {
-                                if (progressWindow == null) return;
-                                progressWindow.Dispatcher.BeginInvoke(new Action(delegate
-                                {
-                                    if (progressBar == null || progressMeta == null) return;
-                                    progressBar.IsIndeterminate = totalCount <= 0;
-                                    if (totalCount > 0)
-                                    {
-                                        progressBar.Maximum = totalCount;
-                                        progressBar.Value = Math.Min(currentCount, totalCount);
-                                        var remaining = Math.Max(totalCount - currentCount, 0);
-                                        progressMeta.Text = currentCount + " of " + totalCount + " processed | " + remaining + " remaining";
-                                    }
-                                    else
-                                    {
-                                        progressMeta.Text = detail;
-                                    }
-                                    appendProgress(detail);
-                                }));
-                            }, scanCancellation.Token);
-                        }).ContinueWith(delegate(System.Threading.Tasks.Task<int> scanTask)
-                        {
-                            libraryWindow.Dispatcher.BeginInvoke(new Action(delegate
-                            {
-                                scanFinished = true;
-                                if (scanCancellation != null)
-                                {
-                                    scanCancellation.Dispose();
-                                    scanCancellation = null;
-                                }
-                                finishButtons();
-                                if (scanTask.IsCanceled || (scanTask.IsFaulted && scanTask.Exception != null && scanTask.Exception.Flatten().InnerExceptions.Any(ex => ex is OperationCanceledException)))
-                                {
-                                    status.Text = "Library scan cancelled";
-                                    if (progressMeta != null) progressMeta.Text = "Scan cancelled before completion.";
-                                    appendProgress("Scan cancelled.");
-                                }
-                                else if (scanTask.IsFaulted)
-                                {
-                                    status.Text = "Library scan failed";
-                                    var flattened = scanTask.Exception == null ? null : scanTask.Exception.Flatten();
-                                    var scanError = flattened == null ? new Exception("Library scan failed.") : flattened.InnerExceptions.First();
-                                    if (progressMeta != null) progressMeta.Text = scanError.Message;
-                                    appendProgress("ERROR: " + scanError.Message);
-                                    Log(scanError.ToString());
-                                    MessageBox.Show(scanError.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
-                                }
-                                else
-                                {
-                                    status.Text = string.IsNullOrWhiteSpace(folderPath) ? (forceRescan ? "Library metadata index rebuilt" : "Library metadata index refreshed") : (forceRescan ? "Folder metadata index rebuilt" : "Folder metadata index refreshed");
-                                    if (progressMeta != null) progressMeta.Text += " | complete";
-                                    appendProgress("Scan finished successfully.");
-                                    if (string.IsNullOrWhiteSpace(folderPath)) current = null;
-                                    else current = new LibraryFolderInfo { FolderPath = folderPath, PlatformLabel = current == null ? string.Empty : current.PlatformLabel, Name = current == null ? string.Empty : current.Name };
-                                    if (refreshLibraryFoldersAsync != null) refreshLibraryFoldersAsync(false);
-                                }
-                                if (actionButton != null)
-                                {
-                                    actionButton.IsEnabled = true;
-                                    actionButton.Content = "Close";
-                                }
-                            }));
-                        });
-                    }
-                    catch (Exception ex)
-                    {
-                        scanFinished = true;
-                        if (scanCancellation != null)
-                        {
-                            scanCancellation.Dispose();
-                            scanCancellation = null;
-                        }
-                        finishButtons();
-                        status.Text = "Library scan failed";
-                        Log(ex.ToString());
-                        if (progressMeta != null) progressMeta.Text = ex.Message;
-                        appendProgress("ERROR: " + ex.Message);
-                        if (actionButton != null)
-                        {
-                            actionButton.IsEnabled = true;
-                            actionButton.Content = "Close";
-                        }
-                        MessageBox.Show(ex.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
-                    }
+                        if (string.IsNullOrWhiteSpace(folderPath)) current = null;
+                        else current = new LibraryFolderInfo { FolderPath = folderPath, PlatformLabel = current == null ? string.Empty : current.PlatformLabel, Name = current == null ? string.Empty : current.Name };
+                        if (refreshLibraryFoldersAsync != null) refreshLibraryFoldersAsync(false);
+                    });
                 };
 
                 runScopedCoverRefresh = delegate(List<LibraryFolderInfo> requestedFolders, string scopeLabel, bool forceRefreshExistingCovers)
@@ -5130,14 +5344,7 @@ namespace PixelVaultNative
                     };
                     Action finishButtons = delegate
                     {
-                        refreshButton.IsEnabled = true;
-                        rebuildLibraryButton.IsEnabled = true;
-                        scanFolderButton.IsEnabled = true;
-                        editMetadataButton.IsEnabled = true;
-                        fetchButton.IsEnabled = true;
-                        importButton.IsEnabled = true;
-                        importCommentsButton.IsEnabled = true;
-                        manualImportButton.IsEnabled = true;
+                        if (setLibraryBusyState != null) setLibraryBusyState(false);
                         System.Windows.Input.Mouse.OverrideCursor = null;
                     };
                     try
@@ -5197,14 +5404,7 @@ namespace PixelVaultNative
                         progressWindow.Show();
                         appendProgress("Starting cover refresh for " + resolvedScopeLabel + ".");
                         status.Text = targetFolders.Count == 1 ? "Resolving IDs and fetching folder cover art" : "Resolving IDs and fetching cover art";
-                        refreshButton.IsEnabled = false;
-                        rebuildLibraryButton.IsEnabled = false;
-                        scanFolderButton.IsEnabled = false;
-                        editMetadataButton.IsEnabled = false;
-                        fetchButton.IsEnabled = false;
-                        importButton.IsEnabled = false;
-                        importCommentsButton.IsEnabled = false;
-                        manualImportButton.IsEnabled = false;
+                        if (setLibraryBusyState != null) setLibraryBusyState(true);
                         System.Windows.Input.Mouse.OverrideCursor = System.Windows.Input.Cursors.Wait;
                         refreshCancellation = new CancellationTokenSource();
                         System.Threading.Tasks.Task.Factory.StartNew(delegate
@@ -5316,8 +5516,10 @@ namespace PixelVaultNative
                     applySearchFilter();
                 };
 
-                refreshButton.Click += delegate { runLibraryScan(null, false); };
-                rebuildLibraryButton.Click += delegate { runLibraryScan(null, true); };
+                refreshButton.Click += delegate
+                {
+                    if (refreshLibraryFoldersAsync != null) refreshLibraryFoldersAsync(false);
+                };
                 settingsButton.Click += delegate { ShowSettingsWindow(); if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge(); };
                 gameIndexButton.Click += delegate { OpenGameIndexEditor(); };
                 photoIndexButton.Click += delegate { OpenPhotoIndexEditor(); };
@@ -5327,14 +5529,8 @@ namespace PixelVaultNative
                 manualImportButton.Click += delegate { OpenManualIntakeWindow(); if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge(); };
                 fetchButton.Click += delegate
                 {
-                    if (current != null && !string.IsNullOrWhiteSpace(current.FolderPath))
-                    {
-                        runScopedCoverRefresh(new List<LibraryFolderInfo> { current }, current.Name + " | " + current.PlatformLabel, false);
-                        return;
-                    }
-
                     var choice = MessageBox.Show(
-                        "No library folder is selected.\n\nRefresh cover art for the entire library?",
+                        "Refresh cover art for the entire library?",
                         "PixelVault",
                         MessageBoxButton.OKCancel,
                         MessageBoxImage.Question);
@@ -5347,15 +5543,6 @@ namespace PixelVaultNative
                     if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge();
                 };
                 openFolderButton.Click += delegate { if (current != null) OpenFolder(current.FolderPath); };
-                scanFolderButton.Click += delegate
-                {
-                    if (current == null)
-                    {
-                        MessageBox.Show("Choose a library folder first.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
-                        return;
-                    }
-                    runLibraryScan(current.FolderPath, true);
-                };
                 openLibraryMetadataEditor = delegate(LibraryFolderInfo focusFolder)
                 {
                     if (focusFolder == null)
@@ -5666,35 +5853,38 @@ namespace PixelVaultNative
 
         List<LibraryFolderInfo> LoadLibraryFoldersCached(string root, bool forceRefresh)
         {
-            var stopwatch = Stopwatch.StartNew();
-            var stamp = BuildLibraryFolderInventoryStamp(root);
-            if (!forceRefresh)
+            lock (libraryMaintenanceSync)
             {
-                var cached = LoadLibraryFolderCache(root, stamp);
-                if (cached != null)
+                var stopwatch = Stopwatch.StartNew();
+                var stamp = BuildLibraryFolderInventoryStamp(root);
+                if (!forceRefresh)
                 {
-                    var cacheUpdated = PopulateMissingLibraryFolderSortKeys(cached);
-                    if (ApplySavedGameIndexRows(root, cached))
+                    var cached = LoadLibraryFolderCache(root, stamp);
+                    if (cached != null)
                     {
-                        cacheUpdated = true;
+                        var cacheUpdated = PopulateMissingLibraryFolderSortKeys(cached);
+                        if (ApplySavedGameIndexRows(root, cached))
+                        {
+                            cacheUpdated = true;
+                        }
+                        if (cacheUpdated)
+                        {
+                            SaveLibraryFolderCache(root, stamp, cached);
+                        }
+                        Log("Library folder cache hit.");
+                        stopwatch.Stop();
+                        LogPerformanceSample("LibraryFolderCache", stopwatch, "mode=hit; folders=" + cached.Count + "; forceRefresh=" + forceRefresh, 40);
+                        return cached;
                     }
-                    if (cacheUpdated)
-                    {
-                        SaveLibraryFolderCache(root, stamp, cached);
-                    }
-                    Log("Library folder cache hit.");
-                    stopwatch.Stop();
-                    LogPerformanceSample("LibraryFolderCache", stopwatch, "mode=hit; folders=" + cached.Count + "; forceRefresh=" + forceRefresh, 40);
-                    return cached;
                 }
+                Log("Refreshing library folder cache.");
+                var fresh = LoadLibraryFolders(root);
+                ApplySavedGameIndexRows(root, fresh);
+                SaveLibraryFolderCache(root, stamp, fresh);
+                stopwatch.Stop();
+                LogPerformanceSample("LibraryFolderCache", stopwatch, "mode=rebuild; folders=" + fresh.Count + "; forceRefresh=" + forceRefresh, 40);
+                return fresh;
             }
-            Log("Refreshing library folder cache.");
-            var fresh = LoadLibraryFolders(root);
-            ApplySavedGameIndexRows(root, fresh);
-            SaveLibraryFolderCache(root, stamp, fresh);
-            stopwatch.Stop();
-            LogPerformanceSample("LibraryFolderCache", stopwatch, "mode=rebuild; folders=" + fresh.Count + "; forceRefresh=" + forceRefresh, 40);
-            return fresh;
         }
 
         void OpenLibraryFolderIdEditor(LibraryFolderInfo folder, Action refreshLibrary)
@@ -6138,13 +6328,17 @@ namespace PixelVaultNative
                 folder.SuppressSteamGridDbIdAutoResolve = false;
                 return folder.SteamGridDbId;
             }
-            var steamGridDbId = TryResolveSteamGridDbIdByName(folder.Name, cancellationToken);
-            if (string.IsNullOrWhiteSpace(steamGridDbId) && ShouldUseSteamStoreLookups(folder))
+            string steamGridDbId = null;
+            if (ShouldUseSteamStoreLookups(folder))
             {
                 var appId = ResolveBestLibraryFolderSteamAppId(root, folder, true, cancellationToken);
                 steamGridDbId = !string.IsNullOrWhiteSpace(appId)
                     ? TryResolveSteamGridDbIdBySteamAppId(appId, cancellationToken)
                     : null;
+            }
+            if (string.IsNullOrWhiteSpace(steamGridDbId))
+            {
+                steamGridDbId = TryResolveSteamGridDbIdByName(folder.Name, cancellationToken);
             }
             if (!string.IsNullOrWhiteSpace(steamGridDbId))
             {
@@ -6188,8 +6382,22 @@ namespace PixelVaultNative
         bool ShouldUseSteamStoreLookups(LibraryFolderInfo folder)
         {
             var platform = NormalizeConsoleLabel(folder == null ? string.Empty : folder.PlatformLabel);
-            return string.Equals(platform, "Steam", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(platform, "PC", StringComparison.OrdinalIgnoreCase);
+            if (string.Equals(platform, "Steam", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(platform, "PC", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            foreach (var file in (folder == null ? new string[0] : (folder.FilePaths ?? new string[0])).Where(File.Exists).Take(3))
+            {
+                var parsedPlatform = NormalizeConsoleLabel(ParseFilename(file, libraryRoot).PlatformLabel);
+                if (string.Equals(parsedPlatform, "Steam", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(parsedPlatform, "PC", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         int EnrichLibraryFoldersWithSteamAppIds(string root, List<LibraryFolderInfo> folders, Action<int, int, string> progress)
@@ -6257,19 +6465,19 @@ namespace PixelVaultNative
                     File.Copy(existingCached, backupPath, true);
                 }
 
+                var steamDownloaded = TryDownloadSteamCover(folder, cancellationToken);
+                if (!string.IsNullOrWhiteSpace(steamDownloaded) && File.Exists(steamDownloaded))
+                {
+                    if (!string.IsNullOrWhiteSpace(backupPath) && File.Exists(backupPath)) File.Delete(backupPath);
+                    return steamDownloaded;
+                }
+
                 DeleteCachedCover(folder.Name);
                 var steamGridDbDownloaded = TryDownloadSteamGridDbCover(folder, cancellationToken);
                 if (!string.IsNullOrWhiteSpace(steamGridDbDownloaded) && File.Exists(steamGridDbDownloaded))
                 {
                     if (!string.IsNullOrWhiteSpace(backupPath) && File.Exists(backupPath)) File.Delete(backupPath);
                     return steamGridDbDownloaded;
-                }
-
-                var steamDownloaded = TryDownloadSteamCover(folder, cancellationToken);
-                if (!string.IsNullOrWhiteSpace(steamDownloaded) && File.Exists(steamDownloaded))
-                {
-                    if (!string.IsNullOrWhiteSpace(backupPath) && File.Exists(backupPath)) File.Delete(backupPath);
-                    return steamDownloaded;
                 }
 
                 if (!string.IsNullOrWhiteSpace(backupPath) && File.Exists(backupPath) && !string.IsNullOrWhiteSpace(existingCached))
@@ -6329,8 +6537,8 @@ namespace PixelVaultNative
                 var itemLabel = "Game " + (i + 1) + " of " + targetFolders.Count + " | " + folder.Name;
                 var hadAppId = !string.IsNullOrWhiteSpace(folder.SteamAppId);
                 var hadSteamGridDbId = !string.IsNullOrWhiteSpace(folder.SteamGridDbId);
+                var appId = ResolveBestLibraryFolderSteamAppId(root, folder, true, cancellationToken);
                 var steamGridDbId = ResolveBestLibraryFolderSteamGridDbId(root, folder, cancellationToken);
-                var appId = ResolveBestLibraryFolderSteamAppId(root, folder, string.IsNullOrWhiteSpace(steamGridDbId), cancellationToken);
                 if ((!hadAppId && !string.IsNullOrWhiteSpace(appId)) || (!hadSteamGridDbId && !string.IsNullOrWhiteSpace(steamGridDbId)))
                 {
                     resolvedIds++;
@@ -6406,10 +6614,10 @@ namespace PixelVaultNative
             if (cached != null) return cached;
             if (allowDownload)
             {
-                var steamGridDbDownloaded = TryDownloadSteamGridDbCover(folder, cancellationToken);
-                if (steamGridDbDownloaded != null) return steamGridDbDownloaded;
                 var downloaded = TryDownloadSteamCover(folder, cancellationToken);
                 if (downloaded != null) return downloaded;
+                var steamGridDbDownloaded = TryDownloadSteamGridDbCover(folder, cancellationToken);
+                if (steamGridDbDownloaded != null) return steamGridDbDownloaded;
             }
             return folder.PreviewImagePath;
         }
@@ -6457,7 +6665,7 @@ namespace PixelVaultNative
             if (folder == null) return null;
             try
             {
-                var appId = ResolveBestLibraryFolderSteamAppId(libraryRoot, folder, string.IsNullOrWhiteSpace(folder.SteamGridDbId), cancellationToken);
+                var appId = ResolveBestLibraryFolderSteamAppId(libraryRoot, folder, true, cancellationToken);
                 var downloaded = coverService.TryDownloadSteamCover(folder.Name, appId, cancellationToken);
                 if (!string.IsNullOrWhiteSpace(downloaded) && File.Exists(downloaded))
                 {
@@ -6955,8 +7163,10 @@ namespace PixelVaultNative
         {
             if (string.Equals(dataRoot, appRoot, StringComparison.OrdinalIgnoreCase)) return;
             CopyIfNewerOrMissing(Path.Combine(appRoot, "PixelVault.settings.ini"), settingsPath);
-            CopyDirectoryContentsIfNewer(Path.Combine(appRoot, "cache"), cacheRoot);
-            CopyDirectoryContentsIfNewer(Path.Combine(appRoot, "logs"), logsRoot);
+            // Shared PixelVaultData becomes authoritative once it exists; release-local caches
+            // can help bootstrap missing files, but they should never roll newer shared index data back.
+            CopyDirectoryContentsIfMissing(Path.Combine(appRoot, "cache"), cacheRoot);
+            CopyDirectoryContentsIfMissing(Path.Combine(appRoot, "logs"), logsRoot);
             var currentDir = new DirectoryInfo(appRoot);
             var distDir = currentDir == null ? null : currentDir.Parent;
             if (distDir == null || !distDir.Exists) return;
@@ -6964,8 +7174,8 @@ namespace PixelVaultNative
             {
                 if (string.Equals(dir.FullName.TrimEnd(Path.DirectorySeparatorChar), appRoot, StringComparison.OrdinalIgnoreCase)) continue;
                 CopyIfNewerOrMissing(Path.Combine(dir.FullName, "PixelVault.settings.ini"), settingsPath);
-                CopyDirectoryContentsIfNewer(Path.Combine(dir.FullName, "cache"), cacheRoot);
-                CopyDirectoryContentsIfNewer(Path.Combine(dir.FullName, "logs"), logsRoot);
+                CopyDirectoryContentsIfMissing(Path.Combine(dir.FullName, "cache"), cacheRoot);
+                CopyDirectoryContentsIfMissing(Path.Combine(dir.FullName, "logs"), logsRoot);
             }
         }
 
@@ -7000,6 +7210,21 @@ namespace PixelVaultNative
                     if (destinationInfo.Length == sourceInfo.Length && destinationInfo.LastWriteTimeUtc >= sourceInfo.LastWriteTimeUtc) continue;
                 }
                 File.Copy(sourceFile, destinationFile, true);
+            }
+        }
+
+        void CopyDirectoryContentsIfMissing(string sourceDirectory, string destinationDirectory)
+        {
+            if (!Directory.Exists(sourceDirectory)) return;
+            Directory.CreateDirectory(destinationDirectory);
+            foreach (var sourceFile in Directory.EnumerateFiles(sourceDirectory, "*", SearchOption.AllDirectories))
+            {
+                var relative = sourceFile.Substring(sourceDirectory.Length).TrimStart(Path.DirectorySeparatorChar);
+                var destinationFile = Path.Combine(destinationDirectory, relative);
+                if (File.Exists(destinationFile)) continue;
+                var destinationFolder = Path.GetDirectoryName(destinationFile);
+                if (!string.IsNullOrWhiteSpace(destinationFolder)) Directory.CreateDirectory(destinationFolder);
+                File.Copy(sourceFile, destinationFile, false);
             }
         }
         void OpenFolder(string path)
@@ -7808,7 +8033,60 @@ namespace PixelVaultNative
         }
 
         string LogFilePath() { return Path.Combine(logsRoot, "PixelVault-native.log"); }
-        void LoadLogView() { if (logBox != null && File.Exists(LogFilePath())) { logBox.Text = File.ReadAllText(LogFilePath()); logBox.ScrollToEnd(); } }
+        string TryReadLogFile()
+        {
+            var path = LogFilePath();
+            if (!File.Exists(path)) return string.Empty;
+            for (int attempt = 0; attempt < 3; attempt++)
+            {
+                try
+                {
+                    using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+                    using (var reader = new StreamReader(stream))
+                    {
+                        return reader.ReadToEnd();
+                    }
+                }
+                catch (IOException)
+                {
+                    Thread.Sleep(25 * (attempt + 1));
+                }
+            }
+            return string.Empty;
+        }
+        void AppendLogFileLine(string line)
+        {
+            var path = LogFilePath();
+            Directory.CreateDirectory(logsRoot);
+            lock (logFileSync)
+            {
+                for (int attempt = 0; attempt < 4; attempt++)
+                {
+                    try
+                    {
+                        using (var stream = new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete))
+                        using (var writer = new StreamWriter(stream))
+                        {
+                            writer.WriteLine(line);
+                            writer.Flush();
+                            return;
+                        }
+                    }
+                    catch (IOException)
+                    {
+                        if (attempt == 3) return;
+                        Thread.Sleep(25 * (attempt + 1));
+                    }
+                }
+            }
+        }
+        void LoadLogView()
+        {
+            if (logBox == null) return;
+            var content = TryReadLogFile();
+            logBox.Text = content;
+            logBox.ScrollToEnd();
+        }
         void Log(string message)
         {
             var line = "[" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "] " + message;
@@ -7822,7 +8100,7 @@ namespace PixelVaultNative
                 if (logBox.Dispatcher.CheckAccess()) append();
                 else logBox.Dispatcher.BeginInvoke(append);
             }
-            File.AppendAllText(LogFilePath(), line + Environment.NewLine);
+            AppendLogFileLine(line);
         }
     }
 }
