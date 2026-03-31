@@ -1,3 +1,7 @@
+## 0.816
+- Cached capture timestamps in the library metadata index so folder ordering and grouped Library detail renders can reuse indexed times instead of deriving capture dates file-by-file every time.
+- Added an in-place SQLite upgrade for `photo_index` plus background backfill of missing capture timestamps during folder rebuilds and first detail selection, which cuts the first-click cost on laggy folders without requiring a cache reset.
+
 ## 0.815
 - Cut the biggest Library responsiveness bottlenecks by caching parser and saved-game-index lookups, moving detail-date grouping off the UI thread, gating startup rebuilds, and debouncing folder search against a committed term.
 - Reduced background churn in the Library by stopping off-screen tile work, batching missing metadata tag reads during folder and index rebuilds, and avoiding full-folder rescans when backfilling cached sort keys.

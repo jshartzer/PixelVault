@@ -41,6 +41,11 @@ Status: mostly in place; extend only if the next debounce pass needs more visibi
 5. Audit long-running UI workflows for real background execution.
 - Review scan/rebuild, import/manual import, and cover-fetch paths for any work that can still block the UI thread.
 - Keep the current progress-window pattern, but tighten where work starts and where dispatcher marshaling happens.
+Status: queued behind the remaining game-capture-keyword threading cleanup.
+
+5a. Remove the remaining synchronous UI hop from game-capture keyword tagging.
+- Replace the `Dispatcher.Invoke` call in `ShouldIncludeGameCaptureKeywords` with the same cached-setting pattern used elsewhere in the metadata path.
+- Goal: avoid background metadata/tag work synchronously blocking on the UI thread.
 Status: next.
 
 6. Add cancellation-token support across long-running workflows.

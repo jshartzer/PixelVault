@@ -38,8 +38,95 @@ namespace PixelVaultNative
 
         string BuildLibraryMetadataStamp(string file)
         {
-            var info = new FileInfo(file);
             return MetadataCacheStamp(file).ToString();
+        }
+
+        long ToCaptureUtcTicks(DateTime captureTime)
+        {
+            return captureTime <= DateTime.MinValue ? 0L : captureTime.ToUniversalTime().Ticks;
+        }
+
+        long ToCaptureUtcTicks(DateTime? captureTime)
+        {
+            return captureTime.HasValue ? ToCaptureUtcTicks(captureTime.Value) : 0L;
+        }
+
+        bool TryConvertCaptureUtcTicksToLocal(long captureUtcTicks, out DateTime captureDate)
+        {
+            captureDate = DateTime.MinValue;
+            if (captureUtcTicks <= 0) return false;
+            try
+            {
+                captureDate = new DateTime(captureUtcTicks, DateTimeKind.Utc).ToLocalTime();
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        string[] ResolveLibraryMetadataTags(EmbeddedMetadataSnapshot snapshot, LibraryMetadataIndexEntry existingEntry)
+        {
+            var snapshotTags = (snapshot == null ? new string[0] : (snapshot.Tags ?? new string[0]))
+                .Select(CleanTag)
+                .Where(tag => !string.IsNullOrWhiteSpace(tag))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            if (snapshotTags.Length > 0) return snapshotTags;
+            return existingEntry == null ? new string[0] : ParseTagText(existingEntry.TagText);
+        }
+
+        long ResolveLibraryMetadataCaptureUtcTicks(string file, string stamp, EmbeddedMetadataSnapshot snapshot, LibraryMetadataIndexEntry existingEntry)
+        {
+            var snapshotTicks = ToCaptureUtcTicks(snapshot == null ? (DateTime?)null : snapshot.CaptureTime);
+            if (snapshotTicks > 0) return snapshotTicks;
+
+            if (existingEntry != null
+                && existingEntry.CaptureUtcTicks > 0
+                && string.Equals(existingEntry.Stamp ?? string.Empty, stamp ?? string.Empty, StringComparison.Ordinal))
+            {
+                return existingEntry.CaptureUtcTicks;
+            }
+
+            var fallback = GetLibraryDate(file);
+            return fallback <= DateTime.MinValue ? 0L : fallback.ToUniversalTime().Ticks;
+        }
+
+        LibraryMetadataIndexEntry BuildResolvedLibraryMetadataIndexEntry(string root, string file, string stamp, EmbeddedMetadataSnapshot snapshot, LibraryMetadataIndexEntry existingEntry, Dictionary<string, LibraryMetadataIndexEntry> index, List<GameIndexEditorRow> gameRows)
+        {
+            var tags = ResolveLibraryMetadataTags(snapshot, existingEntry);
+            var platformLabel = DetermineConsoleLabelFromTags(tags);
+            var preferredGameId = existingEntry == null ? string.Empty : existingEntry.GameId;
+            return new LibraryMetadataIndexEntry
+            {
+                FilePath = file,
+                Stamp = stamp,
+                GameId = ResolveGameIdForIndexedFile(root, file, platformLabel, tags, index, gameRows, preferredGameId),
+                ConsoleLabel = platformLabel,
+                TagText = string.Join(", ", tags),
+                CaptureUtcTicks = ResolveLibraryMetadataCaptureUtcTicks(file, stamp, snapshot, existingEntry)
+            };
+        }
+
+        DateTime ResolveIndexedLibraryDate(string root, string file, Dictionary<string, LibraryMetadataIndexEntry> index = null)
+        {
+            if (string.IsNullOrWhiteSpace(file) || !File.Exists(file)) return DateTime.MinValue;
+            LibraryMetadataIndexEntry entry;
+            if (index == null || !index.TryGetValue(file, out entry))
+            {
+                entry = TryGetLibraryMetadataIndexEntry(root, file, index);
+            }
+            if (entry != null && entry.CaptureUtcTicks > 0)
+            {
+                var stamp = BuildLibraryMetadataStamp(file);
+                if (string.Equals(entry.Stamp ?? string.Empty, stamp, StringComparison.Ordinal))
+                {
+                    DateTime cachedCapture;
+                    if (TryConvertCaptureUtcTicksToLocal(entry.CaptureUtcTicks, out cachedCapture)) return cachedCapture;
+                }
+            }
+            return GetLibraryDate(file);
         }
 
         Dictionary<string, LibraryMetadataIndexEntry> LoadLibraryMetadataIndex(string root, bool forceDiskReload = false)
@@ -68,7 +155,8 @@ namespace PixelVaultNative
                     Stamp = entry.Stamp,
                     GameId = NormalizeGameId(entry.GameId),
                     ConsoleLabel = entry.ConsoleLabel,
-                    TagText = entry.TagText
+                    TagText = entry.TagText,
+                    CaptureUtcTicks = entry.CaptureUtcTicks
                 };
             }
         }
@@ -160,7 +248,7 @@ namespace PixelVaultNative
                 .Chunk(batchSize)
                 .Select((files, index) => Tuple.Create(index + 1, files))
                 .ToList();
-            var batchTagsByFile = new ConcurrentDictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
+            var batchMetadataByFile = new ConcurrentDictionary<string, EmbeddedMetadataSnapshot>(StringComparer.OrdinalIgnoreCase);
             var scanWorkerCount = GetLibraryScanWorkerCount(batches.Count, string.IsNullOrWhiteSpace(folderPath) ? root : folderPath);
             if (batches.Count > 0)
             {
@@ -171,13 +259,13 @@ namespace PixelVaultNative
                 Parallel.ForEach(batches, new ParallelOptions { MaxDegreeOfParallelism = scanWorkerCount, CancellationToken = cancellationToken }, delegate(Tuple<int, string[]> batch)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    if (progress != null) progress(unchanged, fileList.Count, "Reading embedded tags in batch " + batch.Item1 + " of " + batchCount + " (" + batch.Item2.Length + " file(s)).");
-                    var batchTags = ReadEmbeddedKeywordTagsBatch(batch.Item2, cancellationToken);
+                    if (progress != null) progress(unchanged, fileList.Count, "Reading embedded metadata in batch " + batch.Item1 + " of " + batchCount + " (" + batch.Item2.Length + " file(s)).");
+                    var batchMetadata = ReadEmbeddedMetadataBatch(batch.Item2, cancellationToken);
                     foreach (var file in batch.Item2)
                     {
-                        string[] tags;
-                        if (!batchTags.TryGetValue(file, out tags)) tags = new string[0];
-                        batchTagsByFile[file] = tags;
+                        EmbeddedMetadataSnapshot snapshot;
+                        if (!batchMetadata.TryGetValue(file, out snapshot) || snapshot == null) snapshot = new EmbeddedMetadataSnapshot();
+                        batchMetadataByFile[file] = snapshot;
                     }
                 });
             }
@@ -192,18 +280,12 @@ namespace PixelVaultNative
             foreach (var file in pendingFiles)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                string[] tags;
-                if (!batchTagsByFile.TryGetValue(file, out tags)) tags = new string[0];
-                var platformLabel = DetermineConsoleLabelFromTags(tags);
-                var existingGameId = index.ContainsKey(file) && index[file] != null ? index[file].GameId : string.Empty;
-                index[file] = new LibraryMetadataIndexEntry
-                {
-                    FilePath = file,
-                    Stamp = pendingStamps[file],
-                    GameId = ResolveGameIdForIndexedFile(root, file, platformLabel, tags, index, gameRows, existingGameId),
-                    ConsoleLabel = platformLabel,
-                    TagText = string.Join(", ", tags)
-                };
+                EmbeddedMetadataSnapshot snapshot;
+                if (!batchMetadataByFile.TryGetValue(file, out snapshot) || snapshot == null) snapshot = new EmbeddedMetadataSnapshot();
+                LibraryMetadataIndexEntry existingEntry;
+                if (!index.TryGetValue(file, out existingEntry)) existingEntry = null;
+                index[file] = BuildResolvedLibraryMetadataIndexEntry(root, file, pendingStamps[file], snapshot, existingEntry, index, gameRows);
+                var tags = ResolveLibraryMetadataTags(snapshot, existingEntry);
                 fileTagCache[file] = tags;
                 fileTagCacheStamp[file] = MetadataCacheStamp(file);
                 updated++;
@@ -269,21 +351,18 @@ namespace PixelVaultNative
             if (fileList.Count == 0) return;
             var index = LoadLibraryMetadataIndex(root, true);
             var gameRows = LoadSavedGameIndexRows(root);
-            var tagsByFile = ReadEmbeddedKeywordTagsForFiles(fileList);
+            var metadataByFile = ReadEmbeddedMetadataBatch(fileList);
             foreach (var file in fileList)
             {
-                string[] tags;
-                if (!tagsByFile.TryGetValue(file, out tags)) tags = new string[0];
-                var platformLabel = DetermineConsoleLabelFromTags(tags);
-                var existingGameId = index.ContainsKey(file) && index[file] != null ? index[file].GameId : string.Empty;
-                index[file] = new LibraryMetadataIndexEntry
-                {
-                    FilePath = file,
-                    Stamp = BuildLibraryMetadataStamp(file),
-                    GameId = ResolveGameIdForIndexedFile(root, file, platformLabel, tags, index, gameRows, existingGameId),
-                    ConsoleLabel = platformLabel,
-                    TagText = string.Join(", ", tags)
-                };
+                EmbeddedMetadataSnapshot snapshot;
+                if (!metadataByFile.TryGetValue(file, out snapshot) || snapshot == null) snapshot = new EmbeddedMetadataSnapshot();
+                var stamp = BuildLibraryMetadataStamp(file);
+                LibraryMetadataIndexEntry existingEntry;
+                if (!index.TryGetValue(file, out existingEntry)) existingEntry = null;
+                index[file] = BuildResolvedLibraryMetadataIndexEntry(root, file, stamp, snapshot, existingEntry, index, gameRows);
+                var tags = ResolveLibraryMetadataTags(snapshot, existingEntry);
+                fileTagCache[file] = tags;
+                fileTagCacheStamp[file] = MetadataCacheStamp(file);
             }
             SaveLibraryMetadataIndex(root, index);
             RebuildLibraryFolderCache(root, index);
@@ -314,7 +393,8 @@ namespace PixelVaultNative
                     Stamp = BuildLibraryMetadataStamp(item.FilePath),
                     GameId = item.GameId,
                     ConsoleLabel = platformLabel,
-                    TagText = string.Join(", ", tags)
+                    TagText = string.Join(", ", tags),
+                    CaptureUtcTicks = ToCaptureUtcTicks(item.CaptureTime)
                 };
                 fileTagCache[item.FilePath] = tags;
                 fileTagCacheStamp[item.FilePath] = MetadataCacheStamp(item.FilePath);
@@ -378,18 +458,23 @@ namespace PixelVaultNative
             var missingGameId = rowList.FirstOrDefault(row => string.IsNullOrWhiteSpace(NormalizeGameId(row.GameId)));
             if (missingGameId != null) throw new InvalidOperationException("Each photo index row needs a Game ID before saving. Missing: " + Path.GetFileName(missingGameId.FilePath));
 
+            var existingIndex = LoadLibraryMetadataIndex(root, true);
             var index = new Dictionary<string, LibraryMetadataIndexEntry>(StringComparer.OrdinalIgnoreCase);
             foreach (var row in rowList)
             {
                 var normalizedTags = string.Join(", ", ParseTagText(row.TagText));
                 var normalizedConsole = NormalizeConsoleLabel(string.IsNullOrWhiteSpace(row.ConsoleLabel) ? DetermineConsoleLabelFromTags(ParseTagText(normalizedTags)) : row.ConsoleLabel);
+                var stamp = BuildLibraryMetadataStamp(row.FilePath);
+                LibraryMetadataIndexEntry existingEntry;
+                if (!existingIndex.TryGetValue(row.FilePath, out existingEntry)) existingEntry = null;
                 index[row.FilePath] = new LibraryMetadataIndexEntry
                 {
                     FilePath = row.FilePath,
-                    Stamp = BuildLibraryMetadataStamp(row.FilePath),
+                    Stamp = stamp,
                     GameId = NormalizeGameId(row.GameId),
                     ConsoleLabel = normalizedConsole,
-                    TagText = normalizedTags
+                    TagText = normalizedTags,
+                    CaptureUtcTicks = ResolveLibraryMetadataCaptureUtcTicks(row.FilePath, stamp, null, existingEntry)
                 };
             }
 

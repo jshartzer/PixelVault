@@ -207,8 +207,20 @@ Completed on March 30, 2026:
   from SQLite on every filename parse for the same library root.
 - The cache invalidates when saved game-index rows are written, so Steam rename
   detection stays fresh after edits.
+- Library metadata index rows now cache `CaptureUtcTicks`, and existing SQLite
+  `photo_index` databases upgrade in place with a `capture_utc_ticks` column
+  instead of requiring a reset.
+- Metadata scan, file upsert, manual metadata save, and folder-alignment paths
+  now populate or preserve cached capture timestamps when they write library
+  metadata index rows.
+- Background folder-cache rebuilds now treat rows without cached capture times as
+  incomplete metadata, batch-read embedded metadata for them, and reuse cached
+  capture times for folder ordering and newest-date derivation.
 - Library detail rendering now moves capture-date derivation and grouping off the
   UI thread and shows a loading placeholder while the work completes.
+- Selected-folder detail rendering now batch-backfills missing capture times on a
+  background thread before grouping, so cached-startup sessions do not have to
+  wait for a manual Library refresh before benefiting from the metadata cache.
 - Library startup now skips the automatic folder-cache refresh when a valid cache
   snapshot already exists, so launch relies on the cached snapshot instead of
   immediately walking the full library again.
@@ -236,6 +248,10 @@ Observed result from live click-through on the bad folder:
   17338 ms for `Horizon Zero Dawn™ Remastered`.
 - Fresh local Release build showed `Loading captures...` within ~216 ms and then
   completed the same `LibraryDetailRender` in 2182 ms.
+- After caching capture timestamps in the library metadata index and backfilling
+  missing capture times on first selection, a fresh local Release launch with a
+  cached folder list rendered the same `Horizon Zero Dawn™ Remastered` folder in
+  1448 ms on the first automated click-through.
 - Fresh local Release launch now logs `PixelVault 0.814 ready` plus a
   `LibraryFolderRender` sample without immediately logging `Refreshing library
   folder cache.` or a `LibraryFolderCache` rebuild.
@@ -245,8 +261,11 @@ Observed result from live click-through on the bad folder:
   another render sample.
 
 Next up:
-- Audit the remaining scan / rebuild / import / manual-import paths for work that
-  still starts too close to the UI thread.
+- Remove the remaining `Dispatcher.Invoke` path from
+  `ShouldIncludeGameCaptureKeywords` so metadata/tag work no longer pings the UI
+  thread synchronously.
+- Then audit the remaining scan / rebuild / import / manual-import paths for work
+  that still starts too close to the UI thread.
 - Keep an eye on mixed-media folder scrolling and manual Steam search behavior in
   click-through testing now that the main Phase 2 slices are in.
 

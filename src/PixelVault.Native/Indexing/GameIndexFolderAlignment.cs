@@ -85,13 +85,15 @@ namespace PixelVaultNative
                     else
                     {
                         var fallbackTags = ReadEmbeddedKeywordTagsDirect(targetPath);
+                        var targetStamp = BuildLibraryMetadataStamp(targetPath);
                         entry = new LibraryMetadataIndexEntry
                         {
                             FilePath = targetPath,
-                            Stamp = BuildLibraryMetadataStamp(targetPath),
+                            Stamp = targetStamp,
                             GameId = NormalizeGameId(row.GameId),
                             ConsoleLabel = NormalizeConsoleLabel(row.PlatformLabel),
-                            TagText = string.Join(", ", fallbackTags)
+                            TagText = string.Join(", ", fallbackTags),
+                            CaptureUtcTicks = ResolveLibraryMetadataCaptureUtcTicks(targetPath, targetStamp, null, null)
                         };
                     }
 
@@ -99,6 +101,10 @@ namespace PixelVaultNative
                     entry.Stamp = BuildLibraryMetadataStamp(targetPath);
                     entry.GameId = NormalizeGameId(row.GameId);
                     entry.ConsoleLabel = NormalizeConsoleLabel(row.PlatformLabel);
+                    if (entry.CaptureUtcTicks <= 0)
+                    {
+                        entry.CaptureUtcTicks = ResolveLibraryMetadataCaptureUtcTicks(targetPath, entry.Stamp, null, entry);
+                    }
                     index[targetPath] = entry;
                     updatedFiles.Add(targetPath);
                 }

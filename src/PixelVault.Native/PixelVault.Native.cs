@@ -39,7 +39,7 @@ namespace PixelVaultNative
 
     public sealed partial class MainWindow : Window
     {
-        const string AppVersion = "0.815";
+        const string AppVersion = "0.816";
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
         const string ClearedExternalIdSentinel = "__PV_CLEARED__";
@@ -554,7 +554,7 @@ namespace PixelVaultNative
             {
                 newestSource = folder.PreviewImagePath;
             }
-            var newest = string.IsNullOrWhiteSpace(newestSource) ? DateTime.MinValue : GetLibraryDate(newestSource);
+            var newest = string.IsNullOrWhiteSpace(newestSource) ? DateTime.MinValue : ResolveIndexedLibraryDate(libraryRoot, newestSource);
             if (newest > DateTime.MinValue) folder.NewestCaptureUtcTicks = newest.ToUniversalTime().Ticks;
             return newest;
         }
@@ -4388,8 +4388,55 @@ namespace PixelVaultNative
                     if (refreshDetailSelectionUi != null) refreshDetailSelectionUi();
                     Task.Run(delegate
                     {
-                        var datedFiles = GetFilesForLibraryFolderEntry(renderFolder, false)
-                            .Select(file => new { FilePath = file, CaptureDate = GetLibraryDate(file) })
+                        var metadataIndex = string.IsNullOrWhiteSpace(libraryRoot)
+                            ? new Dictionary<string, LibraryMetadataIndexEntry>(StringComparer.OrdinalIgnoreCase)
+                            : new Dictionary<string, LibraryMetadataIndexEntry>(LoadLibraryMetadataIndex(libraryRoot), StringComparer.OrdinalIgnoreCase);
+                        var detailFiles = GetFilesForLibraryFolderEntry(renderFolder, false)
+                            .Where(file => !string.IsNullOrWhiteSpace(file) && File.Exists(file))
+                            .Distinct(StringComparer.OrdinalIgnoreCase)
+                            .ToList();
+                        if (!string.IsNullOrWhiteSpace(libraryRoot) && detailFiles.Count > 0)
+                        {
+                            var filesMissingCaptureTicks = detailFiles
+                                .Where(file =>
+                                {
+                                    LibraryMetadataIndexEntry entry;
+                                    if (!metadataIndex.TryGetValue(file, out entry) || entry == null || entry.CaptureUtcTicks <= 0) return true;
+                                    return !string.Equals(entry.Stamp ?? string.Empty, BuildLibraryMetadataStamp(file), StringComparison.Ordinal);
+                                })
+                                .ToList();
+                            if (filesMissingCaptureTicks.Count > 0)
+                            {
+                                var savedGameRows = LoadSavedGameIndexRows(libraryRoot);
+                                var metadataByFile = ReadEmbeddedMetadataBatch(filesMissingCaptureTicks);
+                                var indexChanged = false;
+                                var gameRowsChanged = false;
+                                foreach (var file in filesMissingCaptureTicks)
+                                {
+                                    EmbeddedMetadataSnapshot metadataSnapshot;
+                                    if (!metadataByFile.TryGetValue(file, out metadataSnapshot) || metadataSnapshot == null) metadataSnapshot = new EmbeddedMetadataSnapshot();
+                                    LibraryMetadataIndexEntry existingEntry;
+                                    if (!metadataIndex.TryGetValue(file, out existingEntry)) existingEntry = null;
+                                    var stamp = BuildLibraryMetadataStamp(file);
+                                    var previousGameId = existingEntry == null ? string.Empty : NormalizeGameId(existingEntry.GameId);
+                                    var previousConsole = existingEntry == null ? string.Empty : NormalizeConsoleLabel(existingEntry.ConsoleLabel);
+                                    var rebuiltEntry = BuildResolvedLibraryMetadataIndexEntry(libraryRoot, file, stamp, metadataSnapshot, existingEntry, metadataIndex, savedGameRows);
+                                    metadataIndex[file] = rebuiltEntry;
+                                    fileTagCache[file] = ParseTagText(rebuiltEntry.TagText);
+                                    fileTagCacheStamp[file] = MetadataCacheStamp(file);
+                                    indexChanged = true;
+                                    if (!string.Equals(previousGameId, NormalizeGameId(rebuiltEntry.GameId), StringComparison.OrdinalIgnoreCase)
+                                        || !string.Equals(previousConsole, NormalizeConsoleLabel(rebuiltEntry.ConsoleLabel), StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        gameRowsChanged = true;
+                                    }
+                                }
+                                if (gameRowsChanged) SaveSavedGameIndexRows(libraryRoot, savedGameRows);
+                                if (indexChanged) SaveLibraryMetadataIndex(libraryRoot, metadataIndex);
+                            }
+                        }
+                        var datedFiles = detailFiles
+                            .Select(file => new { FilePath = file, CaptureDate = ResolveIndexedLibraryDate(libraryRoot, file, metadataIndex) })
                             .OrderByDescending(entry => entry.CaptureDate)
                             .ThenBy(entry => entry.FilePath, StringComparer.OrdinalIgnoreCase)
                             .ToList();

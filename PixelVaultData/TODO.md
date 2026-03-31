@@ -22,13 +22,14 @@ For the focused performance backlog, use:
 - Cover refresh, game-index ID resolution, and library scan now cancel active provider or ExifTool work instead of waiting only between titles or batches.
 - Debounced Library search is in and the quick live validation pass looked good.
 - Manual Steam search now supports in-flight cancellation from the metadata editor.
-- Next cleanup: audit the remaining scan/rebuild/import/manual-import paths for work that still starts too close to the UI thread.
+- Library metadata index rows now cache capture timestamps, and the Library detail path batch-backfills missing capture times on first selection.
+- Next cleanup: remove the remaining `Dispatcher.Invoke` path from game-capture keyword tagging, then audit the remaining scan/rebuild/import/manual-import paths for work that still starts too close to the UI thread.
 
 2. Keep repo docs and Notion in sync when releases, phase status, or workflow rules change.
 - Follow `C:\Codex\docs\DOC_SYNC_POLICY.md` instead of relying on memory.
 
 3. Pull performance-specific work from the dedicated backlog instead of mixing it into this general list.
-- Capture virtualization, cached sort keys, debounced Library search, and the remaining manual provider-search cancellation cleanup are in; next up is the broader background-thread audit.
+- Capture virtualization, cached sort keys, debounced Library search, manual provider-search cancellation cleanup, and cached library capture timestamps are in; next up is the keyword-threading cleanup, then the broader background-thread audit.
 
 4. Rebuild the Filename Rules screen from a workflow spec instead of adding more controls to the current dense grid.
 - Use `C:\Codex\docs\FILENAME_RULES_FORM_SPEC.md` as the source of truth for the next UI pass.

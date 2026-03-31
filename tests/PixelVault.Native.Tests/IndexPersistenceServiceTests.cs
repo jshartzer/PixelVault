@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using Microsoft.Data.Sqlite;
 using SQLitePCL;
 using Xunit;
 
@@ -68,7 +69,8 @@ public sealed class IndexPersistenceServiceTests
                     Stamp = "stamp-1",
                     GameId = "g00001",
                     ConsoleLabel = "Steam",
-                    TagText = "Steam;Action"
+                    TagText = "Steam;Action",
+                    CaptureUtcTicks = new DateTime(2026, 3, 30, 12, 34, 56, DateTimeKind.Utc).Ticks
                 }
             });
 
@@ -85,6 +87,7 @@ public sealed class IndexPersistenceServiceTests
         Assert.Equal("G00077", entry.GameId);
         Assert.Equal("Steam", entry.ConsoleLabel);
         Assert.Equal("Steam;Action", entry.TagText);
+        Assert.Equal(new DateTime(2026, 3, 30, 12, 34, 56, DateTimeKind.Utc).Ticks, entry.CaptureUtcTicks);
         Assert.Equal(harness.LibraryRoot, harness.LastAliasApplyRoot);
         Assert.NotNull(harness.LastAliasApplyMap);
         Assert.Equal("G00077", harness.LastAliasApplyMap!["G00001"]);
@@ -107,7 +110,8 @@ public sealed class IndexPersistenceServiceTests
                     Stamp = "existing",
                     GameId = "G00010",
                     ConsoleLabel = "Steam",
-                    TagText = "Steam;Photo"
+                    TagText = "Steam;Photo",
+                    CaptureUtcTicks = 12345
                 },
                 [missingFile] = new LibraryMetadataIndexEntry
                 {
@@ -115,7 +119,8 @@ public sealed class IndexPersistenceServiceTests
                     Stamp = "missing",
                     GameId = "G99999",
                     ConsoleLabel = "Other",
-                    TagText = "Other"
+                    TagText = "Other",
+                    CaptureUtcTicks = 67890
                 }
             });
 
@@ -168,10 +173,65 @@ public sealed class IndexPersistenceServiceTests
         Assert.Equal(string.Empty, entry.GameId);
         Assert.Equal("Steam", entry.ConsoleLabel);
         Assert.Equal("Steam;Photo", entry.TagText);
+        Assert.Equal(0, entry.CaptureUtcTicks);
 
         var reloaded = harness.Service.LoadLibraryMetadataIndexEntries(harness.LibraryRoot);
         Assert.Single(reloaded);
         Assert.True(reloaded.ContainsKey(existingFile));
+    }
+
+    [Fact]
+    public void LoadLibraryMetadataIndexEntries_UpgradesExistingDatabaseWithCaptureTicksColumn()
+    {
+        using var harness = new IndexPersistenceHarness();
+        var existingFile = harness.CreateFile("metadata\\upgrade.png");
+
+        var builder = new SqliteConnectionStringBuilder
+        {
+            DataSource = harness.IndexDatabasePath,
+            Mode = SqliteOpenMode.ReadWriteCreate
+        };
+        using (var connection = new SqliteConnection(builder.ToString()))
+        {
+            connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = @"
+CREATE TABLE photo_index (
+    root TEXT NOT NULL,
+    file_path TEXT NOT NULL,
+    stamp TEXT NOT NULL DEFAULT '',
+    game_id TEXT NOT NULL DEFAULT '',
+    console_label TEXT NOT NULL DEFAULT '',
+    tag_text TEXT NOT NULL DEFAULT '',
+    PRIMARY KEY (root, file_path)
+);
+INSERT INTO photo_index (root, file_path, stamp, game_id, console_label, tag_text)
+VALUES ($root, $filePath, $stamp, $gameId, $consoleLabel, $tagText);";
+            command.Parameters.AddWithValue("$root", harness.LibraryRoot);
+            command.Parameters.AddWithValue("$filePath", existingFile);
+            command.Parameters.AddWithValue("$stamp", "legacy-db-stamp");
+            command.Parameters.AddWithValue("$gameId", "G00088");
+            command.Parameters.AddWithValue("$consoleLabel", "Steam");
+            command.Parameters.AddWithValue("$tagText", "Steam;Photo");
+            command.ExecuteNonQuery();
+        }
+
+        var loaded = harness.Service.LoadLibraryMetadataIndexEntries(harness.LibraryRoot);
+
+        var entry = Assert.Single(loaded.Values);
+        Assert.Equal(existingFile, entry.FilePath);
+        Assert.Equal("legacy-db-stamp", entry.Stamp);
+        Assert.Equal("G00088", entry.GameId);
+        Assert.Equal("Steam", entry.ConsoleLabel);
+        Assert.Equal("Steam;Photo", entry.TagText);
+        Assert.Equal(0, entry.CaptureUtcTicks);
+
+        using var verifyConnection = new SqliteConnection(builder.ToString());
+        verifyConnection.Open();
+        using var verifyCommand = verifyConnection.CreateCommand();
+        verifyCommand.CommandText = "SELECT COUNT(1) FROM pragma_table_info('photo_index') WHERE name = 'capture_utc_ticks';";
+        var columnCount = Convert.ToInt32(verifyCommand.ExecuteScalar());
+        Assert.Equal(1, columnCount);
     }
 
     [Fact]
@@ -254,6 +314,7 @@ public sealed class IndexPersistenceServiceTests
         public string RootPath { get; }
         public string CacheRoot { get; }
         public string LibraryRoot { get; }
+        public string IndexDatabasePath { get; }
         public IndexPersistenceService Service { get; }
         public string? LastAliasApplyRoot { get; private set; }
         public Dictionary<string, string>? LastAliasApplyMap { get; private set; }
@@ -263,6 +324,7 @@ public sealed class IndexPersistenceServiceTests
             RootPath = Path.Combine(Path.GetTempPath(), "PixelVault.Native.Tests", Guid.NewGuid().ToString("N"));
             CacheRoot = Path.Combine(RootPath, "cache");
             LibraryRoot = Path.Combine(RootPath, "library-root");
+            IndexDatabasePath = Path.Combine(CacheRoot, "pixelvault-index-" + Regex.Replace((LibraryRoot ?? string.Empty).ToLowerInvariant(), @"[^a-z0-9]+", "_").Trim('_') + ".sqlite");
             Directory.CreateDirectory(CacheRoot);
             Directory.CreateDirectory(LibraryRoot);
 

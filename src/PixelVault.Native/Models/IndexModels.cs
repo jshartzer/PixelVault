@@ -49,6 +49,7 @@ namespace PixelVaultNative
         public string GameId;
         public string ConsoleLabel;
         public string TagText;
+        public long CaptureUtcTicks;
     }
 
     sealed class VideoClipInfo

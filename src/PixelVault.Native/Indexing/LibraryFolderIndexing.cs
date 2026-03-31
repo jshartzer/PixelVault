@@ -184,34 +184,36 @@ namespace PixelVaultNative
                 .Where(File.Exists)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
-            var missingFiles = allFiles
+            var missingOrIncompleteFiles = allFiles
                 .Where(file =>
                 {
                     LibraryMetadataIndexEntry entry;
-                    return !index.TryGetValue(file, out entry) || entry == null;
+                    return !index.TryGetValue(file, out entry) || entry == null || entry.CaptureUtcTicks <= 0;
                 })
                 .ToList();
-            var missingTagsByFile = ReadEmbeddedKeywordTagsForFiles(missingFiles);
+            var metadataByFile = ReadEmbeddedMetadataBatch(missingOrIncompleteFiles);
             foreach (var file in allFiles)
             {
                 LibraryMetadataIndexEntry entry;
-                if (!index.TryGetValue(file, out entry) || entry == null)
+                if (!index.TryGetValue(file, out entry) || entry == null || entry.CaptureUtcTicks <= 0)
                 {
-                    string[] tags;
-                    if (!missingTagsByFile.TryGetValue(file, out tags)) tags = new string[0];
-                    var platformLabel = DetermineConsoleLabelFromTags(tags);
-                    var gameId = ResolveGameIdForIndexedFile(root, file, platformLabel, tags, index, gameRows);
-                    index[file] = new LibraryMetadataIndexEntry
-                    {
-                        FilePath = file,
-                        Stamp = BuildLibraryMetadataStamp(file),
-                        GameId = gameId,
-                        ConsoleLabel = platformLabel,
-                        TagText = string.Join(", ", tags)
-                    };
-                    entry = index[file];
+                    EmbeddedMetadataSnapshot snapshot;
+                    if (!metadataByFile.TryGetValue(file, out snapshot) || snapshot == null) snapshot = new EmbeddedMetadataSnapshot();
+                    var stamp = BuildLibraryMetadataStamp(file);
+                    var previousGameId = entry == null ? string.Empty : NormalizeGameId(entry.GameId);
+                    var previousConsole = entry == null ? string.Empty : NormalizeConsoleLabel(entry.ConsoleLabel);
+                    var rebuiltEntry = BuildResolvedLibraryMetadataIndexEntry(root, file, stamp, snapshot, entry, index, gameRows);
+                    index[file] = rebuiltEntry;
+                    entry = rebuiltEntry;
+                    var tags = ParseTagText(rebuiltEntry.TagText);
+                    fileTagCache[file] = tags;
+                    fileTagCacheStamp[file] = MetadataCacheStamp(file);
                     indexChanged = true;
-                    gameRowsChanged = true;
+                    if (!string.Equals(previousGameId, NormalizeGameId(rebuiltEntry.GameId), StringComparison.OrdinalIgnoreCase)
+                        || !string.Equals(previousConsole, NormalizeConsoleLabel(rebuiltEntry.ConsoleLabel), StringComparison.OrdinalIgnoreCase))
+                    {
+                        gameRowsChanged = true;
+                    }
                 }
                 else if (string.IsNullOrWhiteSpace(entry.GameId))
                 {
@@ -246,7 +248,7 @@ namespace PixelVaultNative
                 .ToList();
             foreach (var group in groupedFiles)
             {
-                var groupFiles = group.Select(item => item.File).OrderByDescending(GetLibraryDate).ThenBy(Path.GetFileName).ToArray();
+                var groupFiles = group.Select(item => item.File).OrderByDescending(file => ResolveIndexedLibraryDate(root, file, index)).ThenBy(Path.GetFileName).ToArray();
                 var saved = FindSavedGameIndexRowById(gameRows, group.Key);
                 var preferredFolderPath = groupFiles
                     .Select(file => Path.GetDirectoryName(file) ?? string.Empty)
@@ -258,6 +260,19 @@ namespace PixelVaultNative
                 var platformLabel = saved == null
                     ? DetermineFolderPlatform(groupFiles.ToList(), index)
                     : NormalizeConsoleLabel(saved.PlatformLabel);
+                long newestCaptureUtcTicks = 0;
+                if (groupFiles.Length > 0)
+                {
+                    LibraryMetadataIndexEntry newestEntry;
+                    if (index.TryGetValue(groupFiles[0], out newestEntry) && newestEntry != null)
+                    {
+                        newestCaptureUtcTicks = newestEntry.CaptureUtcTicks;
+                    }
+                    if (newestCaptureUtcTicks <= 0)
+                    {
+                        newestCaptureUtcTicks = ToCaptureUtcTicks(ResolveIndexedLibraryDate(root, groupFiles[0], index));
+                    }
+                }
                 list.Add(new LibraryFolderInfo
                 {
                     GameId = group.Key,
@@ -267,7 +282,7 @@ namespace PixelVaultNative
                     PreviewImagePath = groupFiles.FirstOrDefault(IsImage) ?? groupFiles.FirstOrDefault(),
                     PlatformLabel = platformLabel,
                     FilePaths = groupFiles,
-                    NewestCaptureUtcTicks = groupFiles.Length > 0 ? GetLibraryDate(groupFiles[0]).ToUniversalTime().Ticks : 0,
+                    NewestCaptureUtcTicks = newestCaptureUtcTicks,
                     SteamAppId = saved != null && (saved.SuppressSteamAppIdAutoResolve || !string.IsNullOrWhiteSpace(saved.SteamAppId))
                         ? (saved.SteamAppId ?? string.Empty)
                         : ResolveLibraryFolderSteamAppId(platformLabel, groupFiles),

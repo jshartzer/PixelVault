@@ -175,6 +175,7 @@ CREATE TABLE IF NOT EXISTS photo_index (
     game_id TEXT NOT NULL DEFAULT '',
     console_label TEXT NOT NULL DEFAULT '',
     tag_text TEXT NOT NULL DEFAULT '',
+    capture_utc_ticks INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (root, file_path)
 );
 CREATE INDEX IF NOT EXISTS idx_photo_index_root_game ON photo_index(root, game_id);
@@ -211,6 +212,37 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_filename_convention_sample_root_file ON fi
 ";
                 command.ExecuteNonQuery();
             }
+
+            EnsurePhotoIndexCaptureTicksColumn(connection);
+        }
+
+        void EnsurePhotoIndexCaptureTicksColumn(SqliteConnection connection)
+        {
+            if (connection == null) return;
+            if (DatabaseTableHasColumn(connection, "photo_index", "capture_utc_ticks")) return;
+            using (var command = connection.CreateCommand())
+            {
+                command.CommandText = "ALTER TABLE photo_index ADD COLUMN capture_utc_ticks INTEGER NOT NULL DEFAULT 0;";
+                command.ExecuteNonQuery();
+            }
+        }
+
+        bool DatabaseTableHasColumn(SqliteConnection connection, string tableName, string columnName)
+        {
+            if (connection == null || string.IsNullOrWhiteSpace(tableName) || string.IsNullOrWhiteSpace(columnName)) return false;
+            using (var command = connection.CreateCommand())
+            {
+                command.CommandText = "PRAGMA table_info(" + tableName + ");";
+                using (var reader = command.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        var currentName = reader.IsDBNull(1) ? string.Empty : reader.GetString(1);
+                        if (string.Equals(currentName, columnName, StringComparison.OrdinalIgnoreCase)) return true;
+                    }
+                }
+            }
+            return false;
         }
 
         long CountIndexDatabaseRows(SqliteConnection connection, string tableName, string root)
@@ -307,7 +339,7 @@ VALUES ($root, $gameId, $folderPath, $name, $platformLabel, $steamAppId, $steamG
             using (var command = connection.CreateCommand())
             {
                 command.CommandText = @"
-SELECT file_path, stamp, game_id, console_label, tag_text
+SELECT file_path, stamp, game_id, console_label, tag_text, capture_utc_ticks
 FROM photo_index
 WHERE root = $root
 ORDER BY file_path COLLATE NOCASE;";
@@ -328,7 +360,8 @@ ORDER BY file_path COLLATE NOCASE;";
                             Stamp = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
                             GameId = !string.IsNullOrWhiteSpace(currentGameId) && aliasMap != null && aliasMap.TryGetValue(currentGameId, out mappedGameId) ? mappedGameId : currentGameId,
                             ConsoleLabel = DetermineConsoleLabelFromTags(ParseTagText(tagText)),
-                            TagText = tagText
+                            TagText = tagText,
+                            CaptureUtcTicks = reader.IsDBNull(5) ? 0L : reader.GetInt64(5)
                         };
                     }
                 }
@@ -361,14 +394,15 @@ ORDER BY file_path COLLATE NOCASE;";
                     {
                         insert.Transaction = transaction;
                         insert.CommandText = @"
-INSERT INTO photo_index (root, file_path, stamp, game_id, console_label, tag_text)
-VALUES ($root, $filePath, $stamp, $gameId, $consoleLabel, $tagText);";
+INSERT INTO photo_index (root, file_path, stamp, game_id, console_label, tag_text, capture_utc_ticks)
+VALUES ($root, $filePath, $stamp, $gameId, $consoleLabel, $tagText, $captureUtcTicks);";
                         insert.Parameters.AddWithValue("$root", root ?? string.Empty);
                         insert.Parameters.AddWithValue("$filePath", entry.FilePath ?? string.Empty);
                         insert.Parameters.AddWithValue("$stamp", entry.Stamp ?? string.Empty);
                         insert.Parameters.AddWithValue("$gameId", NormalizeGameId(entry.GameId));
                         insert.Parameters.AddWithValue("$consoleLabel", entry.ConsoleLabel ?? string.Empty);
                         insert.Parameters.AddWithValue("$tagText", entry.TagText ?? string.Empty);
+                        insert.Parameters.AddWithValue("$captureUtcTicks", entry.CaptureUtcTicks > 0 ? entry.CaptureUtcTicks : 0L);
                         insert.ExecuteNonQuery();
                     }
                 }
@@ -618,7 +652,8 @@ VALUES ($root, $fileName, $platformLabel, $conventionId, $firstSeenUtcTicks, $la
                         Stamp = parts[1],
                         GameId = !string.IsNullOrWhiteSpace(currentGameId) && aliasMap != null && aliasMap.TryGetValue(currentGameId, out mappedGameId) ? mappedGameId : parts[2],
                         ConsoleLabel = DetermineConsoleLabelFromTags(ParseTagText(tagText)),
-                        TagText = tagText
+                        TagText = tagText,
+                        CaptureUtcTicks = 0
                     };
                 }
                 else if (parts.Length >= 4)
@@ -632,7 +667,8 @@ VALUES ($root, $fileName, $platformLabel, $conventionId, $firstSeenUtcTicks, $la
                         Stamp = parts[1],
                         GameId = string.Empty,
                         ConsoleLabel = DetermineConsoleLabelFromTags(ParseTagText(tagText)),
-                        TagText = tagText
+                        TagText = tagText,
+                        CaptureUtcTicks = 0
                     };
                 }
             }

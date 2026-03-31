@@ -44,11 +44,11 @@ This handoff is the short current-state summary.
 
 Current live build:
 
-- `0.815`
+- `0.816`
 
 Current executable:
 
-- `C:\Codex\dist\PixelVault-0.815\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.816\PixelVault.exe`
 
 Current build pointer:
 
