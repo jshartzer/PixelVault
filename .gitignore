@@ -13,19 +13,27 @@ logs/
 tools/
 PixelVault.lnk
 PixelVaultData/PixelVault.settings.ini
+PixelVaultData/PixelVault.settings.ini.*.bak
 PixelVaultData/logs/
 PixelVaultData/cache/covers/
 PixelVaultData/cache/thumbs/
 PixelVaultData/cache/*.sqlite
 PixelVaultData/cache/*.sqlite-shm
 PixelVaultData/cache/*.sqlite-wal
+PixelVaultData/cache/*.args
+PixelVaultData/cache/*.pre-*
 PixelVaultData/cache/*.bak-*
 PixelVaultData/cache/library-folders-*.cache
 PixelVaultData/cache/photography-gallery-*.cache
 PixelVaultData/cache/last-import.tsv
+PixelVaultData/saved-covers/
 
 # Local backups and temp artifacts
+.cursor/
 backups/
+dist/publish-latest/
+PixelVault_BugReport.docx
+tmp/
 tmp_*
 tmp-*
 **/bin/
