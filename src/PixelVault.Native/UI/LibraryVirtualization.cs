@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Input;
 using System.Windows.Threading;
 using System.Windows.Media.Imaging;
 
@@ -194,7 +195,7 @@ namespace PixelVaultNative
             return Math.Max(1, columns);
         }
 
-        Border CreateLibraryDetailTile(string file, int size, Func<bool> shouldLoad, Action<string> openSingleFileMetadataEditor, Action<string, bool, bool> updateDetailSelection, HashSet<string> selectedDetailFiles, Action refreshDetailSelectionUi)
+        Border CreateLibraryDetailTile(string file, int size, Func<bool> shouldLoad, Action<string> openSingleFileMetadataEditor, Action<string, ModifierKeys> updateDetailSelection, HashSet<string> selectedDetailFiles, Action refreshDetailSelectionUi)
         {
             var isVideoFile = IsVideo(file);
             var tileIsActive = true;
@@ -325,15 +326,13 @@ namespace PixelVaultNative
             {
                 var clicked = sender as Border;
                 var clickedFile = clicked == null ? string.Empty : clicked.Tag as string;
-                var additive = (System.Windows.Input.Keyboard.Modifiers & System.Windows.Input.ModifierKeys.Control) == System.Windows.Input.ModifierKeys.Control;
-                updateDetailSelection(clickedFile, additive, additive);
+                updateDetailSelection(clickedFile, Keyboard.Modifiers);
                 if (e.ClickCount >= 2 && !string.IsNullOrWhiteSpace(clickedFile)) OpenWithShell(clickedFile);
             };
             tile.MouseRightButtonDown += delegate(object sender, System.Windows.Input.MouseButtonEventArgs e)
             {
                 var clicked = sender as Border;
                 var clickedFile = clicked == null ? string.Empty : clicked.Tag as string;
-                var additive = (System.Windows.Input.Keyboard.Modifiers & System.Windows.Input.ModifierKeys.Control) == System.Windows.Input.ModifierKeys.Control;
                 if (string.IsNullOrWhiteSpace(clickedFile)) return;
                 if (selectedDetailFiles.Contains(clickedFile))
                 {
@@ -341,7 +340,7 @@ namespace PixelVaultNative
                 }
                 else
                 {
-                    updateDetailSelection(clickedFile, additive, additive);
+                    updateDetailSelection(clickedFile, Keyboard.Modifiers);
                 }
             };
             tile.MouseEnter += delegate

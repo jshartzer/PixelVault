@@ -13,6 +13,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Effects;
 using System.Windows.Media.Imaging;
@@ -3777,41 +3778,6 @@ namespace PixelVaultNative
             }
             ClearImageCache();
         }
-        void RunLibraryMetadataEdit(LibraryFolderInfo folder, Action refreshLibrary)
-        {
-            try
-            {
-                if (folder == null || string.IsNullOrWhiteSpace(folder.FolderPath) || !Directory.Exists(folder.FolderPath))
-                {
-                    MessageBox.Show("Choose a library folder first.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
-                    return;
-                }
-                EnsureExifTool();
-                var items = BuildLibraryMetadataItems(folder);
-                if (items.Count == 0)
-                {
-                    status.Text = "No library captures to edit";
-                    Log("Library metadata editor opened, but no media files were found in " + folder.FolderPath + ".");
-                    MessageBox.Show("There are no capture files in this folder yet.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
-                    return;
-                }
-                status.Text = "Editing library metadata";
-                Log("Opening library metadata editor for " + items.Count + " capture(s) in " + folder.Name + ".");
-                if (!ShowManualMetadataWindow(items, true, folder.Name))
-                {
-                    status.Text = "Library metadata unchanged";
-                    Log("Library metadata editor closed for " + folder.Name + ".");
-                    return;
-                }
-                RunLibraryMetadataWorkflowWithProgress(folder, items, refreshLibrary);
-            }
-            catch (Exception ex)
-            {
-                Log(ex.ToString());
-                MessageBox.Show(ex.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-
         void RunLibraryMetadataWorkflowWithProgress(LibraryFolderInfo folder, List<ManualMetadataItem> items, Action refreshLibrary)
         {
             var originalSavedGameIndexRow = folder == null ? null : FindSavedGameIndexRow(LoadSavedGameIndexRows(libraryRoot), folder);
@@ -4350,40 +4316,85 @@ namespace PixelVaultNative
                 var selectedDetailFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 var detailTiles = new List<Border>();
                 int estimatedDetailRowHeight = 420;
+                int detailSelectionAnchorIndex = -1;
+                var detailFilesDisplayOrder = new List<string>();
+
+                Func<List<string>> getVisibleDetailFilesOrdered = delegate
+                {
+                    if (current == null) return new List<string>();
+                    if (detailFilesDisplayOrder != null && detailFilesDisplayOrder.Count > 0)
+                    {
+                        return detailFilesDisplayOrder
+                            .Where(file => !string.IsNullOrWhiteSpace(file) && File.Exists(file))
+                            .Distinct(StringComparer.OrdinalIgnoreCase)
+                            .ToList();
+                    }
+                    return GetFilesForLibraryFolderEntry(current, false)
+                        .Where(file => !string.IsNullOrWhiteSpace(file) && File.Exists(file))
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .ToList();
+                };
 
                 Func<List<string>> getSelectedDetailFiles = delegate
                 {
                     if (current == null) return new List<string>();
-                    var visibleFiles = GetFilesForLibraryFolderEntry(current, false)
-                        .Where(file => !string.IsNullOrWhiteSpace(file) && File.Exists(file))
-                        .Distinct(StringComparer.OrdinalIgnoreCase)
-                        .ToList();
+                    var visibleFiles = getVisibleDetailFilesOrdered();
                     var visibleSet = new HashSet<string>(visibleFiles, StringComparer.OrdinalIgnoreCase);
                     foreach (var stale in selectedDetailFiles.Where(path => !visibleSet.Contains(path)).ToList()) selectedDetailFiles.Remove(stale);
                     return visibleFiles.Where(path => selectedDetailFiles.Contains(path)).ToList();
                 };
 
-                Action<string, bool, bool> updateDetailSelection = delegate(string filePath, bool additive, bool toggle)
+                Action<string, ModifierKeys> updateDetailSelection = delegate(string filePath, ModifierKeys mods)
                 {
                     if (string.IsNullOrWhiteSpace(filePath))
                     {
-                        if (!additive) selectedDetailFiles.Clear();
+                        if ((mods & ModifierKeys.Control) == 0 && (mods & ModifierKeys.Shift) == 0)
+                        {
+                            selectedDetailFiles.Clear();
+                            detailSelectionAnchorIndex = -1;
+                        }
                         if (refreshDetailSelectionUi != null) refreshDetailSelectionUi();
                         return;
                     }
-                    if (!additive)
+                    var visibleFiles = getVisibleDetailFilesOrdered();
+                    var idx = -1;
+                    for (var i = 0; i < visibleFiles.Count; i++)
                     {
-                        selectedDetailFiles.Clear();
-                        selectedDetailFiles.Add(filePath);
+                        if (string.Equals(visibleFiles[i], filePath, StringComparison.OrdinalIgnoreCase))
+                        {
+                            idx = i;
+                            break;
+                        }
                     }
-                    else if (toggle)
+                    if (idx < 0) return;
+
+                    var ctrl = (mods & ModifierKeys.Control) != 0;
+                    var shift = (mods & ModifierKeys.Shift) != 0;
+
+                    if (shift && detailSelectionAnchorIndex >= 0 && detailSelectionAnchorIndex < visibleFiles.Count)
+                    {
+                        var a = detailSelectionAnchorIndex;
+                        var b = idx;
+                        if (a > b)
+                        {
+                            var t = a;
+                            a = b;
+                            b = t;
+                        }
+                        selectedDetailFiles.Clear();
+                        for (var i = a; i <= b; i++) selectedDetailFiles.Add(visibleFiles[i]);
+                    }
+                    else if (ctrl)
                     {
                         if (selectedDetailFiles.Contains(filePath)) selectedDetailFiles.Remove(filePath);
                         else selectedDetailFiles.Add(filePath);
+                        detailSelectionAnchorIndex = idx;
                     }
                     else
                     {
+                        selectedDetailFiles.Clear();
                         selectedDetailFiles.Add(filePath);
+                        detailSelectionAnchorIndex = idx;
                     }
                     if (refreshDetailSelectionUi != null) refreshDetailSelectionUi();
                 };
@@ -4482,12 +4493,22 @@ namespace PixelVaultNative
                         MessageBox.Show("Choose a capture first.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
                         return;
                     }
+                    EnsureExifTool();
+                    var visibleFiles = getVisibleDetailFilesOrdered();
+                    var visibleSet = new HashSet<string>(visibleFiles, StringComparer.OrdinalIgnoreCase);
                     var selectedFiles = getSelectedDetailFiles();
-                    var useSelection = selectedFiles.Count > 0
-                        && (string.IsNullOrWhiteSpace(filePath) || selectedDetailFiles.Contains(filePath));
-                    var wantedFiles = useSelection
-                        ? new HashSet<string>(selectedFiles, StringComparer.OrdinalIgnoreCase)
-                        : new HashSet<string>(new[] { filePath }, StringComparer.OrdinalIgnoreCase);
+                    HashSet<string> wantedFiles;
+                    if (selectedFiles.Count > 0 && (string.IsNullOrWhiteSpace(filePath) || selectedDetailFiles.Contains(filePath)))
+                        wantedFiles = new HashSet<string>(selectedFiles, StringComparer.OrdinalIgnoreCase);
+                    else if (selectedFiles.Count == 0 && string.IsNullOrWhiteSpace(filePath))
+                        wantedFiles = new HashSet<string>(visibleFiles, StringComparer.OrdinalIgnoreCase);
+                    else if (!string.IsNullOrWhiteSpace(filePath) && visibleSet.Contains(filePath))
+                        wantedFiles = new HashSet<string>(new[] { filePath }, StringComparer.OrdinalIgnoreCase);
+                    else
+                    {
+                        MessageBox.Show("Choose a capture first.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
+                        return;
+                    }
                     if (wantedFiles.Count == 0)
                     {
                         MessageBox.Show("Choose a capture first.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -4503,7 +4524,9 @@ namespace PixelVaultNative
                     }
                     var selectedTitle = selectedItems.Count == 1
                         ? Path.GetFileName(selectedItems[0].FilePath)
-                        : (current.Name + " (" + selectedItems.Count + " selected)");
+                        : (visibleFiles.Count > 0 && selectedItems.Count == visibleFiles.Count
+                            ? (current.Name + " (all " + selectedItems.Count + " captures)")
+                            : (current.Name + " (" + selectedItems.Count + " selected)"));
                     status.Text = selectedItems.Count == 1 ? "Editing selected capture metadata" : "Editing selected capture metadata";
                     Log("Opening library metadata editor for " + selectedItems.Count + " selected capture(s) in " + current.Name + ".");
                     if (!ShowManualMetadataWindow(selectedItems, true, selectedTitle))
@@ -4517,6 +4540,7 @@ namespace PixelVaultNative
                     RunLibraryMetadataWorkflowWithProgress(current, selectedItems, delegate
                     {
                         selectedDetailFiles.Clear();
+                        detailSelectionAnchorIndex = -1;
                         current = string.IsNullOrWhiteSpace(currentFolderPath)
                             ? null
                             : new LibraryFolderInfo { FolderPath = currentFolderPath, PlatformLabel = currentPlatformLabel ?? string.Empty, Name = currentName ?? string.Empty };
@@ -4524,16 +4548,7 @@ namespace PixelVaultNative
                     });
                 };
 
-                openSelectedLibraryMetadataEditor = delegate
-                {
-                    var selectedFiles = getSelectedDetailFiles();
-                    if (selectedFiles.Count == 0)
-                    {
-                        openLibraryMetadataEditor(current);
-                        return;
-                    }
-                    openSingleFileMetadataEditor(null);
-                };
+                openSelectedLibraryMetadataEditor = delegate { openSingleFileMetadataEditor(null); };
 
                 deleteSelectedLibraryFiles = delegate
                 {
@@ -4592,6 +4607,7 @@ namespace PixelVaultNative
                     }
                     foreach (var directory in touchedDirectories) TryDeleteEmptyDirectory(directory);
                     selectedDetailFiles.Clear();
+                    detailSelectionAnchorIndex = -1;
                     current = string.IsNullOrWhiteSpace(current.FolderPath)
                         ? null
                         : new LibraryFolderInfo
@@ -4625,6 +4641,8 @@ namespace PixelVaultNative
                     if (current == null)
                     {
                         selectedDetailFiles.Clear();
+                        detailSelectionAnchorIndex = -1;
+                        detailFilesDisplayOrder.Clear();
                         SetVirtualizedRows(detailRows, new List<VirtualizedRowDefinition>(), true, null);
                         if (refreshDetailSelectionUi != null) refreshDetailSelectionUi();
                         renderStopwatch.Stop();
@@ -4728,6 +4746,7 @@ namespace PixelVaultNative
                             if (!SameLibraryFolderSelection(current, renderFolder)) return;
                             if (loadTask.IsFaulted)
                             {
+                                detailFilesDisplayOrder.Clear();
                                 var flattened = loadTask.Exception == null ? null : loadTask.Exception.Flatten();
                                 var renderError = flattened == null ? new Exception("Capture render failed.") : flattened.InnerExceptions.First();
                                 SetVirtualizedRows(detailRows, new[]
@@ -4751,8 +4770,14 @@ namespace PixelVaultNative
                             var visibleFiles = snapshot.VisibleFiles ?? new List<string>();
                             var visibleSet = new HashSet<string>(visibleFiles, StringComparer.OrdinalIgnoreCase);
                             foreach (var stale in selectedDetailFiles.Where(path => !visibleSet.Contains(path)).ToList()) selectedDetailFiles.Remove(stale);
+                            if (SameLibraryFolderSelection(current, renderFolder))
+                            {
+                                detailFilesDisplayOrder.Clear();
+                                detailFilesDisplayOrder.AddRange(visibleFiles);
+                            }
                             if (snapshot.Groups.Count == 0)
                             {
+                                detailFilesDisplayOrder.Clear();
                                 SetVirtualizedRows(detailRows, new[]
                                 {
                                     new VirtualizedRowDefinition
@@ -4952,7 +4977,12 @@ namespace PixelVaultNative
 
                 showFolder = delegate(LibraryFolderInfo info)
                 {
-                    if (!SameLibraryFolderSelection(current, info)) selectedDetailFiles.Clear();
+                    if (!SameLibraryFolderSelection(current, info))
+                    {
+                        selectedDetailFiles.Clear();
+                        detailSelectionAnchorIndex = -1;
+                        detailFilesDisplayOrder.Clear();
+                    }
                     preserveDetailScrollOnNextRender = false;
                     preservedDetailScrollOffset = 0;
                     thumbScroll.ScrollToVerticalOffset(0);
@@ -5023,6 +5053,8 @@ namespace PixelVaultNative
                         current = null;
                         activeSelectedLibraryFolder = null;
                         selectedDetailFiles.Clear();
+                        detailSelectionAnchorIndex = -1;
+                        detailFilesDisplayOrder.Clear();
                         detailTitle.Text = "Select a folder";
                         detailMeta.Text = "Browse the library you chose in Settings.";
                         previewImage.Source = null;
@@ -5416,14 +5448,10 @@ namespace PixelVaultNative
                         return;
                     }
                     showFolder(focusFolder);
-                    var focusFolderPath = focusFolder.FolderPath;
-                    var focusPlatformLabel = focusFolder.PlatformLabel;
-                    var focusName = focusFolder.Name;
-                    RunLibraryMetadataEdit(focusFolder, delegate
-                    {
-                        current = string.IsNullOrWhiteSpace(focusFolderPath) ? null : new LibraryFolderInfo { FolderPath = focusFolderPath, PlatformLabel = focusPlatformLabel ?? string.Empty, Name = focusName ?? string.Empty };
-                        if (refreshLibraryFoldersAsync != null) refreshLibraryFoldersAsync(false);
-                    });
+                    selectedDetailFiles.Clear();
+                    detailSelectionAnchorIndex = -1;
+                    if (refreshDetailSelectionUi != null) refreshDetailSelectionUi();
+                    openSingleFileMetadataEditor(null);
                 };
                 editMetadataButton.Click += delegate { openSelectedLibraryMetadataEditor(); };
                 deleteSelectedButton.Click += delegate { deleteSelectedLibraryFiles(); };
