@@ -895,7 +895,8 @@ namespace PixelVaultNative
             var viewportWidth = scrollViewer == null ? 0 : scrollViewer.ViewportWidth;
             if (viewportWidth <= 0 && scrollViewer != null) viewportWidth = scrollViewer.ActualWidth;
             viewportWidth = Math.Max(280, viewportWidth - 18);
-            var columns = viewportWidth >= 800 ? 4 : (viewportWidth >= 600 ? 3 : (viewportWidth >= 400 ? 2 : 1));
+            // Four columns once the pane is wide enough for ~4× min tile + gutters (default splitter favors the browser pane).
+            var columns = viewportWidth >= 700 ? 4 : (viewportWidth >= 600 ? 3 : (viewportWidth >= 400 ? 2 : 1));
             var tileWidth = (int)Math.Floor((viewportWidth - ((columns - 1) * 14)) / columns);
             tileWidth = Math.Max(140, Math.Min(360, tileWidth));
             tileWidth = Math.Max(140, Math.Min(360, (int)(Math.Round(tileWidth / 16d) * 16)));
@@ -4217,9 +4218,9 @@ namespace PixelVaultNative
                 root.Children.Add(navBar);
 
                 var contentGrid = new Grid();
-                contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(55, GridUnitType.Star) });
+                contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(62, GridUnitType.Star) });
                 contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(45, GridUnitType.Star) });
+                contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(38, GridUnitType.Star) });
                 Grid.SetRow(contentGrid, 1);
                 root.Children.Add(contentGrid);
 
