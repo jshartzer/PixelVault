@@ -54,6 +54,57 @@ public sealed class IndexPersistenceServiceTests
     }
 
     [Fact]
+    public void LoadSavedGameIndexRows_BackfillsExternalIdsFromPriorRootDatabase()
+    {
+        using var harness = new IndexPersistenceHarness();
+
+        var priorRoot = Path.Combine(harness.RootPath, "legacy-library-root");
+        Directory.CreateDirectory(priorRoot);
+
+        harness.Service.SaveSavedGameIndexRows(
+            priorRoot,
+            new[]
+            {
+                new GameIndexEditorRow
+                {
+                    GameId = "G00999",
+                    Name = "Alan Wake",
+                    PlatformLabel = "Steam",
+                    SteamAppId = "108710",
+                    SteamGridDbId = "9991",
+                    FileCount = 12,
+                    FolderPath = "Y:\\Game Captures\\Alan Wake",
+                    FilePaths = Array.Empty<string>()
+                }
+            });
+
+        harness.Service.SaveSavedGameIndexRows(
+            harness.LibraryRoot,
+            new[]
+            {
+                new GameIndexEditorRow
+                {
+                    GameId = "G00001",
+                    Name = "Alan Wake",
+                    PlatformLabel = "Steam",
+                    SteamAppId = string.Empty,
+                    SteamGridDbId = string.Empty,
+                    FileCount = 12,
+                    FolderPath = "E:\\Game Captures\\Alan Wake",
+                    FilePaths = Array.Empty<string>()
+                }
+            });
+
+        var rows = harness.Service.LoadSavedGameIndexRows(harness.LibraryRoot);
+
+        var row = Assert.Single(rows);
+        Assert.Equal("G00001", row.GameId);
+        Assert.Equal("108710", row.SteamAppId);
+        Assert.Equal("9991", row.SteamGridDbId);
+        Assert.Equal("E:\\Game Captures\\Alan Wake", row.FolderPath);
+    }
+
+    [Fact]
     public void ApplyGameIdAliases_RewritesPhotoIndexRowsAndNotifiesCachedMetadataLayer()
     {
         using var harness = new IndexPersistenceHarness();
@@ -235,6 +286,35 @@ VALUES ($root, $filePath, $stamp, $gameId, $consoleLabel, $tagText);";
     }
 
     [Fact]
+    public void LoadLibraryMetadataIndexEntries_PreservesStoredConsoleLabelWhenTagsAreSparse()
+    {
+        using var harness = new IndexPersistenceHarness();
+        var existingFile = harness.CreateFile("metadata\\steam-without-tag.png");
+
+        harness.Service.SaveLibraryMetadataIndexEntries(
+            harness.LibraryRoot,
+            new Dictionary<string, LibraryMetadataIndexEntry>(StringComparer.OrdinalIgnoreCase)
+            {
+                [existingFile] = new LibraryMetadataIndexEntry
+                {
+                    FilePath = existingFile,
+                    Stamp = "steam-stamp",
+                    GameId = "G00091",
+                    ConsoleLabel = "Steam",
+                    TagText = "Action;Portrait",
+                    CaptureUtcTicks = 0
+                }
+            });
+
+        var loaded = harness.Service.LoadLibraryMetadataIndexEntries(harness.LibraryRoot);
+
+        var entry = Assert.Single(loaded.Values);
+        Assert.Equal("G00091", entry.GameId);
+        Assert.Equal("Steam", entry.ConsoleLabel);
+        Assert.Equal("Action;Portrait", entry.TagText);
+    }
+
+    [Fact]
     public void SaveAndLoadFilenameConventions_RoundTripsCustomRules()
     {
         using var harness = new IndexPersistenceHarness();
@@ -311,10 +391,10 @@ VALUES ($root, $filePath, $stamp, $gameId, $consoleLabel, $tagText);";
 
     sealed class IndexPersistenceHarness : IDisposable
     {
-        public string RootPath { get; }
-        public string CacheRoot { get; }
-        public string LibraryRoot { get; }
-        public string IndexDatabasePath { get; }
+        public string RootPath { get; } = string.Empty;
+        public string CacheRoot { get; } = string.Empty;
+        public string LibraryRoot { get; } = string.Empty;
+        public string IndexDatabasePath { get; } = string.Empty;
         public IndexPersistenceService Service { get; }
         public string? LastAliasApplyRoot { get; private set; }
         public Dictionary<string, string>? LastAliasApplyMap { get; private set; }
@@ -326,13 +406,15 @@ VALUES ($root, $filePath, $stamp, $gameId, $consoleLabel, $tagText);";
             LibraryRoot = Path.Combine(RootPath, "library-root");
             IndexDatabasePath = Path.Combine(CacheRoot, "pixelvault-index-" + Regex.Replace((LibraryRoot ?? string.Empty).ToLowerInvariant(), @"[^a-z0-9]+", "_").Trim('_') + ".sqlite");
             Directory.CreateDirectory(CacheRoot);
-            Directory.CreateDirectory(LibraryRoot);
+            Directory.CreateDirectory(LibraryRoot!);
 
             Service = new IndexPersistenceService(new IndexPersistenceServiceDependencies
             {
                 CacheRoot = CacheRoot,
                 SafeCacheName = value => Regex.Replace((value ?? string.Empty).ToLowerInvariant(), @"[^a-z0-9]+", "_").Trim('_'),
                 NormalizeGameId = value => (value ?? string.Empty).Trim().ToUpperInvariant(),
+                NormalizeGameIndexName = value => (value ?? string.Empty).Trim(),
+                NormalizeConsoleLabel = value => (value ?? string.Empty).Trim(),
                 DisplayExternalIdValue = value => value == "<CLEARED>" ? string.Empty : value,
                 IsClearedExternalIdValue = value => string.Equals(value, "<CLEARED>", StringComparison.OrdinalIgnoreCase),
                 SerializeExternalIdValue = (value, suppressAutoResolve) =>
@@ -378,7 +460,7 @@ VALUES ($root, $filePath, $stamp, $gameId, $consoleLabel, $tagText);";
         {
             var fullPath = Path.Combine(RootPath, relativePath);
             var directory = Path.GetDirectoryName(fullPath);
-            if (!string.IsNullOrWhiteSpace(directory)) Directory.CreateDirectory(directory);
+            if (!string.IsNullOrWhiteSpace(directory)) Directory.CreateDirectory(directory!);
             File.WriteAllText(fullPath, "test");
             return fullPath;
         }

@@ -58,6 +58,38 @@ public sealed class FilenameParserServiceTests
     }
 
     [Fact]
+    public void Parse_XboxCapture_WithHyphenSeparatedTime_PreservesFileTimesAndCapturesTitleHint()
+    {
+        var parser = CreateParser();
+
+        var parsed = parser.Parse("Human Fall Flat-2026_03_31-00-09-35.png", string.Empty);
+
+        Assert.Equal("Xbox", parsed.PlatformLabel);
+        Assert.Contains("Xbox", parsed.PlatformTags);
+        Assert.True(parsed.PreserveFileTimes);
+        Assert.Equal("Human Fall Flat", parsed.GameTitleHint);
+        Assert.Equal(new DateTime(2026, 3, 31, 0, 9, 35), parsed.CaptureTime);
+        Assert.Equal(DateTimeKind.Local, parsed.CaptureTime!.Value.Kind);
+        Assert.Equal("xbox_capture_hyphen_time", parsed.ConventionId);
+    }
+
+    [Fact]
+    public void Parse_Ps5Share_WithSegmentAndFractionalSeconds_UsesPs5Rule()
+    {
+        var parser = CreateParser();
+
+        var parsed = parser.Parse("Astro's Playroom_CLIMBING RUN_2023101311054800.jpg", string.Empty);
+
+        Assert.Equal("PS5", parsed.PlatformLabel);
+        Assert.Contains("PS5", parsed.PlatformTags);
+        Assert.Contains("PlayStation", parsed.PlatformTags);
+        Assert.Equal("Astro's Playroom", parsed.GameTitleHint);
+        Assert.Equal(new DateTime(2023, 10, 13, 11, 5, 48), parsed.CaptureTime);
+        Assert.Equal(DateTimeKind.Local, parsed.CaptureTime!.Value.Kind);
+        Assert.Equal("ps5_share_segmented_fractional", parsed.ConventionId);
+    }
+
+    [Fact]
     public void Parse_CustomDatabaseConvention_ExtendsBuiltInRules()
     {
         using var harness = new FilenameConventionHarness();

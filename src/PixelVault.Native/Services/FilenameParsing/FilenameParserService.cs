@@ -297,6 +297,21 @@ namespace PixelVaultNative
                 },
                 new FilenameConventionRule
                 {
+                    ConventionId = "ps5_share_segmented_fractional",
+                    Name = "PS5 Share (Segmented/Fractional)",
+                    Priority = 848,
+                    Pattern = @"^(?<title>.+?)(?:_[^_]+)*_(?<stamp>\d{14})(?:\d{2})?\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$",
+                    PatternText = @"^(?<title>.+?)(?:_[^_]+)*_(?<stamp>\d{14})(?:\d{2})?\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$",
+                    PlatformLabel = "PS5",
+                    PlatformTagsText = "PS5;PlayStation",
+                    TitleGroup = "title",
+                    TimestampGroup = "stamp",
+                    TimestampFormat = "yyyyMMddHHmmss",
+                    ConfidenceLabel = "ExplicitPattern",
+                    IsBuiltIn = true
+                },
+                new FilenameConventionRule
+                {
                     ConventionId = "xbox_capture",
                     Name = "Xbox Capture",
                     Priority = 840,
@@ -307,6 +322,22 @@ namespace PixelVaultNative
                     TitleGroup = "title",
                     TimestampGroup = "stamp",
                     TimestampFormat = "yyyy_MM_dd-HH_mm_ss",
+                    PreserveFileTimes = true,
+                    ConfidenceLabel = "ExplicitPattern",
+                    IsBuiltIn = true
+                },
+                new FilenameConventionRule
+                {
+                    ConventionId = "xbox_capture_hyphen_time",
+                    Name = "Xbox Capture (Hyphen Time)",
+                    Priority = 838,
+                    Pattern = "[title]-[yyyy]_[MM]_[dd]-[HH]-[mm]-[ss].[ext:media]",
+                    PatternText = "[title]-[yyyy]_[MM]_[dd]-[HH]-[mm]-[ss].[ext:media]",
+                    PlatformLabel = "Xbox",
+                    PlatformTagsText = "Xbox",
+                    TitleGroup = "title",
+                    TimestampGroup = "stamp",
+                    TimestampFormat = "yyyy_MM_dd-HH-mm-ss",
                     PreserveFileTimes = true,
                     ConfidenceLabel = "ExplicitPattern",
                     IsBuiltIn = true

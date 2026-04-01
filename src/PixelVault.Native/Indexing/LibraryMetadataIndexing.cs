@@ -77,11 +77,17 @@ namespace PixelVaultNative
             return existingEntry == null ? new string[0] : ParseTagText(existingEntry.TagText);
         }
 
+        string[] MergeLibraryMetadataTagsWithFilenameHint(string root, string file, string[] tags)
+        {
+            return MergePlatformTagsWithFilenamePlatformHint(tags, ParseFilename(file, root));
+        }
+
         string ResolveStoredLibraryMetadataConsoleLabel(LibraryMetadataIndexEntry existingEntry, IEnumerable<string> tags)
         {
-            if (existingEntry != null && !string.IsNullOrWhiteSpace(existingEntry.ConsoleLabel))
+            var storedLabel = NormalizeConsoleLabel(existingEntry == null ? string.Empty : existingEntry.ConsoleLabel);
+            if (ConsoleLabelBlocksFilenameFallback(storedLabel))
             {
-                return NormalizeConsoleLabel(existingEntry.ConsoleLabel);
+                return storedLabel;
             }
             return NormalizeConsoleLabel(DetermineConsoleLabelFromTags(tags));
         }
@@ -105,6 +111,7 @@ namespace PixelVaultNative
         LibraryMetadataIndexEntry BuildResolvedLibraryMetadataIndexEntry(string root, string file, string stamp, EmbeddedMetadataSnapshot snapshot, LibraryMetadataIndexEntry existingEntry, Dictionary<string, LibraryMetadataIndexEntry> index, List<GameIndexEditorRow> gameRows)
         {
             var tags = ResolveLibraryMetadataTags(snapshot, existingEntry);
+            tags = MergeLibraryMetadataTagsWithFilenameHint(root, file, tags);
             var platformLabel = ResolveStoredLibraryMetadataConsoleLabel(existingEntry, tags);
             var preferredGameId = NormalizeGameId(existingEntry == null ? string.Empty : existingEntry.GameId);
             var resolvedGameId = !string.IsNullOrWhiteSpace(preferredGameId)

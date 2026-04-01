@@ -104,7 +104,7 @@ namespace PixelVaultNative
             return metadataService.ReadEmbeddedCaptureDateDirect(file, cancellationToken);
         }
 
-        string NormalizeConsoleLabel(string label)
+        internal static string NormalizeConsoleLabel(string label)
         {
             if (string.IsNullOrWhiteSpace(label)) return "Other";
             if (string.Equals(label, "Steam", StringComparison.OrdinalIgnoreCase)) return "Steam";
@@ -115,7 +115,7 @@ namespace PixelVaultNative
             return CleanTag(label);
         }
 
-        string[] ExtractConsolePlatformFamilies(IEnumerable<string> tags)
+        internal static string[] ExtractConsolePlatformFamilies(IEnumerable<string> tags)
         {
             var labels = new List<string>();
             var tagList = (tags ?? Enumerable.Empty<string>()).Where(tag => !string.IsNullOrWhiteSpace(tag)).Select(CleanTag).ToList();
@@ -133,12 +133,119 @@ namespace PixelVaultNative
             return labels.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         }
 
-        string DetermineConsoleLabelFromTags(IEnumerable<string> tags)
+        internal static string DetermineConsoleLabelFromTags(IEnumerable<string> tags)
         {
             var labels = ExtractConsolePlatformFamilies(tags);
             if (labels.Length > 1) return "Multiple Tags";
             if (labels.Length == 1) return labels[0];
             return "Other";
+        }
+
+        internal static bool ConsoleLabelBlocksFilenameFallback(string normalizedLabel)
+        {
+            if (string.IsNullOrWhiteSpace(normalizedLabel)) return false;
+            if (string.Equals(normalizedLabel, "Other", StringComparison.OrdinalIgnoreCase)) return false;
+            return true;
+        }
+
+        internal static string[] BuildFilenamePlatformHintTags(FilenameParseResult parsed)
+        {
+            var extras = (parsed == null ? Enumerable.Empty<string>() : (parsed.PlatformTags ?? new string[0]))
+                .Where(tag => !string.IsNullOrWhiteSpace(tag))
+                .Select(CleanTag)
+                .Where(tag => !string.IsNullOrWhiteSpace(tag))
+                .ToList();
+            var normalizedPlatform = NormalizeConsoleLabel(parsed == null ? string.Empty : parsed.PlatformLabel);
+            if (string.Equals(normalizedPlatform, "Steam", StringComparison.OrdinalIgnoreCase)) extras.Add("Steam");
+            else if (string.Equals(normalizedPlatform, "PC", StringComparison.OrdinalIgnoreCase)) extras.Add("PC");
+            else if (string.Equals(normalizedPlatform, "PS5", StringComparison.OrdinalIgnoreCase) || string.Equals(normalizedPlatform, "PlayStation", StringComparison.OrdinalIgnoreCase))
+            {
+                extras.Add("PS5");
+                extras.Add("PlayStation");
+            }
+            else if (string.Equals(normalizedPlatform, "Xbox", StringComparison.OrdinalIgnoreCase)) extras.Add("Xbox");
+            else if (!string.IsNullOrWhiteSpace(normalizedPlatform)
+                && !string.Equals(normalizedPlatform, "Other", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(normalizedPlatform, "Multiple Tags", StringComparison.OrdinalIgnoreCase))
+            {
+                extras.Add(CustomPlatformPrefix + normalizedPlatform);
+            }
+            return extras
+                .Select(CleanTag)
+                .Where(tag => !string.IsNullOrWhiteSpace(tag))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+        }
+
+        internal static string[] MergePlatformTagsWithFilenamePlatformHint(IEnumerable<string> tags, FilenameParseResult parsed)
+        {
+            var tagArray = (tags ?? Enumerable.Empty<string>())
+                .Where(tag => !string.IsNullOrWhiteSpace(tag))
+                .Select(CleanTag)
+                .Where(tag => !string.IsNullOrWhiteSpace(tag))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            var label = NormalizeConsoleLabel(DetermineConsoleLabelFromTags(tagArray));
+            if (ConsoleLabelBlocksFilenameFallback(label)) return tagArray;
+            var extras = BuildFilenamePlatformHintTags(parsed);
+            if (extras.Length == 0) return tagArray;
+            return tagArray
+                .Concat(extras)
+                .Select(CleanTag)
+                .Where(tag => !string.IsNullOrWhiteSpace(tag))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+        }
+
+        internal static void ApplyFilenameParseResultToManualPlatformFlags(
+            FilenameParseResult parsed,
+            out bool tagSteam,
+            out bool tagPc,
+            out bool tagPs5,
+            out bool tagXbox,
+            out bool tagOther,
+            out string customPlatformTag)
+        {
+            tagSteam = false;
+            tagPc = false;
+            tagPs5 = false;
+            tagXbox = false;
+            tagOther = false;
+            customPlatformTag = string.Empty;
+
+            var resolvedPlatform = NormalizeConsoleLabel(parsed == null ? string.Empty : parsed.PlatformLabel);
+            if (string.Equals(resolvedPlatform, "Other", StringComparison.OrdinalIgnoreCase))
+            {
+                resolvedPlatform = NormalizeConsoleLabel(DetermineConsoleLabelFromTags(BuildFilenamePlatformHintTags(parsed)));
+            }
+            if (string.IsNullOrWhiteSpace(resolvedPlatform)
+                || string.Equals(resolvedPlatform, "Other", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(resolvedPlatform, "Multiple Tags", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+            if (string.Equals(resolvedPlatform, "Steam", StringComparison.OrdinalIgnoreCase))
+            {
+                tagSteam = true;
+                return;
+            }
+            if (string.Equals(resolvedPlatform, "PC", StringComparison.OrdinalIgnoreCase))
+            {
+                tagPc = true;
+                return;
+            }
+            if (string.Equals(resolvedPlatform, "PS5", StringComparison.OrdinalIgnoreCase) || string.Equals(resolvedPlatform, "PlayStation", StringComparison.OrdinalIgnoreCase))
+            {
+                tagPs5 = true;
+                return;
+            }
+            if (string.Equals(resolvedPlatform, "Xbox", StringComparison.OrdinalIgnoreCase))
+            {
+                tagXbox = true;
+                return;
+            }
+            tagOther = true;
+            customPlatformTag = resolvedPlatform;
         }
 
         string[] GetEmbeddedKeywordTags(string file)

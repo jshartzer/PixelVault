@@ -36,9 +36,24 @@ namespace PixelVaultNative
         string NormalizeGameIndexName(string name, string folderPath = null)
         {
             var normalized = CleanTag(name);
-            if (!string.IsNullOrWhiteSpace(normalized)) return normalized;
-            if (!string.IsNullOrWhiteSpace(folderPath)) return CleanTag(Path.GetFileName(folderPath.TrimEnd(Path.DirectorySeparatorChar)));
-            return string.Empty;
+            if (string.IsNullOrWhiteSpace(normalized) && !string.IsNullOrWhiteSpace(folderPath))
+            {
+                normalized = CleanTag(Path.GetFileName(folderPath.TrimEnd(Path.DirectorySeparatorChar)));
+            }
+            return StripKnownPlatformSuffixes(normalized);
+        }
+
+        string StripKnownPlatformSuffixes(string value)
+        {
+            var cleaned = CleanTag(value);
+            if (string.IsNullOrWhiteSpace(cleaned)) return string.Empty;
+            while (true)
+            {
+                var updated = Regex.Replace(cleaned, @"\s*-\s*(Steam|PS5|PlayStation|Xbox|PC)\s*$", string.Empty, RegexOptions.IgnoreCase);
+                updated = CleanTag(updated);
+                if (string.Equals(updated, cleaned, StringComparison.Ordinal)) return cleaned;
+                cleaned = updated;
+            }
         }
 
         string BuildGameIndexIdentity(string name, string platformLabel)
@@ -220,7 +235,23 @@ namespace PixelVaultNative
                     FilePaths = mergedFilePaths
                 });
             }
+            var activeRowsByName = mergedRows
+                .Where(row => row != null
+                    && !string.IsNullOrWhiteSpace(row.Name)
+                    && (((row.FilePaths ?? new string[0]).Length > 0) || row.FileCount > 0 || !string.IsNullOrWhiteSpace(row.FolderPath)))
+                .GroupBy(row => NormalizeGameIndexName(row.Name, row.FolderPath), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(group => group.Key, group => group.ToList(), StringComparer.OrdinalIgnoreCase);
             return mergedRows
+                .Where(row =>
+                {
+                    if (row == null || string.IsNullOrWhiteSpace(row.Name)) return false;
+                    if (((row.FilePaths ?? new string[0]).Length > 0) || row.FileCount > 0 || !string.IsNullOrWhiteSpace(row.FolderPath)) return true;
+                    var normalizedPlatform = NormalizeConsoleLabel(row.PlatformLabel);
+                    if (!string.Equals(normalizedPlatform, "Other", StringComparison.OrdinalIgnoreCase)) return true;
+                    List<GameIndexEditorRow> activeRows;
+                    if (!activeRowsByName.TryGetValue(NormalizeGameIndexName(row.Name, row.FolderPath), out activeRows)) return true;
+                    return !activeRows.Any(active => active != null && !ReferenceEquals(active, row) && !string.Equals(NormalizeConsoleLabel(active.PlatformLabel), "Other", StringComparison.OrdinalIgnoreCase));
+                })
                 .OrderBy(row => row.Name ?? string.Empty, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(row => row.PlatformLabel ?? string.Empty, StringComparer.OrdinalIgnoreCase)
                 .ToList();

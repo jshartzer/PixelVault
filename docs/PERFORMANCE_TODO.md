@@ -11,6 +11,17 @@ Source notes folded into this list:
 
 - `C:\Codex\docs\LIBRARY_UI_SCALABILITY_NOTES.txt`
 - `C:\Codex\docs\pixelvault_service_split_plan.txt`
+- `C:\Codex\docs\PERFORMANCE_FIX_PLAN.txt`
+
+## Review notes (consolidated, Mar 2026)
+
+External and in-repo review both agree on the following (0.815 improved runtime behavior but did not remove these structural items):
+
+- **Not duplicate source files:** `MainWindow` is a **`partial` class** split across many `.cs` files under `src/PixelVault.Native/` (e.g. indexing, metadata, import, UI). There is a single primary `PixelVault.Native.cs`; it is large, but it is not “two identical copies” of the same file.
+- **God-object weight remains:** `MainWindow` still owns imperative Library UI, settings, metadata flows, indexing, covers, and more. Full **MVVM** is optional; a practical middle path is a **dedicated Library browser type** (see item 10) plus **service seams**, matching the modular-monolith direction in the changelog and split plan.
+- **`ShowLibraryBrowser` closure depth:** Many nested `Action` delegates still make debugging and testing harder; extracting a named type does not require MVVM.
+- **Silent failures:** Several **`catch { }`** (empty) sites remain across the native project; they hide production failures and slow diagnosis. Prefer logging or a small `TryLog` helper unless swallowing is explicitly safe.
+- **Shared cache thread safety:** `fileTagCache`, `fileTagCacheStamp`, and `folderImageCache` / `folderImageCacheStamp` are touched from **background library work** and from **UI-driven metadata** paths. Without **locking** or a **single owning service**, this is a **correctness risk** (rare races, harder-to-repro bugs), not just style. Treat as higher priority than a broad UI rewrite.
 
 ## Priority Now
 
@@ -37,6 +48,15 @@ Status: landed; Library filtering now uses a committed debounced search term so 
 Status: mostly in place; extend only if the next debounce pass needs more visibility.
 
 ## Next
+
+4a. **Serialize or own shared metadata/thumbnail caches (correctness + perf).**
+- `fileTagCache` / `fileTagCacheStamp` and `folderImageCache` / `folderImageCacheStamp` must not be mutated concurrently from the UI thread and thread-pool library loads without coordination.
+- Options: one **`lock`** per cache group, **`ConcurrentDictionary`**, or move caches behind a small **`IMetadataTagCache`** / file service used only from defined call paths.
+- Goal: eliminate data races; make future batching and profiling safe.
+
+4b. **Tighten empty `catch` blocks in hot and I/O paths.**
+- Audit `catch { }` in `PixelVault.Native`, metadata/media helpers, and virtualization; log at debug or warning unless the exception is expected and harmless.
+- Goal: production issues remain diagnosable without spamming users.
 
 5. Audit long-running UI workflows for real background execution.
 - Review scan/rebuild, import/manual import, and cover-fetch paths for any work that can still block the UI thread.
@@ -69,8 +89,8 @@ Status: landed for the currently known paths, including manual Steam search in t
 - Useful, but clearly lower priority than capture virtualization.
 
 10. Move `ShowLibraryBrowser` orchestration into a dedicated Library UI type.
-- This is mostly an iteration-speed improvement, not a direct runtime win.
-- It becomes more valuable once capture virtualization and search/sort caching are underway.
+- This is mostly an **iteration-speed and testability** improvement; it also reduces closure tangle and makes threading/cancellation easier to reason about.
+- It becomes more valuable once capture virtualization and search/sort caching are underway (many of those are now landed—bump priority if the next perf pass touches Library UI again).
 
 11. Convert touched I/O and provider paths to async-first service APIs.
 - Especially metadata reads, file-heavy scans, and network/provider work.
@@ -78,31 +98,34 @@ Status: landed for the currently known paths, including manual Steam search in t
 
 ## Suggested Order
 
-1. Capture virtualization
-2. Cached sort keys
-3. Search debounce
-4. Instrumentation
-5. Background-thread audit
-6. Cancellation cleanup
-7. Metadata + library scanner service extraction
-8. File-system service seam
-9. Left-side row recycling
-10. Library UI extraction
+1. ~~Capture virtualization~~ (landed—keep validating)
+2. ~~Cached sort keys~~ (landed—keep validating)
+3. ~~Search debounce~~ (landed)
+4. ~~Instrumentation~~ (mostly landed)
+5. **Shared cache thread safety (4a)** and **empty-catch audit (4b)**
+6. Background-thread audit (item 5) + **5a `Dispatcher.Invoke` cleanup**
+7. Cancellation cleanup (item 6—largely landed; spot-check new paths)
+8. Metadata + library scanner service extraction (item 7)
+9. File-system service seam (item 8)
+10. Left-side row recycling (item 9)
+11. Library UI extraction (item 10)
 
 ## What I Would Prioritize
 
 If we want the best near-term payoff with the least product risk, do these first:
 
-1. Capture virtualization
-- Biggest real scalability ceiling today.
+1. **Shared cache correctness (4a)**  
+   - Prevents rare corruption/weird Library state under load; unlocks safer parallel work later.
 
-2. Cached `Recently Added` sort keys
-- Cheap compared with virtualization and likely to make the whole Library feel snappier.
+2. **Game-capture keyword `Dispatcher.Invoke` removal (5a)**  
+   - Stops background metadata from stalling on the UI thread.
 
-3. Search debounce
-- Small change, immediate UX payoff, especially once sort-key work is in.
+3. **Empty-catch audit (4b)**  
+   - Cheap; improves supportability when something regresses.
 
-4. Background-thread audit on scan/import/cover flows
-- Less visible when things are healthy, but important for keeping the app from feeling “hung.”
+4. **Library UI extraction (10)** when touching Library heavily again  
+   - Cuts closure complexity and makes the next virtualization/threading change less risky.
 
-Service extraction matters, but I would treat it as the enabler for the second wave of performance work, not the very first thing to do.
+5. **Service extraction (7–8)** as the enabler for a second wave of batching and async APIs.
+
+Full **MVVM** is not required for these wins; prefer **named types + services + clear thread boundaries** unless you explicitly want a UI-framework rewrite.

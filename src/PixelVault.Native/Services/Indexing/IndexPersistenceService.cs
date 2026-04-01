@@ -26,6 +26,8 @@ namespace PixelVaultNative
         public string CacheRoot;
         public Func<string, string> SafeCacheName;
         public Func<string, string> NormalizeGameId;
+        public Func<string, string> NormalizeGameIndexName;
+        public Func<string, string> NormalizeConsoleLabel;
         public Func<string, string> DisplayExternalIdValue;
         public Func<string, bool> IsClearedExternalIdValue;
         public Func<string, bool, string> SerializeExternalIdValue;
@@ -61,6 +63,16 @@ namespace PixelVaultNative
         string NormalizeGameId(string value)
         {
             return dependencies.NormalizeGameId == null ? (value ?? string.Empty) : dependencies.NormalizeGameId(value);
+        }
+
+        string NormalizeGameIndexName(string value)
+        {
+            return dependencies.NormalizeGameIndexName == null ? (value ?? string.Empty).Trim() : dependencies.NormalizeGameIndexName(value ?? string.Empty);
+        }
+
+        string NormalizeConsoleLabel(string value)
+        {
+            return dependencies.NormalizeConsoleLabel == null ? (value ?? string.Empty).Trim() : dependencies.NormalizeConsoleLabel(value ?? string.Empty);
         }
 
         int ParseInt(string value)
@@ -295,6 +307,43 @@ ORDER BY name COLLATE NOCASE, platform_label COLLATE NOCASE, game_id COLLATE NOC
             return rows;
         }
 
+        List<GameIndexEditorRow> ReadAllSavedGameIndexRowsFromDatabase(SqliteConnection connection)
+        {
+            var rows = new List<GameIndexEditorRow>();
+            using (var command = connection.CreateCommand())
+            {
+                command.CommandText = @"
+SELECT game_id, folder_path, name, platform_label, steam_app_id, steam_grid_db_id, file_count, preview_image_path, file_paths
+FROM game_index
+ORDER BY name COLLATE NOCASE, platform_label COLLATE NOCASE, game_id COLLATE NOCASE;";
+                using (var reader = command.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        var filePathsText = reader.IsDBNull(8) ? string.Empty : reader.GetString(8);
+                        rows.Add(new GameIndexEditorRow
+                        {
+                            GameId = reader.IsDBNull(0) ? string.Empty : reader.GetString(0),
+                            FolderPath = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
+                            Name = reader.IsDBNull(2) ? string.Empty : reader.GetString(2),
+                            PlatformLabel = reader.IsDBNull(3) ? string.Empty : reader.GetString(3),
+                            SteamAppId = DisplayExternalIdValue(reader.IsDBNull(4) ? string.Empty : reader.GetString(4)),
+                            SteamGridDbId = DisplayExternalIdValue(reader.IsDBNull(5) ? string.Empty : reader.GetString(5)),
+                            SuppressSteamAppIdAutoResolve = IsClearedExternalIdValue(reader.IsDBNull(4) ? string.Empty : reader.GetString(4)),
+                            SuppressSteamGridDbIdAutoResolve = IsClearedExternalIdValue(reader.IsDBNull(5) ? string.Empty : reader.GetString(5)),
+                            FileCount = reader.IsDBNull(6) ? 0 : reader.GetInt32(6),
+                            PreviewImagePath = reader.IsDBNull(7) ? string.Empty : reader.GetString(7),
+                            FilePaths = string.IsNullOrWhiteSpace(filePathsText)
+                                ? new string[0]
+                                : filePathsText.Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries).Where(File.Exists).ToArray()
+                        });
+                    }
+                }
+            }
+
+            return rows;
+        }
+
         void WriteSavedGameIndexRowsToDatabase(string root, IEnumerable<GameIndexEditorRow> rows, SqliteConnection connection)
         {
             using (var transaction = connection.BeginTransaction())
@@ -353,13 +402,16 @@ ORDER BY file_path COLLATE NOCASE;";
 
                         var currentGameId = NormalizeGameId(reader.IsDBNull(2) ? string.Empty : reader.GetString(2));
                         string mappedGameId;
+                        var storedConsoleLabel = reader.IsDBNull(3) ? string.Empty : reader.GetString(3);
                         var tagText = reader.IsDBNull(4) ? string.Empty : reader.GetString(4);
                         index[filePath] = new LibraryMetadataIndexEntry
                         {
                             FilePath = filePath,
                             Stamp = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
                             GameId = !string.IsNullOrWhiteSpace(currentGameId) && aliasMap != null && aliasMap.TryGetValue(currentGameId, out mappedGameId) ? mappedGameId : currentGameId,
-                            ConsoleLabel = DetermineConsoleLabelFromTags(ParseTagText(tagText)),
+                            ConsoleLabel = string.IsNullOrWhiteSpace(storedConsoleLabel)
+                                ? DetermineConsoleLabelFromTags(ParseTagText(tagText))
+                                : storedConsoleLabel,
                             TagText = tagText,
                             CaptureUtcTicks = reader.IsDBNull(5) ? 0L : reader.GetInt64(5)
                         };
@@ -768,6 +820,122 @@ WHERE root = $root AND game_id = $oldGameId;";
             return "name|" + name + "|" + platform;
         }
 
+        string BuildCrossRootRowMatchKey(GameIndexEditorRow row)
+        {
+            if (row == null) return string.Empty;
+            var name = NormalizeGameIndexName(row.Name);
+            var platform = NormalizeConsoleLabel(row.PlatformLabel);
+            if (string.IsNullOrWhiteSpace(name)) return string.Empty;
+            return name.ToLowerInvariant() + "|" + platform.ToLowerInvariant();
+        }
+
+        int CountResolvedExternalIds(GameIndexEditorRow row)
+        {
+            if (row == null) return 0;
+            int count = 0;
+            if (!string.IsNullOrWhiteSpace(row.SteamAppId)) count++;
+            if (!string.IsNullOrWhiteSpace(row.SteamGridDbId)) count++;
+            return count;
+        }
+
+        bool HasMissingExternalIds(GameIndexEditorRow row)
+        {
+            if (row == null) return false;
+            return (!row.SuppressSteamAppIdAutoResolve && string.IsNullOrWhiteSpace(row.SteamAppId))
+                || (!row.SuppressSteamGridDbIdAutoResolve && string.IsNullOrWhiteSpace(row.SteamGridDbId));
+        }
+
+        void BackfillMissingGameIndexExternalIdsFromOtherDatabases(string root, SqliteConnection connection)
+        {
+            var dbRows = ReadSavedGameIndexRowsFromDatabase(root, connection);
+            if (dbRows.Count == 0 || !dbRows.Any(HasMissingExternalIds)) return;
+
+            var currentDatabasePath = IndexDatabasePath(root);
+            if (!Directory.Exists(CacheRoot)) return;
+
+            var donorByIdentity = new Dictionary<string, GameIndexEditorRow>(StringComparer.OrdinalIgnoreCase);
+            foreach (var path in Directory.EnumerateFiles(CacheRoot, "pixelvault-index-*.sqlite", SearchOption.TopDirectoryOnly))
+            {
+                if (string.Equals(path, currentDatabasePath, StringComparison.OrdinalIgnoreCase)) continue;
+
+                var builder = new SqliteConnectionStringBuilder
+                {
+                    DataSource = path,
+                    Mode = SqliteOpenMode.ReadWriteCreate
+                };
+
+                using (var donorConnection = new SqliteConnection(builder.ToString()))
+                {
+                    donorConnection.Open();
+                    if (CountIndexDatabaseRows(donorConnection, "game_index", string.Empty) == 0 && !DatabaseHasAnyRows(donorConnection, "game_index")) continue;
+                    foreach (var donorRow in ReadAllSavedGameIndexRowsFromDatabase(donorConnection).Where(row => row != null && CountResolvedExternalIds(row) > 0))
+                    {
+                        var identity = BuildCrossRootRowMatchKey(donorRow);
+                        if (string.IsNullOrWhiteSpace(identity)) continue;
+                        GameIndexEditorRow existing;
+                        if (!donorByIdentity.TryGetValue(identity, out existing)
+                            || CountResolvedExternalIds(donorRow) > CountResolvedExternalIds(existing)
+                            || (CountResolvedExternalIds(donorRow) == CountResolvedExternalIds(existing) && donorRow.FileCount > existing.FileCount))
+                        {
+                            donorByIdentity[identity] = donorRow;
+                        }
+                    }
+                }
+            }
+
+            if (donorByIdentity.Count == 0) return;
+
+            var changed = false;
+            foreach (var row in dbRows)
+            {
+                if (row == null || !HasMissingExternalIds(row)) continue;
+                GameIndexEditorRow donor;
+                if (!donorByIdentity.TryGetValue(BuildCrossRootRowMatchKey(row), out donor) || donor == null) continue;
+
+                if (string.IsNullOrWhiteSpace(row.SteamAppId) && !row.SuppressSteamAppIdAutoResolve)
+                {
+                    if (!string.IsNullOrWhiteSpace(donor.SteamAppId))
+                    {
+                        row.SteamAppId = donor.SteamAppId;
+                        changed = true;
+                    }
+                    else if (donor.SuppressSteamAppIdAutoResolve)
+                    {
+                        row.SuppressSteamAppIdAutoResolve = true;
+                        changed = true;
+                    }
+                }
+
+                if (string.IsNullOrWhiteSpace(row.SteamGridDbId) && !row.SuppressSteamGridDbIdAutoResolve)
+                {
+                    if (!string.IsNullOrWhiteSpace(donor.SteamGridDbId))
+                    {
+                        row.SteamGridDbId = donor.SteamGridDbId;
+                        changed = true;
+                    }
+                    else if (donor.SuppressSteamGridDbIdAutoResolve)
+                    {
+                        row.SuppressSteamGridDbIdAutoResolve = true;
+                        changed = true;
+                    }
+                }
+            }
+
+            if (!changed) return;
+
+            WriteSavedGameIndexRowsToDatabase(root, dbRows, connection);
+        }
+
+        bool DatabaseHasAnyRows(SqliteConnection connection, string tableName)
+        {
+            using (var command = connection.CreateCommand())
+            {
+                command.CommandText = "SELECT COUNT(1) FROM " + tableName + ";";
+                var result = command.ExecuteScalar();
+                return result != null && result != DBNull.Value && Convert.ToInt64(result) > 0;
+            }
+        }
+
         void BackfillMissingGameIndexExternalIdsFromLegacy(string root, SqliteConnection connection)
         {
             var dbRows = ReadSavedGameIndexRowsFromDatabase(root, connection);
@@ -865,6 +1033,7 @@ WHERE root = $root AND game_id = $oldGameId;";
         {
             using (var connection = OpenIndexDatabase(root))
             {
+                BackfillMissingGameIndexExternalIdsFromOtherDatabases(root, connection);
                 var rawRows = ReadSavedGameIndexRowsFromDatabase(root, connection);
                 var normalizedRows = MergeGameIndexRows(rawRows);
                 var aliasMap = BuildGameIdAliasMap(rawRows, normalizedRows);

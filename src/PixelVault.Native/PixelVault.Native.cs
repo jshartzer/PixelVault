@@ -39,7 +39,7 @@ namespace PixelVaultNative
 
     public sealed partial class MainWindow : Window
     {
-        const string AppVersion = "0.821";
+        const string AppVersion = "0.826";
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
         const string ClearedExternalIdSentinel = "__PV_CLEARED__";
@@ -221,6 +221,8 @@ namespace PixelVaultNative
                 CacheRoot = cacheRoot,
                 SafeCacheName = delegate(string value) { return SafeCacheName(value); },
                 NormalizeGameId = delegate(string value) { return NormalizeGameId(value); },
+                NormalizeGameIndexName = delegate(string value) { return NormalizeGameIndexName(value); },
+                NormalizeConsoleLabel = delegate(string value) { return NormalizeConsoleLabel(value); },
                 DisplayExternalIdValue = delegate(string value) { return DisplayExternalIdValue(value); },
                 IsClearedExternalIdValue = delegate(string value) { return IsClearedExternalIdValue(value); },
                 SerializeExternalIdValue = delegate(string value, bool suppressAutoResolve) { return SerializeExternalIdValue(value, suppressAutoResolve); },
@@ -1871,6 +1873,7 @@ namespace PixelVaultNative
                     imageControl.Visibility = Visibility.Visible;
                 }
                 hadSource = true;
+                return;
             }
             if (!hadSource)
             {
@@ -2481,6 +2484,21 @@ namespace PixelVaultNative
             previewBox.Document = doc;
         }
 
+        int CalculateLibraryFolderArtDecodeWidth(int tileWidth)
+        {
+            return Math.Min(640, Math.Max(320, tileWidth + 96));
+        }
+
+        int CalculateLibraryBannerArtDecodeWidth()
+        {
+            return 384;
+        }
+
+        int CalculateLibraryDetailTileDecodeWidth(int tileWidth)
+        {
+            return Math.Min(640, Math.Max(384, tileWidth + 96));
+        }
+
         sealed class IntakePreviewFileAnalysis
         {
             public string FilePath = string.Empty;
@@ -2579,12 +2597,14 @@ namespace PixelVaultNative
                 if (analysis == null || !analysis.TryGetValue(file, out fileAnalysis) || fileAnalysis == null || fileAnalysis.CanUpdateMetadata) continue;
                 var parsed = fileAnalysis.Parsed ?? new FilenameParseResult();
                 var captureTime = fileAnalysis.CaptureTime;
-                var guessedPlatform = parsed.PlatformLabel;
                 if (!parsed.MatchedConvention)
                 {
                     indexPersistenceService.RecordFilenameConventionSample(libraryRoot, fileAnalysis.FileName, parsed);
                 }
                 var titleHint = parsed.GameTitleHint ?? string.Empty;
+                bool tagSteam, tagPc, tagPs5, tagXbox, tagOther;
+                string customPlatformTag;
+                ApplyFilenameParseResultToManualPlatformFlags(parsed, out tagSteam, out tagPc, out tagPs5, out tagXbox, out tagOther, out customPlatformTag);
                 items.Add(new ManualMetadataItem
                 {
                     GameId = string.Empty,
@@ -2598,12 +2618,12 @@ namespace PixelVaultNative
                     Comment = string.Empty,
                     TagText = string.Empty,
                     AddPhotographyTag = false,
-                    TagSteam = string.Equals(guessedPlatform, "Steam", StringComparison.OrdinalIgnoreCase),
-                    TagPs5 = string.Equals(guessedPlatform, "PS5", StringComparison.OrdinalIgnoreCase),
-                    TagXbox = string.Equals(guessedPlatform, "Xbox", StringComparison.OrdinalIgnoreCase),
-                    TagPc = string.Equals(guessedPlatform, "PC", StringComparison.OrdinalIgnoreCase),
-                    TagOther = false,
-                    CustomPlatformTag = string.Empty,
+                    TagSteam = tagSteam,
+                    TagPs5 = tagPs5,
+                    TagXbox = tagXbox,
+                    TagPc = tagPc,
+                    TagOther = tagOther,
+                    CustomPlatformTag = customPlatformTag,
                     OriginalGameId = string.Empty,
                     OriginalSteamAppId = parsed.SteamAppId,
                     OriginalCaptureTime = captureTime,
@@ -2612,12 +2632,12 @@ namespace PixelVaultNative
                     OriginalComment = string.Empty,
                     OriginalTagText = string.Empty,
                     OriginalAddPhotographyTag = false,
-                    OriginalTagSteam = string.Equals(guessedPlatform, "Steam", StringComparison.OrdinalIgnoreCase),
-                    OriginalTagPc = string.Equals(guessedPlatform, "PC", StringComparison.OrdinalIgnoreCase),
-                    OriginalTagPs5 = string.Equals(guessedPlatform, "PS5", StringComparison.OrdinalIgnoreCase),
-                    OriginalTagXbox = string.Equals(guessedPlatform, "Xbox", StringComparison.OrdinalIgnoreCase),
-                    OriginalTagOther = false,
-                    OriginalCustomPlatformTag = string.Empty
+                    OriginalTagSteam = tagSteam,
+                    OriginalTagPc = tagPc,
+                    OriginalTagPs5 = tagPs5,
+                    OriginalTagXbox = tagXbox,
+                    OriginalTagOther = tagOther,
+                    OriginalCustomPlatformTag = customPlatformTag
                 });
             }
             return items.OrderBy(i => i.CaptureTime).ThenBy(i => i.FileName).ToList();
@@ -4439,7 +4459,7 @@ namespace PixelVaultNative
                 Action refreshSortButtons = null;
                 Action<string> setLibrarySortMode = null;
                 Action<LibraryFolderInfo> showFolder = null;
-                Action<List<LibraryFolderInfo>, string, bool> runScopedCoverRefresh = null;
+                Action<List<LibraryFolderInfo>, string, bool, bool> runScopedCoverRefresh = null;
                 Action refreshDetailSelectionUi = null;
                 Action deleteSelectedLibraryFiles = null;
                 Action openSelectedLibraryMetadataEditor = null;
@@ -4962,7 +4982,7 @@ namespace PixelVaultNative
                         var imageGrid = new Grid();
                         imageGrid.Children.Add(CreateAsyncImageTile(
                             ResolveLibraryArt(folder, false),
-                            Math.Max(tileWidth * 3, 760),
+                            CalculateLibraryFolderArtDecodeWidth(tileWidth),
                             tileWidth,
                             tileHeight,
                             Stretch.UniformToFill,
@@ -4981,7 +5001,7 @@ namespace PixelVaultNative
                     {
                         imageBorder.Child = CreateAsyncImageTile(
                             ResolveLibraryArt(folder, false),
-                            Math.Max(tileWidth * 3, 760),
+                            CalculateLibraryFolderArtDecodeWidth(tileWidth),
                             tileWidth,
                             tileHeight,
                             Stretch.UniformToFill,
@@ -5041,7 +5061,7 @@ namespace PixelVaultNative
                     fetchFolderCoverItem.Click += delegate
                     {
                         showFolder(folder);
-                        runScopedCoverRefresh(new List<LibraryFolderInfo> { folder }, folder.Name + " | " + folder.PlatformLabel, true);
+                        runScopedCoverRefresh(new List<LibraryFolderInfo> { folder }, folder.Name + " | " + folder.PlatformLabel, true, true);
                     };
                     contextMenu.Items.Add(openFolderItem);
                     contextMenu.Items.Add(editMetadataItem);
@@ -5072,7 +5092,7 @@ namespace PixelVaultNative
                         previewImage.Source = null;
                         previewImage.Visibility = Visibility.Collapsed;
                     }
-                    else QueueImageLoad(previewImage, artPath, 720, delegate(BitmapImage loaded)
+                    else QueueImageLoad(previewImage, artPath, CalculateLibraryBannerArtDecodeWidth(), delegate(BitmapImage loaded)
                     {
                         previewImage.Source = loaded;
                         previewImage.Visibility = Visibility.Visible;
@@ -5318,7 +5338,7 @@ namespace PixelVaultNative
                     });
                 };
 
-                runScopedCoverRefresh = delegate(List<LibraryFolderInfo> requestedFolders, string scopeLabel, bool forceRefreshExistingCovers)
+                runScopedCoverRefresh = delegate(List<LibraryFolderInfo> requestedFolders, string scopeLabel, bool forceRefreshExistingCovers, bool rebuildFullCacheAfterRefresh)
                 {
                     var targetFolders = (requestedFolders ?? new List<LibraryFolderInfo>()).Where(folder => folder != null && !string.IsNullOrWhiteSpace(folder.FolderPath)).ToList();
                     if (targetFolders.Count == 0)
@@ -5412,7 +5432,7 @@ namespace PixelVaultNative
                         {
                             int resolved = 0;
                             int coversReady = 0;
-                            RefreshLibraryCovers(libraryRoot, targetFolders, delegate(int currentCount, int totalCount, string detail)
+                            RefreshLibraryCovers(libraryRoot, folders, targetFolders, delegate(int currentCount, int totalCount, string detail)
                             {
                                 if (progressWindow == null) return;
                                 progressWindow.Dispatcher.BeginInvoke(new Action(delegate
@@ -5432,7 +5452,7 @@ namespace PixelVaultNative
                                     }
                                     appendProgress(detail);
                                 }));
-                            }, refreshCancellation.Token, forceRefreshExistingCovers, out resolved, out coversReady);
+                            }, refreshCancellation.Token, forceRefreshExistingCovers, rebuildFullCacheAfterRefresh, out resolved, out coversReady);
                             return new[] { resolved, coversReady };
                         }).ContinueWith(delegate(System.Threading.Tasks.Task<int[]> refreshTask)
                         {
@@ -5503,7 +5523,7 @@ namespace PixelVaultNative
 
                 Action runCoverRefresh = delegate
                 {
-                    runScopedCoverRefresh(folders, "library", false);
+                    runScopedCoverRefresh(folders, "library", false, false);
                 };
                 applySearchFilter = delegate
                 {
@@ -6056,12 +6076,15 @@ namespace PixelVaultNative
 
         bool HasLibraryFolderCacheSnapshot(string root)
         {
-            var path = LibraryFolderCachePath(root);
-            if (!File.Exists(path)) return false;
+            return LoadLibraryFolderCacheSnapshot(root) != null;
+        }
+
+        bool LibraryFolderCacheLooksIncomplete(string root, List<LibraryFolderInfo> folders)
+        {
+            if (string.IsNullOrWhiteSpace(root) || folders == null || folders.Count != 1) return false;
             try
             {
-                var header = File.ReadLines(path).Take(2).ToArray();
-                return header.Length >= 2 && string.Equals(header[0], root, StringComparison.OrdinalIgnoreCase);
+                return Directory.Exists(root) && Directory.EnumerateDirectories(root).Skip(1).Any();
             }
             catch
             {
@@ -6077,7 +6100,13 @@ namespace PixelVaultNative
             if (lines.Length < 2) return null;
             if (!string.Equals(lines[0], root, StringComparison.OrdinalIgnoreCase)) return null;
             if (!string.Equals(lines[1], stamp, StringComparison.Ordinal)) return null;
-            return ParseLibraryFolderCacheLines(root, lines);
+            var parsed = ParseLibraryFolderCacheLines(root, lines);
+            if (LibraryFolderCacheLooksIncomplete(root, parsed))
+            {
+                Log("Library folder cache snapshot looked incomplete for " + root + ". Ignoring cached folder list.");
+                return null;
+            }
+            return parsed;
         }
 
         List<LibraryFolderInfo> LoadLibraryFolderCacheSnapshot(string root)
@@ -6087,7 +6116,13 @@ namespace PixelVaultNative
             var lines = File.ReadAllLines(path);
             if (lines.Length < 2) return null;
             if (!string.Equals(lines[0], root, StringComparison.OrdinalIgnoreCase)) return null;
-            return ParseLibraryFolderCacheLines(root, lines);
+            var parsed = ParseLibraryFolderCacheLines(root, lines);
+            if (LibraryFolderCacheLooksIncomplete(root, parsed))
+            {
+                Log("Library folder cache snapshot looked incomplete for " + root + ". Skipping startup prefill.");
+                return null;
+            }
+            return parsed;
         }
 
         List<LibraryFolderInfo> ParseLibraryFolderCacheLines(string root, string[] lines)
@@ -6436,7 +6471,28 @@ namespace PixelVaultNative
                     if (progress != null) progress(i + 1, targetFolders.Count, detailPrefix + " | no match");
                 }
             }
-            SaveLibraryFolderCache(root, BuildLibraryFolderInventoryStamp(root), folders);
+            var stamp = BuildLibraryFolderInventoryStamp(root);
+            var cached = LoadLibraryFolderCache(root, stamp);
+            if (cached == null || cached.Count == 0)
+            {
+                RefreshCachedLibraryFoldersFromGameIndex(root);
+                return resolved;
+            }
+            foreach (var updated in folders.Where(entry => entry != null))
+            {
+                var normalizedGameId = NormalizeGameId(updated.GameId);
+                var match = !string.IsNullOrWhiteSpace(normalizedGameId)
+                    ? cached.FirstOrDefault(entry => string.Equals(NormalizeGameId(entry.GameId), normalizedGameId, StringComparison.OrdinalIgnoreCase))
+                    : null;
+                if (match == null)
+                {
+                    var folderKey = BuildLibraryFolderMasterKey(updated);
+                    match = cached.FirstOrDefault(entry => string.Equals(BuildLibraryFolderMasterKey(entry), folderKey, StringComparison.OrdinalIgnoreCase));
+                }
+                if (match == null) continue;
+                if (!string.IsNullOrWhiteSpace(updated.SteamAppId)) match.SteamAppId = updated.SteamAppId;
+            }
+            SaveLibraryFolderCache(root, stamp, cached);
             return resolved;
         }
 
@@ -6514,11 +6570,14 @@ namespace PixelVaultNative
             return CachedCoverPath(folder.Name);
         }
 
-        void RefreshLibraryCovers(string root, List<LibraryFolderInfo> folders, Action<int, int, string> progress, CancellationToken cancellationToken, bool forceRefreshExistingCovers, out int resolvedIds, out int coversReady)
+        void RefreshLibraryCovers(string root, List<LibraryFolderInfo> libraryFolders, List<LibraryFolderInfo> requestedFolders, Action<int, int, string> progress, CancellationToken cancellationToken, bool forceRefreshExistingCovers, bool rebuildFullCacheAfterRefresh, out int resolvedIds, out int coversReady)
         {
             resolvedIds = 0;
             coversReady = 0;
-            var targetFolders = (folders ?? new List<LibraryFolderInfo>())
+            var allFolders = (libraryFolders ?? requestedFolders ?? new List<LibraryFolderInfo>())
+                .Where(folder => folder != null && !string.IsNullOrWhiteSpace(folder.Name))
+                .ToList();
+            var targetFolders = (requestedFolders ?? libraryFolders ?? new List<LibraryFolderInfo>())
                 .Where(folder => folder != null && !string.IsNullOrWhiteSpace(folder.Name))
                 .GroupBy(BuildLibraryFolderMasterKey, StringComparer.OrdinalIgnoreCase)
                 .Select(group => group.First())
@@ -6544,7 +6603,7 @@ namespace PixelVaultNative
                 {
                     resolvedIds++;
                     var matchKey = BuildLibraryFolderMasterKey(folder);
-                    foreach (var match in folders.Where(entry => entry != null && string.Equals(BuildLibraryFolderMasterKey(entry), matchKey, StringComparison.OrdinalIgnoreCase)))
+                    foreach (var match in allFolders.Where(entry => entry != null && string.Equals(BuildLibraryFolderMasterKey(entry), matchKey, StringComparison.OrdinalIgnoreCase)))
                     {
                         match.SteamAppId = appId;
                         match.SteamGridDbId = steamGridDbId;
@@ -6582,14 +6641,19 @@ namespace PixelVaultNative
                 completed++;
                 if (progress != null) progress(completed, totalWork, itemLabel + " | " + coverDetail);
             }
+            if (rebuildFullCacheAfterRefresh)
+            {
+                RefreshCachedLibraryFoldersFromGameIndex(root);
+                return;
+            }
             var stamp = BuildLibraryFolderInventoryStamp(root);
             var cached = LoadLibraryFolderCache(root, stamp);
             if (cached == null || cached.Count == 0)
             {
-                SaveLibraryFolderCache(root, stamp, folders);
+                SaveLibraryFolderCache(root, stamp, allFolders);
                 return;
             }
-            foreach (var updated in folders.Where(entry => entry != null))
+            foreach (var updated in allFolders.Where(entry => entry != null))
             {
                 var normalizedGameId = NormalizeGameId(updated.GameId);
                 var match = !string.IsNullOrWhiteSpace(normalizedGameId)

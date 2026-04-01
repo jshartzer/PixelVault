@@ -315,7 +315,7 @@ namespace PixelVaultNative
             }
             else applyVideoInfo(null);
             tile.Child = presenter;
-            QueueImageLoad(image, file, size * 2, delegate(BitmapImage loaded)
+            QueueImageLoad(image, file, CalculateLibraryDetailTileDecodeWidth(size), delegate(BitmapImage loaded)
             {
                 image.Source = loaded;
                 image.Visibility = Visibility.Visible;

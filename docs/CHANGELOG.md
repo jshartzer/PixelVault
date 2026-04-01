@@ -1,3 +1,23 @@
+## 0.826
+- Added filename-based console fallback for library metadata indexing when embedded keywords are empty or only resolve to `Other`, so cold-dropped PS5, Xbox, Steam, PC, and custom-platform files no longer stay misclassified just because their EXIF tags are weak.
+- Fixed Manual Intake platform guessing so parser labels like `PlayStation` preselect the PS5 checkbox and custom parser labels flow into `Other` with the custom platform field populated instead of arriving with no platform decision.
+
+## 0.825
+- Fixed a Library cache regression where fetching cover art for a single selected game could overwrite the full folder cache with a one-game snapshot, leaving the Library stuck on that title until a rebuild.
+- Hardened startup cache loading so obviously incomplete folder-cache snapshots are ignored and rebuilt instead of being trusted on launch.
+
+## 0.824
+- Fixed Xbox intake detection for filenames that use hyphens in the time portion, such as `Human Fall Flat-2026_03_31-00-09-35.png`, so they classify as Xbox instead of falling into Manual Intake as `No confident match`.
+- Added a broader PS5 share rule for segmented or fractional timestamp filenames like `Astro's Playroom_CLIMBING RUN_2023101311054800.jpg` while keeping the standard PS5 share format intact.
+
+## 0.823
+- Reduced Library image decode work so the main folder grid, selected-game banner, and screenshot tiles stop requesting oversized bitmaps on first paint.
+- Stopped queued image loads from re-reading files a second time when a cached thumbnail or poster is already available, which makes repeat opens feel much snappier.
+
+## 0.822
+- Fixed game-index persistence across library-root moves by backfilling Steam App IDs and SteamGridDB IDs from older root-scoped SQLite caches when the library is relocated to a new drive.
+- This keeps rebuilt libraries from coming up as a fresh blank-ID index after a move from one capture root path to another, which restores cover fetch and other ID-dependent workflows.
+
 ## 0.821
 - Hardened shared log-file access so PixelVault reads and appends `PixelVault-native.log` with shared file access and short retries instead of letting a transient log-file race block startup.
 - This prevents the current build from failing to open just because another PixelVault process or thread touched the shared log at the same moment.
