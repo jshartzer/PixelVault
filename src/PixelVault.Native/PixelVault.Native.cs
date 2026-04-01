@@ -487,7 +487,7 @@ namespace PixelVaultNative
         }
         Border Card() { return new Border { Background = Brushes.White, BorderBrush = Brush("#D7E1E8"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(18), Padding = new Thickness(18), Effect = new DropShadowEffect { Color = Color.FromArgb(20, 17, 27, 35), BlurRadius = 18, ShadowDepth = 2, Direction = 270, Opacity = 0.4 } }; }
         TextBlock TitleBlock(string t) { return new TextBlock { Text = t, FontSize = 19, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 14), Foreground = Brush("#1F2A30") }; }
-        SolidColorBrush Brush(string hex) { return new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex)); }
+        SolidColorBrush Brush(string hex) { return UiBrushHelper.FromHex(hex); }
         FrameworkElement BuildGamepadGlyph(Brush stroke, double strokeThickness, double width, double height)
         {
             var art = new Canvas { Width = 108, Height = 48 };

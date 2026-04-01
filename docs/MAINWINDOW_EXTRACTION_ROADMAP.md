@@ -74,6 +74,8 @@ The **priority** is to shrink **`PixelVault.Native.cs`**, not to collapse partia
 
 **Progress:** **B3** — Changelog UI lives in `UI/ChangelogWindow.cs` (`ChangelogWindow.ShowDialog`); Settings “Changelog” button calls it with `AppVersion` and `changelogPath`.
 
+**B1** — `UI/UiBrushHelper.cs` provides `FromHex`; `MainWindow.Brush` delegates to it (same call sites); `ChangelogWindow` hex brushes use the helper.
+
 ---
 
 ## Phase C — Intake and review surfaces
