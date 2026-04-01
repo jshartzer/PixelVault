@@ -40,7 +40,7 @@ namespace PixelVaultNative
 
     public sealed partial class MainWindow : Window
     {
-        const string AppVersion = "0.831";
+        const string AppVersion = "0.832";
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
         const string ClearedExternalIdSentinel = "__PV_CLEARED__";
@@ -318,41 +318,42 @@ namespace PixelVaultNative
             root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
 
             var header = new Border { Background = Brush("#161C20"), CornerRadius = new CornerRadius(20), Padding = new Thickness(24), Margin = new Thickness(0, 0, 0, 16) };
-            var hg = new Grid();
-            hg.ColumnDefinitions.Add(new ColumnDefinition());
-            hg.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            var headerGrid = new Grid();
+            headerGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            headerGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             var hs = new StackPanel();
             hs.Children.Add(new TextBlock { Text = "PixelVault Settings", FontSize = 31, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White });
             hs.Children.Add(new TextBlock { Text = "Configure paths, run intake tools, and manage the library without putting the browser itself in the way.", Margin = new Thickness(0, 8, 0, 0), Foreground = Brush("#B7C6C0"), FontSize = 14, TextWrapping = TextWrapping.Wrap });
             status = new TextBlock { Text = "Ready", Foreground = Brushes.White, VerticalAlignment = VerticalAlignment.Center };
-            var headerRight = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            var headerActions = new WrapPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 14, 0, 0) };
+            Action<Button> styleHeaderBtn = delegate(Button b) { b.Margin = new Thickness(0, 0, 10, 8); };
             var pathSettingsTopButton = Btn("Path Settings", delegate { ShowPathSettingsWindow(); }, "#2B3F47", Brushes.White);
-            pathSettingsTopButton.Margin = new Thickness(0, 0, 12, 0);
+            styleHeaderBtn(pathSettingsTopButton);
             var viewLogsTopButton = Btn("View Logs", delegate { OpenFolder(logsRoot); }, "#2B3F47", Brushes.White);
-            viewLogsTopButton.Margin = new Thickness(0, 0, 12, 0);
+            styleHeaderBtn(viewLogsTopButton);
             var myCoversTopButton = Btn("My Covers", delegate { OpenSavedCoversFolder(); }, "#2B3F47", Brushes.White);
-            myCoversTopButton.Margin = new Thickness(0, 0, 12, 0);
+            styleHeaderBtn(myCoversTopButton);
             var gameIndexTopButton = Btn("Game Index", delegate { OpenGameIndexEditor(); }, "#20343A", Brushes.White);
-            gameIndexTopButton.Margin = new Thickness(0, 0, 12, 0);
+            styleHeaderBtn(gameIndexTopButton);
             var photoIndexTopButton = Btn("Photo Index", delegate { OpenPhotoIndexEditor(); }, "#20343A", Brushes.White);
-            photoIndexTopButton.Margin = new Thickness(0, 0, 12, 0);
+            styleHeaderBtn(photoIndexTopButton);
             var filenameRulesTopButton = Btn("Filename Rules", delegate { OpenFilenameConventionEditor(); }, "#20343A", Brushes.White);
-            filenameRulesTopButton.Margin = new Thickness(0, 0, 12, 0);
+            styleHeaderBtn(filenameRulesTopButton);
             var changelogTopButton = Btn("Changelog", delegate { ChangelogWindow.ShowDialog(this, AppVersion, changelogPath); }, "#20343A", Brushes.White);
-            changelogTopButton.Margin = new Thickness(0, 0, 12, 0);
-            var sp = new Border { Child = status, Background = Brush("#20343A"), CornerRadius = new CornerRadius(12), Padding = new Thickness(14, 10, 14, 10) };
-            headerRight.Children.Add(pathSettingsTopButton);
-            headerRight.Children.Add(viewLogsTopButton);
-            headerRight.Children.Add(myCoversTopButton);
-            headerRight.Children.Add(gameIndexTopButton);
-            headerRight.Children.Add(photoIndexTopButton);
-            headerRight.Children.Add(filenameRulesTopButton);
-            headerRight.Children.Add(changelogTopButton);
-            headerRight.Children.Add(sp);
-            hg.Children.Add(hs);
-            Grid.SetColumn(headerRight, 1);
-            hg.Children.Add(headerRight);
-            header.Child = hg;
+            styleHeaderBtn(changelogTopButton);
+            var sp = new Border { Child = status, Background = Brush("#20343A"), CornerRadius = new CornerRadius(12), Padding = new Thickness(14, 10, 14, 10), Margin = new Thickness(0, 0, 10, 8), VerticalAlignment = VerticalAlignment.Center };
+            headerActions.Children.Add(pathSettingsTopButton);
+            headerActions.Children.Add(viewLogsTopButton);
+            headerActions.Children.Add(myCoversTopButton);
+            headerActions.Children.Add(gameIndexTopButton);
+            headerActions.Children.Add(photoIndexTopButton);
+            headerActions.Children.Add(filenameRulesTopButton);
+            headerActions.Children.Add(changelogTopButton);
+            headerActions.Children.Add(sp);
+            headerGrid.Children.Add(hs);
+            Grid.SetRow(headerActions, 1);
+            headerGrid.Children.Add(headerActions);
+            header.Child = headerGrid;
             root.Children.Add(header);
 
             var main = new Grid();
@@ -364,8 +365,8 @@ namespace PixelVaultNative
             var left = Card();
             left.Margin = new Thickness(0, 0, 16, 0);
             var leftGrid = new Grid();
-            leftGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            leftGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            leftGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(2, GridUnitType.Star), MinHeight = 120 });
+            leftGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star), MinHeight = 200 });
             left.Child = leftGrid;
 
             var leftStack = new StackPanel();
@@ -444,14 +445,21 @@ namespace PixelVaultNative
             openRow.Children.Add(Btn("Open Sources", delegate { OpenSourceFolders(); }, "#EEF2F5", Brush("#33424D")));
             openRow.Children.Add(Btn("Open Destination", delegate { OpenFolder(destinationRoot); }, "#EEF2F5", Brush("#33424D")));
             leftStack.Children.Add(openRow);
-            leftGrid.Children.Add(leftStack);
+            var leftScroll = new ScrollViewer
+            {
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                Padding = new Thickness(0, 0, 4, 0)
+            };
+            leftScroll.Content = leftStack;
+            leftGrid.Children.Add(leftScroll);
 
             previewBox = new RichTextBox
             {
                 IsReadOnly = true,
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                Margin = new Thickness(0, 4, 0, 0),
-                MinHeight = 320,
+                Margin = new Thickness(0, 12, 0, 0),
+                MinHeight = 160,
                 BorderThickness = new Thickness(0),
                 Background = Brushes.White,
                 FontFamily = new FontFamily("Cascadia Mono"),
@@ -592,7 +600,7 @@ namespace PixelVaultNative
         }
         double PreferredSettingsWindowHeight()
         {
-            var available = Math.Max(980, SystemParameters.WorkArea.Height - 24);
+            var available = Math.Max(820, SystemParameters.WorkArea.Height - 32);
             return Math.Min(available, 1480);
         }
         string ResolveWorkspaceAssetPath(string fileName)
@@ -657,7 +665,7 @@ namespace PixelVaultNative
         }
         string LibrarySectionCountLabel(int count)
         {
-            return count == 1 ? "folder" : "folders";
+            return count == 1 ? "game" : "games";
         }
         DateTime GetLibraryFolderNewestDate(LibraryFolderInfo folder)
         {
@@ -748,7 +756,7 @@ namespace PixelVaultNative
             }
             return badge;
         }
-        FrameworkElement BuildLibrarySectionHeader(string platformLabel, int folderCount)
+        FrameworkElement BuildLibrarySectionHeader(string platformLabel, int folderCount, bool sectionCollapsed, Action toggleSectionCollapse)
         {
             var resolvedLabel = NormalizeConsoleLabel(platformLabel);
             var accent = LibrarySectionAccentBrush(resolvedLabel);
@@ -756,8 +764,39 @@ namespace PixelVaultNative
 
             var headerGrid = new Grid();
             headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             headerGrid.ColumnDefinitions.Add(new ColumnDefinition());
             headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var chevronGlyph = new TextBlock
+            {
+                Text = sectionCollapsed ? "\uE76C" : "\uE70D",
+                FontFamily = new FontFamily("Segoe MDL2 Assets"),
+                FontSize = 13,
+                Foreground = Brush("#C5D4DE"),
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+            var chevronHit = new Border
+            {
+                Width = 36,
+                MinHeight = 48,
+                Margin = new Thickness(0, 0, 6, 0),
+                Background = Brushes.Transparent,
+                Cursor = Cursors.Hand,
+                VerticalAlignment = VerticalAlignment.Center,
+                Child = chevronGlyph,
+                ToolTip = sectionCollapsed ? "Expand section" : "Collapse section"
+            };
+            if (toggleSectionCollapse != null)
+            {
+                chevronHit.MouseLeftButtonDown += delegate(object sender, MouseButtonEventArgs e)
+                {
+                    e.Handled = true;
+                    toggleSectionCollapse();
+                };
+            }
+            headerGrid.Children.Add(chevronHit);
 
             var iconFrame = new Border
             {
@@ -794,6 +833,7 @@ namespace PixelVaultNative
                     TextAlignment = TextAlignment.Center
                 };
             }
+            Grid.SetColumn(iconFrame, 1);
             headerGrid.Children.Add(iconFrame);
 
             var titleStack = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
@@ -814,36 +854,34 @@ namespace PixelVaultNative
                 Margin = new Thickness(0, 7, 0, 0),
                 HorizontalAlignment = HorizontalAlignment.Left
             });
-            Grid.SetColumn(titleStack, 1);
+            Grid.SetColumn(titleStack, 2);
             headerGrid.Children.Add(titleStack);
 
-            var countStack = new StackPanel
+            var countLine = new StackPanel
             {
+                Orientation = Orientation.Horizontal,
                 VerticalAlignment = VerticalAlignment.Center,
-                HorizontalAlignment = HorizontalAlignment.Right,
-                MinWidth = 74
+                HorizontalAlignment = HorizontalAlignment.Right
             };
-            countStack.Children.Add(new TextBlock
+            countLine.Children.Add(new TextBlock
             {
                 Text = folderCount.ToString(),
-                FontSize = 24,
+                FontSize = 20,
                 FontWeight = FontWeights.Bold,
                 Foreground = Brushes.White,
-                HorizontalAlignment = HorizontalAlignment.Right,
-                TextAlignment = TextAlignment.Right
+                VerticalAlignment = VerticalAlignment.Center
             });
-            countStack.Children.Add(new TextBlock
+            countLine.Children.Add(new TextBlock
             {
-                Text = LibrarySectionCountLabel(folderCount),
-                FontSize = 11.5,
-                FontWeight = FontWeights.Medium,
+                Text = "\u00A0" + LibrarySectionCountLabel(folderCount),
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold,
                 Foreground = Brush("#9AAAB4"),
-                HorizontalAlignment = HorizontalAlignment.Right,
-                TextAlignment = TextAlignment.Right,
-                Margin = new Thickness(0, -2, 0, 0)
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(2, 1, 0, 0)
             });
-            Grid.SetColumn(countStack, 2);
-            headerGrid.Children.Add(countStack);
+            Grid.SetColumn(countLine, 3);
+            headerGrid.Children.Add(countLine);
 
             return new Border
             {
@@ -1067,10 +1105,10 @@ namespace PixelVaultNative
             var window = new Window
             {
                 Title = "PixelVault " + AppVersion + " Path Settings",
-                Width = 760,
-                Height = 620,
-                MinWidth = 680,
-                MinHeight = 700,
+                Width = 780,
+                Height = 660,
+                MinWidth = 640,
+                MinHeight = 520,
                 Owner = this,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
                 Background = Brush("#F3EEE4")
@@ -1102,9 +1140,17 @@ namespace PixelVaultNative
             SettingsBrowseButton(panel, 3, delegate { var picked = PickFile(exifBox.Text, "Executable (*.exe)|*.exe|All files (*.*)|*.*"); if (!string.IsNullOrWhiteSpace(picked)) exifBox.Text = picked; });
             SettingsBrowseButton(panel, 4, delegate { var picked = PickFile(ffmpegBox.Text, "Executable (*.exe)|*.exe|All files (*.*)|*.*"); if (!string.IsNullOrWhiteSpace(picked)) ffmpegBox.Text = picked; });
 
-            root.Children.Add(panel);
+            var pathScroll = new ScrollViewer
+            {
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                Content = panel
+            };
+            Grid.SetRow(pathScroll, 0);
+            root.Children.Add(pathScroll);
             var buttons = new WrapPanel { Margin = new Thickness(0, 18, 0, 0) };
             var save = Btn("Save Settings", null, "#275D47", Brushes.White);
+            save.Margin = new Thickness(0, 0, 12, 0);
             var cancel = Btn("Cancel", null, null, Brushes.Black);
             buttons.Children.Add(save);
             buttons.Children.Add(cancel);
@@ -4453,6 +4499,7 @@ namespace PixelVaultNative
                 int libraryFolderRefreshVersion = 0;
                 int detailRenderVersion = 0;
                 var selectedDetailFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var collapsedLibraryPlatformSections = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 var detailTiles = new List<Border>();
                 int estimatedDetailRowHeight = 420;
                 int detailSelectionAnchorIndex = -1;
@@ -5059,8 +5106,8 @@ namespace PixelVaultNative
                     var setCoverItem = new MenuItem { Header = "Set Custom Cover..." };
                     setCoverItem.Click += delegate
                     {
-                        OpenSavedCoversFolder();
-                        var pickedCover = PickFile(ResolveLibraryArt(folder, false), "Image Files|*.jpg;*.jpeg;*.png;*.bmp;*.gif|All Files|*.*", savedCoversRoot);
+                        Directory.CreateDirectory(savedCoversRoot);
+                        var pickedCover = PickFile(string.Empty, "Image Files|*.jpg;*.jpeg;*.png;*.bmp;*.gif|All Files|*.*", savedCoversRoot);
                         if (string.IsNullOrWhiteSpace(pickedCover)) return;
                         SaveCustomCover(folder, pickedCover);
                         showFolder(folder);
@@ -5258,11 +5305,13 @@ namespace PixelVaultNative
                     {
                         var groupFolders = folderGroup.ToList();
                         var groupLabel = folderGroup.Key;
+                        var sectionCollapsed = collapsedLibraryPlatformSections.Contains(groupLabel);
                         virtualRows.Add(new VirtualizedRowDefinition
                         {
                             Height = 82,
                             Build = delegate
                             {
+                                var gl = groupLabel;
                                 return new Border
                                 {
                                     Height = 82,
@@ -5270,24 +5319,32 @@ namespace PixelVaultNative
                                     BorderBrush = Brush("#26363F"),
                                     BorderThickness = new Thickness(1),
                                     CornerRadius = new CornerRadius(10),
-                                    Padding = new Thickness(14, 10, 14, 12),
-                                    Child = BuildLibrarySectionHeader(groupLabel, groupFolders.Count)
+                                    Padding = new Thickness(10, 10, 14, 12),
+                                    Child = BuildLibrarySectionHeader(gl, groupFolders.Count, collapsedLibraryPlatformSections.Contains(gl), delegate
+                                    {
+                                        if (collapsedLibraryPlatformSections.Contains(gl)) collapsedLibraryPlatformSections.Remove(gl);
+                                        else collapsedLibraryPlatformSections.Add(gl);
+                                        if (renderTiles != null) renderTiles();
+                                    })
                                 };
                             }
                         });
-                        for (int rowStart = 0; rowStart < groupFolders.Count; rowStart += folderColumns)
+                        if (!sectionCollapsed)
                         {
-                            var rowFolders = groupFolders.Skip(rowStart).Take(folderColumns).ToList();
-                            virtualRows.Add(new VirtualizedRowDefinition
+                            for (int rowStart = 0; rowStart < groupFolders.Count; rowStart += folderColumns)
                             {
-                                Height = folderRowHeight,
-                                Build = delegate
+                                var rowFolders = groupFolders.Skip(rowStart).Take(folderColumns).ToList();
+                                virtualRows.Add(new VirtualizedRowDefinition
                                 {
-                                    var groupWrap = new WrapPanel();
-                                    foreach (var folder in rowFolders) groupWrap.Children.Add(buildFolderTile(folder, tileWidth, tileHeight, false));
-                                    return new Border { Height = folderRowHeight, Background = Brushes.Transparent, Child = groupWrap };
-                                }
-                            });
+                                    Height = folderRowHeight,
+                                    Build = delegate
+                                    {
+                                        var groupWrap = new WrapPanel();
+                                        foreach (var folder in rowFolders) groupWrap.Children.Add(buildFolderTile(folder, tileWidth, tileHeight, false));
+                                        return new Border { Height = folderRowHeight, Background = Brushes.Transparent, Child = groupWrap };
+                                    }
+                                });
+                            }
                         }
                     }
                     SetVirtualizedRows(tileRows, virtualRows, !shouldRestoreFolderScroll, shouldRestoreFolderScroll ? (double?)restoreFolderScrollOffset : null);
@@ -7327,7 +7384,7 @@ namespace PixelVaultNative
                     "My Covers (permanent stash)\r\n" +
                     "\r\n" +
                     "Save or copy cover images here (JPG, PNG, GIF, BMP). Subfolders are fine.\r\n" +
-                    "In the library, right-click a game folder, choose Set Custom Cover, and browse from this folder.\r\n" +
+                    "In the library, right-click a game folder, choose Set Custom Cover — the file picker starts here (use Open My Covers Folder in the same menu if you want Explorer).\r\n" +
                     "This folder is not part of the cache; PixelVault will not delete it when refreshing covers.\r\n");
             }
             catch { }
