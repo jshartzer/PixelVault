@@ -1,3 +1,8 @@
+## 0.831
+- **Import and Edit:** if you leave the **game title** as loaded (e.g. the numeric hint from the filename) but the row is **Steam** with an AppID, PixelVault now resolves the **store title** before the game-index prompts—same as automatic import. If you **change** the title, your text is kept.
+- **Manual metadata / library edit preview:** fixed **QueueImageLoad** so images become visible when a callback sets `Source` (single-file preview was staying collapsed).
+- **Steam lookup:** search accepts a **numeric AppID** (store `appdetails`) as well as a game name; help text updated.
+
 ## 0.830
 - **Import and Comment** now opens the same **manual metadata** editor as library edits and manual intake: every top-level upload file appears as a row (rule-matched files show an **Auto** badge). Select which files to import; unselected files stay in the upload folder. Optional **delete before import** applies to the selection. The workflow runs Steam rename (on the selection), manual title rename, delete, EXIF/metadata, and per-file move—no separate review window.
 - **Publish script:** after a successful publish, updates repo-root `PixelVault.lnk` to point at the new `PixelVault.exe` and working directory.

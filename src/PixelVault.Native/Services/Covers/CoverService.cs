@@ -271,10 +271,18 @@ namespace PixelVaultNative
             {
                 if (!string.IsNullOrWhiteSpace(query))
                 {
-                    using (var wc = CreateSteamWebClient())
+                    if (Regex.IsMatch(query, @"^\d+$"))
                     {
-                        var html = wc.DownloadString("https://store.steampowered.com/search/suggest?term=" + Uri.EscapeDataString(query) + "&f=games&cc=US&l=english", cancellationToken);
-                        results = ParseSteamSearchResults(html);
+                        var appName = SteamName(query, cancellationToken);
+                        if (!string.IsNullOrWhiteSpace(appName)) results.Add(Tuple.Create(query, appName));
+                    }
+                    else
+                    {
+                        using (var wc = CreateSteamWebClient())
+                        {
+                            var html = wc.DownloadString("https://store.steampowered.com/search/suggest?term=" + Uri.EscapeDataString(query) + "&f=games&cc=US&l=english", cancellationToken);
+                            results = ParseSteamSearchResults(html);
+                        }
                     }
                 }
             }

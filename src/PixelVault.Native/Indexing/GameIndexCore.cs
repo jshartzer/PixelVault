@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Threading;
 
 namespace PixelVaultNative
 {
@@ -388,6 +389,34 @@ namespace PixelVaultNative
                 .Where(row => row != null && !string.IsNullOrWhiteSpace(row.Name))
                 .GroupBy(row => NormalizeGameIndexName(row.Name, row.FolderPath), StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(group => group.Key, group => group.Count(), StringComparer.OrdinalIgnoreCase);
+        }
+
+        bool ManualMetadataGameNameMatchesOriginal(ManualMetadataItem item)
+        {
+            if (item == null) return false;
+            var cur = NormalizeGameIndexName(item.GameName ?? string.Empty);
+            var orig = NormalizeGameIndexName(item.OriginalGameName ?? string.Empty);
+            return string.Equals(cur, orig, StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// Import-and-edit: when the user did not change the loaded game title, resolve Steam store names from AppID
+        /// (same as automatic import) so the game index is not offered numeric placeholder titles.
+        /// </summary>
+        void ApplyImportAndEditSteamStoreTitlesWhenGameNameUnchanged(IEnumerable<ManualMetadataItem> items, CancellationToken cancellationToken = default(CancellationToken))
+        {
+            foreach (var item in items ?? Enumerable.Empty<ManualMetadataItem>())
+            {
+                if (item == null) continue;
+                if (!item.TagSteam) continue;
+                if (!ManualMetadataGameNameMatchesOriginal(item)) continue;
+                var appId = Regex.Replace(item.SteamAppId ?? string.Empty, @"[^\d]", string.Empty);
+                if (string.IsNullOrWhiteSpace(appId)) continue;
+                cancellationToken.ThrowIfCancellationRequested();
+                var storeTitle = SteamName(appId, cancellationToken);
+                if (string.IsNullOrWhiteSpace(storeTitle)) continue;
+                item.GameName = storeTitle;
+            }
         }
     }
 }

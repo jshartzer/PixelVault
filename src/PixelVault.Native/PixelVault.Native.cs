@@ -40,7 +40,7 @@ namespace PixelVaultNative
 
     public sealed partial class MainWindow : Window
     {
-        const string AppVersion = "0.830";
+        const string AppVersion = "0.831";
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
         const string ClearedExternalIdSentinel = "__PV_CLEARED__";
@@ -1771,7 +1771,11 @@ namespace PixelVaultNative
             var immediate = TryLoadCachedVisualImmediate(sourcePath, decodePixelWidth);
             if (immediate != null)
             {
-                if (onLoaded != null) onLoaded(immediate);
+                if (onLoaded != null)
+                {
+                    onLoaded(immediate);
+                    imageControl.Visibility = Visibility.Visible;
+                }
                 else
                 {
                     imageControl.Source = immediate;
@@ -1819,6 +1823,7 @@ namespace PixelVaultNative
                     }
                     if (onLoaded != null) onLoaded(task.Result);
                     else imageControl.Source = task.Result;
+                    imageControl.Visibility = Visibility.Visible;
                 }));
             }, TaskScheduler.Default);
         }
@@ -2995,7 +3000,7 @@ namespace PixelVaultNative
             steamLookupGrid.Children.Add(steamSearchButton);
             Grid.SetColumn(steamAppIdBox, 2);
             steamLookupGrid.Children.Add(steamAppIdBox);
-            var steamLookupStatus = new TextBlock { Text = "Search by game name to fetch a Steam AppID, or paste one directly.", Foreground = Brush("#5F6970"), Margin = new Thickness(0, 0, 0, 16), TextWrapping = TextWrapping.Wrap };
+            var steamLookupStatus = new TextBlock { Text = "Search by game title or numeric Steam AppID (Search looks up the store name), or paste an AppID in the box on the right.", Foreground = Brush("#5F6970"), Margin = new Thickness(0, 0, 0, 16), TextWrapping = TextWrapping.Wrap };
             var knownGameChoices = new List<string>();
             var knownGameChoiceSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var knownGameChoiceNameMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -3317,7 +3322,7 @@ namespace PixelVaultNative
                     suppressSync = true;
                     steamSearchBox.Text = string.Empty;
                     steamAppIdBox.Text = string.Empty;
-                    steamLookupStatus.Text = "Search by game name to fetch a Steam AppID, or paste one directly.";
+                    steamLookupStatus.Text = "Search by game title or numeric Steam AppID, or paste an AppID in the box on the right.";
                     gameNameBox.Text = string.Empty;
                     tagsBox.Text = string.Empty;
                     commentBox.Text = string.Empty;
@@ -3376,7 +3381,7 @@ namespace PixelVaultNative
                     selectedTitle.Text = selectedItems.Count + " captures selected";
                     selectedMeta.Text = "Edits here apply to all selected files. Mixed values show as blank or indeterminate.";
                     guessText.Text = sharedFilenameGuess(selectedItems);
-                    steamLookupStatus.Text = "Search by game name to apply one Steam AppID to the selected captures, or paste it directly.";
+                    steamLookupStatus.Text = "Search by title or Steam AppID to apply one AppID to the selected captures, or paste it directly.";
                     previewBorder.Child = buildMultiPreview(selectedItems.Count);
                     previewImage.Source = null;
                 }
@@ -3484,7 +3489,7 @@ namespace PixelVaultNative
                 }
                 if (string.IsNullOrWhiteSpace(query))
                 {
-                    MessageBox.Show("Enter a game name first, then search Steam for its AppID.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
+                    MessageBox.Show("Enter a game title or a numeric Steam AppID in the search box, then click Search Steam.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
                     return;
                 }
 
@@ -3776,6 +3781,10 @@ namespace PixelVaultNative
                 {
                     MessageBox.Show("Enter a platform name in the Other box before applying changes.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
                     return;
+                }
+                if (importAndEditMode)
+                {
+                    ApplyImportAndEditSteamStoreTitlesWhenGameNameUnchanged(pendingItems);
                 }
                 var gameRows = LoadSavedGameIndexRows(libraryRoot);
                 var unresolvedMasterRecords = pendingItems
