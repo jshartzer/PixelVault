@@ -76,6 +76,8 @@ The **priority** is to shrink **`PixelVault.Native.cs`**, not to collapse partia
 
 **B1** — `UI/UiBrushHelper.cs` provides `FromHex`; `MainWindow.Brush` delegates to it (same call sites); `ChangelogWindow` hex brushes use the helper.
 
+**B2** — `UI/Progress/WorkflowProgressWindow.cs` provides `WorkflowProgressWindow.Create` + `WorkflowProgressView` (log ring buffer, shared layout). Used by import `RunBackgroundWorkflowWithProgress`, `ShowLibraryMetadataScanWindow`, `RunLibraryMetadataWorkflowWithProgress`, and library cover refresh.
+
 ---
 
 ## Phase C — Intake and review surfaces

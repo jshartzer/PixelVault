@@ -1193,19 +1193,10 @@ namespace PixelVaultNative
             Window progressWindow = null;
             TextBlock progressMeta = null;
             ProgressBar progressBar = null;
-            TextBox progressLog = null;
+            Action<string> appendProgress = null;
             Button actionButton = null;
             bool scanFinished = false;
             CancellationTokenSource scanCancellation = null;
-            var progressLines = new List<string>();
-            Action<string> appendProgress = delegate(string line)
-            {
-                if (string.IsNullOrWhiteSpace(line) || progressLog == null) return;
-                progressLines.Add(line);
-                while (progressLines.Count > 180) progressLines.RemoveAt(0);
-                progressLog.Text = string.Join(Environment.NewLine, progressLines.ToArray());
-                progressLog.ScrollToEnd();
-            };
             Action finishButtons = delegate
             {
                 if (setBusyState != null) setBusyState(false);
@@ -1218,44 +1209,25 @@ namespace PixelVaultNative
                 var scopeLabel = string.IsNullOrWhiteSpace(folderPath)
                     ? (forceRescan ? "full library rebuild" : "full library refresh")
                     : ((Path.GetFileName(folderPath) ?? "selected folder") + (forceRescan ? " rebuild" : " refresh"));
-                progressWindow = new Window
-                {
-                    Title = "PixelVault Scan Monitor",
-                    Width = 900,
-                    Height = 580,
-                    MinWidth = 780,
-                    MinHeight = 520,
-                    Owner = resolvedOwner,
-                    WindowStartupLocation = resolvedOwner == null ? WindowStartupLocation.CenterScreen : WindowStartupLocation.CenterOwner,
-                    Background = Brush("#0F1519")
-                };
-                var progressRoot = new Grid { Margin = new Thickness(18) };
-                progressRoot.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-                progressRoot.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-                progressRoot.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-                progressRoot.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-                var progressTitle = new TextBlock
-                {
-                    Text = string.IsNullOrWhiteSpace(folderPath)
-                        ? (forceRescan ? "Rebuilding library metadata index" : "Refreshing library metadata index")
-                        : (forceRescan ? "Rebuilding folder metadata index" : "Refreshing folder metadata index"),
-                    FontSize = 24,
-                    FontWeight = FontWeights.SemiBold,
-                    Foreground = Brushes.White,
-                    Margin = new Thickness(0, 0, 0, 8)
-                };
-                progressMeta = new TextBlock
-                {
-                    Text = "Building file list...",
-                    Foreground = Brush("#B7C6C0"),
-                    TextWrapping = TextWrapping.Wrap,
-                    Margin = new Thickness(0, 0, 0, 14)
-                };
-                progressBar = new ProgressBar { Height = 18, Minimum = 0, Maximum = 1, Value = 0, IsIndeterminate = true, Margin = new Thickness(0, 0, 0, 14) };
-                progressLog = new TextBox { IsReadOnly = true, AcceptsReturn = true, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, TextWrapping = TextWrapping.Wrap, Background = Brush("#12191E"), Foreground = Brush("#F1E9DA"), BorderBrush = Brush("#2B3A44"), BorderThickness = new Thickness(1), FontFamily = new FontFamily("Cascadia Mono") };
+                var scanHeading = string.IsNullOrWhiteSpace(folderPath)
+                    ? (forceRescan ? "Rebuilding library metadata index" : "Refreshing library metadata index")
+                    : (forceRescan ? "Rebuilding folder metadata index" : "Refreshing folder metadata index");
                 actionButton = Btn("Cancel Scan", null, "#7A2F2F", Brushes.White);
-                actionButton.Margin = new Thickness(0);
-                actionButton.HorizontalAlignment = HorizontalAlignment.Right;
+                var scanProgressView = WorkflowProgressWindow.Create(
+                    resolvedOwner,
+                    "PixelVault Scan Monitor",
+                    scanHeading,
+                    "Building file list...",
+                    0,
+                    1,
+                    0,
+                    true,
+                    actionButton,
+                    WorkflowProgressWindow.ScanStyleMaxLogLines);
+                progressWindow = scanProgressView.Window;
+                progressMeta = scanProgressView.MetaText;
+                progressBar = scanProgressView.ProgressBar;
+                appendProgress = scanProgressView.AppendLogLine;
                 actionButton.Click += delegate
                 {
                     if (!scanFinished)
@@ -1270,21 +1242,6 @@ namespace PixelVaultNative
                         progressWindow.Close();
                     }
                 };
-                progressRoot.Children.Add(progressTitle);
-                Grid.SetRow(progressMeta, 1);
-                progressRoot.Children.Add(progressMeta);
-                var centerPanel = new Grid();
-                centerPanel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-                centerPanel.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-                centerPanel.Children.Add(progressBar);
-                var logBorder = new Border { Background = Brush("#12191E"), CornerRadius = new CornerRadius(14), Padding = new Thickness(12), BorderBrush = Brush("#26363F"), BorderThickness = new Thickness(1), Child = progressLog, Margin = new Thickness(0, 14, 0, 0) };
-                Grid.SetRow(logBorder, 1);
-                centerPanel.Children.Add(logBorder);
-                Grid.SetRow(centerPanel, 2);
-                progressRoot.Children.Add(centerPanel);
-                Grid.SetRow(actionButton, 3);
-                progressRoot.Children.Add(actionButton);
-                progressWindow.Content = progressRoot;
                 progressWindow.Show();
 
                 appendProgress("Starting scan for " + scopeLabel + ".");
@@ -1382,7 +1339,7 @@ namespace PixelVaultNative
                 if (status != null) status.Text = "Library scan failed";
                 Log(ex.ToString());
                 if (progressMeta != null) progressMeta.Text = ex.Message;
-                appendProgress("ERROR: " + ex.Message);
+                if (appendProgress != null) appendProgress("ERROR: " + ex.Message);
                 if (actionButton != null)
                 {
                     actionButton.IsEnabled = true;
@@ -3858,62 +3815,31 @@ namespace PixelVaultNative
         void RunLibraryMetadataWorkflowWithProgress(LibraryFolderInfo folder, List<ManualMetadataItem> items, Action refreshLibrary)
         {
             var originalSavedGameIndexRow = folder == null ? null : FindSavedGameIndexRow(LoadSavedGameIndexRows(libraryRoot), folder);
-            var progressWindow = new Window
-            {
-                Title = "PixelVault " + AppVersion + " Library Metadata Progress",
-                Width = 900,
-                Height = 580,
-                MinWidth = 780,
-                MinHeight = 520,
-                Owner = this,
-                WindowStartupLocation = WindowStartupLocation.CenterOwner,
-                Background = Brush("#0F1519")
-            };
-            var progressRoot = new Grid { Margin = new Thickness(18) };
-            progressRoot.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            progressRoot.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            progressRoot.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-            progressRoot.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            var progressTitle = new TextBlock { Text = "Applying library metadata", FontSize = 24, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, Margin = new Thickness(0, 0, 0, 8) };
-            var progressMeta = new TextBlock { Text = "Preparing " + items.Count + " capture(s)...", Foreground = Brush("#B7C6C0"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 14) };
             var totalPerStage = Math.Max(items.Count, 1);
             var totalWork = totalPerStage * 3;
-            var progressBar = new ProgressBar { Height = 18, Minimum = 0, Maximum = totalWork, Value = 0, IsIndeterminate = false, Margin = new Thickness(0, 0, 0, 14) };
-            var progressLog = new TextBox { IsReadOnly = true, AcceptsReturn = true, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, TextWrapping = TextWrapping.Wrap, Background = Brush("#12191E"), Foreground = Brush("#F1E9DA"), BorderBrush = Brush("#2B3A44"), BorderThickness = new Thickness(1), FontFamily = new FontFamily("Cascadia Mono") };
             var closeButton = Btn("Close", null, "#334249", Brushes.White);
-            closeButton.Margin = new Thickness(0);
-            closeButton.HorizontalAlignment = HorizontalAlignment.Right;
             closeButton.IsEnabled = false;
-            var progressLines = new List<string>();
+            var libMetaView = WorkflowProgressWindow.Create(
+                this,
+                "PixelVault " + AppVersion + " Library Metadata Progress",
+                "Applying library metadata",
+                "Preparing " + items.Count + " capture(s)...",
+                0,
+                totalWork,
+                0,
+                false,
+                closeButton,
+                WorkflowProgressWindow.DefaultMaxLogLines);
+            var progressWindow = libMetaView.Window;
+            var progressMeta = libMetaView.MetaText;
+            var progressBar = libMetaView.ProgressBar;
             bool progressFinished = false;
-            Action<string> appendProgress = delegate(string line)
-            {
-                if (string.IsNullOrWhiteSpace(line)) return;
-                progressLines.Add(line);
-                while (progressLines.Count > 200) progressLines.RemoveAt(0);
-                progressLog.Text = string.Join(Environment.NewLine, progressLines.ToArray());
-                progressLog.ScrollToEnd();
-            };
+            Action<string> appendProgress = libMetaView.AppendLogLine;
             closeButton.Click += delegate
             {
                 if (!progressFinished) return;
                 progressWindow.Close();
             };
-            progressRoot.Children.Add(progressTitle);
-            Grid.SetRow(progressMeta, 1);
-            progressRoot.Children.Add(progressMeta);
-            var centerPanel = new Grid();
-            centerPanel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            centerPanel.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-            centerPanel.Children.Add(progressBar);
-            var logBorder = new Border { Background = Brush("#12191E"), CornerRadius = new CornerRadius(14), Padding = new Thickness(12), BorderBrush = Brush("#26363F"), BorderThickness = new Thickness(1), Child = progressLog, Margin = new Thickness(0, 14, 0, 0) };
-            Grid.SetRow(logBorder, 1);
-            centerPanel.Children.Add(logBorder);
-            Grid.SetRow(centerPanel, 2);
-            progressRoot.Children.Add(centerPanel);
-            Grid.SetRow(closeButton, 3);
-            progressRoot.Children.Add(closeButton);
-            progressWindow.Content = progressRoot;
 
             status.Text = "Applying library metadata";
             appendProgress("Starting library metadata apply for " + items.Count + " capture(s) in " + folder.Name + ".");
@@ -5298,19 +5224,10 @@ namespace PixelVaultNative
                     Window progressWindow = null;
                     TextBlock progressMeta = null;
                     ProgressBar progressBar = null;
-                    TextBox progressLog = null;
+                    Action<string> appendProgress = null;
                     Button actionButton = null;
                     bool refreshFinished = false;
                     CancellationTokenSource refreshCancellation = null;
-                    var progressLines = new List<string>();
-                    Action<string> appendProgress = delegate(string line)
-                    {
-                        if (string.IsNullOrWhiteSpace(line) || progressLog == null) return;
-                        progressLines.Add(line);
-                        while (progressLines.Count > 180) progressLines.RemoveAt(0);
-                        progressLog.Text = string.Join(Environment.NewLine, progressLines.ToArray());
-                        progressLog.ScrollToEnd();
-                    };
                     Action finishButtons = delegate
                     {
                         if (setLibraryBusyState != null) setLibraryBusyState(false);
@@ -5318,29 +5235,22 @@ namespace PixelVaultNative
                     };
                     try
                     {
-                        progressWindow = new Window
-                        {
-                            Title = "PixelVault Cover Refresh",
-                            Width = 900,
-                            Height = 580,
-                            MinWidth = 780,
-                            MinHeight = 520,
-                            Owner = libraryWindow,
-                            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-                            Background = Brush("#0F1519")
-                        };
-                        var progressRoot = new Grid { Margin = new Thickness(18) };
-                        progressRoot.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-                        progressRoot.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-                        progressRoot.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-                        progressRoot.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-                        var progressTitle = new TextBlock { Text = "Resolving IDs and fetching cover art", FontSize = 24, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, Margin = new Thickness(0, 0, 0, 8) };
-                        progressMeta = new TextBlock { Text = "Preparing library entries...", Foreground = Brush("#B7C6C0"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 14) };
-                        progressBar = new ProgressBar { Height = 18, Minimum = 0, Maximum = 1, Value = 0, IsIndeterminate = true, Margin = new Thickness(0, 0, 0, 14) };
-                        progressLog = new TextBox { IsReadOnly = true, AcceptsReturn = true, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, TextWrapping = TextWrapping.Wrap, Background = Brush("#12191E"), Foreground = Brush("#F1E9DA"), BorderBrush = Brush("#2B3A44"), BorderThickness = new Thickness(1), FontFamily = new FontFamily("Cascadia Mono") };
                         actionButton = Btn("Cancel Refresh", null, "#7A2F2F", Brushes.White);
-                        actionButton.Margin = new Thickness(0);
-                        actionButton.HorizontalAlignment = HorizontalAlignment.Right;
+                        var coverRefreshView = WorkflowProgressWindow.Create(
+                            libraryWindow,
+                            "PixelVault Cover Refresh",
+                            "Resolving IDs and fetching cover art",
+                            "Preparing library entries...",
+                            0,
+                            1,
+                            0,
+                            true,
+                            actionButton,
+                            WorkflowProgressWindow.ScanStyleMaxLogLines);
+                        progressWindow = coverRefreshView.Window;
+                        progressMeta = coverRefreshView.MetaText;
+                        progressBar = coverRefreshView.ProgressBar;
+                        appendProgress = coverRefreshView.AppendLogLine;
                         actionButton.Click += delegate
                         {
                             if (!refreshFinished)
@@ -5355,21 +5265,6 @@ namespace PixelVaultNative
                                 progressWindow.Close();
                             }
                         };
-                        progressRoot.Children.Add(progressTitle);
-                        Grid.SetRow(progressMeta, 1);
-                        progressRoot.Children.Add(progressMeta);
-                        var centerPanel = new Grid();
-                        centerPanel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-                        centerPanel.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-                        centerPanel.Children.Add(progressBar);
-                        var logBorder = new Border { Background = Brush("#12191E"), CornerRadius = new CornerRadius(14), Padding = new Thickness(12), BorderBrush = Brush("#26363F"), BorderThickness = new Thickness(1), Child = progressLog, Margin = new Thickness(0, 14, 0, 0) };
-                        Grid.SetRow(logBorder, 1);
-                        centerPanel.Children.Add(logBorder);
-                        Grid.SetRow(centerPanel, 2);
-                        progressRoot.Children.Add(centerPanel);
-                        Grid.SetRow(actionButton, 3);
-                        progressRoot.Children.Add(actionButton);
-                        progressWindow.Content = progressRoot;
                         progressWindow.Show();
                         appendProgress("Starting cover refresh for " + resolvedScopeLabel + ".");
                         status.Text = targetFolders.Count == 1 ? "Resolving IDs and fetching folder cover art" : "Resolving IDs and fetching cover art";
@@ -5459,7 +5354,7 @@ namespace PixelVaultNative
                         status.Text = "Cover refresh failed";
                         Log(ex.ToString());
                         if (progressMeta != null) progressMeta.Text = ex.Message;
-                        appendProgress("ERROR: " + ex.Message);
+                        if (appendProgress != null) appendProgress("ERROR: " + ex.Message);
                         if (actionButton != null)
                         {
                             actionButton.IsEnabled = true;

@@ -144,42 +144,26 @@ namespace PixelVaultNative
 
         void RunBackgroundWorkflowWithProgress<TResult>(string windowTitle, string progressTitleText, string initialMetaText, string startStatusText, string canceledStatusText, string startLogLine, string failureStatusText, int totalWork, Func<Action<int, string>, CancellationToken, TResult> backgroundWork, Action<TResult> onSuccess, Action onCanceled = null)
         {
-            var progressWindow = new Window
-            {
-                Title = windowTitle,
-                Width = 900,
-                Height = 580,
-                MinWidth = 780,
-                MinHeight = 520,
-                Owner = this,
-                WindowStartupLocation = WindowStartupLocation.CenterOwner,
-                Background = Brush("#0F1519")
-            };
-            var progressRoot = new Grid { Margin = new Thickness(18) };
-            progressRoot.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            progressRoot.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            progressRoot.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-            progressRoot.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            var progressTitle = new TextBlock { Text = progressTitleText, FontSize = 24, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, Margin = new Thickness(0, 0, 0, 8) };
-            var progressMeta = new TextBlock { Text = initialMetaText, Foreground = Brush("#B7C6C0"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 14) };
             var effectiveTotalWork = Math.Max(totalWork, 1);
-            var progressBar = new ProgressBar { Height = 18, Minimum = 0, Maximum = effectiveTotalWork, Value = 0, IsIndeterminate = totalWork <= 0, Margin = new Thickness(0, 0, 0, 14) };
-            var progressLog = new TextBox { IsReadOnly = true, AcceptsReturn = true, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, TextWrapping = TextWrapping.Wrap, Background = Brush("#12191E"), Foreground = Brush("#F1E9DA"), BorderBrush = Brush("#2B3A44"), BorderThickness = new Thickness(1), FontFamily = new FontFamily("Cascadia Mono") };
             var closeButton = Btn("Cancel", null, "#334249", Brushes.White);
-            closeButton.Margin = new Thickness(0);
-            closeButton.HorizontalAlignment = HorizontalAlignment.Right;
-            var progressLines = new List<string>();
+            var view = WorkflowProgressWindow.Create(
+                this,
+                windowTitle,
+                progressTitleText,
+                initialMetaText,
+                0,
+                effectiveTotalWork,
+                0,
+                totalWork <= 0,
+                closeButton,
+                WorkflowProgressWindow.DefaultMaxLogLines);
+            var progressWindow = view.Window;
+            var progressMeta = view.MetaText;
+            var progressBar = view.ProgressBar;
             bool progressFinished = false;
             bool cancellationRequested = false;
             var workflowCancellation = new CancellationTokenSource();
-            Action<string> appendProgress = delegate(string line)
-            {
-                if (string.IsNullOrWhiteSpace(line)) return;
-                progressLines.Add(line);
-                while (progressLines.Count > 200) progressLines.RemoveAt(0);
-                progressLog.Text = string.Join(Environment.NewLine, progressLines.ToArray());
-                progressLog.ScrollToEnd();
-            };
+            Action<string> appendProgress = view.AppendLogLine;
             closeButton.Click += delegate
             {
                 if (!progressFinished)
@@ -194,21 +178,6 @@ namespace PixelVaultNative
                 }
                 progressWindow.Close();
             };
-            progressRoot.Children.Add(progressTitle);
-            Grid.SetRow(progressMeta, 1);
-            progressRoot.Children.Add(progressMeta);
-            var centerPanel = new Grid();
-            centerPanel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            centerPanel.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-            centerPanel.Children.Add(progressBar);
-            var logBorder = new Border { Background = Brush("#12191E"), CornerRadius = new CornerRadius(14), Padding = new Thickness(12), BorderBrush = Brush("#26363F"), BorderThickness = new Thickness(1), Child = progressLog, Margin = new Thickness(0, 14, 0, 0) };
-            Grid.SetRow(logBorder, 1);
-            centerPanel.Children.Add(logBorder);
-            Grid.SetRow(centerPanel, 2);
-            progressRoot.Children.Add(centerPanel);
-            Grid.SetRow(closeButton, 3);
-            progressRoot.Children.Add(closeButton);
-            progressWindow.Content = progressRoot;
 
             status.Text = startStatusText;
             appendProgress(startLogLine);
