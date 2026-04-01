@@ -133,6 +133,10 @@ Why this is the core maintainability phase:
 - this is the biggest structural limiter on future velocity
 - better seams here make tests, nullable migration, and future UI improvements easier
 
+**Execution roadmap (phased slices, line-count map, ordering):**
+
+- `C:\Codex\docs\MAINWINDOW_EXTRACTION_ROADMAP.md`
+
 Primary outcomes:
 
 - more responsibilities move into dedicated services or extracted workflow types
@@ -145,6 +149,7 @@ Candidate scope:
 - extract Steam and SteamGridDB cover workflows into a service
 - keep pushing import orchestration into `Import/` or dedicated types
 - isolate non-UI business logic so new work does not flow back into `MainWindow`
+- follow **MAINWINDOW_EXTRACTION_ROADMAP.md** phases B–F for concrete UI and host extractions from `PixelVault.Native.cs`
 
 Definition of done:
 
@@ -226,7 +231,7 @@ Recommended next sequence:
 
 1. start Phase 1 with a small test project and a short golden-path checklist
 2. use that safety net to audit `TimeoutWebClient` and other long-running call paths in Phase 2
-3. extract one real service seam in Phase 3, starting with storage/index or cover-fetch logic
+3. extract one real service seam in Phase 3, using `MAINWINDOW_EXTRACTION_ROADMAP.md` (start with Phase B/C before the Library browser split)
 4. enable nullable only in the newly extracted or new code from Phase 3 onward
 5. keep UX polish incremental instead of batching it into a giant redesign pass
 

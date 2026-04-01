@@ -22,6 +22,11 @@ For **code quality, security hardening, and structural improvements** from the M
 - `C:\Codex\docs\CODE_QUALITY_IMPROVEMENT_PLAN.md` (full checklist: quality, bugs, performance, security, practices)
 - Notion: [PixelVault code quality and hardening plan](https://www.notion.so/33573adc59b681ce906cf060554f1b2d) (under **Project Wiki**; mirror of the doc; update both when status changes per `DOC_SYNC_POLICY.md`)
 
+For **splitting `MainWindow` / shrinking `PixelVault.Native.cs`**, use:
+
+- `C:\Codex\docs\MAINWINDOW_EXTRACTION_ROADMAP.md` (phases A–F; ties to `ROADMAP.md` Phase 3)
+- Notion: [MainWindow extraction roadmap](https://www.notion.so/33573adc59b681d88b7dcd88cad53cb6) (under **Project Wiki**; mirror of the doc)
+
 ## Current Focus
 1. Keep moving through Phase 2 UI-thread responsiveness and cancellation work.
 - Cover refresh, game-index ID resolution, and library scan now cancel active provider or ExifTool work instead of waiting only between titles or batches.
