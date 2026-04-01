@@ -20,7 +20,7 @@ This document is the **execution roadmap** for slicing responsibilities off `Mai
 
 | File | ~Lines | Role |
 |------|--------|------|
-| `PixelVault.Native.cs` | ~7,850 | Constructor, fields, Library UI, Settings, intake preview, review windows, photography, Steam matches, logging, image cache, many helpers |
+| `PixelVault.Native.cs` | ~7,290 | Constructor, fields, Library UI, Settings, intake preview delegates, metadata review delegate, photography, Steam matches, logging, image cache, many helpers |
 | `Import/ImportWorkflow.cs` | ~970 | Import / manual intake / rename-move-sort orchestration |
 | `UI/FilenameConventionEditor.cs` | ~1,075 | Filename rules editor window |
 | `MediaTools/MediaToolHelpers.cs` | ~700 | Exe runners, FFmpeg helpers |
@@ -91,6 +91,10 @@ The **priority** is to shrink **`PixelVault.Native.cs`**, not to collapse partia
 | C3 | Tie-in | Ensure **Steam rename / move** paths stay covered by tests or manual checklist after C1. |
 
 **Exit:** Intake preview and review are **owned by types under `UI/`**; `MainWindow` only opens them and supplies callbacks.
+
+**Progress:** **C1** — Intake Preview modal lives in `UI/Intake/IntakePreviewWindow.cs` (`IntakePreviewWindow.Show` + `IntakePreviewServices`). `MainWindow.ShowIntakePreviewWindow` wires `LoadIntakePreviewSummaryAsync`, `OpenSourceFolders`, `OpenManualIntakeWindow`, `RenderPreview` / `RenderPreviewError`, logging, and shared helpers (`Btn`, `PreviewBadgeBrush`, `PlatformGroupOrder`, etc.).
+
+**C2** — Pre-import **metadata review** (comments, platform tags, delete-before-processing) lives in `UI/Intake/MetadataReviewWindow.cs` (`MetadataReviewWindow.Show` + `MetadataReviewServices`). `MainWindow.ShowMetadataReviewWindow` passes `Btn`, `PreviewBadgeBrush`, `LoadImageSource`, and `GamePhotographyTag`. Note: “Import and comment” currently prefers Import-and-Edit when upload files qualify; `ShowMetadataReviewWindow` is not on the hot path today but remains the home for `List<ReviewItem>` review UI.
 
 ---
 

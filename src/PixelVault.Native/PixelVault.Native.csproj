@@ -37,6 +37,8 @@
     <Compile Include="Services\Metadata\MetadataService.cs" />
     <Compile Include="Storage\IndexDatabaseStorage.cs" />
     <Compile Include="UI\ChangelogWindow.cs" />
+    <Compile Include="UI\Intake\IntakePreviewWindow.cs" />
+    <Compile Include="UI\Intake\MetadataReviewWindow.cs" />
     <Compile Include="UI\UiBrushHelper.cs" />
     <Compile Include="UI\Progress\WorkflowProgressWindow.cs" />
     <Compile Include="UI\FilenameConventionEditor.cs" />
