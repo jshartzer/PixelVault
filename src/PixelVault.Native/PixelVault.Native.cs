@@ -39,7 +39,7 @@ namespace PixelVaultNative
 
     public sealed partial class MainWindow : Window
     {
-        const string AppVersion = "0.826";
+        const string AppVersion = "0.827";
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
         const string ClearedExternalIdSentinel = "__PV_CLEARED__";
@@ -51,6 +51,7 @@ namespace PixelVaultNative
         readonly string cacheRoot;
         readonly string coversRoot;
         readonly string thumbsRoot;
+        readonly string savedCoversRoot;
         readonly string settingsPath;
         readonly string changelogPath;
         readonly string undoManifestPath;
@@ -198,6 +199,7 @@ namespace PixelVaultNative
             cacheRoot = Path.Combine(dataRoot, "cache");
             coversRoot = Path.Combine(cacheRoot, "covers");
             thumbsRoot = Path.Combine(cacheRoot, "thumbs");
+            savedCoversRoot = Path.Combine(dataRoot, "saved-covers");
             settingsPath = Path.Combine(dataRoot, "PixelVault.settings.ini");
             changelogPath = Path.Combine(appRoot, "CHANGELOG.md");
             undoManifestPath = Path.Combine(cacheRoot, "last-import.tsv");
@@ -278,6 +280,8 @@ namespace PixelVaultNative
             Directory.CreateDirectory(cacheRoot);
             Directory.CreateDirectory(coversRoot);
             Directory.CreateDirectory(thumbsRoot);
+            Directory.CreateDirectory(savedCoversRoot);
+            EnsureSavedCoversReadme();
             if (!File.Exists(changelogPath)) File.WriteAllText(changelogPath, "# PixelVault Changelog\r\n\r\n## 0.530\r\n- Replaced the broken library separator glyph with a plain pipe so folder details read cleanly.\r\n- Grouped the Game Library folders into collapsible Steam, PS5, Xbox, Multiple Tags, and Other sections.\r\n- Increased the library folder art size a bit and tightened the caption text underneath for a cleaner browse view.\r\n");
             MigratePersistentDataFromLegacyVersions();
             sourceRoot = @"Y:\Game Capture Uploads";
@@ -325,6 +329,8 @@ namespace PixelVaultNative
             pathSettingsTopButton.Margin = new Thickness(0, 0, 12, 0);
             var viewLogsTopButton = Btn("View Logs", delegate { OpenFolder(logsRoot); }, "#2B3F47", Brushes.White);
             viewLogsTopButton.Margin = new Thickness(0, 0, 12, 0);
+            var myCoversTopButton = Btn("My Covers", delegate { OpenSavedCoversFolder(); }, "#2B3F47", Brushes.White);
+            myCoversTopButton.Margin = new Thickness(0, 0, 12, 0);
             var gameIndexTopButton = Btn("Game Index", delegate { OpenGameIndexEditor(); }, "#20343A", Brushes.White);
             gameIndexTopButton.Margin = new Thickness(0, 0, 12, 0);
             var photoIndexTopButton = Btn("Photo Index", delegate { OpenPhotoIndexEditor(); }, "#20343A", Brushes.White);
@@ -336,6 +342,7 @@ namespace PixelVaultNative
             var sp = new Border { Child = status, Background = Brush("#20343A"), CornerRadius = new CornerRadius(12), Padding = new Thickness(14, 10, 14, 10) };
             headerRight.Children.Add(pathSettingsTopButton);
             headerRight.Children.Add(viewLogsTopButton);
+            headerRight.Children.Add(myCoversTopButton);
             headerRight.Children.Add(gameIndexTopButton);
             headerRight.Children.Add(photoIndexTopButton);
             headerRight.Children.Add(filenameRulesTopButton);
@@ -1041,6 +1048,7 @@ namespace PixelVaultNative
             stack.Children.Add(new TextBlock { Text = "Sources: " + SourceRootsSummary(), TextWrapping = TextWrapping.Wrap, Foreground = Brush("#4C463F"), Margin = new Thickness(0, 0, 0, 4) });
             stack.Children.Add(new TextBlock { Text = "Destination: " + destinationRoot, TextWrapping = TextWrapping.Wrap, Foreground = Brush("#4C463F"), Margin = new Thickness(0, 0, 0, 4) });
             stack.Children.Add(new TextBlock { Text = "Library: " + libraryRoot, TextWrapping = TextWrapping.Wrap, Foreground = Brush("#4C463F"), Margin = new Thickness(0, 0, 0, 4) });
+            stack.Children.Add(new TextBlock { Text = "My Covers: " + savedCoversRoot, TextWrapping = TextWrapping.Wrap, Foreground = Brush("#4C463F"), Margin = new Thickness(0, 0, 0, 4) });
             stack.Children.Add(new TextBlock { Text = "ExifTool: " + exifToolPath, TextWrapping = TextWrapping.Wrap, Foreground = Brush("#4C463F"), Margin = new Thickness(0, 0, 0, 4) });
             stack.Children.Add(new TextBlock { Text = "FFmpeg: " + (string.IsNullOrWhiteSpace(ffmpegPath) ? "(not configured)" : ffmpegPath), TextWrapping = TextWrapping.Wrap, Foreground = Brush("#4C463F"), Margin = new Thickness(0, 0, 0, 4) });
             stack.Children.Add(new TextBlock { Text = "SteamGridDB: " + (HasSteamGridDbApiToken() ? "token configured" : "(token not configured)"), TextWrapping = TextWrapping.Wrap, Foreground = Brush("#4C463F") });
@@ -1602,12 +1610,13 @@ namespace PixelVaultNative
             }
         }
 
-        string PickFile(string current, string filter)
+        string PickFile(string current, string filter, string initialDirectoryFallback = null)
         {
             using (var dialog = new Forms.OpenFileDialog())
             {
                 dialog.Filter = filter;
                 if (File.Exists(current)) dialog.FileName = current;
+                else if (!string.IsNullOrWhiteSpace(initialDirectoryFallback) && Directory.Exists(initialDirectoryFallback)) dialog.InitialDirectory = initialDirectoryFallback;
                 return dialog.ShowDialog() == Forms.DialogResult.OK ? dialog.FileName : null;
             }
         }
@@ -4172,6 +4181,13 @@ namespace PixelVaultNative
                 filenameRulesButton.FontSize = 13;
                 filenameRulesButton.Margin = new Thickness(0, 0, 12, 0);
                 ApplyLibraryToolbarChrome(filenameRulesButton, "#18242B", "#24353F", "#22323C", "#131D23");
+                var myCoversButton = Btn("My Covers", null, "#20343A", Brushes.White);
+                myCoversButton.Width = 122;
+                myCoversButton.Height = 42;
+                myCoversButton.FontSize = 13;
+                myCoversButton.Margin = new Thickness(0, 0, 12, 0);
+                ApplyLibraryToolbarChrome(myCoversButton, "#18242B", "#24353F", "#22323C", "#131D23");
+                myCoversButton.Content = BuildToolbarButtonContent("\uEB9F", "My Covers");
                 var refreshButton = Btn("Refresh", null, "#20343A", Brushes.White);
                 var fetchButton = Btn("Fetch Covers", null, "#275D47", Brushes.White);
                 refreshButton.Width = 122;
@@ -4229,6 +4245,7 @@ namespace PixelVaultNative
                 headerActions.Children.Add(gameIndexButton);
                 headerActions.Children.Add(photoIndexButton);
                 headerActions.Children.Add(filenameRulesButton);
+                headerActions.Children.Add(myCoversButton);
                 headerActions.Children.Add(refreshButton);
                 headerActions.Children.Add(fetchButton);
                 headerActions.Children.Add(intakeReviewButton);
@@ -5020,10 +5037,12 @@ namespace PixelVaultNative
                     tile.Content = tileStack;
                     tile.Click += delegate { showFolder(folder); };
                     var contextMenu = new ContextMenu();
+                    var openMyCoversItem = new MenuItem { Header = "Open My Covers Folder" };
+                    openMyCoversItem.Click += delegate { OpenSavedCoversFolder(); };
                     var setCoverItem = new MenuItem { Header = "Set Custom Cover..." };
                     setCoverItem.Click += delegate
                     {
-                        var pickedCover = PickFile(ResolveLibraryArt(folder, false), "Image Files|*.jpg;*.jpeg;*.png;*.bmp;*.gif|All Files|*.*");
+                        var pickedCover = PickFile(ResolveLibraryArt(folder, false), "Image Files|*.jpg;*.jpeg;*.png;*.bmp;*.gif|All Files|*.*", savedCoversRoot);
                         if (string.IsNullOrWhiteSpace(pickedCover)) return;
                         SaveCustomCover(folder, pickedCover);
                         showFolder(folder);
@@ -5070,6 +5089,7 @@ namespace PixelVaultNative
                     contextMenu.Items.Add(refreshFolderItem);
                     contextMenu.Items.Add(fetchFolderCoverItem);
                     contextMenu.Items.Add(new Separator());
+                    contextMenu.Items.Add(openMyCoversItem);
                     contextMenu.Items.Add(setCoverItem);
                     contextMenu.Items.Add(clearCoverItem);
                     tile.ContextMenu = contextMenu;
@@ -5545,6 +5565,7 @@ namespace PixelVaultNative
                 gameIndexButton.Click += delegate { OpenGameIndexEditor(); };
                 photoIndexButton.Click += delegate { OpenPhotoIndexEditor(); };
                 filenameRulesButton.Click += delegate { OpenFilenameConventionEditor(); };
+                myCoversButton.Click += delegate { OpenSavedCoversFolder(); };
                 importButton.Click += delegate { RunWorkflow(false); if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge(); };
                 importCommentsButton.Click += delegate { RunWorkflow(true); if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge(); };
                 manualImportButton.Click += delegate { OpenManualIntakeWindow(); if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge(); };
@@ -7304,6 +7325,33 @@ namespace PixelVaultNative
             {
                 Process.Start(new ProcessStartInfo("explorer.exe", fullPath) { UseShellExecute = true });
             }
+        }
+
+        void EnsureSavedCoversReadme()
+        {
+            try
+            {
+                var readme = Path.Combine(savedCoversRoot, "README.txt");
+                if (File.Exists(readme)) return;
+                File.WriteAllText(readme,
+                    "My Covers (permanent stash)\r\n" +
+                    "\r\n" +
+                    "Save or copy cover images here (JPG, PNG, GIF, BMP). Subfolders are fine.\r\n" +
+                    "In the library, right-click a game folder, choose Set Custom Cover, and browse from this folder.\r\n" +
+                    "This folder is not part of the cache; PixelVault will not delete it when refreshing covers.\r\n");
+            }
+            catch { }
+        }
+
+        void OpenSavedCoversFolder()
+        {
+            try
+            {
+                Directory.CreateDirectory(savedCoversRoot);
+                EnsureSavedCoversReadme();
+            }
+            catch { }
+            OpenFolder(savedCoversRoot);
         }
 
         void OpenPhotoIndexEditor()

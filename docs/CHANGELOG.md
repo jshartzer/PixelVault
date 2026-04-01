@@ -1,3 +1,6 @@
+## 0.827
+- Added **My Covers**: a permanent `PixelVaultData/saved-covers` folder (outside `cache`) for cover art you collect, with **My Covers** on the Library toolbar and Settings, **Open My Covers Folder** on library tiles, a short `README.txt` on first use, and **Set Custom Cover** defaulting the file dialog there when no existing art path is resolved.
+
 ## 0.826
 - Added filename-based console fallback for library metadata indexing when embedded keywords are empty or only resolve to `Other`, so cold-dropped PS5, Xbox, Steam, PC, and custom-platform files no longer stay misclassified just because their EXIF tags are weak.
 - Fixed Manual Intake platform guessing so parser labels like `PlayStation` preselect the PS5 checkbox and custom parser labels flow into `Other` with the custom platform field populated instead of arriving with no platform decision.

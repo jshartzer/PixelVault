@@ -35,6 +35,8 @@ Shared persistent app data lives under:
 
 ## Versioning Policy
 
+For a concise **release checklist** (commands and files to touch), see **`docs/VERSIONING.md`**. Bump sizing below remains authoritative.
+
 PixelVault uses decimal build versioning.
 
 General rule:
