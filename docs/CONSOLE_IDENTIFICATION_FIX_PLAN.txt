@@ -1,0 +1,274 @@
+PixelVault — Console / platform identification fix plan
+==========================================================
+Drop into Codex as implementation spec. Addresses gaps from the pipeline
+review: library index ignoring filename when embedded tags are empty or
+non-specific; manual intake not mapping PlayStation or custom parser labels
+into checkboxes; optional PC filename note.
+
+Source behavior (baseline)
+--------------------------
+- Intake / preview: FilenameParserService.Parse(fileName, root) drives
+  PlatformLabel and PlatformTags for standard import and AnalyzeIntakePreviewFiles.
+- Library metadata index: BuildResolvedLibraryMetadataIndexEntry uses
+  embedded Exif keywords (EmbeddedMetadataSnapshot.Tags) first; console is
+  DetermineConsoleLabelFromTags(tags). ParseFilename is NOT used today.
+- Manual intake rows: TagSteam/TagPs5/TagXbox/TagPc are set only when
+  parsed.PlatformLabel equals those strings exactly; PlayStation and Switch
+  (etc.) fall through to Other with no TagOther/CustomPlatformTag.
+
+
+================================================================================
+1) Library index: filename fallback when tags do not imply a console
+================================================================================
+
+Goal
+----
+Untagged or generically tagged files in the library (e.g. only "Game Capture"
+or no keywords) still get Steam/PS5/Xbox/PC/custom from the filename when the
+parser matches a convention.
+
+Precedence (do not violate)
+---------------------------
+- If embedded tags already resolve to a single concrete console OR
+  "Multiple Tags", do NOT override with filename (embedded / user intent wins).
+- Apply filename-derived platform tags only when
+  DetermineConsoleLabelFromTags(tags) is "Other" OR tags are empty after
+  ResolveLibraryMetadataTags (same effective outcome for console).
+- If existingEntry.ConsoleLabel is already set and you trust it as authoritative
+  for manual edits, you can keep ResolveStoredLibraryMetadataConsoleLabel as
+  today; the merge below should feed *tags* before that, or recompute label
+  from merged tags when you did not short-circuit on stored ConsoleLabel.
+
+Where to change
+---------------
+File: src/PixelVault.Native/Indexing/LibraryMetadataIndexing.cs
+Methods: ResolveLibraryMetadataTags (optional), or preferably add two helpers
+and call them from BuildResolvedLibraryMetadataIndexEntry.
+
+Example: new helpers (illustrative — adjust to your partial class style)
+
+    // Returns true when we should not second-guess with filename.
+    bool ConsoleLabelBlocksFilenameFallback(string normalizedLabel)
+    {
+        if (string.IsNullOrWhiteSpace(normalizedLabel)) return false;
+        if (string.Equals(normalizedLabel, "Other", StringComparison.OrdinalIgnoreCase)) return false;
+        if (string.Equals(normalizedLabel, "Multiple Tags", StringComparison.OrdinalIgnoreCase)) return true;
+        return true; // Steam, PC, PS5, Xbox, or any other normalized single label
+    }
+
+    string[] MergeLibraryMetadataTagsWithFilenameHint(string root, string file, string[] tags)
+    {
+        var tagArray = tags ?? new string[0];
+        var label = NormalizeConsoleLabel(DetermineConsoleLabelFromTags(tagArray));
+        if (ConsoleLabelBlocksFilenameFallback(label)) return tagArray;
+
+        var parsed = ParseFilename(file, root);
+        var extras = new List<string>();
+        if (parsed.PlatformTags != null)
+        {
+            foreach (var t in parsed.PlatformTags)
+                if (!string.IsNullOrWhiteSpace(t)) extras.Add(t);
+        }
+        // If parser set only PlatformLabel (no tags), synthesize minimal keywords
+        // so DetermineConsoleLabelFromTags can see the family.
+        var pl = NormalizeConsoleLabel(parsed.PlatformLabel ?? string.Empty);
+        if (extras.Count == 0 && !string.IsNullOrWhiteSpace(pl)
+            && !string.Equals(pl, "Other", StringComparison.OrdinalIgnoreCase))
+        {
+            if (string.Equals(pl, "PlayStation", StringComparison.OrdinalIgnoreCase))
+            {
+                extras.Add("PlayStation");
+                extras.Add("PS5");
+            }
+            else extras.Add(pl);
+        }
+
+        if (extras.Count == 0) return tagArray;
+
+        return tagArray
+            .Concat(extras)
+            .Select(CleanTag)
+            .Where(t => !string.IsNullOrWhiteSpace(t))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+Example: BuildResolvedLibraryMetadataIndexEntry body change
+
+    LibraryMetadataIndexEntry BuildResolvedLibraryMetadataIndexEntry(...)
+    {
+        var tags = ResolveLibraryMetadataTags(snapshot, existingEntry);
+        tags = MergeLibraryMetadataTagsWithFilenameHint(root, file, tags);
+        var platformLabel = ResolveStoredLibraryMetadataConsoleLabel(existingEntry, tags);
+        ...
+    }
+
+Notes
+-----
+- ParseFilename is already on MainWindow partial; LibraryMetadataIndexing is
+  partial MainWindow, so ParseFilename(file, root) is in scope.
+- GameId resolution (ResolveGameIdForIndexedFile) runs after tags/label; a
+  better platform from filename can change grouping — that is intended for
+  cold-dropped files.
+- After changing this, run a library refresh on a test folder with
+  PS5-shaped names and *stripped* EXIF keywords to confirm ConsoleLabel becomes
+  PS5.
+
+
+================================================================================
+2) Manual intake: map PlayStation + custom parser labels to UI model
+================================================================================
+
+Goal
+----
+BuildManualMetadataItems should set TagPs5 when parser says PlayStation;
+set TagOther + CustomPlatformTag when parser says Switch (or any non-big-four
+label that is not Other).
+
+Where to change
+---------------
+File: src/PixelVault.Native/PixelVault.Native.cs
+Method: BuildManualMetadataItems(..., analysis, ...) — block where
+ManualMetadataItem is constructed (~2605–2637).
+
+Example: replace the four Tag* assignments with a small local function or
+static helper on MainWindow:
+
+    void ApplyFilenameParseResultToManualPlatformFlags(
+        FilenameParseResult parsed,
+        out bool tagSteam,
+        out bool tagPc,
+        out bool tagPs5,
+        out bool tagXbox,
+        out bool tagOther,
+        out string customPlatformTag)
+    {
+        tagSteam = false;
+        tagPc = false;
+        tagPs5 = false;
+        tagXbox = false;
+        tagOther = false;
+        customPlatformTag = string.Empty;
+
+        var p = NormalizeConsoleLabel(parsed.PlatformLabel ?? string.Empty);
+        if (string.IsNullOrWhiteSpace(p) || string.Equals(p, "Other", StringComparison.OrdinalIgnoreCase))
+            return;
+
+        if (string.Equals(p, "Steam", StringComparison.OrdinalIgnoreCase)) { tagSteam = true; return; }
+        if (string.Equals(p, "PC", StringComparison.OrdinalIgnoreCase)) { tagPc = true; return; }
+        if (string.Equals(p, "PS5", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(p, "PlayStation", StringComparison.OrdinalIgnoreCase)) { tagPs5 = true; return; }
+        if (string.Equals(p, "Xbox", StringComparison.OrdinalIgnoreCase)) { tagXbox = true; return; }
+
+        tagOther = true;
+        customPlatformTag = p;
+    }
+
+Example: usage when creating ManualMetadataItem
+
+    bool ts, tpc, tp5, xb, tother;
+    string customPl;
+    ApplyFilenameParseResultToManualPlatformFlags(parsed, out ts, out tpc, out tp5, out xb, out tother, out customPl);
+
+    items.Add(new ManualMetadataItem
+    {
+        ...
+        TagSteam = ts,
+        TagPc = tpc,
+        TagPs5 = tp5,
+        TagXbox = xb,
+        TagOther = tother,
+        CustomPlatformTag = customPl,
+        OriginalTagSteam = ts,
+        OriginalTagPc = tpc,
+        OriginalTagPs5 = tp5,
+        OriginalTagXbox = xb,
+        OriginalTagOther = tother,
+        OriginalCustomPlatformTag = customPl,
+        ...
+    });
+
+Optional hardening
+------------------
+- If parsed.PlatformTags contains "Steam" but PlatformLabel is wrong, you could
+  second-pass: derive flags from ExtractConsolePlatformFamilies(parsed.PlatformTags)
+  when PlatformLabel is Other — usually redundant if Parse is consistent.
+
+
+================================================================================
+3) PC from filename (no universal built-in)
+================================================================================
+
+Reality
+-------
+There is no single standard PC screenshot filename like Steam/PS5/Xbox.
+Built-in PC rule would be guessy and risky.
+
+Recommended approach
+--------------------
+A) Document in Filename Rules / docs that PC captures should use a custom
+   convention (priority > built-ins) with PlatformLabel PC and appropriate
+   PlatformTagsText.
+B) Optional low-priority built-in only if you accept false positives, e.g.
+  [contains:NVIDIA] or a game-specific prefix — not recommended globally.
+
+No code block required unless product chooses a specific heuristic.
+
+
+================================================================================
+4) Tests to add
+================================================================================
+
+Library index / merge (integration-style or targeted unit if you extract
+MergeLibraryMetadataTagsWithFilenameHint to a testable static):
+
+- Given empty snapshot tags and a file name matching ps5_share_segmented_fractional,
+  merged tags yield PS5 / PlayStation family and ConsoleLabel PS5 (or Multiple
+  only if both families appear — should not happen from parser alone).
+- Given snapshot tags including Steam, same PS5 filename: merged tags still
+  Steam (no filename override).
+- Given snapshot tags that produce Multiple Tags: no filename merge.
+
+Manual intake (could live in a small test harness that builds
+ManualMetadataItem via same helper, or UI test):
+
+- PlatformLabel PlayStation -> TagPs5 true, others false, TagOther false.
+- PlatformLabel Switch (from custom parse) -> TagOther true, CustomPlatformTag Switch.
+- PlatformLabel Other -> all main flags false, TagOther false.
+
+
+================================================================================
+5) Verification checklist (manual)
+================================================================================
+
+- Copy a PS5-shaped PNG with EXIF keywords stripped into the library folder;
+  refresh library; folder/game row and index entry should show PS5 (or correct
+  family), not Other.
+- Manual intake queue: filename with PlayStation token opens editor with PS5
+  (or PlayStation) checkbox aligned with your UX copy.
+- Standard import: unchanged behavior for files that already embed Steam/PS5/
+  Xbox tags.
+- Run existing FilenameParserServiceTests; add one test for PlayStation token
+  if not already asserting PlatformLabel.
+
+
+================================================================================
+6) Files touched (summary)
+================================================================================
+
+- Indexing/LibraryMetadataIndexing.cs — merge helper + BuildResolvedLibraryMetadataIndexEntry
+- PixelVault.Native.cs — ApplyFilenameParseResultToManualPlatformFlags + manual item ctor
+- tests/PixelVault.Native.Tests — new cases as above (optional new file for
+  merge helper if extracted)
+
+Risk
+----
+- Filename fallback could disagree with rare intentional "no console in
+  keywords" + misleading filename; precedence above minimizes that.
+- Changing tags for index entries may mark index dirty and trigger saves —
+  expected on refresh.
+
+
+================================================================================
+End of plan
+================================================================================
