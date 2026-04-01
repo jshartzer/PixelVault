@@ -19,6 +19,7 @@ $changelogPath = Join-Path $repoRoot "docs\CHANGELOG.md"
 $assetsPath = Join-Path $repoRoot "assets"
 $toolsPath = Join-Path $repoRoot "tools"
 $settingsPath = Join-Path $repoRoot "PixelVaultData\PixelVault.settings.ini"
+$shortcutPath = Join-Path $repoRoot "PixelVault.lnk"
 
 if ([string]::IsNullOrWhiteSpace($OutputRoot))
 {
@@ -48,6 +49,7 @@ if ([string]::IsNullOrWhiteSpace($Version))
 
 $currentLinkDir = Join-Path $OutputRoot "PixelVault-current"
 $outputDir = Join-Path $OutputRoot ("PixelVault-" + $Version)
+$exePath = Join-Path $outputDir "PixelVault.exe"
 
 if (Test-Path $outputDir)
 {
@@ -95,6 +97,12 @@ if (Test-Path $currentLinkDir)
 
 New-Item -ItemType Junction -Path $currentLinkDir -Target $outputDir | Out-Null
 
+$shell = New-Object -ComObject WScript.Shell
+$shortcut = $shell.CreateShortcut($shortcutPath)
+$shortcut.TargetPath = $exePath
+$shortcut.WorkingDirectory = $outputDir
+$shortcut.Save()
+
 if ($KeepLatest -gt 0)
 {
     $releaseDirs = Get-ChildItem $OutputRoot -Directory -Filter "PixelVault-*" |
@@ -129,5 +137,6 @@ if (-not (Select-String -Path $changelogPath -Pattern ([regex]::Escape($expected
 }
 
 Write-Host "Published PixelVault $Version"
-Write-Host "Exe: $(Join-Path $outputDir 'PixelVault.exe')"
+Write-Host "Exe: $exePath"
 Write-Host "Current: $currentLinkDir"
+Write-Host "Shortcut: $shortcutPath"

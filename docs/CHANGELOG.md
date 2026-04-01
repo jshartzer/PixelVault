@@ -1,3 +1,7 @@
+## 0.830
+- **Import and Comment** now opens the same **manual metadata** editor as library edits and manual intake: every top-level upload file appears as a row (rule-matched files show an **Auto** badge). Select which files to import; unselected files stay in the upload folder. Optional **delete before import** applies to the selection. The workflow runs Steam rename (on the selection), manual title rename, delete, EXIF/metadata, and per-file move—no separate review window.
+- **Publish script:** after a successful publish, updates repo-root `PixelVault.lnk` to point at the new `PixelVault.exe` and working directory.
+
 ## 0.829
 - **Refactor (no intentional behavior change):** [MainWindow extraction](docs/MAINWINDOW_EXTRACTION_ROADMAP.md) **Phase B** — changelog UI in `UI/ChangelogWindow.cs`, `UiBrushHelper.FromHex`, and `WorkflowProgressWindow` / `WorkflowProgressView` for import progress, library metadata scan/apply, and cover refresh.
 

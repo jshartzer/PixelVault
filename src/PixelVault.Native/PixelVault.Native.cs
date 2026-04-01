@@ -40,7 +40,7 @@ namespace PixelVaultNative
 
     public sealed partial class MainWindow : Window
     {
-        const string AppVersion = "0.829";
+        const string AppVersion = "0.830";
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
         const string ClearedExternalIdSentinel = "__PV_CLEARED__";
@@ -1350,7 +1350,7 @@ namespace PixelVaultNative
             }
         }
 
-        List<string> BuildImportSummaryLines(string workflowLabel, bool usedReview, RenameStepResult renameResult, DeleteStepResult deleteResult, MetadataStepResult metadataResult, MoveStepResult moveResult, SortStepResult sortResult, int manualItemsLeft)
+        List<string> BuildImportSummaryLines(string workflowLabel, bool usedReview, RenameStepResult renameResult, DeleteStepResult deleteResult, MetadataStepResult metadataResult, MoveStepResult moveResult, SortStepResult sortResult, int manualItemsLeft, bool manualItemsLeftAreUploadSkips = false)
         {
             var lines = new List<string>();
             lines.Add("Workflow: " + workflowLabel + (usedReview ? " with review window." : "."));
@@ -1369,7 +1369,18 @@ namespace PixelVaultNative
             {
                 lines.Add("Sort summary: sorted " + sortResult.Sorted + ", folders created " + sortResult.FoldersCreated + ", renamed-on-conflict " + sortResult.RenamedOnConflict + ".");
             }
-            if (manualItemsLeft > 0)
+            if (manualItemsLeftAreUploadSkips)
+            {
+                if (manualItemsLeft > 0)
+                {
+                    lines.Add("Upload folder: " + manualItemsLeft + " file(s) were not selected for this import and remain in the upload folder.");
+                }
+                else
+                {
+                    lines.Add("Upload folder: every listed file was included in this import (none left unselected).");
+                }
+            }
+            else if (manualItemsLeft > 0)
             {
                 lines.Add("Manual Intake queue: left " + manualItemsLeft + " unmatched image(s) untouched.");
             }
@@ -2537,6 +2548,70 @@ namespace PixelVaultNative
             return items.OrderBy(i => i.CaptureTime).ThenBy(i => i.FileName).ToList();
         }
 
+        /// <summary>All top-level upload files as manual-editor rows (rule-matched and manual-intake).</summary>
+        List<ManualMetadataItem> BuildImportAndEditMetadataItems(IEnumerable<string> sourceFiles, Dictionary<string, IntakePreviewFileAnalysis> analysis, CancellationToken cancellationToken = default(CancellationToken))
+        {
+            var items = new List<ManualMetadataItem>();
+            foreach (var file in (sourceFiles ?? Enumerable.Empty<string>()).Where(File.Exists).Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                IntakePreviewFileAnalysis fileAnalysis;
+                if (analysis == null || !analysis.TryGetValue(file, out fileAnalysis) || fileAnalysis == null) continue;
+                var parsed = fileAnalysis.Parsed ?? new FilenameParseResult();
+                var captureTime = fileAnalysis.CaptureTime;
+                if (!parsed.MatchedConvention)
+                {
+                    indexPersistenceService.RecordFilenameConventionSample(libraryRoot, fileAnalysis.FileName, parsed);
+                }
+                var titleHint = parsed.GameTitleHint ?? string.Empty;
+                bool tagSteam, tagPc, tagPs5, tagXbox, tagOther;
+                string customPlatformTag;
+                ApplyFilenameParseResultToManualPlatformFlags(parsed, out tagSteam, out tagPc, out tagPs5, out tagXbox, out tagOther, out customPlatformTag);
+                var ruleMatched = fileAnalysis.CanUpdateMetadata;
+                items.Add(new ManualMetadataItem
+                {
+                    GameId = string.Empty,
+                    SteamAppId = parsed.SteamAppId,
+                    FilePath = file,
+                    FileName = fileAnalysis.FileName,
+                    OriginalFileName = fileAnalysis.FileName,
+                    CaptureTime = captureTime,
+                    UseCustomCaptureTime = false,
+                    GameName = titleHint,
+                    Comment = string.Empty,
+                    TagText = string.Empty,
+                    AddPhotographyTag = false,
+                    TagSteam = tagSteam,
+                    TagPs5 = tagPs5,
+                    TagXbox = tagXbox,
+                    TagPc = tagPc,
+                    TagOther = tagOther,
+                    CustomPlatformTag = customPlatformTag,
+                    OriginalGameId = string.Empty,
+                    OriginalSteamAppId = parsed.SteamAppId,
+                    OriginalCaptureTime = captureTime,
+                    OriginalUseCustomCaptureTime = false,
+                    OriginalGameName = titleHint,
+                    OriginalComment = string.Empty,
+                    OriginalTagText = string.Empty,
+                    OriginalAddPhotographyTag = false,
+                    OriginalTagSteam = tagSteam,
+                    OriginalTagPc = tagPc,
+                    OriginalTagPs5 = tagPs5,
+                    OriginalTagXbox = tagXbox,
+                    OriginalTagOther = tagOther,
+                    OriginalCustomPlatformTag = customPlatformTag,
+                    IntakeRuleMatched = ruleMatched,
+                    DeleteBeforeProcessing = false
+                });
+            }
+            return items
+                .OrderBy(i => PlatformGroupOrder(DetermineManualMetadataPlatformLabel(i)))
+                .ThenBy(i => i.CaptureTime)
+                .ThenBy(i => i.FileName, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
         bool ShowMetadataReviewWindow(List<ReviewItem> items)
         {
             if (items == null || items.Count == 0) return true;
@@ -2804,25 +2879,30 @@ namespace PixelVaultNative
             return result == true;
         }
 
-        bool ShowManualMetadataWindow(List<ManualMetadataItem> items, bool libraryMode, string contextName)
+        bool ShowManualMetadataWindow(List<ManualMetadataItem> items, bool libraryMode, string contextName, bool importAndEditMode = false)
         {
             if (items == null || items.Count == 0) return true;
 
+            var useFlexiblePreview = libraryMode || importAndEditMode;
             var contextLabel = string.IsNullOrWhiteSpace(contextName) ? "selected folder" : contextName;
-            var windowLabel = libraryMode ? "Edit Library Metadata" : "Missing Data";
-            var headerTitleText = libraryMode ? "Edit library metadata" : "Add missing metadata";
-            var headerDescriptionText = libraryMode
-                ? items.Count + " capture(s) from " + contextLabel + " are ready for metadata edits. Select one or more files, update the game title prefix, tags, one console tag, an optional capture date/time, and an optional comment. Files can also be reorganized into the proper game folder when the title changes."
-                : items.Count + " capture(s) were left in intake because they did not match a known format. Select one or more files, add a game title prefix, tags, one console tag, an optional capture date/time, and an optional comment before sending them to the destination.";
-            var leaveButtonText = libraryMode ? "Close" : "Leave Unchanged";
-            var finishButtonText = libraryMode ? "Apply Changes" : "Apply and Send";
-            var emptySelectionText = libraryMode ? "Choose one or more library images to edit." : "Choose unmatched intake images to add metadata.";
-            var defaultStatusText = libraryMode ? "Update the game title prefix, tags, one console tag, optional date/time, and an optional comment." : "Add a game title prefix, tags, one console tag, optional date/time, and an optional comment.";
+            var windowLabel = importAndEditMode ? "Import and Edit" : (libraryMode ? "Edit Library Metadata" : "Missing Data");
+            var headerTitleText = importAndEditMode ? "Import and edit captures" : (libraryMode ? "Edit library metadata" : "Add missing metadata");
+            var headerDescriptionText = importAndEditMode
+                ? items.Count + " file(s) in the upload folder (rule-matched and manual intake). Select files to include in this import, adjust metadata, then continue. Files not selected stay in the upload folder."
+                : libraryMode
+                    ? items.Count + " capture(s) from " + contextLabel + " are ready for metadata edits. Select one or more files, update the game title prefix, tags, one console tag, an optional capture date/time, and an optional comment. Files can also be reorganized into the proper game folder when the title changes."
+                    : items.Count + " capture(s) were left in intake because they did not match a known format. Select one or more files, add a game title prefix, tags, one console tag, an optional capture date/time, and an optional comment before sending them to the destination.";
+            var leaveButtonText = libraryMode || importAndEditMode ? "Close" : "Leave Unchanged";
+            var finishButtonText = importAndEditMode ? "Continue Import" : (libraryMode ? "Apply Changes" : "Apply and Send");
+            var emptySelectionText = libraryMode ? "Choose one or more library images to edit." : importAndEditMode ? "Choose one or more upload files to include in this import." : "Choose unmatched intake images to add metadata.";
+            var defaultStatusText = libraryMode ? "Update the game title prefix, tags, one console tag, optional date/time, and an optional comment." : importAndEditMode ? "Adjust metadata for selected files, then continue import." : "Add a game title prefix, tags, one console tag, optional date/time, and an optional comment.";
             var singleSelectionMetaPrefix = libraryMode ? "Library capture time | " : "Filesystem time | ";
-            var confirmCaption = libraryMode ? "Library Metadata" : "Manual Intake";
+            var confirmCaption = libraryMode ? "Library Metadata" : importAndEditMode ? "Import and Edit" : "Manual Intake";
             var confirmMessage = libraryMode
                 ? items.Count + " image(s) will be renamed if needed, updated with metadata, and reorganized in the library if their title changes.\n\nApply changes now?"
-                : items.Count + " image(s) will be renamed if needed, tagged, updated with metadata, and moved to the destination.\n\nApply changes and send them now?";
+                : importAndEditMode
+                    ? string.Empty
+                    : items.Count + " image(s) will be renamed if needed, tagged, updated with metadata, and moved to the destination.\n\nApply changes and send them now?";
 
             var manualWindow = new Window
             {
@@ -2883,7 +2963,19 @@ namespace PixelVaultNative
             var selectedTitle = new TextBlock { Text = "Select one or more captures", FontSize = 24, FontWeight = FontWeights.SemiBold, Foreground = Brush("#1F2A30"), TextWrapping = TextWrapping.Wrap };
             var selectedMeta = new TextBlock { Text = emptySelectionText, Foreground = Brush("#5F6970"), Margin = new Thickness(0, 8, 0, 12), TextWrapping = TextWrapping.Wrap };
             var previewBorder = new Border { Background = Brush("#EAF0F5"), CornerRadius = new CornerRadius(16), Padding = new Thickness(12), Margin = new Thickness(0, 0, 0, 16), BorderBrush = Brush("#D7E1E8"), BorderThickness = new Thickness(1) };
-            var previewImage = new Image { Stretch = Stretch.Uniform, Height = 320 };
+            var previewImage = new Image { Stretch = Stretch.Uniform };
+            if (useFlexiblePreview)
+            {
+                previewBorder.MinHeight = 200;
+                previewImage.MaxHeight = 420;
+                manualWindow.SizeChanged += delegate
+                {
+                    if (!manualWindow.IsLoaded) return;
+                    var h = Math.Max(220, (manualWindow.ActualHeight - 460) * 0.45);
+                    previewImage.MaxHeight = h;
+                };
+            }
+            else previewImage.Height = 320;
             var guessCallout = new Border { Background = Brush("#F4F7F9"), BorderBrush = Brush("#D7E1E8"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(12), Padding = new Thickness(12, 10, 12, 10), Margin = new Thickness(0, 0, 0, 16) };
             var guessText = new TextBlock { Text = "Best Guess | No confident match", FontSize = 13, Foreground = Brush("#8B98A3"), TextWrapping = TextWrapping.Wrap };
             guessCallout.Child = guessText;
@@ -2971,6 +3063,14 @@ namespace PixelVaultNative
             detailStack.Children.Add(useCustomTimeBox);
             detailStack.Children.Add(new TextBlock { Text = "If left off, PixelVault uses the existing filesystem timestamp.", Foreground = Brush("#5F6970"), Margin = new Thickness(0, 0, 0, 8), TextWrapping = TextWrapping.Wrap });
             detailStack.Children.Add(dateRow);
+            var deleteBeforeBox = new CheckBox
+            {
+                Content = "Delete selected file(s) before import (skipped for metadata and move)",
+                Foreground = Brush("#9B2C2C"),
+                Margin = new Thickness(0, 0, 0, 12),
+                Visibility = importAndEditMode ? Visibility.Visible : Visibility.Collapsed
+            };
+            detailStack.Children.Add(deleteBeforeBox);
             detailStack.Children.Add(new TextBlock { Text = "Comment for Immich description", FontSize = 16, FontWeight = FontWeights.SemiBold, Foreground = Brush("#1F2A30") });
             detailStack.Children.Add(commentBox);
             detailStack.Children.Add(statusText);
@@ -3060,6 +3160,7 @@ namespace PixelVaultNative
 
             Func<ManualMetadataItem, string> manualBadgeLabel = delegate(ManualMetadataItem item)
             {
+                if (item != null && item.IntakeRuleMatched) return "Auto";
                 if (item.TagSteam) return "Steam";
                 if (item.TagPc) return "PC";
                 if (item.TagPs5) return "PS5";
@@ -3070,6 +3171,7 @@ namespace PixelVaultNative
 
             Func<string, Brush> manualBadgeBrush = delegate(string label)
             {
+                if (string.Equals(label, "Auto", StringComparison.OrdinalIgnoreCase)) return Brush("#5CB88A");
                 if (string.Equals(label, "Steam", StringComparison.OrdinalIgnoreCase)) return Brush("#69A7FF");
                 if (string.Equals(label, "PC", StringComparison.OrdinalIgnoreCase)) return Brush("#7F8EA3");
                 if (string.Equals(label, "PS5", StringComparison.OrdinalIgnoreCase)) return Brush("#4F83FF");
@@ -3099,7 +3201,8 @@ namespace PixelVaultNative
 
             Func<int, UIElement> buildMultiPreview = delegate(int count)
             {
-                var grid = new Grid { Height = 320 };
+                var multiH = useFlexiblePreview ? Math.Min(400, Math.Max(240, previewImage.MaxHeight)) : 320;
+                var grid = new Grid { Height = multiH };
                 var art = new Grid { Width = 260, Height = 190, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
                 var back = new Border { Width = 136, Height = 104, Background = Brushes.White, BorderBrush = Brush("#2E2A2A"), BorderThickness = new Thickness(6), CornerRadius = new CornerRadius(8), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(64, -44, 0, 0) };
                 var mid = new Border { Width = 148, Height = 112, Background = Brushes.White, BorderBrush = Brush("#2E2A2A"), BorderThickness = new Thickness(6), CornerRadius = new CornerRadius(8), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(30, -20, 0, 0) };
@@ -3192,7 +3295,12 @@ namespace PixelVaultNative
                 else if (pcBox.IsChecked == true) notes.Add("platform tag: PC");
                 else if (ps5Box.IsChecked == true) notes.Add("platform tag: PS5");
                 else if (xboxBox.IsChecked == true) notes.Add("platform tag: Xbox");
-                else if (otherBox.IsChecked == true) notes.Add("platform tag: " + CleanTag(otherPlatformBox.Text));
+                else                 if (otherBox.IsChecked == true) notes.Add("platform tag: " + CleanTag(otherPlatformBox.Text));
+                if (importAndEditMode && selectedItems.Count > 0)
+                {
+                    var del = selectedItems.Count(i => i.DeleteBeforeProcessing);
+                    if (del > 0) notes.Add(del + " marked for delete before import");
+                }
                 statusText.Text = notes.Count == 0 ? defaultStatusText : string.Join(" | ", notes.ToArray()) + ".";
             };
             refreshGameTitleChoices();
@@ -3225,6 +3333,7 @@ namespace PixelVaultNative
                     hourBox.SelectedIndex = -1;
                     minuteBox.SelectedIndex = -1;
                     ampmBox.SelectedIndex = -1;
+                    if (importAndEditMode) deleteBeforeBox.IsChecked = false;
                     suppressSync = false;
                     refreshDateControls();
                     statusText.Text = defaultStatusText;
@@ -3292,6 +3401,7 @@ namespace PixelVaultNative
                 xboxBox.IsChecked = sharedBool(selectedItems, delegate(ManualMetadataItem item) { return item.TagXbox; });
                 otherBox.IsChecked = sharedBool(selectedItems, delegate(ManualMetadataItem item) { return item.TagOther; });
                 otherPlatformBox.Text = sharedText(selectedItems, delegate(ManualMetadataItem item) { return item.CustomPlatformTag; });
+                if (importAndEditMode) deleteBeforeBox.IsChecked = sharedBool(selectedItems, delegate(ManualMetadataItem item) { return item.DeleteBeforeProcessing; });
 
                 var first = selectedItems[0];
                 captureDatePicker.SelectedDate = first.CaptureTime.Date;
@@ -3626,13 +3736,31 @@ namespace PixelVaultNative
             minuteBox.SelectionChanged += delegate { if (suppressSync || selectedItems.Count == 0 || useCustomTimeBox.IsChecked != true) return; saveSelectedDateTime(); refreshSelectionUi(); };
             ampmBox.SelectionChanged += delegate { if (suppressSync || selectedItems.Count == 0 || useCustomTimeBox.IsChecked != true) return; saveSelectedDateTime(); refreshSelectionUi(); };
 
+            deleteBeforeBox.Checked += delegate
+            {
+                if (suppressSync || selectedItems.Count == 0 || !importAndEditMode) return;
+                foreach (var item in selectedItems) item.DeleteBeforeProcessing = true;
+                refreshSelectionStatus();
+            };
+            deleteBeforeBox.Unchecked += delegate
+            {
+                if (suppressSync || selectedItems.Count == 0 || !importAndEditMode) return;
+                foreach (var item in selectedItems) item.DeleteBeforeProcessing = false;
+                refreshSelectionStatus();
+            };
+
             finishButton.Click += delegate
             {
                 if (!dialogReady || !manualWindow.IsLoaded) return;
                 var pendingItems = selectedItems.Distinct().ToList();
                 if (pendingItems.Count == 0)
                 {
-                    MessageBox.Show(libraryMode ? "Select at least one library image to update." : "Select at least one unmatched image to send.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
+                    var emptyMsg = libraryMode
+                        ? "Select at least one library image to update."
+                        : importAndEditMode
+                            ? "Select at least one upload file to include in this import."
+                            : "Select at least one unmatched image to send.";
+                    MessageBox.Show(emptyMsg, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
                     return;
                 }
                 if (useCustomTimeBox.IsChecked == true) saveSelectedDateTime();
@@ -3700,7 +3828,9 @@ namespace PixelVaultNative
                 }
                 var confirmText = libraryMode
                     ? pendingItems.Count + " selected image(s) will be renamed if needed, updated with metadata, and reorganized in the library if their title changes.\n\nApply changes now?"
-                    : pendingItems.Count + " image(s) will be renamed if needed, tagged, updated with metadata, and moved to the destination.\n\nApply changes and send them now?";
+                    : importAndEditMode
+                        ? pendingItems.Count + " selected file(s) will continue through import (Steam rename if applicable, optional delete, metadata, move to destination).\n\nFiles not selected stay in the upload folder.\n\nContinue?"
+                        : pendingItems.Count + " image(s) will be renamed if needed, tagged, updated with metadata, and moved to the destination.\n\nApply changes and send them now?";
                 var confirm = MessageBox.Show(confirmText, confirmCaption, MessageBoxButton.OKCancel, MessageBoxImage.Question);
                 if (confirm != MessageBoxResult.OK) return;
                 foreach (var item in pendingItems)
@@ -3749,7 +3879,7 @@ namespace PixelVaultNative
                 dialogReady = true;
                 if (items.Count > 0)
                 {
-                    if (libraryMode)
+                    if (libraryMode && !importAndEditMode)
                     {
                         var firstEntry = fileList.Items.Cast<ListBoxItem>().FirstOrDefault();
                         if (firstEntry != null) firstEntry.IsSelected = true;

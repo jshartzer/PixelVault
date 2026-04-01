@@ -22,6 +22,7 @@ namespace PixelVaultNative
             public MoveStepResult MoveResult;
             public SortStepResult SortResult;
             public int ManualItemsLeft;
+            public bool ManualItemsLeftAreUploadSkips;
         }
 
         sealed class ManualIntakeExecutionResult
@@ -65,24 +66,36 @@ namespace PixelVaultNative
                 var manualItems = BuildManualMetadataItems(inventory.TopLevelMediaFiles, recognizedPaths);
                 var manualPaths = new HashSet<string>(manualItems.Select(i => i.FilePath), StringComparer.OrdinalIgnoreCase);
                 prepStopwatch.Stop();
-                LogPerformanceSample("ImportPreparation", prepStopwatch, "workflow=" + (withReview ? "import+comment" : "import") + "; renameScope=" + renameInventory.RenameScopeFiles.Count + "; topLevel=" + inventory.TopLevelMediaFiles.Count + "; reviewItems=" + reviewItems.Count + "; manualItems=" + manualItems.Count, 40);
-                if (withReview && reviewItems.Count > 0)
+                List<ManualMetadataItem> unifiedImportBatch = null;
+                if (withReview)
                 {
-                    status.Text = "Reviewing captures";
-                    Log("Opening review window for " + reviewItems.Count + " metadata candidate(s).");
-                    if (!ShowMetadataReviewWindow(reviewItems))
+                    var analysis = AnalyzeIntakePreviewFiles(inventory.TopLevelMediaFiles);
+                    var importEditItems = BuildImportAndEditMetadataItems(inventory.TopLevelMediaFiles, analysis);
+                    if (importEditItems.Count > 0)
                     {
-                        status.Text = "Import canceled";
-                        Log("Import canceled from review window.");
-                        RefreshPreview();
-                        return;
+                        status.Text = "Import and edit";
+                        Log("Opening import and edit window for " + importEditItems.Count + " upload file(s).");
+                        if (!ShowManualMetadataWindow(importEditItems, false, "Import and comment", true))
+                        {
+                            status.Text = "Import canceled";
+                            Log("Import canceled from import and edit window.");
+                            RefreshPreview();
+                            return;
+                        }
+                        unifiedImportBatch = importEditItems;
+                    }
+                    else
+                    {
+                        Log("No upload files for import and edit. Continuing import.");
                     }
                 }
-                else if (withReview)
-                {
-                    Log("No metadata review items found. Continuing without review comments.");
-                }
-                RunImportWorkflowWithProgress(withReview, renameInventory, inventory, reviewItems, manualItems, manualPaths);
+                var useUnifiedImportBatch = unifiedImportBatch != null;
+                var topAtStart = inventory.TopLevelMediaFiles.Where(File.Exists).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+                var manualLeftOverride = useUnifiedImportBatch
+                    ? (int?)Math.Max(0, topAtStart.Count - unifiedImportBatch.Count)
+                    : null;
+                LogPerformanceSample("ImportPreparation", prepStopwatch, "workflow=" + (withReview ? "import+comment" : "import") + "; renameScope=" + renameInventory.RenameScopeFiles.Count + "; topLevel=" + inventory.TopLevelMediaFiles.Count + "; reviewItems=" + reviewItems.Count + "; manualItems=" + manualItems.Count + "; unifiedImport=" + useUnifiedImportBatch, 40);
+                RunImportWorkflowWithProgress(withReview, useUnifiedImportBatch, renameInventory, inventory, reviewItems, useUnifiedImportBatch ? unifiedImportBatch : manualItems, manualPaths, manualLeftOverride);
             }
             catch (Exception ex)
             {
@@ -258,15 +271,33 @@ namespace PixelVaultNative
             progressWindow.ShowDialog();
         }
 
-        void RunImportWorkflowWithProgress(bool withReview, SourceInventory renameInventory, SourceInventory inventory, List<ReviewItem> reviewItems, List<ManualMetadataItem> manualItems, HashSet<string> manualPaths)
+        void RunImportWorkflowWithProgress(bool withReview, bool useUnifiedManualImportBatch, SourceInventory renameInventory, SourceInventory inventory, List<ReviewItem> reviewItems, List<ManualMetadataItem> manualItems, HashSet<string> manualPaths, int? manualItemsLeftOverride = null)
         {
-            var renameTotal = renameInventory == null || renameInventory.RenameScopeFiles == null ? 0 : renameInventory.RenameScopeFiles.Count;
-            var deleteTotal = reviewItems == null ? 0 : reviewItems.Count(item => item != null && item.DeleteBeforeProcessing);
-            var metadataTotal = reviewItems == null ? 0 : reviewItems.Count;
-            var moveTotal = inventory == null || inventory.TopLevelMediaFiles == null
-                ? 0
-                : inventory.TopLevelMediaFiles.Count(file => !string.IsNullOrWhiteSpace(file) && File.Exists(file) && (manualPaths == null || !manualPaths.Contains(file)));
-            var totalWork = renameTotal + deleteTotal + metadataTotal + moveTotal + 1;
+            var batch = manualItems ?? new List<ManualMetadataItem>();
+            int renameTotal;
+            int deleteTotal;
+            int metadataTotal;
+            int moveTotal;
+            int totalWork;
+            if (useUnifiedManualImportBatch)
+            {
+                renameTotal = batch.Count;
+                var manualRenameTotal = batch.Count;
+                deleteTotal = batch.Count(item => item != null && item.DeleteBeforeProcessing);
+                metadataTotal = batch.Count;
+                moveTotal = batch.Count(item => item != null && !string.IsNullOrWhiteSpace(item.FilePath) && File.Exists(item.FilePath));
+                totalWork = renameTotal + manualRenameTotal + deleteTotal + metadataTotal + moveTotal + 1;
+            }
+            else
+            {
+                renameTotal = renameInventory == null || renameInventory.RenameScopeFiles == null ? 0 : renameInventory.RenameScopeFiles.Count;
+                deleteTotal = reviewItems == null ? 0 : reviewItems.Count(item => item != null && item.DeleteBeforeProcessing);
+                metadataTotal = reviewItems == null ? 0 : reviewItems.Count;
+                moveTotal = inventory == null || inventory.TopLevelMediaFiles == null
+                    ? 0
+                    : inventory.TopLevelMediaFiles.Count(file => !string.IsNullOrWhiteSpace(file) && File.Exists(file) && (manualPaths == null || !manualPaths.Contains(file)));
+                totalWork = renameTotal + deleteTotal + metadataTotal + moveTotal + 1;
+            }
             var workflowLabel = withReview ? "import and comment" : "import";
 
             RunBackgroundWorkflowWithProgress(
@@ -280,6 +311,74 @@ namespace PixelVaultNative
                 totalWork,
                 delegate(Action<int, string> reportProgress, CancellationToken cancellationToken)
                 {
+                    if (useUnifiedManualImportBatch)
+                    {
+                        var steamRenameTotal = batch.Count;
+                        var manualRenameTotal = batch.Count;
+                        var delTotal = batch.Count(item => item != null && item.DeleteBeforeProcessing);
+                        var metaTotal = batch.Count;
+                        var mvTotal = batch.Count(item => item != null && !string.IsNullOrWhiteSpace(item.FilePath) && File.Exists(item.FilePath));
+                        var steamOff = 0;
+                        var manualRenameOff = steamOff + steamRenameTotal;
+                        var deleteOff = manualRenameOff + manualRenameTotal;
+                        var metadataOff = deleteOff + delTotal;
+                        var moveOff = metadataOff + metaTotal;
+                        var sortOff = moveOff + mvTotal;
+
+                        ThrowIfWorkflowCancellationRequested(cancellationToken, "Import workflow");
+                        var steamRenameResult = RunRename(batch.Select(item => item.FilePath), delegate(int current, int total, string detail)
+                        {
+                            reportProgress(steamOff + current, detail);
+                        }, cancellationToken);
+                        var steamMap = steamRenameResult == null ? null : steamRenameResult.OldPathToNewPath;
+                        if (steamMap != null && steamMap.Count > 0) ApplySteamRenameMapToManualMetadataItems(batch, steamMap);
+                        ThrowIfWorkflowCancellationRequested(cancellationToken, "Import workflow");
+                        var manualRenameResult = RunManualRename(batch, delegate(int current, int total, string detail)
+                        {
+                            reportProgress(manualRenameOff + current, detail);
+                        }, cancellationToken);
+                        ThrowIfWorkflowCancellationRequested(cancellationToken, "Import workflow");
+                        var uniDeleteResult = RunDeleteManualMetadata(batch, delegate(int current, int total, string detail)
+                        {
+                            reportProgress(deleteOff + current, detail);
+                        }, cancellationToken);
+                        ThrowIfWorkflowCancellationRequested(cancellationToken, "Import workflow");
+                        var uniMetadataResult = RunManualMetadata(batch, delegate(int current, int total, string detail)
+                        {
+                            reportProgress(metadataOff + current, detail);
+                        }, cancellationToken);
+                        ThrowIfWorkflowCancellationRequested(cancellationToken, "Import workflow");
+                        var uniMoveResult = RunMoveFiles(batch.Select(item => item.FilePath).Where(File.Exists), "Import move summary", delegate(int current, int total, string detail)
+                        {
+                            reportProgress(moveOff + current, detail);
+                        }, cancellationToken);
+                        SortStepResult uniSortResult = null;
+                        if (uniMoveResult != null && uniMoveResult.Moved > 0)
+                        {
+                            ThrowIfWorkflowCancellationRequested(cancellationToken, "Import workflow");
+                            SaveUndoManifest(uniMoveResult.Entries);
+                            reportProgress(sortOff, "Sorting imported captures into game folders...");
+                            uniSortResult = SortDestinationFoldersCore(false, false, cancellationToken);
+                        }
+                        ThrowIfWorkflowCancellationRequested(cancellationToken, "Import workflow");
+                        reportProgress(totalWork, "Import workflow complete.");
+                        var combinedRename = new RenameStepResult
+                        {
+                            Renamed = (steamRenameResult == null ? 0 : steamRenameResult.Renamed) + (manualRenameResult == null ? 0 : manualRenameResult.Renamed),
+                            Skipped = (steamRenameResult == null ? 0 : steamRenameResult.Skipped) + (manualRenameResult == null ? 0 : manualRenameResult.Skipped)
+                        };
+                        return new ImportWorkflowExecutionResult
+                        {
+                            RenameResult = combinedRename,
+                            DeleteResult = uniDeleteResult,
+                            MetadataResult = uniMetadataResult,
+                            MoveResult = uniMoveResult,
+                            SortResult = uniSortResult,
+                            ManualItemsLeft = manualItemsLeftOverride ?? 0,
+                            ManualItemsLeftAreUploadSkips = true
+                        };
+                    }
+
                     var renameOffset = 0;
                     var deleteOffset = renameOffset + renameTotal;
                     var metadataOffset = deleteOffset + deleteTotal;
@@ -326,22 +425,28 @@ namespace PixelVaultNative
                         MetadataResult = metadataResult,
                         MoveResult = moveResult,
                         SortResult = sortResult,
-                        ManualItemsLeft = manualItems == null ? 0 : manualItems.Count
+                        ManualItemsLeft = manualItemsLeftOverride ?? (manualItems == null ? 0 : manualItems.Count),
+                        ManualItemsLeftAreUploadSkips = false
                     };
                 },
                 delegate(ImportWorkflowExecutionResult result)
                 {
                     if (result.ManualItemsLeft > 0)
                     {
-                        Log("Left " + result.ManualItemsLeft + " unmatched intake image(s) untouched. Use Manual Intake when you want to add missing data.");
+                        Log(result.ManualItemsLeftAreUploadSkips
+                            ? "Left " + result.ManualItemsLeft + " upload file(s) not selected for this import."
+                            : "Left " + result.ManualItemsLeft + " unmatched intake image(s) untouched. Use Manual Intake when you want to add missing data.");
                     }
                     RefreshPreview();
                     status.Text = "Workflow complete";
                     Log("Workflow complete.");
-                    var summaryLines = BuildImportSummaryLines("Import", withReview, result.RenameResult, result.DeleteResult, result.MetadataResult, result.MoveResult, result.SortResult, result.ManualItemsLeft);
+                    var summaryLines = BuildImportSummaryLines("Import", withReview, result.RenameResult, result.DeleteResult, result.MetadataResult, result.MoveResult, result.SortResult, result.ManualItemsLeft, result.ManualItemsLeftAreUploadSkips);
                     var movedCount = result.MoveResult == null ? 0 : result.MoveResult.Moved;
                     var metadataUpdated = result.MetadataResult == null ? 0 : result.MetadataResult.Updated;
-                    var summaryMeta = movedCount + " file(s) imported | " + metadataUpdated + " metadata update(s)" + (result.ManualItemsLeft > 0 ? " | " + result.ManualItemsLeft + " unmatched left" : string.Empty);
+                    var leftSuffix = result.ManualItemsLeft > 0
+                        ? (result.ManualItemsLeftAreUploadSkips ? " | " + result.ManualItemsLeft + " not selected (still in upload)" : " | " + result.ManualItemsLeft + " unmatched left")
+                        : string.Empty;
+                    var summaryMeta = movedCount + " file(s) imported | " + metadataUpdated + " metadata update(s)" + leftSuffix;
                     ShowImportSummaryWindow(withReview ? "Import and Comment Summary" : "Import Summary", summaryMeta, summaryLines);
                 },
                 delegate
@@ -431,6 +536,19 @@ namespace PixelVaultNative
         }
 
         static void ApplySteamRenameMapToReviewItems(List<ReviewItem> items, Dictionary<string, string> oldToNew)
+        {
+            if (items == null || oldToNew == null || oldToNew.Count == 0) return;
+            foreach (var item in items)
+            {
+                if (item == null || string.IsNullOrWhiteSpace(item.FilePath)) continue;
+                string newPath;
+                if (!oldToNew.TryGetValue(item.FilePath, out newPath) || string.IsNullOrWhiteSpace(newPath)) continue;
+                item.FilePath = newPath;
+                item.FileName = Path.GetFileName(newPath);
+            }
+        }
+
+        static void ApplySteamRenameMapToManualMetadataItems(List<ManualMetadataItem> items, Dictionary<string, string> oldToNew)
         {
             if (items == null || oldToNew == null || oldToNew.Count == 0) return;
             foreach (var item in items)
@@ -661,6 +779,33 @@ namespace PixelVaultNative
         {
             int deleted = 0, skipped = 0;
             var targets = (reviewItems ?? new List<ReviewItem>()).Where(i => i != null && i.DeleteBeforeProcessing).ToList();
+            var total = targets.Count;
+            if (progress != null) progress(0, total, "Starting delete step for " + total + " file(s).");
+            for (int i = 0; i < total; i++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var item = targets[i];
+                var remaining = total - (i + 1);
+                if (!File.Exists(item.FilePath))
+                {
+                    skipped++;
+                    if (progress != null) progress(i + 1, total, "Skipped delete " + (i + 1) + " of " + total + " | " + remaining + " remaining | file missing");
+                    continue;
+                }
+                File.Delete(item.FilePath);
+                deleted++;
+                Log("Deleted before processing: " + item.FileName);
+                if (progress != null) progress(i + 1, total, "Deleted " + (i + 1) + " of " + total + " | " + remaining + " remaining | " + item.FileName);
+            }
+            if (progress != null) progress(total, total, "Delete step complete: deleted " + deleted + ", skipped " + skipped + ".");
+            if (deleted > 0 || skipped > 0) Log("Delete summary: deleted " + deleted + ", skipped " + skipped + ".");
+            return new DeleteStepResult { Deleted = deleted, Skipped = skipped };
+        }
+
+        DeleteStepResult RunDeleteManualMetadata(List<ManualMetadataItem> items, Action<int, int, string> progress = null, CancellationToken cancellationToken = default(CancellationToken))
+        {
+            int deleted = 0, skipped = 0;
+            var targets = (items ?? new List<ManualMetadataItem>()).Where(i => i != null && i.DeleteBeforeProcessing).ToList();
             var total = targets.Count;
             if (progress != null) progress(0, total, "Starting delete step for " + total + " file(s).");
             for (int i = 0; i < total; i++)

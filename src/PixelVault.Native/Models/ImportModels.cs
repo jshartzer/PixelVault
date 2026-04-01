@@ -53,6 +53,10 @@ namespace PixelVaultNative
         public bool OriginalTagXbox;
         public bool OriginalTagOther;
         public string OriginalCustomPlatformTag;
+        /// <summary>Import-and-edit: delete file before rest of workflow (shown only in that mode).</summary>
+        public bool DeleteBeforeProcessing;
+        /// <summary>True when intake matched an automatic filename rule (for list badge).</summary>
+        public bool IntakeRuleMatched;
     }
 
     sealed class UndoImportEntry
