@@ -36,6 +36,7 @@
     <Compile Include="Services\Indexing\IndexPersistenceService.cs" />
     <Compile Include="Services\Metadata\MetadataService.cs" />
     <Compile Include="Storage\IndexDatabaseStorage.cs" />
+    <Compile Include="UI\ChangelogWindow.cs" />
     <Compile Include="UI\FilenameConventionEditor.cs" />
     <Compile Include="UI\LibraryVirtualization.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

@@ -72,6 +72,8 @@ The **priority** is to shrink **`PixelVault.Native.cs`**, not to collapse partia
 
 **Exit:** Measurable line drop in `PixelVault.Native.cs`; no regression on import or changelog.
 
+**Progress:** **B3** — Changelog UI lives in `UI/ChangelogWindow.cs` (`ChangelogWindow.ShowDialog`); Settings “Changelog” button calls it with `AppVersion` and `changelogPath`.
+
 ---
 
 ## Phase C — Intake and review surfaces

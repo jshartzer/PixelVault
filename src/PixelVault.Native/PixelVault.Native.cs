@@ -337,7 +337,7 @@ namespace PixelVaultNative
             photoIndexTopButton.Margin = new Thickness(0, 0, 12, 0);
             var filenameRulesTopButton = Btn("Filename Rules", delegate { OpenFilenameConventionEditor(); }, "#20343A", Brushes.White);
             filenameRulesTopButton.Margin = new Thickness(0, 0, 12, 0);
-            var changelogTopButton = Btn("Changelog", delegate { ShowChangelogWindow(); }, "#20343A", Brushes.White);
+            var changelogTopButton = Btn("Changelog", delegate { ChangelogWindow.ShowDialog(this, AppVersion, changelogPath); }, "#20343A", Brushes.White);
             changelogTopButton.Margin = new Thickness(0, 0, 12, 0);
             var sp = new Border { Child = status, Background = Brush("#20343A"), CornerRadius = new CornerRadius(12), Padding = new Thickness(14, 10, 14, 10) };
             headerRight.Children.Add(pathSettingsTopButton);
@@ -1164,79 +1164,6 @@ namespace PixelVaultNative
                 keywordsBox = previousKeywordsBox;
                 conflictBox = previousConflictBox;
             };
-            window.ShowDialog();
-        }
-
-        void ShowChangelogWindow()
-        {
-            var window = new Window
-            {
-                Title = "PixelVault " + AppVersion + " Changelog",
-                Width = 780,
-                Height = 700,
-                MinWidth = 680,
-                MinHeight = 520,
-                Owner = this,
-                WindowStartupLocation = WindowStartupLocation.CenterOwner,
-                Background = Brush("#F5F8FC")
-            };
-
-            var root = new Grid { Margin = new Thickness(24), Background = Brushes.White };
-            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-
-            var header = new StackPanel { Margin = new Thickness(0, 0, 0, 16) };
-            header.Children.Add(new TextBlock { Text = "PixelVault changelog", FontSize = 28, FontWeight = FontWeights.SemiBold, Foreground = Brush("#1F2A30") });
-            header.Children.Add(new TextBlock { Text = "Recent release notes, fixes, and workflow updates.", Margin = new Thickness(0, 8, 0, 0), Foreground = Brush("#5F6970") });
-            root.Children.Add(header);
-
-            var viewer = new RichTextBox
-            {
-                IsReadOnly = true,
-                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                BorderThickness = new Thickness(0),
-                Background = Brushes.White,
-                FontFamily = new FontFamily("Segoe UI")
-            };
-            var doc = new FlowDocument { PagePadding = new Thickness(18), Background = Brushes.White };
-            var lines = File.Exists(changelogPath) ? File.ReadAllLines(changelogPath) : new[] { "# PixelVault Changelog", "", "No changelog entries yet." };
-            foreach (var rawLine in lines)
-            {
-                var line = rawLine ?? string.Empty;
-                if (line.StartsWith("## "))
-                {
-                    doc.Blocks.Add(new Paragraph(new Run(line.Substring(3))) { Margin = new Thickness(0, 14, 0, 6), FontSize = 22, FontWeight = FontWeights.SemiBold, Foreground = Brush("#1F2A30") });
-                }
-                else if (line.StartsWith("# "))
-                {
-                    doc.Blocks.Add(new Paragraph(new Run(line.Substring(2))) { Margin = new Thickness(0, 0, 0, 10), FontSize = 26, FontWeight = FontWeights.Bold, Foreground = Brush("#1F2A30") });
-                }
-                else if (line.StartsWith("- "))
-                {
-                    doc.Blocks.Add(new Paragraph(new Run("• " + line.Substring(2))) { Margin = new Thickness(0, 0, 0, 8), FontSize = 14, Foreground = Brush("#3B4650") });
-                }
-                else if (string.IsNullOrWhiteSpace(line))
-                {
-                    doc.Blocks.Add(new Paragraph(new Run(string.Empty)) { Margin = new Thickness(0, 2, 0, 2) });
-                }
-                else
-                {
-                    doc.Blocks.Add(new Paragraph(new Run(line)) { Margin = new Thickness(0, 0, 0, 8), FontSize = 14, Foreground = Brush("#3B4650") });
-                }
-            }
-            viewer.Document = doc;
-            Grid.SetRow(viewer, 1);
-            root.Children.Add(viewer);
-
-            var buttons = new WrapPanel { Margin = new Thickness(0, 16, 0, 0) };
-            var close = Btn("Close", null, "#20343A", Brushes.White);
-            close.Click += delegate { window.Close(); };
-            buttons.Children.Add(close);
-            Grid.SetRow(buttons, 2);
-            root.Children.Add(buttons);
-
-            window.Content = root;
             window.ShowDialog();
         }
 
