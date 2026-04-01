@@ -1,3 +1,8 @@
+## 0.828
+- Fixed Steam intake rename for **title + timestamp** filenames (and AppIDs resolved from the game index): the old logic treated the numeric AppID length as a prefix to strip from the **title**, which duplicated the game name (e.g. `...Simulator` + `ewind...`). Renames now strip only a real **AppID prefix** on the filename, or replace the parsed **title segment** before the timestamp.
+- Fixed import **after** Steam rename: metadata and move steps now use **post-rename paths** so files are not left stuck in the upload folder with new names.
+- **Set Custom Cover** opens the **My Covers** folder in Explorer before the file picker (unchanged picker default).
+
 ## 0.827
 - Added **My Covers**: a permanent `PixelVaultData/saved-covers` folder (outside `cache`) for cover art you collect, with **My Covers** on the Library toolbar and Settings, **Open My Covers Folder** on library tiles, a short `README.txt` on first use, and **Set Custom Cover** defaulting the file dialog there when no existing art path is resolved.
 

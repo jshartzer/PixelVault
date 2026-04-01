@@ -66,6 +66,8 @@ namespace PixelVaultNative
     {
         public int Renamed;
         public int Skipped;
+        /// <summary>Full paths: key = path before Steam rename, value = path after rename (same directory).</summary>
+        public Dictionary<string, string> OldPathToNewPath = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
     }
 
     sealed class DeleteStepResult

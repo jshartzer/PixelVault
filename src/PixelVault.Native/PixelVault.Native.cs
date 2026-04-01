@@ -39,7 +39,7 @@ namespace PixelVaultNative
 
     public sealed partial class MainWindow : Window
     {
-        const string AppVersion = "0.827";
+        const string AppVersion = "0.828";
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
         const string ClearedExternalIdSentinel = "__PV_CLEARED__";
@@ -5042,6 +5042,7 @@ namespace PixelVaultNative
                     var setCoverItem = new MenuItem { Header = "Set Custom Cover..." };
                     setCoverItem.Click += delegate
                     {
+                        OpenSavedCoversFolder();
                         var pickedCover = PickFile(ResolveLibraryArt(folder, false), "Image Files|*.jpg;*.jpeg;*.png;*.bmp;*.gif|All Files|*.*", savedCoversRoot);
                         if (string.IsNullOrWhiteSpace(pickedCover)) return;
                         SaveCustomCover(folder, pickedCover);
