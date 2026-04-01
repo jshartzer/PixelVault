@@ -26,6 +26,7 @@ Active workspace note:
 - `C:\Codex\docs\PROJECT_CONTEXT.md`: broader architecture and product context
 - `C:\Codex\docs\CHANGELOG.md`: published version history
 - `C:\Codex\docs\VERSIONING.md`: short release checklist (bump rules live in `POLICY.md`)
+- `C:\Codex\docs\CODE_QUALITY_IMPROVEMENT_PLAN.md`: quality, security, and structural hardening backlog (linked from `PixelVaultData/TODO.md` and Notion Project Wiki)
 - `C:\Codex\docs\CURRENT_BUILD.txt`: path pointer to the live published executable
 - `C:\Codex\docs\LIBRARY_WORKFLOW_VERIFICATION.md`: repeatable checks for Library regrouping, delete, and metadata-editor behavior
 

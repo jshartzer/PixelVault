@@ -17,6 +17,11 @@ For the focused performance backlog, use:
 
 - `C:\Codex\docs\PERFORMANCE_TODO.md`
 
+For **code quality, security hardening, and structural improvements** from the March 2026 review, use:
+
+- `C:\Codex\docs\CODE_QUALITY_IMPROVEMENT_PLAN.md` (full checklist: quality, bugs, performance, security, practices)
+- Notion: [PixelVault code quality and hardening plan](https://www.notion.so/33573adc59b681ce906cf060554f1b2d) (under **Project Wiki**; mirror of the doc; update both when status changes per `DOC_SYNC_POLICY.md`)
+
 ## Current Focus
 1. Keep moving through Phase 2 UI-thread responsiveness and cancellation work.
 - Cover refresh, game-index ID resolution, and library scan now cancel active provider or ExifTool work instead of waiting only between titles or batches.
@@ -33,6 +38,19 @@ For the focused performance backlog, use:
 
 4. Rebuild the Filename Rules screen from a workflow spec instead of adding more controls to the current dense grid.
 - Use `C:\Codex\docs\FILENAME_RULES_FORM_SPEC.md` as the source of truth for the next UI pass.
+
+## Code quality and hardening (from review)
+
+Work items live in `C:\Codex\docs\CODE_QUALITY_IMPROVEMENT_PLAN.md`. Short picks:
+
+- Cap `TimeoutWebClient` / HTTP string download size; avoid buffering unbounded bodies.
+- Audit empty `catch` blocks; log or narrow exception types.
+- Make `CoverService` caches thread-safe if cover work runs in parallel (`ConcurrentDictionary` or locking).
+- Tighten Steam rename “numeric prefix” detection (separator + length); consider normalized title vs hint.
+- Debounce Library virtualization `SizeChanged` refresh (similar to search debounce).
+- ReDoS guardrails for user-defined filename convention regexes.
+- Redact SteamGridDB token from any HTTP error logging.
+- Continue peeling `MainWindow` into partials/services; document Steam rename rules in one place.
 
 ## As I Think Of It
 - Add a recurring automation that checks repo docs vs Notion for drift:
