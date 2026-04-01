@@ -183,18 +183,14 @@ This was a data-only maintenance pass, not a new app build.
 
 ## Current Stop Point
 
-The current live build is `0.810`.
+The current live published build is **`0.828`** (see `docs/CURRENT_BUILD.txt` and the **Recent Shipped State** / `CHANGELOG.md` for what that build contains).
 
-Latest shipped work:
+**Recent source work (not necessarily published yet):** MainWindow extraction **Phase B** landed on `main`: changelog window (`f8a5583`), `UiBrushHelper` (`f9f1212`), shared progress shell `WorkflowProgressWindow` (`5bcc917`). Full detail: `docs/MAINWINDOW_EXTRACTION_ROADMAP.md`.
 
-1. Steam imports now keep their Steam classification after rename, including the app's renamed `title_timestamp_counter` filename shape, so they no longer fall into `Other` on first import.
-2. the import workflow now carries renamed paths forward through the rest of intake, preventing renamed Steam captures from getting stuck in the queue on stale pre-rename paths.
-3. the Library browser now opens with a wider default split and a four-cover default row layout on the left pane.
-4. the live build docs and shortcut now point at `0.810`.
+The most likely next structural step is:
 
-The most likely next product step is:
-
-1. keep peeling workflow services out of the monolith, especially around Library scanning and intake preview orchestration
+1. **Phase C** of the MainWindow roadmap — intake preview and metadata review surfaces under `UI/Intake/`, with `MainWindow` passing callbacks only.
+2. Continue Phase 2 responsiveness / threading cleanups from `PixelVaultData/TODO.md` and `docs/PERFORMANCE_TODO.md` in parallel where they touch the same code paths.
 
 ## Important Expectations
 

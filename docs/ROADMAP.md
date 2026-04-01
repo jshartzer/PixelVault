@@ -135,7 +135,7 @@ Why this is the core maintainability phase:
 
 **Execution roadmap (phased slices, line-count map, ordering):**
 
-- `C:\Codex\docs\MAINWINDOW_EXTRACTION_ROADMAP.md`
+- `C:\Codex\docs\MAINWINDOW_EXTRACTION_ROADMAP.md` — **Phase B (B1–B3) complete in source** (changelog window, brush helper, progress window factory); **next slice: Phase C** (`UI/Intake/`).
 
 Primary outcomes:
 

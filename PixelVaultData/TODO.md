@@ -26,6 +26,7 @@ For **splitting `MainWindow` / shrinking `PixelVault.Native.cs`**, use:
 
 - `C:\Codex\docs\MAINWINDOW_EXTRACTION_ROADMAP.md` (phases A–F; ties to `ROADMAP.md` Phase 3)
 - Notion: [MainWindow extraction roadmap](https://www.notion.so/33573adc59b681d88b7dcd88cad53cb6) (under **Project Wiki**; mirror of the doc)
+- **Phase B (low-risk extractions) is done in source:** B3 changelog window, B1 `UiBrushHelper.FromHex`, B2 `WorkflowProgressWindow` factory. **Next extraction slice:** Phase C → `UI/Intake/`.
 
 ## Current Focus
 1. Keep moving through Phase 2 UI-thread responsiveness and cancellation work.
