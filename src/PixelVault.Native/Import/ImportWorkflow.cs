@@ -535,7 +535,7 @@ namespace PixelVaultNative
             return RunRename(BuildSourceInventory(recurseBox != null && recurseBox.IsChecked == true).RenameScopeFiles);
         }
 
-        static void ApplySteamRenameMapToReviewItems(List<ReviewItem> items, Dictionary<string, string> oldToNew)
+        internal static void ApplySteamRenameMapToReviewItems(List<ReviewItem> items, Dictionary<string, string> oldToNew)
         {
             if (items == null || oldToNew == null || oldToNew.Count == 0) return;
             foreach (var item in items)
@@ -548,7 +548,7 @@ namespace PixelVaultNative
             }
         }
 
-        static void ApplySteamRenameMapToManualMetadataItems(List<ManualMetadataItem> items, Dictionary<string, string> oldToNew)
+        internal static void ApplySteamRenameMapToManualMetadataItems(List<ManualMetadataItem> items, Dictionary<string, string> oldToNew)
         {
             if (items == null || oldToNew == null || oldToNew.Count == 0) return;
             foreach (var item in items)
@@ -561,7 +561,7 @@ namespace PixelVaultNative
             }
         }
 
-        static List<string> ResolveTopLevelPathsAfterSteamRename(IEnumerable<string> topLevelBeforeRename, Dictionary<string, string> oldToNew)
+        internal static List<string> ResolveTopLevelPathsAfterSteamRename(IEnumerable<string> topLevelBeforeRename, Dictionary<string, string> oldToNew)
         {
             var list = new List<string>();
             if (topLevelBeforeRename == null) return list;

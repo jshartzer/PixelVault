@@ -35,6 +35,15 @@ If this path fails, stop and fix that first before spending time on deeper spot 
 9. If Steam handling changed, verify at least one Steam filename case.
 10. If virtualization or layout changed, scroll a larger folder and look for spacing, rerender, or selection regressions.
 
+## Phase C3 — Intake UI extraction + Steam rename / move glue
+
+Run after changes to **`UI/Intake/*`**, **`ImportWorkflow`**, or Steam rename / move ordering. Automated coverage: `SteamRenamePathMappingTests` (path map → review items, manual batch, move source list).
+
+1. **Intake preview** — Settings → **Preview Intake** → **Refresh**; confirm queue/rename/manual counts and RichText summary still look right.
+2. **Steam rename → move** — Put one **numeric Steam AppID–prefixed** screenshot in the upload folder (same shape `FilenameParserServiceTests` uses). Run **Import** (not “import and comment” unless you are testing that path). Confirm the file is **renamed** to `GameTitle_…` in upload (or logs), then **lands in the library** under the expected game folder after move/sort.
+3. **Import and comment / Import and Edit** — If you use that flow, complete it once with a small batch; confirm no regression vs. plain import for Steam-titled files.
+4. **Recurse rename (optional)** — With **recurse rename** enabled for a nested Steam file, confirm rename still runs on the intended scope and the workflow finishes.
+
 ## Good Extra Checks
 
 - Open the intake preview window once.
