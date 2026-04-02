@@ -272,7 +272,8 @@ namespace PixelVaultNative
                 GetSafeGameFolderName = GetSafeGameFolderName,
                 GetGameNameFromFileName = GetGameNameFromFileName,
                 EnsureDirectoryExists = EnsureDir,
-                GetLibraryScanner = () => libraryScanner
+                GetLibraryScanner = () => libraryScanner,
+                EnumerateSourceMediaFiles = EnumerateSourceFiles
             });
             libraryWorkspace = new LibraryWorkspaceContext(this);
             Directory.CreateDirectory(dataRoot);
@@ -1593,7 +1594,7 @@ namespace PixelVaultNative
         {
             cancellationToken.ThrowIfCancellationRequested();
             EnsureSourceFolders();
-            var inventory = BuildSourceInventory(recurseRename);
+            var inventory = importService.BuildSourceInventory(recurseRename);
             cancellationToken.ThrowIfCancellationRequested();
             var rename = inventory.RenameScopeFiles;
             var move = inventory.TopLevelMediaFiles;
@@ -1779,7 +1780,7 @@ namespace PixelVaultNative
 
         List<ReviewItem> BuildReviewItems()
         {
-            return BuildReviewItems(BuildSourceInventory(false).TopLevelMediaFiles);
+            return BuildReviewItems(importService.BuildSourceInventory(false).TopLevelMediaFiles);
         }
 
         List<ReviewItem> BuildReviewItems(IEnumerable<string> sourceFiles, CancellationToken cancellationToken = default(CancellationToken))
@@ -1819,7 +1820,7 @@ namespace PixelVaultNative
 
         List<ManualMetadataItem> BuildManualMetadataItems(HashSet<string> recognizedPaths)
         {
-            return BuildManualMetadataItems(BuildSourceInventory(false).TopLevelMediaFiles, recognizedPaths);
+            return BuildManualMetadataItems(importService.BuildSourceInventory(false).TopLevelMediaFiles, recognizedPaths);
         }
 
         List<ManualMetadataItem> BuildManualMetadataItems(IEnumerable<string> sourceFiles, HashSet<string> recognizedPaths, CancellationToken cancellationToken = default(CancellationToken))

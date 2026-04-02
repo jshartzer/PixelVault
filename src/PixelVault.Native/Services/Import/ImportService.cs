@@ -21,6 +21,9 @@ namespace PixelVaultNative
         SortStepResult SortDestinationRootIntoGameFolders(string destinationRoot, string libraryRoot, CancellationToken cancellationToken = default);
 
         UndoImportExecutionResult ExecuteUndoImportMoves(IEnumerable<UndoImportEntry> entries);
+
+        /// <summary>Top-level and optional recursive media file lists from configured source roots.</summary>
+        SourceInventory BuildSourceInventory(bool recurseRename);
     }
 
     /// <summary>Outcome of moving files back to source folders during undo (no UI).</summary>
@@ -47,6 +50,9 @@ namespace PixelVaultNative
         public Func<string, string> GetGameNameFromFileName;
         public Action<string, string> EnsureDirectoryExists;
         public Func<ILibraryScanner> GetLibraryScanner;
+
+        /// <summary>Enumerate files under all configured source roots (deduped, full paths).</summary>
+        public Func<SearchOption, Func<string, bool>, IEnumerable<string>> EnumerateSourceMediaFiles;
     }
 
     internal sealed class ImportService : IImportService
@@ -215,6 +221,21 @@ namespace PixelVaultNative
                 d.Log?.Invoke("Undo move: " + currentPath + " -> " + target);
             }
             return result;
+        }
+
+        public SourceInventory BuildSourceInventory(bool recurseRename)
+        {
+            var enumerate = d.EnumerateSourceMediaFiles;
+            var isMedia = d.IsMedia;
+            if (enumerate == null || isMedia == null) return new SourceInventory();
+            var topLevelMediaFiles = enumerate(SearchOption.TopDirectoryOnly, isMedia).ToList();
+            return new SourceInventory
+            {
+                TopLevelMediaFiles = topLevelMediaFiles,
+                RenameScopeFiles = recurseRename
+                    ? enumerate(SearchOption.AllDirectories, isMedia).ToList()
+                    : topLevelMediaFiles.ToList()
+            };
         }
 
         string ResolveUndoCurrentPath(UndoImportEntry entry, HashSet<string> usedPaths, string destinationRoot, string libraryRoot)

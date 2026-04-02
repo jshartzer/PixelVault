@@ -562,7 +562,7 @@ namespace PixelVaultNative
                         try
                         {
                             EnsureSourceFolders();
-                            return BuildSourceInventory(false).TopLevelMediaFiles.Count;
+                            return importService.BuildSourceInventory(false).TopLevelMediaFiles.Count;
                         }
                         catch
                         {

@@ -33,18 +33,6 @@ namespace PixelVaultNative
             public SortStepResult SortResult;
         }
 
-        SourceInventory BuildSourceInventory(bool recurseRename)
-        {
-            var topLevelMediaFiles = EnumerateSourceFiles(SearchOption.TopDirectoryOnly, IsMedia).ToList();
-            return new SourceInventory
-            {
-                TopLevelMediaFiles = topLevelMediaFiles,
-                RenameScopeFiles = recurseRename
-                    ? EnumerateSourceFiles(SearchOption.AllDirectories, IsMedia).ToList()
-                    : topLevelMediaFiles.ToList()
-            };
-        }
-
         int GetMetadataWorkerCount(int workItems)
         {
             if (workItems <= 1) return 1;
@@ -59,8 +47,8 @@ namespace PixelVaultNative
                 EnsureExifTool();
                 Directory.CreateDirectory(destinationRoot);
                 var prepStopwatch = Stopwatch.StartNew();
-                var renameInventory = BuildSourceInventory(recurseBox != null && recurseBox.IsChecked == true);
-                var inventory = BuildSourceInventory(false);
+                var renameInventory = importService.BuildSourceInventory(recurseBox != null && recurseBox.IsChecked == true);
+                var inventory = importService.BuildSourceInventory(false);
                 var reviewItems = BuildReviewItems(inventory.TopLevelMediaFiles);
                 var recognizedPaths = new HashSet<string>(reviewItems.Select(i => i.FilePath), StringComparer.OrdinalIgnoreCase);
                 var manualItems = BuildManualMetadataItems(inventory.TopLevelMediaFiles, recognizedPaths);
@@ -113,7 +101,7 @@ namespace PixelVaultNative
                 EnsureExifTool();
                 Directory.CreateDirectory(destinationRoot);
                 var prepStopwatch = Stopwatch.StartNew();
-                var inventory = BuildSourceInventory(false);
+                var inventory = importService.BuildSourceInventory(false);
                 var recognizedPaths = new HashSet<string>(BuildReviewItems(inventory.TopLevelMediaFiles).Select(i => i.FilePath), StringComparer.OrdinalIgnoreCase);
                 var manualItems = BuildManualMetadataItems(inventory.TopLevelMediaFiles, recognizedPaths);
                 prepStopwatch.Stop();
@@ -532,7 +520,7 @@ namespace PixelVaultNative
 
         RenameStepResult RunRename()
         {
-            return RunRename(BuildSourceInventory(recurseBox != null && recurseBox.IsChecked == true).RenameScopeFiles);
+            return RunRename(importService.BuildSourceInventory(recurseBox != null && recurseBox.IsChecked == true).RenameScopeFiles);
         }
 
         internal static void ApplySteamRenameMapToReviewItems(List<ReviewItem> items, Dictionary<string, string> oldToNew)
@@ -904,12 +892,12 @@ namespace PixelVaultNative
 
         MoveStepResult RunMove()
         {
-            return RunMove(BuildSourceInventory(false).TopLevelMediaFiles, null);
+            return RunMove(importService.BuildSourceInventory(false).TopLevelMediaFiles, null);
         }
 
         MoveStepResult RunMove(HashSet<string> skipFiles)
         {
-            return RunMove(BuildSourceInventory(false).TopLevelMediaFiles, skipFiles);
+            return RunMove(importService.BuildSourceInventory(false).TopLevelMediaFiles, skipFiles);
         }
 
         MoveStepResult RunMove(IEnumerable<string> sourceFiles, HashSet<string> skipFiles, Action<int, int, string> progress = null, CancellationToken cancellationToken = default(CancellationToken))
