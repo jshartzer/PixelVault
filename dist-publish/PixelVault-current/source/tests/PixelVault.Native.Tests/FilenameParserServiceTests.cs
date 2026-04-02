@@ -74,6 +74,40 @@ public sealed class FilenameParserServiceTests
     }
 
     [Fact]
+    public void Parse_GenericDate_IsoAtStartOfFileName_ParsesDate()
+    {
+        var parser = CreateParser();
+
+        var parsed = parser.Parse("2011-05-16_00001.jpg", string.Empty);
+
+        Assert.Equal(new DateTime(2011, 5, 16), parsed.CaptureTime);
+        Assert.Equal(DateTimeKind.Local, parsed.CaptureTime!.Value.Kind);
+        Assert.Equal("generic-date-match", parsed.ConventionId);
+    }
+
+    [Fact]
+    public void Parse_GenericDate_CompactAfterUnderscore_ParsesDate()
+    {
+        var parser = CreateParser();
+
+        var parsed = parser.Parse("IMG_20110516_0001.jpg", string.Empty);
+
+        Assert.Equal(new DateTime(2011, 5, 16), parsed.CaptureTime);
+        Assert.Equal("generic-date-match", parsed.ConventionId);
+    }
+
+    [Fact]
+    public void Parse_GenericDate_DottedDate_ParsesDate()
+    {
+        var parser = CreateParser();
+
+        var parsed = parser.Parse("vacation_2011.05.16.jpg", string.Empty);
+
+        Assert.Equal(new DateTime(2011, 5, 16), parsed.CaptureTime);
+        Assert.Equal("generic-date-match", parsed.ConventionId);
+    }
+
+    [Fact]
     public void Parse_Ps5Share_WithSegmentAndFractionalSeconds_UsesPs5Rule()
     {
         var parser = CreateParser();

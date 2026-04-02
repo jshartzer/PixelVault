@@ -2,6 +2,8 @@
 - **Settings:** Path Settings **MinHeight** no longer exceeds window height; paths area is **scrollable**; main Settings **header actions wrap** on a second row; **Control Center** scrolls so the intake preview keeps space; default window height fits smaller displays better.
 - **Library (platform sort):** each console section has a **chevron** to **collapse or expand** its tiles; section counts read **`N games`** on **one line** (no stacked “folders” label).
 - **Set Custom Cover:** opens **only** the file picker (starts in **My Covers**); **Open My Covers Folder** still opens Explorer from the same menu.
+- **Photography gallery:** **Photography** on the **Library** toolbar and **Settings** header opens the game-photography tagged capture browser (same behavior as before; entry points restored).
+- **Engineering / structure (no intentional user-visible behavior change for these):** MainWindow extraction **Phase E** — `ShowLibraryBrowser` → `UI/Library/MainWindow.LibraryBrowser.cs`; **`LibraryWorkspaceContext`** holds folder listing + file-tag caches; **Phase F1–F2** — settings shell partial (`BuildUi`, path settings window), photography + Steam match picker partial. **`Publish-PixelVault.ps1`** bundles `source/src/PixelVault.Native` and `source/tests/PixelVault.Native.Tests` into the publish folder. See `docs/MAINWINDOW_EXTRACTION_ROADMAP.md`.
 
 ## 0.831
 - **Import and Edit:** if you leave the **game title** as loaded (e.g. the numeric hint from the filename) but the row is **Steam** with an AppID, PixelVault now resolves the **store title** before the game-index prompts—same as automatic import. If you **change** the title, your text is kept.

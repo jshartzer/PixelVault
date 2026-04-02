@@ -1466,6 +1466,8 @@ namespace PixelVaultNative
                     imageControl.Source = immediate;
                     imageControl.Visibility = Visibility.Visible;
                 }
+                imageControl.InvalidateMeasure();
+                imageControl.InvalidateVisual();
                 hadSource = true;
                 return;
             }
@@ -1508,7 +1510,9 @@ namespace PixelVaultNative
                     if (onLoaded != null) onLoaded(task.Result);
                     else imageControl.Source = task.Result;
                     imageControl.Visibility = Visibility.Visible;
-                }));
+                    imageControl.InvalidateMeasure();
+                    imageControl.InvalidateVisual();
+                }), DispatcherPriority.Render);
             }, TaskScheduler.Default);
         }
 
@@ -2448,8 +2452,7 @@ namespace PixelVaultNative
                         true,
                         delegate
                         {
-                            return manualWindow.IsLoaded
-                                && previewBorder.Child == previewImage
+                            return previewBorder.Child == previewImage
                                 && selectedItems.Count == 1
                                 && ReferenceEquals(selectedItems[0], item);
                         });
@@ -4126,28 +4129,39 @@ namespace PixelVaultNative
         {
             try
             {
-                if (string.IsNullOrWhiteSpace(path) || !File.Exists(path)) return null;
-                var sourcePath = path;
-                var normalizedDecodePixelWidth = NormalizeThumbnailDecodeWidth(decodePixelWidth);
-                if (IsVideo(path))
+                if (string.IsNullOrWhiteSpace(path)) return null;
+                string fullPath;
+                try
                 {
-                    var poster = EnsureVideoPoster(path, normalizedDecodePixelWidth);
-                    if (!string.IsNullOrWhiteSpace(poster) && File.Exists(poster)) path = poster;
+                    fullPath = Path.GetFullPath(path.Trim());
                 }
-                var info = new FileInfo(path);
-                var cacheKey = path + "|" + info.LastWriteTimeUtc.Ticks + "|" + info.Length + "|" + normalizedDecodePixelWidth;
+                catch
+                {
+                    return null;
+                }
+
+                if (!File.Exists(fullPath)) return null;
+                var sourcePath = fullPath;
+                var normalizedDecodePixelWidth = NormalizeThumbnailDecodeWidth(decodePixelWidth);
+                if (IsVideo(fullPath))
+                {
+                    var poster = EnsureVideoPoster(fullPath, normalizedDecodePixelWidth);
+                    if (!string.IsNullOrWhiteSpace(poster) && File.Exists(poster)) fullPath = poster;
+                }
+                var info = new FileInfo(fullPath);
+                var cacheKey = fullPath + "|" + info.LastWriteTimeUtc.Ticks + "|" + info.Length + "|" + normalizedDecodePixelWidth;
                 var cached = TryGetCachedImage(cacheKey);
                 if (cached != null) return cached;
 
                 BitmapImage image = null;
-                var thumbnailPath = IsVideo(sourcePath) ? null : ThumbnailCachePath(path, normalizedDecodePixelWidth);
+                var thumbnailPath = IsVideo(sourcePath) ? null : ThumbnailCachePath(fullPath, normalizedDecodePixelWidth);
                 if (!string.IsNullOrWhiteSpace(thumbnailPath) && File.Exists(thumbnailPath))
                 {
                     image = LoadFrozenBitmap(thumbnailPath, 0);
                 }
                 if (image == null)
                 {
-                    image = LoadFrozenBitmap(path, normalizedDecodePixelWidth);
+                    image = LoadFrozenBitmap(fullPath, normalizedDecodePixelWidth);
                     if (image != null && !string.IsNullOrWhiteSpace(thumbnailPath) && !File.Exists(thumbnailPath))
                     {
                         SaveThumbnailCache(image, thumbnailPath);
@@ -4330,16 +4344,27 @@ namespace PixelVaultNative
 
         BitmapImage TryLoadCachedVisualImmediate(string sourcePath, int decodePixelWidth)
         {
-            if (string.IsNullOrWhiteSpace(sourcePath) || !File.Exists(sourcePath)) return null;
+            if (string.IsNullOrWhiteSpace(sourcePath)) return null;
+            string fullPath;
+            try
+            {
+                fullPath = Path.GetFullPath(sourcePath.Trim());
+            }
+            catch
+            {
+                return null;
+            }
+
+            if (!File.Exists(fullPath)) return null;
             try
             {
                 var normalizedDecodePixelWidth = NormalizeThumbnailDecodeWidth(decodePixelWidth);
-                if (IsVideo(sourcePath))
+                if (IsVideo(fullPath))
                 {
-                    var posterPath = ExistingVideoPosterPath(sourcePath, normalizedDecodePixelWidth);
+                    var posterPath = ExistingVideoPosterPath(fullPath, normalizedDecodePixelWidth);
                     return string.IsNullOrWhiteSpace(posterPath) ? null : LoadFrozenBitmap(posterPath, 0);
                 }
-                var thumbnailPath = ThumbnailCachePath(sourcePath, normalizedDecodePixelWidth);
+                var thumbnailPath = ThumbnailCachePath(fullPath, normalizedDecodePixelWidth);
                 return string.IsNullOrWhiteSpace(thumbnailPath) || !File.Exists(thumbnailPath)
                     ? null
                     : LoadFrozenBitmap(thumbnailPath, 0);
@@ -4352,25 +4377,37 @@ namespace PixelVaultNative
 
         BitmapImage LoadFrozenBitmap(string path, int decodePixelWidth)
         {
-            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path)) return null;
+            if (string.IsNullOrWhiteSpace(path)) return null;
             string fullPath;
             try
             {
-                fullPath = Path.GetFullPath(path);
+                fullPath = Path.GetFullPath(path.Trim());
             }
             catch
             {
                 return null;
             }
 
-            var image = new BitmapImage();
-            image.BeginInit();
-            image.CacheOption = BitmapCacheOption.OnLoad;
-            if (decodePixelWidth > 0) image.DecodePixelWidth = decodePixelWidth;
-            image.UriSource = new UriBuilder { Scheme = Uri.UriSchemeFile, Host = string.Empty, Path = fullPath }.Uri;
-            image.EndInit();
-            image.Freeze();
-            return image;
+            if (!File.Exists(fullPath)) return null;
+
+            try
+            {
+                using (var stream = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+                {
+                    var image = new BitmapImage();
+                    image.BeginInit();
+                    image.CacheOption = BitmapCacheOption.OnLoad;
+                    if (decodePixelWidth > 0) image.DecodePixelWidth = decodePixelWidth;
+                    image.StreamSource = stream;
+                    image.EndInit();
+                    image.Freeze();
+                    return image;
+                }
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         void SaveThumbnailCache(BitmapSource source, string destinationPath)

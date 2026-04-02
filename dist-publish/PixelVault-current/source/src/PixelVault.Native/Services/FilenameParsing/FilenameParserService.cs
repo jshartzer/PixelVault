@@ -550,19 +550,41 @@ namespace PixelVaultNative
         static DateTime? ParseGenericCaptureDate(string fileName)
         {
             DateTime parsed;
-            var fullStamp = Regex.Match(fileName ?? string.Empty, @"(?:^|_)(?<stamp>\d{14})(?:[_-]|(?=\.[^.]+$))", RegexOptions.IgnoreCase);
+            if (string.IsNullOrEmpty(fileName)) return null;
+
+            var fullStamp = Regex.Match(fileName, @"(?:^|_)(?<stamp>\d{14})(?:[_-]|(?=\.[^.]+$))", RegexOptions.IgnoreCase);
             if (fullStamp.Success && DateTime.TryParseExact(fullStamp.Groups["stamp"].Value, "yyyyMMddHHmmss", CultureInfo.InvariantCulture, DateTimeStyles.None, out parsed))
             {
                 return DateTime.SpecifyKind(parsed, DateTimeKind.Local);
             }
 
-            var dateOnly = Regex.Match(fileName ?? string.Empty, @"_(?<stamp>\d{4}-\d{2}-\d{2})(?:_|(?=\.[^.]+$))", RegexOptions.IgnoreCase);
+            // ISO date at start of name (e.g. 2011-05-16_00001.jpg) or after underscore (e.g. IMG_2011-05-16.jpg)
+            var dateOnly = Regex.Match(fileName, @"(?:^|_)(?<stamp>\d{4}-\d{2}-\d{2})(?:_|(?=\.[^.]+$))", RegexOptions.IgnoreCase);
             if (dateOnly.Success && DateTime.TryParseExact(dateOnly.Groups["stamp"].Value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out parsed))
             {
                 return DateTime.SpecifyKind(parsed, DateTimeKind.Local);
             }
 
-            var xboxStamp = Regex.Match(fileName ?? string.Empty, @"[-–—](?<stamp>\d{4}_\d{2}_\d{2}[-_]\d{2}[-_]\d{2}[-_]\d{2})(?=\.[^.]+$)", RegexOptions.IgnoreCase);
+            var dateDots = Regex.Match(fileName, @"(?:^|_)(?<stamp>\d{4}\.\d{2}\.\d{2})(?:_|(?=\.[^.]+$))", RegexOptions.IgnoreCase);
+            if (dateDots.Success && DateTime.TryParseExact(dateDots.Groups["stamp"].Value, "yyyy.MM.dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out parsed))
+            {
+                return DateTime.SpecifyKind(parsed, DateTimeKind.Local);
+            }
+
+            var dateUnder = Regex.Match(fileName, @"(?:^|_)(?<stamp>\d{4}_\d{2}_\d{2})(?:_|(?=\.[^.]+$))", RegexOptions.IgnoreCase);
+            if (dateUnder.Success && DateTime.TryParseExact(dateUnder.Groups["stamp"].Value, "yyyy_MM_dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out parsed))
+            {
+                return DateTime.SpecifyKind(parsed, DateTimeKind.Local);
+            }
+
+            // Compact yyyyMMdd at start or after separator (e.g. 20110516_1.jpg, photo_20110516.png)
+            var compactDate = Regex.Match(fileName, @"(?:^|_)(?<stamp>\d{8})(?:_|(?=\.[^.]+$))", RegexOptions.IgnoreCase);
+            if (compactDate.Success && DateTime.TryParseExact(compactDate.Groups["stamp"].Value, "yyyyMMdd", CultureInfo.InvariantCulture, DateTimeStyles.None, out parsed))
+            {
+                return DateTime.SpecifyKind(parsed, DateTimeKind.Local);
+            }
+
+            var xboxStamp = Regex.Match(fileName, @"[-–—](?<stamp>\d{4}_\d{2}_\d{2}[-_]\d{2}[-_]\d{2}[-_]\d{2})(?=\.[^.]+$)", RegexOptions.IgnoreCase);
             if (xboxStamp.Success && DateTime.TryParseExact(xboxStamp.Groups["stamp"].Value, "yyyy_MM_dd-HH_mm_ss", CultureInfo.InvariantCulture, DateTimeStyles.None, out parsed))
             {
                 return DateTime.SpecifyKind(parsed, DateTimeKind.Local);
@@ -572,7 +594,7 @@ namespace PixelVaultNative
                 return DateTime.SpecifyKind(parsed, DateTimeKind.Local);
             }
 
-            var steamClipUnix = Regex.Match(fileName ?? string.Empty, @"^clip_(?<stamp>[\d,]{13,17})(?=\.[^.]+$)", RegexOptions.IgnoreCase);
+            var steamClipUnix = Regex.Match(fileName, @"^clip_(?<stamp>[\d,]{13,17})(?=\.[^.]+$)", RegexOptions.IgnoreCase);
             if (steamClipUnix.Success)
             {
                 return ParseTimestamp(steamClipUnix.Groups["stamp"].Value, "unix-ms");
