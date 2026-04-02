@@ -12,7 +12,7 @@ namespace PixelVaultNative
         void EnsureLibraryRootExists(string root);
         void EnsureExifTool();
 
-        Dictionary<string, LibraryMetadataIndexEntry> LoadLibraryMetadataIndex(string root);
+        Dictionary<string, LibraryMetadataIndexEntry> LoadLibraryMetadataIndex(string root, bool forceDiskReload = false);
         void SaveLibraryMetadataIndex(string root, Dictionary<string, LibraryMetadataIndexEntry> index);
 
         List<GameIndexEditorRow> LoadSavedGameIndexRows(string root);
@@ -21,7 +21,7 @@ namespace PixelVaultNative
 
         string BuildLibraryMetadataStamp(string file);
 
-        Dictionary<string, EmbeddedMetadataSnapshot> ReadEmbeddedMetadataBatch(string[] files, CancellationToken cancellationToken);
+        Dictionary<string, EmbeddedMetadataSnapshot> ReadEmbeddedMetadataBatch(IEnumerable<string> files, CancellationToken cancellationToken);
 
         LibraryMetadataIndexEntry BuildResolvedLibraryMetadataIndexEntry(
             string root,
@@ -43,5 +43,56 @@ namespace PixelVaultNative
         void LogLibraryScan(string message);
 
         void RebuildLibraryFolderCache(string root, Dictionary<string, LibraryMetadataIndexEntry> index);
+
+        void RemoveCachedFileTagEntries(IEnumerable<string> files);
+
+        void RemoveCachedImageEntries(IEnumerable<string> files);
+
+        void RemoveCachedFolderListings(IEnumerable<string> folderPaths);
+
+        string[] BuildManualMetadataTagsForIndexUpsert(ManualMetadataItem item);
+
+        string DetermineConsoleLabelFromTags(IEnumerable<string> tags);
+
+        bool ManualMetadataChangesGroupingIdentity(ManualMetadataItem item);
+
+        GameIndexEditorRow ResolveExistingGameIndexRowForAssignment(IEnumerable<GameIndexEditorRow> rows, string name, string platformLabel, string preferredGameId);
+
+        long ToCaptureUtcTicks(DateTime captureTime);
+
+        string NormalizeGameId(string value);
+
+        string NormalizeConsoleLabel(string value);
+
+        long ResolveLibraryMetadataCaptureUtcTicks(string file, string stamp, EmbeddedMetadataSnapshot snapshot, LibraryMetadataIndexEntry existingEntry);
+
+        void SaveSavedGameIndexRows(string root, IEnumerable<GameIndexEditorRow> rows);
+
+        GameIndexEditorRow EnsureGameIndexRowForAssignment(List<GameIndexEditorRow> rows, string name, string platformLabel, string preferredGameId);
+
+        string GuessGameIndexNameForFile(string file);
+
+        bool IsLibraryImageFile(string path);
+
+        DateTime ResolveIndexedLibraryDate(string root, string file, Dictionary<string, LibraryMetadataIndexEntry> index);
+
+        string DetermineFolderPlatformForFiles(List<string> files, Dictionary<string, LibraryMetadataIndexEntry> index);
+
+        GameIndexEditorRow FindSavedGameIndexRowById(IEnumerable<GameIndexEditorRow> rows, string gameId);
+
+        string ResolveGameIdForIndexedFile(
+            string root,
+            string file,
+            string platformLabel,
+            IEnumerable<string> tags,
+            Dictionary<string, LibraryMetadataIndexEntry> index,
+            List<GameIndexEditorRow> gameRows,
+            string preferredGameId);
+
+        bool SyncGameIndexRowsFromLibraryFolders(List<GameIndexEditorRow> rows, List<LibraryFolderInfo> folders);
+
+        bool PruneObsoleteMultipleTagsRows(List<GameIndexEditorRow> rows);
+
+        string ResolveLibraryFolderSteamAppId(string platformLabel, IEnumerable<string> files);
     }
 }

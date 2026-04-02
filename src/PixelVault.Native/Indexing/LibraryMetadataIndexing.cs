@@ -232,170 +232,27 @@ namespace PixelVaultNative
 
         void UpsertLibraryMetadataIndexEntries(IEnumerable<string> files, string root)
         {
-            lock (libraryMaintenanceSync)
-            {
-                if (string.IsNullOrWhiteSpace(root)) return;
-                var fileList = (files ?? Enumerable.Empty<string>()).Where(f => !string.IsNullOrWhiteSpace(f) && File.Exists(f)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-                if (fileList.Count == 0) return;
-                var index = LoadLibraryMetadataIndex(root, true);
-                var gameRows = LoadSavedGameIndexRows(root);
-                var metadataByFile = ReadEmbeddedMetadataBatch(fileList);
-                foreach (var file in fileList)
-                {
-                    EmbeddedMetadataSnapshot snapshot;
-                    if (!metadataByFile.TryGetValue(file, out snapshot) || snapshot == null) snapshot = new EmbeddedMetadataSnapshot();
-                    var stamp = BuildLibraryMetadataStamp(file);
-                    LibraryMetadataIndexEntry existingEntry;
-                    if (!index.TryGetValue(file, out existingEntry)) existingEntry = null;
-                    var rebuiltEntry = BuildResolvedLibraryMetadataIndexEntry(root, file, stamp, snapshot, existingEntry, index, gameRows);
-                    index[file] = rebuiltEntry;
-                    SetCachedFileTags(file, ParseTagText(rebuiltEntry.TagText), MetadataCacheStamp(file));
-                }
-                SaveLibraryMetadataIndex(root, index);
-                RebuildLibraryFolderCache(root, index);
-            }
+            libraryScanner.UpsertLibraryMetadataIndexEntries(files, root);
         }
 
         void UpsertLibraryMetadataIndexEntries(IEnumerable<ManualMetadataItem> items, string root)
         {
-            lock (libraryMaintenanceSync)
-            {
-                if (string.IsNullOrWhiteSpace(root)) return;
-                var itemList = (items ?? Enumerable.Empty<ManualMetadataItem>())
-                    .Where(item => item != null && !string.IsNullOrWhiteSpace(item.FilePath) && File.Exists(item.FilePath))
-                    .GroupBy(item => item.FilePath, StringComparer.OrdinalIgnoreCase)
-                    .Select(group => group.Last())
-                    .ToList();
-                if (itemList.Count == 0) return;
-                var index = LoadLibraryMetadataIndex(root, true);
-                var gameRows = LoadSavedGameIndexRows(root);
-                foreach (var item in itemList)
-                {
-                    var tags = BuildMetadataTagSet(null, BuildManualMetadataExtraTags(item), item.AddPhotographyTag);
-                    var platformLabel = DetermineConsoleLabelFromTags(tags);
-                    var preferredGameId = ManualMetadataChangesGroupingIdentity(item) ? string.Empty : item.GameId;
-                    var resolvedRow = ResolveExistingGameIndexRowForAssignment(gameRows, item.GameName, platformLabel, preferredGameId);
-                    item.GameId = resolvedRow == null ? string.Empty : resolvedRow.GameId;
-                    if (resolvedRow != null && !string.IsNullOrWhiteSpace(resolvedRow.Name)) item.GameName = resolvedRow.Name;
-                    index[item.FilePath] = new LibraryMetadataIndexEntry
-                    {
-                        FilePath = item.FilePath,
-                        Stamp = BuildLibraryMetadataStamp(item.FilePath),
-                        GameId = item.GameId,
-                        ConsoleLabel = platformLabel,
-                        TagText = string.Join(", ", tags),
-                        CaptureUtcTicks = ToCaptureUtcTicks(item.CaptureTime)
-                    };
-                    SetCachedFileTags(item.FilePath, tags, MetadataCacheStamp(item.FilePath));
-                }
-                SaveLibraryMetadataIndex(root, index);
-                RebuildLibraryFolderCache(root, index);
-            }
+            libraryScanner.UpsertLibraryMetadataIndexEntries(items, root);
         }
 
         void RemoveLibraryMetadataIndexEntries(IEnumerable<string> files, string root)
         {
-            lock (libraryMaintenanceSync)
-            {
-                if (string.IsNullOrWhiteSpace(root)) return;
-                var fileList = (files ?? Enumerable.Empty<string>()).Where(f => !string.IsNullOrWhiteSpace(f)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-                if (fileList.Count == 0) return;
-                var touchedDirectories = new HashSet<string>(
-                    fileList
-                        .Select(file => Path.GetDirectoryName(file) ?? string.Empty)
-                        .Where(path => !string.IsNullOrWhiteSpace(path)),
-                    StringComparer.OrdinalIgnoreCase);
-                var index = LoadLibraryMetadataIndex(root, true);
-                var changed = false;
-                foreach (var file in fileList)
-                {
-                    if (index.Remove(file)) changed = true;
-                }
-                RemoveCachedFileTagEntries(fileList);
-                if (changed)
-                {
-                    SaveLibraryMetadataIndex(root, index);
-                    RebuildLibraryFolderCache(root, index);
-                    RemoveCachedImageEntries(fileList);
-                    RemoveCachedFolderListings(touchedDirectories);
-                }
-            }
+            libraryScanner.RemoveLibraryMetadataIndexEntries(files, root);
         }
 
         List<PhotoIndexEditorRow> LoadPhotoIndexEditorRows(string root)
         {
-            return LoadLibraryMetadataIndex(root, true)
-                .Values
-                .Where(entry => entry != null && !string.IsNullOrWhiteSpace(entry.FilePath) && File.Exists(entry.FilePath))
-                .Select(entry => new PhotoIndexEditorRow
-                {
-                    FilePath = entry.FilePath ?? string.Empty,
-                    Stamp = entry.Stamp ?? string.Empty,
-                    GameId = NormalizeGameId(entry.GameId),
-                    ConsoleLabel = NormalizeConsoleLabel(entry.ConsoleLabel),
-                    TagText = entry.TagText ?? string.Empty
-                })
-                .OrderBy(row => row.FilePath ?? string.Empty, StringComparer.OrdinalIgnoreCase)
-                .ToList();
+            return libraryScanner.LoadPhotoIndexEditorRows(root);
         }
 
         void SavePhotoIndexEditorRows(string root, IEnumerable<PhotoIndexEditorRow> rows)
         {
-            lock (libraryMaintenanceSync)
-            {
-                if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root)) return;
-                var rowList = (rows ?? Enumerable.Empty<PhotoIndexEditorRow>())
-                    .Where(row => row != null && !string.IsNullOrWhiteSpace(row.FilePath) && File.Exists(row.FilePath))
-                    .GroupBy(row => row.FilePath, StringComparer.OrdinalIgnoreCase)
-                    .Select(group => group.Last())
-                    .ToList();
-                var missingGameId = rowList.FirstOrDefault(row => string.IsNullOrWhiteSpace(NormalizeGameId(row.GameId)));
-                if (missingGameId != null) throw new InvalidOperationException("Each photo index row needs a Game ID before saving. Missing: " + Path.GetFileName(missingGameId.FilePath));
-
-                var existingIndex = LoadLibraryMetadataIndex(root, true);
-                var index = new Dictionary<string, LibraryMetadataIndexEntry>(StringComparer.OrdinalIgnoreCase);
-                foreach (var row in rowList)
-                {
-                    var normalizedTags = string.Join(", ", ParseTagText(row.TagText));
-                    var normalizedConsole = NormalizeConsoleLabel(string.IsNullOrWhiteSpace(row.ConsoleLabel) ? DetermineConsoleLabelFromTags(ParseTagText(normalizedTags)) : row.ConsoleLabel);
-                    var stamp = BuildLibraryMetadataStamp(row.FilePath);
-                    LibraryMetadataIndexEntry existingEntry;
-                    if (!existingIndex.TryGetValue(row.FilePath, out existingEntry)) existingEntry = null;
-                    index[row.FilePath] = new LibraryMetadataIndexEntry
-                    {
-                        FilePath = row.FilePath,
-                        Stamp = stamp,
-                        GameId = NormalizeGameId(row.GameId),
-                        ConsoleLabel = normalizedConsole,
-                        TagText = normalizedTags,
-                        CaptureUtcTicks = ResolveLibraryMetadataCaptureUtcTicks(row.FilePath, stamp, null, existingEntry)
-                    };
-                }
-
-                var gameRows = LoadSavedGameIndexRows(root);
-                foreach (var group in index.Values.Where(entry => entry != null && !string.IsNullOrWhiteSpace(entry.GameId)).GroupBy(entry => NormalizeGameId(entry.GameId), StringComparer.OrdinalIgnoreCase))
-                {
-                    var first = group.First();
-                    var row = EnsureGameIndexRowForAssignment(gameRows, GuessGameIndexNameForFile(first.FilePath), first.ConsoleLabel, group.Key);
-                    if (row == null) continue;
-                    var filePaths = group.Select(entry => entry.FilePath).Where(File.Exists).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(path => path, StringComparer.OrdinalIgnoreCase).ToArray();
-                    row.FileCount = filePaths.Length;
-                    row.FilePaths = filePaths;
-                    row.PreviewImagePath = filePaths.FirstOrDefault(IsImage) ?? filePaths.FirstOrDefault() ?? string.Empty;
-                    row.FolderPath = filePaths
-                        .Select(path => Path.GetDirectoryName(path) ?? string.Empty)
-                        .GroupBy(path => path, StringComparer.OrdinalIgnoreCase)
-                        .OrderByDescending(pathGroup => pathGroup.Count())
-                        .ThenBy(pathGroup => pathGroup.Key, StringComparer.OrdinalIgnoreCase)
-                        .Select(pathGroup => pathGroup.Key)
-                        .FirstOrDefault() ?? string.Empty;
-                    row.PlatformLabel = NormalizeConsoleLabel(first.ConsoleLabel);
-                }
-
-                SaveSavedGameIndexRows(root, gameRows);
-                SaveLibraryMetadataIndex(root, index);
-                RebuildLibraryFolderCache(root, index);
-            }
+            libraryScanner.SavePhotoIndexEditorRows(root, rows);
         }
     }
 }
