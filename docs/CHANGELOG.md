@@ -4,6 +4,7 @@
 - **Set Custom Cover:** opens **only** the file picker (starts in **My Covers**); **Open My Covers Folder** still opens Explorer from the same menu.
 - **Photography gallery:** **Photography** on the **Library** toolbar and **Settings** header opens the game-photography tagged capture browser (same behavior as before; entry points restored).
 - **Engineering / structure (no intentional user-visible behavior change for these):** MainWindow extraction **Phase E** — `ShowLibraryBrowser` → `UI/Library/MainWindow.LibraryBrowser.cs`; **`LibraryWorkspaceContext`** holds folder listing + file-tag caches; **Phase F1–F2** — settings shell partial (`BuildUi`, path settings window), photography + Steam match picker partial. **`Publish-PixelVault.ps1`** bundles `source/src/PixelVault.Native` and `source/tests/PixelVault.Native.Tests` into the publish folder. See `docs/MAINWINDOW_EXTRACTION_ROADMAP.md`.
+- **Engineering / structure (service split):** **Phase 4** items **1–2** — `LoadPhotoIndexEditorRows` and `LoadLibraryFolders` moved into **`LibraryScanner`** with **`ILibraryScanHost`** callbacks; **`LibraryMetadataIndexing`** / **`LibraryFolderIndexing`** keep thin wrappers. Plan: `docs/pixelvault_service_split_plan.txt`.
 
 ## 0.831
 - **Import and Edit:** if you leave the **game title** as loaded (e.g. the numeric hint from the filename) but the row is **Steam** with an AppID, PixelVault now resolves the **store title** before the game-index prompts—same as automatic import. If you **change** the title, your text is kept.

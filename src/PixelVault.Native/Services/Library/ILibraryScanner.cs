@@ -27,5 +27,11 @@ namespace PixelVaultNative
 
         /// <summary>Build folder cards from on-disk library layout and metadata index (may refresh index entries and saved game rows).</summary>
         List<LibraryFolderInfo> LoadLibraryFolders(string root, Dictionary<string, LibraryMetadataIndexEntry> index);
+
+        /// <summary>Rebuild persisted folder-card cache from a metadata index snapshot (locks library maintenance).</summary>
+        void RebuildLibraryFolderCache(string root, Dictionary<string, LibraryMetadataIndexEntry> index);
+
+        /// <summary>Load folder cards from disk cache when stamp matches; otherwise rebuild via <see cref="LoadLibraryFolders"/>.</summary>
+        List<LibraryFolderInfo> LoadLibraryFoldersCached(string root, bool forceRefresh);
     }
 }

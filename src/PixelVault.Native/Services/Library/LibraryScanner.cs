@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -152,7 +153,7 @@ namespace PixelVaultNative
                 }
 
                 host.SaveLibraryMetadataIndex(root, index);
-                host.RebuildLibraryFolderCache(root, index);
+                RebuildLibraryFolderCache(root, index);
                 var summary = string.IsNullOrWhiteSpace(folderPath)
                     ? "Library metadata index scan complete: updated " + updated + ", unchanged " + unchanged + ", removed " + removed + "."
                     : "Library folder scan complete for " + Path.GetFileName(folderPath) + ": updated " + updated + ", unchanged " + unchanged + ", removed " + removed + ".";
@@ -185,7 +186,7 @@ namespace PixelVaultNative
                 }
 
                 host.SaveLibraryMetadataIndex(root, index);
-                host.RebuildLibraryFolderCache(root, index);
+                RebuildLibraryFolderCache(root, index);
             }
         }
 
@@ -223,7 +224,7 @@ namespace PixelVaultNative
                 }
 
                 host.SaveLibraryMetadataIndex(root, index);
-                host.RebuildLibraryFolderCache(root, index);
+                RebuildLibraryFolderCache(root, index);
             }
         }
 
@@ -250,7 +251,7 @@ namespace PixelVaultNative
                 if (changed)
                 {
                     host.SaveLibraryMetadataIndex(root, index);
-                    host.RebuildLibraryFolderCache(root, index);
+                    RebuildLibraryFolderCache(root, index);
                     host.RemoveCachedImageEntries(fileList);
                     host.RemoveCachedFolderListings(touchedDirectories);
                 }
@@ -312,7 +313,7 @@ namespace PixelVaultNative
 
                 host.SaveSavedGameIndexRows(root, gameRows);
                 host.SaveLibraryMetadataIndex(root, index);
-                host.RebuildLibraryFolderCache(root, index);
+                RebuildLibraryFolderCache(root, index);
             }
         }
 
@@ -448,6 +449,55 @@ namespace PixelVaultNative
             if (gameRowsChanged) host.SaveSavedGameIndexRows(root, gameRows);
             if (indexChanged) host.SaveLibraryMetadataIndex(root, index);
             return list;
+        }
+
+        public void RebuildLibraryFolderCache(string root, Dictionary<string, LibraryMetadataIndexEntry> index)
+        {
+            lock (host.LibraryMaintenanceSync)
+            {
+                if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root))
+                {
+                    host.ClearLibraryFolderCache(root);
+                    return;
+                }
+                var stopwatch = Stopwatch.StartNew();
+                host.LogLibraryScan("Rebuilding library folder cache.");
+                var fresh = LoadLibraryFolders(root, index);
+                host.ApplySavedGameIndexRows(root, fresh);
+                host.SaveLibraryFolderCache(root, host.BuildLibraryFolderInventoryStamp(root), fresh);
+                stopwatch.Stop();
+                host.LogLibraryScan("Library folder cache rebuild complete in " + stopwatch.ElapsedMilliseconds + " ms for " + fresh.Count + " folder(s).");
+            }
+        }
+
+        public List<LibraryFolderInfo> LoadLibraryFoldersCached(string root, bool forceRefresh)
+        {
+            lock (host.LibraryMaintenanceSync)
+            {
+                var stopwatch = Stopwatch.StartNew();
+                var stamp = host.BuildLibraryFolderInventoryStamp(root);
+                if (!forceRefresh)
+                {
+                    var cached = host.LoadLibraryFolderCache(root, stamp);
+                    if (cached != null)
+                    {
+                        var cacheUpdated = host.PopulateMissingLibraryFolderSortKeys(cached);
+                        if (host.ApplySavedGameIndexRows(root, cached)) cacheUpdated = true;
+                        if (cacheUpdated) host.SaveLibraryFolderCache(root, stamp, cached);
+                        host.LogLibraryScan("Library folder cache hit.");
+                        stopwatch.Stop();
+                        host.LogPerformanceSample("LibraryFolderCache", stopwatch, "mode=hit; folders=" + cached.Count + "; forceRefresh=" + forceRefresh, 40);
+                        return cached;
+                    }
+                }
+                host.LogLibraryScan("Refreshing library folder cache.");
+                var fresh = LoadLibraryFolders(root, null);
+                host.ApplySavedGameIndexRows(root, fresh);
+                host.SaveLibraryFolderCache(root, stamp, fresh);
+                stopwatch.Stop();
+                host.LogPerformanceSample("LibraryFolderCache", stopwatch, "mode=rebuild; folders=" + fresh.Count + "; forceRefresh=" + forceRefresh, 40);
+                return fresh;
+            }
         }
     }
 }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading;
 
 namespace PixelVaultNative
@@ -42,7 +43,19 @@ namespace PixelVaultNative
 
         void LogLibraryScan(string message);
 
-        void RebuildLibraryFolderCache(string root, Dictionary<string, LibraryMetadataIndexEntry> index);
+        void ClearLibraryFolderCache(string root);
+
+        string BuildLibraryFolderInventoryStamp(string root);
+
+        List<LibraryFolderInfo> LoadLibraryFolderCache(string root, string stamp);
+
+        void SaveLibraryFolderCache(string root, string stamp, List<LibraryFolderInfo> folders);
+
+        bool ApplySavedGameIndexRows(string root, List<LibraryFolderInfo> folders);
+
+        bool PopulateMissingLibraryFolderSortKeys(List<LibraryFolderInfo> folders);
+
+        void LogPerformanceSample(string area, Stopwatch stopwatch, string detail, long thresholdMilliseconds);
 
         void RemoveCachedFileTagEntries(IEnumerable<string> files);
 

@@ -3174,38 +3174,7 @@ namespace PixelVaultNative
 
         List<LibraryFolderInfo> LoadLibraryFoldersCached(string root, bool forceRefresh)
         {
-            lock (libraryMaintenanceSync)
-            {
-                var stopwatch = Stopwatch.StartNew();
-                var stamp = BuildLibraryFolderInventoryStamp(root);
-                if (!forceRefresh)
-                {
-                    var cached = LoadLibraryFolderCache(root, stamp);
-                    if (cached != null)
-                    {
-                        var cacheUpdated = PopulateMissingLibraryFolderSortKeys(cached);
-                        if (ApplySavedGameIndexRows(root, cached))
-                        {
-                            cacheUpdated = true;
-                        }
-                        if (cacheUpdated)
-                        {
-                            SaveLibraryFolderCache(root, stamp, cached);
-                        }
-                        Log("Library folder cache hit.");
-                        stopwatch.Stop();
-                        LogPerformanceSample("LibraryFolderCache", stopwatch, "mode=hit; folders=" + cached.Count + "; forceRefresh=" + forceRefresh, 40);
-                        return cached;
-                    }
-                }
-                Log("Refreshing library folder cache.");
-                var fresh = LoadLibraryFolders(root);
-                ApplySavedGameIndexRows(root, fresh);
-                SaveLibraryFolderCache(root, stamp, fresh);
-                stopwatch.Stop();
-                LogPerformanceSample("LibraryFolderCache", stopwatch, "mode=rebuild; folders=" + fresh.Count + "; forceRefresh=" + forceRefresh, 40);
-                return fresh;
-            }
+            return libraryScanner.LoadLibraryFoldersCached(root, forceRefresh);
         }
 
         void OpenLibraryFolderIdEditor(LibraryFolderInfo folder, Action refreshLibrary)
