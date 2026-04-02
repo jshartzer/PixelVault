@@ -1475,7 +1475,6 @@ namespace PixelVaultNative
             }
             Task.Run(delegate
             {
-                if (shouldLoad != null && !shouldLoad()) return null;
                 limiter.Wait();
                 try
                 {
@@ -2051,6 +2050,7 @@ namespace PixelVaultNative
             if (useFlexiblePreview)
             {
                 previewBorder.MinHeight = 200;
+                previewImage.MinHeight = 200;
                 previewImage.MaxHeight = 420;
                 manualWindow.SizeChanged += delegate
                 {
@@ -2448,8 +2448,7 @@ namespace PixelVaultNative
                         true,
                         delegate
                         {
-                            return dialogReady
-                                && manualWindow.IsLoaded
+                            return manualWindow.IsLoaded
                                 && previewBorder.Child == previewImage
                                 && selectedItems.Count == 1
                                 && ReferenceEquals(selectedItems[0], item);
@@ -4354,11 +4353,21 @@ namespace PixelVaultNative
         BitmapImage LoadFrozenBitmap(string path, int decodePixelWidth)
         {
             if (string.IsNullOrWhiteSpace(path) || !File.Exists(path)) return null;
+            string fullPath;
+            try
+            {
+                fullPath = Path.GetFullPath(path);
+            }
+            catch
+            {
+                return null;
+            }
+
             var image = new BitmapImage();
             image.BeginInit();
             image.CacheOption = BitmapCacheOption.OnLoad;
             if (decodePixelWidth > 0) image.DecodePixelWidth = decodePixelWidth;
-            image.UriSource = new Uri(path);
+            image.UriSource = new UriBuilder { Scheme = Uri.UriSchemeFile, Host = string.Empty, Path = fullPath }.Uri;
             image.EndInit();
             image.Freeze();
             return image;

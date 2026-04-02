@@ -92,14 +92,18 @@ Practical current focus:
 
 The app is currently published at `0.832`.
 
-The active structural work is still the modular-monolith cleanup path:
+**Notion (synced Mar 2026):** [Releases — 0.832](https://www.notion.so/33673adc59b68139b705c987dd98d2fd), [MainWindow extraction roadmap](https://www.notion.so/33573adc59b681d88b7dcd88cad53cb6) (status block matches `docs/MAINWINDOW_EXTRACTION_ROADMAP.md`).
 
-- MainWindow extraction
-- service boundary cleanup
-- keeping Library/import/index flows stable while responsibilities move into smaller types
+Recent extraction progress (repo):
+
+- **E1–E3:** Library browser partial, `LibraryWorkspaceContext` caches, virtualization unchanged in `LibraryVirtualization.cs`
+- **F1–F2:** Settings shell partial (incl. path settings dialog), photography gallery + Steam picker partial; photography wired from Library + Settings
+- **Publish:** script copies full native + test sources under `dist/.../source/`
+
+Next likely slices: **F3** (optional settings persistence helper), deeper library **host/facade**, or **Phase 2** responsiveness items from `PERFORMANCE_TODO.md`.
 
 If you are picking work up midstream:
 
 1. decide whether the task is a shipped-behavior change or a source-only refactor
-2. check whether the change belongs in `MainWindow`, an extracted UI host, or a service seam
-3. update the matching docs if the workflow or structure meaningfully changes
+2. check whether the change belongs in `MainWindow`, an extracted UI partial/host, or a service seam
+3. update the matching docs and Notion per `DOC_SYNC_POLICY.md` when milestones or releases change

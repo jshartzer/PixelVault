@@ -1,3 +1,5 @@
+# If -Force fails removing the output folder (often PixelVault.ico / exe in use), close PixelVault and
+# any Explorer windows on that dist folder, or use -OutputRoot to publish to a fresh directory first.
 [CmdletBinding()]
 param(
     [string]$Version,

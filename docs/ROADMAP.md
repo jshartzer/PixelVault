@@ -135,7 +135,7 @@ Why this is the core maintainability phase:
 
 **Execution roadmap (phased slices, line-count map, ordering):**
 
-- `C:\Codex\docs\MAINWINDOW_EXTRACTION_ROADMAP.md` — **Phase B (B1–B3) complete in source** (changelog window, brush helper, progress window factory); **next slice: Phase C** (`UI/Intake/`).
+- `C:\Codex\docs\MAINWINDOW_EXTRACTION_ROADMAP.md` — **Phases A–D complete**; **E1–E3** (library browser partial, `LibraryWorkspaceContext`, virtualization seam); **F1–F2** (settings shell + path dialog partial, photography / Steam picker partial). **`PixelVault.Native.cs`** is ~4.9k lines (Mar 2026). **Next:** F3 or deeper library host / Phase 2 responsiveness.
 
 Primary outcomes:
 
