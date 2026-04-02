@@ -12,13 +12,16 @@ Important workspace note:
 - if a tool session ever starts in `A:\Codex`, treat that as an environment quirk, not the real project root
 - `C:\Codex` is the source of truth for code, builds, docs, and shared app data
 
-Current published build:
+**Current version and published exe path** are not duplicated here (they change every release). Use:
 
-- `C:\Codex\dist\PixelVault-0.779\PixelVault.exe`
+- `docs/CURRENT_BUILD.txt` — version string and full path to the last published `PixelVault.exe`
+- `docs/CHANGELOG.md` — release notes per version
+- `src/PixelVault.Native/PixelVault.Native.cs` — `const string AppVersion` for the in-repo build
 
-Desktop shortcut:
+**Convenience:** after `Publish-PixelVault.ps1`, the repo-root shortcut `PixelVault.lnk` and the junction folder below track the latest publish without editing this file:
 
 - `C:\Codex\PixelVault.lnk`
+- `C:\Codex\dist\PixelVault-current\` → points at the most recently published `PixelVault-<version>\` folder
 
 ## What PixelVault Does
 
@@ -80,7 +83,7 @@ PixelVault currently includes:
 - Game Index editor for master game records
 - Photo Index editor for per-file metadata rows
 
-The Game Index now also acts as the canonical folder-naming authority when records are saved, so library folders can be renamed/moved to follow edited game titles and platform splits.
+The Game Index also acts as the canonical folder-naming authority when records are saved, so library folders can be renamed/moved to follow edited game titles and platform splits.
 
 ## Data Layout
 
@@ -88,23 +91,21 @@ Shared persistent app data lives under:
 
 - `C:\Codex\PixelVaultData`
 
-Important files:
+Important paths (names depend on configured library root and cache hashing — adjust for your machine):
 
-- `C:\Codex\PixelVaultData\cache\pixelvault-index-<library>.sqlite`
-- `C:\Codex\PixelVaultData\cache\game-index-y_game_captures.cache`
-- `C:\Codex\PixelVaultData\cache\library-metadata-index-y_game_captures.cache`
-- `C:\Codex\docs\CURRENT_BUILD.txt`
-- `C:\Codex\docs\CHANGELOG.md`
-- `C:\Codex\docs\HANDOFF.md`
-- `C:\Codex\docs\POLICY.md`
-- `C:\Codex\docs\PROJECT_CONTEXT.md`
+- `PixelVaultData/cache/` — SQLite indexes, folder caches, covers, thumbs, logs (see `POLICY.md` for what belongs in git)
+- `docs/CURRENT_BUILD.txt`
+- `docs/CHANGELOG.md`
+- `docs/HANDOFF.md`
+- `docs/POLICY.md`
+- `docs/PROJECT_CONTEXT.md`
 
 ## Workspace Map
 
 - `C:\Codex\src\PixelVault.Native`: live app source and SDK project
 - `C:\Codex\scripts`: build/publish and developer utility scripts
 - `C:\Codex\docs`: handoff, policy, changelog, project context, and current-build marker
-- `C:\Codex\dist`: published versioned builds
+- `C:\Codex\dist`: published versioned builds (`PixelVault-<version>/`) plus `PixelVault-current` junction
 - `C:\Codex\assets`: shared branding and UI assets
 - `C:\Codex\tools`: bundled runtime dependencies such as `ExifTool` and `FFmpeg`
 - `C:\Codex\PixelVaultData`: live shared app data, indexes, caches, and logs
@@ -113,30 +114,22 @@ Important files:
 
 ## Source And Packaging
 
-The live published source snapshot for the current build is:
-
-- `C:\Codex\dist\PixelVault-0.779\PixelVault.Native.cs`
-
-The live build source now lives at:
+Authoritative source:
 
 - `C:\Codex\src\PixelVault.Native\PixelVault.Native.cs`
 - `C:\Codex\src\PixelVault.Native\PixelVault.Native.csproj`
 
-Use the publish helper for new release folders:
-
-- `C:\Codex\scripts\Publish-PixelVault.ps1`
+Each publish run also copies a source tree and changelog into the output folder (see `scripts/Publish-PixelVault.ps1`).
 
 ## Running The App
 
-Use the current published executable:
+**Latest published build** (after you run the publish script):
 
 ```powershell
-C:\Codex\dist\PixelVault-0.779\PixelVault.exe
+& "C:\Codex\dist\PixelVault-current\PixelVault.exe"
 ```
 
-Or launch it from:
-
-- `C:\Codex\PixelVault.lnk`
+Or open `C:\Codex\PixelVault.lnk`. For an exact versioned path, read `docs/CURRENT_BUILD.txt`.
 
 ## Building And Publishing
 
@@ -146,11 +139,13 @@ Build the live source with the SDK project:
 dotnet build C:\Codex\src\PixelVault.Native\PixelVault.Native.csproj -c Release
 ```
 
-Publish a new versioned dist folder with the helper script:
+Publish a new versioned folder under `dist\`. The script reads **`AppVersion`** from `PixelVault.Native.cs` when you omit `-Version`:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File C:\Codex\scripts\Publish-PixelVault.ps1 -Version 0.779
+pwsh -File C:\Codex\scripts\Publish-PixelVault.ps1 -Force
 ```
+
+Optional: `-OutputRoot` if the default `dist` folder is locked; see script header comments.
 
 ## Project Documents
 
@@ -171,7 +166,7 @@ This repo is intended to track:
 
 It should not track:
 
-- the actual screenshot/video library on `Y:\`
+- the actual screenshot/video library on `Y:\` (or other capture volumes)
 - runtime logs
 - cover cache
 - thumbnail cache
@@ -184,6 +179,6 @@ Older PowerShell workflow files are now grouped under `C:\Codex\legacy\GameCaptu
 
 ## Storage Note
 
-The live Game Index and Photo Index are now backed by a per-library SQLite database in `C:\Codex\PixelVaultData\cache`.
+The live Game Index and Photo Index are backed by a per-library SQLite database under `PixelVaultData/cache/`.
 
-The older tab-delimited `game-index-*.cache` and `library-metadata-index-*.cache` files are now legacy migration inputs and historical snapshots, not the primary runtime store.
+Older tab-delimited `game-index-*.cache` and `library-metadata-index-*.cache` files may still appear as migration inputs or historical artifacts; SQLite is the primary runtime store for current builds.
