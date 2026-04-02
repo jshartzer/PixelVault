@@ -39,6 +39,8 @@
     <Compile Include="Services\Covers\CoverService.cs" />
     <Compile Include="Services\FilenameParsing\FilenameParserService.cs" />
     <Compile Include="Services\FilenameRules\FilenameRulesService.cs" />
+    <Compile Include="Services\IO\FileSystemService.cs" />
+    <Compile Include="Services\IO\IFileSystemService.cs" />
     <Compile Include="Services\Import\ImportService.cs" />
     <Compile Include="Services\Import\SteamImportRename.cs" />
     <Compile Include="Services\Indexing\IndexPersistenceService.cs" />

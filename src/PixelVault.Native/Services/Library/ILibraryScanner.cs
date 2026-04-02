@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace PixelVaultNative
 {
@@ -9,6 +10,14 @@ namespace PixelVaultNative
         /// <summary>Scan (or rescan) library metadata index for the whole library or one game folder.</summary>
         /// <returns>Count of entries updated from embedded reads.</returns>
         int ScanLibraryMetadataIndex(
+            string root,
+            string folderPath,
+            bool forceRescan,
+            Action<int, int, string> progress,
+            CancellationToken cancellationToken = default);
+
+        /// <summary>Runs <see cref="ScanLibraryMetadataIndex"/> on the thread pool; await from UI code instead of wrapping sync scan in <see cref="Task.Factory"/>.</summary>
+        Task<int> ScanLibraryMetadataIndexAsync(
             string root,
             string folderPath,
             bool forceRescan,

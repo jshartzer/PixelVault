@@ -77,15 +77,19 @@ namespace PixelVaultNative
 
         /// <summary>Normalize title for “already game-prefixed?” checks during manual rename.</summary>
         public Func<string, string> NormalizeTitleForManualRename;
+
+        public IFileSystemService FileSystem;
     }
 
     internal sealed class ImportService : IImportService
     {
         readonly ImportServiceDependencies d;
+        readonly IFileSystemService fs;
 
         public ImportService(ImportServiceDependencies dependencies)
         {
             d = dependencies ?? throw new ArgumentNullException(nameof(dependencies));
+            fs = d.FileSystem ?? throw new ArgumentNullException(nameof(dependencies) + "." + nameof(dependencies.FileSystem));
         }
 
         string UndoPath => d.UndoManifestPath == null ? string.Empty : (d.UndoManifestPath() ?? string.Empty);
@@ -94,8 +98,8 @@ namespace PixelVaultNative
         {
             var path = UndoPath;
             var entries = new List<UndoImportEntry>();
-            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path)) return entries;
-            foreach (var line in File.ReadAllLines(path))
+            if (string.IsNullOrWhiteSpace(path)) return entries;
+            foreach (var line in fs.ReadAllLines(path))
             {
                 if (string.IsNullOrWhiteSpace(line)) continue;
                 var parts = line.Split('\t');
@@ -111,16 +115,16 @@ namespace PixelVaultNative
             if (string.IsNullOrWhiteSpace(path)) return;
             if (entries == null || entries.Count == 0)
             {
-                if (File.Exists(path)) File.Delete(path);
+                if (fs.FileExists(path)) fs.DeleteFile(path);
                 return;
             }
 
-            File.WriteAllLines(path, entries.Select(entry => string.Join("\t", new[]
+            fs.WriteAllLines(path, entries.Select(entry => string.Join("\t", new[]
             {
                 entry.SourceDirectory ?? string.Empty,
                 entry.ImportedFileName ?? string.Empty,
                 entry.CurrentPath ?? string.Empty
-            })).ToArray());
+            })).ToList());
         }
 
         public MoveStepResult MoveFilesToLibraryDestination(
@@ -132,7 +136,7 @@ namespace PixelVaultNative
             var destinationRoot = d.GetDestinationRoot == null ? string.Empty : d.GetDestinationRoot() ?? string.Empty;
             int moved = 0, skipped = 0, renamedConflict = 0;
             var entries = new List<UndoImportEntry>();
-            var fileList = (files ?? Enumerable.Empty<string>()).Where(File.Exists).ToList();
+            var fileList = (files ?? Enumerable.Empty<string>()).Where(fs.FileExists).ToList();
             var total = fileList.Count;
             if (progress != null) progress(0, total, "Starting move step for " + total + " file(s).");
             for (int i = 0; i < total; i++)
@@ -142,7 +146,7 @@ namespace PixelVaultNative
                 var remaining = total - (i + 1);
                 var sourceDirectory = Path.GetDirectoryName(file);
                 var target = Path.Combine(destinationRoot, Path.GetFileName(file));
-                if (File.Exists(target))
+                if (fs.FileExists(target))
                 {
                     var mode = d.GetConflictMode == null ? "Rename" : (d.GetConflictMode() ?? "Rename");
                     if (string.Equals(mode, "Skip", StringComparison.OrdinalIgnoreCase))
@@ -156,9 +160,9 @@ namespace PixelVaultNative
                         target = d.UniquePath == null ? target : d.UniquePath(target);
                         renamedConflict++;
                     }
-                    if (string.Equals(mode, "Overwrite", StringComparison.OrdinalIgnoreCase)) File.Delete(target);
+                    if (string.Equals(mode, "Overwrite", StringComparison.OrdinalIgnoreCase)) fs.DeleteFile(target);
                 }
-                File.Move(file, target);
+                fs.MoveFile(file, target);
                 d.MoveMetadataSidecarIfPresent?.Invoke(file, target);
                 moved++;
                 entries.Add(new UndoImportEntry { SourceDirectory = sourceDirectory, ImportedFileName = Path.GetFileName(target), CurrentPath = target });
@@ -174,7 +178,7 @@ namespace PixelVaultNative
         public SortStepResult SortDestinationRootIntoGameFolders(string destinationRoot, string libraryRoot, CancellationToken cancellationToken = default)
         {
             d.EnsureDirectoryExists?.Invoke(destinationRoot, "Destination folder");
-            var files = Directory.EnumerateFiles(destinationRoot, "*", SearchOption.TopDirectoryOnly).Where(f => d.IsMedia != null && d.IsMedia(f)).ToList();
+            var files = fs.EnumerateFiles(destinationRoot, "*", SearchOption.TopDirectoryOnly).Where(f => d.IsMedia != null && d.IsMedia(f)).ToList();
             if (files.Count == 0)
             {
                 d.Log?.Invoke("Sort destination found no root-level media files to organize.");
@@ -192,20 +196,20 @@ namespace PixelVaultNative
                         ? Path.GetFileNameWithoutExtension(file)
                         : d.GetGameNameFromFileName(Path.GetFileNameWithoutExtension(file)));
                 var targetDirectory = Path.Combine(destinationRoot, folderName);
-                if (!Directory.Exists(targetDirectory))
+                if (!fs.DirectoryExists(targetDirectory))
                 {
-                    Directory.CreateDirectory(targetDirectory);
+                    fs.CreateDirectory(targetDirectory);
                     created++;
                 }
 
                 var target = Path.Combine(targetDirectory, Path.GetFileName(file));
-                if (File.Exists(target))
+                if (fs.FileExists(target))
                 {
                     target = d.UniquePath == null ? target : d.UniquePath(target);
                     renamedConflict++;
                 }
 
-                File.Move(file, target);
+                fs.MoveFile(file, target);
                 d.MoveMetadataSidecarIfPresent?.Invoke(file, target);
                 moved++;
                 indexedTargets.Add(target);
@@ -227,7 +231,7 @@ namespace PixelVaultNative
             foreach (var entry in entries ?? Enumerable.Empty<UndoImportEntry>())
             {
                 var currentPath = ResolveUndoCurrentPath(entry, usedPaths, destinationRoot, libraryRoot);
-                if (string.IsNullOrWhiteSpace(currentPath) || !File.Exists(currentPath))
+                if (string.IsNullOrWhiteSpace(currentPath) || !fs.FileExists(currentPath))
                 {
                     result.Skipped++;
                     result.RemainingEntries.Add(entry);
@@ -235,11 +239,11 @@ namespace PixelVaultNative
                     continue;
                 }
 
-                Directory.CreateDirectory(entry.SourceDirectory);
+                fs.CreateDirectory(entry.SourceDirectory);
                 var target = d.UniquePath == null
                     ? Path.Combine(entry.SourceDirectory, Path.GetFileName(currentPath))
                     : d.UniquePath(Path.Combine(entry.SourceDirectory, Path.GetFileName(currentPath)));
-                File.Move(currentPath, target);
+                fs.MoveFile(currentPath, target);
                 result.Moved++;
                 result.RemovedFromLibraryPaths.Add(currentPath);
                 d.Log?.Invoke("Undo move: " + currentPath + " -> " + target);
@@ -273,13 +277,13 @@ namespace PixelVaultNative
                 cancellationToken.ThrowIfCancellationRequested();
                 var path = paths[i];
                 var remaining = total - (i + 1);
-                if (!File.Exists(path))
+                if (!fs.FileExists(path))
                 {
                     skipped++;
                     if (progress != null) progress(i + 1, total, "Skipped delete " + (i + 1) + " of " + total + " | " + remaining + " remaining | file missing");
                     continue;
                 }
-                File.Delete(path);
+                fs.DeleteFile(path);
                 deleted++;
                 var name = Path.GetFileName(path);
                 d.Log?.Invoke("Deleted before processing: " + name);
@@ -304,7 +308,7 @@ namespace PixelVaultNative
             }
 
             var libraryRoot = d.GetLibraryRoot == null ? string.Empty : d.GetLibraryRoot() ?? string.Empty;
-            var files = (sourceFiles ?? Enumerable.Empty<string>()).Where(File.Exists).ToList();
+            var files = (sourceFiles ?? Enumerable.Empty<string>()).Where(fs.FileExists).ToList();
             var total = files.Count;
             if (progress != null) progress(0, total, "Starting rename step for " + total + " file(s).");
             for (int i = 0; i < total; i++)
@@ -345,7 +349,7 @@ namespace PixelVaultNative
                 }
                 var combined = Path.Combine(Path.GetDirectoryName(file) ?? string.Empty, newBase + Path.GetExtension(file));
                 var target = d.UniquePath == null ? combined : d.UniquePath(combined);
-                File.Move(file, target);
+                fs.MoveFile(file, target);
                 pathMap[file] = target;
                 d.MoveMetadataSidecarIfPresent?.Invoke(file, target);
                 renamed++;
@@ -375,7 +379,7 @@ namespace PixelVaultNative
                 cancellationToken.ThrowIfCancellationRequested();
                 var item = items[i];
                 var remaining = total - (i + 1);
-                if (!File.Exists(item.FilePath))
+                if (!fs.FileExists(item.FilePath))
                 {
                     skipped++;
                     if (progress != null) progress(i + 1, total, "Skipped rename " + (i + 1) + " of " + total + " | " + remaining + " remaining | file missing");
@@ -418,16 +422,16 @@ namespace PixelVaultNative
         string ResolveUndoCurrentPath(UndoImportEntry entry, HashSet<string> usedPaths, string destinationRoot, string libraryRoot)
         {
             if (entry == null) return null;
-            if (!string.IsNullOrWhiteSpace(entry.CurrentPath) && File.Exists(entry.CurrentPath))
+            if (!string.IsNullOrWhiteSpace(entry.CurrentPath) && fs.FileExists(entry.CurrentPath))
             {
                 var fullCurrent = Path.GetFullPath(entry.CurrentPath);
                 if (usedPaths.Add(fullCurrent)) return fullCurrent;
             }
 
-            foreach (var root in new[] { destinationRoot, libraryRoot }.Where(r => !string.IsNullOrWhiteSpace(r) && Directory.Exists(r)).Distinct(StringComparer.OrdinalIgnoreCase))
+            foreach (var root in new[] { destinationRoot, libraryRoot }.Where(r => !string.IsNullOrWhiteSpace(r) && fs.DirectoryExists(r)).Distinct(StringComparer.OrdinalIgnoreCase))
             {
-                foreach (var candidate in Directory.EnumerateFiles(root, entry.ImportedFileName, SearchOption.AllDirectories)
-                    .OrderByDescending(path => File.GetLastWriteTime(path)))
+                foreach (var candidate in fs.EnumerateFiles(root, entry.ImportedFileName, SearchOption.AllDirectories)
+                    .OrderByDescending(path => fs.GetLastWriteTime(path)))
                 {
                     var fullCandidate = Path.GetFullPath(candidate);
                     if (usedPaths.Add(fullCandidate)) return fullCandidate;

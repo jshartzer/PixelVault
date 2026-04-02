@@ -106,6 +106,7 @@ namespace PixelVaultNative
         readonly IIndexPersistenceService indexPersistenceService;
         readonly IMetadataService metadataService;
         readonly ISettingsService settingsService;
+        readonly IFileSystemService fileSystemService;
         readonly ILibraryScanner libraryScanner;
         readonly IImportService importService;
 
@@ -260,7 +261,8 @@ namespace PixelVaultNative
                 RunExeCapture = delegate(string file, string[] args, string cwd, bool logOutput, CancellationToken cancellationToken) { return RunExeCapture(file, args, cwd, logOutput, cancellationToken); }
             });
             settingsService = new SettingsService();
-            libraryScanner = new LibraryScanner(new LibraryScanHost(this), metadataService);
+            fileSystemService = new FileSystemService();
+            libraryScanner = new LibraryScanner(new LibraryScanHost(this), metadataService, fileSystemService);
             importService = new ImportService(new ImportServiceDependencies
             {
                 UndoManifestPath = () => undoManifestPath,
@@ -281,7 +283,8 @@ namespace PixelVaultNative
                 ResolveSteamStoreTitle = appId => SteamName(appId),
                 EnsureSteamAppIdInGameIndex = EnsureSteamAppIdInGameIndex,
                 SanitizeManualRenameGameTitle = Sanitize,
-                NormalizeTitleForManualRename = NormalizeTitle
+                NormalizeTitleForManualRename = NormalizeTitle,
+                FileSystem = fileSystemService
             });
             libraryWorkspace = new LibraryWorkspaceContext(this);
             Directory.CreateDirectory(dataRoot);
@@ -1001,30 +1004,27 @@ namespace PixelVaultNative
                 var capturedFolderPath = folderPath;
                 var capturedForceRescan = forceRescan;
                 scanCancellation = new CancellationTokenSource();
-                System.Threading.Tasks.Task.Factory.StartNew(delegate
+                libraryScanner.ScanLibraryMetadataIndexAsync(root, capturedFolderPath, capturedForceRescan, delegate(int currentCount, int totalCount, string detail)
                 {
-                    return libraryScanner.ScanLibraryMetadataIndex(root, capturedFolderPath, capturedForceRescan, delegate(int currentCount, int totalCount, string detail)
+                    if (progressWindow == null) return;
+                    progressWindow.Dispatcher.BeginInvoke(new Action(delegate
                     {
-                        if (progressWindow == null) return;
-                        progressWindow.Dispatcher.BeginInvoke(new Action(delegate
+                        if (progressBar == null || progressMeta == null) return;
+                        progressBar.IsIndeterminate = totalCount <= 0;
+                        if (totalCount > 0)
                         {
-                            if (progressBar == null || progressMeta == null) return;
-                            progressBar.IsIndeterminate = totalCount <= 0;
-                            if (totalCount > 0)
-                            {
-                                progressBar.Maximum = totalCount;
-                                progressBar.Value = Math.Min(currentCount, totalCount);
-                                var remaining = Math.Max(totalCount - currentCount, 0);
-                                progressMeta.Text = currentCount + " of " + totalCount + " processed | " + remaining + " remaining";
-                            }
-                            else
-                            {
-                                progressMeta.Text = detail;
-                            }
-                            appendProgress(detail);
-                        }));
-                    }, scanCancellation.Token);
-                }).ContinueWith(delegate(System.Threading.Tasks.Task<int> scanTask)
+                            progressBar.Maximum = totalCount;
+                            progressBar.Value = Math.Min(currentCount, totalCount);
+                            var remaining = Math.Max(totalCount - currentCount, 0);
+                            progressMeta.Text = currentCount + " of " + totalCount + " processed | " + remaining + " remaining";
+                        }
+                        else
+                        {
+                            progressMeta.Text = detail;
+                        }
+                        appendProgress(detail);
+                    }));
+                }, scanCancellation.Token).ContinueWith(delegate(System.Threading.Tasks.Task<int> scanTask)
                 {
                     Dispatcher.BeginInvoke(new Action(delegate
                     {

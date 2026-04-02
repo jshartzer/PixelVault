@@ -13,11 +13,13 @@ namespace PixelVaultNative
     {
         readonly ILibraryScanHost host;
         readonly IMetadataService metadataService;
+        readonly IFileSystemService fileSystem;
 
-        public LibraryScanner(ILibraryScanHost host, IMetadataService metadataService)
+        public LibraryScanner(ILibraryScanHost host, IMetadataService metadataService, IFileSystemService fileSystem)
         {
             this.host = host ?? throw new ArgumentNullException(nameof(host));
             this.metadataService = metadataService ?? throw new ArgumentNullException(nameof(metadataService));
+            this.fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
         }
 
         public int ScanLibraryMetadataIndex(
@@ -36,24 +38,24 @@ namespace PixelVaultNative
                 var targets = new List<string>();
                 if (string.IsNullOrWhiteSpace(folderPath))
                 {
-                    foreach (var dir in Directory.EnumerateDirectories(root))
+                    foreach (var dir in fileSystem.EnumerateDirectories(root))
                     {
-                        targets.AddRange(Directory.EnumerateFiles(dir, "*.*", SearchOption.TopDirectoryOnly).Where(host.IsLibraryMediaFile));
+                        targets.AddRange(fileSystem.EnumerateFiles(dir, "*.*", SearchOption.TopDirectoryOnly).Where(host.IsLibraryMediaFile));
                     }
                 }
                 else
                 {
-                    targets.AddRange(Directory.EnumerateFiles(folderPath, "*.*", SearchOption.TopDirectoryOnly).Where(host.IsLibraryMediaFile));
+                    targets.AddRange(fileSystem.EnumerateFiles(folderPath, "*.*", SearchOption.TopDirectoryOnly).Where(host.IsLibraryMediaFile));
                 }
 
-                var fileList = targets.Where(File.Exists).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(p => p, StringComparer.OrdinalIgnoreCase).ToList();
+                var fileList = targets.Where(fileSystem.FileExists).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(p => p, StringComparer.OrdinalIgnoreCase).ToList();
                 var targetSet = new HashSet<string>(fileList, StringComparer.OrdinalIgnoreCase);
                 int updated = 0, unchanged = 0, removed = 0;
                 var scopeLabel = string.IsNullOrWhiteSpace(folderPath) ? "library" : (Path.GetFileName(folderPath) ?? "folder");
                 if (progress != null) progress(0, fileList.Count, "Queued " + fileList.Count + " media file(s) for " + scopeLabel + " scan.");
                 if (string.IsNullOrWhiteSpace(folderPath))
                 {
-                    foreach (var stale in index.Keys.Where(key => !targetSet.Contains(key) || !File.Exists(key)).ToList())
+                    foreach (var stale in index.Keys.Where(key => !targetSet.Contains(key) || !fileSystem.FileExists(key)).ToList())
                     {
                         cancellationToken.ThrowIfCancellationRequested();
                         index.Remove(stale);
@@ -66,7 +68,7 @@ namespace PixelVaultNative
                     {
                         var fileDirectory = Path.GetDirectoryName(key) ?? string.Empty;
                         return string.Equals(fileDirectory, folderPath, StringComparison.OrdinalIgnoreCase)
-                            && (!targetSet.Contains(key) || !File.Exists(key));
+                            && (!targetSet.Contains(key) || !fileSystem.FileExists(key));
                     }).ToList())
                     {
                         cancellationToken.ThrowIfCancellationRequested();
@@ -117,18 +119,30 @@ namespace PixelVaultNative
 
                 try
                 {
-                    Parallel.ForEach(batches, new ParallelOptions { MaxDegreeOfParallelism = scanWorkerCount, CancellationToken = cancellationToken }, delegate(Tuple<int, string[]> batch)
+                    using (var batchGate = new SemaphoreSlim(scanWorkerCount, scanWorkerCount))
                     {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        if (progress != null) progress(unchanged, fileList.Count, "Reading embedded metadata in batch " + batch.Item1 + " of " + batchCount + " (" + batch.Item2.Length + " file(s)).");
-                        var batchMetadata = metadataService.ReadEmbeddedMetadataBatch(batch.Item2, cancellationToken);
-                        foreach (var file in batch.Item2)
+                        var tasks = batches.Select(async batch =>
                         {
-                            EmbeddedMetadataSnapshot snapshot;
-                            if (!batchMetadata.TryGetValue(file, out snapshot) || snapshot == null) snapshot = new EmbeddedMetadataSnapshot();
-                            batchMetadataByFile[file] = snapshot;
-                        }
-                    });
+                            await batchGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+                            try
+                            {
+                                cancellationToken.ThrowIfCancellationRequested();
+                                if (progress != null) progress(unchanged, fileList.Count, "Reading embedded metadata in batch " + batch.Item1 + " of " + batchCount + " (" + batch.Item2.Length + " file(s)).");
+                                var batchMetadata = await metadataService.ReadEmbeddedMetadataBatchAsync(batch.Item2, cancellationToken).ConfigureAwait(false);
+                                foreach (var file in batch.Item2)
+                                {
+                                    EmbeddedMetadataSnapshot snapshot;
+                                    if (!batchMetadata.TryGetValue(file, out snapshot) || snapshot == null) snapshot = new EmbeddedMetadataSnapshot();
+                                    batchMetadataByFile[file] = snapshot;
+                                }
+                            }
+                            finally
+                            {
+                                batchGate.Release();
+                            }
+                        });
+                        Task.WhenAll(tasks).GetAwaiter().GetResult();
+                    }
                 }
                 catch (AggregateException ex)
                 {
@@ -165,16 +179,26 @@ namespace PixelVaultNative
             }
         }
 
+        public Task<int> ScanLibraryMetadataIndexAsync(
+            string root,
+            string folderPath,
+            bool forceRescan,
+            Action<int, int, string> progress,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.Run(() => ScanLibraryMetadataIndex(root, folderPath, forceRescan, progress, cancellationToken), cancellationToken);
+        }
+
         public void UpsertLibraryMetadataIndexEntries(IEnumerable<string> files, string root)
         {
             lock (host.LibraryMaintenanceSync)
             {
                 if (string.IsNullOrWhiteSpace(root)) return;
-                var fileList = (files ?? Enumerable.Empty<string>()).Where(f => !string.IsNullOrWhiteSpace(f) && File.Exists(f)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+                var fileList = (files ?? Enumerable.Empty<string>()).Where(f => !string.IsNullOrWhiteSpace(f) && fileSystem.FileExists(f)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
                 if (fileList.Count == 0) return;
                 var index = host.LoadLibraryMetadataIndex(root, true);
                 var gameRows = host.LoadSavedGameIndexRows(root);
-                var metadataByFile = metadataService.ReadEmbeddedMetadataBatch(fileList, CancellationToken.None);
+                var metadataByFile = metadataService.ReadEmbeddedMetadataBatchAsync(fileList, CancellationToken.None).GetAwaiter().GetResult();
                 foreach (var file in fileList)
                 {
                     EmbeddedMetadataSnapshot snapshot;
@@ -198,7 +222,7 @@ namespace PixelVaultNative
             {
                 if (string.IsNullOrWhiteSpace(root)) return;
                 var itemList = (items ?? Enumerable.Empty<ManualMetadataItem>())
-                    .Where(item => item != null && !string.IsNullOrWhiteSpace(item.FilePath) && File.Exists(item.FilePath))
+                    .Where(item => item != null && !string.IsNullOrWhiteSpace(item.FilePath) && fileSystem.FileExists(item.FilePath))
                     .GroupBy(item => item.FilePath, StringComparer.OrdinalIgnoreCase)
                     .Select(group => group.Last())
                     .ToList();
@@ -264,9 +288,9 @@ namespace PixelVaultNative
         {
             lock (host.LibraryMaintenanceSync)
             {
-                if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root)) return;
+                if (string.IsNullOrWhiteSpace(root) || !fileSystem.DirectoryExists(root)) return;
                 var rowList = (rows ?? Enumerable.Empty<PhotoIndexEditorRow>())
-                    .Where(row => row != null && !string.IsNullOrWhiteSpace(row.FilePath) && File.Exists(row.FilePath))
+                    .Where(row => row != null && !string.IsNullOrWhiteSpace(row.FilePath) && fileSystem.FileExists(row.FilePath))
                     .GroupBy(row => row.FilePath, StringComparer.OrdinalIgnoreCase)
                     .Select(group => group.Last())
                     .ToList();
@@ -299,7 +323,7 @@ namespace PixelVaultNative
                     var first = group.First();
                     var row = host.EnsureGameIndexRowForAssignment(gameRows, host.GuessGameIndexNameForFile(first.FilePath), first.ConsoleLabel, group.Key);
                     if (row == null) continue;
-                    var filePaths = group.Select(entry => entry.FilePath).Where(File.Exists).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(path => path, StringComparer.OrdinalIgnoreCase).ToArray();
+                    var filePaths = group.Select(entry => entry.FilePath).Where(fileSystem.FileExists).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(path => path, StringComparer.OrdinalIgnoreCase).ToArray();
                     row.FileCount = filePaths.Length;
                     row.FilePaths = filePaths;
                     row.PreviewImagePath = filePaths.FirstOrDefault(host.IsLibraryImageFile) ?? filePaths.FirstOrDefault() ?? string.Empty;
@@ -323,7 +347,7 @@ namespace PixelVaultNative
         {
             return host.LoadLibraryMetadataIndex(root, true)
                 .Values
-                .Where(entry => entry != null && !string.IsNullOrWhiteSpace(entry.FilePath) && File.Exists(entry.FilePath))
+                .Where(entry => entry != null && !string.IsNullOrWhiteSpace(entry.FilePath) && fileSystem.FileExists(entry.FilePath))
                 .Select(entry => new PhotoIndexEditorRow
                 {
                     FilePath = entry.FilePath ?? string.Empty,
@@ -343,9 +367,9 @@ namespace PixelVaultNative
             var gameRows = host.LoadSavedGameIndexRows(root);
             bool indexChanged = false;
             bool gameRowsChanged = false;
-            var allFiles = Directory.EnumerateDirectories(root)
-                .SelectMany(dir => Directory.EnumerateFiles(dir, "*.*", SearchOption.TopDirectoryOnly).Where(host.IsLibraryMediaFile))
-                .Where(File.Exists)
+            var allFiles = fileSystem.EnumerateDirectories(root)
+                .SelectMany(dir => fileSystem.EnumerateFiles(dir, "*.*", SearchOption.TopDirectoryOnly).Where(host.IsLibraryMediaFile))
+                .Where(fileSystem.FileExists)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
             var missingOrIncompleteFiles = allFiles
@@ -355,7 +379,7 @@ namespace PixelVaultNative
                     return !index.TryGetValue(file, out entry) || entry == null || entry.CaptureUtcTicks <= 0;
                 })
                 .ToList();
-            var metadataByFile = metadataService.ReadEmbeddedMetadataBatch(missingOrIncompleteFiles, CancellationToken.None);
+            var metadataByFile = metadataService.ReadEmbeddedMetadataBatchAsync(missingOrIncompleteFiles, CancellationToken.None).GetAwaiter().GetResult();
             foreach (var file in allFiles)
             {
                 LibraryMetadataIndexEntry entry;
@@ -457,7 +481,7 @@ namespace PixelVaultNative
         {
             lock (host.LibraryMaintenanceSync)
             {
-                if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root))
+                if (string.IsNullOrWhiteSpace(root) || !fileSystem.DirectoryExists(root))
                 {
                     host.ClearLibraryFolderCache(root);
                     return;
@@ -474,7 +498,7 @@ namespace PixelVaultNative
 
         public void RefreshFolderCacheAfterGameIndexChange(string root)
         {
-            if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root)) return;
+            if (string.IsNullOrWhiteSpace(root) || !fileSystem.DirectoryExists(root)) return;
             RebuildLibraryFolderCache(root, host.LoadLibraryMetadataIndex(root, true));
         }
 

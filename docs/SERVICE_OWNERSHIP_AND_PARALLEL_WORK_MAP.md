@@ -71,7 +71,7 @@ These are the best next service seams, ordered by usefulness and risk.
 | `ILibraryScanner` / `LibraryScanner` | Pulls scan/rebuild/group logic out of library UI code | `src/PixelVault.Native/Services/Library/LibraryScanner.cs` | Medium-High | Biggest leverage after settings/import, but touches many helpers |
 | `ILibraryBrowserHost` / `LibraryBrowserHost` | Makes the main library window a host instead of one giant construction method | `src/PixelVault.Native/UI/Library/LibraryBrowserHost.cs` | High | Strong UI extraction target, but avoid pairing it with service extraction in the same edit pass |
 | `ILogService` | Centralizes log writes and operational messages | `src/PixelVault.Native/Services/Logging/LogService.cs` | Low-Medium | Helpful, but not the first slice unless logging is actively hurting productivity |
-| `IFileSystemService` | Reduces direct `System.IO` calls and helps testability | `src/PixelVault.Native/Services/IO/FileSystemService.cs` | Medium | Useful support seam for import/library later |
+| `IFileSystemService` | Reduces direct `System.IO` calls and helps testability | `src/PixelVault.Native/Services/IO/FileSystemService.cs` | Medium | **First slice (Mar 2026):** `LibraryScanner` enumerates/exists via the seam; extend for import/move/timestamps later |
 
 ---
 
