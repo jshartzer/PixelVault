@@ -52,11 +52,11 @@ Then use these based on the task:
 
 Current live build:
 
-- `0.833`
+- `0.834`
 
 Current executable:
 
-- `C:\Codex\dist\PixelVault-0.833\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.834\PixelVault.exe`
 
 Current build pointer:
 
@@ -90,9 +90,9 @@ Practical current focus:
 
 ## Current Stop Point
 
-The app is currently published at `0.833`.
+The app is currently published at `0.834`.
 
-**Notion (synced Mar 2026):** [Releases — 0.833](https://www.notion.so/33673adc59b68135902ff2a817b509f2), [MainWindow extraction roadmap](https://www.notion.so/33573adc59b681d88b7dcd88cad53cb6) (status block matches `docs/MAINWINDOW_EXTRACTION_ROADMAP.md`).
+**Notion (synced Mar 2026):** [Releases — 0.834](https://www.notion.so/33673adc59b681b89a25cdd0ad9ba663), [MainWindow extraction roadmap](https://www.notion.so/33573adc59b681d88b7dcd88cad53cb6) (status block matches `docs/MAINWINDOW_EXTRACTION_ROADMAP.md`).
 
 Recent extraction progress (repo):
 

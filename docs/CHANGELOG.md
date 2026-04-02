@@ -1,3 +1,6 @@
+## 0.834
+- **Release:** Version **0.834** — publish refresh. Engineering since **0.833** is unchanged in intent (see **0.833** bullets for **Phase 4** completion and **Phase 5** **`ImportService`** extraction).
+
 ## 0.833
 - **Release:** Version **0.833** — publish refresh. User-facing changes since **0.831** are summarized under **0.832** (settings, library UI, covers, photography, MainWindow extraction, **Phase 4** **`LibraryScanner`** work).
 - **Engineering / structure (service split):** **Phase 4 complete** for the current scope — **`LibraryScanner`** now depends on **`IMetadataService`** for **`ReadEmbeddedMetadataBatch`** (removed from **`ILibraryScanHost`**). Added **`RefreshFolderCacheAfterGameIndexChange`**. **MainWindow** / import / library browser call **`libraryScanner`** directly for metadata scans, index upserts/removes, and photo-index load/save; redundant partial wrappers in **`LibraryMetadataIndexing`** and the unused **`LoadLibraryFolders`** shim in **`LibraryFolderIndexing`** are removed.
