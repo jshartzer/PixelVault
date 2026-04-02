@@ -1,287 +1,205 @@
 # PixelVault Project Context
 
-## Overview
+This document is the durable orientation guide for the PixelVault repo.
 
-`PixelVault` is a native Windows desktop app built in C# and WPF for organizing, tagging, previewing, and browsing a game screenshot and clip library.
+Use it for:
 
-The current live app line is based in:
+- what the app is
+- how the workspace is laid out
+- which subsystems exist
+- how data flows through the app
+- which docs own which kinds of facts
 
-- `C:\Codex`
+Do not use this file as a live build tracker or session handoff.
 
-Workspace note:
-
-- the live project root is `C:\Codex`
-- if a tool session starts in `A:\Codex`, continue treating `C:\Codex` as the real workspace
-
-The app now runs from packaged builds under `C:\Codex\dist\PixelVault-x.xxx`, with shared persistent data stored outside the versioned build folders in `C:\Codex\PixelVaultData`.
-
-## Current Published State
-
-Current published build:
-
-- `0.779`
-
-Current executable:
-
-- `C:\Codex\dist\PixelVault-0.779\PixelVault.exe`
-
-Desktop shortcut:
-
-- `C:\Codex\PixelVault.lnk`
-
-Current build pointer:
+For those, use:
 
 - `C:\Codex\docs\CURRENT_BUILD.txt`
+- `C:\Codex\docs\HANDOFF.md`
+- `C:\Codex\docs\CHANGELOG.md`
 
-## Core Goals
+## Product Summary
 
-PixelVault is intended to:
+`PixelVault` is a native Windows desktop app built in C# and WPF for organizing, tagging, indexing, and browsing game screenshots and clips.
 
-- normalize and enrich incoming captures from multiple platforms
-- preserve metadata so external-library tools such as Immich can ingest tags and comments
-- browse an existing NAS-hosted capture library in a polished desktop UI
-- support manual cleanup and metadata correction without losing batch efficiency
+Core jobs:
 
-## Important Paths
+- ingest new captures from upload folders
+- classify likely platform/source from filenames and metadata
+- support review-before-processing and manual cleanup flows
+- write metadata into files and sidecars through `ExifTool`
+- maintain a persistent game index and per-file metadata index
+- browse the library through a richer WPF Library surface
+- fetch and manage cover art, including SteamGridDB-backed workflows
 
-Workspace root:
+## Workspace Rules
+
+Work out of:
 
 - `C:\Codex`
 
-Current live source file:
+Important:
 
-- `C:\Codex\src\PixelVault.Native\PixelVault.Native.cs`
+- treat `C:\Codex` as the only real workspace root
+- if a shell or tool reports `A:\Codex`, treat that as an environment quirk
+- do not treat `A:\` as the live project drive
 
-Current native build project:
+## Runtime Layout
 
-- `C:\Codex\src\PixelVault.Native\PixelVault.Native.csproj`
+Primary areas:
 
-Current publish helper:
+- `C:\Codex\src\PixelVault.Native`: live app source
+- `C:\Codex\docs`: repo documentation
+- `C:\Codex\scripts`: publish and developer utility scripts
+- `C:\Codex\dist`: versioned published builds
+- `C:\Codex\assets`: shared branding and UI assets
+- `C:\Codex\tools`: bundled runtime tools such as `ExifTool` and `FFmpeg`
+- `C:\Codex\PixelVaultData`: shared persistent app data, indexes, caches, and logs
 
-- `C:\Codex\scripts\Publish-PixelVault.ps1`
+Important runtime pointers:
 
-Shared data root:
+- current published build: `C:\Codex\docs\CURRENT_BUILD.txt`
+- desktop shortcut that should track the newest publish: `C:\Codex\PixelVault.lnk`
+- publish helper: `C:\Codex\scripts\Publish-PixelVault.ps1`
 
-- `C:\Codex\PixelVaultData`
+## Source Layout
 
-Shared cache folder:
+The app is still a modular monolith.
 
-- `C:\Codex\PixelVaultData\cache`
+`PixelVault.Native.cs` remains the main orchestration shell, but significant logic has already been pulled into dedicated folders and files.
 
-Shared logs folder:
+Key source areas:
 
-- `C:\Codex\PixelVaultData\logs`
+- `C:\Codex\src\PixelVault.Native\Import`: intake, rename, move, sort, undo, and import orchestration
+- `C:\Codex\src\PixelVault.Native\Indexing`: game-index, folder-cache, and library-index logic
+- `C:\Codex\src\PixelVault.Native\Metadata`: metadata builders, tag helpers, and library edit flows
+- `C:\Codex\src\PixelVault.Native\MediaTools`: `ExifTool` / `FFmpeg` execution helpers
+- `C:\Codex\src\PixelVault.Native\Models`: import, parsing, and index model types
+- `C:\Codex\src\PixelVault.Native\Services`: extracted service seams such as covers, metadata, filename parsing, and filename rules
+- `C:\Codex\src\PixelVault.Native\Storage`: SQLite/cache path and persistence helpers
+- `C:\Codex\src\PixelVault.Native\UI`: extracted windows, editor hosts, virtualization helpers, and UI-specific support code
 
-Live cache files:
+## Current App Shape
 
-- `C:\Codex\PixelVaultData\cache\pixelvault-index-y_game_captures.sqlite`
-- `C:\Codex\PixelVaultData\cache\game-index-y_game_captures.cache`
-- `C:\Codex\PixelVaultData\cache\library-metadata-index-y_game_captures.cache`
-- `C:\Codex\PixelVaultData\cache\library-folders-y_game_captures.cache`
+Major user-facing surfaces:
 
-Current library/intake defaults:
+- Library: the main startup surface and primary browse experience
+- Settings: utility/import hub
+- Path Settings: environment and external-tool configuration
+- Game Index editor: master game-record editing
+- Photo Index editor: per-file metadata row editing
+- intake preview / manual metadata review flows
+- workflow progress and status windows
 
-- source: `Y:\Game Capture Uploads`
-- destination: `Y:\Game Captures`
-- library: `Y:\Game Captures`
+The long-term direction is to keep the WPF shell thinner while moving business logic into explicit services and extracted workflow types.
 
-Tool dependency:
+## Data Model
 
-- `C:\Codex\tools\exiftool.exe`
-- `C:\Codex\tools\ffmpeg.exe` when video poster generation is desired
-
-## Current Architecture
-
-The app now lives as a modular monolith under `C:\Codex\src\PixelVault.Native`.
-
-The current line still keeps `PixelVault.Native.cs` as the main window/orchestration surface, but backend and UI helpers have been pulled into dedicated folders so storage, indexing, import, metadata, media-tool, model, and UI-specific code are no longer all packed into one file.
-
-Major subsystems inside the current line include:
-
-- startup Library window
-- Settings utility window
-- Path Settings window
-- intake preview and processing
-- review-with-comments flow
-- manual intake / metadata editing
-- library browser and folder detail preview
-- photography browser
-- metadata writing through `ExifTool`
-- video sidecar metadata support
-- photo-level metadata index
-- game master index
-- derived folder cache
-- cover-art cache
-- thumbnail cache
-- undo-last-import support
-
-Current source layout highlights:
-
-- `C:\Codex\src\PixelVault.Native\Indexing`
-- `C:\Codex\src\PixelVault.Native\Import`
-- `C:\Codex\src\PixelVault.Native\MediaTools`
-- `C:\Codex\src\PixelVault.Native\Metadata`
-- `C:\Codex\src\PixelVault.Native\Models`
-- `C:\Codex\src\PixelVault.Native\Storage`
-- `C:\Codex\src\PixelVault.Native\UI`
-
-## Current Window Model
-
-### Library
-
-The Library is the main startup form.
-
-It handles:
-
-- grouped folder browsing
-- search
-- direct `Import`, `Import and Comment`, and `Manual Import` actions from the toolbar
-- folder tile sizing
-- folder detail preview
-- `Refresh`
-- `Rebuild`
-- `Fetch Covers`
-
-### Settings
-
-The old home screen has been converted into a utility-oriented Settings window.
-
-It handles:
-
-- preview intake
-- process
-- process with comments
-- manual intake
-- utility shortcuts
-
-### Index editors
-
-There are now two distinct index editors:
-
-- Game Index editor for master records
-- Photo Index editor for per-file metadata rows
-
-## Metadata Strategy
-
-### Files
+### File metadata
 
 Per-file metadata is the source of truth for:
 
 - tags
 - comments / descriptions
-- platform identity
-- capture-date overrides written to the file
+- platform identity written into files
+- capture-date overrides written into files
 
-### Photo index
+### SQLite runtime store
 
-The photo index is the persistent per-file mirror/cache.
+The live runtime store is a per-library SQLite database under:
 
-It is now stored in the per-library SQLite index database and surfaced in the UI through the Photo Index editor.
+- `C:\Codex\PixelVaultData\cache\pixelvault-index-<library>.sqlite`
 
-It stores:
+It backs the live Game Index and Photo Index experience.
 
-- file path
-- stamp
-- `GameId`
-- console label
-- tag text
+### Game Index
 
-### Game index
-
-The game index is the master record table.
-
-It is now stored in the per-library SQLite index database and remains the authority for `GameId`, canonical title, platform, Steam App ID, and `STID`.
-
-It stores:
+The Game Index is the master registry for:
 
 - stable `GameId`
 - canonical title
-- console/platform
+- platform / console
 - Steam App ID
-- `STID` for SteamGridDB
-- file count
-- folder-path context
+- SteamGridDB ID (`STID`)
+- folder-path context and related grouping identity
 
-Grouping is intended to follow `GameId`, not raw title text.
+The Game Index is also authoritative for canonical library folder naming when records are saved.
 
-As of `0.742`, Game Index save is also responsible for normalizing library folder names on disk. When multiple records share the same normalized title across platforms, canonical folder naming now appends ` - Platform`.
+### Photo Index
+
+The Photo Index is the persistent per-file mirror/cache for:
+
+- file path
+- capture stamp
+- `GameId`
+- console label
+- tag text and related metadata mirrors
 
 ### Folder cache
 
-The folder cache is derived state rebuilt from the indexes and should not be treated as the canonical source of tag truth.
+The folder cache is derived state.
 
-## Platform / Tag Model
+It is useful for Library rendering and performance, but it is not the canonical source of metadata truth.
 
-Current recognized platform families are:
+### Legacy cache files
+
+Older flat files such as:
+
+- `game-index-*.cache`
+- `library-metadata-index-*.cache`
+
+are now legacy migration inputs or historical snapshots rather than the primary runtime store.
+
+## Platform And Capture Model
+
+Recognized platform families include:
 
 - `Steam`
 - `PC`
 - `PS5` / `PlayStation`
 - `Xbox`
-- `Platform:<Custom>`
+- custom platform tags through `Platform:<Custom>` or equivalent custom-platform flows
 
-Rules:
+Important rules:
 
-- `Steam` and `PC` are separate tags
-- multiple recognized families produce `Multiple Tags`
-- `Other` should only be used when no recognized platform family exists
+- `Steam` and `PC` are distinct tags
+- multiple recognized platform families resolve to `Multiple Tags`
+- `Other` should only be used when no recognized family is present
 
-## Supported Capture Sources
-
-The app currently supports workflows for:
+Current supported workflow families include:
 
 - Steam captures
 - PS5 captures
 - Xbox captures
-- manual/unmatched captures
-- videos via sidecars where needed
+- manual / unmatched captures
+- mixed-media libraries with video sidecars and optional `FFmpeg` poster generation
 
-## Recent Important Evolution
+## Documentation Map
 
-Recent published lines introduced:
+Use the docs by role:
 
-- persistent shared data outside build folders
-- batched `ExifTool` reads for faster scans
-- dedicated game and photo index editors
-- `GameId`-based grouping
-- Steam App ID persistence in the game index
-- `STID`-first SteamGridDB cover refresh with Steam fallback only when needed
-- right-click cover fetch on a single folder
-- refreshed platform-group headers in the Library with icon-led presentation from the shared workspace asset set
-- persistent Library sorting modes with flattened non-platform views and per-tile platform badges
-- Library top-bar import actions moved into the main browse surface with a quieter footer-style status line
-- tightened Library toolbar spacing and restyled the sort picker shell
-- Library header branding with the shared PixelVault logo, aligned search placement, and a cleaner filter-row balance for sort and folder-size controls
-- startup Library view
-- search and size sliders in the library
-- preview-tile right-click actions
-- self-healing for stale `Multiple Tags` master rows
-- thumbnail queue prioritization and loader hardening for large libraries
-- Steam cover-refresh timeout protection and better scoped-refresh deduping
-- `STID` persistence in the Game Index
-- Game Index save-time game-ID remapping and canonical folder renaming/moves
-- row-windowed Library folder virtualization plus lazy-loaded detail rows
-- game-name-first metadata picker choices and faster batched metadata-editor startup
+- `C:\Codex\docs\POLICY.md`: durable behavior rules and operating rules
+- `C:\Codex\docs\DOC_SYNC_POLICY.md`: repo/Notion sync rules
+- `C:\Codex\docs\HANDOFF.md`: short current stop point and immediate context
+- `C:\Codex\docs\CHANGELOG.md`: published version history
+- `C:\Codex\docs\CURRENT_BUILD.txt`: current published build pointer
+- `C:\Codex\docs\ROADMAP.md`: long-term sequencing
+- `C:\Codex\docs\MAINWINDOW_EXTRACTION_ROADMAP.md`: concrete MainWindow extraction slices
+- `C:\Codex\docs\PERFORMANCE_TODO.md`: active responsiveness and scalability backlog
+- `C:\Codex\docs\MANUAL_GOLDEN_PATH_CHECKLIST.md`: short manual verification path for risky changes
+- `C:\Codex\docs\SERVICE_OWNERSHIP_AND_PARALLEL_WORK_MAP.md`: service boundaries and safe parallel-work lanes
 
-## Recent Non-Build Maintenance
+## Current Direction
 
-After the `0.714` build, a live data cleanup pass removed `PC` from any indexed file that still had both `Steam` and `PC` when `Steam` was present.
+The repo direction is:
 
-Result:
+1. keep adding small safety nets around risky behavior
+2. reduce UI-thread blocking and long-operation rough edges
+3. keep shrinking orchestration out of `MainWindow`
+4. prefer small explicit seams over framework rewrites
 
-- `594` files updated on disk
-- `594` photo-index rows updated
-- `0` remaining verified live files with both `Steam` and `PC`
-- `0` remaining verified photo-index rows with both `Steam` and `PC`
+That means:
 
-## Source Of Truth Documents
-
-Use these documents together:
-
-- `C:\Codex\docs\POLICY.md` for behavior contracts and workflow rules
-- `C:\Codex\docs\HANDOFF.md` for the current stop point
-- `C:\Codex\docs\CHANGELOG.md` for release history
-
-## Immediate Next Step
-
-The next likely milestone is to keep polishing the Library browse surface and metadata editor on real mixed-media folders while moving on to broader FFmpeg-backed video handling beyond poster generation.
+- no large MVVM rewrite before the seams exist
+- no broad churn just to “modernize”
+- keep shipping behavior stable while the codebase gets easier to work in

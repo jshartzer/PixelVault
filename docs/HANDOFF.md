@@ -1,201 +1,105 @@
 # PixelVault Handoff
 
+This file is the short current-state handoff.
+
+Use it for:
+
+- where to work
+- what to read first
+- what build is live right now
+- what the current source focus is
+
+For durable architecture and data-model context, use:
+
+- `C:\Codex\docs\PROJECT_CONTEXT.md`
+
 ## Active Workspace
 
 Work out of:
 
 - `C:\Codex`
 
-Treat `C:\Codex` as the only live source of truth for code, builds, docs, and shared app data.
-
 Important:
 
-- work out of `C:\Codex`
-- if a session or app shell reports `A:\Codex`, ignore that and continue using `C:\Codex`
+- `C:\Codex` is the source of truth for code, builds, docs, and shared app data
+- if a shell or tool reports `A:\Codex`, ignore that and keep using `C:\Codex`
 - do not treat `A:\` as the active project drive
 
-Current live build source:
+Live source:
 
 - `C:\Codex\src\PixelVault.Native\PixelVault.Native.cs`
 - `C:\Codex\src\PixelVault.Native\PixelVault.Native.csproj`
-- `C:\Codex\scripts\Publish-PixelVault.ps1`
 
-Published `dist\PixelVault-x.xxx\PixelVault.Native.cs` files are version snapshots, not the primary edit target.
+Do not edit published `dist\PixelVault-x.xxx\PixelVault.Native.cs` snapshots as the primary source.
 
-## Rulebook First
+## Read First
 
 Before making app changes, read:
 
 - `C:\Codex\docs\POLICY.md`
 - `C:\Codex\docs\DOC_SYNC_POLICY.md`
 
-That file now holds the durable working rules for:
+Then use these based on the task:
 
-- versioning
-- form responsibilities
-- data ownership
-- index behavior
-- release packaging
-- git snapshot policy
-
-This handoff is the short current-state summary.
+- `C:\Codex\docs\PROJECT_CONTEXT.md` for architecture and data model
+- `C:\Codex\docs\ROADMAP.md` for sequencing and larger direction
+- `C:\Codex\docs\MAINWINDOW_EXTRACTION_ROADMAP.md` for MainWindow split work
+- `C:\Codex\docs\PERFORMANCE_TODO.md` for responsiveness/scalability follow-up
+- `C:\Codex\docs\MANUAL_GOLDEN_PATH_CHECKLIST.md` for risky manual verification
+- `C:\Codex\docs\SERVICE_OWNERSHIP_AND_PARALLEL_WORK_MAP.md` for service boundaries and parallel lanes
 
 ## Current Published Build
 
 Current live build:
 
-- `0.829`
+- `0.832`
+
 Current executable:
 
-- `C:\Codex\dist\PixelVault-0.829\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.832\PixelVault.exe`
 
 Current build pointer:
 
 - `C:\Codex\docs\CURRENT_BUILD.txt`
 
-Desktop shortcut that must always follow the newest published build:
+Desktop shortcut that should always follow the newest published build:
 
 - `C:\Codex\PixelVault.lnk`
 
-## Documentation Sync
+## Current Direction
 
-Keep repo docs and Notion aligned using:
+The current codebase direction is:
 
-- `C:\Codex\docs\DOC_SYNC_POLICY.md`
+1. keep shrinking orchestration out of `MainWindow`
+2. keep responsiveness and long-running workflow polish moving forward
+3. add service seams and UI host extractions without changing visible behavior unless intended
 
-Practical rule:
+Practical current focus:
 
-- repo docs own technical/runtime facts
-- Notion owns planning, release tracking, QA status, and roadmap status
-- milestone completions, publishes, and workflow-rule changes should update both before work is considered finished
+- continue the MainWindow extraction roadmap in small slices
+- keep service extraction coordinated so parallel work does not collide
+- treat source-only refactors and published-build changes as different things
 
-## Current App Shape
+## Working Expectations
 
-PixelVault now opens into the Library view by default.
-
-Important current windows/forms:
-
-- Library window is the main startup surface
-- Settings window is the utility/import hub
-- Path Settings edits environment paths and tool paths only
-- Game Index is the master game-record editor
-- Photo Index is the per-file metadata cache editor
-- Library Edit Metadata updates selected existing library files
-- Review window handles `Process with Comments`
-
-## Data Model Summary
-
-Shared persistent data lives under:
-
-- `C:\Codex\PixelVaultData`
-
-Important live cache files:
-
-- `C:\Codex\PixelVaultData\cache\pixelvault-index-y_game_captures.sqlite`
-- `C:\Codex\PixelVaultData\cache\game-index-y_game_captures.cache`
-- `C:\Codex\PixelVaultData\cache\library-metadata-index-y_game_captures.cache`
-- `C:\Codex\PixelVaultData\cache\library-folders-y_game_captures.cache`
-
-Behavior summary:
-
-- file metadata is the source of truth for per-file tags
-- the SQLite index database is the live runtime store for the Game Index and Photo Index
-- the photo index is the persistent per-file mirror/cache
-- the game index is the master registry for `GameId`, canonical title, console, Steam App ID, and `STID`
-- the folder cache is derived state and may be rebuilt
-- the older `game-index-*.cache` and `library-metadata-index-*.cache` files are now legacy migration/snapshot files rather than the primary runtime store
-- as of `0.742`, Game Index save is also authoritative for canonical library folder naming
-
-## Recent Shipped State
-
-Recent important published changes in the current `0.724` to `0.779` line:
-
-- intake preview/process/manual flows now reuse shared source inventories instead of rescanning the same roots repeatedly
-- metadata writes run with bounded parallel `ExifTool` workers
-- the library/gallery now use deferred thumbnail loading plus capped image caching
-- optional FFmpeg-backed video poster generation is implemented
-- thumbnail-loader regressions were fixed through `0.728`
-- cover-refresh requests now use explicit timeouts, and scoped cover refresh dedupes by folder master key instead of raw name
-- the Game Index now stores `STID` for SteamGridDB IDs
-- Game Index save now remaps stale game IDs before rebuild so deleted/consolidated rows stop resurrecting
-- Game Index save now renames/moves library folders on disk to canonical names based on the saved title/platform, adding ` - Platform` suffixes when the same title exists on multiple platforms
-- SteamGridDB token-backed `STID` resolution is now wired into the Game Index
-- cover refresh can now prefer SteamGridDB portrait art when an `STID` is available
-- Path Settings now supports both a SteamGridDB token and an optional `FFmpeg` path for video poster generation
-- Steam screenshot rename/import now records the raw Steam AppID into the Game Index before filename normalization
-- cover refresh now defaults to saved `STID` values, preserves existing cached art, and avoids unnecessary Steam App ID lookups during single-folder fetches
-- Library section headers now use larger typography, cleaner folder counts, and shared console icons from `C:\Codex\assets`
-- the Library now has persistent sort modes for grouped platform view, recently added, and most photos, with platform badges on tiles when headers are hidden
-- the Library top bar now exposes Import actions directly, drops the Photography shortcut there, and moves status into a smaller footer line
-- the Library toolbar spacing was tightened again so the right-side action buttons fit cleanly, and the sort picker got a cleaner shell treatment
-- the Library header now uses the shared PixelVault logo, the search field lines up with the import actions, and the sort and folder-size controls were rebalanced for a cleaner filter row
-- the Library header no longer reserves space for the PixelVault logo or folder count, and the search field now starts on the same left edge as the `Import` button
-- Steam rename detection is now limited to known Steam screenshot filename patterns so unrelated numeric filenames do not get misclassified during intake
-- library refresh/index reconciliation now preserves an existing `GameId` when the platform still matches, reducing accidental regrouping from folder-name guesses
-- normal Steam intake now writes `Steam` without silently adding `PC`, keeping shipped metadata aligned with the current review flow and prior cleanup rules
-- Library-driven imports now default move conflicts to `Rename` even when the Settings-only conflict dropdown has not been created yet, which fixes a null-reference crash after metadata writes
-- import failure logging now records full exception details for workflow and manual-intake errors
-- the live Game Index and Photo Index runtime store now uses a per-library SQLite database with first-run migration from the older flat cache files
-- the SQLite-backed index store now initializes its runtime provider correctly on startup, fixing the `SetProvider` popup that appeared on write paths
-- the Library toolbar now exposes `Game Index` and `Photo Index` directly, those editors stay modeless, and folder right-click now includes a small `Edit IDs...` dialog for Steam App ID and SteamGridDB ID edits
-- the Library index buttons now sit centered between Search and Sort with a smaller light-purple treatment, and the `Edit IDs` dialog is taller with a cleaner action row
-- the `Edit IDs` Save and Cancel buttons now share the same vertical alignment and margin treatment so the action row sits level
-- Library-driven imports now skip the Settings-only preview repaint path when that preview control is not present, which fixes the shared workflow null reference after sort
-- completed import runs now open a dark themed summary window that matches the other status monitors and shows rename, metadata, move, sort, and unmatched-item totals
-- the live source has started moving toward a modular monolith by extracting shared models and the timeout web client into dedicated files without changing the one-executable app shape
-- the Library detail capture view now supports multi-select actions, including selection-aware metadata editing and permanent delete from the live viewer instead of from the Photo Index editor
-- Photo Index row removal is now explicitly `Forget Row`, and Library metadata edits can regroup files when the title or platform identity changes
-- the Library now reuses the rebuilt folder cache after metadata edits and live deletes instead of forcing a cold refresh that temporarily blanked the full tile grid
-- the folder-tile right-click `Fetch Cover Art` action now forces a fresh pull for cached downloaded art, while the toolbar-wide Library cover refresh still skips titles that already have art
-- thumbnail caching now keeps recently used images around longer in memory and buckets decode sizes more aggressively so revisiting a folder is less likely to trigger a cold thumbnail reload
-- manual clears for Steam AppID and STID now persist as explicit do-not-auto-resolve choices, so cover refresh and ID resolution stop writing those values back after you blank them out in `Edit IDs...`
-- Library regroup, Game Index folder-align, and capture-delete flows now invalidate only the changed file and folder thumbnails instead of clearing the whole image cache, which keeps the rest of the Library populated during edits
-- video capture tiles now retry FFmpeg-based frame extraction instead of staying stuck on generic fallback cards, and Library detail tiles support muted hover previews for video clips
-- Library launch now reuses existing on-disk cached thumbnails immediately so the browser looks populated faster on startup, and video hover playback now runs inline inside the same capture tile
-- inline video hover playback now preloads each visible clip source and reuses the existing poster bounds, which makes hover start faster and preserves the video aspect ratio instead of forcing a square playback surface
-- Library video hover now prefers a lightweight cached 10-second preview clip generated with FFmpeg, and visible video tiles warm those preview clips in the background to reduce hover startup lag
-- Library hover preview has been switched back to the original direct-video playback method because it felt materially faster than the preview-clip path, while keeping the newer inline-tile aspect-ratio fix
-- the live source has now pushed the modular refactor much further by extracting storage, indexing, media-tool, import, and metadata/library-edit helper slices into dedicated files while keeping the shipped behavior and one-executable packaging model intact
-
-See `C:\Codex\docs\CHANGELOG.md` for the detailed version history.
-
-## Recent Non-Build Maintenance
-
-After `0.714`, a data cleanup pass was run against the live library state.
-
-Result:
-
-- any indexed file that still had both `Steam` and `PC` had `PC` removed from the file metadata when `Steam` was present
-- the same cleanup was mirrored into the photo index
-
-Cleanup result:
-
-- `594` files updated on disk
-- `594` photo-index rows updated
-- verification found `0` remaining live files with both `Steam` and `PC`
-- verification found `0` remaining photo-index rows with both `Steam` and `PC`
-
-Safety backup created before that cleanup:
-
-- `C:\Codex\PixelVaultData\cache\library-metadata-index-y_game_captures.cache.bak-20260322-165520`
-
-This was a data-only maintenance pass, not a new app build.
+- keep `POLICY.md` as the durable behavior contract
+- keep `HANDOFF.md` short and current
+- use `CHANGELOG.md` for release history, not this file
+- after a publish, update `CURRENT_BUILD.txt`, `CHANGELOG.md`, and this file together
+- if repo docs and Notion can drift, follow `DOC_SYNC_POLICY.md`
 
 ## Current Stop Point
 
-The current live published build is **`0.828`** (see `docs/CURRENT_BUILD.txt` and the **Recent Shipped State** / `CHANGELOG.md` for what that build contains).
+The app is currently published at `0.832`.
 
-**Recent source work (not necessarily published yet):** MainWindow extraction **Phase B** landed on `main`: changelog window (`f8a5583`), `UiBrushHelper` (`f9f1212`), shared progress shell `WorkflowProgressWindow` (`5bcc917`). Full detail: `docs/MAINWINDOW_EXTRACTION_ROADMAP.md`.
+The active structural work is still the modular-monolith cleanup path:
 
-The most likely next structural step is:
+- MainWindow extraction
+- service boundary cleanup
+- keeping Library/import/index flows stable while responsibilities move into smaller types
 
-1. **Phase C** of the MainWindow roadmap — intake preview and metadata review surfaces under `UI/Intake/`, with `MainWindow` passing callbacks only.
-2. Continue Phase 2 responsiveness / threading cleanups from `PixelVaultData/TODO.md` and `docs/PERFORMANCE_TODO.md` in parallel where they touch the same code paths.
+If you are picking work up midstream:
 
-## Important Expectations
-
-- After every published build, repoint `C:\Codex\PixelVault.lnk` to the newest executable.
-- Keep `C:\Codex\docs\POLICY.md` as the durable behavior contract.
-- Keep `C:\Codex\docs\HANDOFF.md` short and current.
-- Do not let the game index or photo index drift from the actual intended behavior without documenting the rule change.
-- If a build changes record identity or folder naming, update both the handoff docs and the curated cache snapshots intentionally before committing.
+1. decide whether the task is a shipped-behavior change or a source-only refactor
+2. check whether the change belongs in `MainWindow`, an extracted UI host, or a service seam
+3. update the matching docs if the workflow or structure meaningfully changes
