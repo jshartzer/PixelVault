@@ -3204,10 +3204,11 @@ namespace PixelVaultNative
                 }
                 if (importAndEditMode)
                 {
-                    ApplyImportAndEditSteamStoreTitlesWhenGameNameUnchanged(pendingItems);
+                    ApplyImportAndEditSteamStoreTitlesWhenGameNameUnchanged(pendingItems.Where(i => i != null && !i.DeleteBeforeProcessing));
                 }
                 var gameRows = LoadSavedGameIndexRows(libraryRoot);
                 var unresolvedMasterRecords = pendingItems
+                    .Where(item => item != null && !item.DeleteBeforeProcessing)
                     .Select(item => new
                     {
                         Item = item,
@@ -3244,6 +3245,7 @@ namespace PixelVaultNative
                     refreshGameTitleChoices();
                     foreach (var item in pendingItems)
                     {
+                        if (item.DeleteBeforeProcessing) continue;
                         var resolvedName = NormalizeGameIndexName(
                             string.IsNullOrWhiteSpace(item.GameName)
                                 ? GetGameNameFromFileName(Path.GetFileNameWithoutExtension(item.FilePath))
@@ -3264,6 +3266,7 @@ namespace PixelVaultNative
                 if (confirm != MessageBoxResult.OK) return;
                 foreach (var item in pendingItems)
                 {
+                    if (item.DeleteBeforeProcessing) continue;
                     var resolvedName = NormalizeGameIndexName(
                         string.IsNullOrWhiteSpace(item.GameName)
                             ? GetGameNameFromFileName(Path.GetFileNameWithoutExtension(item.FilePath))
