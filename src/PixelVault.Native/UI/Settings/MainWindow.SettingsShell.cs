@@ -82,8 +82,11 @@ namespace PixelVaultNative
             leftStack.Children.Add(new TextBlock { Text = "Import options", FontSize = 14, FontWeight = FontWeights.SemiBold, Foreground = Brush("#1F2A30"), Margin = new Thickness(0, 16, 0, 8) });
             recurseBox = new CheckBox { Content = "Search subfolders for rename", Margin = new Thickness(0, 0, 0, 8) };
             keywordsBox = new CheckBox { Content = "Add Game Capture keywords", Margin = new Thickness(0, 0, 0, 8) };
+            keywordsBox.Checked += delegate { SyncIncludeGameCaptureKeywordsMirror(); };
+            keywordsBox.Unchecked += delegate { SyncIncludeGameCaptureKeywordsMirror(); };
             leftStack.Children.Add(recurseBox);
             leftStack.Children.Add(keywordsBox);
+            SyncIncludeGameCaptureKeywordsMirror();
 
             var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 14) };
             row.Children.Add(new TextBlock { Text = "Move conflicts", Width = 110, VerticalAlignment = VerticalAlignment.Center, Foreground = Brush("#4C463F") });

@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Net.Http;
@@ -105,7 +106,14 @@ namespace PixelVaultNative
                 {
                     if (!string.IsNullOrWhiteSpace(filePath) && File.Exists(filePath))
                     {
-                        try { File.Delete(filePath); } catch { }
+                        try
+                        {
+                            File.Delete(filePath);
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine("PixelVault TimeoutWebClient: could not delete partial download " + filePath + " — " + ex.Message);
+                        }
                     }
                     throw;
                 }

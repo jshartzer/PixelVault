@@ -53,20 +53,23 @@ Status: mostly in place; extend only if the next debounce pass needs more visibi
 - `fileTagCache` / `fileTagCacheStamp` and `folderImageCache` / `folderImageCacheStamp` must not be mutated concurrently from the UI thread and thread-pool library loads without coordination.
 - Options: one **`lock`** per cache group, **`ConcurrentDictionary`**, or move caches behind a small **`IMetadataTagCache`** / file service used only from defined call paths.
 - Goal: eliminate data races; make future batching and profiling safe.
+- Status: landed for current hotspots — **`LibraryWorkspaceContext`** now locks **`_folderListingSync`** for per-folder image path listings (alongside existing **`_fileTagCacheSync`** for embedded tags). **`CoverService`** Steam / SteamGridDB in-memory response caches use dedicated locks (**`_steamAppNameCacheLock`**, **`_steamSearchIdCacheLock`**, **`_steamSearchResultsCacheLock`**, **`_steamGridDbResponseCacheLock`**) so parallel cover/metadata work cannot corrupt dictionaries. **`MainWindow`** image LRU cache already uses **`imageCacheSync`**; **`FilenameParserService`** already uses **`sync`** for rule/regex caches.
 
 4b. **Tighten empty `catch` blocks in hot and I/O paths.**
 - Audit `catch { }` in `PixelVault.Native`, metadata/media helpers, and virtualization; log at debug or warning unless the exception is expected and harmless.
 - Goal: production issues remain diagnosable without spamming users.
+- Status: landed — removed bare **`catch { }`** in the audited native paths; failures now **`Log(...)`** via **`MainWindow`** where available, or **`Debug.WriteLine`** for **`TimeoutWebClient`** partial download cleanup (no app **`Log`** hook on that type).
 
 5. Audit long-running UI workflows for real background execution.
 - Review scan/rebuild, import/manual import, and cover-fetch paths for any work that can still block the UI thread.
 - Keep the current progress-window pattern, but tighten where work starts and where dispatcher marshaling happens.
-Status: queued behind the remaining game-capture-keyword threading cleanup.
+- Note: **Library folder list** refresh already uses **`Task.Factory.StartNew`** + **`Dispatcher.BeginInvoke`** (`MainWindow.LibraryBrowser.cs`). **Game Index** open loads **`LoadGameIndexEditorRowsCore`** on the thread pool, then **`GameIndexEditorHost.Show(..., preloadedRows)`**. **Reload** uses **`LoadRowsForBackground`** (same core) off the UI thread with a short busy state on the editor (grid + action buttons).
+Status: spot-checked (Mar 2026) — **`ShowLibraryMetadataScanWindow`** runs **`libraryScanner.ScanLibraryMetadataIndex`** on the thread pool and marshals progress with **`BeginInvoke`**. Library browser folder snapshot/refresh, selected-folder detail render (**`Task.Run`**), intake badge count, and cover refresh (**`RefreshLibraryCovers`** from **`StartNew`**) follow the same pattern. Import workflows use **`RunBackgroundWorkflowWithProgress`** in **`ImportWorkflow.cs`**. Manual metadata **game title** combo: saved rows + fallback **`LoadGameIndexEditorRowsCore(root, null)`** now load off the UI thread (**`refreshGameTitleChoices`**).
 
 5a. Remove the remaining synchronous UI hop from game-capture keyword tagging.
 - Replace the `Dispatcher.Invoke` call in `ShouldIncludeGameCaptureKeywords` with the same cached-setting pattern used elsewhere in the metadata path.
 - Goal: avoid background metadata/tag work synchronously blocking on the UI thread.
-Status: next.
+Status: landed — `keywordsBox` updates a `volatile` `_includeGameCaptureKeywordsMirror` on Checked/Unchecked and after Settings `BuildUi`; when `keywordsBox` is null (Library-only), behavior stays “include keywords” as before.
 
 6. Add cancellation-token support across long-running workflows.
 - Start with library scan, cover fetch, and import-related work where cancellation already exists conceptually.
@@ -91,6 +94,7 @@ Status: landed for the currently known paths, including manual Steam search in t
 10. Move `ShowLibraryBrowser` orchestration into a dedicated Library UI type.
 - This is mostly an **iteration-speed and testability** improvement; it also reduces closure tangle and makes threading/cancellation easier to reason about.
 - It becomes more valuable once capture virtualization and search/sort caching are underway (many of those are now landed—bump priority if the next perf pass touches Library UI again).
+- Status (Mar 2026): **`LibraryBrowserHost`** (`UI/Library/LibraryBrowserHost.cs`) is the entry point; **`MainWindow.ShowLibraryBrowserCore`** holds the existing implementation on the **`MainWindow`** partial. Next step when touching Library again: pull more logic behind an **`ILibrarySession` / facade** and shrink **`ShowLibraryBrowserCore`**.
 
 11. Convert touched I/O and provider paths to async-first service APIs.
 - Especially metadata reads, file-heavy scans, and network/provider work.
@@ -102,29 +106,28 @@ Status: landed for the currently known paths, including manual Steam search in t
 2. ~~Cached sort keys~~ (landed—keep validating)
 3. ~~Search debounce~~ (landed)
 4. ~~Instrumentation~~ (mostly landed)
-5. **Shared cache thread safety (4a)** and **empty-catch audit (4b)**
-6. Background-thread audit (item 5) + **5a `Dispatcher.Invoke` cleanup**
+5. ~~**Shared cache thread safety (4a)**~~ and ~~**empty-catch audit (4b)**~~ (landed—keep an eye on new caches / catches in future PRs)
+6. Background-thread audit (item 5); ~~5a `Dispatcher.Invoke` cleanup~~ (landed)
 7. Cancellation cleanup (item 6—largely landed; spot-check new paths)
 8. Metadata + library scanner service extraction (item 7)
 9. File-system service seam (item 8)
 10. Left-side row recycling (item 9)
-11. Library UI extraction (item 10)
+11. ~~Library UI extraction (item 10)~~ — first slice landed (`LibraryBrowserHost` + `ShowLibraryBrowserCore`); keep iterating when Library changes
 
 ## What I Would Prioritize
 
 If we want the best near-term payoff with the least product risk, do these first:
 
-1. **Shared cache correctness (4a)**  
+1. ~~**Shared cache correctness (4a)**~~ (landed for folder listings + cover HTTP caches; re-check when adding caches)  
    - Prevents rare corruption/weird Library state under load; unlocks safer parallel work later.
 
-2. **Game-capture keyword `Dispatcher.Invoke` removal (5a)**  
+2. ~~**Game-capture keyword `Dispatcher.Invoke` removal (5a)**~~ (landed)  
    - Stops background metadata from stalling on the UI thread.
 
-3. **Empty-catch audit (4b)**  
+3. ~~**Empty-catch audit (4b)**~~ (landed in audited paths)  
    - Cheap; improves supportability when something regresses.
 
-4. **Library UI extraction (10)** when touching Library heavily again  
-   - Cuts closure complexity and makes the next virtualization/threading change less risky.
+4. ~~**Library UI extraction (10)**~~ — first slice landed; extend the host/facade when the next Library pass needs it.
 
 5. **Service extraction (7–8)** as the enabler for a second wave of batching and async APIs.
 

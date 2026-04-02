@@ -145,7 +145,7 @@ The **priority** is to shrink **`PixelVault.Native.cs`**, not to collapse partia
 
 **Dependency:** Prefer completing **Phase 2** responsiveness items that touch Library (debounce, image load paths) before E1, or do E1 behind a thin wrapper so background work stays correct.
 
-**Progress (E1):** `ShowLibraryBrowser` moved from `PixelVault.Native.cs` to **`UI/Library/MainWindow.LibraryBrowser.cs`** as a **`MainWindow` partial** (no behavior change; next steps: optional rename to `LibraryBrowserHost` + `ILibrarySession` facade per E2).
+**Progress (E1):** `ShowLibraryBrowser` moved from `PixelVault.Native.cs` to **`UI/Library/MainWindow.LibraryBrowser.cs`** as a **`MainWindow` partial**; entry is now **`LibraryBrowserHost`** (`UI/Library/LibraryBrowserHost.cs`) delegating to **`MainWindow.ShowLibraryBrowserCore`** (Mar 2026). Next: **`ILibrarySession` / facade** per E2 when Library is touched again.
 
 **Progress (E2):** **`UI/Library/LibraryWorkspaceContext.cs`** — owns **folder image listing cache** and **file-tag cache** (formerly `fileTagCache` / `fileTagCacheStamp` / `fileTagCacheSync`), exposes **`LibraryRoot`** (via `LibraryWorkspaceRoot`) and **`UiDispatcher`**. `RemoveCachedFolderListings`, `ClearFolderImageListings`, `GetCachedFolderImages`, `TryGetCachedFileTags`, `SetCachedFileTags`, `RemoveCachedFileTagEntries`, and `ClearFileTagCache` live on the context; **`MainWindow`** keeps thin wrappers for call sites in partials. **`MainWindow.LibraryBrowser`** uses **`libraryWorkspace.LibraryRoot`**. Bitmap decode cache remains on **`MainWindow`** for now.
 

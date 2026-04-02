@@ -438,8 +438,9 @@ namespace PixelVaultNative
                         {
                             videoPreviewMedia.Play();
                         }
-                        catch
+                        catch (Exception ex)
                         {
+                            Log("Video preview Play: " + ex.Message);
                             videoPreviewStatus.Visibility = Visibility.Collapsed;
                             videoPreviewMedia.Visibility = Visibility.Collapsed;
                         }
@@ -457,8 +458,9 @@ namespace PixelVaultNative
                         videoPreviewMedia.Position = TimeSpan.FromMilliseconds(250);
                         if (videoPreviewHovered) videoPreviewMedia.Play();
                     }
-                    catch
+                    catch (Exception ex)
                     {
+                        Log("Video preview MediaEnded: " + ex.Message);
                         videoPreviewStopTimer.Stop();
                         videoPreviewStatus.Visibility = Visibility.Collapsed;
                         videoPreviewMedia.Visibility = Visibility.Hidden;
@@ -476,8 +478,9 @@ namespace PixelVaultNative
                     {
                         videoPreviewMedia.Stop();
                     }
-                    catch
+                    catch (Exception ex)
                     {
+                        Log("Video preview MediaFailed cleanup: " + ex.Message);
                     }
                 };
             }
@@ -497,8 +500,9 @@ namespace PixelVaultNative
                     videoPreviewMedia.Stop();
                     videoPreviewMedia.Source = null;
                 }
-                catch
+                catch (Exception ex)
                 {
+                    Log("Video tile unload cleanup: " + ex.Message);
                 }
             };
             var contextMenu = new ContextMenu();
@@ -511,7 +515,14 @@ namespace PixelVaultNative
             var copyPathItem = new MenuItem { Header = "Copy File Path" };
             copyPathItem.Click += delegate
             {
-                try { Clipboard.SetText(file); } catch { }
+                try
+                {
+                    Clipboard.SetText(file);
+                }
+                catch (Exception ex)
+                {
+                    Log("Copy file path to clipboard failed. " + ex.Message);
+                }
             };
             contextMenu.Items.Add(openItem);
             if (isVideoFile)

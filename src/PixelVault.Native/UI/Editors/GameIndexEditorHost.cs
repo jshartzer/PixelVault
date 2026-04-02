@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -29,6 +30,8 @@ namespace PixelVaultNative
         public Action<string> Log { get; set; }
         public Func<string, RoutedEventHandler, string, Brush, Button> CreateButton { get; set; }
         public Func<string, List<GameIndexEditorRow>> LoadRows { get; set; }
+        /// <summary>Same data as <see cref="LoadRows"/> but safe from a thread-pool thread (no main-window status updates).</summary>
+        public Func<string, List<GameIndexEditorRow>> LoadRowsForBackground { get; set; }
         public Action<string, List<GameIndexEditorRow>> SaveRows { get; set; }
         public Func<IEnumerable<string>, string> CreateGameId { get; set; }
         public Func<string, string, string> NormalizeGameIndexName { get; set; }
@@ -46,7 +49,8 @@ namespace PixelVaultNative
     {
         static SolidColorBrush B(string hex) => UiBrushHelper.FromHex(hex);
 
-        public static void Show(Window owner, string appVersion, string libraryRoot, Action<Window> assignEditorWindow, Action<Window> clearEditorWindowIfCurrent, GameIndexEditorServices services)
+        /// <param name="preloadedRows">When set, skips synchronous <see cref="GameIndexEditorServices.LoadRows"/> (use after background load).</param>
+        public static void Show(Window owner, string appVersion, string libraryRoot, Action<Window> assignEditorWindow, Action<Window> clearEditorWindowIfCurrent, GameIndexEditorServices services, IList<GameIndexEditorRow> preloadedRows = null)
         {
             if (owner == null) throw new ArgumentNullException(nameof(owner));
             if (services == null) throw new ArgumentNullException(nameof(services));
@@ -54,6 +58,7 @@ namespace PixelVaultNative
             if (services.Log == null) throw new ArgumentNullException(nameof(services) + "." + nameof(services.Log));
             if (services.CreateButton == null) throw new ArgumentNullException(nameof(services) + "." + nameof(services.CreateButton));
             if (services.LoadRows == null) throw new ArgumentNullException(nameof(services) + "." + nameof(services.LoadRows));
+            if (services.LoadRowsForBackground == null) throw new ArgumentNullException(nameof(services) + "." + nameof(services.LoadRowsForBackground));
             if (services.SaveRows == null) throw new ArgumentNullException(nameof(services) + "." + nameof(services.SaveRows));
             if (services.CreateGameId == null) throw new ArgumentNullException(nameof(services) + "." + nameof(services.CreateGameId));
             if (services.NormalizeGameIndexName == null) throw new ArgumentNullException(nameof(services) + "." + nameof(services.NormalizeGameIndexName));
@@ -65,8 +70,17 @@ namespace PixelVaultNative
             if (services.ResolveMissingSteamAppIds == null) throw new ArgumentNullException(nameof(services) + "." + nameof(services.ResolveMissingSteamAppIds));
             if (services.ResolveMissingSteamGridDbIds == null) throw new ArgumentNullException(nameof(services) + "." + nameof(services.ResolveMissingSteamGridDbIds));
             if (services.OpenFolder == null) throw new ArgumentNullException(nameof(services) + "." + nameof(services.OpenFolder));
-            services.SetStatus("Loading game index");
-            var allRows = services.LoadRows(libraryRoot);
+            List<GameIndexEditorRow> allRows;
+            if (preloadedRows != null)
+            {
+                allRows = new List<GameIndexEditorRow>(preloadedRows);
+            }
+            else
+            {
+                services.SetStatus("Loading game index");
+                allRows = services.LoadRows(libraryRoot) ?? new List<GameIndexEditorRow>();
+            }
+
             var editorWindow = new Window
             {
                 Title = "PixelVault " + appVersion + " Game Index",
@@ -236,13 +250,54 @@ namespace PixelVaultNative
                 refreshStatus();
             };
 
+            object reloadCoordinator = new object();
+            var latestReloadId = 0;
             Action reloadRows = delegate
             {
-                allRows = services.LoadRows(libraryRoot);
-                dirty = false;
-                refreshGrid();
-                services.SetStatus("Game index reloaded");
-                services.Log("Reloaded game index editor rows from cache.");
+                int myId;
+                lock (reloadCoordinator) { myId = ++latestReloadId; }
+                void setReloadBusy(bool busy)
+                {
+                    reloadButton.IsEnabled = !busy;
+                    resolveIdsButton.IsEnabled = !busy;
+                    addRowButton.IsEnabled = !busy;
+                    deleteRowButton.IsEnabled = !busy;
+                    saveButton.IsEnabled = !busy;
+                    grid.IsEnabled = !busy;
+                }
+                setReloadBusy(true);
+                services.SetStatus("Reloading game index...");
+                Task.Factory.StartNew(delegate
+                {
+                    return services.LoadRowsForBackground(libraryRoot);
+                }).ContinueWith(delegate(Task<List<GameIndexEditorRow>> t)
+                {
+                    editorWindow.Dispatcher.BeginInvoke(new Action(delegate
+                    {
+                        if (!editorWindow.IsLoaded) return;
+                        bool stillCurrent;
+                        lock (reloadCoordinator) { stillCurrent = myId == latestReloadId; }
+                        if (!stillCurrent) return;
+                        setReloadBusy(false);
+                        if (t.IsFaulted)
+                        {
+                            services.SetStatus("Game index reload failed");
+                            var flattened = t.Exception == null ? null : t.Exception.Flatten();
+                            var err = flattened == null ? new Exception("Reload failed.") : flattened.InnerExceptions.First();
+                            services.Log("Game index reload failed. " + err);
+                            MessageBox.Show("Could not reload the game index." + Environment.NewLine + Environment.NewLine + err.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
+                            refreshStatus();
+                            return;
+                        }
+                        allRows = t.Status == TaskStatus.RanToCompletion && t.Result != null
+                            ? t.Result
+                            : new List<GameIndexEditorRow>();
+                        dirty = false;
+                        refreshGrid();
+                        services.SetStatus("Game index reloaded");
+                        services.Log("Reloaded game index editor rows from cache.");
+                    }));
+                }, CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
             };
 
             searchBox.TextChanged += delegate { refreshGrid(); };

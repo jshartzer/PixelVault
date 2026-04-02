@@ -98,11 +98,26 @@ namespace PixelVaultNative
                     {
                         if (!p.HasExited) p.Kill(true);
                     }
-                    catch
+                    catch (Exception ex)
                     {
+                        Log("Process kill after cancel: " + ex.Message);
                     }
-                    try { p.WaitForExit(); } catch { }
-                    try { Task.WhenAll(stdoutTask, stderrTask).GetAwaiter().GetResult(); } catch { }
+                    try
+                    {
+                        p.WaitForExit();
+                    }
+                    catch (Exception ex)
+                    {
+                        Log("WaitForExit after cancel: " + ex.Message);
+                    }
+                    try
+                    {
+                        Task.WhenAll(stdoutTask, stderrTask).GetAwaiter().GetResult();
+                    }
+                    catch (Exception ex)
+                    {
+                        Log("Drain stdout/stderr after cancel: " + ex.Message);
+                    }
                     throw;
                 }
                 var stdout = stdoutTask.GetAwaiter().GetResult();
@@ -147,7 +162,14 @@ namespace PixelVaultNative
                         failedFfmpegPosterKeys.Remove(hash);
                         if (File.Exists(fallbackPosterPath))
                         {
-                            try { File.Delete(fallbackPosterPath); } catch { }
+                            try
+                            {
+                                File.Delete(fallbackPosterPath);
+                            }
+                            catch (Exception ex)
+                            {
+                                Log("Delete fallback video poster: " + ex.Message);
+                            }
                         }
                         return ffmpegPoster;
                     }
@@ -156,8 +178,9 @@ namespace PixelVaultNative
                 if (File.Exists(fallbackPosterPath)) return fallbackPosterPath;
                 return CreateFallbackVideoPoster(videoPath, fallbackPosterPath, renderWidth, renderHeight);
             }
-            catch
+            catch (Exception ex)
             {
+                Log("EnsureVideoPoster: " + (videoPath ?? "") + " — " + ex.Message);
                 return null;
             }
         }

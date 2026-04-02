@@ -91,6 +91,8 @@ namespace PixelVaultNative
         TextBox logBox;
         TextBlock status;
         CheckBox recurseBox, keywordsBox;
+        /// <summary>Thread-safe mirror of keywordsBox.IsChecked for background metadata (avoid Dispatcher.Invoke).</summary>
+        volatile bool _includeGameCaptureKeywordsMirror;
         ComboBox conflictBox;
         Window photoIndexEditorWindow;
         Window gameIndexEditorWindow;
@@ -300,7 +302,10 @@ namespace PixelVaultNative
             {
                 if (!string.IsNullOrWhiteSpace(libraryRoot) && Directory.Exists(libraryRoot)) LoadSavedGameIndexRows(libraryRoot);
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Log("Startup: could not preload saved game index for library root. " + ex.Message);
+            }
 
             Title = "PixelVault " + AppVersion;
             Width = PreferredLibraryWindowWidth();
@@ -900,6 +905,7 @@ namespace PixelVaultNative
                 recurseBox = previousRecurseBox;
                 keywordsBox = previousKeywordsBox;
                 conflictBox = previousConflictBox;
+                SyncIncludeGameCaptureKeywordsMirror();
             };
             window.ShowDialog();
         }
@@ -2167,6 +2173,7 @@ namespace PixelVaultNative
             bool dialogReady = false;
             CancellationTokenSource steamSearchCancellation = null;
             int steamSearchRequestVersion = 0;
+            int gameTitleChoicesRefreshVersion = 0;
             var badgeBlocks = new Dictionary<ManualMetadataItem, TextBlock>();
             var tileBorders = new Dictionary<ManualMetadataItem, Border>();
             var selectedItems = new List<ManualMetadataItem>();
@@ -2174,39 +2181,61 @@ namespace PixelVaultNative
             Action syncSelectedSteamAppIds = null;
             Action refreshGameTitleChoices = delegate
             {
+                var version = ++gameTitleChoicesRefreshVersion;
+                var root = libraryRoot;
                 var currentText = gameNameBox.Text;
-                var rows = LoadSavedGameIndexRows(libraryRoot);
-                if (rows.Count == 0) rows = LoadGameIndexEditorRows(libraryRoot);
-                var loadedChoices = rows
-                    .Where(row => row != null && !string.IsNullOrWhiteSpace(row.Name))
-                    .OrderBy(row => row.Name ?? string.Empty, StringComparer.OrdinalIgnoreCase)
-                    .ThenBy(row => row.PlatformLabel ?? string.Empty, StringComparer.OrdinalIgnoreCase)
-                    .Select(row => BuildGameTitleChoiceLabel(row.Name, row.PlatformLabel))
-                    .Where(label => !string.IsNullOrWhiteSpace(label))
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .ToList();
-                foreach (var extraChoice in knownGameChoices.Where(label => !string.IsNullOrWhiteSpace(label)))
+                System.Threading.Tasks.Task.Factory.StartNew(delegate
                 {
-                    if (!loadedChoices.Contains(extraChoice, StringComparer.OrdinalIgnoreCase)) loadedChoices.Add(extraChoice);
-                }
-                knownGameChoices = loadedChoices;
-                knownGameChoiceSet = new HashSet<string>(knownGameChoices, StringComparer.OrdinalIgnoreCase);
-                knownGameChoiceNameMap = rows
-                    .Where(row => row != null && !string.IsNullOrWhiteSpace(row.Name))
-                    .Select(row => new { Label = BuildGameTitleChoiceLabel(row.Name, row.PlatformLabel), Name = NormalizeGameIndexName(row.Name, row.FolderPath) })
-                    .Where(entry => !string.IsNullOrWhiteSpace(entry.Label) && !string.IsNullOrWhiteSpace(entry.Name))
-                    .GroupBy(entry => entry.Label, StringComparer.OrdinalIgnoreCase)
-                    .ToDictionary(group => CleanTag(group.Key), group => group.First().Name, StringComparer.OrdinalIgnoreCase);
-                foreach (var extraChoice in knownGameChoices)
+                    var rows = LoadSavedGameIndexRows(root);
+                    if (rows == null || rows.Count == 0) rows = LoadGameIndexEditorRowsCore(root, null);
+                    return rows ?? new List<GameIndexEditorRow>();
+                }).ContinueWith(delegate(System.Threading.Tasks.Task<List<GameIndexEditorRow>> loadTask)
                 {
-                    var normalizedChoice = CleanTag(extraChoice);
-                    if (knownGameChoiceNameMap.ContainsKey(normalizedChoice)) continue;
-                    var extraName = ExtractGameNameFromChoiceLabel(extraChoice);
-                    if (!string.IsNullOrWhiteSpace(extraName)) knownGameChoiceNameMap[normalizedChoice] = extraName;
-                }
-                gameNameBox.ItemsSource = null;
-                gameNameBox.ItemsSource = knownGameChoices;
-                gameNameBox.Text = currentText;
+                    Dispatcher.BeginInvoke(new Action(delegate
+                    {
+                        if (version != gameTitleChoicesRefreshVersion) return;
+                        if (loadTask.IsFaulted)
+                        {
+                            var flattened = loadTask.Exception == null ? null : loadTask.Exception.Flatten();
+                            var err = flattened == null ? null : flattened.InnerExceptions.FirstOrDefault();
+                            Log(err == null ? "Game title list load failed." : err.ToString());
+                            return;
+                        }
+                        var rows = loadTask.Status == System.Threading.Tasks.TaskStatus.RanToCompletion && loadTask.Result != null
+                            ? loadTask.Result
+                            : new List<GameIndexEditorRow>();
+                        var loadedChoices = rows
+                            .Where(row => row != null && !string.IsNullOrWhiteSpace(row.Name))
+                            .OrderBy(row => row.Name ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+                            .ThenBy(row => row.PlatformLabel ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+                            .Select(row => BuildGameTitleChoiceLabel(row.Name, row.PlatformLabel))
+                            .Where(label => !string.IsNullOrWhiteSpace(label))
+                            .Distinct(StringComparer.OrdinalIgnoreCase)
+                            .ToList();
+                        foreach (var extraChoice in knownGameChoices.Where(label => !string.IsNullOrWhiteSpace(label)))
+                        {
+                            if (!loadedChoices.Contains(extraChoice, StringComparer.OrdinalIgnoreCase)) loadedChoices.Add(extraChoice);
+                        }
+                        knownGameChoices = loadedChoices;
+                        knownGameChoiceSet = new HashSet<string>(knownGameChoices, StringComparer.OrdinalIgnoreCase);
+                        knownGameChoiceNameMap = rows
+                            .Where(row => row != null && !string.IsNullOrWhiteSpace(row.Name))
+                            .Select(row => new { Label = BuildGameTitleChoiceLabel(row.Name, row.PlatformLabel), Name = NormalizeGameIndexName(row.Name, row.FolderPath) })
+                            .Where(entry => !string.IsNullOrWhiteSpace(entry.Label) && !string.IsNullOrWhiteSpace(entry.Name))
+                            .GroupBy(entry => entry.Label, StringComparer.OrdinalIgnoreCase)
+                            .ToDictionary(group => CleanTag(group.Key), group => group.First().Name, StringComparer.OrdinalIgnoreCase);
+                        foreach (var extraChoice in knownGameChoices)
+                        {
+                            var normalizedChoice = CleanTag(extraChoice);
+                            if (knownGameChoiceNameMap.ContainsKey(normalizedChoice)) continue;
+                            var extraName = ExtractGameNameFromChoiceLabel(extraChoice);
+                            if (!string.IsNullOrWhiteSpace(extraName)) knownGameChoiceNameMap[normalizedChoice] = extraName;
+                        }
+                        gameNameBox.ItemsSource = null;
+                        gameNameBox.ItemsSource = knownGameChoices;
+                        gameNameBox.Text = currentText;
+                    }));
+                }, System.Threading.Tasks.TaskScheduler.Default);
             };
             Action syncSelectedGameNames = delegate
             {
@@ -3827,8 +3856,9 @@ namespace PixelVaultNative
                     return existingCached;
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                Log("ForceRefreshLibraryArt failed mid-refresh. " + ex.Message);
                 if (!string.IsNullOrWhiteSpace(backupPath) && File.Exists(backupPath) && !string.IsNullOrWhiteSpace(existingCached))
                 {
                     try
@@ -3838,14 +3868,24 @@ namespace PixelVaultNative
                         ClearImageCache();
                         return existingCached;
                     }
-                    catch { }
+                    catch (Exception restoreEx)
+                    {
+                        Log("Custom cover: could not promote backup over cached file. " + restoreEx.Message);
+                    }
                 }
             }
             finally
             {
                 if (!string.IsNullOrWhiteSpace(backupPath) && File.Exists(backupPath))
                 {
-                    try { File.Delete(backupPath); } catch { }
+                    try
+                    {
+                        File.Delete(backupPath);
+                    }
+                    catch (Exception delEx)
+                    {
+                        Log("Custom cover: could not delete temp backup. " + delEx.Message);
+                    }
                 }
             }
 
@@ -4025,7 +4065,10 @@ namespace PixelVaultNative
             {
                 throw;
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Log("Steam cover download failed for " + (folder == null ? "unknown" : folder.Name) + ". " + ex.Message);
+            }
             return null;
         }
 
@@ -4338,8 +4381,9 @@ namespace PixelVaultNative
                     ? null
                     : LoadFrozenBitmap(thumbnailPath, 0);
             }
-            catch
+            catch (Exception ex)
             {
+                Log("TryLoadCachedVisualImmediate: " + fullPath + " — " + ex.Message);
                 return null;
             }
         }
@@ -4373,8 +4417,9 @@ namespace PixelVaultNative
                     return image;
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                Log("LoadFrozenBitmap: " + fullPath + " — " + ex.Message);
                 return null;
             }
         }
@@ -4396,13 +4441,17 @@ namespace PixelVaultNative
                 if (File.Exists(destinationPath)) File.Delete(destinationPath);
                 File.Move(tempPath, destinationPath);
             }
-            catch
+            catch (Exception ex)
             {
+                Log("SaveThumbnailCache failed for " + destinationPath + ". " + ex.Message);
                 try
                 {
                     if (File.Exists(destinationPath + ".tmp")) File.Delete(destinationPath + ".tmp");
                 }
-                catch { }
+                catch (Exception inner)
+                {
+                    Log("SaveThumbnailCache: could not remove temp file. " + inner.Message);
+                }
             }
         }
         string NormalizeTitle(string title) { title = WebUtility.HtmlDecode(title ?? string.Empty); title = title.Replace("â„¢", " ").Replace("Â®", " ").Replace("Â©", " ").Replace("_", " ").Replace("-", " ").Replace(":", " "); title = Regex.Replace(title, @"[^\p{L}\p{Nd}]+", " "); return Regex.Replace(title, @"\s+", " ").Trim().ToLowerInvariant(); }
@@ -4435,7 +4484,10 @@ namespace PixelVaultNative
                     probe = probe.Parent;
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Log("ResolvePersistentDataRoot: " + ex.Message);
+            }
             return currentAppRoot;
         }
 
@@ -4515,8 +4567,9 @@ namespace PixelVaultNative
             {
                 Process.Start(new ProcessStartInfo { FileName = fullPath, UseShellExecute = true, Verb = "open" });
             }
-            catch
+            catch (Exception ex)
             {
+                Log("OpenFolder primary open failed; trying explorer. " + ex.Message);
                 Process.Start(new ProcessStartInfo("explorer.exe", fullPath) { UseShellExecute = true });
             }
         }
@@ -4534,7 +4587,10 @@ namespace PixelVaultNative
                     "In the library, right-click a game folder, choose Set Custom Cover — the file picker starts here (use Open My Covers Folder in the same menu if you want Explorer).\r\n" +
                     "This folder is not part of the cache; PixelVault will not delete it when refreshing covers.\r\n");
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Log("EnsureSavedCoversReadme: " + ex.Message);
+            }
         }
 
         void OpenSavedCoversFolder()
@@ -4544,7 +4600,10 @@ namespace PixelVaultNative
                 Directory.CreateDirectory(savedCoversRoot);
                 EnsureSavedCoversReadme();
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Log("OpenSavedCoversFolder setup: " + ex.Message);
+            }
             OpenFolder(savedCoversRoot);
         }
 
@@ -4614,39 +4673,65 @@ namespace PixelVaultNative
                 gameIndexEditorWindow = null;
             }
 
-            try
+            if (status != null) status.Text = "Loading game index...";
+            Task.Factory.StartNew(delegate
             {
-                GameIndexEditorHost.Show(
-                    this,
-                    AppVersion,
-                    libraryRoot,
-                    w => gameIndexEditorWindow = w,
-                    w => { if (ReferenceEquals(gameIndexEditorWindow, w)) gameIndexEditorWindow = null; },
-                    new GameIndexEditorServices
+                return LoadGameIndexEditorRowsCore(libraryRoot, null);
+            }).ContinueWith(delegate(Task<List<GameIndexEditorRow>> loadTask)
+            {
+                Dispatcher.BeginInvoke(new Action(delegate
+                {
+                    if (loadTask.IsFaulted)
                     {
-                        SetStatus = delegate(string text) { if (status != null) status.Text = text; },
-                        Log = Log,
-                        CreateButton = Btn,
-                        LoadRows = LoadGameIndexEditorRows,
-                        SaveRows = SaveGameIndexEditorRows,
-                        CreateGameId = CreateGameId,
-                        NormalizeGameIndexName = NormalizeGameIndexName,
-                        NormalizeConsoleLabel = NormalizeConsoleLabel,
-                        MergeRows = delegate(List<GameIndexEditorRow> rows) { return MergeGameIndexRows(rows); },
-                        BuildMergeKey = BuildGameIndexMergeKey,
-                        RunBackgroundWorkflowIntArray = RunBackgroundWorkflowWithProgress<int[]>,
-                        ThrowIfWorkflowCancellationRequested = ThrowIfWorkflowCancellationRequested,
-                        ResolveMissingSteamAppIds = ResolveMissingGameIndexSteamAppIds,
-                        ResolveMissingSteamGridDbIds = ResolveMissingGameIndexSteamGridDbIds,
-                        OpenFolder = OpenFolder
-                    });
-            }
-            catch (Exception ex)
-            {
-                status.Text = "Game index unavailable";
-                Log("Failed to open game index. " + ex.Message);
-                MessageBox.Show("Could not open the game index." + Environment.NewLine + Environment.NewLine + ex.Message, "PixelVault");
-            }
+                        if (status != null) status.Text = "Game index unavailable";
+                        var flattened = loadTask.Exception == null ? null : loadTask.Exception.Flatten();
+                        var err = flattened == null ? new Exception("Game index load failed.") : flattened.InnerExceptions.First();
+                        Log(err.ToString());
+                        MessageBox.Show("Could not load the game index." + Environment.NewLine + Environment.NewLine + err.Message, "PixelVault");
+                        return;
+                    }
+
+                    var preloaded = loadTask.Status == TaskStatus.RanToCompletion && loadTask.Result != null
+                        ? loadTask.Result
+                        : new List<GameIndexEditorRow>();
+                    if (status != null) status.Text = "Library ready";
+                    try
+                    {
+                        GameIndexEditorHost.Show(
+                            this,
+                            AppVersion,
+                            libraryRoot,
+                            w => gameIndexEditorWindow = w,
+                            w => { if (ReferenceEquals(gameIndexEditorWindow, w)) gameIndexEditorWindow = null; },
+                            new GameIndexEditorServices
+                            {
+                                SetStatus = delegate(string text) { if (status != null) status.Text = text; },
+                                Log = Log,
+                                CreateButton = Btn,
+                                LoadRows = LoadGameIndexEditorRows,
+                                LoadRowsForBackground = root => LoadGameIndexEditorRowsCore(root, null),
+                                SaveRows = SaveGameIndexEditorRows,
+                                CreateGameId = CreateGameId,
+                                NormalizeGameIndexName = NormalizeGameIndexName,
+                                NormalizeConsoleLabel = NormalizeConsoleLabel,
+                                MergeRows = delegate(List<GameIndexEditorRow> rows) { return MergeGameIndexRows(rows); },
+                                BuildMergeKey = BuildGameIndexMergeKey,
+                                RunBackgroundWorkflowIntArray = RunBackgroundWorkflowWithProgress<int[]>,
+                                ThrowIfWorkflowCancellationRequested = ThrowIfWorkflowCancellationRequested,
+                                ResolveMissingSteamAppIds = ResolveMissingGameIndexSteamAppIds,
+                                ResolveMissingSteamGridDbIds = ResolveMissingGameIndexSteamGridDbIds,
+                                OpenFolder = OpenFolder
+                            },
+                            preloaded);
+                    }
+                    catch (Exception ex)
+                    {
+                        if (status != null) status.Text = "Game index unavailable";
+                        Log("Failed to open game index. " + ex.Message);
+                        MessageBox.Show("Could not open the game index." + Environment.NewLine + Environment.NewLine + ex.Message, "PixelVault");
+                    }
+                }));
+            }, CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
         }
         void OpenWithShell(string path) { if (!string.IsNullOrWhiteSpace(path) && File.Exists(path)) Process.Start(new ProcessStartInfo(path) { UseShellExecute = true }); }
 

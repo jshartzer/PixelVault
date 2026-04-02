@@ -52,6 +52,10 @@ namespace PixelVaultNative
         readonly Dictionary<string, List<Tuple<string, string>>> steamSearchResultsCache = new Dictionary<string, List<Tuple<string, string>>>(StringComparer.OrdinalIgnoreCase);
         readonly Dictionary<string, string> steamGridDbSearchCache = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         readonly Dictionary<string, string> steamGridDbPlatformCache = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        readonly object _steamAppNameCacheLock = new object();
+        readonly object _steamSearchIdCacheLock = new object();
+        readonly object _steamSearchResultsCacheLock = new object();
+        readonly object _steamGridDbResponseCacheLock = new object();
 
         public CoverService(CoverServiceDependencies dependencies)
         {
@@ -190,8 +194,12 @@ namespace PixelVaultNative
         {
             if (string.IsNullOrWhiteSpace(steamAppId) || !HasSteamGridDbApiToken()) return null;
             cancellationToken.ThrowIfCancellationRequested();
+            var platformKey = "steam:" + steamAppId;
             string cached;
-            if (steamGridDbPlatformCache.TryGetValue("steam:" + steamAppId, out cached)) return cached;
+            lock (_steamGridDbResponseCacheLock)
+            {
+                if (steamGridDbPlatformCache.TryGetValue(platformKey, out cached)) return cached;
+            }
             var stopwatch = Stopwatch.StartNew();
             try
             {
@@ -200,7 +208,10 @@ namespace PixelVaultNative
                     if (wc == null) return null;
                     var json = wc.DownloadString("https://www.steamgriddb.com/api/v2/games/steam/" + Uri.EscapeDataString(steamAppId), cancellationToken);
                     cached = ParseSteamGridDbIdFromGamePayload(json);
-                    steamGridDbPlatformCache["steam:" + steamAppId] = cached;
+                    lock (_steamGridDbResponseCacheLock)
+                    {
+                        steamGridDbPlatformCache[platformKey] = cached;
+                    }
                     return cached;
                 }
             }
@@ -217,7 +228,10 @@ namespace PixelVaultNative
                 stopwatch.Stop();
                 LogPerformanceSample("SteamGridDbIdByAppId", stopwatch, "appId=" + steamAppId, 120);
             }
-            steamGridDbPlatformCache["steam:" + steamAppId] = null;
+            lock (_steamGridDbResponseCacheLock)
+            {
+                steamGridDbPlatformCache[platformKey] = null;
+            }
             return null;
         }
 
@@ -226,7 +240,10 @@ namespace PixelVaultNative
             if (string.IsNullOrWhiteSpace(title) || !HasSteamGridDbApiToken()) return null;
             cancellationToken.ThrowIfCancellationRequested();
             string cached;
-            if (steamGridDbSearchCache.TryGetValue(title, out cached)) return cached;
+            lock (_steamGridDbResponseCacheLock)
+            {
+                if (steamGridDbSearchCache.TryGetValue(title, out cached)) return cached;
+            }
             var stopwatch = Stopwatch.StartNew();
             try
             {
@@ -235,7 +252,10 @@ namespace PixelVaultNative
                     if (wc == null) return null;
                     var json = wc.DownloadString("https://www.steamgriddb.com/api/v2/search/autocomplete/" + Uri.EscapeDataString(title), cancellationToken);
                     cached = FindBestSteamGridDbSearchMatch(title, ParseSteamGridDbSearchResults(json));
-                    steamGridDbSearchCache[title] = cached;
+                    lock (_steamGridDbResponseCacheLock)
+                    {
+                        steamGridDbSearchCache[title] = cached;
+                    }
                     return cached;
                 }
             }
@@ -252,7 +272,10 @@ namespace PixelVaultNative
                 stopwatch.Stop();
                 LogPerformanceSample("SteamGridDbSearch", stopwatch, "title=" + title, 120);
             }
-            steamGridDbSearchCache[title] = null;
+            lock (_steamGridDbResponseCacheLock)
+            {
+                steamGridDbSearchCache[title] = null;
+            }
             return null;
         }
 
@@ -261,9 +284,12 @@ namespace PixelVaultNative
             var query = (title ?? string.Empty).Trim();
             cancellationToken.ThrowIfCancellationRequested();
             List<Tuple<string, string>> cached;
-            if (steamSearchResultsCache.TryGetValue(query, out cached))
+            lock (_steamSearchResultsCacheLock)
             {
-                return cached == null ? new List<Tuple<string, string>>() : new List<Tuple<string, string>>(cached);
+                if (steamSearchResultsCache.TryGetValue(query, out cached))
+                {
+                    return cached == null ? new List<Tuple<string, string>>() : new List<Tuple<string, string>>(cached);
+                }
             }
             var stopwatch = Stopwatch.StartNew();
             var results = new List<Tuple<string, string>>();
@@ -290,39 +316,55 @@ namespace PixelVaultNative
             {
                 throw;
             }
-            catch
+            catch (Exception ex)
             {
+                Log("Steam store search suggest failed for \"" + query + "\". " + ex.Message);
             }
             finally
             {
                 stopwatch.Stop();
                 LogPerformanceSample("SteamSearch", stopwatch, "title=" + query + "; results=" + results.Count, 120);
             }
-            steamSearchResultsCache[query] = new List<Tuple<string, string>>(results);
+            lock (_steamSearchResultsCacheLock)
+            {
+                steamSearchResultsCache[query] = new List<Tuple<string, string>>(results);
+            }
             return results;
         }
 
         public string TryResolveSteamAppId(string title, CancellationToken cancellationToken = default(CancellationToken))
         {
             string cached;
-            if (steamSearchCache.TryGetValue(title, out cached)) return cached;
+            lock (_steamSearchIdCacheLock)
+            {
+                if (steamSearchCache.TryGetValue(title, out cached)) return cached;
+            }
             foreach (var match in SearchSteamAppMatches(title, cancellationToken))
             {
                 if (NormalizeTitle(match.Item2) == NormalizeTitle(title))
                 {
                     cached = match.Item1;
-                    steamSearchCache[title] = cached;
+                    lock (_steamSearchIdCacheLock)
+                    {
+                        steamSearchCache[title] = cached;
+                    }
                     return cached;
                 }
             }
-            steamSearchCache[title] = null;
+            lock (_steamSearchIdCacheLock)
+            {
+                steamSearchCache[title] = null;
+            }
             return null;
         }
 
         public string SteamName(string appId, CancellationToken cancellationToken = default(CancellationToken))
         {
             string cached;
-            if (steamCache.TryGetValue(appId, out cached)) return cached;
+            lock (_steamAppNameCacheLock)
+            {
+                if (steamCache.TryGetValue(appId, out cached)) return cached;
+            }
             cancellationToken.ThrowIfCancellationRequested();
             var stopwatch = Stopwatch.StartNew();
             try
@@ -334,7 +376,10 @@ namespace PixelVaultNative
                     if (match.Success)
                     {
                         cached = Sanitize(Regex.Unescape(match.Groups["n"].Value));
-                        steamCache[appId] = cached;
+                        lock (_steamAppNameCacheLock)
+                        {
+                            steamCache[appId] = cached;
+                        }
                         return cached;
                     }
                 }
@@ -352,7 +397,10 @@ namespace PixelVaultNative
                 stopwatch.Stop();
                 LogPerformanceSample("SteamAppDetails", stopwatch, "appId=" + appId, 120);
             }
-            steamCache[appId] = null;
+            lock (_steamAppNameCacheLock)
+            {
+                steamCache[appId] = null;
+            }
             return null;
         }
 

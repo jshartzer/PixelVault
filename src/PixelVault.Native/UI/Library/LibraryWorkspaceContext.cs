@@ -8,13 +8,14 @@ namespace PixelVaultNative
 {
     /// <summary>
     /// Library workspace facade: <see cref="LibraryRoot"/>, folder listing cache, and embedded file-tag cache.
-    /// Use the UI thread for cache mutations (same contract as when these lived on <see cref="MainWindow"/>).
+    /// Folder image listings and file-tag maps use per-cache locks so background library work and UI paths can coordinate safely.
     /// </summary>
     internal sealed class LibraryWorkspaceContext
     {
         readonly MainWindow _host;
         readonly Dictionary<string, List<string>> _folderImageListingByPath = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
         readonly Dictionary<string, long> _folderImageListingStampByPath = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+        readonly object _folderListingSync = new object();
         readonly Dictionary<string, string[]> _fileTagByPath = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
         readonly Dictionary<string, long> _fileTagStampByPath = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
         readonly object _fileTagCacheSync = new object();
@@ -46,32 +47,41 @@ namespace PixelVaultNative
                     }),
                 StringComparer.OrdinalIgnoreCase);
             if (normalizedPaths.Count == 0) return;
-            foreach (var folderPath in normalizedPaths)
+            lock (_folderListingSync)
             {
-                _folderImageListingByPath.Remove(folderPath);
-                _folderImageListingStampByPath.Remove(folderPath);
+                foreach (var folderPath in normalizedPaths)
+                {
+                    _folderImageListingByPath.Remove(folderPath);
+                    _folderImageListingStampByPath.Remove(folderPath);
+                }
             }
         }
 
         internal void ClearFolderImageListings()
         {
-            _folderImageListingByPath.Clear();
-            _folderImageListingStampByPath.Clear();
+            lock (_folderListingSync)
+            {
+                _folderImageListingByPath.Clear();
+                _folderImageListingStampByPath.Clear();
+            }
         }
 
         internal List<string> GetCachedFolderImages(string folderPath)
         {
-            var stamp = Directory.GetLastWriteTimeUtc(folderPath).Ticks;
-            List<string> cached;
-            long cachedStamp;
-            if (_folderImageListingByPath.TryGetValue(folderPath, out cached) && _folderImageListingStampByPath.TryGetValue(folderPath, out cachedStamp) && cachedStamp == stamp)
+            lock (_folderListingSync)
             {
-                return cached;
+                var stamp = Directory.GetLastWriteTimeUtc(folderPath).Ticks;
+                List<string> cached;
+                long cachedStamp;
+                if (_folderImageListingByPath.TryGetValue(folderPath, out cached) && _folderImageListingStampByPath.TryGetValue(folderPath, out cachedStamp) && cachedStamp == stamp)
+                {
+                    return cached;
+                }
+                var fresh = Directory.EnumerateFiles(folderPath, "*.*", SearchOption.TopDirectoryOnly).Where(MainWindow.IsImage).ToList();
+                _folderImageListingByPath[folderPath] = fresh;
+                _folderImageListingStampByPath[folderPath] = stamp;
+                return fresh;
             }
-            var fresh = Directory.EnumerateFiles(folderPath, "*.*", SearchOption.TopDirectoryOnly).Where(MainWindow.IsImage).ToList();
-            _folderImageListingByPath[folderPath] = fresh;
-            _folderImageListingStampByPath[folderPath] = stamp;
-            return fresh;
         }
 
         internal bool TryGetCachedFileTags(string file, long expectedStamp, out string[] tags)

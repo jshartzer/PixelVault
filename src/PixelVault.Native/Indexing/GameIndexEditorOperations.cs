@@ -7,12 +7,13 @@ namespace PixelVaultNative
 {
     public sealed partial class MainWindow
     {
-        List<GameIndexEditorRow> LoadGameIndexEditorRows(string root)
+        /// <summary>Load merged game index rows (may call <see cref="LoadLibraryFoldersCached"/>). Safe from thread pool when <paramref name="setUiStatus"/> is null.</summary>
+        List<GameIndexEditorRow> LoadGameIndexEditorRowsCore(string root, Action<string> setUiStatus)
         {
             var folders = LoadLibraryFoldersCached(root, false);
             if (folders == null || folders.Count == 0)
             {
-                status.Text = "Building game index";
+                if (setUiStatus != null) setUiStatus("Building game index");
                 Log("Game index cache missing or stale. Rebuilding it before editing.");
                 folders = LoadLibraryFoldersCached(root, true);
             }
@@ -25,6 +26,11 @@ namespace PixelVaultNative
                 RefreshCachedLibraryFoldersFromGameIndex(root);
             }
             return rows;
+        }
+
+        List<GameIndexEditorRow> LoadGameIndexEditorRows(string root)
+        {
+            return LoadGameIndexEditorRowsCore(root, s => { if (status != null) status.Text = s; });
         }
 
         void SaveGameIndexEditorRows(string root, IEnumerable<GameIndexEditorRow> rows)

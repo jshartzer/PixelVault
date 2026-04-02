@@ -96,7 +96,8 @@ P3 — Soften video tile warmup / limit concurrent clip work
       (reduces jank when scrolling folders with many videos).
 
 P4 — Replace Dispatcher.Invoke in hot metadata paths
-      (avoids background threads stalling on UI).
+      (avoids background threads stalling on UI). [Game-capture keywords: landed
+      — mirror flag on MainWindow, see PERFORMANCE_TODO 5a.]
 
 Suggested first implementation step
 ----------------------------------

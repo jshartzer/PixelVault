@@ -26,7 +26,7 @@ namespace PixelVaultNative
 {
     public sealed partial class MainWindow
     {
-        void ShowLibraryBrowser(bool reuseMainWindow = false)
+        internal void ShowLibraryBrowserCore(bool reuseMainWindow = false)
         {
             try
             {

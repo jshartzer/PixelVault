@@ -56,6 +56,7 @@
     <Compile Include="UI\Photography\MainWindow.PhotographyAndSteam.cs" />
     <Compile Include="UI\Settings\MainWindow.SettingsShell.cs" />
     <Compile Include="UI\Library\LibraryWorkspaceContext.cs" />
+    <Compile Include="UI\Library\LibraryBrowserHost.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowser.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryScannerBridge.cs" />
     <Compile Include="UI\LibraryVirtualization.cs" />

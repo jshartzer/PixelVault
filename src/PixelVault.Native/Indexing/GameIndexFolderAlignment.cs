@@ -36,7 +36,10 @@ namespace PixelVaultNative
                 if (Directory.EnumerateFileSystemEntries(path).Any()) return;
                 Directory.Delete(path, false);
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Log("TryDeleteEmptyDirectory: " + path + " — " + ex.Message);
+            }
         }
 
         void AlignLibraryFoldersToGameIndex(string root, List<GameIndexEditorRow> rows)

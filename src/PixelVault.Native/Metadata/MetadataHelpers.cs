@@ -25,15 +25,16 @@ namespace PixelVaultNative
             return metadataService.BuildExifArgs(file, dt, platformTags, extraTags, preserveFileTimes, comment, addPhotographyTag, writeDateMetadata, writeCommentMetadata, writeTagMetadata);
         }
 
+        void SyncIncludeGameCaptureKeywordsMirror()
+        {
+            if (keywordsBox == null) return;
+            _includeGameCaptureKeywordsMirror = keywordsBox.IsChecked == true;
+        }
+
         bool ShouldIncludeGameCaptureKeywords()
         {
-            bool includeGameCaptureKeywords = true;
-            if (keywordsBox != null)
-            {
-                if (keywordsBox.Dispatcher.CheckAccess()) includeGameCaptureKeywords = keywordsBox.IsChecked == true;
-                else includeGameCaptureKeywords = (bool)keywordsBox.Dispatcher.Invoke(new Func<bool>(delegate { return keywordsBox.IsChecked == true; }));
-            }
-            return includeGameCaptureKeywords;
+            if (keywordsBox == null) return true;
+            return _includeGameCaptureKeywordsMirror;
         }
 
         string[] BuildMetadataTagSet(IEnumerable<string> platformTags, IEnumerable<string> extraTags, bool addPhotographyTag)
