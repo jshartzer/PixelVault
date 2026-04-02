@@ -1,8 +1,0 @@
-source=Y:\Game Capture Uploads
-destination=Y:\Game Captures
-library=Y:\Game Captures
-exiftool=C:\Codex\tools\exiftool.exe
-ffmpeg=C:\Codex\tools\ffmpeg.exe
-steamgriddb_token=6bd9514534489cdaf5b998f7a80b97eb
-library_folder_tile_size=240
-library_folder_sort_mode=recent
