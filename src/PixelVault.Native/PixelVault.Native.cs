@@ -103,6 +103,7 @@ namespace PixelVaultNative
         readonly IIndexPersistenceService indexPersistenceService;
         readonly IMetadataService metadataService;
         readonly ISettingsService settingsService;
+        readonly ILibraryScanner libraryScanner;
 
         sealed class LibraryDetailRenderSnapshot
         {
@@ -255,6 +256,7 @@ namespace PixelVaultNative
                 RunExeCapture = delegate(string file, string[] args, string cwd, bool logOutput, CancellationToken cancellationToken) { return RunExeCapture(file, args, cwd, logOutput, cancellationToken); }
             });
             settingsService = new SettingsService();
+            libraryScanner = new LibraryScanner(new LibraryScanHost(this));
             libraryWorkspace = new LibraryWorkspaceContext(this);
             Directory.CreateDirectory(dataRoot);
             Directory.CreateDirectory(logsRoot);
