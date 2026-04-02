@@ -96,7 +96,8 @@ The app is currently published at `0.834`.
 
 Recent extraction progress (repo):
 
-- **E1–E3:** Library browser partial, `LibraryWorkspaceContext` caches, virtualization unchanged in `LibraryVirtualization.cs`
+- **E1–E3:** Library browser: **`LibraryBrowserHost`** entry + **`ShowLibraryBrowserCore`** on the **`MainWindow`** partial (`UI/Library/`), **`LibraryWorkspaceContext`** caches, virtualization unchanged in **`LibraryVirtualization.cs`**
+- **Responsiveness:** **`PERFORMANCE_TODO.md`** — item 5 long-workflow spot-check; item 10 first slice (**`LibraryBrowserHost`**); manual-metadata game-title list off UI thread when rebuilding choices
 - **F1–F2:** Settings shell partial (incl. path settings dialog), photography gallery + Steam picker partial; photography wired from Library + Settings
 - **Publish:** script copies full native + test sources under `dist/.../source/`
 
