@@ -50,12 +50,10 @@ Reason:
 Path:
 
 - `runScopedCoverRefresh(...)`
-- background `Task.Factory.StartNew(...)`
-- `RefreshLibraryCovers(...)`
-- `ResolveBestLibraryFolderSteamAppId(...)` / `ResolveBestLibraryFolderSteamGridDbId(...)`
-- `TryDownloadSteamCover(...)` / `TryDownloadSteamGridDbCover(...)`
-- `CoverService.*`
-- `TimeoutWebClient.DownloadString(...)` / `DownloadFile(...)`
+- background `Task.Run` → `RefreshLibraryCoversAsync(...)` (`await` chain)
+- `ResolveBestLibraryFolderSteamAppIdAsync` / `ResolveBestLibraryFolderSteamGridDbIdAsync`
+- `TryDownloadSteamCoverAsync` / `TryDownloadSteamGridDbCoverAsync` → `CoverService.*Async`
+- `TimeoutWebClient.DownloadStringAsync` / `DownloadFileAsync` (sync wrappers unused on this path)
 
 Status:
 

@@ -101,7 +101,7 @@ Recent extraction progress (repo):
 - **F1–F2:** Settings shell partial (incl. path settings dialog), photography gallery + Steam picker partial; photography wired from Library + Settings
 - **Publish:** script copies full native + test sources under `dist/.../source/`
 
-Next likely slices: **F3** (optional settings persistence helper), deeper library **host/facade**, or **Phase 2** responsiveness items from `PERFORMANCE_TODO.md`.
+Next likely slices: **F3** (optional settings persistence helper), deeper library **host/facade**, or further **`await`** cleanup on remaining sync metadata/cover call sites per `PERFORMANCE_TODO.md` item 11.
 
 If you are picking work up midstream:
 

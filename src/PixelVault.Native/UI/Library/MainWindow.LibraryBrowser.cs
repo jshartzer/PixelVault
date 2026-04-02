@@ -1445,11 +1445,9 @@ namespace PixelVaultNative
                         if (setLibraryBusyState != null) setLibraryBusyState(true);
                         System.Windows.Input.Mouse.OverrideCursor = System.Windows.Input.Cursors.Wait;
                         refreshCancellation = new CancellationTokenSource();
-                        System.Threading.Tasks.Task.Factory.StartNew(delegate
+                        System.Threading.Tasks.Task.Run(async () =>
                         {
-                            int resolved = 0;
-                            int coversReady = 0;
-                            RefreshLibraryCovers(libraryWorkspace.LibraryRoot, folders, targetFolders, delegate(int currentCount, int totalCount, string detail)
+                            var result = await RefreshLibraryCoversAsync(libraryWorkspace.LibraryRoot, folders, targetFolders, delegate(int currentCount, int totalCount, string detail)
                             {
                                 if (progressWindow == null) return;
                                 progressWindow.Dispatcher.BeginInvoke(new Action(delegate
@@ -1469,9 +1467,9 @@ namespace PixelVaultNative
                                     }
                                     appendProgress(detail);
                                 }));
-                            }, refreshCancellation.Token, forceRefreshExistingCovers, rebuildFullCacheAfterRefresh, out resolved, out coversReady);
-                            return new[] { resolved, coversReady };
-                        }).ContinueWith(delegate(System.Threading.Tasks.Task<int[]> refreshTask)
+                            }, refreshCancellation.Token, forceRefreshExistingCovers, rebuildFullCacheAfterRefresh).ConfigureAwait(false);
+                            return new[] { result.resolvedIds, result.coversReady };
+                        }, refreshCancellation.Token).ContinueWith(delegate(System.Threading.Tasks.Task<int[]> refreshTask)
                         {
                             libraryWindow.Dispatcher.BeginInvoke(new Action(delegate
                             {

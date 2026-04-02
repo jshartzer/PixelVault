@@ -64,7 +64,7 @@ Status: mostly in place; extend only if the next debounce pass needs more visibi
 - Review scan/rebuild, import/manual import, and cover-fetch paths for any work that can still block the UI thread.
 - Keep the current progress-window pattern, but tighten where work starts and where dispatcher marshaling happens.
 - Note: **Library folder list** refresh already uses **`Task.Factory.StartNew`** + **`Dispatcher.BeginInvoke`** (`MainWindow.LibraryBrowser.cs`). **Game Index** open loads **`LoadGameIndexEditorRowsCore`** on the thread pool, then **`GameIndexEditorHost.Show(..., preloadedRows)`**. **Reload** uses **`LoadRowsForBackground`** (same core) off the UI thread with a short busy state on the editor (grid + action buttons).
-Status: spot-checked (Mar 2026) — **`ShowLibraryMetadataScanWindow`** runs **`libraryScanner.ScanLibraryMetadataIndex`** on the thread pool and marshals progress with **`BeginInvoke`**. Library browser folder snapshot/refresh, selected-folder detail render (**`Task.Run`**), intake badge count, and cover refresh (**`RefreshLibraryCovers`** from **`StartNew`**) follow the same pattern. Import workflows use **`RunBackgroundWorkflowWithProgress`** in **`ImportWorkflow.cs`**. Manual metadata **game title** combo: saved rows + fallback **`LoadGameIndexEditorRowsCore(root, null)`** now load off the UI thread (**`refreshGameTitleChoices`**).
+Status: spot-checked (Mar 2026) — **`ShowLibraryMetadataScanWindow`** uses **`libraryScanner.ScanLibraryMetadataIndexAsync`** (scheduled off the UI thread) and marshals progress with **`BeginInvoke`**. Library browser folder snapshot/refresh, selected-folder detail render (**`Task.Run`**), and intake badge count follow the same pattern. **Cover refresh** uses **`Task.Run`** + **`RefreshLibraryCoversAsync`**, which **`await`**s **`ICoverService`** **`*Async`** (no sync **`GetResult()`** on that path). Import workflows use **`RunBackgroundWorkflowWithProgress`** in **`ImportWorkflow.cs`**. Manual metadata **game title** combo: saved rows + fallback **`LoadGameIndexEditorRowsCore(root, null)`** now load off the UI thread (**`refreshGameTitleChoices`**).
 
 5a. Remove the remaining synchronous UI hop from game-capture keyword tagging.
 - Replace the `Dispatcher.Invoke` call in `ShouldIncludeGameCaptureKeywords` with the same cached-setting pattern used elsewhere in the metadata path.
@@ -84,7 +84,7 @@ Status: landed for the currently known paths, including manual Steam search in t
 8. Add an `IFileSystemService` seam around heavy file-system operations.
 - Wrap directory enumeration, file existence, timestamp reads/writes, and path-heavy scans.
 - Performance reason: centralizing file I/O makes caching and batched enumeration much easier later.
-- Status (Mar 2026) — first slice: **`IFileSystemService`** + **`FileSystemService`** in **`Services/IO/`** (`FileExists`, **`DirectoryExists`**, **`EnumerateDirectories`**, **`EnumerateFiles`**). **`LibraryScanner`** takes the seam and uses it for scan targets, **`LoadLibraryFolders`**, photo-index save guards, and cache rebuild guards. **`MainWindow`** wires **`new FileSystemService()`**. Tests: **`FileSystemServiceTests`**. **Next:** timestamps / copy-move helpers, or reuse from import paths.
+- Status (Mar 2026) — **`IFileSystemService`** + **`FileSystemService`** in **`Services/IO/`** (`FileExists`, **`DirectoryExists`**, **`EnumerateDirectories`**, **`EnumerateFiles`**, **`ReadAllLines`**, **`WriteAllLines`**, **`DeleteFile`**, **`MoveFile`**, **`CreateDirectory`**, **`GetLastWriteTime`**). **`LibraryScanner`** and **`ImportService`** use the seam; **`MainWindow`** wires one shared instance. Tests: **`FileSystemServiceTests`**. **Next:** optional **`CopyFile`** / stream helpers if another consumer needs them.
 
 ## Later
 
@@ -101,7 +101,7 @@ Status: landed for the currently known paths, including manual Steam search in t
 11. Convert touched I/O and provider paths to async-first service APIs.
 - Especially metadata reads, file-heavy scans, and network/provider work.
 - Do this gradually after the service seams exist so the churn stays bounded.
-- Status (Mar 2026) — first slice: **`TimeoutWebClient.DownloadStringAsync` / `DownloadFileAsync`** (true async HTTP + file write); sync **`DownloadString` / `DownloadFile`** delegate to them. **`IMetadataService`** — **`ReadEmbeddedKeywordTagsBatchAsync`** / **`ReadEmbeddedMetadataBatchAsync`** (**`Task.FromResult`** wrappers; ExifTool remains synchronous—call off UI). **`ICoverService`** — `*Async` twins for Steam / SteamGridDB HTTP + cover downloads; sync APIs **`GetAwaiter().GetResult()`** into async (avoid calling sync cover APIs from the UI thread). Library **detail** render uses **`await metadataService.ReadEmbeddedMetadataBatchAsync`** inside **`Task.Run`**. **`LibraryScanner`** parallel batches **`await`** **`ReadEmbeddedMetadataBatchAsync`** with **`SemaphoreSlim`** (item 8 **`IFileSystemService`** landed separately). **Next:** extend **`IFileSystemService`** (timestamps, copy/move) and **`await`** more cover/metadata call sites.
+- Status (Mar 2026) — **`TimeoutWebClient.DownloadStringAsync` / `DownloadFileAsync`** (true async HTTP + file write); sync **`DownloadString` / `DownloadFile`** delegate to them. **`IMetadataService`** — **`ReadEmbeddedKeywordTagsBatchAsync`** / **`ReadEmbeddedMetadataBatchAsync`** (**`Task.FromResult`** wrappers; ExifTool remains synchronous—call off UI). **`ICoverService`** — `*Async` twins for Steam / SteamGridDB HTTP + cover downloads; sync APIs **`GetAwaiter().GetResult()`** into async (avoid calling sync cover APIs from the UI thread). Library **detail** render uses **`await metadataService.ReadEmbeddedMetadataBatchAsync`** inside **`Task.Run`**. **`LibraryScanner`** parallel batches **`await`** **`ReadEmbeddedMetadataBatchAsync`** with **`SemaphoreSlim`**. Library **cover refresh** (**`RefreshLibraryCoversAsync`**) **`await`**s **`ICoverService`** **`*Async`** end-to-end on the background path. **`IFileSystemService`** extended slice landed separately (item 8). **Next:** **`await`** remaining metadata/editor call sites that still use sync **`GetResult()`** only where profiling shows benefit.
 
 ## Suggested Order
 
@@ -113,11 +113,11 @@ Status: landed for the currently known paths, including manual Steam search in t
 6. Background-thread audit (item 5); ~~5a `Dispatcher.Invoke` cleanup~~ (landed)
 7. Cancellation cleanup (item 6—largely landed; spot-check new paths)
 8. Metadata + library scanner service extraction (item 7)
-9. File-system service seam (item 8)
+9. ~~File-system service seam (item 8)~~ — extended slice landed; optional **`CopyFile`** later
 10. ~~Left-side row recycling (item 9)~~ — landed (`RecycleVisibleRowElements` on folder **`tileRows`**)
 11. ~~Library UI extraction (item 10)~~ — first slice landed (`LibraryBrowserHost` + `ShowLibraryBrowserCore`); keep iterating when Library changes
-12. ~~Async-first I/O (item 11)~~ — first slice landed (`TimeoutWebClient`, **`IMetadataService`** / **`ICoverService`** `*Async`); **`LibraryScanner`** batch reads use **`ReadEmbeddedMetadataBatchAsync`** + **`SemaphoreSlim`** (same parallelism as before).
-13. ~~`IFileSystemService` seam (item 8)~~ — first slice landed (**`LibraryScanner`** + default **`FileSystemService`**); extend surface as needed.
+12. ~~Async-first I/O (item 11)~~ — landed for **`TimeoutWebClient`**, **`IMetadataService`** / **`ICoverService`** `*Async`**, **`LibraryScanner`** batch reads (**`ReadEmbeddedMetadataBatchAsync`** + **`SemaphoreSlim`**), and library **cover refresh** (**`RefreshLibraryCoversAsync`** **`await`** chain).
+13. ~~`IFileSystemService` seam (item 8)~~ — landed (**`LibraryScanner`**, **`ImportService`**, extended read/write/move/timestamp helpers).
 
 ## What I Would Prioritize
 
