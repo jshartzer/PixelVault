@@ -1,0 +1,16 @@
+Review fixes for async UI regressions
+Date: 2026-04-02
+
+1. Game index editor re-entrancy
+- Added a pending-load guard in MainWindow.OpenGameIndexEditor.
+- Repeated clicks now return while the async preload is still running instead of starting a second background load.
+- The guard is cleared on the UI-thread continuation before success/error handling.
+- The preload now also uses the captured library root from the click that started it.
+
+2. Manual metadata game-title overwrite race
+- Updated refreshGameTitleChoices to preserve the live ComboBox text at completion time.
+- The async refresh no longer restores the stale text captured before the background load started.
+- This prevents in-progress typing from being overwritten when the game-title choices finish loading.
+
+Verification
+- dotnet test C:\Codex\tests\PixelVault.Native.Tests\PixelVault.Native.Tests.csproj

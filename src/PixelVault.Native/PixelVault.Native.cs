@@ -96,6 +96,7 @@ namespace PixelVaultNative
         ComboBox conflictBox;
         Window photoIndexEditorWindow;
         Window gameIndexEditorWindow;
+        bool gameIndexEditorLoadPending;
         Window filenameConventionEditorWindow;
         int previewRefreshVersion;
         CancellationTokenSource previewRefreshCancellation;
@@ -2183,7 +2184,6 @@ namespace PixelVaultNative
             {
                 var version = ++gameTitleChoicesRefreshVersion;
                 var root = libraryRoot;
-                var currentText = gameNameBox.Text;
                 System.Threading.Tasks.Task.Factory.StartNew(delegate
                 {
                     var rows = LoadSavedGameIndexRows(root);
@@ -2231,9 +2231,10 @@ namespace PixelVaultNative
                             var extraName = ExtractGameNameFromChoiceLabel(extraChoice);
                             if (!string.IsNullOrWhiteSpace(extraName)) knownGameChoiceNameMap[normalizedChoice] = extraName;
                         }
+                        var restoreText = gameNameBox.Text;
                         gameNameBox.ItemsSource = null;
                         gameNameBox.ItemsSource = knownGameChoices;
-                        gameNameBox.Text = currentText;
+                        gameNameBox.Text = restoreText;
                     }));
                 }, System.Threading.Tasks.TaskScheduler.Default);
             };
@@ -4672,15 +4673,29 @@ namespace PixelVaultNative
                 }
                 gameIndexEditorWindow = null;
             }
+            if (gameIndexEditorLoadPending)
+            {
+                if (status != null) status.Text = "Loading game index...";
+                return;
+            }
 
+            gameIndexEditorLoadPending = true;
+            var requestedLibraryRoot = libraryRoot;
             if (status != null) status.Text = "Loading game index...";
             Task.Factory.StartNew(delegate
             {
-                return LoadGameIndexEditorRowsCore(libraryRoot, null);
+                return LoadGameIndexEditorRowsCore(requestedLibraryRoot, null);
             }).ContinueWith(delegate(Task<List<GameIndexEditorRow>> loadTask)
             {
                 Dispatcher.BeginInvoke(new Action(delegate
                 {
+                    gameIndexEditorLoadPending = false;
+                    if (gameIndexEditorWindow != null && gameIndexEditorWindow.IsVisible)
+                    {
+                        gameIndexEditorWindow.Activate();
+                        if (status != null) status.Text = "Library ready";
+                        return;
+                    }
                     if (loadTask.IsFaulted)
                     {
                         if (status != null) status.Text = "Game index unavailable";
@@ -4700,7 +4715,7 @@ namespace PixelVaultNative
                         GameIndexEditorHost.Show(
                             this,
                             AppVersion,
-                            libraryRoot,
+                            requestedLibraryRoot,
                             w => gameIndexEditorWindow = w,
                             w => { if (ReferenceEquals(gameIndexEditorWindow, w)) gameIndexEditorWindow = null; },
                             new GameIndexEditorServices
