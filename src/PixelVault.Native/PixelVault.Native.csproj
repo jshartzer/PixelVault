@@ -42,7 +42,10 @@
     <Compile Include="UI\UiBrushHelper.cs" />
     <Compile Include="UI\Progress\WorkflowProgressWindow.cs" />
     <Compile Include="UI\Editors\FilenameConventionEditorWindow.cs" />
+    <Compile Include="UI\Editors\GameIndexEditorHost.cs" />
+    <Compile Include="UI\Editors\PhotoIndexEditorHost.cs" />
     <Compile Include="UI\FilenameConventionEditor.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryBrowser.cs" />
     <Compile Include="UI\LibraryVirtualization.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="PixelVault.Native.cs" />

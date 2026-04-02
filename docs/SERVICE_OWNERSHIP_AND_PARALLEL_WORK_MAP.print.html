@@ -1,0 +1,541 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Service Ownership And Parallel Work Map</title>
+  <style>
+    @page {
+      size: Letter landscape;
+      margin: 0.6in;
+    }
+
+    :root {
+      --bg: #f6f3ed;
+      --surface: #ffffff;
+      --surface-alt: #f3f6f9;
+      --text: #1d252c;
+      --muted: #5a6670;
+      --rule: #d5dfe6;
+      --accent: #1f5b75;
+      --accent-soft: #e7f1f6;
+      --code-bg: #eef3f6;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", "Aptos", Arial, sans-serif;
+      font-size: 11px;
+      line-height: 1.45;
+    }
+
+    body {
+      padding: 0.25in;
+    }
+
+    .page {
+      background: var(--surface);
+      border: 1px solid var(--rule);
+      border-radius: 18px;
+      padding: 24px 28px;
+      box-shadow: 0 8px 24px rgba(30, 42, 51, 0.06);
+    }
+
+    h1, h2, h3 {
+      margin: 0;
+      page-break-after: avoid;
+      break-after: avoid-page;
+    }
+
+    h1 {
+      font-size: 24px;
+      line-height: 1.2;
+      margin-bottom: 8px;
+      color: #123243;
+    }
+
+    h2 {
+      margin-top: 22px;
+      padding-top: 10px;
+      border-top: 2px solid var(--accent-soft);
+      font-size: 16px;
+      color: var(--accent);
+    }
+
+    h3 {
+      margin-top: 18px;
+      font-size: 13px;
+      color: #21485b;
+    }
+
+    p, ul, ol {
+      margin: 8px 0 0 0;
+    }
+
+    ul, ol {
+      padding-left: 18px;
+    }
+
+    li {
+      margin: 4px 0;
+    }
+
+    code {
+      font-family: "Cascadia Mono", "Consolas", monospace;
+      background: var(--code-bg);
+      border-radius: 4px;
+      padding: 1px 4px;
+      font-size: 0.95em;
+    }
+
+    hr {
+      border: 0;
+      border-top: 1px solid var(--rule);
+      margin: 18px 0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      table-layout: fixed;
+      page-break-inside: avoid;
+      break-inside: avoid;
+      font-size: 10px;
+    }
+
+    thead {
+      display: table-header-group;
+    }
+
+    tr {
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    th, td {
+      border: 1px solid var(--rule);
+      padding: 7px 8px;
+      vertical-align: top;
+      text-align: left;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
+    th {
+      background: var(--accent-soft);
+      color: #17384a;
+      font-weight: 700;
+    }
+
+    tbody tr:nth-child(even) td {
+      background: var(--surface-alt);
+    }
+
+    blockquote {
+      margin: 12px 0 0 0;
+      padding: 10px 14px;
+      border-left: 4px solid var(--accent);
+      background: #f4f9fb;
+      color: #30444f;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      margin-top: 4px;
+      margin-bottom: 16px;
+      font-size: 12px;
+    }
+
+    .callout {
+      margin-top: 16px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #eef6fa, #f8fbfd);
+      border: 1px solid #d6e7ef;
+    }
+
+    .callout strong {
+      color: #123243;
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="subtitle">PixelVault coordination handoff for splitting responsibilities out of MainWindow</div>
+    <div class="callout">
+      <strong>How to use this PDF:</strong> keep Cursor on UI-host and MainWindow surface work, keep Codex on new services/models/tests, and let only one side own the final integration pass in <code>PixelVault.Native.cs</code> or <code>ImportWorkflow.cs</code>.
+    </div>
+    <h1 id="service-ownership-and-parallel-work-map">Service Ownership And Parallel Work Map</h1>
+<h2 id="purpose">Purpose</h2>
+<p>This is the practical coordination map for continuing the MainWindow split without stepping on each other.</p>
+<p>Use it to answer three questions:</p>
+<ol>
+<li>What already counts as a real service or host?</li>
+<li>What still lives in <code>MainWindow</code> or partials?</li>
+<li>Which slices are safe to do in parallel between Cursor and Codex?</li>
+</ol>
+<p>This document is based on the current code in <code>C:\Codex\src\PixelVault.Native</code> and complements:</p>
+<ul>
+<li><code>C:\Codex\docs\MAINWINDOW_EXTRACTION_ROADMAP.md</code></li>
+<li><code>C:\Codex\docs\pixelvault_service_split_plan.txt</code></li>
+</ul>
+<hr />
+<h2 id="current-service-map">Current Service Map</h2>
+<table>
+<thead>
+<tr>
+<th>Area</th>
+<th>Current type(s)</th>
+<th>File(s)</th>
+<th>What it owns now</th>
+<th>What still lives outside it</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Cover art and external lookups</td>
+<td><code>ICoverService</code>, <code>CoverService</code></td>
+<td><code>src/PixelVault.Native/Services/Covers/CoverService.cs</code></td>
+<td>Steam app lookups, SteamGridDB lookups, cover downloads, custom cover file paths, cache naming, deleting cached covers</td>
+<td>Library toolbar/button wiring, image rendering, library refresh flow, some title/console normalization delegated from <code>MainWindow</code></td>
+<td>Extracted service, still depends on <code>MainWindow</code> helpers</td>
+</tr>
+<tr>
+<td>Metadata read/write</td>
+<td><code>IMetadataService</code>, <code>MetadataService</code></td>
+<td><code>src/PixelVault.Native/Services/Metadata/MetadataService.cs</code></td>
+<td>ExifTool arg building, direct metadata reads, batch metadata reads, write batching, sidecar handling, timestamp restoration</td>
+<td>Metadata policy helpers (<code>BuildMetadataTagSet</code>, comment/tag cleanup), metadata editor workflow orchestration, UI progress + status text</td>
+<td>Extracted service, behavior still partly defined by <code>MainWindow</code> delegates</td>
+</tr>
+<tr>
+<td>Index persistence and filename rule storage</td>
+<td><code>IIndexPersistenceService</code>, <code>IndexPersistenceService</code></td>
+<td><code>src/PixelVault.Native/Services/Indexing/IndexPersistenceService.cs</code></td>
+<td>SQLite-backed game/photo index persistence, filename convention persistence, filename convention samples, alias persistence/migration</td>
+<td>Scan/rebuild orchestration, folder grouping, index editor UI actions, some normalization/alias rewrite behavior still delegated from <code>MainWindow</code></td>
+<td>Extracted persistence layer, not yet a full library/index domain service</td>
+</tr>
+<tr>
+<td>Filename parsing</td>
+<td><code>IFilenameParserService</code>, <code>FilenameParserService</code></td>
+<td><code>src/PixelVault.Native/Services/FilenameParsing/FilenameParserService.cs</code></td>
+<td>Built-in + custom filename rule loading, parsing filenames into a <code>FilenameParseResult</code>, generic capture-date fallback, Steam rename hint logic</td>
+<td>Import workflow consequences of parse results, manual intake routing, rename/move path propagation, UI-facing display decisions</td>
+<td>Extracted parser, still consumed directly from <code>MainWindow</code>/import partials</td>
+</tr>
+<tr>
+<td>Filename rules editor state</td>
+<td><code>IFilenameRulesService</code>, <code>FilenameRulesService</code></td>
+<td><code>src/PixelVault.Native/Services/FilenameRules/FilenameRulesService.cs</code></td>
+<td>Load/save rules, create rules, normalize/validate save payload, dismiss samples</td>
+<td>Editor window layout, editor control wiring, status/log handling</td>
+<td>Good separation already</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="current-ui-host-map">Current UI Host Map</h2>
+<p>These are not &quot;services&quot;, but they are important extraction seams because they remove UI surface area from <code>PixelVault.Native.cs</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Surface</th>
+<th>Current type(s)</th>
+<th>File(s)</th>
+<th>What it owns now</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Changelog window</td>
+<td><code>ChangelogWindow</code></td>
+<td><code>src/PixelVault.Native/UI/ChangelogWindow.cs</code></td>
+<td>Changelog dialog UI</td>
+<td>Extracted</td>
+</tr>
+<tr>
+<td>Progress shell</td>
+<td><code>WorkflowProgressWindow</code>, <code>WorkflowProgressView</code></td>
+<td><code>src/PixelVault.Native/UI/Progress/WorkflowProgressWindow.cs</code></td>
+<td>Shared progress window layout, log box, progress bar, footer action button</td>
+<td>Extracted</td>
+</tr>
+<tr>
+<td>Intake preview</td>
+<td><code>IntakePreviewWindow</code>, <code>IntakePreviewServices</code></td>
+<td><code>src/PixelVault.Native/UI/Intake/IntakePreviewWindow.cs</code></td>
+<td>Upload queue preview modal UI</td>
+<td>Extracted host</td>
+</tr>
+<tr>
+<td>Metadata review</td>
+<td><code>MetadataReviewWindow</code>, <code>MetadataReviewServices</code></td>
+<td><code>src/PixelVault.Native/UI/Intake/MetadataReviewWindow.cs</code></td>
+<td>Pre-import metadata review UI</td>
+<td>Extracted host</td>
+</tr>
+<tr>
+<td>Filename rules editor window</td>
+<td><code>FilenameConventionEditorWindow</code>, <code>FilenameConventionEditorServices</code></td>
+<td><code>src/PixelVault.Native/UI/Editors/FilenameConventionEditorWindow.cs</code></td>
+<td>Filename rules modal UI</td>
+<td>Extracted host</td>
+</tr>
+<tr>
+<td>Library virtualization primitives</td>
+<td>partial <code>MainWindow</code> helpers</td>
+<td><code>src/PixelVault.Native/UI/LibraryVirtualization.cs</code></td>
+<td>Virtualized rows/scroll host behavior</td>
+<td>Extracted partial, not yet a standalone host</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="areas-still-centered-on-mainwindow">Areas Still Centered On MainWindow</h2>
+<p>These are the big remaining ownership zones even though some helpers are already split out.</p>
+<table>
+<thead>
+<tr>
+<th>Area</th>
+<th>Main files</th>
+<th>Why it is still &quot;MainWindow-owned&quot;</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>App bootstrapping + composition</td>
+<td><code>src/PixelVault.Native/PixelVault.Native.cs</code></td>
+<td><code>MainWindow</code> constructs services directly and passes many behavior delegates into them</td>
+</tr>
+<tr>
+<td>Settings/config</td>
+<td><code>src/PixelVault.Native/PixelVault.Native.cs</code></td>
+<td>Paths, settings load/save, defaults, and config UI still live in <code>MainWindow</code></td>
+</tr>
+<tr>
+<td>Import orchestration</td>
+<td><code>src/PixelVault.Native/Import/ImportWorkflow.cs</code></td>
+<td>Rename, delete, metadata, move, sort, undo manifest, and workflow progress still live as a <code>MainWindow</code> partial</td>
+</tr>
+<tr>
+<td>Library browser shell</td>
+<td><code>src/PixelVault.Native/PixelVault.Native.cs</code>, <code>src/PixelVault.Native/UI/LibraryVirtualization.cs</code></td>
+<td>Folder tiles, detail pane, toolbar actions, search, selection, refresh, and library scan workflow are still heavily window-owned</td>
+</tr>
+<tr>
+<td>Library scanning/grouping</td>
+<td><code>src/PixelVault.Native/Indexing/LibraryFolderIndexing.cs</code>, <code>src/PixelVault.Native/Indexing/LibraryMetadataIndexing.cs</code>, <code>src/PixelVault.Native/Indexing/GameIndexCore.cs</code>, <code>src/PixelVault.Native/Indexing/GameIndexFolderAlignment.cs</code></td>
+<td>Logic is split across partials/helpers, but there is not yet a dedicated <code>LibraryScanner</code> / <code>LibraryService</code> boundary</td>
+</tr>
+<tr>
+<td>Metadata editing flows</td>
+<td><code>src/PixelVault.Native/Metadata/LibraryMetadataEditing.cs</code>, <code>src/PixelVault.Native/Metadata/MetadataHelpers.cs</code></td>
+<td>The ExifTool service exists, but metadata policy and edit orchestration still lean on window state</td>
+</tr>
+<tr>
+<td>Logging, file system, process execution</td>
+<td><code>src/PixelVault.Native/PixelVault.Native.cs</code>, <code>src/PixelVault.Native/MediaTools/MediaToolHelpers.cs</code></td>
+<td>Cross-cutting helpers still come from <code>MainWindow</code> and direct <code>System.IO</code> / process calls</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="missing-or-incomplete-service-candidates">Missing Or Incomplete Service Candidates</h2>
+<p>These are the best next service seams, ordered by usefulness and risk.</p>
+<table>
+<thead>
+<tr>
+<th>Candidate</th>
+<th>Why it matters</th>
+<th>Suggested file/home</th>
+<th>Risk</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ISettingsService</code> / <code>SettingsService</code></td>
+<td>Reduces path/config noise and secrets handling in <code>MainWindow</code></td>
+<td><code>src/PixelVault.Native/Services/Config/SettingsService.cs</code></td>
+<td>Low</td>
+<td>Best next true service extraction</td>
+</tr>
+<tr>
+<td><code>IImportService</code> / <code>ImportService</code></td>
+<td>Converts <code>ImportWorkflow.cs</code> from a <code>MainWindow</code> partial into a domain service</td>
+<td><code>src/PixelVault.Native/Services/Import/ImportService.cs</code></td>
+<td>Medium</td>
+<td>Good boundary because the workflow is already clustered in one file</td>
+</tr>
+<tr>
+<td><code>ILibraryScanner</code> / <code>LibraryScanner</code></td>
+<td>Pulls scan/rebuild/group logic out of library UI code</td>
+<td><code>src/PixelVault.Native/Services/Library/LibraryScanner.cs</code></td>
+<td>Medium-High</td>
+<td>Biggest leverage after settings/import, but touches many helpers</td>
+</tr>
+<tr>
+<td><code>ILibraryBrowserHost</code> / <code>LibraryBrowserHost</code></td>
+<td>Makes the main library window a host instead of one giant construction method</td>
+<td><code>src/PixelVault.Native/UI/Library/LibraryBrowserHost.cs</code></td>
+<td>High</td>
+<td>Strong UI extraction target, but avoid pairing it with service extraction in the same edit pass</td>
+</tr>
+<tr>
+<td><code>ILogService</code></td>
+<td>Centralizes log writes and operational messages</td>
+<td><code>src/PixelVault.Native/Services/Logging/LogService.cs</code></td>
+<td>Low-Medium</td>
+<td>Helpful, but not the first slice unless logging is actively hurting productivity</td>
+</tr>
+<tr>
+<td><code>IFileSystemService</code></td>
+<td>Reduces direct <code>System.IO</code> calls and helps testability</td>
+<td><code>src/PixelVault.Native/Services/IO/FileSystemService.cs</code></td>
+<td>Medium</td>
+<td>Useful support seam for import/library later</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="recommended-parallel-lanes">Recommended Parallel Lanes</h2>
+<p>The most important rule: do not have both tools editing <code>PixelVault.Native.cs</code> or <code>ImportWorkflow.cs</code> at the same time unless one side is only reading.</p>
+<h3 id="lane-a-ui-host-mainwindow-surface-work">Lane A: UI Host / MainWindow Surface Work</h3>
+<p>Best owner: Cursor</p>
+<p>Write scope:</p>
+<ul>
+<li><code>src/PixelVault.Native/PixelVault.Native.cs</code></li>
+<li><code>src/PixelVault.Native/UI/**/*</code></li>
+<li>small related docs if needed</li>
+</ul>
+<p>Good tasks:</p>
+<ul>
+<li>continue extracting window-building blocks out of <code>PixelVault.Native.cs</code></li>
+<li>move library browser sections into a dedicated host class</li>
+<li>reduce WPF layout/event wiring in the main file</li>
+<li>keep <code>MainWindow</code> focused on composition + top-level navigation</li>
+</ul>
+<p>Avoid pairing with:</p>
+<ul>
+<li>Codex changing the same partial class or the same UI host files</li>
+</ul>
+<h3 id="lane-b-service-model-test-work">Lane B: Service / Model / Test Work</h3>
+<p>Best owner: Codex</p>
+<p>Write scope:</p>
+<ul>
+<li><code>src/PixelVault.Native/Services/**/*</code></li>
+<li><code>src/PixelVault.Native/Models/**/*</code></li>
+<li><code>tests/PixelVault.Native.Tests/**/*</code></li>
+<li>service-oriented docs</li>
+</ul>
+<p>Good tasks:</p>
+<ul>
+<li>introduce a new service interface + implementation</li>
+<li>move pure business logic out of partials into new service classes</li>
+<li>add unit tests for extracted service behavior</li>
+<li>create DTO/result models so UI does not pass raw dictionaries everywhere</li>
+</ul>
+<p>Avoid pairing with:</p>
+<ul>
+<li>Cursor rewriting the same method bodies in <code>ImportWorkflow.cs</code> or <code>PixelVault.Native.cs</code> during the same pass</li>
+</ul>
+<h3 id="lane-c-integration-pass">Lane C: Integration Pass</h3>
+<p>Best owner: one person at a time</p>
+<p>Write scope:</p>
+<ul>
+<li><code>src/PixelVault.Native/PixelVault.Native.cs</code></li>
+<li>whichever partial currently wires the extracted logic</li>
+</ul>
+<p>Good tasks:</p>
+<ul>
+<li>replace direct method calls with service calls</li>
+<li>pass dependencies into a new host/service</li>
+<li>remove dead helpers after extraction</li>
+</ul>
+<p>Rule:</p>
+<ul>
+<li>only one tool should own the integration commit</li>
+</ul>
+<hr />
+<h2 id="safe-parallel-slices-right-now">Safe Parallel Slices Right Now</h2>
+<p>These are the slices that are easiest to split between Cursor and Codex without merge pain.</p>
+<table>
+<thead>
+<tr>
+<th>Cursor focus</th>
+<th>Codex focus</th>
+<th>Why this pairing is safe</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Extract more Library UI out of <code>PixelVault.Native.cs</code> into <code>UI/Library/*</code></td>
+<td>Build <code>ISettingsService</code> and tests in new <code>Services/Config/*</code> files</td>
+<td>Different write sets until final wiring</td>
+</tr>
+<tr>
+<td>Continue window/host extraction under <code>UI/Intake/*</code> or <code>UI/Editors/*</code></td>
+<td>Build <code>IImportService</code> skeleton, result models, and unit tests in new <code>Services/Import/*</code> files</td>
+<td>Service work can happen first without touching the current WPF host</td>
+</tr>
+<tr>
+<td>Clean up toolbar/layout/event-wiring sections in <code>PixelVault.Native.cs</code></td>
+<td>Build <code>ILibraryScanner</code> models and persistence-facing facade in <code>Services/Library/*</code></td>
+<td>Codex can prepare domain objects while Cursor works on the surface</td>
+</tr>
+<tr>
+<td>Refine <code>LibraryBrowserHost</code> or equivalent UI extraction</td>
+<td>Harden <code>MetadataService</code> / <code>IndexPersistenceService</code> tests and move more pure helpers behind them</td>
+<td>Test/service hardening does not need the same UI files</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="bad-parallel-pairings">Bad Parallel Pairings</h2>
+<p>Avoid these combinations in the same active time window:</p>
+<ul>
+<li>both tools editing <code>src/PixelVault.Native/PixelVault.Native.cs</code></li>
+<li>both tools editing <code>src/PixelVault.Native/Import/ImportWorkflow.cs</code></li>
+<li>one tool changing service interfaces while the other tool simultaneously rewires callers to an older version of that interface</li>
+<li>one tool renaming/moving files while the other is patching those same files</li>
+</ul>
+<hr />
+<h2 id="suggested-next-steps">Suggested Next Steps</h2>
+<p>If the goal is productive parallel work with low merge friction, the strongest next move is:</p>
+<ol>
+<li>Cursor owns Library/MainWindow UI extraction.</li>
+<li>Codex owns <code>ISettingsService</code> extraction in new files plus tests.</li>
+<li>After that lands, Codex can take <code>IImportService</code> extraction while Cursor continues Library host work.</li>
+<li>Do integration touches in <code>MainWindow</code> one slice at a time, with one owner per integration commit.</li>
+</ol>
+<p>That sequence keeps the highest-conflict file (<code>PixelVault.Native.cs</code>) under one owner most of the time while still letting the service layer move forward.</p>
+<hr />
+<h2 id="quick-prompt-templates">Quick Prompt Templates</h2>
+<h3 id="prompt-for-cursor">Prompt for Cursor</h3>
+<p>Continue the MainWindow split by extracting Library UI composition out of <code>PixelVault.Native.cs</code> into dedicated UI host files under <code>src/PixelVault.Native/UI/Library</code>. Preserve behavior. Avoid changing service interfaces unless necessary.</p>
+<h3 id="prompt-for-codex">Prompt for Codex</h3>
+<p>Extract the next low-risk service from MainWindow in small safe steps. Start with <code>ISettingsService</code> in <code>src/PixelVault.Native/Services/Config</code>, keep behavior unchanged, add focused tests, and avoid touching Library UI files unless needed for final wiring.</p>
+<hr />
+<h2 id="definition-of-a-good-slice">Definition Of A Good Slice</h2>
+<p>A slice is ready to merge when:</p>
+<ul>
+<li>it has a clear owner</li>
+<li>it mostly touches one area of the tree</li>
+<li>it compiles</li>
+<li>it has at least one focused regression check</li>
+<li>it reduces what <code>MainWindow</code> directly knows about</li>
+</ul>
+
+  </main>
+</body>
+</html>

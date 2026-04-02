@@ -20,11 +20,14 @@ This document is the **execution roadmap** for slicing responsibilities off `Mai
 
 | File | ~Lines | Role |
 |------|--------|------|
-| `PixelVault.Native.cs` | ~7,290 | Constructor, fields, Library UI, Settings, intake preview delegates, metadata review delegate, photography, Steam matches, logging, image cache, many helpers |
+| `PixelVault.Native.cs` | ~5,480 | Constructor, fields, Settings, intake preview delegates, metadata review delegate, photography, Steam matches, logging, image cache, many helpers (Library browser → `UI/Library/MainWindow.LibraryBrowser.cs`) |
 | `Import/ImportWorkflow.cs` | ~970 | Import / manual intake / rename-move-sort orchestration |
 | `UI/FilenameConventionEditor.cs` | ~315 | Filename rule helpers + `OpenFilenameConventionEditor` shell |
 | `UI/Editors/FilenameConventionEditorWindow.cs` | ~925 | Filename rules editor UI (`FilenameConventionEditorWindow.Show` + `FilenameConventionEditorServices`, Phase D1) |
+| `UI/Editors/GameIndexEditorHost.cs` | ~410 | Game index editor UI (`GameIndexEditorHost.Show` + `GameIndexEditorServices`, Phase D2) |
+| `UI/Editors/PhotoIndexEditorHost.cs` | ~370 | Photo index editor UI (`PhotoIndexEditorHost.Show` + `PhotoIndexEditorServices`, Phase D3) |
 | `MediaTools/MediaToolHelpers.cs` | ~700 | Exe runners, FFmpeg helpers |
+| `UI/Library/MainWindow.LibraryBrowser.cs` | ~1,670 | `ShowLibraryBrowser` (Phase E1 partial extraction; same `MainWindow` partial) |
 | `UI/LibraryVirtualization.cs` | ~570 | Virtualized rows / scroll hosts |
 | `Indexing/LibraryMetadataIndexing.cs` | ~500 | Metadata index building |
 | `Indexing/GameIndexCore.cs` | ~370 | Game index core |
@@ -115,6 +118,10 @@ The **priority** is to shrink **`PixelVault.Native.cs`**, not to collapse partia
 
 **Progress:** **D1** — Filename rules editor UI lives in `UI/Editors/FilenameConventionEditorWindow.cs` (`Show` + `FilenameConventionEditorServices`). `MainWindow.OpenFilenameConventionEditor` keeps singleton activation, library check, and catch; it wires rules/parser services, status, log, preview refresh, `Btn`, `NormalizeConsoleLabel`, and `CleanTag`. Static `FilenameParserService` helpers stay called by name for pattern text/regex (instance `IFilenameParserService` is used for `InvalidateRules`).
 
+**D2** — Game index editor UI lives in `UI/Editors/GameIndexEditorHost.cs` (`GameIndexEditorHost.Show` + `GameIndexEditorServices` + `GameIndexBackgroundIntArrayDelegate` for `RunBackgroundWorkflowWithProgress<int[]>`). `MainWindow.OpenGameIndexEditor` keeps singleton activation, library check, and catch; it wires load/save rows, merge keys, ID resolution, `ThrowIfWorkflowCancellationRequested`, and `OpenFolder`.
+
+**D3** — Photo index editor UI lives in `UI/Editors/PhotoIndexEditorHost.cs` (`PhotoIndexEditorHost.Show` + `PhotoIndexEditorServices`). `MainWindow.OpenPhotoIndexEditor` keeps singleton activation, library check, and catch; it wires load/save, embedded-tag read / console label / metadata stamp, `OpenFolder`, `OpenWithShell`, and normalize/clean/parse helpers (`ReadEmbeddedKeywordTagsDirect` is wired as `path => ReadEmbeddedKeywordTagsDirect(path)` because of the optional `CancellationToken` overload).
+
 ---
 
 ## Phase E — Library browser (largest win, highest risk)
@@ -130,6 +137,8 @@ The **priority** is to shrink **`PixelVault.Native.cs`**, not to collapse partia
 **Exit:** **Phase 3 definition of done** from `ROADMAP.md`: new nontrivial Library behavior is added in **`LibraryBrowserHost` (or services)**, not at the bottom of `PixelVault.Native.cs`.
 
 **Dependency:** Prefer completing **Phase 2** responsiveness items that touch Library (debounce, image load paths) before E1, or do E1 behind a thin wrapper so background work stays correct.
+
+**Progress (E1):** `ShowLibraryBrowser` moved from `PixelVault.Native.cs` to **`UI/Library/MainWindow.LibraryBrowser.cs`** as a **`MainWindow` partial** (no behavior change; next steps: optional rename to `LibraryBrowserHost` + `ILibrarySession` facade per E2).
 
 ---
 
