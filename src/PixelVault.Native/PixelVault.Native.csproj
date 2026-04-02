@@ -30,6 +30,9 @@
     <Compile Include="Models\FilenameParsingModels.cs" />
     <Compile Include="Models\ImportModels.cs" />
     <Compile Include="Models\IndexModels.cs" />
+    <Compile Include="Services\Config\AppSettings.cs" />
+    <Compile Include="Services\Config\ISettingsService.cs" />
+    <Compile Include="Services\Config\SettingsService.cs" />
     <Compile Include="Services\Covers\CoverService.cs" />
     <Compile Include="Services\FilenameParsing\FilenameParserService.cs" />
     <Compile Include="Services\FilenameRules\FilenameRulesService.cs" />
