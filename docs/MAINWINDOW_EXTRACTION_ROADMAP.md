@@ -2,6 +2,8 @@
 
 This document is the **execution roadmap** for slicing responsibilities off `MainWindow`. It extends **Phase 3: Shrink MainWindow** in `C:\Codex\docs\ROADMAP.md` and aligns with `C:\Codex\docs\pixelvault_service_split_plan.txt` and `C:\Codex\docs\CODE_QUALITY_IMPROVEMENT_PLAN.md`.
 
+**Not a duplicate of `PERFORMANCE_FIX_PLAN.txt`:** that file tracks **Library performance** (virtualization, sort cost, batch reads, threading). This file tracks **where UI and orchestration code lives** (partials, hosts). The **service split** (`ILibraryScanner`, `IImportService`, …) is in `pixelvault_service_split_plan.txt` — see **Service split alignment** below.
+
 **Notion (Project Wiki):** [MainWindow extraction roadmap](https://www.notion.so/33573adc59b681d88b7dcd88cad53cb6)
 
 **Not a scratchpad:** concrete slices and order of operations. Update this file when a slice ships or the plan changes; sync Notion if you track milestones there (`DOC_SYNC_POLICY.md`).
@@ -11,7 +13,7 @@ This document is the **execution roadmap** for slicing responsibilities off `Mai
 ## Context
 
 - `MainWindow` is a **partial** class spread across many files, but **`PixelVault.Native.cs` still holds the bulk of UI orchestration** (library browser, settings shell, intake preview, editors, photography flow, etc.).
-- Several **services already exist** and are injected in the constructor (`ICoverService`, `IMetadataService`, `IIndexPersistenceService`, `IFilenameParserService`, `IFilenameRulesService`). Extraction means **moving glue code** out of the giant file, not reinventing those services.
+- Several **services already exist** and are injected in the constructor (`ICoverService`, `IMetadataService`, `IIndexPersistenceService`, `IFilenameParserService`, `IFilenameRulesService`, **`ILibraryScanner`**, **`IImportService`**). Extraction means **moving glue code** out of the giant file, not reinventing those services.
 - **Phases 1–2** of the product roadmap (tests, UI-thread responsiveness) should stay **in progress or done** before aggressive slicing; extraction is easier when call sites are already background-safe.
 
 ---
@@ -21,7 +23,7 @@ This document is the **execution roadmap** for slicing responsibilities off `Mai
 | File | ~Lines | Role |
 |------|--------|------|
 | `PixelVault.Native.cs` | ~4,900 | Constructor, fields, `ShowSettingsWindow`, intake preview, manual metadata / Steam search glue, logging, image cache, helpers (library, settings path UI, photography/Steam pickers → `UI/` partials) |
-| `Import/ImportWorkflow.cs` | ~970 | Import / manual intake / rename-move-sort orchestration |
+| `Import/ImportWorkflow.cs` | ~970 | Import / manual intake / rename-move-sort orchestration (move-to-destination, undo manifest, destination sort → **`ImportService`**) |
 | `UI/FilenameConventionEditor.cs` | ~315 | Filename rule helpers + `OpenFilenameConventionEditor` shell |
 | `UI/Editors/FilenameConventionEditorWindow.cs` | ~925 | Filename rules editor UI (`FilenameConventionEditorWindow.Show` + `FilenameConventionEditorServices`, Phase D1) |
 | `UI/Editors/GameIndexEditorHost.cs` | ~410 | Game index editor UI (`GameIndexEditorHost.Show` + `GameIndexEditorServices`, Phase D2) |
@@ -32,7 +34,9 @@ This document is the **execution roadmap** for slicing responsibilities off `Mai
 | `UI/Settings/MainWindow.SettingsShell.cs` | ~300 | `BuildUi`, `BuildSettingsSummary`, `ShowPathSettingsWindow`, `Card`, `TitleBlock` (Phase F1) |
 | `UI/Photography/MainWindow.PhotographyAndSteam.cs` | ~265 | `ShowPhotographyGallery`, `ShowSteamAppMatchWindow` (Phase F2) |
 | `UI/LibraryVirtualization.cs` | ~570 | Virtualized rows / scroll hosts |
-| `Indexing/LibraryMetadataIndexing.cs` | ~500 | Metadata index building |
+| `Services/Library/LibraryScanner.cs` | — | **`ILibraryScanner`**: metadata index scan, folder grouping, folder cache rebuild/cached load; uses **`IMetadataService`** + **`ILibraryScanHost`**. |
+| `Services/Import/ImportService.cs` | — | **`IImportService`**: move-to-destination, undo manifest, sort destination root, undo moves (`ImportServiceDependencies`). |
+| `Indexing/LibraryMetadataIndexing.cs` | ~500 | Metadata index building (scan/save paths delegate to **`LibraryScanner`** where split) |
 | `Indexing/GameIndexCore.cs` | ~370 | Game index core |
 | `Indexing/LibraryFolderIndexing.cs` | ~290 | Folder inventory / library folders |
 | `Indexing/GameIndexFolderAlignment.cs` | ~300 | Folder alignment |
@@ -165,6 +169,25 @@ The **priority** is to shrink **`PixelVault.Native.cs`**, not to collapse partia
 
 **Progress (F2):** **`UI/Photography/MainWindow.PhotographyAndSteam.cs`** — **`ShowPhotographyGallery`** (uses **`libraryWorkspace.LibraryRoot`** for paths) and **`ShowSteamAppMatchWindow`** (manual metadata Steam search picker).
 
+**Progress (F3):** **`ISettingsService`** / **`SettingsService`** already own settings load/save (`Services/Config/`). **`ShowSettingsWindow`** and path UI remain on **`MainWindow`**; no further F3 slice required unless settings UI moves out of `PixelVault.Native.cs`.
+
+---
+
+## Service split alignment (parallel to phases A–F)
+
+Tracked in **`docs/pixelvault_service_split_plan.txt`** (different numbering from extraction phases here).
+
+| Plan phase | Status (Apr 2026) | Notes |
+|------------|-------------------|--------|
+| Phase 1 Settings | Done | `ISettingsService` |
+| Phase 2 Metadata | Done | `IMetadataService` |
+| Phase 3 Index persistence | Done | `IIndexPersistenceService` |
+| Phase 4 Library scan | Done (current scope) | `ILibraryScanner` + `ILibraryScanHost`; `ShowLibraryBrowser` still **`MainWindow` partial** |
+| Phase 5 Import | Initial slice done | `IImportService` — moves, undo manifest, destination sort; rename/metadata/delete steps still in **`ImportWorkflow`** / **`MainWindow`** |
+| Phase 6+ Covers / composition root | Not this roadmap’s focus | See service split plan |
+
+**Extraction roadmap vs service split:** Moving **`ShowLibraryBrowser`** to a non-`Window` host (Phase E1 “ideal”) is **orthogonal** to `LibraryScanner`; both can proceed independently.
+
 ---
 
 ## Milestone targets (optional metrics)
@@ -206,7 +229,8 @@ Fill this in during **Phase A** (region name, primary file lines if known, Dispa
 
 | Region | Dispatcher / UI thread | Shared `MainWindow` state | Services |
 |--------|-------------------------|---------------------------|----------|
-| *(example)* Library browser | Yes | `folderImageCache`, `libraryRoot` | cover, metadata, index persistence |
+| *(example)* Library browser | Yes | `libraryWorkspace`, bitmap decode cache | cover, metadata, **`libraryScanner`**, index persistence |
+| Import workflow | Progress on UI; work on pool | `sourceRoot`, `destinationRoot`, `conflictBox` | **`importService`**, **`metadataService`**, **`libraryScanner`** |
 | | | | |
 
 ---
@@ -216,5 +240,6 @@ Fill this in during **Phase A** (region name, primary file lines if known, Dispa
 - `C:\Codex\docs\ROADMAP.md` — Phase 3 strategy and definition of done  
 - `C:\Codex\docs\pixelvault_service_split_plan.txt` — service map and folder ideas  
 - `C:\Codex\docs\CODE_QUALITY_IMPROVEMENT_PLAN.md` — threading, HTTP, catches  
-- `C:\Codex\docs\PERFORMANCE_TODO.md` — Library / thread work that overlaps Phase E  
+- `C:\Codex\docs\PERFORMANCE_TODO.md` — short active checklist for Library / thread work  
+- `C:\Codex\docs\PERFORMANCE_FIX_PLAN.txt` — Library **performance** phases and completion log (not the same as extraction phases A–F)  
 - `C:\Codex\PixelVaultData\TODO.md` — rolling tasks; link individual slices here when active  

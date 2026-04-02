@@ -3,7 +3,19 @@ PixelVault 0.8x — Library responsiveness & scalability plan
 Copy-paste friendly. Complements docs/PERFORMANCE_TODO.md,
 docs/PERFORMANCE_RESPONSIVENESS_PLAN.txt, docs/LIBRARY_UI_SCALABILITY_NOTES.txt
 
-Flag for review - Coordinate against recent updates - Possible merge
+How this doc fits (consolidation — do not merge into one file)
+---------------------------------------------------------------
+- **This file (PERFORMANCE_FIX_PLAN):** Library **performance** phases (virtualization,
+  sort keys, batch reads, video, threading). Keeps the **“Current status”** log and
+  **“Next up”** queue for perf work.
+- **docs/MAINWINDOW_EXTRACTION_ROADMAP.md:** **UI extraction** (partials, hosts,
+  `ShowLibraryBrowser` location). Different phase letters (A–F); same app, different axis.
+- **docs/pixelvault_service_split_plan.txt:** **Business-logic services**
+  (`ILibraryScanner`, `IImportService`, etc.). Overlaps *operationally* with scan/import
+  paths but is not a substitute for capture-grid virtualization.
+- **docs/PERFORMANCE_TODO.md:** Short **active** checklist; link here for narrative context.
+
+Cross-link these headers instead of duplicating long plans in multiple places.
 
 Goals
 -----
@@ -261,14 +273,54 @@ Observed result from live click-through on the bad folder:
   Death` typing burst, and a later case-only change to `death` did not produce
   another render sample.
 
-Next up:
+Next up (Apr 2026 — still accurate):
 - Remove the remaining `Dispatcher.Invoke` path from
-  `ShouldIncludeGameCaptureKeywords` so metadata/tag work no longer pings the UI
-  thread synchronously.
+  `ShouldIncludeGameCaptureKeywords` (`MetadataHelpers.cs` → `keywordsBox.Dispatcher.Invoke`)
+  so metadata/tag work no longer pings the UI thread synchronously.
 - Then audit the remaining scan / rebuild / import / manual-import paths for work
-  that still starts too close to the UI thread.
+  that still starts too close to the UI thread. (Some orchestration now lives in
+  `LibraryScanner` / `ImportService` per `pixelvault_service_split_plan.txt` — audit
+  call chains from UI entry points, not only `MainWindow` body.)
 - Keep an eye on mixed-media folder scrolling and manual Steam search behavior in
-  click-through testing now that the main Phase 2 slices are in.
+  click-through testing.
+
+Phase checklist vs this document (Apr 2026)
+-------------------------------------------
+Legend: [x] largely done   [~] partial / follow-up   [ ] not done
+
+Phase 0 Measure                    [~] LogPerformanceSample in use; optional finer splits
+                                   (filter vs row build) still optional.
+Phase 1 Capture grid virtualize    [~] Off-screen tiles drop work; full preferred approach
+                                   (ItemsControl + VirtualizingStackPanel / row recycler)
+                                   not fully adopted — still main ceiling for N >> 500.
+Phase 2 Folder sort / search       [x] Cached ticks, backfill, debounced search, etc.
+                                   (see “Completed on March 30, 2026” above).
+Phase 3 Cold index batch reads     [x] Batch embedded reads for missing index entries.
+Phase 4 Video tiles / concurrency  [~] No eager clip pre-gen when visible; cap / poster /
+                                   unload-off-screen polish may remain.
+Phase 5 Threading hygiene        [ ] Dispatcher.Invoke in ShouldIncludeGameCaptureKeywords.
+Phase 6 Polish / consolidation   [ ] Folder-row recycle, async service APIs, etc.
+
+Revised milestones (same doc, re-read against repo)
+---------------------------------------------------
+M0 logging              [~] usable; can deepen
+M1 parser / game-index  [x] per March 30 log
+M2 detail-date off UI   [x] per March 30 log
+M3 startup gating       [x] per March 30 log
+M4 virtualized grid     [~] partial (see Phase 1)
+M5 sort keys + batch    [x] overlaps Phase 2–3
+M6 debounced search     [x] per March 30 log
+M7 Steam search cancel  [x] per March 30 log
+M8 background UI audit  [~] ongoing (“Next up”)
+
+Service split note (Apr 2026, for reviewers)
+--------------------------------------------
+- **Phase 4 (plan):** `ILibraryScanner` / `LibraryScanner` — metadata scan, folder load,
+  folder cache rebuild/cached load; uses `IMetadataService` for batch reads.
+- **Phase 5 (initial):** `IImportService` / `ImportService` — move-to-destination,
+  undo manifest, sort destination root, undo moves.
+These improve **structure and test seams**; they do **not** by themselves complete
+Phase 1 capture-grid virtualization.
 
 Verification checklist (manual)
 -------------------------------
@@ -284,3 +336,5 @@ References in repo
 - docs/PERFORMANCE_TODO.md
 - docs/PERFORMANCE_RESPONSIVENESS_PLAN.txt
 - docs/LIBRARY_UI_SCALABILITY_NOTES.txt
+- docs/MAINWINDOW_EXTRACTION_ROADMAP.md (UI partials / hosts — separate from perf phases)
+- docs/pixelvault_service_split_plan.txt (services: Library, Import, etc.)
