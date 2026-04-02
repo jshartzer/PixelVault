@@ -22,7 +22,8 @@ This document is the **execution roadmap** for slicing responsibilities off `Mai
 |------|--------|------|
 | `PixelVault.Native.cs` | ~7,290 | Constructor, fields, Library UI, Settings, intake preview delegates, metadata review delegate, photography, Steam matches, logging, image cache, many helpers |
 | `Import/ImportWorkflow.cs` | ~970 | Import / manual intake / rename-move-sort orchestration |
-| `UI/FilenameConventionEditor.cs` | ~1,075 | Filename rules editor window |
+| `UI/FilenameConventionEditor.cs` | ~315 | Filename rule helpers + `OpenFilenameConventionEditor` shell |
+| `UI/Editors/FilenameConventionEditorWindow.cs` | ~925 | Filename rules editor UI (`FilenameConventionEditorWindow.Show` + `FilenameConventionEditorServices`, Phase D1) |
 | `MediaTools/MediaToolHelpers.cs` | ~700 | Exe runners, FFmpeg helpers |
 | `UI/LibraryVirtualization.cs` | ~570 | Virtualized rows / scroll hosts |
 | `Indexing/LibraryMetadataIndexing.cs` | ~500 | Metadata index building |
@@ -111,6 +112,8 @@ The **priority** is to shrink **`PixelVault.Native.cs`**, not to collapse partia
 | D3 | `UI/Editors/PhotoIndexEditorHost.cs` | Same for photo index. |
 
 **Exit:** `MainWindow` calls `new XxxEditorWindow(deps)` instead of hosting 500+ lines of editor UI inline.
+
+**Progress:** **D1** — Filename rules editor UI lives in `UI/Editors/FilenameConventionEditorWindow.cs` (`Show` + `FilenameConventionEditorServices`). `MainWindow.OpenFilenameConventionEditor` keeps singleton activation, library check, and catch; it wires rules/parser services, status, log, preview refresh, `Btn`, `NormalizeConsoleLabel`, and `CleanTag`. Static `FilenameParserService` helpers stay called by name for pattern text/regex (instance `IFilenameParserService` is used for `InvalidateRules`).
 
 ---
 

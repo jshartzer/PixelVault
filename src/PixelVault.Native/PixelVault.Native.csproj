@@ -41,6 +41,7 @@
     <Compile Include="UI\Intake\MetadataReviewWindow.cs" />
     <Compile Include="UI\UiBrushHelper.cs" />
     <Compile Include="UI\Progress\WorkflowProgressWindow.cs" />
+    <Compile Include="UI\Editors\FilenameConventionEditorWindow.cs" />
     <Compile Include="UI\FilenameConventionEditor.cs" />
     <Compile Include="UI\LibraryVirtualization.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
