@@ -20,14 +20,17 @@ This document is the **execution roadmap** for slicing responsibilities off `Mai
 
 | File | ~Lines | Role |
 |------|--------|------|
-| `PixelVault.Native.cs` | ~5,480 | Constructor, fields, Settings, intake preview delegates, metadata review delegate, photography, Steam matches, logging, image cache, many helpers (Library browser → `UI/Library/MainWindow.LibraryBrowser.cs`) |
+| `PixelVault.Native.cs` | ~4,900 | Constructor, fields, `ShowSettingsWindow`, intake preview, manual metadata / Steam search glue, logging, image cache, helpers (library, settings path UI, photography/Steam pickers → `UI/` partials) |
 | `Import/ImportWorkflow.cs` | ~970 | Import / manual intake / rename-move-sort orchestration |
 | `UI/FilenameConventionEditor.cs` | ~315 | Filename rule helpers + `OpenFilenameConventionEditor` shell |
 | `UI/Editors/FilenameConventionEditorWindow.cs` | ~925 | Filename rules editor UI (`FilenameConventionEditorWindow.Show` + `FilenameConventionEditorServices`, Phase D1) |
 | `UI/Editors/GameIndexEditorHost.cs` | ~410 | Game index editor UI (`GameIndexEditorHost.Show` + `GameIndexEditorServices`, Phase D2) |
 | `UI/Editors/PhotoIndexEditorHost.cs` | ~370 | Photo index editor UI (`PhotoIndexEditorHost.Show` + `PhotoIndexEditorServices`, Phase D3) |
 | `MediaTools/MediaToolHelpers.cs` | ~700 | Exe runners, FFmpeg helpers |
+| `UI/Library/LibraryWorkspaceContext.cs` | ~175 | Library root + folder listing + file-tag cache facade (Phase E2) |
 | `UI/Library/MainWindow.LibraryBrowser.cs` | ~1,670 | `ShowLibraryBrowser` (Phase E1 partial extraction; same `MainWindow` partial) |
+| `UI/Settings/MainWindow.SettingsShell.cs` | ~300 | `BuildUi`, `BuildSettingsSummary`, `ShowPathSettingsWindow`, `Card`, `TitleBlock` (Phase F1) |
+| `UI/Photography/MainWindow.PhotographyAndSteam.cs` | ~265 | `ShowPhotographyGallery`, `ShowSteamAppMatchWindow` (Phase F2) |
 | `UI/LibraryVirtualization.cs` | ~570 | Virtualized rows / scroll hosts |
 | `Indexing/LibraryMetadataIndexing.cs` | ~500 | Metadata index building |
 | `Indexing/GameIndexCore.cs` | ~370 | Game index core |
@@ -132,13 +135,17 @@ The **priority** is to shrink **`PixelVault.Native.cs`**, not to collapse partia
 |-------|---------|--------|
 | E1 | `UI/Library/LibraryBrowserHost.cs` (or `LibraryShellController`) | Owns grid split, folder tiles, detail pane, search, toolbar actions; receives `ILibraryServices` facade or individual services. |
 | E2 | Facade | `ILibrarySession` or `LibraryWorkspaceContext`: library root, caches, `refresh` actions, **document thread affinity** for image cache. |
-| E3 | Virtualization | Keep using `LibraryVirtualization.cs`; host only **calls** it. |
+| E3 | Virtualization | Keep using `LibraryVirtualization.cs`; host only **calls** it. **Done** — no extra file move required. |
 
 **Exit:** **Phase 3 definition of done** from `ROADMAP.md`: new nontrivial Library behavior is added in **`LibraryBrowserHost` (or services)**, not at the bottom of `PixelVault.Native.cs`.
 
 **Dependency:** Prefer completing **Phase 2** responsiveness items that touch Library (debounce, image load paths) before E1, or do E1 behind a thin wrapper so background work stays correct.
 
 **Progress (E1):** `ShowLibraryBrowser` moved from `PixelVault.Native.cs` to **`UI/Library/MainWindow.LibraryBrowser.cs`** as a **`MainWindow` partial** (no behavior change; next steps: optional rename to `LibraryBrowserHost` + `ILibrarySession` facade per E2).
+
+**Progress (E2):** **`UI/Library/LibraryWorkspaceContext.cs`** — owns **folder image listing cache** and **file-tag cache** (formerly `fileTagCache` / `fileTagCacheStamp` / `fileTagCacheSync`), exposes **`LibraryRoot`** (via `LibraryWorkspaceRoot`) and **`UiDispatcher`**. `RemoveCachedFolderListings`, `ClearFolderImageListings`, `GetCachedFolderImages`, `TryGetCachedFileTags`, `SetCachedFileTags`, `RemoveCachedFileTagEntries`, and `ClearFileTagCache` live on the context; **`MainWindow`** keeps thin wrappers for call sites in partials. **`MainWindow.LibraryBrowser`** uses **`libraryWorkspace.LibraryRoot`**. Bitmap decode cache remains on **`MainWindow`** for now.
+
+**Progress (E3):** Library virtualization stays in **`UI/LibraryVirtualization.cs`**; **`ShowLibraryBrowser`** already consumes it via **`MainWindow`** partial methods — **no further structural change** for this slice.
 
 ---
 
@@ -148,11 +155,15 @@ The **priority** is to shrink **`PixelVault.Native.cs`**, not to collapse partia
 
 | Slice | Move to | Notes |
 |-------|---------|--------|
-| F1 | `UI/Settings/SettingsShellBuilder.cs` | `BuildUi`, path summary cards, top buttons. |
-| F2 | `UI/Photography/PhotographyWindowHost.cs` | Photography / Steam matches if they remain large standalone surfaces. |
+| F1 | `UI/Settings/MainWindow.SettingsShell.cs` (or `SettingsShellBuilder`) | `BuildUi`, path summary, top buttons, **`ShowPathSettingsWindow`**. **Done** as `MainWindow` partial; **`ShowSettingsWindow`** still in `PixelVault.Native.cs`. |
+| F2 | `UI/Photography/MainWindow.PhotographyAndSteam.cs` (roadmap name: `PhotographyWindowHost`) | **`ShowPhotographyGallery`** + **`ShowSteamAppMatchWindow`** as `MainWindow` partial. |
 | F3 | `Services/Config` (optional) | Persisted settings read/write if still embedded in `MainWindow`. |
 
 **Exit:** `PixelVault.Native.cs` is mostly **constructor wiring**, `MainWindow` lifecycle, and delegation to hosts.
+
+**Progress (F1):** **`UI/Settings/MainWindow.SettingsShell.cs`** — **`BuildUi`**, **`BuildSettingsSummary`**, **`Card`**, **`TitleBlock`**, and **`ShowPathSettingsWindow`**. **`ShowSettingsWindow`** remains in **`PixelVault.Native.cs`** (dialog wrapper + field swap).
+
+**Progress (F2):** **`UI/Photography/MainWindow.PhotographyAndSteam.cs`** — **`ShowPhotographyGallery`** (uses **`libraryWorkspace.LibraryRoot`** for paths) and **`ShowSteamAppMatchWindow`** (manual metadata Steam search picker).
 
 ---
 
