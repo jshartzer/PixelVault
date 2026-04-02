@@ -18,7 +18,7 @@ public sealed class SteamRenamePathMappingTests
         var map = new Dictionary<string, string>(System.StringComparer.OrdinalIgnoreCase) { { oldPath, newPath } };
         var item = new ReviewItem { FilePath = oldPath, FileName = "2561580_20240101120000.png" };
 
-        MainWindow.ApplySteamRenameMapToReviewItems(new List<ReviewItem> { item }, map);
+        SteamImportRename.ApplySteamRenameMapToReviewItems(new List<ReviewItem> { item }, map);
 
         Assert.Equal(newPath, item.FilePath);
         Assert.Equal("MyGame_20240101120000.png", item.FileName);
@@ -28,13 +28,13 @@ public sealed class SteamRenamePathMappingTests
     public void ApplySteamRenameMapToReviewItems_NoOp_WhenListOrMapNullOrMapEmpty()
     {
         var item = new ReviewItem { FilePath = @"C:\a.png", FileName = "a.png" };
-        MainWindow.ApplySteamRenameMapToReviewItems(null, new Dictionary<string, string> { { @"C:\a.png", @"C:\b.png" } });
+        SteamImportRename.ApplySteamRenameMapToReviewItems(null, new Dictionary<string, string> { { @"C:\a.png", @"C:\b.png" } });
         Assert.Equal(@"C:\a.png", item.FilePath);
 
-        MainWindow.ApplySteamRenameMapToReviewItems(new List<ReviewItem> { item }, null);
+        SteamImportRename.ApplySteamRenameMapToReviewItems(new List<ReviewItem> { item }, null);
         Assert.Equal(@"C:\a.png", item.FilePath);
 
-        MainWindow.ApplySteamRenameMapToReviewItems(new List<ReviewItem> { item }, new Dictionary<string, string>());
+        SteamImportRename.ApplySteamRenameMapToReviewItems(new List<ReviewItem> { item }, new Dictionary<string, string>());
         Assert.Equal(@"C:\a.png", item.FilePath);
     }
 
@@ -46,7 +46,7 @@ public sealed class SteamRenamePathMappingTests
         var map = new Dictionary<string, string>(System.StringComparer.OrdinalIgnoreCase) { { oldPath, newPath } };
         var item = new ManualMetadataItem { FilePath = oldPath, FileName = "108710_screenshot.png" };
 
-        MainWindow.ApplySteamRenameMapToManualMetadataItems(new List<ManualMetadataItem> { item }, map);
+        SteamImportRename.ApplySteamRenameMapToManualMetadataItems(new List<ManualMetadataItem> { item }, map);
 
         Assert.Equal(newPath, item.FilePath);
         Assert.Equal("GameName_screenshot.png", item.FileName);
@@ -60,7 +60,7 @@ public sealed class SteamRenamePathMappingTests
         var bRenamed = @"C:\u\two.png";
         var map = new Dictionary<string, string>(System.StringComparer.OrdinalIgnoreCase) { { b, bRenamed } };
 
-        var result = MainWindow.ResolveTopLevelPathsAfterSteamRename(new[] { a, b }, map);
+        var result = SteamImportRename.ResolveTopLevelPathsAfterSteamRename(new[] { a, b }, map);
 
         Assert.Equal(new[] { a, bRenamed }, result);
     }
@@ -69,14 +69,14 @@ public sealed class SteamRenamePathMappingTests
     public void ResolveTopLevelPathsAfterSteamRename_NullOldToNew_KeepsOriginalPaths()
     {
         var paths = new[] { @"C:\x\a.jpg", @"C:\x\b.jpg" };
-        var result = MainWindow.ResolveTopLevelPathsAfterSteamRename(paths, null);
+        var result = SteamImportRename.ResolveTopLevelPathsAfterSteamRename(paths, null);
         Assert.Equal(paths, result);
     }
 
     [Fact]
     public void ResolveTopLevelPathsAfterSteamRename_NullTopLevel_ReturnsEmpty()
     {
-        var result = MainWindow.ResolveTopLevelPathsAfterSteamRename(null, new Dictionary<string, string>());
+        var result = SteamImportRename.ResolveTopLevelPathsAfterSteamRename(null, new Dictionary<string, string>());
         Assert.Empty(result);
     }
 
@@ -84,8 +84,29 @@ public sealed class SteamRenamePathMappingTests
     public void ResolveTopLevelPathsAfterSteamRename_SkipsWhitespaceEntries()
     {
         var map = new Dictionary<string, string>(System.StringComparer.OrdinalIgnoreCase) { { @"C:\ok.png", @"C:\renamed.png" } };
-        var result = MainWindow.ResolveTopLevelPathsAfterSteamRename(new[] { @"C:\ok.png", "", "   ", null }, map);
+        var result = SteamImportRename.ResolveTopLevelPathsAfterSteamRename(new[] { @"C:\ok.png", "", "   ", null }, map);
         Assert.Single(result);
         Assert.Equal(@"C:\renamed.png", result[0]);
+    }
+
+    [Fact]
+    public void TryBuildSteamRenameBase_AppIdPrefix_ReplacesWithCanonicalTitle()
+    {
+        Assert.True(SteamImportRename.TryBuildSteamRenameBase("2561580_20240101120000", "2561580", "My Game", null, out var nb));
+        Assert.Equal("My Game_20240101120000", nb);
+    }
+
+    [Fact]
+    public void TryBuildSteamRenameBase_TitleHintUnderscore_ReplacesSegment()
+    {
+        Assert.True(SteamImportRename.TryBuildSteamRenameBase("OldHint_20240101120000", "999", "New Title", "OldHint", out var nb));
+        Assert.Equal("New Title_20240101120000", nb);
+    }
+
+    [Fact]
+    public void TryBuildSteamRenameBase_AlreadyCanonicalTitleUnderscore_ReturnsSameBase()
+    {
+        Assert.True(SteamImportRename.TryBuildSteamRenameBase("My Game_screenshot_1", "1", "My Game", null, out var nb));
+        Assert.Equal("My Game_screenshot_1", nb);
     }
 }

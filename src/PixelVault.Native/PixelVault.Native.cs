@@ -273,7 +273,12 @@ namespace PixelVaultNative
                 GetGameNameFromFileName = GetGameNameFromFileName,
                 EnsureDirectoryExists = EnsureDir,
                 GetLibraryScanner = () => libraryScanner,
-                EnumerateSourceMediaFiles = EnumerateSourceFiles
+                EnumerateSourceMediaFiles = EnumerateSourceFiles,
+                ParseFilenameForImport = ParseFilename,
+                ResolveSteamStoreTitle = appId => SteamName(appId),
+                EnsureSteamAppIdInGameIndex = EnsureSteamAppIdInGameIndex,
+                SanitizeManualRenameGameTitle = Sanitize,
+                NormalizeTitleForManualRename = NormalizeTitle
             });
             libraryWorkspace = new LibraryWorkspaceContext(this);
             Directory.CreateDirectory(dataRoot);
@@ -3042,7 +3047,7 @@ namespace PixelVaultNative
 
             System.Threading.Tasks.Task.Factory.StartNew(delegate
             {
-                RunManualRename(items, delegate(int current, int total, string detail)
+                importService.RunManualRename(items, delegate(int current, int total, string detail)
                 {
                     reportStage(0, current, total, detail);
                 });

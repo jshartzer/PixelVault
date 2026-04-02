@@ -24,6 +24,15 @@ namespace PixelVaultNative
 
         /// <summary>Top-level and optional recursive media file lists from configured source roots.</summary>
         SourceInventory BuildSourceInventory(bool recurseRename);
+
+        /// <summary>Deletes each path that exists (e.g. import “delete before processing”). Skips missing files.</summary>
+        DeleteStepResult DeleteSourceFiles(IEnumerable<string> filePaths, Action<int, int, string> progress = null, CancellationToken cancellationToken = default);
+
+        /// <summary>Steam AppID-based renames in the upload folder (canonical store title + timestamp suffix rules).</summary>
+        RenameStepResult RunSteamRename(IEnumerable<string> sourceFiles, Action<int, int, string> progress = null, CancellationToken cancellationToken = default);
+
+        /// <summary>Prefix filenames with sanitized game title for manual metadata / library edit flows (mutates item paths).</summary>
+        RenameStepResult RunManualRename(List<ManualMetadataItem> items, Action<int, int, string> progress = null, CancellationToken cancellationToken = default);
     }
 
     /// <summary>Outcome of moving files back to source folders during undo (no UI).</summary>
@@ -53,6 +62,21 @@ namespace PixelVaultNative
 
         /// <summary>Enumerate files under all configured source roots (deduped, full paths).</summary>
         public Func<SearchOption, Func<string, bool>, IEnumerable<string>> EnumerateSourceMediaFiles;
+
+        /// <summary>Parse filename for intake (Steam AppID, title hint).</summary>
+        public Func<string, FilenameParseResult> ParseFilenameForImport;
+
+        /// <summary>Resolve Steam store title for an AppID (sync; may call network).</summary>
+        public Func<string, string> ResolveSteamStoreTitle;
+
+        /// <summary>Record Steam AppID on the saved game index when first seen during rename.</summary>
+        public Action<string, string, string> EnsureSteamAppIdInGameIndex;
+
+        /// <summary>Sanitize user-entered game title for use in filenames.</summary>
+        public Func<string, string> SanitizeManualRenameGameTitle;
+
+        /// <summary>Normalize title for “already game-prefixed?” checks during manual rename.</summary>
+        public Func<string, string> NormalizeTitleForManualRename;
     }
 
     internal sealed class ImportService : IImportService
@@ -236,6 +260,159 @@ namespace PixelVaultNative
                     ? enumerate(SearchOption.AllDirectories, isMedia).ToList()
                     : topLevelMediaFiles.ToList()
             };
+        }
+
+        public DeleteStepResult DeleteSourceFiles(IEnumerable<string> filePaths, Action<int, int, string> progress = null, CancellationToken cancellationToken = default)
+        {
+            int deleted = 0, skipped = 0;
+            var paths = (filePaths ?? Enumerable.Empty<string>()).Where(p => !string.IsNullOrWhiteSpace(p)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            var total = paths.Count;
+            if (progress != null) progress(0, total, "Starting delete step for " + total + " file(s).");
+            for (int i = 0; i < total; i++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var path = paths[i];
+                var remaining = total - (i + 1);
+                if (!File.Exists(path))
+                {
+                    skipped++;
+                    if (progress != null) progress(i + 1, total, "Skipped delete " + (i + 1) + " of " + total + " | " + remaining + " remaining | file missing");
+                    continue;
+                }
+                File.Delete(path);
+                deleted++;
+                var name = Path.GetFileName(path);
+                d.Log?.Invoke("Deleted before processing: " + name);
+                if (progress != null) progress(i + 1, total, "Deleted " + (i + 1) + " of " + total + " | " + remaining + " remaining | " + name);
+            }
+            if (progress != null) progress(total, total, "Delete step complete: deleted " + deleted + ", skipped " + skipped + ".");
+            if (deleted > 0 || skipped > 0) d.Log?.Invoke("Delete summary: deleted " + deleted + ", skipped " + skipped + ".");
+            return new DeleteStepResult { Deleted = deleted, Skipped = skipped };
+        }
+
+        public RenameStepResult RunSteamRename(IEnumerable<string> sourceFiles, Action<int, int, string> progress = null, CancellationToken cancellationToken = default)
+        {
+            int renamed = 0, skipped = 0;
+            var pathMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var recordedSteamAppIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var parse = d.ParseFilenameForImport;
+            var steamTitle = d.ResolveSteamStoreTitle;
+            if (parse == null || steamTitle == null)
+            {
+                d.Log?.Invoke("Steam rename skipped: ParseFilenameForImport or ResolveSteamStoreTitle not configured.");
+                return new RenameStepResult { Renamed = 0, Skipped = 0, OldPathToNewPath = pathMap };
+            }
+
+            var libraryRoot = d.GetLibraryRoot == null ? string.Empty : d.GetLibraryRoot() ?? string.Empty;
+            var files = (sourceFiles ?? Enumerable.Empty<string>()).Where(File.Exists).ToList();
+            var total = files.Count;
+            if (progress != null) progress(0, total, "Starting rename step for " + total + " file(s).");
+            for (int i = 0; i < total; i++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var file = files[i];
+                var remaining = total - (i + 1);
+                var parsed = parse(file);
+                var appId = parsed == null ? null : parsed.SteamAppId;
+                if (string.IsNullOrWhiteSpace(appId))
+                {
+                    skipped++;
+                    if (progress != null) progress(i + 1, total, "Skipped rename " + (i + 1) + " of " + total + " | " + remaining + " remaining | no Steam AppID in filename");
+                    continue;
+                }
+                var game = steamTitle(appId);
+                if (string.IsNullOrWhiteSpace(game))
+                {
+                    skipped++;
+                    if (progress != null) progress(i + 1, total, "Skipped rename " + (i + 1) + " of " + total + " | " + remaining + " remaining | no Steam title match");
+                    continue;
+                }
+                if (recordedSteamAppIds.Add(appId)) d.EnsureSteamAppIdInGameIndex?.Invoke(libraryRoot, game, appId);
+                var baseName = Path.GetFileNameWithoutExtension(file);
+                string newBase;
+                var titleHint = parsed == null ? null : parsed.GameTitleHint;
+                if (!SteamImportRename.TryBuildSteamRenameBase(baseName, appId, game, titleHint, out newBase))
+                {
+                    skipped++;
+                    if (progress != null) progress(i + 1, total, "Skipped rename " + (i + 1) + " of " + total + " | " + remaining + " remaining | not AppID-prefixed or title_timestamp form | " + Path.GetFileName(file));
+                    continue;
+                }
+                if (string.Equals(newBase, baseName, StringComparison.OrdinalIgnoreCase))
+                {
+                    skipped++;
+                    if (progress != null) progress(i + 1, total, "Skipped rename " + (i + 1) + " of " + total + " | " + remaining + " remaining | already canonical name | " + Path.GetFileName(file));
+                    continue;
+                }
+                var combined = Path.Combine(Path.GetDirectoryName(file) ?? string.Empty, newBase + Path.GetExtension(file));
+                var target = d.UniquePath == null ? combined : d.UniquePath(combined);
+                File.Move(file, target);
+                pathMap[file] = target;
+                d.MoveMetadataSidecarIfPresent?.Invoke(file, target);
+                renamed++;
+                d.Log?.Invoke("Renamed: " + Path.GetFileName(file) + " -> " + Path.GetFileName(target));
+                if (progress != null) progress(i + 1, total, "Renamed " + (i + 1) + " of " + total + " | " + remaining + " remaining | " + Path.GetFileName(target));
+            }
+            if (progress != null) progress(total, total, "Rename step complete: renamed " + renamed + ", skipped " + skipped + ".");
+            d.Log?.Invoke("Rename summary: renamed " + renamed + ", skipped " + skipped + ".");
+            return new RenameStepResult { Renamed = renamed, Skipped = skipped, OldPathToNewPath = pathMap };
+        }
+
+        public RenameStepResult RunManualRename(List<ManualMetadataItem> items, Action<int, int, string> progress = null, CancellationToken cancellationToken = default)
+        {
+            var sanitize = d.SanitizeManualRenameGameTitle;
+            var normalize = d.NormalizeTitleForManualRename;
+            if (sanitize == null || normalize == null)
+            {
+                d.Log?.Invoke("Manual rename skipped: SanitizeManualRenameGameTitle or NormalizeTitleForManualRename not configured.");
+                return new RenameStepResult();
+            }
+
+            int renamed = 0, skipped = 0;
+            var total = items == null ? 0 : items.Count;
+            if (progress != null) progress(0, total, "Starting rename step for " + total + " image(s).");
+            for (int i = 0; i < total; i++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var item = items[i];
+                var remaining = total - (i + 1);
+                if (!File.Exists(item.FilePath))
+                {
+                    skipped++;
+                    if (progress != null) progress(i + 1, total, "Skipped rename " + (i + 1) + " of " + total + " | " + remaining + " remaining | file missing");
+                    continue;
+                }
+                var gameName = sanitize(item.GameName ?? string.Empty);
+                if (string.IsNullOrWhiteSpace(gameName))
+                {
+                    skipped++;
+                    if (progress != null) progress(i + 1, total, "Skipped rename " + (i + 1) + " of " + total + " | " + remaining + " remaining | no game title");
+                    continue;
+                }
+                var currentBase = Path.GetFileNameWithoutExtension(item.FilePath);
+                var normalizedCurrent = normalize(currentBase);
+                var normalizedGame = normalize(gameName);
+                if (currentBase.StartsWith(gameName + "_", StringComparison.OrdinalIgnoreCase) || normalizedCurrent == normalizedGame || normalizedCurrent.StartsWith(normalizedGame + " "))
+                {
+                    skipped++;
+                    if (progress != null) progress(i + 1, total, "Skipped rename " + (i + 1) + " of " + total + " | " + remaining + " remaining | " + item.FileName);
+                    continue;
+                }
+                var oldName = item.FileName;
+                var dir = Path.GetDirectoryName(item.FilePath) ?? string.Empty;
+                var combined = Path.Combine(dir, gameName + "_" + currentBase + Path.GetExtension(item.FilePath));
+                var target = d.UniquePath == null ? combined : d.UniquePath(combined);
+                var originalPath = item.FilePath;
+                File.Move(item.FilePath, target);
+                d.MoveMetadataSidecarIfPresent?.Invoke(originalPath, target);
+                d.Log?.Invoke("Manual rename: " + oldName + " -> " + Path.GetFileName(target));
+                item.FilePath = target;
+                item.FileName = Path.GetFileName(target);
+                renamed++;
+                if (progress != null) progress(i + 1, total, "Renamed " + (i + 1) + " of " + total + " | " + remaining + " remaining | " + item.FileName);
+            }
+            if (progress != null) progress(total, total, "Rename step complete: renamed " + renamed + ", skipped " + skipped + ".");
+            if (renamed > 0 || skipped > 0) d.Log?.Invoke("Manual rename summary: renamed " + renamed + ", skipped " + skipped + ".");
+            return new RenameStepResult { Renamed = renamed, Skipped = skipped };
         }
 
         string ResolveUndoCurrentPath(UndoImportEntry entry, HashSet<string> usedPaths, string destinationRoot, string libraryRoot)
