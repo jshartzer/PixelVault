@@ -90,6 +90,7 @@ Status: landed for the currently known paths, including manual Steam search in t
 9. Recycle row elements on the Library folder side.
 - The left-side row virtualizer is already decent, but it still clears and rebuilds row trees instead of reusing them.
 - Useful, but clearly lower priority than capture virtualization.
+- Status: landed (Mar 2026) — **`VirtualizedRowHost.RecycleVisibleRowElements`** + per-row-index cache in **`UI/LibraryVirtualization.cs`**; enabled for the Library **folder** scroll host only (**`tileRows`**). **Detail** pane keeps recycling off because **`BeforeVisibleRowsRebuilt`** / **`detailTiles`** expect each visible rebuild to run **`Build()`**. Cache clears on **`SetVirtualizedRows`** and when the model has zero rows.
 
 10. Move `ShowLibraryBrowser` orchestration into a dedicated Library UI type.
 - This is mostly an **iteration-speed and testability** improvement; it also reduces closure tangle and makes threading/cancellation easier to reason about.
@@ -99,6 +100,7 @@ Status: landed for the currently known paths, including manual Steam search in t
 11. Convert touched I/O and provider paths to async-first service APIs.
 - Especially metadata reads, file-heavy scans, and network/provider work.
 - Do this gradually after the service seams exist so the churn stays bounded.
+- Status (Mar 2026) — first slice: **`TimeoutWebClient.DownloadStringAsync` / `DownloadFileAsync`** (true async HTTP + file write); sync **`DownloadString` / `DownloadFile`** delegate to them. **`IMetadataService`** — **`ReadEmbeddedKeywordTagsBatchAsync`** / **`ReadEmbeddedMetadataBatchAsync`** (**`Task.FromResult`** wrappers; ExifTool remains synchronous—call off UI). **`ICoverService`** — `*Async` twins for Steam / SteamGridDB HTTP + cover downloads; sync APIs **`GetAwaiter().GetResult()`** into async (avoid calling sync cover APIs from the UI thread). Library **detail** render uses **`await metadataService.ReadEmbeddedMetadataBatchAsync`** inside **`Task.Run`**. **Next:** migrate **`LibraryScanner`** / other hot paths to **`await`** where helpful; optional **`IFileSystemService`** (item 8) for file enumeration.
 
 ## Suggested Order
 
@@ -111,8 +113,9 @@ Status: landed for the currently known paths, including manual Steam search in t
 7. Cancellation cleanup (item 6—largely landed; spot-check new paths)
 8. Metadata + library scanner service extraction (item 7)
 9. File-system service seam (item 8)
-10. Left-side row recycling (item 9)
+10. ~~Left-side row recycling (item 9)~~ — landed (`RecycleVisibleRowElements` on folder **`tileRows`**)
 11. ~~Library UI extraction (item 10)~~ — first slice landed (`LibraryBrowserHost` + `ShowLibraryBrowserCore`); keep iterating when Library changes
+12. ~~Async-first I/O (item 11)~~ — first slice landed (`TimeoutWebClient`, **`IMetadataService`** / **`ICoverService`** `*Async`); extend to more call sites as needed
 
 ## What I Would Prioritize
 

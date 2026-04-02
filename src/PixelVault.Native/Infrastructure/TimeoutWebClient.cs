@@ -5,10 +5,11 @@ using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace PixelVaultNative
 {
-    // Synchronous wrapper kept for legacy call sites. Any heavy use of this type must stay off the WPF UI thread.
+    // Sync entry points call the async implementations with GetAwaiter().GetResult(); prefer DownloadStringAsync/DownloadFileAsync with await off the UI thread so HTTP does not block a thread-pool thread.
     sealed class TimeoutWebClient : IDisposable
     {
         readonly HttpClientHandler handler = new HttpClientHandler();
@@ -58,64 +59,86 @@ namespace PixelVaultNative
             return requestCancellation == null ? fallbackToken : requestCancellation.Token;
         }
 
+        static string DecodeResponseBody(byte[] bytes, Encoding fallbackEncoding, HttpResponseMessage response)
+        {
+            var charset = response.Content.Headers.ContentType == null ? null : response.Content.Headers.ContentType.CharSet;
+            if (!string.IsNullOrWhiteSpace(charset))
+            {
+                try
+                {
+                    return System.Text.Encoding.GetEncoding(charset).GetString(bytes);
+                }
+                catch
+                {
+                }
+            }
+
+            return (fallbackEncoding ?? System.Text.Encoding.UTF8).GetString(bytes);
+        }
+
         public string DownloadString(string address, CancellationToken cancellationToken = default(CancellationToken))
+        {
+            return DownloadStringAsync(address, cancellationToken).GetAwaiter().GetResult();
+        }
+
+        public async Task<string> DownloadStringAsync(string address, CancellationToken cancellationToken = default(CancellationToken))
         {
             using (var request = BuildRequest(HttpMethod.Get, address))
             using (var requestCancellation = CreateRequestCancellation(cancellationToken))
-            using (var response = client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ResolveRequestToken(requestCancellation, cancellationToken)).GetAwaiter().GetResult())
             {
-                response.EnsureSuccessStatusCode();
-                using (var stream = response.Content.ReadAsStreamAsync().GetAwaiter().GetResult())
-                using (var buffer = new MemoryStream())
+                var token = ResolveRequestToken(requestCancellation, cancellationToken);
+                using (var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token).ConfigureAwait(false))
                 {
-                    stream.CopyToAsync(buffer, 81920, ResolveRequestToken(requestCancellation, cancellationToken)).GetAwaiter().GetResult();
-                    var bytes = buffer.ToArray();
-                    var charset = response.Content.Headers.ContentType == null ? null : response.Content.Headers.ContentType.CharSet;
-                    if (!string.IsNullOrWhiteSpace(charset))
+                    response.EnsureSuccessStatusCode();
+                    using (var stream = await response.Content.ReadAsStreamAsync(token).ConfigureAwait(false))
+                    using (var buffer = new MemoryStream())
                     {
-                        try
-                        {
-                            return System.Text.Encoding.GetEncoding(charset).GetString(bytes);
-                        }
-                        catch
-                        {
-                        }
+                        await stream.CopyToAsync(buffer, 81920, token).ConfigureAwait(false);
+                        var bytes = buffer.ToArray();
+                        return DecodeResponseBody(bytes, Encoding, response);
                     }
-
-                    return (Encoding ?? System.Text.Encoding.UTF8).GetString(bytes);
                 }
             }
         }
 
         public void DownloadFile(string address, string filePath, CancellationToken cancellationToken = default(CancellationToken))
         {
+            DownloadFileAsync(address, filePath, cancellationToken).GetAwaiter().GetResult();
+        }
+
+        public async Task DownloadFileAsync(string address, string filePath, CancellationToken cancellationToken = default(CancellationToken))
+        {
             using (var request = BuildRequest(HttpMethod.Get, address))
             using (var requestCancellation = CreateRequestCancellation(cancellationToken))
-            using (var response = client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ResolveRequestToken(requestCancellation, cancellationToken)).GetAwaiter().GetResult())
             {
-                response.EnsureSuccessStatusCode();
-                try
+                var token = ResolveRequestToken(requestCancellation, cancellationToken);
+                using (var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token).ConfigureAwait(false))
                 {
-                    using (var stream = response.Content.ReadAsStreamAsync().GetAwaiter().GetResult())
-                    using (var target = File.Create(filePath))
+                    response.EnsureSuccessStatusCode();
+                    try
                     {
-                        stream.CopyToAsync(target, 81920, ResolveRequestToken(requestCancellation, cancellationToken)).GetAwaiter().GetResult();
-                    }
-                }
-                catch
-                {
-                    if (!string.IsNullOrWhiteSpace(filePath) && File.Exists(filePath))
-                    {
-                        try
+                        using (var stream = await response.Content.ReadAsStreamAsync(token).ConfigureAwait(false))
+                        using (var target = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, FileOptions.Asynchronous))
                         {
-                            File.Delete(filePath);
-                        }
-                        catch (Exception ex)
-                        {
-                            Debug.WriteLine("PixelVault TimeoutWebClient: could not delete partial download " + filePath + " — " + ex.Message);
+                            await stream.CopyToAsync(target, 81920, token).ConfigureAwait(false);
+                            await target.FlushAsync(token).ConfigureAwait(false);
                         }
                     }
-                    throw;
+                    catch
+                    {
+                        if (!string.IsNullOrWhiteSpace(filePath) && File.Exists(filePath))
+                        {
+                            try
+                            {
+                                File.Delete(filePath);
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.WriteLine("PixelVault TimeoutWebClient: could not delete partial download " + filePath + " — " + ex.Message);
+                            }
+                        }
+                        throw;
+                    }
                 }
             }
         }

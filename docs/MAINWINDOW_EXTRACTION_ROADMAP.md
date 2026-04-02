@@ -149,6 +149,22 @@ The **priority** is to shrink **`PixelVault.Native.cs`**, not to collapse partia
 
 **Progress (E2):** **`UI/Library/LibraryWorkspaceContext.cs`** — owns **folder image listing cache** and **file-tag cache** (formerly `fileTagCache` / `fileTagCacheStamp` / `fileTagCacheSync`), exposes **`LibraryRoot`** (via `LibraryWorkspaceRoot`) and **`UiDispatcher`**. `RemoveCachedFolderListings`, `ClearFolderImageListings`, `GetCachedFolderImages`, `TryGetCachedFileTags`, `SetCachedFileTags`, `RemoveCachedFileTagEntries`, and `ClearFileTagCache` live on the context; **`MainWindow`** keeps thin wrappers for call sites in partials. **`MainWindow.LibraryBrowser`** uses **`libraryWorkspace.LibraryRoot`**. Bitmap decode cache remains on **`MainWindow`** for now.
 
+### E2 follow-on — session facade scope and UI-adjacent async (Mar 2026)
+
+Review feedback matches the plan: **`LibraryBrowserHost`** is intentionally a **thin entry** into **`ShowLibraryBrowserCore`**. The next **substantive** Library slice is **not** moving code between partials for its own sake, but shaping a **library/session facade** (working name **`ILibrarySession`**, or an interface over **`LibraryWorkspaceContext`** plus scan/refresh seams) that:
+
+- Surfaces **library root**, **folder refresh contracts**, and explicit rules for **thread-pool-safe** work vs **UI-thread-only** work (e.g. bitmap decode cache, **`Dispatcher.BeginInvoke`** boundaries).
+- Cuts down **behavior expressed as deep nested `Action` delegates** on **`MainWindow`**, which is the main place **async UI races** show up (stale task completions, double window open, combo refill after close).
+- Lets **`LibraryBrowserHost`** (and later, **`ShowLibraryBrowserCore`**) depend on **facade + services** (`ILibraryScanner`, `IMetadataService`, persistence) instead of **`MainWindow`** as a grab-bag of helpers.
+
+**Testing:** Unit coverage is solid for core logic; **UI-adjacent async** (pool load → marshal → show window or refill controls) is the weakest area. Mitigations, cheapest first:
+
+1. **Regression tests** on **non-WPF** paths: e.g. **`LoadGameIndexEditorRowsCore`**, merge/save invariants, version-token “ignore stale completion” behavior where logic can be isolated.
+2. A small **internal helper** (e.g. run work on **`TaskScheduler.Default`**, continue with **`dispatcher.BeginInvoke`**, unified fault logging) **used by hosts** and covered by tests for ordering and exceptions.
+3. **Manual steps** in **`docs/MANUAL_GOLDEN_PATH_CHECKLIST.md`** for Library → Game Index and manual metadata until (1)–(2) cover the riskiest flows.
+
+**Coordination:** Prefer **not** pairing a large facade pass with heavy **`IImportService`** / **`ImportWorkflow`** edits in the same window; see **`docs/SERVICE_OWNERSHIP_AND_PARALLEL_WORK_MAP.md`**.
+
 **Progress (E3):** Library virtualization stays in **`UI/LibraryVirtualization.cs`**; **`ShowLibraryBrowser`** already consumes it via **`MainWindow`** partial methods — **no further structural change** for this slice.
 
 ---

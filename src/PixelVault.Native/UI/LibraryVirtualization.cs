@@ -31,6 +31,9 @@ namespace PixelVaultNative
             public double ViewportHeightFallback = 720;
             public Action BeforeVisibleRowsRebuilt;
             public Action AfterVisibleRowsRebuilt;
+            /// <summary>When true, visible row <see cref="FrameworkElement"/>s are keyed by row index and reused across scroll refreshes (same <see cref="Rows"/> model). Cleared on <see cref="SetVirtualizedRows"/>. Do not use when <see cref="BeforeVisibleRowsRebuilt"/> assumes a full rebuild every time (e.g. detail pane repopulates parallel tile lists).</summary>
+            public bool RecycleVisibleRowElements;
+            public readonly Dictionary<int, FrameworkElement> RecycledRowElements = new Dictionary<int, FrameworkElement>();
         }
 
         VirtualizedRowHost CreateVirtualizedRowHost(Thickness margin, Brush background)
@@ -70,6 +73,7 @@ namespace PixelVaultNative
             host.Rows = rows == null ? new List<VirtualizedRowDefinition>() : new List<VirtualizedRowDefinition>(rows);
             host.FirstVisibleIndex = -1;
             host.LastVisibleIndex = -1;
+            if (host.RecycleVisibleRowElements) host.RecycledRowElements.Clear();
             if (host.ScrollViewer != null)
             {
                 if (resetScroll) host.ScrollViewer.ScrollToVerticalOffset(0);
@@ -98,6 +102,7 @@ namespace PixelVaultNative
                 host.TopSpacer.Height = 0;
                 host.BottomSpacer.Height = 0;
                 host.VisibleRowsPanel.Children.Clear();
+                if (host.RecycleVisibleRowElements) host.RecycledRowElements.Clear();
                 host.FirstVisibleIndex = -1;
                 host.LastVisibleIndex = -1;
                 if (host.AfterVisibleRowsRebuilt != null) host.AfterVisibleRowsRebuilt();
@@ -155,7 +160,19 @@ namespace PixelVaultNative
             {
                 var row = rows[i];
                 if (row == null || row.Build == null) continue;
-                var element = row.Build();
+                FrameworkElement element = null;
+                if (host.RecycleVisibleRowElements)
+                {
+                    if (!host.RecycledRowElements.TryGetValue(i, out element) || element == null)
+                    {
+                        element = row.Build();
+                        if (element != null) host.RecycledRowElements[i] = element;
+                    }
+                }
+                else
+                {
+                    element = row.Build();
+                }
                 if (element == null) continue;
                 host.VisibleRowsPanel.Children.Add(element);
                 if (measureWidth > 0)
@@ -169,6 +186,14 @@ namespace PixelVaultNative
                     }
                 }
                 renderedHeight += Math.Max(1, row.Height);
+            }
+
+            if (host.RecycleVisibleRowElements)
+            {
+                foreach (var key in host.RecycledRowElements.Keys.ToList())
+                {
+                    if (key < firstIndex || key > lastIndex) host.RecycledRowElements.Remove(key);
+                }
             }
 
             host.TopSpacer.Height = topHeight;

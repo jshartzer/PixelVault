@@ -21,6 +21,8 @@ namespace PixelVaultNative
         DateTime? ReadEmbeddedCaptureDateDirect(string file, CancellationToken cancellationToken = default(CancellationToken));
         Dictionary<string, string[]> ReadEmbeddedKeywordTagsBatch(IEnumerable<string> files, CancellationToken cancellationToken = default(CancellationToken));
         Dictionary<string, EmbeddedMetadataSnapshot> ReadEmbeddedMetadataBatch(IEnumerable<string> files, CancellationToken cancellationToken = default(CancellationToken));
+        Task<Dictionary<string, string[]>> ReadEmbeddedKeywordTagsBatchAsync(IEnumerable<string> files, CancellationToken cancellationToken = default(CancellationToken));
+        Task<Dictionary<string, EmbeddedMetadataSnapshot>> ReadEmbeddedMetadataBatchAsync(IEnumerable<string> files, CancellationToken cancellationToken = default(CancellationToken));
         void EnsureExifTool();
         void RunExifToolBatch(IReadOnlyList<ExifWriteRequest> requests);
         int RunExifWriteRequests(List<ExifWriteRequest> requests, int totalCount, int alreadyCompleted, Action<int, int, string> progress = null, CancellationToken cancellationToken = default(CancellationToken));
@@ -505,6 +507,28 @@ namespace PixelVaultNative
             }
 
             return result;
+        }
+
+        /// <summary>Async-shaped batch read; runs ExifTool work synchronously on the caller's context when awaited. Call from a thread-pool/async continuation (or wrap in <see cref="Task.Run(System.Action)"/>) so the UI thread is not blocked.</summary>
+        public Task<Dictionary<string, string[]>> ReadEmbeddedKeywordTagsBatchAsync(IEnumerable<string> files, CancellationToken cancellationToken = default(CancellationToken))
+        {
+            var list = (files ?? Enumerable.Empty<string>())
+                .Where(file => !string.IsNullOrWhiteSpace(file) && File.Exists(file))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (list.Count == 0) return Task.FromResult(new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase));
+            return Task.FromResult(ReadEmbeddedKeywordTagsBatch(list, cancellationToken));
+        }
+
+        /// <summary>Async-shaped batch read; runs ExifTool work synchronously on the caller's context when awaited. Call from a thread-pool/async continuation (or wrap in <see cref="Task.Run(System.Action)"/>) so the UI thread is not blocked.</summary>
+        public Task<Dictionary<string, EmbeddedMetadataSnapshot>> ReadEmbeddedMetadataBatchAsync(IEnumerable<string> files, CancellationToken cancellationToken = default(CancellationToken))
+        {
+            var list = (files ?? Enumerable.Empty<string>())
+                .Where(file => !string.IsNullOrWhiteSpace(file) && File.Exists(file))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (list.Count == 0) return Task.FromResult(new Dictionary<string, EmbeddedMetadataSnapshot>(StringComparer.OrdinalIgnoreCase));
+            return Task.FromResult(ReadEmbeddedMetadataBatch(list, cancellationToken));
         }
 
         public void EnsureExifTool()

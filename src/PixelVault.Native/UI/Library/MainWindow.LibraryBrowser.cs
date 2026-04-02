@@ -295,6 +295,7 @@ namespace PixelVaultNative
                 leftGrid.Children.Add(filterShell);
 
                 var tileRows = CreateVirtualizedRowHost(new Thickness(0, 12, 0, 0), null);
+                tileRows.RecycleVisibleRowElements = true;
                 var tileScroll = tileRows.ScrollViewer;
                 tileScroll.Padding = new Thickness(0, 4, 0, 0);
                 Grid.SetRow(tileScroll, 1);
@@ -801,7 +802,7 @@ namespace PixelVaultNative
                         }
                     }, true, null);
                     if (refreshDetailSelectionUi != null) refreshDetailSelectionUi();
-                    Task.Run(delegate
+                    Task.Run(async delegate
                     {
                         var metadataIndex = string.IsNullOrWhiteSpace(libraryWorkspace.LibraryRoot)
                             ? new Dictionary<string, LibraryMetadataIndexEntry>(StringComparer.OrdinalIgnoreCase)
@@ -823,7 +824,7 @@ namespace PixelVaultNative
                             if (filesMissingCaptureTicks.Count > 0)
                             {
                                 var savedGameRows = LoadSavedGameIndexRows(libraryWorkspace.LibraryRoot);
-                                var metadataByFile = ReadEmbeddedMetadataBatch(filesMissingCaptureTicks);
+                                var metadataByFile = await metadataService.ReadEmbeddedMetadataBatchAsync(filesMissingCaptureTicks, CancellationToken.None).ConfigureAwait(false);
                                 var indexChanged = false;
                                 var gameRowsChanged = false;
                                 foreach (var file in filesMissingCaptureTicks)
