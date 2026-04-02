@@ -3,6 +3,7 @@ PixelVault 0.8x — Library responsiveness & scalability plan
 Copy-paste friendly. Complements docs/PERFORMANCE_TODO.md,
 docs/PERFORMANCE_RESPONSIVENESS_PLAN.txt, docs/LIBRARY_UI_SCALABILITY_NOTES.txt
 
+Flag for review - Coordinate against recent updates - Possible merge
 
 Goals
 -----
