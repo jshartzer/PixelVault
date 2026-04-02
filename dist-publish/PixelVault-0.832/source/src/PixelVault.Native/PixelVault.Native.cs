@@ -102,6 +102,8 @@ namespace PixelVaultNative
         readonly IFilenameRulesService filenameRulesService;
         readonly IIndexPersistenceService indexPersistenceService;
         readonly IMetadataService metadataService;
+        readonly ISettingsService settingsService;
+        readonly ILibraryScanner libraryScanner;
 
         sealed class LibraryDetailRenderSnapshot
         {
@@ -253,6 +255,8 @@ namespace PixelVaultNative
                 RunExe = delegate(string file, string[] args, string cwd, bool logOutput) { RunExe(file, args, cwd, logOutput); },
                 RunExeCapture = delegate(string file, string[] args, string cwd, bool logOutput, CancellationToken cancellationToken) { return RunExeCapture(file, args, cwd, logOutput, cancellationToken); }
             });
+            settingsService = new SettingsService();
+            libraryScanner = new LibraryScanner(new LibraryScanHost(this));
             libraryWorkspace = new LibraryWorkspaceContext(this);
             Directory.CreateDirectory(dataRoot);
             Directory.CreateDirectory(logsRoot);
@@ -669,15 +673,7 @@ namespace PixelVaultNative
                 Child = headerGrid
             };
         }
-        string FindSteamGridDbApiTokenInEnvironment()
-        {
-            foreach (var key in new[] { "PIXELVAULT_STEAMGRIDDB_TOKEN", "STEAMGRIDDB_API_KEY", "STEAMGRIDDB_TOKEN" })
-            {
-                var value = Environment.GetEnvironmentVariable(key);
-                if (!string.IsNullOrWhiteSpace(value)) return value.Trim();
-            }
-            return string.Empty;
-        }
+        string FindSteamGridDbApiTokenInEnvironment() => SettingsService.FindSteamGridDbApiTokenInEnvironment();
         string CurrentSteamGridDbApiToken()
         {
             var envToken = FindSteamGridDbApiTokenInEnvironment();
@@ -705,12 +701,7 @@ namespace PixelVaultNative
             if (!string.IsNullOrWhiteSpace(cleanedEdited)) return false;
             return previousSuppressed || !string.IsNullOrWhiteSpace(CleanTag(previousValue));
         }
-        int NormalizeLibraryFolderTileSize(int value)
-        {
-            if (value < 140) return 140;
-            if (value > 340) return 340;
-            return value;
-        }
+        int NormalizeLibraryFolderTileSize(int value) => SettingsService.NormalizeLibraryFolderTileSize(value);
         (int Columns, int TileSize) CalculateResponsiveLibraryFolderLayout(ScrollViewer scrollViewer)
         {
             var viewportWidth = scrollViewer == null ? 0 : scrollViewer.ViewportWidth;
@@ -734,13 +725,7 @@ namespace PixelVaultNative
             tileWidth = Math.Max(180, Math.Min(680, (int)(Math.Round(tileWidth / 24d) * 24)));
             return (columns, tileWidth);
         }
-        string NormalizeLibraryFolderSortMode(string value)
-        {
-            var normalized = (value ?? string.Empty).Trim().ToLowerInvariant();
-            if (normalized == "recent" || normalized == "recently added" || normalized == "recently-added") return "recent";
-            if (normalized == "photos" || normalized == "most photos" || normalized == "photo count") return "photos";
-            return "platform";
-        }
+        string NormalizeLibraryFolderSortMode(string value) => SettingsService.NormalizeLibraryFolderSortMode(value);
         string LibraryFolderSortModeLabel(string value)
         {
             switch (NormalizeLibraryFolderSortMode(value))
@@ -1273,15 +1258,7 @@ namespace PixelVaultNative
             return roots.Count == 0 ? "(none)" : string.Join(" | ", roots);
         }
 
-        string SerializeSourceRoots(string raw)
-        {
-            if (string.IsNullOrWhiteSpace(raw)) return string.Empty;
-            return string.Join(";", raw
-                .Split(new[] { '\r', '\n', ';' }, StringSplitOptions.RemoveEmptyEntries)
-                .Select(path => path.Trim())
-                .Where(path => !string.IsNullOrWhiteSpace(path))
-                .Distinct(StringComparer.OrdinalIgnoreCase));
-        }
+        string SerializeSourceRoots(string raw) => SettingsService.SerializeSourceRoots(raw);
 
         string AppendSourceRoot(string existing, string newPath)
         {
@@ -3197,38 +3174,7 @@ namespace PixelVaultNative
 
         List<LibraryFolderInfo> LoadLibraryFoldersCached(string root, bool forceRefresh)
         {
-            lock (libraryMaintenanceSync)
-            {
-                var stopwatch = Stopwatch.StartNew();
-                var stamp = BuildLibraryFolderInventoryStamp(root);
-                if (!forceRefresh)
-                {
-                    var cached = LoadLibraryFolderCache(root, stamp);
-                    if (cached != null)
-                    {
-                        var cacheUpdated = PopulateMissingLibraryFolderSortKeys(cached);
-                        if (ApplySavedGameIndexRows(root, cached))
-                        {
-                            cacheUpdated = true;
-                        }
-                        if (cacheUpdated)
-                        {
-                            SaveLibraryFolderCache(root, stamp, cached);
-                        }
-                        Log("Library folder cache hit.");
-                        stopwatch.Stop();
-                        LogPerformanceSample("LibraryFolderCache", stopwatch, "mode=hit; folders=" + cached.Count + "; forceRefresh=" + forceRefresh, 40);
-                        return cached;
-                    }
-                }
-                Log("Refreshing library folder cache.");
-                var fresh = LoadLibraryFolders(root);
-                ApplySavedGameIndexRows(root, fresh);
-                SaveLibraryFolderCache(root, stamp, fresh);
-                stopwatch.Stop();
-                LogPerformanceSample("LibraryFolderCache", stopwatch, "mode=rebuild; folders=" + fresh.Count + "; forceRefresh=" + forceRefresh, 40);
-                return fresh;
-            }
+            return libraryScanner.LoadLibraryFoldersCached(root, forceRefresh);
         }
 
         void OpenLibraryFolderIdEditor(LibraryFolderInfo folder, Action refreshLibrary)
@@ -4681,60 +4627,48 @@ namespace PixelVaultNative
         }
         void OpenWithShell(string path) { if (!string.IsNullOrWhiteSpace(path) && File.Exists(path)) Process.Start(new ProcessStartInfo(path) { UseShellExecute = true }); }
 
+        AppSettings CaptureAppSettings()
+        {
+            return new AppSettings
+            {
+                SourceRootsSerialized = sourceRoot ?? string.Empty,
+                DestinationRoot = destinationRoot ?? string.Empty,
+                LibraryRoot = libraryRoot ?? string.Empty,
+                ExifToolPath = exifToolPath ?? string.Empty,
+                FfmpegPath = ffmpegPath ?? string.Empty,
+                SteamGridDbApiToken = steamGridDbApiToken ?? string.Empty,
+                LibraryFolderTileSize = libraryFolderTileSize,
+                LibraryFolderSortMode = libraryFolderSortMode ?? "platform"
+            };
+        }
+
+        void ApplyAppSettings(AppSettings s)
+        {
+            if (s == null) return;
+            sourceRoot = s.SourceRootsSerialized ?? string.Empty;
+            destinationRoot = s.DestinationRoot ?? string.Empty;
+            libraryRoot = s.LibraryRoot ?? string.Empty;
+            exifToolPath = s.ExifToolPath ?? string.Empty;
+            ffmpegPath = s.FfmpegPath ?? string.Empty;
+            steamGridDbApiToken = s.SteamGridDbApiToken ?? string.Empty;
+            libraryFolderTileSize = s.LibraryFolderTileSize;
+            libraryFolderSortMode = s.LibraryFolderSortMode ?? "platform";
+        }
+
         void LoadSettings()
         {
-            if (!File.Exists(settingsPath)) return;
-            foreach (var line in File.ReadAllLines(settingsPath))
-            {
-                if (string.IsNullOrWhiteSpace(line) || !line.Contains("=")) continue;
-                var index = line.IndexOf('=');
-                var key = line.Substring(0, index);
-                var value = line.Substring(index + 1);
-                if (key == "source") sourceRoot = SerializeSourceRoots(value);
-                else if (key == "destination") destinationRoot = value;
-                else if (key == "library") libraryRoot = value;
-                else if (key == "exiftool" && !string.IsNullOrWhiteSpace(value)) exifToolPath = value;
-                else if (key == "ffmpeg" && !string.IsNullOrWhiteSpace(value)) ffmpegPath = value;
-                else if (key == "steamgriddb_token") steamGridDbApiToken = value;
-                else if (key == "library_folder_tile_size")
-                {
-                    int parsedSize;
-                    if (int.TryParse(value, out parsedSize)) libraryFolderTileSize = NormalizeLibraryFolderTileSize(parsedSize);
-                }
-                else if (key == "library_folder_sort_mode") libraryFolderSortMode = NormalizeLibraryFolderSortMode(value);
-            }
-
-            var bundledExifTool = Path.Combine(appRoot, "tools", "exiftool.exe");
-            if (!File.Exists(exifToolPath) && File.Exists(bundledExifTool))
-            {
-                exifToolPath = bundledExifTool;
-            }
-
-            var bundledFfmpeg = Path.Combine(appRoot, "tools", "ffmpeg.exe");
-            if (string.IsNullOrWhiteSpace(ffmpegPath) || !File.Exists(ffmpegPath))
-            {
-                ffmpegPath = File.Exists(bundledFfmpeg) ? bundledFfmpeg : (FindExecutableOnPath("ffmpeg.exe") ?? string.Empty);
-            }
-            var envSteamGridDbToken = FindSteamGridDbApiTokenInEnvironment();
-            if (!string.IsNullOrWhiteSpace(envSteamGridDbToken))
-            {
-                steamGridDbApiToken = envSteamGridDbToken;
-            }
+            var merged = settingsService.LoadFromIni(
+                settingsPath,
+                CaptureAppSettings(),
+                appRoot,
+                () => FindExecutableOnPath("ffmpeg.exe") ?? string.Empty,
+                SettingsService.FindSteamGridDbApiTokenInEnvironment);
+            ApplyAppSettings(merged);
         }
 
         void SaveSettings()
         {
-            File.WriteAllLines(settingsPath, new[]
-            {
-                "source=" + SerializeSourceRoots(sourceRoot),
-                "destination=" + destinationRoot,
-                "library=" + libraryRoot,
-                "exiftool=" + exifToolPath,
-                "ffmpeg=" + (ffmpegPath ?? string.Empty),
-                "steamgriddb_token=" + (steamGridDbApiToken ?? string.Empty),
-                "library_folder_tile_size=" + NormalizeLibraryFolderTileSize(libraryFolderTileSize),
-                "library_folder_sort_mode=" + NormalizeLibraryFolderSortMode(libraryFolderSortMode)
-            });
+            settingsService.SaveToIni(settingsPath, CaptureAppSettings());
         }
 
         string LogFilePath() { return Path.Combine(logsRoot, "PixelVault-native.log"); }

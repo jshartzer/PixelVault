@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Threading;
 
@@ -8,25 +7,6 @@ namespace PixelVaultNative
 {
     public sealed partial class MainWindow
     {
-        void RebuildLibraryFolderCache(string root, Dictionary<string, LibraryMetadataIndexEntry> index)
-        {
-            lock (libraryMaintenanceSync)
-            {
-                if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root))
-                {
-                    ClearLibraryFolderCache(root);
-                    return;
-                }
-                var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-                Log("Rebuilding library folder cache.");
-                var fresh = LoadLibraryFolders(root, index);
-                ApplySavedGameIndexRows(root, fresh);
-                SaveLibraryFolderCache(root, BuildLibraryFolderInventoryStamp(root), fresh);
-                stopwatch.Stop();
-                Log("Library folder cache rebuild complete in " + stopwatch.ElapsedMilliseconds + " ms for " + fresh.Count + " folder(s).");
-            }
-        }
-
         List<GameIndexEditorRow> LoadGameIndexEditorRows(string root)
         {
             var folders = LoadLibraryFoldersCached(root, false);
