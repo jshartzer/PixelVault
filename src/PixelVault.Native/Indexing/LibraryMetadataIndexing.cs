@@ -188,11 +188,6 @@ namespace PixelVaultNative
             return entry;
         }
 
-        int ScanLibraryMetadataIndex(string root, string folderPath, bool forceRescan, Action<int, int, string> progress, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            return libraryScanner.ScanLibraryMetadataIndex(root, folderPath, forceRescan, progress, cancellationToken);
-        }
-
         Dictionary<string, string[]> ReadEmbeddedKeywordTagsForFiles(IEnumerable<string> files, CancellationToken cancellationToken = default(CancellationToken))
         {
             var result = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
@@ -230,29 +225,5 @@ namespace PixelVaultNative
             return result;
         }
 
-        void UpsertLibraryMetadataIndexEntries(IEnumerable<string> files, string root)
-        {
-            libraryScanner.UpsertLibraryMetadataIndexEntries(files, root);
-        }
-
-        void UpsertLibraryMetadataIndexEntries(IEnumerable<ManualMetadataItem> items, string root)
-        {
-            libraryScanner.UpsertLibraryMetadataIndexEntries(items, root);
-        }
-
-        void RemoveLibraryMetadataIndexEntries(IEnumerable<string> files, string root)
-        {
-            libraryScanner.RemoveLibraryMetadataIndexEntries(files, root);
-        }
-
-        List<PhotoIndexEditorRow> LoadPhotoIndexEditorRows(string root)
-        {
-            return libraryScanner.LoadPhotoIndexEditorRows(root);
-        }
-
-        void SavePhotoIndexEditorRows(string root, IEnumerable<PhotoIndexEditorRow> rows)
-        {
-            libraryScanner.SavePhotoIndexEditorRows(root, rows);
-        }
     }
 }

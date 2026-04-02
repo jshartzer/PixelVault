@@ -92,7 +92,7 @@ Practical current focus:
 
 The app is currently published at `0.833`.
 
-**Notion (synced Mar 2026):** [Releases — 0.832](https://www.notion.so/33673adc59b68139b705c987dd98d2fd) (add a **0.833** row when syncing), [MainWindow extraction roadmap](https://www.notion.so/33573adc59b681d88b7dcd88cad53cb6) (status block matches `docs/MAINWINDOW_EXTRACTION_ROADMAP.md`).
+**Notion (synced Mar 2026):** [Releases — 0.833](https://www.notion.so/33673adc59b68135902ff2a817b509f2), [MainWindow extraction roadmap](https://www.notion.so/33573adc59b681d88b7dcd88cad53cb6) (status block matches `docs/MAINWINDOW_EXTRACTION_ROADMAP.md`).
 
 Recent extraction progress (repo):
 

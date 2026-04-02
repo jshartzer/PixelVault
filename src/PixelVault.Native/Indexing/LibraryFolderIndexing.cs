@@ -172,11 +172,6 @@ namespace PixelVaultNative
             return changed;
         }
 
-        List<LibraryFolderInfo> LoadLibraryFolders(string root, Dictionary<string, LibraryMetadataIndexEntry> index = null)
-        {
-            return libraryScanner.LoadLibraryFolders(root, index);
-        }
-
         string GuessSteamAppIdFromFileName(string file)
         {
             return ParseFilename(file).SteamAppId;

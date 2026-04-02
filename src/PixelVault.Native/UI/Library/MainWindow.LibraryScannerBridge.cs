@@ -33,9 +33,6 @@ namespace PixelVaultNative
 
             public string BuildLibraryMetadataStamp(string file) => window.BuildLibraryMetadataStamp(file);
 
-            public Dictionary<string, EmbeddedMetadataSnapshot> ReadEmbeddedMetadataBatch(IEnumerable<string> files, CancellationToken cancellationToken) =>
-                window.ReadEmbeddedMetadataBatch(files, cancellationToken);
-
             public LibraryMetadataIndexEntry BuildResolvedLibraryMetadataIndexEntry(
                 string root,
                 string file,

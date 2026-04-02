@@ -356,7 +356,7 @@ namespace PixelVaultNative
                         if (uniMoveResult != null && uniMoveResult.Moved > 0)
                         {
                             ThrowIfWorkflowCancellationRequested(cancellationToken, "Import workflow");
-                            SaveUndoManifest(uniMoveResult.Entries);
+                            importService.SaveUndoManifest(uniMoveResult.Entries);
                             reportProgress(sortOff, "Sorting imported captures into game folders...");
                             uniSortResult = SortDestinationFoldersCore(false, false, cancellationToken);
                         }
@@ -412,7 +412,7 @@ namespace PixelVaultNative
                     if (moveResult != null && moveResult.Moved > 0)
                     {
                         ThrowIfWorkflowCancellationRequested(cancellationToken, "Import workflow");
-                        SaveUndoManifest(moveResult.Entries);
+                        importService.SaveUndoManifest(moveResult.Entries);
                         reportProgress(sortOffset, "Sorting imported captures into game folders...");
                         sortResult = SortDestinationFoldersCore(false, false, cancellationToken);
                     }
@@ -498,7 +498,7 @@ namespace PixelVaultNative
                     if (moveResult != null && moveResult.Moved > 0)
                     {
                         ThrowIfWorkflowCancellationRequested(cancellationToken, "Manual intake workflow");
-                        SaveUndoManifest(moveResult.Entries);
+                        importService.SaveUndoManifest(moveResult.Entries);
                         reportProgress(sortOffset, "Sorting imported captures into game folders...");
                         sortResult = SortDestinationFoldersCore(false, false, cancellationToken);
                     }
@@ -922,41 +922,7 @@ namespace PixelVaultNative
 
         MoveStepResult RunMoveFiles(IEnumerable<string> files, string summaryLabel, Action<int, int, string> progress = null, CancellationToken cancellationToken = default(CancellationToken))
         {
-            int moved = 0, skipped = 0, renamedConflict = 0;
-            var entries = new List<UndoImportEntry>();
-            var fileList = (files ?? Enumerable.Empty<string>()).Where(File.Exists).ToList();
-            var total = fileList.Count;
-            if (progress != null) progress(0, total, "Starting move step for " + total + " file(s).");
-            for (int i = 0; i < total; i++)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var file = fileList[i];
-                var remaining = total - (i + 1);
-                var sourceDirectory = Path.GetDirectoryName(file);
-                var target = Path.Combine(destinationRoot, Path.GetFileName(file));
-                if (File.Exists(target))
-                {
-                    var mode = CurrentConflictMode();
-                    if (mode == "Skip")
-                    {
-                        skipped++;
-                        if (progress != null) progress(i + 1, total, "Skipped move " + (i + 1) + " of " + total + " | " + remaining + " remaining | conflict | " + Path.GetFileName(file));
-                        continue;
-                    }
-                    if (mode == "Rename") { target = Unique(target); renamedConflict++; }
-                    if (mode == "Overwrite") File.Delete(target);
-                }
-                File.Move(file, target);
-                MoveMetadataSidecarIfPresent(file, target);
-                moved++;
-                entries.Add(new UndoImportEntry { SourceDirectory = sourceDirectory, ImportedFileName = Path.GetFileName(target), CurrentPath = target });
-                AddSidecarUndoEntryIfPresent(target, sourceDirectory, entries);
-                Log("Moved: " + Path.GetFileName(file) + " -> " + target);
-                if (progress != null) progress(i + 1, total, "Moved " + (i + 1) + " of " + total + " | " + remaining + " remaining | " + Path.GetFileName(target));
-            }
-            if (progress != null) progress(total, total, summaryLabel + ": moved " + moved + ", skipped " + skipped + ", renamed-on-conflict " + renamedConflict + ".");
-            Log(summaryLabel + ": moved " + moved + ", skipped " + skipped + ", renamed-on-conflict " + renamedConflict + ".");
-            return new MoveStepResult { Moved = moved, Skipped = skipped, RenamedOnConflict = renamedConflict, Entries = entries };
+            return importService.MoveFilesToLibraryDestination(files, summaryLabel, progress, cancellationToken);
         }
 
         string CurrentConflictMode()
@@ -981,55 +947,23 @@ namespace PixelVaultNative
 
         SortStepResult SortDestinationFoldersCore(bool interactive, bool updateUi = true, CancellationToken cancellationToken = default(CancellationToken))
         {
-            EnsureDir(destinationRoot, "Destination folder");
-            var files = Directory.EnumerateFiles(destinationRoot, "*", SearchOption.TopDirectoryOnly).Where(IsMedia).ToList();
-            if (files.Count == 0)
+            var result = importService.SortDestinationRootIntoGameFolders(destinationRoot, libraryRoot, cancellationToken);
+            if (result.Sorted == 0 && result.FoldersCreated == 0)
             {
                 if (updateUi) status.Text = "Nothing to sort";
-                Log("Sort destination found no root-level media files to organize.");
                 if (interactive) MessageBox.Show("There are no root-level media files in the destination folder to sort right now.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
-                return new SortStepResult();
+                return result;
             }
-
-            int moved = 0, created = 0, renamedConflict = 0;
-            var indexedTargets = new List<string>();
-            foreach (var file in files)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var folderName = GetSafeGameFolderName(GetGameNameFromFileName(Path.GetFileNameWithoutExtension(file)));
-                var targetDirectory = Path.Combine(destinationRoot, folderName);
-                if (!Directory.Exists(targetDirectory))
-                {
-                    Directory.CreateDirectory(targetDirectory);
-                    created++;
-                }
-
-                var target = Path.Combine(targetDirectory, Path.GetFileName(file));
-                if (File.Exists(target))
-                {
-                    target = Unique(target);
-                    renamedConflict++;
-                }
-
-                File.Move(file, target);
-                MoveMetadataSidecarIfPresent(file, target);
-                moved++;
-                indexedTargets.Add(target);
-                Log("Sorted: " + Path.GetFileName(file) + " -> " + target);
-            }
-
-            UpsertLibraryMetadataIndexEntries(indexedTargets, libraryRoot);
             if (updateUi) status.Text = "Destination sorted";
-            Log("Sort summary: sorted " + moved + ", folders created " + created + ", renamed-on-conflict " + renamedConflict + ".");
             if (updateUi) RefreshPreview();
-            return new SortStepResult { Sorted = moved, FoldersCreated = created, RenamedOnConflict = renamedConflict };
+            return result;
         }
 
         void UndoLastImport()
         {
             try
             {
-                var entries = LoadUndoManifest();
+                var entries = importService.LoadUndoManifest();
                 if (entries.Count == 0)
                 {
                     status.Text = "Nothing to undo";
@@ -1041,33 +975,11 @@ namespace PixelVaultNative
                 var confirm = MessageBox.Show(entries.Count + " imported item(s) will be moved back to their source folders. Embedded metadata changes and comments will stay in the files.\n\nContinue?", "Undo Last Import", MessageBoxButton.OKCancel, MessageBoxImage.Warning);
                 if (confirm != MessageBoxResult.OK) return;
 
-                int moved = 0, skipped = 0;
-                var usedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                var remaining = new List<UndoImportEntry>();
-                var removedFromLibrary = new List<string>();
-                foreach (var entry in entries)
-                {
-                    var currentPath = ResolveUndoCurrentPath(entry, usedPaths);
-                    if (string.IsNullOrWhiteSpace(currentPath) || !File.Exists(currentPath))
-                    {
-                        skipped++;
-                        remaining.Add(entry);
-                        Log("Undo skipped: could not find " + entry.ImportedFileName + " in the destination/library folders.");
-                        continue;
-                    }
-
-                    Directory.CreateDirectory(entry.SourceDirectory);
-                    var target = Unique(Path.Combine(entry.SourceDirectory, Path.GetFileName(currentPath)));
-                    File.Move(currentPath, target);
-                    moved++;
-                    removedFromLibrary.Add(currentPath);
-                    Log("Undo move: " + currentPath + " -> " + target);
-                }
-
-                RemoveLibraryMetadataIndexEntries(removedFromLibrary, libraryRoot);
-                SaveUndoManifest(remaining);
-                status.Text = moved > 0 ? "Last import undone" : "Undo incomplete";
-                Log("Undo summary: moved back " + moved + ", skipped " + skipped + ".");
+                var undoResult = importService.ExecuteUndoImportMoves(entries);
+                libraryScanner.RemoveLibraryMetadataIndexEntries(undoResult.RemovedFromLibraryPaths, libraryRoot);
+                importService.SaveUndoManifest(undoResult.RemainingEntries);
+                status.Text = undoResult.Moved > 0 ? "Last import undone" : "Undo incomplete";
+                Log("Undo summary: moved back " + undoResult.Moved + ", skipped " + undoResult.Skipped + ".");
                 RefreshPreview();
             }
             catch (Exception ex)
@@ -1078,55 +990,5 @@ namespace PixelVaultNative
             }
         }
 
-        string ResolveUndoCurrentPath(UndoImportEntry entry, HashSet<string> usedPaths)
-        {
-            if (entry == null) return null;
-            if (!string.IsNullOrWhiteSpace(entry.CurrentPath) && File.Exists(entry.CurrentPath))
-            {
-                var fullCurrent = Path.GetFullPath(entry.CurrentPath);
-                if (usedPaths.Add(fullCurrent)) return fullCurrent;
-            }
-
-            foreach (var root in new[] { destinationRoot, libraryRoot }.Where(Directory.Exists).Distinct(StringComparer.OrdinalIgnoreCase))
-            {
-                foreach (var candidate in Directory.EnumerateFiles(root, entry.ImportedFileName, SearchOption.AllDirectories)
-                    .OrderByDescending(path => File.GetLastWriteTime(path)))
-                {
-                    var fullCandidate = Path.GetFullPath(candidate);
-                    if (usedPaths.Add(fullCandidate)) return fullCandidate;
-                }
-            }
-            return null;
-        }
-
-        List<UndoImportEntry> LoadUndoManifest()
-        {
-            var entries = new List<UndoImportEntry>();
-            if (!File.Exists(undoManifestPath)) return entries;
-            foreach (var line in File.ReadAllLines(undoManifestPath))
-            {
-                if (string.IsNullOrWhiteSpace(line)) continue;
-                var parts = line.Split('\t');
-                if (parts.Length < 3) continue;
-                entries.Add(new UndoImportEntry { SourceDirectory = parts[0], ImportedFileName = parts[1], CurrentPath = parts[2] });
-            }
-            return entries;
-        }
-
-        void SaveUndoManifest(List<UndoImportEntry> entries)
-        {
-            if (entries == null || entries.Count == 0)
-            {
-                if (File.Exists(undoManifestPath)) File.Delete(undoManifestPath);
-                return;
-            }
-
-            File.WriteAllLines(undoManifestPath, entries.Select(entry => string.Join("\t", new[]
-            {
-                entry.SourceDirectory ?? string.Empty,
-                entry.ImportedFileName ?? string.Empty,
-                entry.CurrentPath ?? string.Empty
-            })).ToArray());
-        }
     }
 }

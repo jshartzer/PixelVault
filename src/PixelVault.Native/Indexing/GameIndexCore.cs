@@ -281,8 +281,7 @@ namespace PixelVaultNative
 
         void RefreshCachedLibraryFoldersFromGameIndex(string root)
         {
-            if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root)) return;
-            libraryScanner.RebuildLibraryFolderCache(root, LoadLibraryMetadataIndex(root, true));
+            libraryScanner.RefreshFolderCacheAfterGameIndexChange(root);
         }
 
         GameIndexEditorRow FindSavedGameIndexRowById(IEnumerable<GameIndexEditorRow> rows, string gameId)

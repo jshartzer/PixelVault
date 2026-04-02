@@ -734,7 +734,7 @@ namespace PixelVaultNative
 
                     if (removedFiles.Count > 0)
                     {
-                        RemoveLibraryMetadataIndexEntries(removedFiles, libraryWorkspace.LibraryRoot);
+                        libraryScanner.RemoveLibraryMetadataIndexEntries(removedFiles, libraryWorkspace.LibraryRoot);
                     }
                     foreach (var directory in touchedDirectories) TryDeleteEmptyDirectory(directory);
                     selectedDetailFiles.Clear();

@@ -22,8 +22,6 @@ namespace PixelVaultNative
 
         string BuildLibraryMetadataStamp(string file);
 
-        Dictionary<string, EmbeddedMetadataSnapshot> ReadEmbeddedMetadataBatch(IEnumerable<string> files, CancellationToken cancellationToken);
-
         LibraryMetadataIndexEntry BuildResolvedLibraryMetadataIndexEntry(
             string root,
             string file,

@@ -12,10 +12,12 @@ namespace PixelVaultNative
     internal sealed class LibraryScanner : ILibraryScanner
     {
         readonly ILibraryScanHost host;
+        readonly IMetadataService metadataService;
 
-        public LibraryScanner(ILibraryScanHost host)
+        public LibraryScanner(ILibraryScanHost host, IMetadataService metadataService)
         {
             this.host = host ?? throw new ArgumentNullException(nameof(host));
+            this.metadataService = metadataService ?? throw new ArgumentNullException(nameof(metadataService));
         }
 
         public int ScanLibraryMetadataIndex(
@@ -119,7 +121,7 @@ namespace PixelVaultNative
                     {
                         cancellationToken.ThrowIfCancellationRequested();
                         if (progress != null) progress(unchanged, fileList.Count, "Reading embedded metadata in batch " + batch.Item1 + " of " + batchCount + " (" + batch.Item2.Length + " file(s)).");
-                        var batchMetadata = host.ReadEmbeddedMetadataBatch(batch.Item2, cancellationToken);
+                        var batchMetadata = metadataService.ReadEmbeddedMetadataBatch(batch.Item2, cancellationToken);
                         foreach (var file in batch.Item2)
                         {
                             EmbeddedMetadataSnapshot snapshot;
@@ -172,7 +174,7 @@ namespace PixelVaultNative
                 if (fileList.Count == 0) return;
                 var index = host.LoadLibraryMetadataIndex(root, true);
                 var gameRows = host.LoadSavedGameIndexRows(root);
-                var metadataByFile = host.ReadEmbeddedMetadataBatch(fileList, CancellationToken.None);
+                var metadataByFile = metadataService.ReadEmbeddedMetadataBatch(fileList, CancellationToken.None);
                 foreach (var file in fileList)
                 {
                     EmbeddedMetadataSnapshot snapshot;
@@ -353,7 +355,7 @@ namespace PixelVaultNative
                     return !index.TryGetValue(file, out entry) || entry == null || entry.CaptureUtcTicks <= 0;
                 })
                 .ToList();
-            var metadataByFile = host.ReadEmbeddedMetadataBatch(missingOrIncompleteFiles, CancellationToken.None);
+            var metadataByFile = metadataService.ReadEmbeddedMetadataBatch(missingOrIncompleteFiles, CancellationToken.None);
             foreach (var file in allFiles)
             {
                 LibraryMetadataIndexEntry entry;
@@ -468,6 +470,12 @@ namespace PixelVaultNative
                 stopwatch.Stop();
                 host.LogLibraryScan("Library folder cache rebuild complete in " + stopwatch.ElapsedMilliseconds + " ms for " + fresh.Count + " folder(s).");
             }
+        }
+
+        public void RefreshFolderCacheAfterGameIndexChange(string root)
+        {
+            if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root)) return;
+            RebuildLibraryFolderCache(root, host.LoadLibraryMetadataIndex(root, true));
         }
 
         public List<LibraryFolderInfo> LoadLibraryFoldersCached(string root, bool forceRefresh)

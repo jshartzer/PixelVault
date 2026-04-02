@@ -104,6 +104,7 @@ namespace PixelVaultNative
         readonly IMetadataService metadataService;
         readonly ISettingsService settingsService;
         readonly ILibraryScanner libraryScanner;
+        readonly IImportService importService;
 
         sealed class LibraryDetailRenderSnapshot
         {
@@ -256,7 +257,23 @@ namespace PixelVaultNative
                 RunExeCapture = delegate(string file, string[] args, string cwd, bool logOutput, CancellationToken cancellationToken) { return RunExeCapture(file, args, cwd, logOutput, cancellationToken); }
             });
             settingsService = new SettingsService();
-            libraryScanner = new LibraryScanner(new LibraryScanHost(this));
+            libraryScanner = new LibraryScanner(new LibraryScanHost(this), metadataService);
+            importService = new ImportService(new ImportServiceDependencies
+            {
+                UndoManifestPath = () => undoManifestPath,
+                GetDestinationRoot = () => destinationRoot,
+                GetLibraryRoot = () => libraryRoot,
+                GetConflictMode = CurrentConflictMode,
+                UniquePath = Unique,
+                MoveMetadataSidecarIfPresent = MoveMetadataSidecarIfPresent,
+                AddSidecarUndoEntryIfPresent = AddSidecarUndoEntryIfPresent,
+                Log = Log,
+                IsMedia = IsMedia,
+                GetSafeGameFolderName = GetSafeGameFolderName,
+                GetGameNameFromFileName = GetGameNameFromFileName,
+                EnsureDirectoryExists = EnsureDir,
+                GetLibraryScanner = () => libraryScanner
+            });
             libraryWorkspace = new LibraryWorkspaceContext(this);
             Directory.CreateDirectory(dataRoot);
             Directory.CreateDirectory(logsRoot);
@@ -973,7 +990,7 @@ namespace PixelVaultNative
                 scanCancellation = new CancellationTokenSource();
                 System.Threading.Tasks.Task.Factory.StartNew(delegate
                 {
-                    return ScanLibraryMetadataIndex(root, capturedFolderPath, capturedForceRescan, delegate(int currentCount, int totalCount, string detail)
+                    return libraryScanner.ScanLibraryMetadataIndex(root, capturedFolderPath, capturedForceRescan, delegate(int currentCount, int totalCount, string detail)
                     {
                         if (progressWindow == null) return;
                         progressWindow.Dispatcher.BeginInvoke(new Action(delegate
@@ -3036,7 +3053,7 @@ namespace PixelVaultNative
                 {
                     reportStage(totalPerStage * 2, current, total, detail);
                 });
-                UpsertLibraryMetadataIndexEntries(items, libraryRoot);
+                libraryScanner.UpsertLibraryMetadataIndexEntries(items, libraryRoot);
                 PreserveLibraryMetadataEditGameIndex(libraryRoot, folder, originalSavedGameIndexRow, items);
                 progressWindow.Dispatcher.BeginInvoke(new Action(delegate
                 {
@@ -4555,8 +4572,8 @@ namespace PixelVaultNative
                         SetStatus = delegate(string text) { if (status != null) status.Text = text; },
                         Log = Log,
                         CreateButton = Btn,
-                        LoadRows = LoadPhotoIndexEditorRows,
-                        SaveRows = SavePhotoIndexEditorRows,
+                        LoadRows = libraryScanner.LoadPhotoIndexEditorRows,
+                        SaveRows = libraryScanner.SavePhotoIndexEditorRows,
                         ReadEmbeddedKeywordTagsDirect = path => ReadEmbeddedKeywordTagsDirect(path),
                         DetermineConsoleLabelFromTags = DetermineConsoleLabelFromTags,
                         BuildLibraryMetadataStamp = BuildLibraryMetadataStamp,
