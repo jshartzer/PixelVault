@@ -15,6 +15,8 @@ $ErrorActionPreference = "Stop"
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $projectPath = Join-Path $repoRoot "src\PixelVault.Native\PixelVault.Native.csproj"
 $sourcePath = Join-Path $repoRoot "src\PixelVault.Native\PixelVault.Native.cs"
+$nativeProjectDir = Join-Path $repoRoot "src\PixelVault.Native"
+$testsProjectDir = Join-Path $repoRoot "tests\PixelVault.Native.Tests"
 $changelogPath = Join-Path $repoRoot "docs\CHANGELOG.md"
 $assetsPath = Join-Path $repoRoot "assets"
 $toolsPath = Join-Path $repoRoot "tools"
@@ -34,6 +36,38 @@ if (-not (Test-Path $projectPath))
 if (-not (Test-Path $sourcePath))
 {
     throw "Could not find source file: $sourcePath"
+}
+
+function Copy-SourceTreeForBundle
+{
+    param(
+        [Parameter(Mandatory)][string]$SourcePath,
+        [Parameter(Mandatory)][string]$DestinationPath
+    )
+
+    if (-not (Test-Path $SourcePath))
+    {
+        return
+    }
+
+    if (Test-Path $DestinationPath)
+    {
+        Remove-Item $DestinationPath -Recurse -Force
+    }
+
+    $destParent = Split-Path $DestinationPath -Parent
+    if (-not (Test-Path $destParent))
+    {
+        New-Item -ItemType Directory -Path $destParent -Force | Out-Null
+    }
+
+    # Robocopy: success codes 0-7; >= 8 = failure
+    & robocopy.exe $SourcePath $DestinationPath /E /NFL /NDL /NJH /NJS /XD bin obj .vs | Out-Null
+    $rc = $LASTEXITCODE
+    if ($rc -ge 8)
+    {
+        throw "robocopy failed ($rc) copying $SourcePath -> $DestinationPath"
+    }
 }
 
 if ([string]::IsNullOrWhiteSpace($Version))
@@ -82,6 +116,15 @@ if ($LASTEXITCODE -ne 0)
 
 Copy-Item $sourcePath (Join-Path $outputDir "PixelVault.Native.cs") -Force
 Copy-Item $changelogPath (Join-Path $outputDir "CHANGELOG.md") -Force
+
+# Source bundle: same layout as the repo (no bin/obj), for audits and rebuilds.
+# Keep the legacy top-level snapshot too so older release workflows still work.
+$bundleNativeDest = Join-Path $outputDir "source\src\PixelVault.Native"
+$bundleTestsDest = Join-Path $outputDir "source\tests\PixelVault.Native.Tests"
+Copy-SourceTreeForBundle -SourcePath $nativeProjectDir -DestinationPath $bundleNativeDest
+Copy-SourceTreeForBundle -SourcePath $testsProjectDir -DestinationPath $bundleTestsDest
+Write-Host "Bundled source under: $(Join-Path $outputDir 'source')"
+
 Copy-Item $assetsPath (Join-Path $outputDir "assets") -Recurse -Force
 Copy-Item $toolsPath (Join-Path $outputDir "tools") -Recurse -Force
 
