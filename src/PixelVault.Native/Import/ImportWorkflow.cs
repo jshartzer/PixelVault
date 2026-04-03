@@ -616,70 +616,7 @@ namespace PixelVaultNative
 
         MetadataStepResult RunMetadata(List<ReviewItem> reviewItems, Action<int, int, string> progress = null, CancellationToken cancellationToken = default(CancellationToken))
         {
-            int updated = 0, skipped = 0;
-            var requests = new List<ExifWriteRequest>();
-            var items = reviewItems ?? new List<ReviewItem>();
-            var total = items.Count;
-            if (progress != null) progress(0, total, "Starting metadata step for " + total + " file(s).");
-            for (int i = 0; i < total; i++)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var item = items[i];
-                var remaining = total - (i + 1);
-                if (item.DeleteBeforeProcessing)
-                {
-                    skipped++;
-                    if (progress != null) progress(i + 1, total, "Skipped metadata " + (i + 1) + " of " + total + " | " + remaining + " remaining | file marked for delete");
-                    continue;
-                }
-                var file = item.FilePath;
-                if (!File.Exists(file))
-                {
-                    skipped++;
-                    if (progress != null) progress(i + 1, total, "Skipped metadata " + (i + 1) + " of " + total + " | " + remaining + " remaining | file missing");
-                    continue;
-                }
-                var selectedPlatformTags = new List<string>();
-                if (item.TagSteam)
-                {
-                    selectedPlatformTags.Add("Steam");
-                }
-                if (item.TagPs5)
-                {
-                    selectedPlatformTags.Add("PS5");
-                    selectedPlatformTags.Add("PlayStation");
-                }
-                if (item.TagXbox) selectedPlatformTags.Add("Xbox");
-                if (selectedPlatformTags.Count == 0 && item.PlatformTags != null) selectedPlatformTags.AddRange(item.PlatformTags);
-                var platformTags = selectedPlatformTags.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-                var metadataTarget = item.CaptureTime.ToString("yyyy-MM-dd HH:mm:ss") + (item.PreserveFileTimes ? " (preserving file timestamps)" : string.Empty);
-                var notes = new List<string>();
-                if (!string.IsNullOrWhiteSpace(item.Comment)) notes.Add("comment added");
-                if (item.AddPhotographyTag) notes.Add(GamePhotographyTag + " tag added");
-                var noteSuffix = notes.Count > 0 ? " [" + string.Join(", ", notes.ToArray()) + "]" : string.Empty;
-                Log("Updating metadata: " + item.FileName + " -> " + metadataTarget + (platformTags.Length > 0 ? " [" + string.Join(", ", platformTags) + "]" : " [no platform tag]") + noteSuffix);
-                var originalCreate = DateTime.MinValue;
-                var originalWrite = DateTime.MinValue;
-                if (item.PreserveFileTimes)
-                {
-                    originalCreate = File.GetCreationTime(file);
-                    originalWrite = File.GetLastWriteTime(file);
-                }
-                requests.Add(new ExifWriteRequest
-                {
-                    FilePath = file,
-                    FileName = item.FileName,
-                    Arguments = BuildExifArgs(file, item.CaptureTime, platformTags, item.PreserveFileTimes, item.Comment, item.AddPhotographyTag),
-                    RestoreFileTimes = item.PreserveFileTimes,
-                    OriginalCreateTime = originalCreate,
-                    OriginalWriteTime = originalWrite,
-                    SuccessDetail = item.FileName
-                });
-            }
-            updated = RunExifWriteRequests(requests, requests.Count + skipped, skipped, progress, cancellationToken);
-            if (progress != null) progress(total, total, "Metadata step complete: updated " + updated + ", skipped " + skipped + ".");
-            Log("Metadata summary: updated " + updated + ", skipped " + skipped + ".");
-            return new MetadataStepResult { Updated = updated, Skipped = skipped };
+            return importService.WriteMetadataForReviewItems(reviewItems, progress, cancellationToken);
         }
 
         MoveStepResult RunMove()

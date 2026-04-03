@@ -286,7 +286,11 @@ namespace PixelVaultNative
                 EnsureSteamAppIdInGameIndex = EnsureSteamAppIdInGameIndex,
                 SanitizeManualRenameGameTitle = Sanitize,
                 NormalizeTitleForManualRename = NormalizeTitle,
-                FileSystem = fileSystemService
+                FileSystem = fileSystemService,
+                MetadataService = metadataService,
+                GetFileCreationTime = path => File.GetCreationTime(path),
+                GetFileLastWriteTime = path => File.GetLastWriteTime(path),
+                GamePhotographyTagLabel = GamePhotographyTag
             });
             libraryWorkspace = new LibraryWorkspaceContext(this);
             librarySession = new LibrarySession(libraryWorkspace, libraryScanner, fileSystemService);
