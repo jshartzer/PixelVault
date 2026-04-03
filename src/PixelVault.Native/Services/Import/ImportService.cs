@@ -551,7 +551,9 @@ namespace PixelVaultNative
                 var appId = Regex.Replace(item.SteamAppId ?? string.Empty, @"[^\d]", string.Empty);
                 if (string.IsNullOrWhiteSpace(appId)) continue;
                 cancellationToken.ThrowIfCancellationRequested();
-                var storeTitle = await cover.SteamNameAsync(appId, cancellationToken).ConfigureAwait(false);
+                // This path is called from the live manual metadata window, so keep row mutation
+                // on the captured context instead of continuing on a thread-pool thread.
+                var storeTitle = await cover.SteamNameAsync(appId, cancellationToken);
                 if (string.IsNullOrWhiteSpace(storeTitle)) continue;
                 item.GameName = storeTitle;
             }

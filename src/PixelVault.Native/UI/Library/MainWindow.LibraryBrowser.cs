@@ -788,6 +788,8 @@ namespace PixelVaultNative
                     lastDetailTileSize = size;
                     estimatedDetailRowHeight = Math.Max(200, size + 96);
                     var shouldRestoreDetailScroll = preserveDetailScrollOnNextRender && preservedDetailScrollOffset > 0.1d;
+                    var restoreDetailScrollOffset = shouldRestoreDetailScroll ? (double?)preservedDetailScrollOffset : null;
+                    var restoreDetailScrollPending = shouldRestoreDetailScroll;
                     preserveDetailScrollOnNextRender = false;
                     var renderFolder = current;
                     SetVirtualizedRows(detailRows, new[]
@@ -831,7 +833,8 @@ namespace PixelVaultNative
                                             return new TextBlock { Text = "No captures found in this folder.", Foreground = Brush("#A7B5BD") };
                                         }
                                     }
-                                }, !shouldRestoreDetailScroll, shouldRestoreDetailScroll ? (double?)preservedDetailScrollOffset : null);
+                                }, !restoreDetailScrollPending, restoreDetailScrollPending ? restoreDetailScrollOffset : null);
+                                restoreDetailScrollPending = false;
                                 if (refreshDetailSelectionUi != null) refreshDetailSelectionUi();
                                 if (logCompletion)
                                 {
@@ -892,7 +895,8 @@ namespace PixelVaultNative
                                     });
                                 }
                             }
-                            SetVirtualizedRows(detailRows, virtualRows, !shouldRestoreDetailScroll, shouldRestoreDetailScroll ? (double?)preservedDetailScrollOffset : null);
+                            SetVirtualizedRows(detailRows, virtualRows, !restoreDetailScrollPending, restoreDetailScrollPending ? restoreDetailScrollOffset : null);
+                            restoreDetailScrollPending = false;
                             if (refreshDetailSelectionUi != null) refreshDetailSelectionUi();
                             if (logCompletion)
                             {

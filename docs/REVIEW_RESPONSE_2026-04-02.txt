@@ -1,0 +1,24 @@
+PixelVault review response
+Date: 2026-04-02
+
+This note is a short handoff you can relay back through Cursor or a review thread.
+
+Fixed issue 1: incremental Library detail rerender could restore an old scroll position
+- Area: src/PixelVault.Native/UI/Library/MainWindow.LibraryBrowser.cs
+- What changed: the detail view now treats scroll restoration as a one-time action for the first snapshot only.
+- Why this fixes it: after the quick snapshot is rendered, a later refined snapshot no longer replays the original preserved offset and yank the user back while they are already scrolling.
+
+Fixed issue 2: import-and-edit Steam title resolution could mutate manual metadata rows off the UI thread
+- Area: src/PixelVault.Native/Services/Import/ImportService.cs
+- What changed: the import-and-edit Steam title lookup no longer resumes with ConfigureAwait(false) before assigning back into ManualMetadataItem.GameName.
+- Why this fixes it: the Finish flow is operating on live manual metadata window state, so the row mutation now stays on the captured UI context instead of racing back from a thread-pool continuation.
+
+Verification
+- dotnet test C:\Codex\tests\PixelVault.Native.Tests\PixelVault.Native.Tests.csproj
+- Result: passed (54/54)
+
+Suggested reviewer reply
+- Thanks, both issues are fixed.
+- The Library detail path now restores the saved scroll offset only on the first snapshot render, so the later metadata-refined render does not snap the user back.
+- The import-and-edit Steam title resolution path now keeps ManualMetadataItem mutation on the captured UI context instead of continuing with ConfigureAwait(false) before updating GameName.
+- Test suite still passes after the change.

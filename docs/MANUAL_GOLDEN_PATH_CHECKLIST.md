@@ -36,6 +36,24 @@ If this path fails, stop and fix that first before spending time on deeper spot 
 9. If Steam handling changed, verify at least one Steam filename case.
 10. If virtualization or layout changed, scroll a larger folder and look for spacing, rerender, or selection regressions.
 
+## Library detail scroll + import-and-edit Steam title (threading)
+
+Run after changes to **`MainWindow.LibraryBrowser`** (detail / screenshot grid), embedded-metadata repair, or **`ImportService.ApplyImportAndEditSteamStoreTitlesWhenGameNameUnchangedAsync`** / manual metadata finish. See **`docs/REVIEW_RESPONSE_2026-04-02.txt`**.
+
+### Library — preserved scroll vs. metadata-refined rerender
+
+1. Open the Library and select a game folder with **many** captures (enough to scroll the right-hand **Screenshots** / detail grid).
+2. Scroll the detail grid **down** so you are not at the top.
+3. Prefer a folder where some files still trigger **embedded-metadata repair** (e.g. index stamp vs. file mismatch) so the UI does a **quick** render then a possible **refined** regroup; if unsure, try folders you recently added or rescanned.
+4. After the quick list appears, **scroll again** if needed; wait for any background metadata work to finish.
+5. **Pass:** the grid does **not** jump back to the previously saved offset on a later rerender while you are interacting; only the **first** snapshot after a deliberate refresh should restore a preserved offset when that feature applies.
+
+### Import-and-edit — Steam store title on finish
+
+1. Put at least one **Steam**-tagged capture in **Import and Edit** (or equivalent manual metadata finish path) with an AppID, leaving the **game title** unchanged from the loaded hint so the app resolves the **store title**.
+2. Complete **Finish** (or the action that runs **`ApplyImportAndEditSteamStoreTitlesWhenGameNameUnchangedAsync`** then finalize).
+3. **Pass:** titles update without binding or cross-thread warnings in the debug output; UI stays responsive and the grid shows the resolved names.
+
 ## Phase C3 — Intake UI extraction + Steam rename / move glue
 
 Run after changes to **`UI/Intake/*`**, **`ImportWorkflow`**, or Steam rename / move ordering. Automated coverage: `SteamRenamePathMappingTests` (path map → review items, manual batch, move source list).
