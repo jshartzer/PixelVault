@@ -1481,7 +1481,7 @@ namespace PixelVaultNative
                 };
                 navChrome.SettingsButton.Click += delegate { ShowSettingsWindow(); if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge(); };
                 navChrome.GameIndexButton.Click += delegate { OpenGameIndexEditor(); };
-                photoIndexButton.Click += delegate { OpenPhotoIndexEditor(); };
+                navChrome.PhotoIndexButton.Click += delegate { OpenPhotoIndexEditor(); };
                 navChrome.PhotographyGalleryButton.Click += delegate { ShowPhotographyGallery(libraryWindow); };
                 navChrome.FilenameRulesButton.Click += delegate { OpenFilenameConventionEditor(); };
                 navChrome.MyCoversButton.Click += delegate { OpenSavedCoversFolder(); };

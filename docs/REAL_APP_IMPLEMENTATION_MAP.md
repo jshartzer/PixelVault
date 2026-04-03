@@ -35,6 +35,7 @@ If a change only fits by adding more deep delegate glue to `PixelVault.Native.cs
 Primary ownership:
 
 - `src/PixelVault.Native/UI/Library/MainWindow.LibraryBrowserOrchestrator.cs`
+- `src/PixelVault.Native/UI/Library/MainWindow.LibraryBrowserChrome.cs`
 - `src/PixelVault.Native/UI/Library/LibraryBrowserHost.cs`
 - `src/PixelVault.Native/UI/Library/LibrarySession.cs`
 - `src/PixelVault.Native/UI/Library/LibraryWorkspaceContext.cs`
