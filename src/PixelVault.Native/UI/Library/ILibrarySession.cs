@@ -18,5 +18,8 @@ namespace PixelVaultNative
 
         /// <summary>Load the library metadata index for <see cref="LibraryRoot"/> (empty dictionary when root is unset).</summary>
         Dictionary<string, LibraryMetadataIndexEntry> LoadLibraryMetadataIndex(bool forceDiskReload = false);
+
+        /// <summary>Load saved game index rows for <see cref="LibraryRoot"/> (empty list when root is unset).</summary>
+        List<GameIndexEditorRow> LoadSavedGameIndexRows();
     }
 }

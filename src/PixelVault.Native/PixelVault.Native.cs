@@ -310,7 +310,7 @@ namespace PixelVaultNative
                 CleanTag = CleanTag
             });
             libraryWorkspace = new LibraryWorkspaceContext(this);
-            librarySession = new LibrarySession(libraryWorkspace, libraryScanner, fileSystemService, gameIndexEditorAssignmentService, LoadLibraryMetadataIndex);
+            librarySession = new LibrarySession(libraryWorkspace, libraryScanner, fileSystemService, gameIndexEditorAssignmentService, LoadLibraryMetadataIndex, LoadSavedGameIndexRows);
             Directory.CreateDirectory(dataRoot);
             Directory.CreateDirectory(logsRoot);
             Directory.CreateDirectory(cacheRoot);
@@ -3575,26 +3575,6 @@ namespace PixelVaultNative
             return loose.Count == 1 ? loose[0].Item1 : null;
         }
 
-        string TryResolveSteamGridDbIdBySteamAppId(string steamAppId, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            return coverService.TryResolveSteamGridDbIdBySteamAppId(steamAppId, cancellationToken);
-        }
-
-        string TryResolveSteamGridDbIdByName(string title, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            return coverService.TryResolveSteamGridDbIdByName(title, cancellationToken);
-        }
-
-        string ResolveBestLibraryFolderSteamGridDbId(string root, LibraryFolderInfo folder, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            return ResolveBestLibraryFolderSteamGridDbIdAsync(root, folder, cancellationToken).ConfigureAwait(false).GetAwaiter().GetResult();
-        }
-
-        string ResolveBestLibraryFolderSteamAppId(string root, LibraryFolderInfo folder, bool allowLookup = true, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            return ResolveBestLibraryFolderSteamAppIdAsync(root, folder, allowLookup, cancellationToken).ConfigureAwait(false).GetAwaiter().GetResult();
-        }
-
         async Task<string> ResolveBestLibraryFolderSteamAppIdAsync(string root, LibraryFolderInfo folder, bool allowLookup = true, CancellationToken cancellationToken = default(CancellationToken))
         {
             if (folder == null || string.IsNullOrWhiteSpace(folder.Name)) return string.Empty;
@@ -3990,16 +3970,6 @@ namespace PixelVaultNative
         string CachedCoverPath(string title)
         {
             return coverService.CachedCoverPath(title);
-        }
-
-        string TryDownloadSteamCover(LibraryFolderInfo folder, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            return TryDownloadSteamCoverAsync(folder, cancellationToken).ConfigureAwait(false).GetAwaiter().GetResult();
-        }
-
-        string TryDownloadSteamGridDbCover(LibraryFolderInfo folder, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            return TryDownloadSteamGridDbCoverAsync(folder, cancellationToken).ConfigureAwait(false).GetAwaiter().GetResult();
         }
 
         async Task<string> TryDownloadSteamCoverAsync(LibraryFolderInfo folder, CancellationToken cancellationToken = default(CancellationToken))

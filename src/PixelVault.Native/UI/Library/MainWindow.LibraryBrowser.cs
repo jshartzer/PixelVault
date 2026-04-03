@@ -956,7 +956,7 @@ namespace PixelVaultNative
                             {
                                 try
                                 {
-                                    var savedGameRows = LoadSavedGameIndexRows(librarySession.LibraryRoot);
+                                    var savedGameRows = librarySession.LoadSavedGameIndexRows();
                                     var metadataByFile = await metadataService.ReadEmbeddedMetadataBatchAsync(filesMissingCaptureTicks, CancellationToken.None).ConfigureAwait(false);
                                     var indexChanged = false;
                                     var gameRowsChanged = false;
