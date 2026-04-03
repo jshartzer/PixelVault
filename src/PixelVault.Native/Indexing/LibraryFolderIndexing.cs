@@ -58,14 +58,7 @@ namespace PixelVaultNative
 
         GameIndexEditorRow ResolveExistingGameIndexRowForAssignment(IEnumerable<GameIndexEditorRow> rows, string name, string platformLabel, string preferredGameId = null)
         {
-            var normalizedRows = rows ?? Enumerable.Empty<GameIndexEditorRow>();
-            var normalizedGameId = NormalizeGameId(preferredGameId);
-            if (!string.IsNullOrWhiteSpace(normalizedGameId))
-            {
-                var byId = FindSavedGameIndexRowById(normalizedRows, normalizedGameId);
-                if (byId != null) return byId;
-            }
-            return FindSavedGameIndexRowByIdentity(normalizedRows, NormalizeGameIndexName(name), NormalizeConsoleLabel(platformLabel));
+            return gameIndexEditorAssignmentService.ResolveExistingGameIndexRowForAssignment(rows, name, platformLabel, preferredGameId);
         }
 
         bool DoesSavedGameIndexRowMatchIndexedFile(GameIndexEditorRow row, string file, string platformLabel)

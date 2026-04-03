@@ -193,6 +193,7 @@ Done criteria:
 - Import, manual import, and import-and-comment still work.
 - Undo manifests still work.
 - MainWindow no longer owns the file move pipeline.
+- Manual metadata finish uses **IGameIndexEditorAssignmentService** (resolve existing row + save cloned rows + filename-rule invalidate) from **ImportService** instead of ad-hoc MainWindow funcs on **ImportServiceDependencies**.
 
 Phase 6: Cover art and external providers
 Why sixth:

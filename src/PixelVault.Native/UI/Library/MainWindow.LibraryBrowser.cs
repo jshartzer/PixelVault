@@ -981,7 +981,7 @@ namespace PixelVaultNative
                                             gameRowsChanged = true;
                                         }
                                     }
-                                    if (gameRowsChanged) SaveSavedGameIndexRows(librarySession.LibraryRoot, savedGameRows);
+                                    if (gameRowsChanged) librarySession.PersistGameIndexRows(savedGameRows);
                                     if (indexChanged) SaveLibraryMetadataIndex(librarySession.LibraryRoot, metadataIndex);
                                 }
                                 catch (Exception repairEx)

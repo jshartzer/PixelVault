@@ -110,6 +110,7 @@ namespace PixelVaultNative
         readonly ILibraryScanner libraryScanner;
         readonly ILibrarySession librarySession;
         readonly IImportService importService;
+        readonly IGameIndexEditorAssignmentService gameIndexEditorAssignmentService;
 
         sealed class LibraryDetailRenderSnapshot
         {
@@ -236,6 +237,13 @@ namespace PixelVaultNative
                 IsVideo = delegate(string file) { return IsVideo(file); },
                 NormalizeConsoleLabel = delegate(string value) { return NormalizeConsoleLabel(value); }
             });
+            gameIndexEditorAssignmentService = new GameIndexEditorAssignmentService(
+                indexPersistenceService,
+                filenameParserService,
+                (name, folderPath) => NormalizeGameIndexName(name, folderPath),
+                value => NormalizeConsoleLabel(value ?? string.Empty),
+                value => NormalizeGameId(value ?? string.Empty),
+                value => CleanTag(value ?? string.Empty));
             filenameRulesService = new FilenameRulesService(new FilenameRulesServiceDependencies
             {
                 GetConventionRules = delegate(string root) { return filenameParserService.GetConventionRules(root); },
@@ -283,7 +291,6 @@ namespace PixelVaultNative
                 GetLibraryScanner = () => libraryScanner,
                 EnumerateSourceMediaFiles = EnumerateSourceFiles,
                 ParseFilenameForImport = ParseFilename,
-                ResolveSteamStoreTitle = appId => SteamName(appId),
                 EnsureSteamAppIdInGameIndex = EnsureSteamAppIdInGameIndex,
                 SanitizeManualRenameGameTitle = Sanitize,
                 NormalizeTitleForManualRename = NormalizeTitle,
@@ -294,13 +301,12 @@ namespace PixelVaultNative
                 GamePhotographyTagLabel = GamePhotographyTag,
                 CoverService = coverService,
                 NormalizeGameIndexName = name => NormalizeGameIndexName(name),
-                ResolveExistingGameIndexRowForAssignment = ResolveExistingGameIndexRowForAssignment,
                 DetermineManualMetadataPlatformLabel = DetermineManualMetadataPlatformLabel,
                 ManualMetadataChangesGroupingIdentity = ManualMetadataChangesGroupingIdentity,
-                SaveSavedGameIndexRows = SaveSavedGameIndexRows
+                GameIndexEditorAssignment = gameIndexEditorAssignmentService
             });
             libraryWorkspace = new LibraryWorkspaceContext(this);
-            librarySession = new LibrarySession(libraryWorkspace, libraryScanner, fileSystemService);
+            librarySession = new LibrarySession(libraryWorkspace, libraryScanner, fileSystemService, gameIndexEditorAssignmentService);
             Directory.CreateDirectory(dataRoot);
             Directory.CreateDirectory(logsRoot);
             Directory.CreateDirectory(cacheRoot);
@@ -3614,72 +3620,12 @@ namespace PixelVaultNative
 
         string ResolveBestLibraryFolderSteamGridDbId(string root, LibraryFolderInfo folder, CancellationToken cancellationToken = default(CancellationToken))
         {
-            if (folder == null || string.IsNullOrWhiteSpace(folder.Name) || !HasSteamGridDbApiToken()) return string.Empty;
-            if (folder.SuppressSteamGridDbIdAutoResolve) return string.Empty;
-            if (!string.IsNullOrWhiteSpace(folder.SteamGridDbId)) return folder.SteamGridDbId;
-            cancellationToken.ThrowIfCancellationRequested();
-            var saved = FindSavedGameIndexRow(LoadSavedGameIndexRows(root), folder);
-            if (saved != null && saved.SuppressSteamGridDbIdAutoResolve)
-            {
-                folder.SteamGridDbId = string.Empty;
-                folder.SuppressSteamGridDbIdAutoResolve = true;
-                return string.Empty;
-            }
-            if (saved != null && !string.IsNullOrWhiteSpace(saved.SteamGridDbId))
-            {
-                folder.SteamGridDbId = saved.SteamGridDbId;
-                folder.SuppressSteamGridDbIdAutoResolve = false;
-                return folder.SteamGridDbId;
-            }
-            string steamGridDbId = null;
-            if (ShouldUseSteamStoreLookups(folder))
-            {
-                var appId = ResolveBestLibraryFolderSteamAppId(root, folder, true, cancellationToken);
-                steamGridDbId = !string.IsNullOrWhiteSpace(appId)
-                    ? TryResolveSteamGridDbIdBySteamAppId(appId, cancellationToken)
-                    : null;
-            }
-            if (string.IsNullOrWhiteSpace(steamGridDbId))
-            {
-                steamGridDbId = TryResolveSteamGridDbIdByName(folder.Name, cancellationToken);
-            }
-            if (!string.IsNullOrWhiteSpace(steamGridDbId))
-            {
-                folder.SteamGridDbId = steamGridDbId;
-                UpsertSavedGameIndexRow(root, folder);
-            }
-            return folder.SteamGridDbId ?? string.Empty;
+            return ResolveBestLibraryFolderSteamGridDbIdAsync(root, folder, cancellationToken).ConfigureAwait(false).GetAwaiter().GetResult();
         }
 
         string ResolveBestLibraryFolderSteamAppId(string root, LibraryFolderInfo folder, bool allowLookup = true, CancellationToken cancellationToken = default(CancellationToken))
         {
-            if (folder == null || string.IsNullOrWhiteSpace(folder.Name)) return string.Empty;
-            if (folder.SuppressSteamAppIdAutoResolve) return string.Empty;
-            if (!string.IsNullOrWhiteSpace(folder.SteamAppId)) return folder.SteamAppId;
-            cancellationToken.ThrowIfCancellationRequested();
-            var saved = FindSavedGameIndexRow(LoadSavedGameIndexRows(root), folder);
-            if (saved != null && saved.SuppressSteamAppIdAutoResolve)
-            {
-                folder.SteamAppId = string.Empty;
-                folder.SuppressSteamAppIdAutoResolve = true;
-                return string.Empty;
-            }
-            if (saved != null && !string.IsNullOrWhiteSpace(saved.SteamAppId))
-            {
-                folder.SteamAppId = saved.SteamAppId;
-                folder.SuppressSteamAppIdAutoResolve = false;
-                return folder.SteamAppId;
-            }
-            if (!ShouldUseSteamStoreLookups(folder)) return string.Empty;
-            if (!allowLookup) return folder.SteamAppId ?? string.Empty;
-            var appId = ResolveLibraryFolderSteamAppId(folder.PlatformLabel, folder.FilePaths ?? new string[0]);
-            if (string.IsNullOrWhiteSpace(appId)) appId = TryResolveSteamAppId(folder.Name, cancellationToken);
-            if (!string.IsNullOrWhiteSpace(appId))
-            {
-                folder.SteamAppId = appId;
-                UpsertSavedGameIndexRow(root, folder);
-            }
-            return folder.SteamAppId ?? string.Empty;
+            return ResolveBestLibraryFolderSteamAppIdAsync(root, folder, allowLookup, cancellationToken).ConfigureAwait(false).GetAwaiter().GetResult();
         }
 
         async Task<string> ResolveBestLibraryFolderSteamAppIdAsync(string root, LibraryFolderInfo folder, bool allowLookup = true, CancellationToken cancellationToken = default(CancellationToken))
@@ -3792,7 +3738,7 @@ namespace PixelVaultNative
                     if (progress != null) progress(i + 1, targetFolders.Count, detailPrefix + " | already cached as " + folder.SteamAppId);
                     continue;
                 }
-                var appId = ResolveBestLibraryFolderSteamAppId(root, folder);
+                var appId = ResolveBestLibraryFolderSteamAppIdAsync(root, folder, true, CancellationToken.None).ConfigureAwait(false).GetAwaiter().GetResult();
                 if (!string.IsNullOrWhiteSpace(appId))
                 {
                     var matchKey = BuildLibraryFolderMasterKey(folder);
@@ -4022,18 +3968,7 @@ namespace PixelVaultNative
 
         string ResolveLibraryArt(LibraryFolderInfo folder, bool allowDownload, CancellationToken cancellationToken = default(CancellationToken))
         {
-            var custom = CustomCoverPath(folder);
-            if (!string.IsNullOrWhiteSpace(custom)) return custom;
-            var cached = CachedCoverPath(folder.Name);
-            if (cached != null) return cached;
-            if (allowDownload)
-            {
-                var downloaded = TryDownloadSteamCover(folder, cancellationToken);
-                if (downloaded != null) return downloaded;
-                var steamGridDbDownloaded = TryDownloadSteamGridDbCover(folder, cancellationToken);
-                if (steamGridDbDownloaded != null) return steamGridDbDownloaded;
-            }
-            return folder.PreviewImagePath;
+            return ResolveLibraryArtAsync(folder, allowDownload, cancellationToken).ConfigureAwait(false).GetAwaiter().GetResult();
         }
 
         async Task<string> ResolveLibraryArtAsync(LibraryFolderInfo folder, bool allowDownload, CancellationToken cancellationToken = default(CancellationToken))
@@ -4092,52 +4027,12 @@ namespace PixelVaultNative
 
         string TryDownloadSteamCover(LibraryFolderInfo folder, CancellationToken cancellationToken = default(CancellationToken))
         {
-            if (folder == null) return null;
-            try
-            {
-                var appId = ResolveBestLibraryFolderSteamAppId(libraryRoot, folder, true, cancellationToken);
-                var downloaded = coverService.TryDownloadSteamCover(folder.Name, appId, cancellationToken);
-                if (!string.IsNullOrWhiteSpace(downloaded) && File.Exists(downloaded))
-                {
-                    folder.PreviewImagePath = downloaded;
-                    UpdateCachedLibraryFolderInfo(libraryRoot, folder);
-                    return downloaded;
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                Log("Steam cover download failed for " + (folder == null ? "unknown" : folder.Name) + ". " + ex.Message);
-            }
-            return null;
+            return TryDownloadSteamCoverAsync(folder, cancellationToken).ConfigureAwait(false).GetAwaiter().GetResult();
         }
 
         string TryDownloadSteamGridDbCover(LibraryFolderInfo folder, CancellationToken cancellationToken = default(CancellationToken))
         {
-            if (folder == null || !HasSteamGridDbApiToken()) return null;
-            try
-            {
-                var steamGridDbId = ResolveBestLibraryFolderSteamGridDbId(libraryRoot, folder, cancellationToken);
-                var downloaded = coverService.TryDownloadSteamGridDbCover(folder.Name, steamGridDbId, cancellationToken);
-                if (!string.IsNullOrWhiteSpace(downloaded) && File.Exists(downloaded))
-                {
-                    folder.PreviewImagePath = downloaded;
-                    UpdateCachedLibraryFolderInfo(libraryRoot, folder);
-                    return downloaded;
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                Log("SteamGridDB cover download failed for " + (folder.Name ?? "unknown title") + ". " + ex.Message);
-            }
-            return null;
+            return TryDownloadSteamGridDbCoverAsync(folder, cancellationToken).ConfigureAwait(false).GetAwaiter().GetResult();
         }
 
         async Task<string> TryDownloadSteamCoverAsync(LibraryFolderInfo folder, CancellationToken cancellationToken = default(CancellationToken))
@@ -4280,12 +4175,6 @@ namespace PixelVaultNative
                 return null;
             }
         }
-
-        string SteamName(string appId, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            return coverService.SteamName(appId, cancellationToken);
-        }
-
 
         string PrimaryPlatformLabel(string file)
         {

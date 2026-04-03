@@ -84,16 +84,28 @@ sealed class StubCoverService : ICoverService
     public Task<string> TryDownloadSteamGridDbCoverAsync(string title, string steamGridDbId, CancellationToken cancellationToken = default) => Task.FromResult<string>(null);
 }
 
+sealed class StubGameIndexEditorAssignmentService : IGameIndexEditorAssignmentService
+{
+    public Func<IEnumerable<GameIndexEditorRow>, string, string, string, GameIndexEditorRow> Resolve;
+    public Action<string, IEnumerable<GameIndexEditorRow>> Save;
+
+    public GameIndexEditorRow ResolveExistingGameIndexRowForAssignment(IEnumerable<GameIndexEditorRow> rows, string name, string platformLabel, string preferredGameId) =>
+        Resolve == null ? null : Resolve(rows, name, platformLabel, preferredGameId);
+
+    public void SaveSavedGameIndexRows(string root, IEnumerable<GameIndexEditorRow> rows) =>
+        Save?.Invoke(root, rows);
+}
+
 public sealed class ImportServiceManualMetadataTests
 {
     static ImportService CreateServiceWithManualMetadataDeps(
         ICoverService cover,
         Func<string, string> normalizeGameIndexName,
-        Func<IEnumerable<GameIndexEditorRow>, string, string, string, GameIndexEditorRow> resolveExisting = null,
+        StubGameIndexEditorAssignmentService assignment = null,
         Func<ManualMetadataItem, string> platformLabel = null,
-        Func<ManualMetadataItem, bool> groupingIdentity = null,
-        Action<string, IEnumerable<GameIndexEditorRow>> saveRows = null)
+        Func<ManualMetadataItem, bool> groupingIdentity = null)
     {
+        var stub = assignment ?? new StubGameIndexEditorAssignmentService();
         return new ImportService(new ImportServiceDependencies
         {
             FileSystem = new FileSystemService(),
@@ -103,10 +115,9 @@ public sealed class ImportServiceManualMetadataTests
             CoverService = cover,
             NormalizeGameIndexName = normalizeGameIndexName ?? (s => s?.Trim() ?? string.Empty),
             GetGameNameFromFileName = fn => Path.GetFileNameWithoutExtension(fn ?? string.Empty),
-            ResolveExistingGameIndexRowForAssignment = resolveExisting,
             DetermineManualMetadataPlatformLabel = platformLabel,
             ManualMetadataChangesGroupingIdentity = groupingIdentity,
-            SaveSavedGameIndexRows = saveRows
+            GameIndexEditorAssignment = stub
         });
     }
 
@@ -154,17 +165,21 @@ public sealed class ImportServiceManualMetadataTests
         string savedRoot = null;
         IEnumerable<GameIndexEditorRow> savedSnapshot = null;
 
-        var svc = CreateServiceWithManualMetadataDeps(
-            new StubCoverService(),
-            s => s.Trim(),
-            (all, name, platform, pref) => row,
-            _ => "Steam",
-            _ => false,
-            (root, list) =>
+        var assignmentStub = new StubGameIndexEditorAssignmentService
+        {
+            Resolve = (all, name, platform, pref) => row,
+            Save = (root, list) =>
             {
                 savedRoot = root;
                 savedSnapshot = list.ToList();
-            });
+            }
+        };
+        var svc = CreateServiceWithManualMetadataDeps(
+            new StubCoverService(),
+            s => s.Trim(),
+            assignmentStub,
+            _ => "Steam",
+            _ => false);
 
         var item = new ManualMetadataItem
         {

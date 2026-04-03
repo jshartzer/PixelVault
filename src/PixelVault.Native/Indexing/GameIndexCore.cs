@@ -354,9 +354,7 @@ namespace PixelVaultNative
 
         void SaveSavedGameIndexRows(string root, IEnumerable<GameIndexEditorRow> rows)
         {
-            var sourceRows = (rows ?? Enumerable.Empty<GameIndexEditorRow>()).Where(row => row != null).Select(CloneGameIndexEditorRow).ToList();
-            indexPersistenceService.SaveSavedGameIndexRows(root, sourceRows);
-            if (filenameParserService != null) filenameParserService.InvalidateRules(root);
+            gameIndexEditorAssignmentService.SaveSavedGameIndexRows(root, rows);
         }
 
         List<GameIndexEditorRow> BuildGameIndexRowsFromFolders(IEnumerable<LibraryFolderInfo> folders)
