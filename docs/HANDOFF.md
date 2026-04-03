@@ -93,7 +93,7 @@ Practical current focus:
 
 The app is currently published at `0.835`.
 
-**Notion:** When you track releases in Notion, add **0.835** and sync per `docs/DOC_SYNC_POLICY.md`. [MainWindow extraction roadmap](https://www.notion.so/33573adc59b681d88b7dcd88cad53cb6) (status block matches `docs/MAINWINDOW_EXTRACTION_ROADMAP.md`).
+**Notion:** **0.835** is in **Releases**; [release page](https://www.notion.so/33773adc59b681628cfdcb7e21044773). [MainWindow extraction roadmap](https://www.notion.so/33573adc59b681d88b7dcd88cad53cb6) status block updated (Phase 5 import slice + published **0.835**). Further releases: `docs/DOC_SYNC_POLICY.md`.
 
 Recent extraction progress (repo):
 
