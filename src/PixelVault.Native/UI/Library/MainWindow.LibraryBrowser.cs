@@ -804,102 +804,12 @@ namespace PixelVaultNative
                     if (refreshDetailSelectionUi != null) refreshDetailSelectionUi();
                     Task.Run(async delegate
                     {
-                        var metadataIndex = string.IsNullOrWhiteSpace(librarySession.LibraryRoot)
-                            ? new Dictionary<string, LibraryMetadataIndexEntry>(StringComparer.OrdinalIgnoreCase)
-                            : new Dictionary<string, LibraryMetadataIndexEntry>(LoadLibraryMetadataIndex(librarySession.LibraryRoot), StringComparer.OrdinalIgnoreCase);
-                        var detailFiles = GetFilesForLibraryFolderEntry(renderFolder, false)
-                            .Where(file => !string.IsNullOrWhiteSpace(file) && File.Exists(file))
-                            .Distinct(StringComparer.OrdinalIgnoreCase)
-                            .ToList();
-                        if (!string.IsNullOrWhiteSpace(librarySession.LibraryRoot) && detailFiles.Count > 0)
-                        {
-                            var filesMissingCaptureTicks = detailFiles
-                                .Where(file =>
-                                {
-                                    LibraryMetadataIndexEntry entry;
-                                    if (!metadataIndex.TryGetValue(file, out entry) || entry == null || entry.CaptureUtcTicks <= 0) return true;
-                                    return !string.Equals(entry.Stamp ?? string.Empty, BuildLibraryMetadataStamp(file), StringComparison.Ordinal);
-                                })
-                                .ToList();
-                            if (filesMissingCaptureTicks.Count > 0)
-                            {
-                                var savedGameRows = LoadSavedGameIndexRows(librarySession.LibraryRoot);
-                                var metadataByFile = await metadataService.ReadEmbeddedMetadataBatchAsync(filesMissingCaptureTicks, CancellationToken.None).ConfigureAwait(false);
-                                var indexChanged = false;
-                                var gameRowsChanged = false;
-                                foreach (var file in filesMissingCaptureTicks)
-                                {
-                                    EmbeddedMetadataSnapshot metadataSnapshot;
-                                    if (!metadataByFile.TryGetValue(file, out metadataSnapshot) || metadataSnapshot == null) metadataSnapshot = new EmbeddedMetadataSnapshot();
-                                    LibraryMetadataIndexEntry existingEntry;
-                                    if (!metadataIndex.TryGetValue(file, out existingEntry)) existingEntry = null;
-                                    var stamp = BuildLibraryMetadataStamp(file);
-                                    var previousGameId = existingEntry == null ? string.Empty : NormalizeGameId(existingEntry.GameId);
-                                    var previousConsole = existingEntry == null ? string.Empty : NormalizeConsoleLabel(existingEntry.ConsoleLabel);
-                                    var rebuiltEntry = BuildResolvedLibraryMetadataIndexEntry(librarySession.LibraryRoot, file, stamp, metadataSnapshot, existingEntry, metadataIndex, savedGameRows);
-                                    metadataIndex[file] = rebuiltEntry;
-                                    SetCachedFileTags(file, ParseTagText(rebuiltEntry.TagText), MetadataCacheStamp(file));
-                                    indexChanged = true;
-                                    if (!string.Equals(previousGameId, NormalizeGameId(rebuiltEntry.GameId), StringComparison.OrdinalIgnoreCase)
-                                        || !string.Equals(previousConsole, NormalizeConsoleLabel(rebuiltEntry.ConsoleLabel), StringComparison.OrdinalIgnoreCase))
-                                    {
-                                        gameRowsChanged = true;
-                                    }
-                                }
-                                if (gameRowsChanged) SaveSavedGameIndexRows(librarySession.LibraryRoot, savedGameRows);
-                                if (indexChanged) SaveLibraryMetadataIndex(librarySession.LibraryRoot, metadataIndex);
-                            }
-                        }
-                        var datedFiles = detailFiles
-                            .Select(file => new { FilePath = file, CaptureDate = ResolveIndexedLibraryDate(librarySession.LibraryRoot, file, metadataIndex) })
-                            .OrderByDescending(entry => entry.CaptureDate)
-                            .ThenBy(entry => entry.FilePath, StringComparer.OrdinalIgnoreCase)
-                            .ToList();
-                        var snapshot = new LibraryDetailRenderSnapshot
-                        {
-                            VisibleFiles = datedFiles.Select(entry => entry.FilePath).Distinct(StringComparer.OrdinalIgnoreCase).ToList()
-                        };
-                        foreach (var group in datedFiles
-                            .GroupBy(entry => entry.CaptureDate.Date)
-                            .OrderByDescending(group => group.Key))
-                        {
-                            snapshot.Groups.Add(new LibraryDetailRenderGroup
-                            {
-                                CaptureDate = group.Key,
-                                Files = group.Select(entry => entry.FilePath).ToList()
-                            });
-                        }
-                        return snapshot;
-                    }).ContinueWith(delegate(Task<LibraryDetailRenderSnapshot> loadTask)
-                    {
-                        libraryWindow.Dispatcher.BeginInvoke(new Action(delegate
+                        Action<LibraryDetailRenderSnapshot, bool> applyDetailSnapshot = null;
+                        applyDetailSnapshot = delegate(LibraryDetailRenderSnapshot snapshot, bool logCompletion)
                         {
                             if (renderVersion != detailRenderVersion) return;
                             if (!SameLibraryFolderSelection(current, renderFolder)) return;
-                            if (loadTask.IsFaulted)
-                            {
-                                detailFilesDisplayOrder.Clear();
-                                var flattened = loadTask.Exception == null ? null : loadTask.Exception.Flatten();
-                                var renderError = flattened == null ? new Exception("Capture render failed.") : flattened.InnerExceptions.First();
-                                SetVirtualizedRows(detailRows, new[]
-                                {
-                                    new VirtualizedRowDefinition
-                                    {
-                                        Height = 44,
-                                        Build = delegate
-                                        {
-                                            return new TextBlock { Text = "Failed to load captures.", Foreground = Brush("#D9A3A3") };
-                                        }
-                                    }
-                                }, true, null);
-                                if (refreshDetailSelectionUi != null) refreshDetailSelectionUi();
-                                Log("Library detail render failed for " + (renderFolder.Name ?? renderFolder.FolderPath ?? "(unknown)") + ". " + renderError.Message);
-                                renderStopwatch.Stop();
-                                return;
-                            }
-
-                            var snapshot = loadTask.Result ?? new LibraryDetailRenderSnapshot();
-                            var visibleFiles = snapshot.VisibleFiles ?? new List<string>();
+                            var visibleFiles = snapshot == null ? new List<string>() : (snapshot.VisibleFiles ?? new List<string>());
                             var visibleSet = new HashSet<string>(visibleFiles, StringComparer.OrdinalIgnoreCase);
                             foreach (var stale in selectedDetailFiles.Where(path => !visibleSet.Contains(path)).ToList()) selectedDetailFiles.Remove(stale);
                             if (SameLibraryFolderSelection(current, renderFolder))
@@ -907,7 +817,8 @@ namespace PixelVaultNative
                                 detailFilesDisplayOrder.Clear();
                                 detailFilesDisplayOrder.AddRange(visibleFiles);
                             }
-                            if (snapshot.Groups.Count == 0)
+                            detailTiles.Clear();
+                            if (snapshot == null || snapshot.Groups == null || snapshot.Groups.Count == 0)
                             {
                                 detailFilesDisplayOrder.Clear();
                                 SetVirtualizedRows(detailRows, new[]
@@ -922,8 +833,11 @@ namespace PixelVaultNative
                                     }
                                 }, !shouldRestoreDetailScroll, shouldRestoreDetailScroll ? (double?)preservedDetailScrollOffset : null);
                                 if (refreshDetailSelectionUi != null) refreshDetailSelectionUi();
-                                renderStopwatch.Stop();
-                                LogPerformanceSample("LibraryDetailRender", renderStopwatch, "folder=" + (renderFolder.Name ?? renderFolder.FolderPath ?? "(unknown)") + "; rows=1; files=0; size=" + size, 40);
+                                if (logCompletion)
+                                {
+                                    renderStopwatch.Stop();
+                                    LogPerformanceSample("LibraryDetailRender", renderStopwatch, "folder=" + (renderFolder.Name ?? renderFolder.FolderPath ?? "(unknown)") + "; rows=1; files=0; size=" + size, 40);
+                                }
                                 return;
                             }
 
@@ -980,10 +894,151 @@ namespace PixelVaultNative
                             }
                             SetVirtualizedRows(detailRows, virtualRows, !shouldRestoreDetailScroll, shouldRestoreDetailScroll ? (double?)preservedDetailScrollOffset : null);
                             if (refreshDetailSelectionUi != null) refreshDetailSelectionUi();
-                            renderStopwatch.Stop();
-                            LogPerformanceSample("LibraryDetailRender", renderStopwatch, "folder=" + (renderFolder.Name ?? renderFolder.FolderPath ?? "(unknown)") + "; groups=" + snapshot.Groups.Count + "; files=" + visibleFiles.Count + "; rows=" + virtualRows.Count + "; columns=" + detailColumns + "; size=" + size, 40);
-                        }));
-                    }, TaskScheduler.Default);
+                            if (logCompletion)
+                            {
+                                renderStopwatch.Stop();
+                                LogPerformanceSample("LibraryDetailRender", renderStopwatch, "folder=" + (renderFolder.Name ?? renderFolder.FolderPath ?? "(unknown)") + "; groups=" + snapshot.Groups.Count + "; files=" + visibleFiles.Count + "; rows=" + virtualRows.Count + "; columns=" + detailColumns + "; size=" + size, 40);
+                            }
+                        };
+
+                        try
+                        {
+                            var metadataIndex = string.IsNullOrWhiteSpace(librarySession.LibraryRoot)
+                                ? new Dictionary<string, LibraryMetadataIndexEntry>(StringComparer.OrdinalIgnoreCase)
+                                : new Dictionary<string, LibraryMetadataIndexEntry>(LoadLibraryMetadataIndex(librarySession.LibraryRoot), StringComparer.OrdinalIgnoreCase);
+                            var detailFiles = GetFilesForLibraryFolderEntry(renderFolder, false)
+                                .Where(file => !string.IsNullOrWhiteSpace(file) && File.Exists(file))
+                                .Distinct(StringComparer.OrdinalIgnoreCase)
+                                .ToList();
+                            var filesMissingCaptureTicks = new List<string>();
+                            if (!string.IsNullOrWhiteSpace(librarySession.LibraryRoot) && detailFiles.Count > 0)
+                            {
+                                filesMissingCaptureTicks = detailFiles
+                                    .Where(file =>
+                                    {
+                                        LibraryMetadataIndexEntry entry;
+                                        if (!metadataIndex.TryGetValue(file, out entry) || entry == null || entry.CaptureUtcTicks <= 0) return true;
+                                        return !string.Equals(entry.Stamp ?? string.Empty, BuildLibraryMetadataStamp(file), StringComparison.Ordinal);
+                                    })
+                                    .ToList();
+                            }
+
+                            Func<LibraryDetailRenderSnapshot> buildSnapshot = delegate
+                            {
+                                var datedFiles = detailFiles
+                                    .Select(file => new { FilePath = file, CaptureDate = ResolveIndexedLibraryDate(librarySession.LibraryRoot, file, metadataIndex) })
+                                    .OrderByDescending(entry => entry.CaptureDate)
+                                    .ThenBy(entry => entry.FilePath, StringComparer.OrdinalIgnoreCase)
+                                    .ToList();
+                                var snapshot = new LibraryDetailRenderSnapshot
+                                {
+                                    VisibleFiles = datedFiles.Select(entry => entry.FilePath).Distinct(StringComparer.OrdinalIgnoreCase).ToList()
+                                };
+                                foreach (var group in datedFiles
+                                    .GroupBy(entry => entry.CaptureDate.Date)
+                                    .OrderByDescending(group => group.Key))
+                                {
+                                    snapshot.Groups.Add(new LibraryDetailRenderGroup
+                                    {
+                                        CaptureDate = group.Key,
+                                        Files = group.Select(entry => entry.FilePath).ToList()
+                                    });
+                                }
+                                return snapshot;
+                            };
+
+                            var quickSnapshot = buildSnapshot();
+                            await libraryWindow.Dispatcher.InvokeAsync((Action)(delegate { applyDetailSnapshot(quickSnapshot, true); }));
+
+                            if (filesMissingCaptureTicks.Count > 0)
+                            {
+                                try
+                                {
+                                    var savedGameRows = LoadSavedGameIndexRows(librarySession.LibraryRoot);
+                                    var metadataByFile = await metadataService.ReadEmbeddedMetadataBatchAsync(filesMissingCaptureTicks, CancellationToken.None).ConfigureAwait(false);
+                                    var indexChanged = false;
+                                    var gameRowsChanged = false;
+                                    foreach (var file in filesMissingCaptureTicks)
+                                    {
+                                        EmbeddedMetadataSnapshot metadataSnapshot;
+                                        if (!metadataByFile.TryGetValue(file, out metadataSnapshot) || metadataSnapshot == null) metadataSnapshot = new EmbeddedMetadataSnapshot();
+                                        LibraryMetadataIndexEntry existingEntry;
+                                        if (!metadataIndex.TryGetValue(file, out existingEntry)) existingEntry = null;
+                                        var stamp = BuildLibraryMetadataStamp(file);
+                                        var previousGameId = existingEntry == null ? string.Empty : NormalizeGameId(existingEntry.GameId);
+                                        var previousConsole = existingEntry == null ? string.Empty : NormalizeConsoleLabel(existingEntry.ConsoleLabel);
+                                        var rebuiltEntry = BuildResolvedLibraryMetadataIndexEntry(librarySession.LibraryRoot, file, stamp, metadataSnapshot, existingEntry, metadataIndex, savedGameRows);
+                                        metadataIndex[file] = rebuiltEntry;
+                                        SetCachedFileTags(file, ParseTagText(rebuiltEntry.TagText), MetadataCacheStamp(file));
+                                        indexChanged = true;
+                                        if (!string.Equals(previousGameId, NormalizeGameId(rebuiltEntry.GameId), StringComparison.OrdinalIgnoreCase)
+                                            || !string.Equals(previousConsole, NormalizeConsoleLabel(rebuiltEntry.ConsoleLabel), StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            gameRowsChanged = true;
+                                        }
+                                    }
+                                    if (gameRowsChanged) SaveSavedGameIndexRows(librarySession.LibraryRoot, savedGameRows);
+                                    if (indexChanged) SaveLibraryMetadataIndex(librarySession.LibraryRoot, metadataIndex);
+                                }
+                                catch (Exception repairEx)
+                                {
+                                    Log("Library detail metadata repair failed for " + (renderFolder.Name ?? renderFolder.FolderPath ?? "(unknown)") + ". " + repairEx.Message);
+                                }
+
+                                var refinedSnapshot = buildSnapshot();
+                                var layoutUnchanged = quickSnapshot.Groups.Count == refinedSnapshot.Groups.Count;
+                                if (layoutUnchanged)
+                                {
+                                    for (int gi = 0; gi < quickSnapshot.Groups.Count && layoutUnchanged; gi++)
+                                    {
+                                        var ag = quickSnapshot.Groups[gi];
+                                        var bg = refinedSnapshot.Groups[gi];
+                                        if (ag.CaptureDate.Date != bg.CaptureDate.Date) layoutUnchanged = false;
+                                        else
+                                        {
+                                            var af = ag.Files ?? new List<string>();
+                                            var bf = bg.Files ?? new List<string>();
+                                            if (af.Count != bf.Count) layoutUnchanged = false;
+                                            else
+                                            {
+                                                for (int j = 0; j < af.Count && layoutUnchanged; j++)
+                                                {
+                                                    if (!string.Equals(af[j], bf[j], StringComparison.OrdinalIgnoreCase)) layoutUnchanged = false;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                if (!layoutUnchanged)
+                                {
+                                    await libraryWindow.Dispatcher.InvokeAsync((Action)(delegate { applyDetailSnapshot(refinedSnapshot, false); }));
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            await libraryWindow.Dispatcher.InvokeAsync((Action)(delegate
+                            {
+                                if (renderVersion != detailRenderVersion) return;
+                                if (!SameLibraryFolderSelection(current, renderFolder)) return;
+                                detailFilesDisplayOrder.Clear();
+                                SetVirtualizedRows(detailRows, new[]
+                                {
+                                    new VirtualizedRowDefinition
+                                    {
+                                        Height = 44,
+                                        Build = delegate
+                                        {
+                                            return new TextBlock { Text = "Failed to load captures.", Foreground = Brush("#D9A3A3") };
+                                        }
+                                    }
+                                }, true, null);
+                                if (refreshDetailSelectionUi != null) refreshDetailSelectionUi();
+                                Log("Library detail render failed for " + (renderFolder.Name ?? renderFolder.FolderPath ?? "(unknown)") + ". " + ex.Message);
+                                renderStopwatch.Stop();
+                            }));
+                        }
+                    });
                 };
 
                 Func<LibraryFolderInfo, int, int, bool, Button> buildFolderTile = delegate(LibraryFolderInfo folder, int tileWidth, int tileHeight, bool showPlatformBadge)

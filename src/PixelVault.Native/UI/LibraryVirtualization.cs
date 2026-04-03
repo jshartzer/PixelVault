@@ -346,7 +346,7 @@ namespace PixelVaultNative
                 image.Source = loaded;
                 image.Visibility = Visibility.Visible;
                 placeholder.Visibility = Visibility.Collapsed;
-            }, false, shouldKeepLoading);
+            }, true, shouldKeepLoading);
             tile.MouseLeftButtonDown += delegate(object sender, System.Windows.Input.MouseButtonEventArgs e)
             {
                 var clicked = sender as Border;
