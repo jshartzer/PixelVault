@@ -3913,24 +3913,43 @@ namespace PixelVaultNative
             return (resolvedIds, coversReady);
         }
 
-        string ResolveLibraryArt(LibraryFolderInfo folder, bool allowDownload, CancellationToken cancellationToken = default(CancellationToken))
+        bool TryGetCustomOrCachedCoverPath(LibraryFolderInfo folder, out string path)
         {
-            return ResolveLibraryArtAsync(folder, allowDownload, cancellationToken).ConfigureAwait(false).GetAwaiter().GetResult();
+            path = null;
+            if (folder == null) return false;
+            var custom = CustomCoverPath(folder);
+            if (!string.IsNullOrWhiteSpace(custom))
+            {
+                path = custom;
+                return true;
+            }
+
+            var cached = CachedCoverPath(folder.Name);
+            if (cached != null)
+            {
+                path = cached;
+                return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>Custom cover, on-disk cache entry, or folder preview path — no network (Library tiles / banner when downloads are off).</summary>
+        internal string GetLibraryArtPathForDisplayOnly(LibraryFolderInfo folder)
+        {
+            if (TryGetCustomOrCachedCoverPath(folder, out var early)) return early;
+            return folder?.PreviewImagePath;
         }
 
         async Task<string> ResolveLibraryArtAsync(LibraryFolderInfo folder, bool allowDownload, CancellationToken cancellationToken = default(CancellationToken))
         {
-            var custom = CustomCoverPath(folder);
-            if (!string.IsNullOrWhiteSpace(custom)) return custom;
-            var cached = CachedCoverPath(folder.Name);
-            if (cached != null) return cached;
-            if (allowDownload)
-            {
-                var downloaded = await TryDownloadSteamCoverAsync(folder, cancellationToken).ConfigureAwait(false);
-                if (downloaded != null) return downloaded;
-                var steamGridDbDownloaded = await TryDownloadSteamGridDbCoverAsync(folder, cancellationToken).ConfigureAwait(false);
-                if (steamGridDbDownloaded != null) return steamGridDbDownloaded;
-            }
+            if (folder == null) return null;
+            if (!allowDownload) return GetLibraryArtPathForDisplayOnly(folder);
+            if (TryGetCustomOrCachedCoverPath(folder, out var early)) return early;
+            var downloaded = await TryDownloadSteamCoverAsync(folder, cancellationToken).ConfigureAwait(false);
+            if (downloaded != null) return downloaded;
+            var steamGridDbDownloaded = await TryDownloadSteamGridDbCoverAsync(folder, cancellationToken).ConfigureAwait(false);
+            if (steamGridDbDownloaded != null) return steamGridDbDownloaded;
             return folder.PreviewImagePath;
         }
 

@@ -1065,7 +1065,7 @@ namespace PixelVaultNative
                     {
                         var imageGrid = new Grid();
                         imageGrid.Children.Add(CreateAsyncImageTile(
-                            ResolveLibraryArt(folder, false),
+                            GetLibraryArtPathForDisplayOnly(folder),
                             CalculateLibraryFolderArtDecodeWidth(tileWidth),
                             tileWidth,
                             tileHeight,
@@ -1084,7 +1084,7 @@ namespace PixelVaultNative
                     else
                     {
                         imageBorder.Child = CreateAsyncImageTile(
-                            ResolveLibraryArt(folder, false),
+                            GetLibraryArtPathForDisplayOnly(folder),
                             CalculateLibraryFolderArtDecodeWidth(tileWidth),
                             tileWidth,
                             tileHeight,
@@ -1179,17 +1179,43 @@ namespace PixelVaultNative
                     activeSelectedLibraryFolder = CloneLibraryFolderInfo(info);
                     detailTitle.Text = info.Name;
                     detailMeta.Text = info.FileCount + " item(s) | " + info.PlatformLabel + " | " + info.FolderPath;
-                    var artPath = ResolveLibraryArt(info, false);
-                    if (string.IsNullOrWhiteSpace(artPath) || !File.Exists(artPath))
+                    previewImage.Source = null;
+                    previewImage.Visibility = Visibility.Collapsed;
+                    var infoCapture = info;
+                    _ = Task.Run(async () =>
                     {
-                        previewImage.Source = null;
-                        previewImage.Visibility = Visibility.Collapsed;
-                    }
-                    else QueueImageLoad(previewImage, artPath, CalculateLibraryBannerArtDecodeWidth(), delegate(BitmapImage loaded)
-                    {
-                        previewImage.Source = loaded;
-                        previewImage.Visibility = Visibility.Visible;
-                    }, true, delegate { return SameLibraryFolderSelection(current, info); });
+                        try
+                        {
+                            var artPath = await ResolveLibraryArtAsync(infoCapture, false, CancellationToken.None).ConfigureAwait(false);
+                            await libraryWindow.Dispatcher.InvokeAsync((Action)(delegate
+                            {
+                                if (!SameLibraryFolderSelection(current, infoCapture)) return;
+                                if (string.IsNullOrWhiteSpace(artPath) || !File.Exists(artPath))
+                                {
+                                    previewImage.Source = null;
+                                    previewImage.Visibility = Visibility.Collapsed;
+                                }
+                                else
+                                {
+                                    QueueImageLoad(previewImage, artPath, CalculateLibraryBannerArtDecodeWidth(), delegate(BitmapImage loaded)
+                                    {
+                                        previewImage.Source = loaded;
+                                        previewImage.Visibility = Visibility.Visible;
+                                    }, true, delegate { return SameLibraryFolderSelection(current, infoCapture); });
+                                }
+                            }));
+                        }
+                        catch (OperationCanceledException)
+                        {
+                        }
+                        catch (Exception ex)
+                        {
+                            _ = libraryWindow.Dispatcher.BeginInvoke(new Action(delegate
+                            {
+                                Log("Library detail banner art resolve failed for " + (infoCapture.Name ?? "?") + ". " + ex.Message);
+                            }));
+                        }
+                    });
                     renderSelectedFolder();
                 };
 

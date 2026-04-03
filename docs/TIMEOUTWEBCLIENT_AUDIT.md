@@ -88,7 +88,7 @@ Reason:
 
 ### Library tile rendering
 
-`ResolveLibraryArt(folder, false)` is used while rendering Library tiles and folder previews.
+Library folder tiles use **`GetLibraryArtPathForDisplayOnly`** (no download); the selected-folder banner uses **`ResolveLibraryArtAsync(folder, false)`** off the UI thread before **`QueueImageLoad`**.
 
 Status:
 
@@ -109,7 +109,7 @@ Reason:
 - The manual Steam AppID search runs on a background task, which keeps the UI responsive.
 - It still does not expose a cancel path to the user if a provider call stalls or they change their mind mid-search.
 
-3. `ResolveLibraryArt(folder, true)` would block if reused on the UI thread
+3. **`ResolveLibraryArtAsync(folder, true)`** must stay off the UI thread (cover refresh already **`await`**s it)
 - Current audited usages are backgrounded.
 - Future callers should not use the download-enabled path from direct UI rendering or click handlers without a worker/task boundary.
 
