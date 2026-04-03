@@ -310,7 +310,17 @@ namespace PixelVaultNative
                 CleanTag = CleanTag
             });
             libraryWorkspace = new LibraryWorkspaceContext(this);
-            librarySession = new LibrarySession(libraryWorkspace, libraryScanner, fileSystemService, gameIndexEditorAssignmentService, LoadLibraryMetadataIndex, LoadSavedGameIndexRows);
+            librarySession = new LibrarySession(
+                libraryWorkspace,
+                libraryScanner,
+                fileSystemService,
+                gameIndexEditorAssignmentService,
+                LoadLibraryMetadataIndex,
+                LoadSavedGameIndexRows,
+                SaveLibraryMetadataIndex,
+                LoadLibraryFolderCacheSnapshot,
+                ResolveIndexedLibraryDate,
+                BuildResolvedLibraryMetadataIndexEntry);
             Directory.CreateDirectory(dataRoot);
             Directory.CreateDirectory(logsRoot);
             Directory.CreateDirectory(cacheRoot);
@@ -3941,10 +3951,19 @@ namespace PixelVaultNative
             return folder?.PreviewImagePath;
         }
 
-        async Task<string> ResolveLibraryArtAsync(LibraryFolderInfo folder, bool allowDownload, CancellationToken cancellationToken = default(CancellationToken))
+        /// <summary>
+        /// Resolve a library folder cover path. When <paramref name="allowDownload"/> is false, returns a <b>completed</b> task
+        /// (<see cref="GetLibraryArtPathForDisplayOnly"/> only — no network). When true, may download via Steam / SteamGridDB.
+        /// </summary>
+        Task<string> ResolveLibraryArtAsync(LibraryFolderInfo folder, bool allowDownload, CancellationToken cancellationToken = default(CancellationToken))
         {
-            if (folder == null) return null;
-            if (!allowDownload) return GetLibraryArtPathForDisplayOnly(folder);
+            if (folder == null) return Task.FromResult<string>(null);
+            if (!allowDownload) return Task.FromResult(GetLibraryArtPathForDisplayOnly(folder));
+            return ResolveLibraryArtWithDownloadAsync(folder, cancellationToken);
+        }
+
+        async Task<string> ResolveLibraryArtWithDownloadAsync(LibraryFolderInfo folder, CancellationToken cancellationToken)
+        {
             if (TryGetCustomOrCachedCoverPath(folder, out var early)) return early;
             var downloaded = await TryDownloadSteamCoverAsync(folder, cancellationToken).ConfigureAwait(false);
             if (downloaded != null) return downloaded;

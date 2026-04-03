@@ -88,7 +88,7 @@ Reason:
 
 ### Library tile rendering
 
-Library folder tiles use **`GetLibraryArtPathForDisplayOnly`** (no download); the selected-folder banner uses **`ResolveLibraryArtAsync(folder, false)`** off the UI thread before **`QueueImageLoad`**.
+Library folder tiles use **`GetLibraryArtPathForDisplayOnly`** (no download); the selected-folder banner runs **`GetLibraryArtPathForDisplayOnly`** + **`File.Exists`** on the thread pool, then **`QueueImageLoad`** on the dispatcher. **`ResolveLibraryArtAsync(folder, false)`** is a completed task (**`Task.FromResult`**) over the same path.
 
 Status:
 
