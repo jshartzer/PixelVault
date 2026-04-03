@@ -52,6 +52,8 @@ namespace PixelVaultNative
         public Action<string> Log;
         public Action<string, Stopwatch, string, long> LogPerformanceSample;
         public Action ClearImageCache;
+        /// <summary>When set, cover file changes evict only these paths from the host image LRU instead of clearing the entire cache.</summary>
+        public Action<IEnumerable<string>> RemoveCachedImageEntries;
     }
 
     sealed class CoverService : ICoverService
@@ -198,6 +200,16 @@ namespace PixelVaultNative
         void ClearImageCache()
         {
             if (dependencies.ClearImageCache != null) dependencies.ClearImageCache();
+        }
+
+        void InvalidateCoverImageCache(IEnumerable<string> coverFilePaths)
+        {
+            if (dependencies.RemoveCachedImageEntries != null)
+            {
+                dependencies.RemoveCachedImageEntries(coverFilePaths ?? Enumerable.Empty<string>());
+                return;
+            }
+            ClearImageCache();
         }
 
         public string TryResolveSteamGridDbIdBySteamAppId(string steamAppId, CancellationToken cancellationToken = default(CancellationToken))
@@ -475,29 +487,40 @@ namespace PixelVaultNative
             var key = CustomCoverKey(folder);
             if (string.IsNullOrWhiteSpace(key)) return;
             Directory.CreateDirectory(dependencies.CoversRoot);
+            var invalidated = new List<string>();
             foreach (var ext in new[] { ".jpg", ".jpeg", ".png", ".bmp", ".gif" })
             {
                 var existing = Path.Combine(dependencies.CoversRoot, "custom-" + key + ext);
-                if (File.Exists(existing)) File.Delete(existing);
+                if (File.Exists(existing))
+                {
+                    invalidated.Add(existing);
+                    File.Delete(existing);
+                }
             }
             var extension = Path.GetExtension(sourcePath);
             if (string.IsNullOrWhiteSpace(extension)) extension = ".png";
             var target = Path.Combine(dependencies.CoversRoot, "custom-" + key + extension.ToLowerInvariant());
             if (dependencies.FileSystem != null) dependencies.FileSystem.CopyFile(sourcePath, target, true);
             else File.Copy(sourcePath, target, true);
-            ClearImageCache();
+            invalidated.Add(target);
+            InvalidateCoverImageCache(invalidated);
         }
 
         public void ClearCustomCover(LibraryFolderInfo folder)
         {
             var key = CustomCoverKey(folder);
             if (string.IsNullOrWhiteSpace(key)) return;
+            var invalidated = new List<string>();
             foreach (var ext in new[] { ".jpg", ".jpeg", ".png", ".bmp", ".gif" })
             {
                 var existing = Path.Combine(dependencies.CoversRoot, "custom-" + key + ext);
-                if (File.Exists(existing)) File.Delete(existing);
+                if (File.Exists(existing))
+                {
+                    invalidated.Add(existing);
+                    File.Delete(existing);
+                }
             }
-            ClearImageCache();
+            InvalidateCoverImageCache(invalidated);
         }
 
         public string CachedCoverPath(string title)
@@ -514,12 +537,17 @@ namespace PixelVaultNative
         public void DeleteCachedCover(string title)
         {
             var safe = SafeCacheName(title);
+            var invalidated = new List<string>();
             foreach (var ext in new[] { ".jpg", ".jpeg", ".png" })
             {
                 var path = Path.Combine(dependencies.CoversRoot, safe + ext);
-                if (File.Exists(path)) File.Delete(path);
+                if (File.Exists(path))
+                {
+                    invalidated.Add(path);
+                    File.Delete(path);
+                }
             }
-            ClearImageCache();
+            InvalidateCoverImageCache(invalidated);
         }
 
         public bool HasDedicatedLibraryCover(LibraryFolderInfo folder)

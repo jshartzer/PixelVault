@@ -8,6 +8,7 @@ Use this after touching import, indexing, metadata persistence, or Library behav
 
 - Confirm the app launches from the current published build.
 - Keep one small known-good intake sample ready.
+- Optional: use repo **`C:\Codex\PixelVaultData\import-stability-test-upload`** (minimal PNGs + `README.txt`) as the Settings upload folder for import smoke tests, or copy those files into your real upload folder.
 - Keep the NAS-backed test export folder available at `Y:\PixelVault-Test-Exports`.
 
 ## Minimum Pass

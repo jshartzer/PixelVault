@@ -40,7 +40,7 @@ namespace PixelVaultNative
 
     public sealed partial class MainWindow : Window
     {
-        const string AppVersion = "0.834";
+        const string AppVersion = "0.835";
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
         const string ClearedExternalIdSentinel = "__PV_CLEARED__";
@@ -205,7 +205,8 @@ namespace PixelVaultNative
                 Sanitize = delegate(string value) { return Sanitize(value); },
                 Log = delegate(string message) { Log(message); },
                 LogPerformanceSample = delegate(string area, Stopwatch stopwatch, string detail, long thresholdMilliseconds) { LogPerformanceSample(area, stopwatch, detail, thresholdMilliseconds); },
-                ClearImageCache = delegate { ClearImageCache(); }
+                ClearImageCache = delegate { ClearImageCache(); },
+                RemoveCachedImageEntries = delegate(IEnumerable<string> paths) { RemoveCachedImageEntries(paths); }
             });
             indexPersistenceService = new IndexPersistenceService(new IndexPersistenceServiceDependencies
             {
@@ -3931,7 +3932,7 @@ namespace PixelVaultNative
                 {
                     if (File.Exists(existingCached)) File.Delete(existingCached);
                     File.Move(backupPath, existingCached);
-                    ClearImageCache();
+                    RemoveCachedImageEntries(new[] { existingCached });
                     return existingCached;
                 }
             }
@@ -3944,7 +3945,7 @@ namespace PixelVaultNative
                     {
                         if (File.Exists(existingCached)) File.Delete(existingCached);
                         File.Move(backupPath, existingCached);
-                        ClearImageCache();
+                        RemoveCachedImageEntries(new[] { existingCached });
                         return existingCached;
                     }
                     catch (Exception restoreEx)

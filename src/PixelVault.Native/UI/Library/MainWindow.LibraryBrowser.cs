@@ -1091,7 +1091,7 @@ namespace PixelVaultNative
                     fetchFolderCoverItem.Click += delegate
                     {
                         showFolder(folder);
-                        runScopedCoverRefresh(new List<LibraryFolderInfo> { folder }, folder.Name + " | " + folder.PlatformLabel, true, true);
+                        runScopedCoverRefresh(new List<LibraryFolderInfo> { folder }, folder.Name + " | " + folder.PlatformLabel, true, false);
                     };
                     contextMenu.Items.Add(openFolderItem);
                     contextMenu.Items.Add(editMetadataItem);

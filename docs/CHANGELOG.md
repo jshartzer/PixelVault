@@ -1,3 +1,7 @@
+## 0.835
+- **Release:** Version **0.835** — publish refresh. No intentional user-visible behavior change; continues **Phase 5** import service extraction and structural work from **0.834**.
+- **Engineering / structure (service split):** Intake **review-item metadata** writes live in **`IImportService.WriteMetadataForReviewItems`** (see **0.834** changelog for detail) — shipped in this build.
+
 ## 0.834
 - **Release:** Version **0.834** — publish refresh. **Phase 4** / **Phase 5** service-split intent since **0.833** is unchanged (see **0.833**); additional engineering below.
 - **Docs:** Added **`docs/ARCHITECTURE_REFACTOR_PLAN.md`** — refactor contract (tiered MainWindow vs legacy, **`ILibraryScanHost`** as application port, **`IFileSystemService`** / async scope, sequencing). Linked from **`HANDOFF.md`**, **`PROJECT_CONTEXT.md`**, **`MAINWINDOW_EXTRACTION_ROADMAP.md`**, **`SERVICE_OWNERSHIP_AND_PARALLEL_WORK_MAP.md`**, **`PERFORMANCE_TODO.md`**.
