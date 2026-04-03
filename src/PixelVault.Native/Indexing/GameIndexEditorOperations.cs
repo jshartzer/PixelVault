@@ -49,7 +49,10 @@ namespace PixelVaultNative
                 row.SteamGridDbId = cleanedSteamGridDbId;
             }
             var normalizedRows = MergeGameIndexRows(rows);
-            var previousRows = MergeGameIndexRows(LoadSavedGameIndexRows(root).Concat(BuildGameIndexRowsFromFolders(libraryScanner.LoadLibraryFoldersCached(root, false) ?? new List<LibraryFolderInfo>())));
+            var cachedFoldersForAlias = string.Equals(root, librarySession.LibraryRoot, StringComparison.OrdinalIgnoreCase)
+                ? librarySession.LoadLibraryFoldersCached(false)
+                : (libraryScanner.LoadLibraryFoldersCached(root, false) ?? new List<LibraryFolderInfo>());
+            var previousRows = MergeGameIndexRows(LoadSavedGameIndexRows(root).Concat(BuildGameIndexRowsFromFolders(cachedFoldersForAlias)));
             var aliasMap = BuildGameIndexSaveAliasMap(previousRows, normalizedRows);
             AlignLibraryFoldersToGameIndex(root, normalizedRows);
             SaveSavedGameIndexRows(root, normalizedRows);

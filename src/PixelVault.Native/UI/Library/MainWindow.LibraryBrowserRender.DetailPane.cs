@@ -14,37 +14,22 @@ namespace PixelVaultNative
 {
     public sealed partial class MainWindow
     {
-        sealed class LibraryBrowserDetailPaneContext
-        {
-            internal LibraryBrowserPaneRefs Panes;
-            internal LibraryFolderInfo Current;
-            internal int DetailRenderSequence;
-            internal bool PreserveDetailScrollOnNextRender;
-            internal double PreservedDetailScrollOffset;
-            internal List<Border> DetailTiles;
-            internal HashSet<string> SelectedDetailFiles;
-            internal List<string> DetailFilesDisplayOrder;
-            internal int LastDetailColumns;
-            internal int LastDetailTileSize;
-            internal int EstimatedDetailRowHeight;
-        }
-
         void LibraryBrowserRenderSelectedFolderDetail(
-            LibraryBrowserDetailPaneContext ctx,
+            LibraryBrowserWorkingSet ws,
             Window libraryWindow,
             Action<string> openSingleFileMetadataEditor,
             Action<string, ModifierKeys> updateDetailSelection,
             Action refreshDetailSelectionUi)
         {
-            var panes = ctx.Panes;
+            var panes = ws.Panes;
             var renderStopwatch = Stopwatch.StartNew();
-            var renderVersion = ++ctx.DetailRenderSequence;
-            if (!ctx.PreserveDetailScrollOnNextRender) ctx.PreservedDetailScrollOffset = 0;
-            ctx.DetailTiles.Clear();
-            if (ctx.Current == null)
+            var renderVersion = ++ws.DetailRenderSequence;
+            if (!ws.PreserveDetailScrollOnNextRender) ws.PreservedDetailScrollOffset = 0;
+            ws.DetailTiles.Clear();
+            if (ws.Current == null)
             {
-                ctx.SelectedDetailFiles.Clear();
-                ctx.DetailFilesDisplayOrder.Clear();
+                ws.SelectedDetailFiles.Clear();
+                ws.DetailFilesDisplayOrder.Clear();
                 SetVirtualizedRows(panes.DetailRows, new List<VirtualizedRowDefinition>(), true, null);
                 if (refreshDetailSelectionUi != null) refreshDetailSelectionUi();
                 renderStopwatch.Stop();
@@ -54,14 +39,14 @@ namespace PixelVaultNative
             var detailLayout = CalculateResponsiveLibraryDetailLayout(panes.ThumbScroll);
             var targetDetailColumns = detailLayout.Columns;
             var size = detailLayout.TileSize;
-            ctx.LastDetailColumns = targetDetailColumns;
-            ctx.LastDetailTileSize = size;
-            ctx.EstimatedDetailRowHeight = Math.Max(200, size + 96);
-            var shouldRestoreDetailScroll = ctx.PreserveDetailScrollOnNextRender && ctx.PreservedDetailScrollOffset > 0.1d;
-            var restoreDetailScrollOffset = shouldRestoreDetailScroll ? (double?)ctx.PreservedDetailScrollOffset : null;
+            ws.LastDetailColumns = targetDetailColumns;
+            ws.LastDetailTileSize = size;
+            ws.EstimatedDetailRowHeight = Math.Max(200, size + 96);
+            var shouldRestoreDetailScroll = ws.PreserveDetailScrollOnNextRender && ws.PreservedDetailScrollOffset > 0.1d;
+            var restoreDetailScrollOffset = shouldRestoreDetailScroll ? (double?)ws.PreservedDetailScrollOffset : null;
             var restoreDetailScrollPending = shouldRestoreDetailScroll;
-            ctx.PreserveDetailScrollOnNextRender = false;
-            var renderFolder = ctx.Current;
+            ws.PreserveDetailScrollOnNextRender = false;
+            var renderFolder = ws.Current;
             SetVirtualizedRows(panes.DetailRows, new[]
             {
                 new VirtualizedRowDefinition
@@ -79,20 +64,20 @@ namespace PixelVaultNative
                 Action<LibraryDetailRenderSnapshot, bool> applyDetailSnapshot = null;
                 applyDetailSnapshot = delegate(LibraryDetailRenderSnapshot snapshot, bool logCompletion)
                 {
-                    if (renderVersion != ctx.DetailRenderSequence) return;
-                    if (!SameLibraryFolderSelection(ctx.Current, renderFolder)) return;
+                    if (renderVersion != ws.DetailRenderSequence) return;
+                    if (!SameLibraryFolderSelection(ws.Current, renderFolder)) return;
                     var visibleFiles = snapshot == null ? new List<string>() : (snapshot.VisibleFiles ?? new List<string>());
                     var visibleSet = new HashSet<string>(visibleFiles, StringComparer.OrdinalIgnoreCase);
-                    foreach (var stale in ctx.SelectedDetailFiles.Where(path => !visibleSet.Contains(path)).ToList()) ctx.SelectedDetailFiles.Remove(stale);
-                    if (SameLibraryFolderSelection(ctx.Current, renderFolder))
+                    foreach (var stale in ws.SelectedDetailFiles.Where(path => !visibleSet.Contains(path)).ToList()) ws.SelectedDetailFiles.Remove(stale);
+                    if (SameLibraryFolderSelection(ws.Current, renderFolder))
                     {
-                        ctx.DetailFilesDisplayOrder.Clear();
-                        ctx.DetailFilesDisplayOrder.AddRange(visibleFiles);
+                        ws.DetailFilesDisplayOrder.Clear();
+                        ws.DetailFilesDisplayOrder.AddRange(visibleFiles);
                     }
-                    ctx.DetailTiles.Clear();
+                    ws.DetailTiles.Clear();
                     if (snapshot == null || snapshot.Groups == null || snapshot.Groups.Count == 0)
                     {
-                        ctx.DetailFilesDisplayOrder.Clear();
+                        ws.DetailFilesDisplayOrder.Clear();
                         SetVirtualizedRows(panes.DetailRows, new[]
                         {
                             new VirtualizedRowDefinition
@@ -141,7 +126,7 @@ namespace PixelVaultNative
                             var rowFiles = groupFiles.Skip(rowStart).Take(detailColumns).ToList();
                             virtualRows.Add(new VirtualizedRowDefinition
                             {
-                                Height = ctx.EstimatedDetailRowHeight,
+                                Height = ws.EstimatedDetailRowHeight,
                                 Build = delegate
                                 {
                                     var rowPanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, detailTileGap) };
@@ -151,13 +136,13 @@ namespace PixelVaultNative
                                         var tile = CreateLibraryDetailTile(
                                             file,
                                             size,
-                                            delegate { return SameLibraryFolderSelection(ctx.Current, renderFolder); },
+                                            delegate { return SameLibraryFolderSelection(ws.Current, renderFolder); },
                                             openSingleFileMetadataEditor,
                                             updateDetailSelection,
-                                            ctx.SelectedDetailFiles,
+                                            ws.SelectedDetailFiles,
                                             refreshDetailSelectionUi);
                                         tile.Margin = new Thickness(0, 0, fileIndex < rowFiles.Count - 1 ? detailTileGap : 0, 0);
-                                        ctx.DetailTiles.Add(tile);
+                                        ws.DetailTiles.Add(tile);
                                         rowPanel.Children.Add(tile);
                                     }
                                     return rowPanel;
@@ -291,9 +276,9 @@ namespace PixelVaultNative
                 {
                     await libraryWindow.Dispatcher.InvokeAsync((Action)(delegate
                     {
-                        if (renderVersion != ctx.DetailRenderSequence) return;
-                        if (!SameLibraryFolderSelection(ctx.Current, renderFolder)) return;
-                        ctx.DetailFilesDisplayOrder.Clear();
+                        if (renderVersion != ws.DetailRenderSequence) return;
+                        if (!SameLibraryFolderSelection(ws.Current, renderFolder)) return;
+                        ws.DetailFilesDisplayOrder.Clear();
                         SetVirtualizedRows(panes.DetailRows, new[]
                         {
                             new VirtualizedRowDefinition

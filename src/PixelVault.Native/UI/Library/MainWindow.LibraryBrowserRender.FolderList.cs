@@ -10,39 +10,22 @@ namespace PixelVaultNative
 {
     public sealed partial class MainWindow
     {
-        sealed class LibraryBrowserFolderListContext
-        {
-            internal LibraryBrowserPaneRefs Panes;
-            internal List<LibraryFolderInfo> Folders;
-            internal HashSet<string> CollapsedPlatformSections;
-            internal HashSet<string> SelectedDetailFiles;
-            internal List<string> DetailFilesDisplayOrder;
-            internal LibraryFolderInfo Current;
-            internal bool PreserveFolderScrollOnNextRender;
-            internal double PreservedFolderScrollOffset;
-            internal string AppliedLibrarySearchText;
-            internal bool LibraryFoldersLoading;
-            internal int LastFolderColumns;
-            internal int LastFolderTileSize;
-            internal int DetailSelectionAnchorIndex;
-        }
-
         void LibraryBrowserRenderFolderList(
-            LibraryBrowserFolderListContext ctx,
+            LibraryBrowserWorkingSet ws,
             Func<LibraryFolderInfo, int, int, bool, Button> buildFolderTile,
             Action<LibraryFolderInfo> showFolder,
             Action renderSelectedFolder,
             Action selfRerender)
         {
-            var panes = ctx.Panes;
-            var folders = ctx.Folders;
+            var panes = ws.Panes;
+            var folders = ws.Folders;
             var renderStopwatch = Stopwatch.StartNew();
-            var restoreFolderScrollOffset = ctx.PreserveFolderScrollOnNextRender ? Math.Max(0, ctx.PreservedFolderScrollOffset) : 0;
-            var shouldRestoreFolderScroll = ctx.PreserveFolderScrollOnNextRender && restoreFolderScrollOffset > 0.1d;
-            ctx.PreserveFolderScrollOnNextRender = false;
+            var restoreFolderScrollOffset = ws.PreserveFolderScrollOnNextRender ? Math.Max(0, ws.PreservedFolderScrollOffset) : 0;
+            var shouldRestoreFolderScroll = ws.PreserveFolderScrollOnNextRender && restoreFolderScrollOffset > 0.1d;
+            ws.PreserveFolderScrollOnNextRender = false;
             var sortMode = NormalizeLibraryFolderSortMode(libraryFolderSortMode);
             var flattenGroups = !string.Equals(sortMode, "platform", StringComparison.OrdinalIgnoreCase);
-            var searchText = ctx.AppliedLibrarySearchText;
+            var searchText = ws.AppliedLibrarySearchText;
             var filterSortStopwatch = Stopwatch.StartNew();
             var visibleFolders = string.IsNullOrWhiteSpace(searchText)
                 ? folders
@@ -64,27 +47,27 @@ namespace PixelVaultNative
             var folderLayout = CalculateResponsiveLibraryFolderLayout(panes.TileScroll);
             var targetFolderColumns = folderLayout.Columns;
             var tileWidth = folderLayout.TileSize;
-            ctx.LastFolderColumns = targetFolderColumns;
-            ctx.LastFolderTileSize = tileWidth;
+            ws.LastFolderColumns = targetFolderColumns;
+            ws.LastFolderTileSize = tileWidth;
             var tileHeight = (int)Math.Round(tileWidth * 1.5d);
             LibraryFolderInfo selectedFolder = null;
-            if (ctx.Current != null)
+            if (ws.Current != null)
             {
-                selectedFolder = folders.FirstOrDefault(f => f.FolderPath == ctx.Current.FolderPath && string.Equals(f.PlatformLabel, ctx.Current.PlatformLabel, StringComparison.OrdinalIgnoreCase));
-                if (selectedFolder == null) selectedFolder = folders.FirstOrDefault(f => f.FolderPath == ctx.Current.FolderPath);
+                selectedFolder = folders.FirstOrDefault(f => f.FolderPath == ws.Current.FolderPath && string.Equals(f.PlatformLabel, ws.Current.PlatformLabel, StringComparison.OrdinalIgnoreCase));
+                if (selectedFolder == null) selectedFolder = folders.FirstOrDefault(f => f.FolderPath == ws.Current.FolderPath);
             }
             if (selectedFolder != null)
             {
-                if (!SameLibraryFolderSelection(ctx.Current, selectedFolder)) showFolder(selectedFolder);
-                else ctx.Current = selectedFolder;
+                if (!SameLibraryFolderSelection(ws.Current, selectedFolder)) showFolder(selectedFolder);
+                else ws.Current = selectedFolder;
             }
             else
             {
-                ctx.Current = null;
+                ws.Current = null;
                 activeSelectedLibraryFolder = null;
-                ctx.SelectedDetailFiles.Clear();
-                ctx.DetailSelectionAnchorIndex = -1;
-                ctx.DetailFilesDisplayOrder.Clear();
+                ws.SelectedDetailFiles.Clear();
+                ws.DetailSelectionAnchorIndex = -1;
+                ws.DetailFilesDisplayOrder.Clear();
                 panes.DetailTitle.Text = "Select a folder";
                 panes.DetailMeta.Text = "Browse the library you chose in Settings.";
                 panes.PreviewImage.Source = null;
@@ -105,7 +88,7 @@ namespace PixelVaultNative
                     {
                         return new TextBlock
                         {
-                            Text = ctx.LibraryFoldersLoading
+                            Text = ws.LibraryFoldersLoading
                                 ? "Loading library folders..."
                                 : (string.IsNullOrWhiteSpace(searchText) ? "No library folders found." : "No folders match the current search."),
                             Foreground = Brush("#A7B5BD"),
@@ -115,7 +98,7 @@ namespace PixelVaultNative
                 });
                 SetVirtualizedRows(panes.TileRows, virtualRows, true, null);
                 renderStopwatch.Stop();
-                LogPerformanceSample("LibraryFolderRender", renderStopwatch, "mode=" + (ctx.LibraryFoldersLoading ? "loading" : "empty") + "; foldersLoaded=" + folders.Count + "; visible=0; search=" + (string.IsNullOrWhiteSpace(searchText) ? "(none)" : searchText) + "; sort=" + sortMode + "; loadMs=0; filterMs=" + filterSortStopwatch.ElapsedMilliseconds, 40);
+                LogPerformanceSample("LibraryFolderRender", renderStopwatch, "mode=" + (ws.LibraryFoldersLoading ? "loading" : "empty") + "; foldersLoaded=" + folders.Count + "; visible=0; search=" + (string.IsNullOrWhiteSpace(searchText) ? "(none)" : searchText) + "; sort=" + sortMode + "; loadMs=0; filterMs=" + filterSortStopwatch.ElapsedMilliseconds, 40);
                 return;
             }
             if (flattenGroups)
@@ -149,7 +132,7 @@ namespace PixelVaultNative
             {
                 var groupFolders = folderGroup.ToList();
                 var groupLabel = folderGroup.Key;
-                var sectionCollapsed = ctx.CollapsedPlatformSections.Contains(groupLabel);
+                var sectionCollapsed = ws.CollapsedPlatformSections.Contains(groupLabel);
                 virtualRows.Add(new VirtualizedRowDefinition
                 {
                     Height = 82,
@@ -164,10 +147,10 @@ namespace PixelVaultNative
                             BorderThickness = new Thickness(1),
                             CornerRadius = new CornerRadius(10),
                             Padding = new Thickness(10, 10, 14, 12),
-                            Child = BuildLibrarySectionHeader(gl, groupFolders.Count, ctx.CollapsedPlatformSections.Contains(gl), delegate
+                            Child = BuildLibrarySectionHeader(gl, groupFolders.Count, ws.CollapsedPlatformSections.Contains(gl), delegate
                             {
-                                if (ctx.CollapsedPlatformSections.Contains(gl)) ctx.CollapsedPlatformSections.Remove(gl);
-                                else ctx.CollapsedPlatformSections.Add(gl);
+                                if (ws.CollapsedPlatformSections.Contains(gl)) ws.CollapsedPlatformSections.Remove(gl);
+                                else ws.CollapsedPlatformSections.Add(gl);
                                 if (selfRerender != null) selfRerender();
                             })
                         };
