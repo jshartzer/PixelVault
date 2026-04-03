@@ -45,5 +45,8 @@ namespace PixelVaultNative
 
         /// <summary>Load folder cards from disk cache when stamp matches; otherwise rebuild via <see cref="LoadLibraryFolders"/>.</summary>
         List<LibraryFolderInfo> LoadLibraryFoldersCached(string root, bool forceRefresh);
+
+        /// <summary>Cached folder list for game-index / editor flows; forces a rebuild when empty. <paramref name="setUiStatus"/> is optional (UI thread).</summary>
+        List<LibraryFolderInfo> EnsureGameIndexFolderContext(string root, Action<string> setUiStatus);
     }
 }

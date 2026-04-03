@@ -73,6 +73,31 @@ public sealed class FileSystemServiceTests
     }
 
     [Fact]
+    public void CopyFile_Works_And_Overwrite()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "pv-copy-" + Guid.NewGuid().ToString("N"));
+        var src = Path.Combine(dir, "a.txt");
+        var dst = Path.Combine(dir, "b.txt");
+        Directory.CreateDirectory(dir);
+        File.WriteAllText(src, "x");
+        try
+        {
+            var fs = new FileSystemService();
+            fs.CopyFile(src, dst, overwrite: false);
+            Assert.Equal("x", File.ReadAllText(dst));
+            File.WriteAllText(src, "y");
+            fs.CopyFile(src, dst, overwrite: true);
+            Assert.Equal("y", File.ReadAllText(dst));
+        }
+        finally
+        {
+            try { if (File.Exists(src)) File.Delete(src); } catch { /* ignore */ }
+            try { if (File.Exists(dst)) File.Delete(dst); } catch { /* ignore */ }
+            try { Directory.Delete(dir); } catch { /* ignore */ }
+        }
+    }
+
+    [Fact]
     public void MoveFile_And_DeleteFile_Work()
     {
         var dir = Path.Combine(Path.GetTempPath(), "pv-move-" + Guid.NewGuid().ToString("N"));

@@ -50,6 +50,12 @@ namespace PixelVaultNative
             File.Move(sourceFileName, destFileName);
         }
 
+        public void CopyFile(string sourceFileName, string destFileName, bool overwrite)
+        {
+            if (string.IsNullOrWhiteSpace(sourceFileName) || string.IsNullOrWhiteSpace(destFileName)) return;
+            File.Copy(sourceFileName, destFileName, overwrite);
+        }
+
         public void CreateDirectory(string path)
         {
             if (!string.IsNullOrWhiteSpace(path)) Directory.CreateDirectory(path);

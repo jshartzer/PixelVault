@@ -406,7 +406,7 @@ namespace PixelVaultNative
                 var combined = Path.Combine(dir, gameName + "_" + currentBase + Path.GetExtension(item.FilePath));
                 var target = d.UniquePath == null ? combined : d.UniquePath(combined);
                 var originalPath = item.FilePath;
-                File.Move(item.FilePath, target);
+                fs.MoveFile(item.FilePath, target);
                 d.MoveMetadataSidecarIfPresent?.Invoke(originalPath, target);
                 d.Log?.Invoke("Manual rename: " + oldName + " -> " + Path.GetFileName(target));
                 item.FilePath = target;

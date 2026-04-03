@@ -108,6 +108,7 @@ namespace PixelVaultNative
         readonly ISettingsService settingsService;
         readonly IFileSystemService fileSystemService;
         readonly ILibraryScanner libraryScanner;
+        readonly ILibrarySession librarySession;
         readonly IImportService importService;
 
         sealed class LibraryDetailRenderSnapshot
@@ -188,8 +189,11 @@ namespace PixelVaultNative
             settingsPath = Path.Combine(dataRoot, "PixelVault.settings.ini");
             changelogPath = Path.Combine(appRoot, "CHANGELOG.md");
             undoManifestPath = Path.Combine(cacheRoot, "last-import.tsv");
+            settingsService = new SettingsService();
+            fileSystemService = new FileSystemService();
             coverService = new CoverService(new CoverServiceDependencies
             {
+                FileSystem = fileSystemService,
                 AppVersion = AppVersion,
                 CoversRoot = coversRoot,
                 RequestTimeoutMilliseconds = SteamRequestTimeoutMilliseconds,
@@ -260,8 +264,6 @@ namespace PixelVaultNative
                 RunExe = delegate(string file, string[] args, string cwd, bool logOutput) { RunExe(file, args, cwd, logOutput); },
                 RunExeCapture = delegate(string file, string[] args, string cwd, bool logOutput, CancellationToken cancellationToken) { return RunExeCapture(file, args, cwd, logOutput, cancellationToken); }
             });
-            settingsService = new SettingsService();
-            fileSystemService = new FileSystemService();
             libraryScanner = new LibraryScanner(new LibraryScanHost(this), metadataService, fileSystemService);
             importService = new ImportService(new ImportServiceDependencies
             {
@@ -287,6 +289,7 @@ namespace PixelVaultNative
                 FileSystem = fileSystemService
             });
             libraryWorkspace = new LibraryWorkspaceContext(this);
+            librarySession = new LibrarySession(libraryWorkspace, libraryScanner, fileSystemService);
             Directory.CreateDirectory(dataRoot);
             Directory.CreateDirectory(logsRoot);
             Directory.CreateDirectory(cacheRoot);
@@ -2610,10 +2613,11 @@ namespace PixelVaultNative
                 steamSearchCancellation = searchCancellation;
                 var searchVersion = ++steamSearchRequestVersion;
                 steamSearchButton.Content = "Cancel Search";
-                Task.Factory.StartNew(delegate
+                Task.Run(async () =>
                 {
                     searchCancellation.Token.ThrowIfCancellationRequested();
-                    return Tuple.Create(searchQuery, SearchSteamAppMatches(searchQuery, searchCancellation.Token));
+                    var matches = await coverService.SearchSteamAppMatchesAsync(searchQuery, searchCancellation.Token).ConfigureAwait(false);
+                    return Tuple.Create(searchQuery, matches);
                 }, searchCancellation.Token).ContinueWith(delegate(Task<Tuple<string, List<Tuple<string, string>>>> searchTask)
                 {
                     Dispatcher.BeginInvoke(new Action(delegate
@@ -3901,7 +3905,7 @@ namespace PixelVaultNative
                 if (!string.IsNullOrWhiteSpace(existingCached) && File.Exists(existingCached))
                 {
                     backupPath = existingCached + ".bak-" + Guid.NewGuid().ToString("N");
-                    File.Copy(existingCached, backupPath, true);
+                    fileSystemService.CopyFile(existingCached, backupPath, true);
                 }
 
                 var steamDownloaded = await TryDownloadSteamCoverAsync(folder, cancellationToken).ConfigureAwait(false);
@@ -4660,7 +4664,7 @@ namespace PixelVaultNative
                 var destinationInfo = new FileInfo(destinationPath);
                 if (destinationInfo.Length == sourceInfo.Length && destinationInfo.LastWriteTimeUtc >= sourceInfo.LastWriteTimeUtc) return;
             }
-            File.Copy(sourcePath, destinationPath, true);
+            fileSystemService.CopyFile(sourcePath, destinationPath, true);
         }
 
         void CopyDirectoryContentsIfNewer(string sourceDirectory, string destinationDirectory)
@@ -4679,7 +4683,7 @@ namespace PixelVaultNative
                     var destinationInfo = new FileInfo(destinationFile);
                     if (destinationInfo.Length == sourceInfo.Length && destinationInfo.LastWriteTimeUtc >= sourceInfo.LastWriteTimeUtc) continue;
                 }
-                File.Copy(sourceFile, destinationFile, true);
+                fileSystemService.CopyFile(sourceFile, destinationFile, true);
             }
         }
 
@@ -4694,7 +4698,7 @@ namespace PixelVaultNative
                 if (File.Exists(destinationFile)) continue;
                 var destinationFolder = Path.GetDirectoryName(destinationFile);
                 if (!string.IsNullOrWhiteSpace(destinationFolder)) Directory.CreateDirectory(destinationFolder);
-                File.Copy(sourceFile, destinationFile, false);
+                fileSystemService.CopyFile(sourceFile, destinationFile, false);
             }
         }
         void OpenFolder(string path)

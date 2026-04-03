@@ -6,11 +6,15 @@ namespace PixelVaultNative
     internal sealed class LibraryBrowserHost
     {
         readonly MainWindow _owner;
+        readonly ILibrarySession _session;
 
-        internal LibraryBrowserHost(MainWindow owner)
+        internal LibraryBrowserHost(MainWindow owner, ILibrarySession session)
         {
             _owner = owner ?? throw new ArgumentNullException(nameof(owner));
+            _session = session ?? throw new ArgumentNullException(nameof(session));
         }
+
+        internal ILibrarySession Session => _session;
 
         internal void Show(bool reuseMainWindow)
         {
@@ -25,7 +29,7 @@ namespace PixelVaultNative
         void ShowLibraryBrowser(bool reuseMainWindow = false)
         {
             if (_libraryBrowserHost == null)
-                _libraryBrowserHost = new LibraryBrowserHost(this);
+                _libraryBrowserHost = new LibraryBrowserHost(this, librarySession);
             _libraryBrowserHost.Show(reuseMainWindow);
         }
     }

@@ -38,6 +38,8 @@ namespace PixelVaultNative
 
     sealed class CoverServiceDependencies
     {
+        /// <summary>Optional; when set, custom cover save uses the seam instead of raw <see cref="File.Copy"/>.</summary>
+        public IFileSystemService FileSystem;
         public string AppVersion;
         public string CoversRoot;
         public int RequestTimeoutMilliseconds;
@@ -481,7 +483,8 @@ namespace PixelVaultNative
             var extension = Path.GetExtension(sourcePath);
             if (string.IsNullOrWhiteSpace(extension)) extension = ".png";
             var target = Path.Combine(dependencies.CoversRoot, "custom-" + key + extension.ToLowerInvariant());
-            File.Copy(sourcePath, target, true);
+            if (dependencies.FileSystem != null) dependencies.FileSystem.CopyFile(sourcePath, target, true);
+            else File.Copy(sourcePath, target, true);
             ClearImageCache();
         }
 

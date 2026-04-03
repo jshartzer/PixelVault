@@ -16,6 +16,7 @@ namespace PixelVaultNative
         void WriteAllLines(string path, IReadOnlyList<string> lines);
         void DeleteFile(string path);
         void MoveFile(string sourceFileName, string destFileName);
+        void CopyFile(string sourceFileName, string destFileName, bool overwrite);
         void CreateDirectory(string path);
         DateTime GetLastWriteTime(string path);
     }

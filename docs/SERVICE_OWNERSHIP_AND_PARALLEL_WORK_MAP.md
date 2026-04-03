@@ -40,6 +40,7 @@ These are not "services", but they are important extraction seams because they r
 | Intake preview | `IntakePreviewWindow`, `IntakePreviewServices` | `src/PixelVault.Native/UI/Intake/IntakePreviewWindow.cs` | Upload queue preview modal UI | Extracted host |
 | Metadata review | `MetadataReviewWindow`, `MetadataReviewServices` | `src/PixelVault.Native/UI/Intake/MetadataReviewWindow.cs` | Pre-import metadata review UI | Extracted host |
 | Filename rules editor window | `FilenameConventionEditorWindow`, `FilenameConventionEditorServices` | `src/PixelVault.Native/UI/Editors/FilenameConventionEditorWindow.cs` | Filename rules modal UI | Extracted host |
+| Library session facade | `ILibrarySession`, `LibrarySession` | `src/PixelVault.Native/UI/Library/ILibrarySession.cs`, `LibrarySession.cs` | **`LibraryRoot`**, **`LibraryWorkspaceContext`**, **`ILibraryScanner`**, **`IFileSystemService`** for Library UI | **`LibraryBrowserHost`** receives **`ILibrarySession`**; **`MainWindow.LibraryBrowser`** uses **`librarySession`** |
 | Library virtualization primitives | partial `MainWindow` helpers | `src/PixelVault.Native/UI/LibraryVirtualization.cs` | Virtualized rows/scroll host behavior | Extracted partial, not yet a standalone host |
 
 ---
@@ -71,7 +72,7 @@ These are the best next service seams, ordered by usefulness and risk.
 | `ILibraryScanner` / `LibraryScanner` | Pulls scan/rebuild/group logic out of library UI code | `src/PixelVault.Native/Services/Library/LibraryScanner.cs` | Medium-High | Biggest leverage after settings/import, but touches many helpers |
 | `ILibraryBrowserHost` / `LibraryBrowserHost` | Makes the main library window a host instead of one giant construction method | `src/PixelVault.Native/UI/Library/LibraryBrowserHost.cs` | High | Strong UI extraction target, but avoid pairing it with service extraction in the same edit pass |
 | `ILogService` | Centralizes log writes and operational messages | `src/PixelVault.Native/Services/Logging/LogService.cs` | Low-Medium | Helpful, but not the first slice unless logging is actively hurting productivity |
-| `IFileSystemService` | Reduces direct `System.IO` calls and helps testability | `src/PixelVault.Native/Services/IO/FileSystemService.cs` | Medium | **Mar 2026:** `LibraryScanner` + **`ImportService`** use enumeration, existence, lines, move/delete, mkdir, last-write; **`MainWindow`** wires one shared **`FileSystemService`** |
+| `IFileSystemService` | Reduces direct `System.IO` calls and helps testability | `src/PixelVault.Native/Services/IO/FileSystemService.cs` | Medium | **Mar 2026:** `LibraryScanner` + **`ImportService`** + optional **`CoverService`** dep; copy/move/delete/mkdir/lines/timestamps/enumeration; **`MainWindow`** migration + cover backup use the shared instance |
 
 ---
 
