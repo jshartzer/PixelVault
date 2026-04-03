@@ -15,5 +15,8 @@ namespace PixelVaultNative
 
         /// <summary>Persist game index rows for <see cref="LibraryRoot"/> (clone + SQLite + filename-rule cache invalidate).</summary>
         void PersistGameIndexRows(IEnumerable<GameIndexEditorRow> rows);
+
+        /// <summary>Load the library metadata index for <see cref="LibraryRoot"/> (empty dictionary when root is unset).</summary>
+        Dictionary<string, LibraryMetadataIndexEntry> LoadLibraryMetadataIndex(bool forceDiskReload = false);
     }
 }

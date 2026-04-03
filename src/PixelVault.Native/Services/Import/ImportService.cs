@@ -60,6 +60,14 @@ namespace PixelVaultNative
         /// After user accepts adding new master records: ensure placeholder rows exist in the in-memory <paramref name="gameRows"/> list (not persisted until <see cref="FinalizeManualMetadataItemsAgainstGameIndex"/>).
         /// </summary>
         void EnsureNewManualMetadataMasterRecordsInGameIndex(List<GameIndexEditorRow> gameRows, IEnumerable<ManualMetadataItem> pendingItems);
+
+        /// <summary>
+        /// Manual metadata finish: when extra tag text names a platform (Steam, PC, PS5/PlayStation, Xbox), align per-row platform flags the same way as the platform checkboxes (first token wins).
+        /// </summary>
+        void ApplyManualMetadataTagTextToPlatformFlags(IEnumerable<ManualMetadataItem> items);
+
+        /// <summary>True if any row has Other platform checked but no non-empty cleaned custom platform name (blocks finish).</summary>
+        bool ManualMetadataItemsMissingOtherPlatformName(IEnumerable<ManualMetadataItem> items);
     }
 
     /// <summary>Outcome of moving files back to source folders during undo (no UI).</summary>
@@ -136,6 +144,12 @@ namespace PixelVaultNative
 
         /// <summary>“Game Name | Console” label for manual metadata game-title combo (same as library edit UI).</summary>
         public Func<string, string, string> BuildManualMetadataGameTitleChoiceLabel;
+
+        /// <summary>Split manual metadata “extra tags” text into distinct tokens (same rules as the editor).</summary>
+        public Func<string, string[]> ParseManualMetadataTagText;
+
+        /// <summary>Normalize whitespace for tag / platform text (host uses the same rules as manual metadata UI).</summary>
+        public Func<string, string> CleanTag;
     }
 
     internal sealed class ImportService : IImportService
@@ -675,6 +689,49 @@ namespace PixelVaultNative
                 if (!assignment.ManualMetadataMasterRecordNeedsNewPlaceholder(gameRows, resolvedName, resolvedPlatform, preferredGameId)) continue;
                 assignment.EnsureManualMetadataMasterRow(gameRows, resolvedName, resolvedPlatform, preferredGameId);
             }
+        }
+
+        public void ApplyManualMetadataTagTextToPlatformFlags(IEnumerable<ManualMetadataItem> items)
+        {
+            var parse = d.ParseManualMetadataTagText;
+            if (parse == null)
+            {
+                throw new InvalidOperationException("ImportServiceDependencies must set ParseManualMetadataTagText.");
+            }
+
+            foreach (var item in items ?? Enumerable.Empty<ManualMetadataItem>())
+            {
+                if (item == null) continue;
+                var tagNames = new HashSet<string>(parse(item.TagText ?? string.Empty), StringComparer.OrdinalIgnoreCase);
+                string platform = null;
+                if (tagNames.Contains("Steam")) platform = "Steam";
+                else if (tagNames.Contains("PC")) platform = "PC";
+                else if (tagNames.Contains("PS5") || tagNames.Contains("PlayStation")) platform = "PS5";
+                else if (tagNames.Contains("Xbox")) platform = "Xbox";
+                if (platform == null) continue;
+
+                item.TagSteam = string.Equals(platform, "Steam", StringComparison.OrdinalIgnoreCase);
+                item.TagPc = string.Equals(platform, "PC", StringComparison.OrdinalIgnoreCase);
+                item.TagPs5 = string.Equals(platform, "PS5", StringComparison.OrdinalIgnoreCase);
+                item.TagXbox = string.Equals(platform, "Xbox", StringComparison.OrdinalIgnoreCase);
+                item.TagOther = false;
+                item.CustomPlatformTag = string.Empty;
+                item.ForceTagMetadataWrite = true;
+            }
+        }
+
+        public bool ManualMetadataItemsMissingOtherPlatformName(IEnumerable<ManualMetadataItem> items)
+        {
+            var clean = d.CleanTag;
+            if (clean == null)
+            {
+                throw new InvalidOperationException("ImportServiceDependencies must set CleanTag.");
+            }
+
+            return (items ?? Enumerable.Empty<ManualMetadataItem>()).Any(item =>
+                item != null
+                && item.TagOther
+                && string.IsNullOrWhiteSpace(clean(item.CustomPlatformTag)));
         }
 
         string ResolveUndoCurrentPath(UndoImportEntry entry, HashSet<string> usedPaths, string destinationRoot, string libraryRoot)

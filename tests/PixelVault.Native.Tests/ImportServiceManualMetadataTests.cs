@@ -126,7 +126,14 @@ public sealed class ImportServiceManualMetadataTests
             DetermineManualMetadataPlatformLabel = platformLabel,
             ManualMetadataChangesGroupingIdentity = groupingIdentity,
             GameIndexEditorAssignment = stub,
-            BuildManualMetadataGameTitleChoiceLabel = (name, platform) => (name ?? "") + " | " + (platform ?? "")
+            BuildManualMetadataGameTitleChoiceLabel = (name, platform) => (name ?? "") + " | " + (platform ?? ""),
+            ParseManualMetadataTagText = s => (s ?? string.Empty)
+                .Split(new[] { ',', ';', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(x => x.Trim())
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray(),
+            CleanTag = s => string.IsNullOrWhiteSpace(s) ? string.Empty : s.Trim()
         });
     }
 
@@ -279,5 +286,46 @@ public sealed class ImportServiceManualMetadataTests
         var items = new[] { new ManualMetadataItem { GameName = "G", FilePath = @"c\f.png" } };
         svc.EnsureNewManualMetadataMasterRecordsInGameIndex(rows, items);
         Assert.Equal(1, ensureCalls);
+    }
+
+    [Fact]
+    public void ApplyManualMetadataTagTextToPlatformFlags_Sets_Flags_From_First_Platform_Token()
+    {
+        var svc = CreateServiceWithManualMetadataDeps(new StubCoverService(), s => s);
+        var item = new ManualMetadataItem
+        {
+            TagText = "foo, Steam, PC",
+            TagSteam = false,
+            TagPc = true,
+            TagOther = true,
+            CustomPlatformTag = "x",
+            ForceTagMetadataWrite = false
+        };
+        svc.ApplyManualMetadataTagTextToPlatformFlags(new[] { item });
+        Assert.True(item.TagSteam);
+        Assert.False(item.TagPc);
+        Assert.False(item.TagOther);
+        Assert.Equal(string.Empty, item.CustomPlatformTag);
+        Assert.True(item.ForceTagMetadataWrite);
+    }
+
+    [Fact]
+    public void ApplyManualMetadataTagTextToPlatformFlags_PlayStation_Maps_To_PS5()
+    {
+        var svc = CreateServiceWithManualMetadataDeps(new StubCoverService(), s => s);
+        var item = new ManualMetadataItem { TagText = "PlayStation" };
+        svc.ApplyManualMetadataTagTextToPlatformFlags(new[] { item });
+        Assert.True(item.TagPs5);
+        Assert.False(item.TagSteam);
+    }
+
+    [Fact]
+    public void ManualMetadataItemsMissingOtherPlatformName_True_When_Other_And_Blank_Custom()
+    {
+        var svc = CreateServiceWithManualMetadataDeps(new StubCoverService(), s => s);
+        var bad = new ManualMetadataItem { TagOther = true, CustomPlatformTag = "   " };
+        var ok = new ManualMetadataItem { TagOther = true, CustomPlatformTag = "Switch" };
+        Assert.True(svc.ManualMetadataItemsMissingOtherPlatformName(new[] { bad }));
+        Assert.False(svc.ManualMetadataItemsMissingOtherPlatformName(new[] { ok }));
     }
 }

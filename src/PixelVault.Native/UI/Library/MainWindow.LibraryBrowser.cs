@@ -907,9 +907,7 @@ namespace PixelVaultNative
 
                         try
                         {
-                            var metadataIndex = string.IsNullOrWhiteSpace(librarySession.LibraryRoot)
-                                ? new Dictionary<string, LibraryMetadataIndexEntry>(StringComparer.OrdinalIgnoreCase)
-                                : new Dictionary<string, LibraryMetadataIndexEntry>(LoadLibraryMetadataIndex(librarySession.LibraryRoot), StringComparer.OrdinalIgnoreCase);
+                            var metadataIndex = librarySession.LoadLibraryMetadataIndex(false);
                             var detailFiles = GetFilesForLibraryFolderEntry(renderFolder, false)
                                 .Where(file => !string.IsNullOrWhiteSpace(file) && File.Exists(file))
                                 .Distinct(StringComparer.OrdinalIgnoreCase)

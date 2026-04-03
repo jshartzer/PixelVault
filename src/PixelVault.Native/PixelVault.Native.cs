@@ -305,10 +305,12 @@ namespace PixelVaultNative
                 DetermineManualMetadataPlatformLabel = DetermineManualMetadataPlatformLabel,
                 ManualMetadataChangesGroupingIdentity = ManualMetadataChangesGroupingIdentity,
                 GameIndexEditorAssignment = gameIndexEditorAssignmentService,
-                BuildManualMetadataGameTitleChoiceLabel = (name, platform) => BuildGameTitleChoiceLabel(name, platform)
+                BuildManualMetadataGameTitleChoiceLabel = (name, platform) => BuildGameTitleChoiceLabel(name, platform),
+                ParseManualMetadataTagText = ParseTagText,
+                CleanTag = CleanTag
             });
             libraryWorkspace = new LibraryWorkspaceContext(this);
-            librarySession = new LibrarySession(libraryWorkspace, libraryScanner, fileSystemService, gameIndexEditorAssignmentService);
+            librarySession = new LibrarySession(libraryWorkspace, libraryScanner, fileSystemService, gameIndexEditorAssignmentService, LoadLibraryMetadataIndex);
             Directory.CreateDirectory(dataRoot);
             Directory.CreateDirectory(logsRoot);
             Directory.CreateDirectory(cacheRoot);
@@ -2864,15 +2866,8 @@ namespace PixelVaultNative
                     return;
                 }
                 if (useCustomTimeBox.IsChecked == true) saveSelectedDateTime();
-                foreach (var item in pendingItems)
-                {
-                    var tagNames = new HashSet<string>(ParseTagText(item.TagText), StringComparer.OrdinalIgnoreCase);
-                    if (tagNames.Contains("Steam")) applyConsoleSelection(new[] { item }, "Steam");
-                    else if (tagNames.Contains("PC")) applyConsoleSelection(new[] { item }, "PC");
-                    else if (tagNames.Contains("PS5") || tagNames.Contains("PlayStation")) applyConsoleSelection(new[] { item }, "PS5");
-                    else if (tagNames.Contains("Xbox")) applyConsoleSelection(new[] { item }, "Xbox");
-                }
-                if (pendingItems.Any(item => item.TagOther && string.IsNullOrWhiteSpace(CleanTag(item.CustomPlatformTag))))
+                importService.ApplyManualMetadataTagTextToPlatformFlags(pendingItems);
+                if (importService.ManualMetadataItemsMissingOtherPlatformName(pendingItems))
                 {
                     MessageBox.Show("Enter a platform name in the Other box before applying changes.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
                     return;
@@ -4085,16 +4080,6 @@ namespace PixelVaultNative
             }
             SaveLibraryFolderCache(root, stamp, cached);
             UpsertSavedGameIndexRow(root, folder);
-        }
-
-        string TryResolveSteamAppId(string title, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            return coverService.TryResolveSteamAppId(title, cancellationToken);
-        }
-
-        List<Tuple<string, string>> SearchSteamAppMatches(string title, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            return coverService.SearchSteamAppMatches(title, cancellationToken) ?? new List<Tuple<string, string>>();
         }
 
         BitmapImage LoadImageSource(string path, int decodePixelWidth)
