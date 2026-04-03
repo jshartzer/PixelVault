@@ -1290,10 +1290,10 @@ namespace PixelVaultNative
                 };
                 setLibraryBusyState = delegate(bool isBusy)
                 {
-                    refreshButton.IsEnabled = !isBusy;
+                    navChrome.RefreshButton.IsEnabled = !isBusy;
                     editMetadataButton.IsEnabled = !isBusy;
-                    fetchButton.IsEnabled = !isBusy;
-                    importButton.IsEnabled = !isBusy;
+                    navChrome.FetchButton.IsEnabled = !isBusy;
+                    navChrome.ImportButton.IsEnabled = !isBusy;
                     navChrome.ImportCommentsButton.IsEnabled = !isBusy;
                     navChrome.ManualImportButton.IsEnabled = !isBusy;
                     if (navChrome.IntakeReviewButton != null) navChrome.IntakeReviewButton.IsEnabled = !isBusy;
@@ -1475,20 +1475,20 @@ namespace PixelVaultNative
                     applySearchFilter();
                 };
 
-                refreshButton.Click += delegate
+                navChrome.RefreshButton.Click += delegate
                 {
                     if (refreshLibraryFoldersAsync != null) refreshLibraryFoldersAsync(false);
                 };
-                settingsButton.Click += delegate { ShowSettingsWindow(); if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge(); };
+                navChrome.SettingsButton.Click += delegate { ShowSettingsWindow(); if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge(); };
                 navChrome.GameIndexButton.Click += delegate { OpenGameIndexEditor(); };
                 photoIndexButton.Click += delegate { OpenPhotoIndexEditor(); };
                 navChrome.PhotographyGalleryButton.Click += delegate { ShowPhotographyGallery(libraryWindow); };
                 navChrome.FilenameRulesButton.Click += delegate { OpenFilenameConventionEditor(); };
                 navChrome.MyCoversButton.Click += delegate { OpenSavedCoversFolder(); };
-                importButton.Click += delegate { RunWorkflow(false); if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge(); };
+                navChrome.ImportButton.Click += delegate { RunWorkflow(false); if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge(); };
                 navChrome.ImportCommentsButton.Click += delegate { RunWorkflow(true); if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge(); };
                 navChrome.ManualImportButton.Click += delegate { OpenManualIntakeWindow(); if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge(); };
-                fetchButton.Click += delegate
+                navChrome.FetchButton.Click += delegate
                 {
                     var choice = MessageBox.Show(
                         "Refresh cover art for the entire library?",
