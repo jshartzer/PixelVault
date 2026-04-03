@@ -63,6 +63,7 @@
     <Compile Include="UI\Library\LibrarySession.cs" />
     <Compile Include="UI\Library\LibraryBrowserHost.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserChrome.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryBrowserLayout.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserOrchestrator.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryScannerBridge.cs" />
     <Compile Include="UI\LibraryVirtualization.cs" />

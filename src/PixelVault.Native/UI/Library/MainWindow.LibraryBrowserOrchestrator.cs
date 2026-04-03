@@ -49,208 +49,7 @@ namespace PixelVaultNative
                 Grid.SetRow(contentGrid, 1);
                 root.Children.Add(contentGrid);
 
-                var left = new Border
-                {
-                    Background = Brush("#11181D"),
-                    BorderBrush = Brush("#27313A"),
-                    BorderThickness = new Thickness(0, 0, 1, 0),
-                    Padding = new Thickness(18, 16, 18, 12)
-                };
-                var leftGrid = new Grid();
-                leftGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-                leftGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-                leftGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-                status = new TextBlock { Text = "Ready", Foreground = Brush("#8EA0AA"), FontSize = 11.5, Margin = new Thickness(2, 12, 0, 0), TextWrapping = TextWrapping.Wrap };
-
-                var filterShell = new Border
-                {
-                    Background = Brushes.Transparent,
-                    BorderBrush = Brush("#27313A"),
-                    BorderThickness = new Thickness(0, 0, 0, 1),
-                    Padding = new Thickness(0, 2, 0, 14),
-                    Margin = new Thickness(0, 0, 0, 6)
-                };
-                var filterGrid = new Grid();
-                filterGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-                filterGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-                var searchPanel = new StackPanel { Margin = new Thickness(0, 0, 0, 12) };
-                var searchBoxShell = new Border
-                {
-                    Background = Brush("#182129"),
-                    BorderBrush = Brush("#2D3A43"),
-                    BorderThickness = new Thickness(1),
-                    CornerRadius = new CornerRadius(12),
-                    Padding = new Thickness(12, 0, 12, 0),
-                    Height = 42
-                };
-                var searchBoxRow = new Grid();
-                searchBoxRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                searchBoxRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                var searchIcon = BuildSymbolIcon("\uE721", "#8FA4B0", 13);
-                searchIcon.Margin = new Thickness(0, 0, 10, 0);
-                searchBoxRow.Children.Add(searchIcon);
-                var searchBox = new TextBox { Padding = new Thickness(0, 6, 0, 6), Background = Brushes.Transparent, Foreground = Brush("#F1E9DA"), BorderThickness = new Thickness(0), FontSize = 13.5, VerticalContentAlignment = VerticalAlignment.Center };
-                Grid.SetColumn(searchBox, 1);
-                searchBoxRow.Children.Add(searchBox);
-                searchBoxShell.Child = searchBoxRow;
-                var searchDebounceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(220) };
-                var detailResizeDebounceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(16) };
-                var folderResizeDebounceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(16) };
-                searchPanel.Children.Add(searchBoxShell);
-                Grid.SetRow(searchPanel, 0);
-                filterGrid.Children.Add(searchPanel);
-                var browserToolbar = new Grid();
-                browserToolbar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                browserToolbar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                browserToolbar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                browserToolbar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                var sortPlatformButton = Btn("Sort + Filter", null, "#20343A", Brushes.White);
-                sortPlatformButton.Width = 112;
-                sortPlatformButton.Height = 34;
-                sortPlatformButton.FontSize = 11.5;
-                sortPlatformButton.Margin = new Thickness(0, 0, 10, 0);
-                ApplyLibraryPillChrome(sortPlatformButton, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
-                var sortRecentButton = Btn("Recently Added", null, "#20343A", Brushes.White);
-                sortRecentButton.Width = 122;
-                sortRecentButton.Height = 34;
-                sortRecentButton.FontSize = 11.5;
-                sortRecentButton.Margin = new Thickness(0, 0, 10, 0);
-                ApplyLibraryPillChrome(sortRecentButton, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
-                var sortPhotosButton = Btn("Most Photos", null, "#20343A", Brushes.White);
-                sortPhotosButton.Width = 108;
-                sortPhotosButton.Height = 34;
-                sortPhotosButton.FontSize = 11.5;
-                sortPhotosButton.Margin = new Thickness(0, 0, 0, 0);
-                ApplyLibraryPillChrome(sortPhotosButton, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
-                browserToolbar.Children.Add(sortPlatformButton);
-                Grid.SetColumn(sortRecentButton, 1);
-                browserToolbar.Children.Add(sortRecentButton);
-                Grid.SetColumn(sortPhotosButton, 2);
-                browserToolbar.Children.Add(sortPhotosButton);
-                Grid.SetRow(browserToolbar, 1);
-                filterGrid.Children.Add(browserToolbar);
-                filterShell.Child = filterGrid;
-                Grid.SetRow(filterShell, 0);
-                leftGrid.Children.Add(filterShell);
-
-                var tileRows = CreateVirtualizedRowHost(new Thickness(0, 12, 0, 0), null);
-                tileRows.RecycleVisibleRowElements = true;
-                var tileScroll = tileRows.ScrollViewer;
-                tileScroll.Padding = new Thickness(0, 4, 0, 0);
-                Grid.SetRow(tileScroll, 1);
-                leftGrid.Children.Add(tileScroll);
-                Grid.SetRow(status, 2);
-                leftGrid.Children.Add(status);
-                left.Child = leftGrid;
-                contentGrid.Children.Add(left);
-
-                var splitter = new GridSplitter
-                {
-                    Width = 12,
-                    HorizontalAlignment = HorizontalAlignment.Stretch,
-                    VerticalAlignment = VerticalAlignment.Stretch,
-                    Background = Brush("#182028"),
-                    BorderBrush = Brush("#27313A"),
-                    BorderThickness = new Thickness(1, 0, 1, 0),
-                    ResizeBehavior = GridResizeBehavior.PreviousAndNext,
-                    ResizeDirection = GridResizeDirection.Columns,
-                    ShowsPreview = false
-                };
-                Grid.SetColumn(splitter, 1);
-                contentGrid.Children.Add(splitter);
-
-                var right = new Border { Background = Brush("#10171C"), Padding = new Thickness(26, 22, 26, 18) };
-                Grid.SetColumn(right, 2);
-                var rightGrid = new Grid();
-                rightGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-                rightGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-                rightGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-
-                var banner = new Border { Background = Brushes.Transparent, Padding = new Thickness(0), Margin = new Thickness(0, 0, 0, 18) };
-                var bannerGrid = new Grid();
-                bannerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(230) });
-                bannerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                var previewFrame = new Border
-                {
-                    Width = 210,
-                    Height = 315,
-                    CornerRadius = new CornerRadius(14),
-                    Background = Brush("#0D1216"),
-                    BorderBrush = Brush("#24323A"),
-                    BorderThickness = new Thickness(1),
-                    Margin = new Thickness(0, 0, 18, 0),
-                    ClipToBounds = true
-                };
-                var previewImage = new Image { Width = 210, Height = 315, Stretch = Stretch.UniformToFill };
-                previewFrame.Child = previewImage;
-                bannerGrid.Children.Add(previewFrame);
-                var textStack = new StackPanel();
-                var detailEyebrow = new TextBlock { Text = "Selected game", FontSize = 11, FontWeight = FontWeights.SemiBold, Foreground = Brush("#728996"), Margin = new Thickness(0, 0, 0, 8) };
-                var detailTitle = new TextBlock { Text = "Select a folder", FontSize = 28, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White };
-                var detailMeta = new TextBlock { Text = "Browse the library you chose in Settings.", Foreground = Brush("#9CB1BC"), Margin = new Thickness(0, 8, 0, 14), TextWrapping = TextWrapping.Wrap, FontSize = 13.5 };
-                var openFolderButton = Btn("Open Folder", null, "#275D47", Brushes.White);
-                var editMetadataButton = Btn("Edit Metadata", null, "#20343A", Brushes.White);
-                openFolderButton.Content = BuildToolbarButtonContent("\uE8B7", "Open Folder");
-                ApplyLibraryPillChrome(openFolderButton, "#1F3340", "#314754", "#29424F", "#172630");
-                ApplyLibraryPillChrome(editMetadataButton, "#1C2A32", "#2A3C46", "#22323C", "#141E24");
-                openFolderButton.Height = 38;
-                editMetadataButton.Height = 38;
-                openFolderButton.Margin = new Thickness(0, 0, 12, 0);
-                editMetadataButton.Margin = new Thickness(0);
-                var bannerButtonRow = new Grid { Margin = new Thickness(0, 8, 0, 0), HorizontalAlignment = HorizontalAlignment.Left };
-                bannerButtonRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                bannerButtonRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                bannerButtonRow.Children.Add(openFolderButton);
-                Grid.SetColumn(editMetadataButton, 1);
-                bannerButtonRow.Children.Add(editMetadataButton);
-                textStack.Children.Add(detailEyebrow);
-                textStack.Children.Add(detailTitle);
-                textStack.Children.Add(detailMeta);
-                textStack.Children.Add(bannerButtonRow);
-                Grid.SetColumn(textStack, 1);
-                bannerGrid.Children.Add(textStack);
-                banner.Child = bannerGrid;
-                rightGrid.Children.Add(banner);
-
-                var controls = new DockPanel { Margin = new Thickness(0, 4, 0, 14) };
-                var thumbLabel = new TextBlock { Text = "Screenshots", FontSize = 22, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, VerticalAlignment = VerticalAlignment.Center };
-                controls.Children.Add(thumbLabel);
-                var sliderPanel = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
-                var deleteSelectedButton = new Button
-                {
-                    Width = 28,
-                    Height = 28,
-                    Margin = new Thickness(12, 0, 0, 0),
-                    Padding = new Thickness(0),
-                    Background = Brush("#A3473E"),
-                    BorderBrush = Brush("#C46A5D"),
-                    BorderThickness = new Thickness(1),
-                    Foreground = Brushes.White,
-                    Cursor = System.Windows.Input.Cursors.Hand,
-                    ToolTip = "Delete selected capture(s)",
-                    Content = new TextBlock
-                    {
-                        Text = "🗑",
-                        FontSize = 13,
-                        FontWeight = FontWeights.SemiBold,
-                        HorizontalAlignment = HorizontalAlignment.Center,
-                        VerticalAlignment = VerticalAlignment.Center,
-                        TextAlignment = TextAlignment.Center
-                    }
-                };
-                deleteSelectedButton.IsEnabled = false;
-                sliderPanel.Children.Add(deleteSelectedButton);
-                DockPanel.SetDock(sliderPanel, Dock.Right);
-                controls.Children.Add(sliderPanel);
-                Grid.SetRow(controls, 1);
-                rightGrid.Children.Add(controls);
-
-                var detailRows = CreateVirtualizedRowHost(new Thickness(0), Brush("#0F151A"));
-                var thumbScroll = detailRows.ScrollViewer;
-                Grid.SetRow(thumbScroll, 2);
-                rightGrid.Children.Add(thumbScroll);
-                right.Child = rightGrid;
-                contentGrid.Children.Add(right);
+                var panes = BuildLibraryBrowserContentPanes(contentGrid);
                 libraryWindow.Content = root;
 
                 LibraryFolderInfo current = null;
@@ -381,14 +180,14 @@ namespace PixelVaultNative
                         tile.BorderBrush = isSelected ? Brush("#D46C63") : Brush("#2B3A44");
                         tile.BorderThickness = isSelected ? new Thickness(2) : new Thickness(1);
                     }
-                    deleteSelectedButton.IsEnabled = current != null && selectedFiles.Count > 0;
-                    thumbLabel.Text = selectedFiles.Count > 0 ? selectedFiles.Count + " selected" : "Screenshots";
+                    panes.DeleteSelectedButton.IsEnabled = current != null && selectedFiles.Count > 0;
+                    panes.ThumbLabel.Text = selectedFiles.Count > 0 ? selectedFiles.Count + " selected" : "Screenshots";
                 };
-                detailRows.BeforeVisibleRowsRebuilt = delegate
+                panes.DetailRows.BeforeVisibleRowsRebuilt = delegate
                 {
                     detailTiles.Clear();
                 };
-                detailRows.AfterVisibleRowsRebuilt = delegate
+                panes.DetailRows.AfterVisibleRowsRebuilt = delegate
                 {
                     if (refreshDetailSelectionUi != null) refreshDetailSelectionUi();
                 };
@@ -439,9 +238,9 @@ namespace PixelVaultNative
                         if (active) ApplyLibraryPillChrome(button, "#3A4652", "#566676", "#455463", "#2C3742", "#F4F7FA");
                         else ApplyLibraryPillChrome(button, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
                     };
-                    applyState(sortPlatformButton, string.Equals(normalized, "platform", StringComparison.OrdinalIgnoreCase));
-                    applyState(sortRecentButton, string.Equals(normalized, "recent", StringComparison.OrdinalIgnoreCase));
-                    applyState(sortPhotosButton, string.Equals(normalized, "photos", StringComparison.OrdinalIgnoreCase));
+                    applyState(panes.SortPlatformButton, string.Equals(normalized, "platform", StringComparison.OrdinalIgnoreCase));
+                    applyState(panes.SortRecentButton, string.Equals(normalized, "recent", StringComparison.OrdinalIgnoreCase));
+                    applyState(panes.SortPhotosButton, string.Equals(normalized, "photos", StringComparison.OrdinalIgnoreCase));
                 };
 
                 setLibrarySortMode = delegate(string mode)
@@ -614,13 +413,13 @@ namespace PixelVaultNative
                         selectedDetailFiles.Clear();
                         detailSelectionAnchorIndex = -1;
                         detailFilesDisplayOrder.Clear();
-                        SetVirtualizedRows(detailRows, new List<VirtualizedRowDefinition>(), true, null);
+                        SetVirtualizedRows(panes.DetailRows, new List<VirtualizedRowDefinition>(), true, null);
                         if (refreshDetailSelectionUi != null) refreshDetailSelectionUi();
                         renderStopwatch.Stop();
                         LogPerformanceSample("LibraryDetailRender", renderStopwatch, "folder=(none); rows=0; files=0", 40);
                         return;
                     }
-                    var detailLayout = CalculateResponsiveLibraryDetailLayout(thumbScroll);
+                    var detailLayout = CalculateResponsiveLibraryDetailLayout(panes.ThumbScroll);
                     var targetDetailColumns = detailLayout.Columns;
                     var size = detailLayout.TileSize;
                     lastDetailColumns = targetDetailColumns;
@@ -631,7 +430,7 @@ namespace PixelVaultNative
                     var restoreDetailScrollPending = shouldRestoreDetailScroll;
                     preserveDetailScrollOnNextRender = false;
                     var renderFolder = current;
-                    SetVirtualizedRows(detailRows, new[]
+                    SetVirtualizedRows(panes.DetailRows, new[]
                     {
                         new VirtualizedRowDefinition
                         {
@@ -662,7 +461,7 @@ namespace PixelVaultNative
                             if (snapshot == null || snapshot.Groups == null || snapshot.Groups.Count == 0)
                             {
                                 detailFilesDisplayOrder.Clear();
-                                SetVirtualizedRows(detailRows, new[]
+                                SetVirtualizedRows(panes.DetailRows, new[]
                                 {
                                     new VirtualizedRowDefinition
                                     {
@@ -734,7 +533,7 @@ namespace PixelVaultNative
                                     });
                                 }
                             }
-                            SetVirtualizedRows(detailRows, virtualRows, !restoreDetailScrollPending, restoreDetailScrollPending ? restoreDetailScrollOffset : null);
+                            SetVirtualizedRows(panes.DetailRows, virtualRows, !restoreDetailScrollPending, restoreDetailScrollPending ? restoreDetailScrollOffset : null);
                             restoreDetailScrollPending = false;
                             if (refreshDetailSelectionUi != null) refreshDetailSelectionUi();
                             if (logCompletion)
@@ -863,7 +662,7 @@ namespace PixelVaultNative
                                 if (renderVersion != detailRenderVersion) return;
                                 if (!SameLibraryFolderSelection(current, renderFolder)) return;
                                 detailFilesDisplayOrder.Clear();
-                                SetVirtualizedRows(detailRows, new[]
+                                SetVirtualizedRows(panes.DetailRows, new[]
                                 {
                                     new VirtualizedRowDefinition
                                     {
@@ -1013,13 +812,13 @@ namespace PixelVaultNative
                     }
                     preserveDetailScrollOnNextRender = false;
                     preservedDetailScrollOffset = 0;
-                    thumbScroll.ScrollToVerticalOffset(0);
+                    panes.ThumbScroll.ScrollToVerticalOffset(0);
                     current = info;
                     activeSelectedLibraryFolder = CloneLibraryFolderInfo(info);
-                    detailTitle.Text = info.Name;
-                    detailMeta.Text = info.FileCount + " item(s) | " + info.PlatformLabel + " | " + info.FolderPath;
-                    previewImage.Source = null;
-                    previewImage.Visibility = Visibility.Collapsed;
+                    panes.DetailTitle.Text = info.Name;
+                    panes.DetailMeta.Text = info.FileCount + " item(s) | " + info.PlatformLabel + " | " + info.FolderPath;
+                    panes.PreviewImage.Source = null;
+                    panes.PreviewImage.Visibility = Visibility.Collapsed;
                     var infoCapture = info;
                     _ = Task.Run(() =>
                     {
@@ -1032,15 +831,15 @@ namespace PixelVaultNative
                                 if (!SameLibraryFolderSelection(current, infoCapture)) return;
                                 if (!pathOk)
                                 {
-                                    previewImage.Source = null;
-                                    previewImage.Visibility = Visibility.Collapsed;
+                                    panes.PreviewImage.Source = null;
+                                    panes.PreviewImage.Visibility = Visibility.Collapsed;
                                 }
                                 else
                                 {
-                                    QueueImageLoad(previewImage, artPath, CalculateLibraryBannerArtDecodeWidth(), delegate(BitmapImage loaded)
+                                    QueueImageLoad(panes.PreviewImage, artPath, CalculateLibraryBannerArtDecodeWidth(), delegate(BitmapImage loaded)
                                     {
-                                        previewImage.Source = loaded;
-                                        previewImage.Visibility = Visibility.Visible;
+                                        panes.PreviewImage.Source = loaded;
+                                        panes.PreviewImage.Visibility = Visibility.Visible;
                                     }, true, delegate { return SameLibraryFolderSelection(current, infoCapture); });
                                 }
                             }));
@@ -1086,7 +885,7 @@ namespace PixelVaultNative
                         .ThenBy(folder => folder.Name ?? string.Empty, StringComparer.OrdinalIgnoreCase)
                         .ToList();
                     filterSortStopwatch.Stop();
-                    var folderLayout = CalculateResponsiveLibraryFolderLayout(tileScroll);
+                    var folderLayout = CalculateResponsiveLibraryFolderLayout(panes.TileScroll);
                     var targetFolderColumns = folderLayout.Columns;
                     var tileWidth = folderLayout.TileSize;
                     lastFolderColumns = targetFolderColumns;
@@ -1110,10 +909,10 @@ namespace PixelVaultNative
                         selectedDetailFiles.Clear();
                         detailSelectionAnchorIndex = -1;
                         detailFilesDisplayOrder.Clear();
-                        detailTitle.Text = "Select a folder";
-                        detailMeta.Text = "Browse the library you chose in Settings.";
-                        previewImage.Source = null;
-                        previewImage.Visibility = Visibility.Collapsed;
+                        panes.DetailTitle.Text = "Select a folder";
+                        panes.DetailMeta.Text = "Browse the library you chose in Settings.";
+                        panes.PreviewImage.Source = null;
+                        panes.PreviewImage.Visibility = Visibility.Collapsed;
                         renderSelectedFolder();
                     }
 
@@ -1138,7 +937,7 @@ namespace PixelVaultNative
                                 };
                             }
                         });
-                        SetVirtualizedRows(tileRows, virtualRows, true, null);
+                        SetVirtualizedRows(panes.TileRows, virtualRows, true, null);
                         renderStopwatch.Stop();
                         LogPerformanceSample("LibraryFolderRender", renderStopwatch, "mode=" + (libraryFoldersLoading ? "loading" : "empty") + "; foldersLoaded=" + folders.Count + "; visible=0; search=" + (string.IsNullOrWhiteSpace(searchText) ? "(none)" : searchText) + "; sort=" + sortMode + "; loadMs=0; filterMs=" + filterSortStopwatch.ElapsedMilliseconds, 40);
                         return;
@@ -1159,7 +958,7 @@ namespace PixelVaultNative
                                 }
                             });
                         }
-                        SetVirtualizedRows(tileRows, virtualRows, !shouldRestoreFolderScroll, shouldRestoreFolderScroll ? (double?)restoreFolderScrollOffset : null);
+                        SetVirtualizedRows(panes.TileRows, virtualRows, !shouldRestoreFolderScroll, shouldRestoreFolderScroll ? (double?)restoreFolderScrollOffset : null);
                         renderStopwatch.Stop();
                         LogPerformanceSample("LibraryFolderRender", renderStopwatch, "mode=flat; foldersLoaded=" + folders.Count + "; visible=" + orderedVisibleFolders.Count + "; rows=" + virtualRows.Count + "; columns=" + folderColumns + "; search=" + (string.IsNullOrWhiteSpace(searchText) ? "(none)" : searchText) + "; sort=" + sortMode + "; loadMs=0; filterMs=" + filterSortStopwatch.ElapsedMilliseconds, 40);
                         return;
@@ -1216,7 +1015,7 @@ namespace PixelVaultNative
                             }
                         }
                     }
-                    SetVirtualizedRows(tileRows, virtualRows, !shouldRestoreFolderScroll, shouldRestoreFolderScroll ? (double?)restoreFolderScrollOffset : null);
+                    SetVirtualizedRows(panes.TileRows, virtualRows, !shouldRestoreFolderScroll, shouldRestoreFolderScroll ? (double?)restoreFolderScrollOffset : null);
                     renderStopwatch.Stop();
                     LogPerformanceSample("LibraryFolderRender", renderStopwatch, "mode=grouped; foldersLoaded=" + folders.Count + "; visible=" + orderedVisibleFolders.Count + "; rows=" + virtualRows.Count + "; columns=" + folderColumns + "; search=" + (string.IsNullOrWhiteSpace(searchText) ? "(none)" : searchText) + "; sort=" + sortMode + "; loadMs=0; filterMs=" + filterSortStopwatch.ElapsedMilliseconds, 40);
                 };
@@ -1291,7 +1090,7 @@ namespace PixelVaultNative
                 setLibraryBusyState = delegate(bool isBusy)
                 {
                     navChrome.RefreshButton.IsEnabled = !isBusy;
-                    editMetadataButton.IsEnabled = !isBusy;
+                    panes.EditMetadataButton.IsEnabled = !isBusy;
                     navChrome.FetchButton.IsEnabled = !isBusy;
                     navChrome.ImportButton.IsEnabled = !isBusy;
                     navChrome.ImportCommentsButton.IsEnabled = !isBusy;
@@ -1465,12 +1264,12 @@ namespace PixelVaultNative
                 };
                 applySearchFilter = delegate
                 {
-                    searchDebounceTimer.Stop();
+                    panes.SearchDebounceTimer.Stop();
                     if (string.Equals(appliedLibrarySearchText, pendingLibrarySearchText, StringComparison.OrdinalIgnoreCase)) return;
                     appliedLibrarySearchText = pendingLibrarySearchText;
                     if (renderTiles != null) renderTiles();
                 };
-                searchDebounceTimer.Tick += delegate
+                panes.SearchDebounceTimer.Tick += delegate
                 {
                     applySearchFilter();
                 };
@@ -1503,7 +1302,7 @@ namespace PixelVaultNative
                     ShowIntakePreviewWindow(false);
                     if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge();
                 };
-                openFolderButton.Click += delegate { if (current != null) OpenFolder(current.FolderPath); };
+                panes.OpenFolderButton.Click += delegate { if (current != null) OpenFolder(current.FolderPath); };
                 openLibraryMetadataEditor = delegate(LibraryFolderInfo focusFolder)
                 {
                     if (focusFolder == null)
@@ -1517,67 +1316,67 @@ namespace PixelVaultNative
                     if (refreshDetailSelectionUi != null) refreshDetailSelectionUi();
                     openSingleFileMetadataEditor(null);
                 };
-                editMetadataButton.Click += delegate { openSelectedLibraryMetadataEditor(); };
-                deleteSelectedButton.Click += delegate { deleteSelectedLibraryFiles(); };
-                sortPlatformButton.Click += delegate { setLibrarySortMode("platform"); };
-                sortRecentButton.Click += delegate { setLibrarySortMode("recent"); };
-                sortPhotosButton.Click += delegate { setLibrarySortMode("photos"); };
-                detailResizeDebounceTimer.Tick += delegate
+                panes.EditMetadataButton.Click += delegate { openSelectedLibraryMetadataEditor(); };
+                panes.DeleteSelectedButton.Click += delegate { deleteSelectedLibraryFiles(); };
+                panes.SortPlatformButton.Click += delegate { setLibrarySortMode("platform"); };
+                panes.SortRecentButton.Click += delegate { setLibrarySortMode("recent"); };
+                panes.SortPhotosButton.Click += delegate { setLibrarySortMode("photos"); };
+                panes.DetailResizeDebounceTimer.Tick += delegate
                 {
-                    detailResizeDebounceTimer.Stop();
+                    panes.DetailResizeDebounceTimer.Stop();
                     if (current == null) return;
-                    var layout = CalculateResponsiveLibraryDetailLayout(thumbScroll);
+                    var layout = CalculateResponsiveLibraryDetailLayout(panes.ThumbScroll);
                     if (layout.Columns == lastDetailColumns && layout.TileSize == lastDetailTileSize) return;
-                    preservedDetailScrollOffset = thumbScroll.VerticalOffset;
+                    preservedDetailScrollOffset = panes.ThumbScroll.VerticalOffset;
                     preserveDetailScrollOnNextRender = preservedDetailScrollOffset > 0.1d;
                     renderSelectedFolder();
                 };
-                folderResizeDebounceTimer.Tick += delegate
+                panes.FolderResizeDebounceTimer.Tick += delegate
                 {
-                    folderResizeDebounceTimer.Stop();
-                    var layout = CalculateResponsiveLibraryFolderLayout(tileScroll);
+                    panes.FolderResizeDebounceTimer.Stop();
+                    var layout = CalculateResponsiveLibraryFolderLayout(panes.TileScroll);
                     if (layout.Columns == lastFolderColumns && layout.TileSize == lastFolderTileSize) return;
-                    preservedFolderScrollOffset = tileScroll.VerticalOffset;
+                    preservedFolderScrollOffset = panes.TileScroll.VerticalOffset;
                     preserveFolderScrollOnNextRender = preservedFolderScrollOffset > 0.1d;
                     if (renderTiles != null) renderTiles();
                 };
-                thumbScroll.SizeChanged += delegate(object sender, SizeChangedEventArgs e)
+                panes.ThumbScroll.SizeChanged += delegate(object sender, SizeChangedEventArgs e)
                 {
                     if (Math.Abs(e.PreviousSize.Width - e.NewSize.Width) > 1)
                     {
                         if (current != null)
                         {
-                            detailResizeDebounceTimer.Stop();
-                            detailResizeDebounceTimer.Start();
+                            panes.DetailResizeDebounceTimer.Stop();
+                            panes.DetailResizeDebounceTimer.Start();
                         }
                     }
                 };
-                tileScroll.SizeChanged += delegate(object sender, SizeChangedEventArgs e)
+                panes.TileScroll.SizeChanged += delegate(object sender, SizeChangedEventArgs e)
                 {
                     if (Math.Abs(e.PreviousSize.Width - e.NewSize.Width) > 1)
                     {
-                        folderResizeDebounceTimer.Stop();
-                        folderResizeDebounceTimer.Start();
+                        panes.FolderResizeDebounceTimer.Stop();
+                        panes.FolderResizeDebounceTimer.Start();
                     }
                 };
-                searchBox.TextChanged += delegate
+                panes.SearchBox.TextChanged += delegate
                 {
-                    pendingLibrarySearchText = string.IsNullOrWhiteSpace(searchBox.Text) ? string.Empty : searchBox.Text.Trim();
-                    searchDebounceTimer.Stop();
+                    pendingLibrarySearchText = string.IsNullOrWhiteSpace(panes.SearchBox.Text) ? string.Empty : panes.SearchBox.Text.Trim();
+                    panes.SearchDebounceTimer.Stop();
                     if (string.Equals(pendingLibrarySearchText, appliedLibrarySearchText, StringComparison.OrdinalIgnoreCase)) return;
-                    searchDebounceTimer.Start();
+                    panes.SearchDebounceTimer.Start();
                 };
-                searchBox.KeyDown += delegate(object sender, System.Windows.Input.KeyEventArgs e)
+                panes.SearchBox.KeyDown += delegate(object sender, System.Windows.Input.KeyEventArgs e)
                 {
                     if (e.Key != System.Windows.Input.Key.Enter) return;
-                    pendingLibrarySearchText = string.IsNullOrWhiteSpace(searchBox.Text) ? string.Empty : searchBox.Text.Trim();
+                    pendingLibrarySearchText = string.IsNullOrWhiteSpace(panes.SearchBox.Text) ? string.Empty : panes.SearchBox.Text.Trim();
                     if (!string.Equals(pendingLibrarySearchText, appliedLibrarySearchText, StringComparison.OrdinalIgnoreCase)) applySearchFilter();
                     e.Handled = true;
                 };
-                searchBox.LostKeyboardFocus += delegate
+                panes.SearchBox.LostKeyboardFocus += delegate
                 {
-                    pendingLibrarySearchText = string.IsNullOrWhiteSpace(searchBox.Text) ? string.Empty : searchBox.Text.Trim();
-                    if (searchDebounceTimer.IsEnabled || !string.Equals(pendingLibrarySearchText, appliedLibrarySearchText, StringComparison.OrdinalIgnoreCase)) applySearchFilter();
+                    pendingLibrarySearchText = string.IsNullOrWhiteSpace(panes.SearchBox.Text) ? string.Empty : panes.SearchBox.Text.Trim();
+                    if (panes.SearchDebounceTimer.IsEnabled || !string.Equals(pendingLibrarySearchText, appliedLibrarySearchText, StringComparison.OrdinalIgnoreCase)) applySearchFilter();
                 };
                 libraryWindow.Activated += delegate
                 {

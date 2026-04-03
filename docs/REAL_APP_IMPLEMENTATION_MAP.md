@@ -36,6 +36,7 @@ Primary ownership:
 
 - `src/PixelVault.Native/UI/Library/MainWindow.LibraryBrowserOrchestrator.cs`
 - `src/PixelVault.Native/UI/Library/MainWindow.LibraryBrowserChrome.cs`
+- `src/PixelVault.Native/UI/Library/MainWindow.LibraryBrowserLayout.cs`
 - `src/PixelVault.Native/UI/Library/LibraryBrowserHost.cs`
 - `src/PixelVault.Native/UI/Library/LibrarySession.cs`
 - `src/PixelVault.Native/UI/Library/LibraryWorkspaceContext.cs`
