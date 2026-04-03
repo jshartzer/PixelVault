@@ -1364,7 +1364,7 @@ namespace PixelVaultNative
                     if (renderTiles != null) renderTiles();
                     System.Threading.Tasks.Task.Factory.StartNew(delegate
                     {
-                        return LoadLibraryFoldersCached(librarySession.LibraryRoot, forceRefresh);
+                        return librarySession.Scanner.LoadLibraryFoldersCached(librarySession.LibraryRoot, forceRefresh);
                     }).ContinueWith(delegate(System.Threading.Tasks.Task<List<LibraryFolderInfo>> loadTask)
                     {
                         libraryWindow.Dispatcher.BeginInvoke(new Action(delegate

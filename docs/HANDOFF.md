@@ -102,7 +102,7 @@ Recent extraction progress (repo):
 - **F1–F2:** Settings shell partial (incl. path settings dialog), photography gallery + Steam picker partial; photography wired from Library + Settings
 - **Publish:** script copies full native + test sources under `dist/.../source/`
 
-Next likely slices: broaden **`ILibrarySession`** usage across remaining Library partials / hosts, **`ShowSettingsWindow`** shell move (F1 tail), or further **`await`** cleanup per `PERFORMANCE_TODO.md` item 11.
+Next likely slices: keep broadening **`ILibrarySession`** / **`ILibraryScanner`** at Library + game-index call sites (folder cache loads now use **`Scanner.LoadLibraryFoldersCached`** directly), **`ShowSettingsWindow`** shell move (F1 tail), or further **`await`** cleanup per `PERFORMANCE_TODO.md` item 11.
 
 If you are picking work up midstream:
 

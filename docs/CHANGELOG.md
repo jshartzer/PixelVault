@@ -1,6 +1,9 @@
 ## 0.835
-- **Release:** Version **0.835** — publish refresh. No intentional user-visible behavior change; continues **Phase 5** import service extraction and structural work from **0.834**.
+- **Release:** Version **0.835** — publish refresh. Continues **Phase 5** import service extraction and structural work from **0.834**; Library responsiveness fixes below are user-visible.
+- **Library (covers):** Cancelling **Fetch Cover Art** no longer wipes the global decoded-image cache, so other folder tiles stay stable. **Fetch Cover Art** on one game skips the full folder-cache rebuild when IDs can be merged into the existing cache (faster finish).
+- **Library (screenshots):** Selected-game **Screenshots** grid paints from the file list and index/file-date fallbacks first; embedded-metadata repair (ExifTool batch) runs afterward and refreshes grouping only when day order changes. Detail thumbnails use the priority image queue so the open game loads sooner.
 - **Engineering / structure (service split):** Intake **review-item metadata** writes live in **`IImportService.WriteMetadataForReviewItems`** (see **0.834** changelog for detail) — shipped in this build.
+- **Engineering / structure (item 7 slice):** Library folder refresh and game-index save alignment read cached folders via **`ILibraryScanner.LoadLibraryFoldersCached`** instead of **`MainWindow`** indirection.
 
 ## 0.834
 - **Release:** Version **0.834** — publish refresh. **Phase 4** / **Phase 5** service-split intent since **0.833** is unchanged (see **0.833**); additional engineering below.

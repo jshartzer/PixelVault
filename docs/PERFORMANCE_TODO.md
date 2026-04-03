@@ -82,7 +82,7 @@ Status: landed for the currently known paths, including manual Steam search in t
 7. Isolate metadata and library scan work behind services.
 - Prioritize `IMetadataService` and `ILibraryScanner` extractions from the service split plan.
 - Performance reason: once ExifTool/process work and library scanning stop living directly in `MainWindow`, it becomes much easier to batch, cache, profile, and move work off the UI thread safely.
-- Status (Mar 2026) — **`LoadGameIndexEditorRowsCore`** uses **`ILibraryScanner.EnsureGameIndexFolderContext`** (cached folders + forced rebuild when empty + log via host). **Next:** more game-index / metadata orchestration that still duplicates **`LibraryScanner`** patterns.
+- Status (Mar 2026) — **`LoadGameIndexEditorRowsCore`** uses **`ILibraryScanner.EnsureGameIndexFolderContext`** (cached folders + forced rebuild when empty + log via host). Library browser folder refresh and **`SaveGameIndexEditorRows`** folder snapshot for alias alignment call **`libraryScanner` / `librarySession.Scanner`** **`LoadLibraryFoldersCached`** directly. **Next:** remaining game-index / metadata orchestration that still bypasses **`ILibraryScanner`** where a seam exists.
 
 8. Add an `IFileSystemService` seam around heavy file-system operations.
 - Wrap directory enumeration, file existence, timestamp reads/writes, and path-heavy scans.
