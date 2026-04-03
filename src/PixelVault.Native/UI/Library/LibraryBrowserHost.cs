@@ -2,7 +2,7 @@ using System;
 
 namespace PixelVaultNative
 {
-    /// <summary>Orchestrates opening the Library browser; heavy UI lives in <see cref="MainWindow.ShowLibraryBrowserCore"/>.</summary>
+    /// <summary>Orchestrates opening the Library browser; heavy UI lives in <see cref="MainWindow.ShowLibraryBrowserCore"/> (<c>MainWindow.LibraryBrowserOrchestrator.cs</c>).</summary>
     internal sealed class LibraryBrowserHost
     {
         readonly MainWindow _owner;

@@ -34,7 +34,7 @@ If a change only fits by adding more deep delegate glue to `PixelVault.Native.cs
 
 Primary ownership:
 
-- `src/PixelVault.Native/UI/Library/MainWindow.LibraryBrowser.cs`
+- `src/PixelVault.Native/UI/Library/MainWindow.LibraryBrowserOrchestrator.cs`
 - `src/PixelVault.Native/UI/Library/LibraryBrowserHost.cs`
 - `src/PixelVault.Native/UI/Library/LibrarySession.cs`
 - `src/PixelVault.Native/UI/Library/LibraryWorkspaceContext.cs`
@@ -99,7 +99,7 @@ Good follow-on slices:
 Primary ownership:
 
 - `src/PixelVault.Native/Services/Config/SettingsService.cs`
-- `src/PixelVault.Native/UI/Library/MainWindow.LibraryBrowser.cs`
+- `src/PixelVault.Native/UI/Library/MainWindow.LibraryBrowserOrchestrator.cs`
 - `src/PixelVault.Native/UI/Settings/MainWindow.SettingsShell.cs`
 - `src/PixelVault.Native/PixelVault.Native.cs`
 - editor hosts under `src/PixelVault.Native/UI/Editors/`
@@ -127,7 +127,7 @@ Good follow-on slices:
 
 Primary ownership:
 
-- `src/PixelVault.Native/UI/Library/MainWindow.LibraryBrowser.cs`
+- `src/PixelVault.Native/UI/Library/MainWindow.LibraryBrowserOrchestrator.cs`
 - `src/PixelVault.Native/UI/Settings/MainWindow.SettingsShell.cs`
 - `src/PixelVault.Native/UI/Editors/GameIndexEditorHost.cs`
 - `src/PixelVault.Native/UI/Editors/PhotoIndexEditorHost.cs`
@@ -218,7 +218,7 @@ These are the moves that most strongly change how mature the app feels, but they
 
 When touching these areas, bias toward these goals:
 
-- `src/PixelVault.Native/UI/Library/MainWindow.LibraryBrowser.cs`
+- `src/PixelVault.Native/UI/Library/MainWindow.LibraryBrowserOrchestrator.cs`
   - first paint, selection responsiveness, keyboard flow, inline status, state restoration
 - `src/PixelVault.Native/UI/Library/LibraryBrowserHost.cs`
   - host ownership, less delegate sprawl, safer async orchestration

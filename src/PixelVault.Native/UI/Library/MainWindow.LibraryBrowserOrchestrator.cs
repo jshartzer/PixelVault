@@ -24,6 +24,7 @@ using Forms = System.Windows.Forms;
 
 namespace PixelVaultNative
 {
+    // Library browser UI orchestration (folder/detail panes, toolbar). Entry: LibraryBrowserHost → ShowLibraryBrowserCore.
     public sealed partial class MainWindow
     {
         internal void ShowLibraryBrowserCore(bool reuseMainWindow = false)
@@ -32,176 +33,14 @@ namespace PixelVaultNative
             {
                 librarySession.EnsureLibraryRootAccessible("Library folder");
                 var folders = new List<LibraryFolderInfo>();
-                Button intakeReviewButton = null;
-                Border intakeReviewBadge = null;
-                TextBlock intakeReviewBadgeText = null;
                 Action refreshIntakeReviewBadge = null;
-                var libraryWindow = reuseMainWindow
-                    ? this
-                    : new Window
-                    {
-                        Title = "PixelVault " + AppVersion + " Library",
-                        Width = PreferredLibraryWindowWidth(),
-                        Height = PreferredLibraryWindowHeight(),
-                        MinWidth = 1200,
-                        MinHeight = 780,
-                        Owner = this,
-                        WindowStartupLocation = WindowStartupLocation.CenterOwner,
-                        Background = Brush("#0F1519")
-                    };
-                libraryWindow.Title = "PixelVault " + AppVersion + " Library";
-                libraryWindow.Width = PreferredLibraryWindowWidth();
-                libraryWindow.Height = PreferredLibraryWindowHeight();
-                libraryWindow.MinWidth = 1200;
-                libraryWindow.MinHeight = 780;
-                libraryWindow.Background = Brush("#0F1519");
-
+                var libraryWindow = GetOrCreateLibraryBrowserWindow(reuseMainWindow);
                 var root = new Grid { Background = Brush("#0F1519") };
                 root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
                 root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
 
-                var navBar = new Border
-                {
-                    Background = Brush("#161E24"),
-                    BorderBrush = Brush("#27313A"),
-                    BorderThickness = new Thickness(0, 0, 0, 1),
-                    Padding = new Thickness(18, 14, 18, 14)
-                };
-                var navGrid = new Grid();
-                navGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                navGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                navGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-
-                var importButton = Btn("Import", null, "#2B7A52", Brushes.White);
-                importButton.Width = 142;
-                importButton.Height = 42;
-                importButton.FontSize = 13.5;
-                importButton.Margin = new Thickness(0, 0, 10, 0);
-                ApplyLibraryToolbarChrome(importButton, "#275742", "#2F6B53", "#2E654D", "#214D39");
-                var importCommentsButton = Btn("Import and Edit", null, "#355F93", Brushes.White);
-                importCommentsButton.Width = 156;
-                importCommentsButton.Height = 42;
-                importCommentsButton.FontSize = 13.5;
-                importCommentsButton.Margin = new Thickness(0, 0, 10, 0);
-                ApplyLibraryToolbarChrome(importCommentsButton, "#274B68", "#315D80", "#31597A", "#203E57");
-                var manualImportButton = Btn("Manual Import", null, "#7C5A34", Brushes.White);
-                manualImportButton.Width = 150;
-                manualImportButton.Height = 42;
-                manualImportButton.FontSize = 13.5;
-                manualImportButton.Margin = new Thickness(0, 0, 0, 0);
-                ApplyLibraryToolbarChrome(manualImportButton, "#5F4528", "#7A5A35", "#735431", "#4E381F");
-                var importActions = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-                importActions.Children.Add(importButton);
-                importActions.Children.Add(importCommentsButton);
-                importActions.Children.Add(manualImportButton);
-                Grid.SetColumn(importActions, 0);
-                navGrid.Children.Add(importActions);
-                var settingsButton = Btn("Settings", null, "#20343A", Brushes.White);
-                settingsButton.Width = 122;
-                settingsButton.Height = 42;
-                settingsButton.FontSize = 13;
-                settingsButton.Margin = new Thickness(0, 0, 12, 0);
-                ApplyLibraryToolbarChrome(settingsButton, "#18242B", "#24353F", "#22323C", "#131D23");
-                settingsButton.Content = BuildToolbarButtonContent("\uE713", "Settings");
-                var gameIndexButton = Btn("Game Index", null, "#20343A", Brushes.White);
-                gameIndexButton.Width = 122;
-                gameIndexButton.Height = 42;
-                gameIndexButton.FontSize = 13;
-                gameIndexButton.Margin = new Thickness(0, 0, 12, 0);
-                ApplyLibraryToolbarChrome(gameIndexButton, "#18242B", "#24353F", "#22323C", "#131D23");
-                var photoIndexButton = Btn("Photo Index", null, "#20343A", Brushes.White);
-                photoIndexButton.Width = 122;
-                photoIndexButton.Height = 42;
-                photoIndexButton.FontSize = 13;
-                photoIndexButton.Margin = new Thickness(0, 0, 12, 0);
-                ApplyLibraryToolbarChrome(photoIndexButton, "#18242B", "#24353F", "#22323C", "#131D23");
-                var photographyGalleryButton = Btn("Photography", null, "#20343A", Brushes.White);
-                photographyGalleryButton.Width = 122;
-                photographyGalleryButton.Height = 42;
-                photographyGalleryButton.FontSize = 13;
-                photographyGalleryButton.Margin = new Thickness(0, 0, 12, 0);
-                photographyGalleryButton.ToolTip = "Browse captures tagged for game photography";
-                ApplyLibraryToolbarChrome(photographyGalleryButton, "#18242B", "#24353F", "#22323C", "#131D23");
-                photographyGalleryButton.Content = BuildToolbarButtonContent("\uE722", "Photography");
-                var filenameRulesButton = Btn("Filename Rules", null, "#20343A", Brushes.White);
-                filenameRulesButton.Width = 122;
-                filenameRulesButton.Height = 42;
-                filenameRulesButton.FontSize = 13;
-                filenameRulesButton.Margin = new Thickness(0, 0, 12, 0);
-                ApplyLibraryToolbarChrome(filenameRulesButton, "#18242B", "#24353F", "#22323C", "#131D23");
-                var myCoversButton = Btn("My Covers", null, "#20343A", Brushes.White);
-                myCoversButton.Width = 122;
-                myCoversButton.Height = 42;
-                myCoversButton.FontSize = 13;
-                myCoversButton.Margin = new Thickness(0, 0, 12, 0);
-                ApplyLibraryToolbarChrome(myCoversButton, "#18242B", "#24353F", "#22323C", "#131D23");
-                myCoversButton.Content = BuildToolbarButtonContent("\uEB9F", "My Covers");
-                var refreshButton = Btn("Refresh", null, "#20343A", Brushes.White);
-                var fetchButton = Btn("Fetch Covers", null, "#275D47", Brushes.White);
-                refreshButton.Width = 122;
-                fetchButton.Width = 136;
-                refreshButton.Margin = new Thickness(8, 0, 0, 0);
-                fetchButton.Margin = new Thickness(8, 0, 0, 0);
-                ApplyLibraryToolbarChrome(refreshButton, "#18242B", "#24353F", "#22323C", "#131D23");
-                ApplyLibraryToolbarChrome(fetchButton, "#234E3B", "#2F6950", "#2C604A", "#1B3F31");
-                refreshButton.Content = BuildToolbarButtonContent("\uE72C", "Refresh");
-                intakeReviewButton = Btn(string.Empty, null, "#152028", Brushes.White);
-                intakeReviewButton.Width = 76;
-                intakeReviewButton.Height = 56;
-                intakeReviewButton.Padding = new Thickness(0);
-                intakeReviewButton.Margin = new Thickness(8, 0, 0, 0);
-                intakeReviewButton.ToolTip = "Preview upload queue";
-                ApplyLibraryToolbarChrome(intakeReviewButton, "#152028", "#253745", "#1E2D37", "#121C23");
-                var intakeReviewContent = new Grid();
-                intakeReviewContent.Children.Add(new Viewbox
-                {
-                    Width = 42,
-                    Height = 28,
-                    Stretch = Stretch.Uniform,
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Center,
-                    Child = BuildGamepadGlyph(Brush("#F5F7FA"), 2.15, 42, 28)
-                });
-                intakeReviewBadgeText = new TextBlock
-                {
-                    Foreground = Brushes.White,
-                    FontSize = 10,
-                    FontWeight = FontWeights.Bold,
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Center,
-                    TextAlignment = TextAlignment.Center
-                };
-                intakeReviewBadge = new Border
-                {
-                    MinWidth = 22,
-                    Height = 22,
-                    Background = Brush("#FF453A"),
-                    BorderBrush = Brush("#FFD6D2"),
-                    BorderThickness = new Thickness(1),
-                    CornerRadius = new CornerRadius(11),
-                    HorizontalAlignment = HorizontalAlignment.Right,
-                    VerticalAlignment = VerticalAlignment.Top,
-                    Margin = new Thickness(0, -4, -4, 0),
-                    Padding = new Thickness(6, 0, 6, 0),
-                    Visibility = Visibility.Collapsed,
-                    Child = intakeReviewBadgeText
-                };
-                intakeReviewContent.Children.Add(intakeReviewBadge);
-                intakeReviewButton.Content = intakeReviewContent;
-                var headerActions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
-                headerActions.Children.Add(settingsButton);
-                headerActions.Children.Add(gameIndexButton);
-                headerActions.Children.Add(photoIndexButton);
-                headerActions.Children.Add(photographyGalleryButton);
-                headerActions.Children.Add(filenameRulesButton);
-                headerActions.Children.Add(myCoversButton);
-                headerActions.Children.Add(refreshButton);
-                headerActions.Children.Add(fetchButton);
-                headerActions.Children.Add(intakeReviewButton);
-                Grid.SetColumn(headerActions, 2);
-                navGrid.Children.Add(headerActions);
-                navBar.Child = navGrid;
-                root.Children.Add(navBar);
+                var navChrome = BuildLibraryBrowserNavChrome();
+                root.Children.Add(navChrome.NavBar);
 
                 var contentGrid = new Grid();
                 contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(62, GridUnitType.Star) });
@@ -556,7 +395,7 @@ namespace PixelVaultNative
 
                 refreshIntakeReviewBadge = delegate
                 {
-                    if (intakeReviewButton == null || intakeReviewBadge == null || intakeReviewBadgeText == null) return;
+                    if (navChrome.IntakeReviewButton == null || navChrome.IntakeReviewBadge == null || navChrome.IntakeReviewBadgeText == null) return;
                     var refreshVersion = ++intakeBadgeRefreshVersion;
                     System.Threading.Tasks.Task.Factory.StartNew(delegate
                     {
@@ -577,15 +416,15 @@ namespace PixelVaultNative
                             var count = badgeTask.Status == TaskStatus.RanToCompletion ? badgeTask.Result : -1;
                             if (count > 0)
                             {
-                                intakeReviewBadgeText.Text = IntakeBadgeCountText(count);
-                                intakeReviewBadge.Visibility = Visibility.Visible;
-                                intakeReviewButton.ToolTip = count + " intake item(s) waiting";
+                                navChrome.IntakeReviewBadgeText.Text = IntakeBadgeCountText(count);
+                                navChrome.IntakeReviewBadge.Visibility = Visibility.Visible;
+                                navChrome.IntakeReviewButton.ToolTip = count + " intake item(s) waiting";
                             }
                             else
                             {
-                                intakeReviewBadgeText.Text = string.Empty;
-                                intakeReviewBadge.Visibility = Visibility.Collapsed;
-                                intakeReviewButton.ToolTip = count == 0 ? "No intake items waiting" : "Preview upload queue";
+                                navChrome.IntakeReviewBadgeText.Text = string.Empty;
+                                navChrome.IntakeReviewBadge.Visibility = Visibility.Collapsed;
+                                navChrome.IntakeReviewButton.ToolTip = count == 0 ? "No intake items waiting" : "Preview upload queue";
                             }
                         }));
                     }, TaskScheduler.Default);
@@ -1455,9 +1294,9 @@ namespace PixelVaultNative
                     editMetadataButton.IsEnabled = !isBusy;
                     fetchButton.IsEnabled = !isBusy;
                     importButton.IsEnabled = !isBusy;
-                    importCommentsButton.IsEnabled = !isBusy;
-                    manualImportButton.IsEnabled = !isBusy;
-                    if (intakeReviewButton != null) intakeReviewButton.IsEnabled = !isBusy;
+                    navChrome.ImportCommentsButton.IsEnabled = !isBusy;
+                    navChrome.ManualImportButton.IsEnabled = !isBusy;
+                    if (navChrome.IntakeReviewButton != null) navChrome.IntakeReviewButton.IsEnabled = !isBusy;
                 };
 
                 runLibraryScan = delegate(string folderPath, bool forceRescan)
@@ -1641,14 +1480,14 @@ namespace PixelVaultNative
                     if (refreshLibraryFoldersAsync != null) refreshLibraryFoldersAsync(false);
                 };
                 settingsButton.Click += delegate { ShowSettingsWindow(); if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge(); };
-                gameIndexButton.Click += delegate { OpenGameIndexEditor(); };
+                navChrome.GameIndexButton.Click += delegate { OpenGameIndexEditor(); };
                 photoIndexButton.Click += delegate { OpenPhotoIndexEditor(); };
-                photographyGalleryButton.Click += delegate { ShowPhotographyGallery(libraryWindow); };
-                filenameRulesButton.Click += delegate { OpenFilenameConventionEditor(); };
-                myCoversButton.Click += delegate { OpenSavedCoversFolder(); };
+                navChrome.PhotographyGalleryButton.Click += delegate { ShowPhotographyGallery(libraryWindow); };
+                navChrome.FilenameRulesButton.Click += delegate { OpenFilenameConventionEditor(); };
+                navChrome.MyCoversButton.Click += delegate { OpenSavedCoversFolder(); };
                 importButton.Click += delegate { RunWorkflow(false); if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge(); };
-                importCommentsButton.Click += delegate { RunWorkflow(true); if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge(); };
-                manualImportButton.Click += delegate { OpenManualIntakeWindow(); if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge(); };
+                navChrome.ImportCommentsButton.Click += delegate { RunWorkflow(true); if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge(); };
+                navChrome.ManualImportButton.Click += delegate { OpenManualIntakeWindow(); if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge(); };
                 fetchButton.Click += delegate
                 {
                     var choice = MessageBox.Show(
@@ -1659,7 +1498,7 @@ namespace PixelVaultNative
                     if (choice != MessageBoxResult.OK) return;
                     runCoverRefresh();
                 };
-                intakeReviewButton.Click += delegate
+                navChrome.IntakeReviewButton.Click += delegate
                 {
                     ShowIntakePreviewWindow(false);
                     if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge();

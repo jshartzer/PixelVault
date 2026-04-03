@@ -65,7 +65,7 @@ Status: mostly in place; extend only if the next debounce pass needs more visibi
 5. Audit long-running UI workflows for real background execution.
 - Review scan/rebuild, import/manual import, and cover-fetch paths for any work that can still block the UI thread.
 - Keep the current progress-window pattern, but tighten where work starts and where dispatcher marshaling happens.
-- Note: **Library folder list** refresh already uses **`Task.Factory.StartNew`** + **`Dispatcher.BeginInvoke`** (`MainWindow.LibraryBrowser.cs`). **Game Index** open loads **`LoadGameIndexEditorRowsCore`** on the thread pool, then **`GameIndexEditorHost.Show(..., preloadedRows)`**. **Reload** uses **`LoadRowsForBackground`** (same core) off the UI thread with a short busy state on the editor (grid + action buttons).
+- Note: **Library folder list** refresh already uses **`Task.Factory.StartNew`** + **`Dispatcher.BeginInvoke`** (`MainWindow.LibraryBrowserOrchestrator.cs`). **Game Index** open loads **`LoadGameIndexEditorRowsCore`** on the thread pool, then **`GameIndexEditorHost.Show(..., preloadedRows)`**. **Reload** uses **`LoadRowsForBackground`** (same core) off the UI thread with a short busy state on the editor (grid + action buttons).
 Status: spot-checked (Mar 2026) — **`ShowLibraryMetadataScanWindow`** uses **`libraryScanner.ScanLibraryMetadataIndexAsync`** (scheduled off the UI thread) and marshals progress with **`BeginInvoke`**. Library browser folder snapshot/refresh, selected-folder detail render (**`Task.Run`**), and intake badge count follow the same pattern. **Cover refresh** uses **`Task.Run`** + **`RefreshLibraryCoversAsync`**, which **`await`**s **`ICoverService`** **`*Async`** (no sync **`GetResult()`** on that path). Import workflows use **`RunBackgroundWorkflowWithProgress`** in **`ImportWorkflow.cs`**. Manual metadata **game title** combo: saved rows + fallback **`LoadGameIndexEditorRowsCore(root, null)`** now load off the UI thread (**`refreshGameTitleChoices`**).
 
 5a. Remove the remaining synchronous UI hop from game-capture keyword tagging.
@@ -99,7 +99,7 @@ Status: landed for the currently known paths, including manual Steam search in t
 10. Move `ShowLibraryBrowser` orchestration into a dedicated Library UI type.
 - This is mostly an **iteration-speed and testability** improvement; it also reduces closure tangle and makes threading/cancellation easier to reason about.
 - It becomes more valuable once capture virtualization and search/sort caching are underway (many of those are now landed—bump priority if the next perf pass touches Library UI again).
-- Status (Mar 2026): **`LibraryBrowserHost`** (`UI/Library/LibraryBrowserHost.cs`) is the entry point (receives **`ILibrarySession`**); **`MainWindow.ShowLibraryBrowserCore`** holds the existing implementation on the **`MainWindow`** partial. **E2 slice:** **`ILibrarySession`** / **`LibrarySession`** surface workspace + scanner + file seam + root; **`MainWindow.LibraryBrowser`** consumes **`librarySession`**. Next: route more Library partials through **`librarySession`** and shrink **`ShowLibraryBrowserCore`**.
+- Status (Mar 2026): **`LibraryBrowserHost`** (`UI/Library/LibraryBrowserHost.cs`) is the entry point (receives **`ILibrarySession`**). **`MainWindow.ShowLibraryBrowserCore`** lives in **`UI/Library/MainWindow.LibraryBrowserOrchestrator.cs`** (dedicated partial file for Library browser UI; same **`MainWindow`** type, no behavior change). **E2 slice:** **`ILibrarySession`** / **`LibrarySession`** surface workspace + scanner + file seam + root. Next: optional further shrink (named sub-handlers / less closure depth) when Library UI is touched again.
 
 11. Convert touched I/O and provider paths to async-first service APIs.
 - Especially metadata reads, file-heavy scans, and network/provider work.
@@ -118,7 +118,7 @@ Status: landed for the currently known paths, including manual Steam search in t
 8. Metadata + library scanner service extraction (item 7)
 9. ~~File-system service seam (item 8)~~ — extended slice landed; optional **`CopyFile`** later
 10. ~~Left-side row recycling (item 9)~~ — landed (`RecycleVisibleRowElements` on folder **`tileRows`**)
-11. ~~Library UI extraction (item 10)~~ — first slice landed (`LibraryBrowserHost` + `ShowLibraryBrowserCore`); keep iterating when Library changes
+11. ~~Library UI extraction (item 10)~~ — landed (`LibraryBrowserHost` + `ShowLibraryBrowserCore` in **`MainWindow.LibraryBrowserOrchestrator.cs`**); optional deeper splits when Library changes
 12. ~~Async-first I/O (item 11)~~ — landed for **`TimeoutWebClient`**, **`IMetadataService`** / **`ICoverService`** `*Async`**, **`LibraryScanner`** batch reads (**`ReadEmbeddedMetadataBatchAsync`** + **`SemaphoreSlim`**), and library **cover refresh** (**`RefreshLibraryCoversAsync`** **`await`** chain).
 13. ~~`IFileSystemService` seam (item 8)~~ — landed (**`LibraryScanner`**, **`ImportService`**, extended read/write/move/timestamp helpers).
 

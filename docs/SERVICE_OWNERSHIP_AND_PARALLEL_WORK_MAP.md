@@ -42,7 +42,7 @@ These are not "services", but they are important extraction seams because they r
 | Intake preview | `IntakePreviewWindow`, `IntakePreviewServices` | `src/PixelVault.Native/UI/Intake/IntakePreviewWindow.cs` | Upload queue preview modal UI | Extracted host |
 | Metadata review | `MetadataReviewWindow`, `MetadataReviewServices` | `src/PixelVault.Native/UI/Intake/MetadataReviewWindow.cs` | Pre-import metadata review UI | Extracted host |
 | Filename rules editor window | `FilenameConventionEditorWindow`, `FilenameConventionEditorServices` | `src/PixelVault.Native/UI/Editors/FilenameConventionEditorWindow.cs` | Filename rules modal UI | Extracted host |
-| Library session facade | `ILibrarySession`, `LibrarySession` | `src/PixelVault.Native/UI/Library/ILibrarySession.cs`, `LibrarySession.cs` | **`LibraryRoot`**, **`LibraryWorkspaceContext`**, **`ILibraryScanner`**, **`IFileSystemService`** for Library UI | **`LibraryBrowserHost`** receives **`ILibrarySession`**; **`MainWindow.LibraryBrowser`** uses **`librarySession`** |
+| Library session facade | `ILibrarySession`, `LibrarySession` | `src/PixelVault.Native/UI/Library/ILibrarySession.cs`, `LibrarySession.cs` | **`LibraryRoot`**, **`LibraryWorkspaceContext`**, **`ILibraryScanner`**, **`IFileSystemService`** for Library UI | **`LibraryBrowserHost`** receives **`ILibrarySession`**; **`ShowLibraryBrowserCore`** (**`MainWindow.LibraryBrowserOrchestrator.cs`**) uses **`librarySession`** |
 | Library virtualization primitives | partial `MainWindow` helpers | `src/PixelVault.Native/UI/LibraryVirtualization.cs` | Virtualized rows/scroll host behavior | Extracted partial, not yet a standalone host |
 
 ---
