@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace PixelVaultNative
 {
@@ -36,6 +38,12 @@ namespace PixelVaultNative
 
         /// <summary>Write Exif/metadata for intake review items (standard import / import-and-comment workflow).</summary>
         MetadataStepResult WriteMetadataForReviewItems(IEnumerable<ReviewItem> reviewItems, Action<int, int, string> progress = null, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Import-and-edit: for rows still tagged Steam, when the user did not change the loaded game title from the original,
+        /// replace numeric/placeholder titles with the Steam store name for that AppID (same idea as automatic import).
+        /// </summary>
+        Task ApplyImportAndEditSteamStoreTitlesWhenGameNameUnchangedAsync(IEnumerable<ManualMetadataItem> items, CancellationToken cancellationToken = default);
     }
 
     /// <summary>Outcome of moving files back to source folders during undo (no UI).</summary>
@@ -94,6 +102,12 @@ namespace PixelVaultNative
 
         /// <summary>Display label for photography tag in progress/log text (e.g. “Game Photography”).</summary>
         public string GamePhotographyTagLabel;
+
+        /// <summary>Steam / store lookups (async store title for import-and-edit).</summary>
+        public ICoverService CoverService;
+
+        /// <summary>Same normalization as game-index manual metadata (single-argument form: title only).</summary>
+        public Func<string, string> NormalizeGameIndexName;
     }
 
     internal sealed class ImportService : IImportService
@@ -108,6 +122,8 @@ namespace PixelVaultNative
             if (d.MetadataService == null) throw new ArgumentNullException(nameof(dependencies) + "." + nameof(dependencies.MetadataService));
             if (d.GetFileCreationTime == null) throw new ArgumentNullException(nameof(dependencies) + "." + nameof(dependencies.GetFileCreationTime));
             if (d.GetFileLastWriteTime == null) throw new ArgumentNullException(nameof(dependencies) + "." + nameof(dependencies.GetFileLastWriteTime));
+            if (d.CoverService == null) throw new ArgumentNullException(nameof(dependencies) + "." + nameof(dependencies.CoverService));
+            if (d.NormalizeGameIndexName == null) throw new ArgumentNullException(nameof(dependencies) + "." + nameof(dependencies.NormalizeGameIndexName));
         }
 
         string UndoPath => d.UndoManifestPath == null ? string.Empty : (d.UndoManifestPath() ?? string.Empty);
@@ -501,6 +517,26 @@ namespace PixelVaultNative
             if (progress != null) progress(total, total, "Metadata step complete: updated " + updated + ", skipped " + skipped + ".");
             d.Log?.Invoke("Metadata summary: updated " + updated + ", skipped " + skipped + ".");
             return new MetadataStepResult { Updated = updated, Skipped = skipped };
+        }
+
+        public async Task ApplyImportAndEditSteamStoreTitlesWhenGameNameUnchangedAsync(IEnumerable<ManualMetadataItem> items, CancellationToken cancellationToken = default)
+        {
+            var normalize = d.NormalizeGameIndexName;
+            var cover = d.CoverService;
+            foreach (var item in items ?? Enumerable.Empty<ManualMetadataItem>())
+            {
+                if (item == null) continue;
+                if (!item.TagSteam) continue;
+                var cur = normalize(item.GameName ?? string.Empty);
+                var orig = normalize(item.OriginalGameName ?? string.Empty);
+                if (!string.Equals(cur, orig, StringComparison.OrdinalIgnoreCase)) continue;
+                var appId = Regex.Replace(item.SteamAppId ?? string.Empty, @"[^\d]", string.Empty);
+                if (string.IsNullOrWhiteSpace(appId)) continue;
+                cancellationToken.ThrowIfCancellationRequested();
+                var storeTitle = await cover.SteamNameAsync(appId, cancellationToken).ConfigureAwait(false);
+                if (string.IsNullOrWhiteSpace(storeTitle)) continue;
+                item.GameName = storeTitle;
+            }
         }
 
         string ResolveUndoCurrentPath(UndoImportEntry entry, HashSet<string> usedPaths, string destinationRoot, string libraryRoot)

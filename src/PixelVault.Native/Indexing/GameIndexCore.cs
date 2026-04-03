@@ -4,7 +4,6 @@ using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace PixelVaultNative
 {
@@ -389,32 +388,5 @@ namespace PixelVaultNative
                 .ToDictionary(group => group.Key, group => group.Count(), StringComparer.OrdinalIgnoreCase);
         }
 
-        bool ManualMetadataGameNameMatchesOriginal(ManualMetadataItem item)
-        {
-            if (item == null) return false;
-            var cur = NormalizeGameIndexName(item.GameName ?? string.Empty);
-            var orig = NormalizeGameIndexName(item.OriginalGameName ?? string.Empty);
-            return string.Equals(cur, orig, StringComparison.OrdinalIgnoreCase);
-        }
-
-        /// <summary>
-        /// Import-and-edit: when the user did not change the loaded game title, resolve Steam store names from AppID
-        /// (same as automatic import) so the game index is not offered numeric placeholder titles.
-        /// </summary>
-        async Task ApplyImportAndEditSteamStoreTitlesWhenGameNameUnchangedAsync(IEnumerable<ManualMetadataItem> items, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            foreach (var item in items ?? Enumerable.Empty<ManualMetadataItem>())
-            {
-                if (item == null) continue;
-                if (!item.TagSteam) continue;
-                if (!ManualMetadataGameNameMatchesOriginal(item)) continue;
-                var appId = Regex.Replace(item.SteamAppId ?? string.Empty, @"[^\d]", string.Empty);
-                if (string.IsNullOrWhiteSpace(appId)) continue;
-                cancellationToken.ThrowIfCancellationRequested();
-                var storeTitle = await coverService.SteamNameAsync(appId, cancellationToken).ConfigureAwait(true);
-                if (string.IsNullOrWhiteSpace(storeTitle)) continue;
-                item.GameName = storeTitle;
-            }
-        }
     }
 }

@@ -291,7 +291,9 @@ namespace PixelVaultNative
                 MetadataService = metadataService,
                 GetFileCreationTime = path => File.GetCreationTime(path),
                 GetFileLastWriteTime = path => File.GetLastWriteTime(path),
-                GamePhotographyTagLabel = GamePhotographyTag
+                GamePhotographyTagLabel = GamePhotographyTag,
+                CoverService = coverService,
+                NormalizeGameIndexName = name => NormalizeGameIndexName(name)
             });
             libraryWorkspace = new LibraryWorkspaceContext(this);
             librarySession = new LibrarySession(libraryWorkspace, libraryScanner, fileSystemService);
@@ -2904,7 +2906,7 @@ namespace PixelVaultNative
                 }
                 if (importAndEditMode)
                 {
-                    await ApplyImportAndEditSteamStoreTitlesWhenGameNameUnchangedAsync(pendingItems.Where(i => i != null && !i.DeleteBeforeProcessing), CancellationToken.None).ConfigureAwait(true);
+                    await importService.ApplyImportAndEditSteamStoreTitlesWhenGameNameUnchangedAsync(pendingItems.Where(i => i != null && !i.DeleteBeforeProcessing), CancellationToken.None).ConfigureAwait(true);
                 }
                 var gameRows = LoadSavedGameIndexRows(libraryRoot);
                 var unresolvedMasterRecords = pendingItems
