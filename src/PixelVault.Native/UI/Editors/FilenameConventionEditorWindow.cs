@@ -160,6 +160,7 @@ namespace PixelVaultNative
             body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             body.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
             body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             shell.Child = new ScrollViewer
             {
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
@@ -200,7 +201,7 @@ namespace PixelVaultNative
 
             var helperText = new TextBlock
             {
-                Text = "Select a sample to draft a rule, or select a built-in to inspect and optionally disable it with a custom override.",
+                Text = "Flow: samples at the top, then the rule editor, then known rules below. Select a sample to draft, or pick a rule to edit or inspect.",
                 VerticalAlignment = VerticalAlignment.Center,
                 Foreground = B("#5F6970"),
                 TextWrapping = TextWrapping.Wrap,
@@ -243,7 +244,7 @@ namespace PixelVaultNative
                 RowHeaderWidth = 0,
                 Margin = new Thickness(0, 0, 0, 12),
                 MinHeight = 38,
-                MaxHeight = 162,
+                MaxHeight = 220,
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto
             };
             sampleGrid.Columns.Add(new DataGridTextColumn { Header = "File Name", Binding = new Binding("FileName"), Width = new DataGridLength(2.6, DataGridLengthUnitType.Star) });
@@ -260,16 +261,11 @@ namespace PixelVaultNative
             };
             sampleStack.Children.Add(new Border { Background = B("#EEF3F7"), BorderBrush = B("#D7E1E8"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(12), Padding = new Thickness(14), Child = sampleSummary });
 
-            var mainGrid = new Grid();
-            mainGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.15, GridUnitType.Star) });
-            mainGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(0.85, GridUnitType.Star) });
-            Grid.SetRow(mainGrid, 2);
-            body.Children.Add(mainGrid);
-
-            var editorCard = Card("Rule Editor", "Edit one draft at a time. Built-ins load here in read-only mode so you can understand them before overriding them.", new Thickness(0, 0, 12, 0));
-            mainGrid.Children.Add(editorCard);
+            var editorCard = Card("Rule Editor", "Edit one draft at a time. Built-ins load here in read-only mode so you can understand them before overriding them.", new Thickness(0, 0, 0, 14));
+            Grid.SetRow(editorCard, 2);
+            body.Children.Add(editorCard);
             var editorStack = (StackPanel)editorCard.Child;
-            editorCard.MinHeight = 520;
+            editorCard.MinHeight = 360;
             var editorHost = new Grid();
             editorHost.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             editorHost.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
@@ -282,7 +278,7 @@ namespace PixelVaultNative
             {
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                 HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
-                MinHeight = 430
+                MinHeight = 280
             };
             Grid.SetRow(editorScroll, 1);
             editorHost.Children.Add(editorScroll);
@@ -354,16 +350,16 @@ namespace PixelVaultNative
             advancedStack.Children.Add(Labeled("Raw Regex Preview", regexPreviewBox, "This is generated from the readable rule pattern. It is read-only."));
             editorFields.Children.Add(advanced);
 
-            var listColumn = new Grid();
-            listColumn.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-            listColumn.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-            Grid.SetColumn(listColumn, 1);
-            mainGrid.Children.Add(listColumn);
+            var knownRulesGrid = new Grid { Margin = new Thickness(0, 0, 0, 8) };
+            knownRulesGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            knownRulesGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            Grid.SetRow(knownRulesGrid, 3);
+            body.Children.Add(knownRulesGrid);
 
-            var customCard = Card("Custom Rules", "Saved for this library. Click one to load it into the editor.", new Thickness(12, 0, 0, 12));
-            listColumn.Children.Add(customCard);
+            var customCard = Card("Custom Rules", "Saved for this library. Click one to load it into the editor.", new Thickness(0, 0, 8, 0));
+            knownRulesGrid.Children.Add(customCard);
             var customStack = (StackPanel)customCard.Child;
-            customCard.MinHeight = 270;
+            customCard.MinHeight = 240;
             var customGrid = new DataGrid
             {
                 AutoGenerateColumns = false,
@@ -380,9 +376,9 @@ namespace PixelVaultNative
                 Background = Brushes.White,
                 Foreground = B("#1B232B"),
                 RowHeaderWidth = 0,
-                Height = 260,
-                MinHeight = 260,
-                MaxHeight = 360,
+                Height = 220,
+                MinHeight = 220,
+                MaxHeight = 320,
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto
             };
             customGrid.Columns.Add(new DataGridTextColumn { Header = "Name", Binding = new Binding("Name"), Width = new DataGridLength(1.2, DataGridLengthUnitType.Star) });
@@ -392,11 +388,11 @@ namespace PixelVaultNative
             customGrid.Columns.Add(new DataGridTextColumn { Header = "Pattern Summary", Binding = new Binding("PatternText"), Width = new DataGridLength(1.8, DataGridLengthUnitType.Star) });
             customStack.Children.Add(customGrid);
 
-            var builtInCard = Card("Built-In Rules", "Shipped defaults. Select one to inspect it, then disable it with a custom override if needed.", new Thickness(12, 12, 0, 0));
-            Grid.SetRow(builtInCard, 1);
-            listColumn.Children.Add(builtInCard);
+            var builtInCard = Card("Built-In Rules", "Shipped defaults. Select one to inspect it, then disable it with a custom override if needed.", new Thickness(8, 0, 0, 0));
+            Grid.SetColumn(builtInCard, 1);
+            knownRulesGrid.Children.Add(builtInCard);
             var builtInStack = (StackPanel)builtInCard.Child;
-            builtInCard.MinHeight = 270;
+            builtInCard.MinHeight = 240;
             var builtInGrid = new DataGrid
             {
                 AutoGenerateColumns = false,
@@ -413,9 +409,9 @@ namespace PixelVaultNative
                 Background = Brushes.White,
                 Foreground = B("#1B232B"),
                 RowHeaderWidth = 0,
-                Height = 260,
-                MinHeight = 260,
-                MaxHeight = 360,
+                Height = 220,
+                MinHeight = 220,
+                MaxHeight = 320,
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto
             };
             builtInGrid.Columns.Add(new DataGridTextColumn { Header = "Name", Binding = new Binding("Name"), Width = new DataGridLength(1.2, DataGridLengthUnitType.Star) });
@@ -427,7 +423,7 @@ namespace PixelVaultNative
 
             var footerGrid = new Grid { Margin = new Thickness(0, 16, 0, 0) };
             footerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            Grid.SetRow(footerGrid, 3);
+            Grid.SetRow(footerGrid, 4);
             body.Children.Add(footerGrid);
 
             var statusText = new TextBlock { Foreground = B("#5F6970"), VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap };
@@ -774,15 +770,58 @@ namespace PixelVaultNative
                 try
                 {
                     PushEditorToRule();
+                    var preserveKey = editingRule != null ? RuleSelectionKey(editingRule) : null;
+                    var preserveBuiltIn = editingBuiltIn;
                     ApplyLoadedState(services.RulesService.SaveRules(libraryRoot, customRules));
                     dirty = false;
-                    customGrid.SelectedItem = null;
-                    builtInGrid.SelectedItem = null;
-                    LoadRuleIntoEditor(null, false);
                     RefreshLists(true);
+                    if (!string.IsNullOrWhiteSpace(preserveKey))
+                    {
+                        if (preserveBuiltIn)
+                        {
+                            var builtIn = builtInRules.FirstOrDefault(rule => string.Equals(RuleSelectionKey(rule), preserveKey, StringComparison.OrdinalIgnoreCase));
+                            if (builtIn != null)
+                            {
+                                customGrid.SelectedItem = null;
+                                builtInGrid.SelectedItem = builtIn;
+                                builtInGrid.ScrollIntoView(builtIn);
+                                LoadRuleIntoEditor(builtIn, true);
+                            }
+                            else
+                            {
+                                customGrid.SelectedItem = null;
+                                builtInGrid.SelectedItem = null;
+                                LoadRuleIntoEditor(null, false);
+                            }
+                        }
+                        else
+                        {
+                            var custom = customRules.FirstOrDefault(rule => string.Equals(RuleSelectionKey(rule), preserveKey, StringComparison.OrdinalIgnoreCase));
+                            if (custom != null)
+                            {
+                                builtInGrid.SelectedItem = null;
+                                customGrid.SelectedItem = custom;
+                                customGrid.ScrollIntoView(custom);
+                                LoadRuleIntoEditor(custom, false);
+                            }
+                            else
+                            {
+                                customGrid.SelectedItem = null;
+                                builtInGrid.SelectedItem = null;
+                                LoadRuleIntoEditor(null, false);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        customGrid.SelectedItem = null;
+                        builtInGrid.SelectedItem = null;
+                        LoadRuleIntoEditor(null, false);
+                    }
+                    RefreshLists(false);
 
                     services.RefreshPreviewIfNeeded();
-                    services.SetStatus("Filename rules saved");
+                    services.SetStatus("Filename rules saved.");
                     services.Log("Saved " + customRules.Count + " custom filename rule(s) to the index database.");
                 }
                 catch (Exception saveEx)

@@ -2874,7 +2874,7 @@ namespace PixelVaultNative
                 refreshSelectionStatus();
             };
 
-            finishButton.Click += delegate
+            finishButton.Click += async delegate
             {
                 if (!dialogReady || !manualWindow.IsLoaded) return;
                 var pendingItems = selectedItems.Distinct().ToList();
@@ -2904,7 +2904,7 @@ namespace PixelVaultNative
                 }
                 if (importAndEditMode)
                 {
-                    ApplyImportAndEditSteamStoreTitlesWhenGameNameUnchanged(pendingItems.Where(i => i != null && !i.DeleteBeforeProcessing));
+                    await ApplyImportAndEditSteamStoreTitlesWhenGameNameUnchangedAsync(pendingItems.Where(i => i != null && !i.DeleteBeforeProcessing), CancellationToken.None).ConfigureAwait(true);
                 }
                 var gameRows = LoadSavedGameIndexRows(libraryRoot);
                 var unresolvedMasterRecords = pendingItems
@@ -4879,8 +4879,8 @@ namespace PixelVaultNative
                                 BuildMergeKey = BuildGameIndexMergeKey,
                                 RunBackgroundWorkflowIntArray = RunBackgroundWorkflowWithProgress<int[]>,
                                 ThrowIfWorkflowCancellationRequested = ThrowIfWorkflowCancellationRequested,
-                                ResolveMissingSteamAppIds = ResolveMissingGameIndexSteamAppIds,
-                                ResolveMissingSteamGridDbIds = ResolveMissingGameIndexSteamGridDbIds,
+                                ResolveMissingSteamAppIdsAsync = ResolveMissingGameIndexSteamAppIdsAsync,
+                                ResolveMissingSteamGridDbIdsAsync = ResolveMissingGameIndexSteamGridDbIdsAsync,
                                 OpenFolder = OpenFolder
                             },
                             preloaded);

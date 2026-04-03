@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace PixelVaultNative
 {
@@ -60,7 +61,7 @@ namespace PixelVaultNative
             RefreshCachedLibraryFoldersFromGameIndex(root);
         }
 
-        int ResolveMissingGameIndexSteamAppIds(string root, List<GameIndexEditorRow> rows, Action<int, int, string> progress, CancellationToken cancellationToken = default(CancellationToken))
+        async Task<int> ResolveMissingGameIndexSteamAppIdsAsync(string root, List<GameIndexEditorRow> rows, Action<int, int, string> progress, CancellationToken cancellationToken = default(CancellationToken))
         {
             var allRows = rows ?? new List<GameIndexEditorRow>();
             var targets = allRows
@@ -97,7 +98,7 @@ namespace PixelVaultNative
                     SteamAppId = row.SteamAppId ?? string.Empty,
                     SteamGridDbId = row.SteamGridDbId ?? string.Empty
                 };
-                var appId = ResolveBestLibraryFolderSteamAppId(root, folder, true, cancellationToken);
+                var appId = await ResolveBestLibraryFolderSteamAppIdAsync(root, folder, true, cancellationToken).ConfigureAwait(false);
                 if (!string.IsNullOrWhiteSpace(appId))
                 {
                     foreach (var match in allRows.Where(entry =>
@@ -117,7 +118,7 @@ namespace PixelVaultNative
             return resolved;
         }
 
-        int ResolveMissingGameIndexSteamGridDbIds(string root, List<GameIndexEditorRow> rows, Action<int, int, string> progress, CancellationToken cancellationToken = default(CancellationToken))
+        async Task<int> ResolveMissingGameIndexSteamGridDbIdsAsync(string root, List<GameIndexEditorRow> rows, Action<int, int, string> progress, CancellationToken cancellationToken = default(CancellationToken))
         {
             if (!HasSteamGridDbApiToken())
             {
@@ -159,7 +160,7 @@ namespace PixelVaultNative
                     SteamAppId = row.SteamAppId ?? string.Empty,
                     SteamGridDbId = row.SteamGridDbId ?? string.Empty
                 };
-                var steamGridDbId = ResolveBestLibraryFolderSteamGridDbId(root, folder, cancellationToken);
+                var steamGridDbId = await ResolveBestLibraryFolderSteamGridDbIdAsync(root, folder, cancellationToken).ConfigureAwait(false);
                 if (!string.IsNullOrWhiteSpace(steamGridDbId))
                 {
                     foreach (var match in allRows.Where(entry =>

@@ -202,7 +202,7 @@ namespace PixelVaultNative
                 if (fileList.Count == 0) return;
                 var index = host.LoadLibraryMetadataIndex(root, true);
                 var gameRows = host.LoadSavedGameIndexRows(root);
-                var metadataByFile = metadataService.ReadEmbeddedMetadataBatchAsync(fileList, CancellationToken.None).GetAwaiter().GetResult();
+                var metadataByFile = metadataService.ReadEmbeddedMetadataBatch(fileList, CancellationToken.None);
                 foreach (var file in fileList)
                 {
                     EmbeddedMetadataSnapshot snapshot;

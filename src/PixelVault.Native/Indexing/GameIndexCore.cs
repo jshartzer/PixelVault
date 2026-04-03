@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace PixelVaultNative
 {
@@ -400,7 +401,7 @@ namespace PixelVaultNative
         /// Import-and-edit: when the user did not change the loaded game title, resolve Steam store names from AppID
         /// (same as automatic import) so the game index is not offered numeric placeholder titles.
         /// </summary>
-        void ApplyImportAndEditSteamStoreTitlesWhenGameNameUnchanged(IEnumerable<ManualMetadataItem> items, CancellationToken cancellationToken = default(CancellationToken))
+        async Task ApplyImportAndEditSteamStoreTitlesWhenGameNameUnchangedAsync(IEnumerable<ManualMetadataItem> items, CancellationToken cancellationToken = default(CancellationToken))
         {
             foreach (var item in items ?? Enumerable.Empty<ManualMetadataItem>())
             {
@@ -410,7 +411,7 @@ namespace PixelVaultNative
                 var appId = Regex.Replace(item.SteamAppId ?? string.Empty, @"[^\d]", string.Empty);
                 if (string.IsNullOrWhiteSpace(appId)) continue;
                 cancellationToken.ThrowIfCancellationRequested();
-                var storeTitle = SteamName(appId, cancellationToken);
+                var storeTitle = await coverService.SteamNameAsync(appId, cancellationToken).ConfigureAwait(true);
                 if (string.IsNullOrWhiteSpace(storeTitle)) continue;
                 item.GameName = storeTitle;
             }

@@ -12,6 +12,12 @@ namespace PixelVaultNative
     // Sync entry points call the async implementations with GetAwaiter().GetResult(); prefer DownloadStringAsync/DownloadFileAsync with await off the UI thread so HTTP does not block a thread-pool thread.
     sealed class TimeoutWebClient : IDisposable
     {
+        /// <summary>Default cap for JSON/text responses (Steam store API, SteamGridDB search, etc.). Zero or negative disables the limit.</summary>
+        public const long DefaultMaxStringResponseBytes = 4L * 1024 * 1024;
+
+        /// <summary>Default cap for binary downloads (e.g. cover art). Zero or negative disables the limit.</summary>
+        public const long DefaultMaxFileDownloadBytes = 48L * 1024 * 1024;
+
         readonly HttpClientHandler handler = new HttpClientHandler();
         readonly HttpClient client;
         bool disposed;
@@ -24,6 +30,12 @@ namespace PixelVaultNative
         public Encoding Encoding = Encoding.UTF8;
         public int TimeoutMilliseconds = 15000;
         public WebHeaderCollection Headers = new WebHeaderCollection();
+
+        /// <summary>Maximum response body size for <see cref="DownloadStringAsync"/>. Zero or negative means no limit.</summary>
+        public long MaxStringResponseBytes = DefaultMaxStringResponseBytes;
+
+        /// <summary>Maximum bytes written for <see cref="DownloadFileAsync"/>. Zero or negative means no limit.</summary>
+        public long MaxFileDownloadBytes = DefaultMaxFileDownloadBytes;
 
         HttpRequestMessage BuildRequest(HttpMethod method, string address)
         {
@@ -59,6 +71,57 @@ namespace PixelVaultNative
             return requestCancellation == null ? fallbackToken : requestCancellation.Token;
         }
 
+        static async Task<byte[]> ReadStreamWithByteLimitAsync(Stream stream, long maxBytes, CancellationToken cancellationToken)
+        {
+            if (maxBytes <= 0)
+            {
+                using (var buffer = new MemoryStream())
+                {
+                    await stream.CopyToAsync(buffer, 81920, cancellationToken).ConfigureAwait(false);
+                    return buffer.ToArray();
+                }
+            }
+
+            using (var buffer = new MemoryStream())
+            {
+                var chunk = new byte[81920];
+                long total = 0;
+                int read;
+                while ((read = await stream.ReadAsync(chunk, 0, chunk.Length, cancellationToken).ConfigureAwait(false)) > 0)
+                {
+                    total += read;
+                    if (total > maxBytes)
+                    {
+                        throw new IOException("HTTP response exceeded maximum allowed size (" + maxBytes + " bytes).");
+                    }
+                    await buffer.WriteAsync(chunk, 0, read, cancellationToken).ConfigureAwait(false);
+                }
+                return buffer.ToArray();
+            }
+        }
+
+        static async Task CopyStreamToFileWithLimitAsync(Stream source, Stream destination, long maxBytes, CancellationToken cancellationToken)
+        {
+            if (maxBytes <= 0)
+            {
+                await source.CopyToAsync(destination, 81920, cancellationToken).ConfigureAwait(false);
+                return;
+            }
+
+            var chunk = new byte[81920];
+            long total = 0;
+            int read;
+            while ((read = await source.ReadAsync(chunk, 0, chunk.Length, cancellationToken).ConfigureAwait(false)) > 0)
+            {
+                total += read;
+                if (total > maxBytes)
+                {
+                    throw new IOException("HTTP download exceeded maximum allowed size (" + maxBytes + " bytes).");
+                }
+                await destination.WriteAsync(chunk, 0, read, cancellationToken).ConfigureAwait(false);
+            }
+        }
+
         static string DecodeResponseBody(byte[] bytes, Encoding fallbackEncoding, HttpResponseMessage response)
         {
             var charset = response.Content.Headers.ContentType == null ? null : response.Content.Headers.ContentType.CharSet;
@@ -91,10 +154,8 @@ namespace PixelVaultNative
                 {
                     response.EnsureSuccessStatusCode();
                     using (var stream = await response.Content.ReadAsStreamAsync(token).ConfigureAwait(false))
-                    using (var buffer = new MemoryStream())
                     {
-                        await stream.CopyToAsync(buffer, 81920, token).ConfigureAwait(false);
-                        var bytes = buffer.ToArray();
+                        var bytes = await ReadStreamWithByteLimitAsync(stream, MaxStringResponseBytes, token).ConfigureAwait(false);
                         return DecodeResponseBody(bytes, Encoding, response);
                     }
                 }
@@ -120,7 +181,7 @@ namespace PixelVaultNative
                         using (var stream = await response.Content.ReadAsStreamAsync(token).ConfigureAwait(false))
                         using (var target = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, FileOptions.Asynchronous))
                         {
-                            await stream.CopyToAsync(target, 81920, token).ConfigureAwait(false);
+                            await CopyStreamToFileWithLimitAsync(stream, target, MaxFileDownloadBytes, token).ConfigureAwait(false);
                             await target.FlushAsync(token).ConfigureAwait(false);
                         }
                     }

@@ -30,7 +30,7 @@ Repo is the source of truth; keep `PixelVaultData/TODO.md` and Notion aligned wh
 
 | Issue | Why it matters | Suggested fix |
 |--------|----------------|---------------|
-| `TimeoutWebClient.DownloadString` buffers entire body in memory | Large responses spike memory and GC | Cap size (`MaxResponseContentBufferSize` or read with max bytes + cancel) |
+| `TimeoutWebClient.DownloadString` buffers entire body in memory | Large responses spike memory and GC | **Addressed in app:** **`TimeoutWebClient`** **`MaxStringResponseBytes`** / **`MaxFileDownloadBytes`** with stream read caps (defaults **`DefaultMaxStringResponseBytes`** / **`DefaultMaxFileDownloadBytes`**). |
 | Custom filename rules compile to `Regex` | Many rules or invalidations cost CPU | Keep caching; consider `RegexOptions.NonBacktracking` where applicable; validate pattern complexity on save |
 | Library virtualization `SizeChanged` → `Dispatcher.BeginInvoke` | Rapid resize queues many refreshes | Debounce like Library search (single timer / coalesce) |
 
