@@ -186,6 +186,8 @@ Tasks:
 - Move source inventory, rename, destination path building, file move/copy, and undo manifest logic into the service.
 - Let ImportService call IMetadataService for write operations when needed.
 - Keep current UI flow and dialogs in MainWindow.
+- Import-and-edit: when the user leaves the loaded game title unchanged on a Steam-tagged row, resolve the Steam store title via ICoverService (ApplyImportAndEditSteamStoreTitlesWhenGameNameUnchangedAsync).
+- Manual metadata / import-and-edit finish: normalize display names, resolve GameId against the in-memory game index, copy canonical name and Steam AppID onto the matched row, then save the index (FinalizeManualMetadataItemsAgainstGameIndex); row-resolution helpers can stay delegated from MainWindow until a dedicated game-index service owns them.
 
 Done criteria:
 - Import, manual import, and import-and-comment still work.

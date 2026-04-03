@@ -293,7 +293,11 @@ namespace PixelVaultNative
                 GetFileLastWriteTime = path => File.GetLastWriteTime(path),
                 GamePhotographyTagLabel = GamePhotographyTag,
                 CoverService = coverService,
-                NormalizeGameIndexName = name => NormalizeGameIndexName(name)
+                NormalizeGameIndexName = name => NormalizeGameIndexName(name),
+                ResolveExistingGameIndexRowForAssignment = ResolveExistingGameIndexRowForAssignment,
+                DetermineManualMetadataPlatformLabel = DetermineManualMetadataPlatformLabel,
+                ManualMetadataChangesGroupingIdentity = ManualMetadataChangesGroupingIdentity,
+                SaveSavedGameIndexRows = SaveSavedGameIndexRows
             });
             libraryWorkspace = new LibraryWorkspaceContext(this);
             librarySession = new LibrarySession(libraryWorkspace, libraryScanner, fileSystemService);
@@ -2966,28 +2970,7 @@ namespace PixelVaultNative
                         : pendingItems.Count + " image(s) will be renamed if needed, tagged, updated with metadata, and moved to the destination.\n\nApply changes and send them now?";
                 var confirm = MessageBox.Show(confirmText, confirmCaption, MessageBoxButton.OKCancel, MessageBoxImage.Question);
                 if (confirm != MessageBoxResult.OK) return;
-                foreach (var item in pendingItems)
-                {
-                    if (item.DeleteBeforeProcessing) continue;
-                    var resolvedName = NormalizeGameIndexName(
-                        string.IsNullOrWhiteSpace(item.GameName)
-                            ? GetGameNameFromFileName(Path.GetFileNameWithoutExtension(item.FilePath))
-                            : item.GameName);
-                    if (!string.IsNullOrWhiteSpace(resolvedName)) item.GameName = resolvedName;
-                    var preferredGameId = ManualMetadataChangesGroupingIdentity(item) ? string.Empty : item.GameId;
-                    var resolvedRow = ResolveExistingGameIndexRowForAssignment(gameRows, item.GameName, DetermineManualMetadataPlatformLabel(item), preferredGameId);
-                    item.GameId = resolvedRow == null ? string.Empty : resolvedRow.GameId;
-                    if (resolvedRow != null)
-                    {
-                        if (!string.IsNullOrWhiteSpace(resolvedRow.Name)) item.GameName = resolvedRow.Name;
-                        if (!string.IsNullOrWhiteSpace(item.SteamAppId))
-                        {
-                            resolvedRow.SteamAppId = item.SteamAppId;
-                            resolvedRow.SuppressSteamAppIdAutoResolve = false;
-                        }
-                    }
-                }
-                SaveSavedGameIndexRows(libraryRoot, gameRows);
+                importService.FinalizeManualMetadataItemsAgainstGameIndex(libraryRoot, gameRows, pendingItems);
                 items.Clear();
                 items.AddRange(pendingItems);
                 manualWindow.DialogResult = true;

@@ -44,6 +44,12 @@ namespace PixelVaultNative
         /// replace numeric/placeholder titles with the Steam store name for that AppID (same idea as automatic import).
         /// </summary>
         Task ApplyImportAndEditSteamStoreTitlesWhenGameNameUnchangedAsync(IEnumerable<ManualMetadataItem> items, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Manual metadata / import-and-edit finish: normalize each item’s display name, resolve <see cref="ManualMetadataItem.GameId"/>
+        /// from the game index, copy canonical name and Steam AppID onto the matched row, then persist the index.
+        /// </summary>
+        void FinalizeManualMetadataItemsAgainstGameIndex(string libraryRoot, List<GameIndexEditorRow> gameRows, IEnumerable<ManualMetadataItem> pendingItems);
     }
 
     /// <summary>Outcome of moving files back to source folders during undo (no UI).</summary>
@@ -108,6 +114,18 @@ namespace PixelVaultNative
 
         /// <summary>Same normalization as game-index manual metadata (single-argument form: title only).</summary>
         public Func<string, string> NormalizeGameIndexName;
+
+        /// <summary>Match manual metadata rows to saved game index rows (by preferred id then name+platform).</summary>
+        public Func<IEnumerable<GameIndexEditorRow>, string, string, string, GameIndexEditorRow> ResolveExistingGameIndexRowForAssignment;
+
+        /// <summary>Platform label for a manual metadata row (checkboxes + tags).</summary>
+        public Func<ManualMetadataItem, string> DetermineManualMetadataPlatformLabel;
+
+        /// <summary>True when the row’s game id should not drive index assignment (library edit grouping).</summary>
+        public Func<ManualMetadataItem, bool> ManualMetadataChangesGroupingIdentity;
+
+        /// <summary>Persist game index after in-memory updates.</summary>
+        public Action<string, IEnumerable<GameIndexEditorRow>> SaveSavedGameIndexRows;
     }
 
     internal sealed class ImportService : IImportService
@@ -537,6 +555,45 @@ namespace PixelVaultNative
                 if (string.IsNullOrWhiteSpace(storeTitle)) continue;
                 item.GameName = storeTitle;
             }
+        }
+
+        public void FinalizeManualMetadataItemsAgainstGameIndex(string libraryRoot, List<GameIndexEditorRow> gameRows, IEnumerable<ManualMetadataItem> pendingItems)
+        {
+            if (gameRows == null) throw new ArgumentNullException(nameof(gameRows));
+            var resolveExisting = d.ResolveExistingGameIndexRowForAssignment;
+            var platformLabelFn = d.DetermineManualMetadataPlatformLabel;
+            var groupingIdentityFn = d.ManualMetadataChangesGroupingIdentity;
+            var saveRows = d.SaveSavedGameIndexRows;
+            var normalize = d.NormalizeGameIndexName;
+            var nameFromFile = d.GetGameNameFromFileName;
+            if (resolveExisting == null || platformLabelFn == null || groupingIdentityFn == null || saveRows == null || normalize == null || nameFromFile == null)
+            {
+                throw new InvalidOperationException("ImportServiceDependencies must set ResolveExistingGameIndexRowForAssignment, DetermineManualMetadataPlatformLabel, ManualMetadataChangesGroupingIdentity, SaveSavedGameIndexRows, NormalizeGameIndexName, and GetGameNameFromFileName for finalize.");
+            }
+
+            foreach (var item in pendingItems ?? Enumerable.Empty<ManualMetadataItem>())
+            {
+                if (item == null || item.DeleteBeforeProcessing) continue;
+                var resolvedName = normalize(
+                    string.IsNullOrWhiteSpace(item.GameName)
+                        ? nameFromFile(Path.GetFileNameWithoutExtension(item.FilePath))
+                        : item.GameName);
+                if (!string.IsNullOrWhiteSpace(resolvedName)) item.GameName = resolvedName;
+                var preferredGameId = groupingIdentityFn(item) ? string.Empty : item.GameId;
+                var resolvedRow = resolveExisting(gameRows, item.GameName, platformLabelFn(item), preferredGameId);
+                item.GameId = resolvedRow == null ? string.Empty : resolvedRow.GameId;
+                if (resolvedRow != null)
+                {
+                    if (!string.IsNullOrWhiteSpace(resolvedRow.Name)) item.GameName = resolvedRow.Name;
+                    if (!string.IsNullOrWhiteSpace(item.SteamAppId))
+                    {
+                        resolvedRow.SteamAppId = item.SteamAppId;
+                        resolvedRow.SuppressSteamAppIdAutoResolve = false;
+                    }
+                }
+            }
+
+            saveRows(libraryRoot, gameRows);
         }
 
         string ResolveUndoCurrentPath(UndoImportEntry entry, HashSet<string> usedPaths, string destinationRoot, string libraryRoot)
