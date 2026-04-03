@@ -1,5 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows;
 
 namespace PixelVaultNative
 {
@@ -15,6 +18,9 @@ namespace PixelVaultNative
         readonly Func<string, List<LibraryFolderInfo>> _loadLibraryFolderCacheSnapshot;
         readonly Func<string, string, Dictionary<string, LibraryMetadataIndexEntry>, DateTime> _resolveIndexedLibraryDate;
         readonly Func<string, string, string, EmbeddedMetadataSnapshot, LibraryMetadataIndexEntry, Dictionary<string, LibraryMetadataIndexEntry>, List<GameIndexEditorRow>, LibraryMetadataIndexEntry> _buildResolvedLibraryMetadataIndexEntry;
+        readonly LibraryCoverRefreshAsyncInvoker _refreshLibraryCovers;
+        readonly LibraryMetadataScanInvoker _runLibraryMetadataScan;
+        readonly Action<string, string> _ensureDirectoryAccessible;
 
         internal LibrarySession(
             LibraryWorkspaceContext workspace,
@@ -26,7 +32,10 @@ namespace PixelVaultNative
             Action<string, Dictionary<string, LibraryMetadataIndexEntry>> saveLibraryMetadataIndex,
             Func<string, List<LibraryFolderInfo>> loadLibraryFolderCacheSnapshot,
             Func<string, string, Dictionary<string, LibraryMetadataIndexEntry>, DateTime> resolveIndexedLibraryDate,
-            Func<string, string, string, EmbeddedMetadataSnapshot, LibraryMetadataIndexEntry, Dictionary<string, LibraryMetadataIndexEntry>, List<GameIndexEditorRow>, LibraryMetadataIndexEntry> buildResolvedLibraryMetadataIndexEntry)
+            Func<string, string, string, EmbeddedMetadataSnapshot, LibraryMetadataIndexEntry, Dictionary<string, LibraryMetadataIndexEntry>, List<GameIndexEditorRow>, LibraryMetadataIndexEntry> buildResolvedLibraryMetadataIndexEntry,
+            LibraryCoverRefreshAsyncInvoker refreshLibraryCovers,
+            LibraryMetadataScanInvoker runLibraryMetadataScan,
+            Action<string, string> ensureDirectoryAccessible)
         {
             _workspace = workspace ?? throw new ArgumentNullException(nameof(workspace));
             _scanner = scanner ?? throw new ArgumentNullException(nameof(scanner));
@@ -38,9 +47,19 @@ namespace PixelVaultNative
             _loadLibraryFolderCacheSnapshot = loadLibraryFolderCacheSnapshot ?? throw new ArgumentNullException(nameof(loadLibraryFolderCacheSnapshot));
             _resolveIndexedLibraryDate = resolveIndexedLibraryDate ?? throw new ArgumentNullException(nameof(resolveIndexedLibraryDate));
             _buildResolvedLibraryMetadataIndexEntry = buildResolvedLibraryMetadataIndexEntry ?? throw new ArgumentNullException(nameof(buildResolvedLibraryMetadataIndexEntry));
+            _refreshLibraryCovers = refreshLibraryCovers ?? throw new ArgumentNullException(nameof(refreshLibraryCovers));
+            _runLibraryMetadataScan = runLibraryMetadataScan ?? throw new ArgumentNullException(nameof(runLibraryMetadataScan));
+            _ensureDirectoryAccessible = ensureDirectoryAccessible ?? throw new ArgumentNullException(nameof(ensureDirectoryAccessible));
         }
 
         public string LibraryRoot => _workspace.LibraryRoot;
+
+        public bool HasLibraryRoot => !string.IsNullOrWhiteSpace(LibraryRoot);
+
+        public void EnsureLibraryRootAccessible(string notFoundMessageLabel)
+        {
+            _ensureDirectoryAccessible(LibraryRoot ?? string.Empty, string.IsNullOrWhiteSpace(notFoundMessageLabel) ? "Library folder" : notFoundMessageLabel);
+        }
 
         public LibraryWorkspaceContext Workspace => _workspace;
 
@@ -105,6 +124,40 @@ namespace PixelVaultNative
             List<GameIndexEditorRow> gameRows)
         {
             return _buildResolvedLibraryMetadataIndexEntry(LibraryRoot ?? string.Empty, file, stamp, snapshot, existingEntry, index, gameRows);
+        }
+
+        public void RemoveLibraryMetadataIndexEntries(IEnumerable<string> removedFiles)
+        {
+            if (string.IsNullOrWhiteSpace(LibraryRoot) || removedFiles == null) return;
+            _scanner.RemoveLibraryMetadataIndexEntries(removedFiles, LibraryRoot);
+        }
+
+        public List<LibraryFolderInfo> LoadLibraryFoldersCached(bool forceRefresh)
+        {
+            if (string.IsNullOrWhiteSpace(LibraryRoot)) return new List<LibraryFolderInfo>();
+            return _scanner.LoadLibraryFoldersCached(LibraryRoot, forceRefresh);
+        }
+
+        public Task<(int resolvedIds, int coversReady)> RefreshLibraryCoversAsync(
+            List<LibraryFolderInfo> libraryFolders,
+            List<LibraryFolderInfo> requestedFolders,
+            Action<int, int, string> progress,
+            CancellationToken cancellationToken,
+            bool forceRefreshExistingCovers,
+            bool rebuildFullCacheAfterRefresh)
+        {
+            if (string.IsNullOrWhiteSpace(LibraryRoot))
+            {
+                return Task.FromResult((0, 0));
+            }
+
+            return _refreshLibraryCovers(LibraryRoot, libraryFolders, requestedFolders, progress, cancellationToken, forceRefreshExistingCovers, rebuildFullCacheAfterRefresh);
+        }
+
+        public void RunLibraryMetadataScan(Window owner, string folderPath, bool forceRescan, Action<bool> setBusyState, Action onSuccess)
+        {
+            if (string.IsNullOrWhiteSpace(LibraryRoot)) return;
+            _runLibraryMetadataScan(owner, LibraryRoot, folderPath, forceRescan, setBusyState, onSuccess);
         }
     }
 }

@@ -68,6 +68,15 @@ namespace PixelVaultNative
 
         /// <summary>True if any row has Other platform checked but no non-empty cleaned custom platform name (blocks finish).</summary>
         bool ManualMetadataItemsMissingOtherPlatformName(IEnumerable<ManualMetadataItem> items);
+
+        /// <summary>Message when the user clicks Finish with no rows selected (library vs import-and-edit vs manual import).</summary>
+        string GetManualMetadataFinishEmptySelectionMessage(bool libraryMode, bool importAndEditMode);
+
+        /// <summary>Final confirmation body text before persisting manual metadata (excludes dialog title).</summary>
+        string GetManualMetadataFinishConfirmBody(int pendingItemCount, bool libraryMode, bool importAndEditMode);
+
+        /// <summary>Full “Add New Game?” prompt body (preview lines capped; caller shows MessageBox).</summary>
+        string BuildManualMetadataAddNewGamePrompt(IReadOnlyList<string> unresolvedMasterRecordLabels, int maxPreviewLines = 8);
     }
 
     /// <summary>Outcome of moving files back to source folders during undo (no UI).</summary>
@@ -732,6 +741,45 @@ namespace PixelVaultNative
                 item != null
                 && item.TagOther
                 && string.IsNullOrWhiteSpace(clean(item.CustomPlatformTag)));
+        }
+
+        public string GetManualMetadataFinishEmptySelectionMessage(bool libraryMode, bool importAndEditMode)
+        {
+            if (libraryMode) return "Select at least one library image to update.";
+            if (importAndEditMode) return "Select at least one upload file to include in this import.";
+            return "Select at least one unmatched image to send.";
+        }
+
+        public string GetManualMetadataFinishConfirmBody(int pendingItemCount, bool libraryMode, bool importAndEditMode)
+        {
+            var n = pendingItemCount;
+            if (libraryMode)
+            {
+                return n + " selected image(s) will be renamed if needed, updated with metadata, and reorganized in the library if their title changes.\n\nApply changes now?";
+            }
+
+            if (importAndEditMode)
+            {
+                return n + " selected file(s) will continue through import (Steam rename if applicable, optional delete, metadata, move to destination).\n\nFiles not selected stay in the upload folder.\n\nContinue?";
+            }
+
+            return n + " image(s) will be renamed if needed, tagged, updated with metadata, and moved to the destination.\n\nApply changes and send them now?";
+        }
+
+        public string BuildManualMetadataAddNewGamePrompt(IReadOnlyList<string> unresolvedMasterRecordLabels, int maxPreviewLines = 8)
+        {
+            if (unresolvedMasterRecordLabels == null || unresolvedMasterRecordLabels.Count == 0)
+            {
+                throw new ArgumentException("At least one unresolved label is required.", nameof(unresolvedMasterRecordLabels));
+            }
+
+            var n = unresolvedMasterRecordLabels.Count;
+            var take = Math.Max(0, maxPreviewLines);
+            var preview = string.Join(Environment.NewLine, unresolvedMasterRecordLabels.Take(take).Select(title => "- " + title));
+            if (n > take) preview += Environment.NewLine + "- ...";
+            return "These game record" + (n == 1 ? " is" : "s are") + " not in the game index yet:" + Environment.NewLine + Environment.NewLine
+                + preview + Environment.NewLine + Environment.NewLine
+                + "Add " + (n == 1 ? "it" : "them") + " as new master game record" + (n == 1 ? "" : "s") + "?";
         }
 
         string ResolveUndoCurrentPath(UndoImportEntry entry, HashSet<string> usedPaths, string destinationRoot, string libraryRoot)

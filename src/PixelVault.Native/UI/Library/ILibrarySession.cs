@@ -1,8 +1,28 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows;
 
 namespace PixelVaultNative
 {
+    internal delegate Task<(int ResolvedIds, int CoversReady)> LibraryCoverRefreshAsyncInvoker(
+        string root,
+        List<LibraryFolderInfo> libraryFolders,
+        List<LibraryFolderInfo> requestedFolders,
+        Action<int, int, string> progress,
+        CancellationToken cancellationToken,
+        bool forceRefreshExistingCovers,
+        bool rebuildFullCacheAfterRefresh);
+
+    internal delegate void LibraryMetadataScanInvoker(
+        Window owner,
+        string libraryRoot,
+        string folderPath,
+        bool forceRescan,
+        Action<bool> setBusyState,
+        Action onSuccess);
+
     /// <summary>
     /// Library-facing session: workspace caches, current root, scanner, file I/O seam, and game-index persistence for the active library root.
     /// Phase E2 — keeps hosts and large partials from reaching for unrelated <see cref="MainWindow"/> state.
@@ -10,6 +30,12 @@ namespace PixelVaultNative
     internal interface ILibrarySession
     {
         string LibraryRoot { get; }
+
+        /// <summary>True when <see cref="LibraryRoot"/> is non-empty.</summary>
+        bool HasLibraryRoot { get; }
+
+        /// <summary>Throws if <see cref="LibraryRoot"/> is missing or not an existing directory (host uses the same rules as <c>EnsureDir</c>).</summary>
+        void EnsureLibraryRootAccessible(string notFoundMessageLabel);
         LibraryWorkspaceContext Workspace { get; }
         ILibraryScanner Scanner { get; }
         IFileSystemService FileSystem { get; }
@@ -43,5 +69,23 @@ namespace PixelVaultNative
             LibraryMetadataIndexEntry existingEntry,
             Dictionary<string, LibraryMetadataIndexEntry> index,
             List<GameIndexEditorRow> gameRows);
+
+        /// <summary>Remove index rows for deleted files under <see cref="LibraryRoot"/> (no-op when root unset).</summary>
+        void RemoveLibraryMetadataIndexEntries(IEnumerable<string> removedFiles);
+
+        /// <summary>Load folder list from cache / scan for <see cref="LibraryRoot"/> (empty list when root unset).</summary>
+        List<LibraryFolderInfo> LoadLibraryFoldersCached(bool forceRefresh);
+
+        /// <summary>Resolve IDs and fetch covers for <see cref="LibraryRoot"/> (completed (0,0) when root unset).</summary>
+        Task<(int resolvedIds, int coversReady)> RefreshLibraryCoversAsync(
+            List<LibraryFolderInfo> libraryFolders,
+            List<LibraryFolderInfo> requestedFolders,
+            Action<int, int, string> progress,
+            CancellationToken cancellationToken,
+            bool forceRefreshExistingCovers,
+            bool rebuildFullCacheAfterRefresh);
+
+        /// <summary>Show metadata scan progress for <see cref="LibraryRoot"/> (no-op when root unset).</summary>
+        void RunLibraryMetadataScan(Window owner, string folderPath, bool forceRescan, Action<bool> setBusyState, Action onSuccess);
     }
 }

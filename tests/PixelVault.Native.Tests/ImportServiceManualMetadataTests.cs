@@ -328,4 +328,53 @@ public sealed class ImportServiceManualMetadataTests
         Assert.True(svc.ManualMetadataItemsMissingOtherPlatformName(new[] { bad }));
         Assert.False(svc.ManualMetadataItemsMissingOtherPlatformName(new[] { ok }));
     }
+
+    [Fact]
+    public void GetManualMetadataFinishEmptySelectionMessage_Uses_Mode()
+    {
+        var svc = CreateServiceWithManualMetadataDeps(new StubCoverService(), s => s);
+        Assert.Contains("library", svc.GetManualMetadataFinishEmptySelectionMessage(true, false), StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("upload", svc.GetManualMetadataFinishEmptySelectionMessage(false, true), StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("unmatched", svc.GetManualMetadataFinishEmptySelectionMessage(false, false), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void GetManualMetadataFinishConfirmBody_Includes_Count_And_Mode_Phrase()
+    {
+        var svc = CreateServiceWithManualMetadataDeps(new StubCoverService(), s => s);
+        Assert.Contains("3 selected image", svc.GetManualMetadataFinishConfirmBody(3, true, false));
+        Assert.Contains("Apply changes now", svc.GetManualMetadataFinishConfirmBody(3, true, false));
+        Assert.Contains("Continue", svc.GetManualMetadataFinishConfirmBody(2, false, true));
+        Assert.Contains("send them now", svc.GetManualMetadataFinishConfirmBody(1, false, false), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void BuildManualMetadataAddNewGamePrompt_Singular_And_Preview()
+    {
+        var svc = CreateServiceWithManualMetadataDeps(new StubCoverService(), s => s);
+        var msg = svc.BuildManualMetadataAddNewGamePrompt(new[] { "A | Steam" }, 8);
+        Assert.Contains("record is not", msg, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("- A | Steam", msg);
+        Assert.Contains("Add it as", msg, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void BuildManualMetadataAddNewGamePrompt_Plural_And_Truncates_Preview()
+    {
+        var svc = CreateServiceWithManualMetadataDeps(new StubCoverService(), s => s);
+        var labels = Enumerable.Range(0, 10).Select(i => "G" + i).ToList();
+        var msg = svc.BuildManualMetadataAddNewGamePrompt(labels, 2);
+        Assert.Contains("records are not", msg, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("- G0", msg);
+        Assert.Contains("- G1", msg);
+        Assert.Contains("- ...", msg);
+        Assert.DoesNotContain("G2", msg);
+    }
+
+    [Fact]
+    public void BuildManualMetadataAddNewGamePrompt_Throws_When_Empty()
+    {
+        var svc = CreateServiceWithManualMetadataDeps(new StubCoverService(), s => s);
+        Assert.Throws<ArgumentException>(() => svc.BuildManualMetadataAddNewGamePrompt(Array.Empty<string>()));
+    }
 }

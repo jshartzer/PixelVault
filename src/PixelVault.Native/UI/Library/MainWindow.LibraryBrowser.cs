@@ -30,7 +30,7 @@ namespace PixelVaultNative
         {
             try
             {
-                EnsureDir(librarySession.LibraryRoot, "Library folder");
+                librarySession.EnsureLibraryRootAccessible("Library folder");
                 var folders = new List<LibraryFolderInfo>();
                 Button intakeReviewButton = null;
                 Border intakeReviewBadge = null;
@@ -735,7 +735,7 @@ namespace PixelVaultNative
 
                     if (removedFiles.Count > 0)
                     {
-                        librarySession.Scanner.RemoveLibraryMetadataIndexEntries(removedFiles, librarySession.LibraryRoot);
+                        librarySession.RemoveLibraryMetadataIndexEntries(removedFiles);
                     }
                     foreach (var directory in touchedDirectories) TryDeleteEmptyDirectory(directory);
                     selectedDetailFiles.Clear();
@@ -913,7 +913,7 @@ namespace PixelVaultNative
                                 .Distinct(StringComparer.OrdinalIgnoreCase)
                                 .ToList();
                             var filesMissingCaptureTicks = new List<string>();
-                            if (!string.IsNullOrWhiteSpace(librarySession.LibraryRoot) && detailFiles.Count > 0)
+                            if (librarySession.HasLibraryRoot && detailFiles.Count > 0)
                             {
                                 filesMissingCaptureTicks = detailFiles
                                     .Where(file =>
@@ -1393,7 +1393,7 @@ namespace PixelVaultNative
                     if (renderTiles != null) renderTiles();
                     System.Threading.Tasks.Task.Factory.StartNew(delegate
                     {
-                        return librarySession.Scanner.LoadLibraryFoldersCached(librarySession.LibraryRoot, forceRefresh);
+                        return librarySession.LoadLibraryFoldersCached(forceRefresh);
                     }).ContinueWith(delegate(System.Threading.Tasks.Task<List<LibraryFolderInfo>> loadTask)
                     {
                         libraryWindow.Dispatcher.BeginInvoke(new Action(delegate
@@ -1462,7 +1462,7 @@ namespace PixelVaultNative
 
                 runLibraryScan = delegate(string folderPath, bool forceRescan)
                 {
-                    ShowLibraryMetadataScanWindow(libraryWindow, librarySession.LibraryRoot, folderPath, forceRescan, setLibraryBusyState, delegate
+                    librarySession.RunLibraryMetadataScan(libraryWindow, folderPath, forceRescan, setLibraryBusyState, delegate
                     {
                         if (string.IsNullOrWhiteSpace(folderPath)) current = null;
                         else current = new LibraryFolderInfo { FolderPath = folderPath, PlatformLabel = current == null ? string.Empty : current.PlatformLabel, Name = current == null ? string.Empty : current.Name };
@@ -1531,7 +1531,7 @@ namespace PixelVaultNative
                         refreshCancellation = new CancellationTokenSource();
                         System.Threading.Tasks.Task.Run(async () =>
                         {
-                            var result = await RefreshLibraryCoversAsync(librarySession.LibraryRoot, folders, targetFolders, delegate(int currentCount, int totalCount, string detail)
+                            var result = await librarySession.RefreshLibraryCoversAsync(folders, targetFolders, delegate(int currentCount, int totalCount, string detail)
                             {
                                 if (progressWindow == null) return;
                                 progressWindow.Dispatcher.BeginInvoke(new Action(delegate

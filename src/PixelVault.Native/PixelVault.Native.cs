@@ -320,7 +320,10 @@ namespace PixelVaultNative
                 SaveLibraryMetadataIndex,
                 LoadLibraryFolderCacheSnapshot,
                 ResolveIndexedLibraryDate,
-                BuildResolvedLibraryMetadataIndexEntry);
+                BuildResolvedLibraryMetadataIndexEntry,
+                RefreshLibraryCoversAsync,
+                ShowLibraryMetadataScanWindow,
+                EnsureDir);
             Directory.CreateDirectory(dataRoot);
             Directory.CreateDirectory(logsRoot);
             Directory.CreateDirectory(cacheRoot);
@@ -2867,12 +2870,7 @@ namespace PixelVaultNative
                 var pendingItems = selectedItems.Distinct().ToList();
                 if (pendingItems.Count == 0)
                 {
-                    var emptyMsg = libraryMode
-                        ? "Select at least one library image to update."
-                        : importAndEditMode
-                            ? "Select at least one upload file to include in this import."
-                            : "Select at least one unmatched image to send.";
-                    MessageBox.Show(emptyMsg, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
+                    MessageBox.Show(importService.GetManualMetadataFinishEmptySelectionMessage(libraryMode, importAndEditMode), "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
                     return;
                 }
                 if (useCustomTimeBox.IsChecked == true) saveSelectedDateTime();
@@ -2890,12 +2888,8 @@ namespace PixelVaultNative
                 var unresolvedMasterRecords = importService.BuildUnresolvedManualMetadataMasterRecordLabels(gameRows, pendingItems);
                 if (unresolvedMasterRecords.Count > 0)
                 {
-                    var preview = string.Join(Environment.NewLine, unresolvedMasterRecords.Take(8).Select(title => "- " + title).ToArray());
-                    if (unresolvedMasterRecords.Count > 8) preview += Environment.NewLine + "- ...";
                     var addChoice = MessageBox.Show(
-                        "These game record" + (unresolvedMasterRecords.Count == 1 ? " is" : "s are") + " not in the game index yet:" + Environment.NewLine + Environment.NewLine +
-                        preview + Environment.NewLine + Environment.NewLine +
-                        "Add " + (unresolvedMasterRecords.Count == 1 ? "it" : "them") + " as new master game record" + (unresolvedMasterRecords.Count == 1 ? "" : "s") + "?",
+                        importService.BuildManualMetadataAddNewGamePrompt(unresolvedMasterRecords, 8),
                         "Add New Game",
                         MessageBoxButton.OKCancel,
                         MessageBoxImage.Question);
@@ -2907,12 +2901,11 @@ namespace PixelVaultNative
                     refreshGameTitleChoices();
                     importService.EnsureNewManualMetadataMasterRecordsInGameIndex(gameRows, pendingItems);
                 }
-                var confirmText = libraryMode
-                    ? pendingItems.Count + " selected image(s) will be renamed if needed, updated with metadata, and reorganized in the library if their title changes.\n\nApply changes now?"
-                    : importAndEditMode
-                        ? pendingItems.Count + " selected file(s) will continue through import (Steam rename if applicable, optional delete, metadata, move to destination).\n\nFiles not selected stay in the upload folder.\n\nContinue?"
-                        : pendingItems.Count + " image(s) will be renamed if needed, tagged, updated with metadata, and moved to the destination.\n\nApply changes and send them now?";
-                var confirm = MessageBox.Show(confirmText, confirmCaption, MessageBoxButton.OKCancel, MessageBoxImage.Question);
+                var confirm = MessageBox.Show(
+                    importService.GetManualMetadataFinishConfirmBody(pendingItems.Count, libraryMode, importAndEditMode),
+                    confirmCaption,
+                    MessageBoxButton.OKCancel,
+                    MessageBoxImage.Question);
                 if (confirm != MessageBoxResult.OK) return;
                 importService.FinalizeManualMetadataItemsAgainstGameIndex(libraryRoot, gameRows, pendingItems);
                 items.Clear();
