@@ -33,6 +33,9 @@ namespace PixelVaultNative
 
         /// <summary>Prefix filenames with sanitized game title for manual metadata / library edit flows (mutates item paths).</summary>
         RenameStepResult RunManualRename(List<ManualMetadataItem> items, Action<int, int, string> progress = null, CancellationToken cancellationToken = default);
+
+        /// <summary>Write Exif/metadata for intake review items (standard import / import-and-comment workflow).</summary>
+        MetadataStepResult WriteMetadataForReviewItems(IEnumerable<ReviewItem> reviewItems, Action<int, int, string> progress = null, CancellationToken cancellationToken = default);
     }
 
     /// <summary>Outcome of moving files back to source folders during undo (no UI).</summary>
@@ -79,6 +82,18 @@ namespace PixelVaultNative
         public Func<string, string> NormalizeTitleForManualRename;
 
         public IFileSystemService FileSystem;
+
+        /// <summary>Exif args and batched ExifTool writes for import metadata step.</summary>
+        public IMetadataService MetadataService;
+
+        /// <summary>Filesystem creation time (for preserve-timestamps restore metadata).</summary>
+        public Func<string, DateTime> GetFileCreationTime;
+
+        /// <summary>Filesystem last write time (for preserve-timestamps restore metadata).</summary>
+        public Func<string, DateTime> GetFileLastWriteTime;
+
+        /// <summary>Display label for photography tag in progress/log text (e.g. “Game Photography”).</summary>
+        public string GamePhotographyTagLabel;
     }
 
     internal sealed class ImportService : IImportService
@@ -90,6 +105,9 @@ namespace PixelVaultNative
         {
             d = dependencies ?? throw new ArgumentNullException(nameof(dependencies));
             fs = d.FileSystem ?? throw new ArgumentNullException(nameof(dependencies) + "." + nameof(dependencies.FileSystem));
+            if (d.MetadataService == null) throw new ArgumentNullException(nameof(dependencies) + "." + nameof(dependencies.MetadataService));
+            if (d.GetFileCreationTime == null) throw new ArgumentNullException(nameof(dependencies) + "." + nameof(dependencies.GetFileCreationTime));
+            if (d.GetFileLastWriteTime == null) throw new ArgumentNullException(nameof(dependencies) + "." + nameof(dependencies.GetFileLastWriteTime));
         }
 
         string UndoPath => d.UndoManifestPath == null ? string.Empty : (d.UndoManifestPath() ?? string.Empty);
@@ -417,6 +435,72 @@ namespace PixelVaultNative
             if (progress != null) progress(total, total, "Rename step complete: renamed " + renamed + ", skipped " + skipped + ".");
             if (renamed > 0 || skipped > 0) d.Log?.Invoke("Manual rename summary: renamed " + renamed + ", skipped " + skipped + ".");
             return new RenameStepResult { Renamed = renamed, Skipped = skipped };
+        }
+
+        public MetadataStepResult WriteMetadataForReviewItems(IEnumerable<ReviewItem> reviewItems, Action<int, int, string> progress = null, CancellationToken cancellationToken = default)
+        {
+            var photoTag = string.IsNullOrWhiteSpace(d.GamePhotographyTagLabel) ? "Game Photography" : d.GamePhotographyTagLabel.Trim();
+            int updated = 0, skipped = 0;
+            var requests = new List<ExifWriteRequest>();
+            var items = (reviewItems ?? Enumerable.Empty<ReviewItem>()).Where(i => i != null).ToList();
+            var total = items.Count;
+            if (progress != null) progress(0, total, "Starting metadata step for " + total + " file(s).");
+            for (int i = 0; i < total; i++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var item = items[i];
+                var remaining = total - (i + 1);
+                if (item.DeleteBeforeProcessing)
+                {
+                    skipped++;
+                    if (progress != null) progress(i + 1, total, "Skipped metadata " + (i + 1) + " of " + total + " | " + remaining + " remaining | file marked for delete");
+                    continue;
+                }
+                var file = item.FilePath;
+                if (!fs.FileExists(file))
+                {
+                    skipped++;
+                    if (progress != null) progress(i + 1, total, "Skipped metadata " + (i + 1) + " of " + total + " | " + remaining + " remaining | file missing");
+                    continue;
+                }
+                var selectedPlatformTags = new List<string>();
+                if (item.TagSteam) selectedPlatformTags.Add("Steam");
+                if (item.TagPs5)
+                {
+                    selectedPlatformTags.Add("PS5");
+                    selectedPlatformTags.Add("PlayStation");
+                }
+                if (item.TagXbox) selectedPlatformTags.Add("Xbox");
+                if (selectedPlatformTags.Count == 0 && item.PlatformTags != null) selectedPlatformTags.AddRange(item.PlatformTags);
+                var platformTags = selectedPlatformTags.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+                var metadataTarget = item.CaptureTime.ToString("yyyy-MM-dd HH:mm:ss") + (item.PreserveFileTimes ? " (preserving file timestamps)" : string.Empty);
+                var notes = new List<string>();
+                if (!string.IsNullOrWhiteSpace(item.Comment)) notes.Add("comment added");
+                if (item.AddPhotographyTag) notes.Add(photoTag + " tag added");
+                var noteSuffix = notes.Count > 0 ? " [" + string.Join(", ", notes.ToArray()) + "]" : string.Empty;
+                d.Log?.Invoke("Updating metadata: " + item.FileName + " -> " + metadataTarget + (platformTags.Length > 0 ? " [" + string.Join(", ", platformTags) + "]" : " [no platform tag]") + noteSuffix);
+                var originalCreate = DateTime.MinValue;
+                var originalWrite = DateTime.MinValue;
+                if (item.PreserveFileTimes)
+                {
+                    originalCreate = d.GetFileCreationTime(file);
+                    originalWrite = d.GetFileLastWriteTime(file);
+                }
+                requests.Add(new ExifWriteRequest
+                {
+                    FilePath = file,
+                    FileName = item.FileName,
+                    Arguments = d.MetadataService.BuildExifArgs(file, item.CaptureTime, platformTags, item.PreserveFileTimes, item.Comment, item.AddPhotographyTag),
+                    RestoreFileTimes = item.PreserveFileTimes,
+                    OriginalCreateTime = originalCreate,
+                    OriginalWriteTime = originalWrite,
+                    SuccessDetail = item.FileName
+                });
+            }
+            updated = d.MetadataService.RunExifWriteRequests(requests, requests.Count + skipped, skipped, progress, cancellationToken);
+            if (progress != null) progress(total, total, "Metadata step complete: updated " + updated + ", skipped " + skipped + ".");
+            d.Log?.Invoke("Metadata summary: updated " + updated + ", skipped " + skipped + ".");
+            return new MetadataStepResult { Updated = updated, Skipped = skipped };
         }
 
         string ResolveUndoCurrentPath(UndoImportEntry entry, HashSet<string> usedPaths, string destinationRoot, string libraryRoot)
