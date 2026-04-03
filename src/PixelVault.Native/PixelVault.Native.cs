@@ -243,7 +243,8 @@ namespace PixelVaultNative
                 (name, folderPath) => NormalizeGameIndexName(name, folderPath),
                 value => NormalizeConsoleLabel(value ?? string.Empty),
                 value => NormalizeGameId(value ?? string.Empty),
-                value => CleanTag(value ?? string.Empty));
+                value => CleanTag(value ?? string.Empty),
+                ids => CreateGameId(ids));
             filenameRulesService = new FilenameRulesService(new FilenameRulesServiceDependencies
             {
                 GetConventionRules = delegate(string root) { return filenameParserService.GetConventionRules(root); },
@@ -303,7 +304,8 @@ namespace PixelVaultNative
                 NormalizeGameIndexName = name => NormalizeGameIndexName(name),
                 DetermineManualMetadataPlatformLabel = DetermineManualMetadataPlatformLabel,
                 ManualMetadataChangesGroupingIdentity = ManualMetadataChangesGroupingIdentity,
-                GameIndexEditorAssignment = gameIndexEditorAssignmentService
+                GameIndexEditorAssignment = gameIndexEditorAssignmentService,
+                BuildManualMetadataGameTitleChoiceLabel = (name, platform) => BuildGameTitleChoiceLabel(name, platform)
             });
             libraryWorkspace = new LibraryWorkspaceContext(this);
             librarySession = new LibrarySession(libraryWorkspace, libraryScanner, fileSystemService, gameIndexEditorAssignmentService);
@@ -2880,25 +2882,7 @@ namespace PixelVaultNative
                     await importService.ApplyImportAndEditSteamStoreTitlesWhenGameNameUnchangedAsync(pendingItems.Where(i => i != null && !i.DeleteBeforeProcessing), CancellationToken.None).ConfigureAwait(true);
                 }
                 var gameRows = LoadSavedGameIndexRows(libraryRoot);
-                var unresolvedMasterRecords = pendingItems
-                    .Where(item => item != null && !item.DeleteBeforeProcessing)
-                    .Select(item => new
-                    {
-                        Item = item,
-                        Name = NormalizeGameIndexName(
-                            string.IsNullOrWhiteSpace(item.GameName)
-                                ? GetGameNameFromFileName(Path.GetFileNameWithoutExtension(item.FilePath))
-                                : item.GameName),
-                        PlatformLabel = DetermineManualMetadataPlatformLabel(item),
-                        PreferredGameId = ManualMetadataChangesGroupingIdentity(item) ? string.Empty : item.GameId
-                    })
-                    .Where(entry => !string.IsNullOrWhiteSpace(entry.Name))
-                    .Where(entry => FindSavedGameIndexRowByIdentity(gameRows, entry.Name, entry.PlatformLabel) == null
-                        && FindSavedGameIndexRowById(gameRows, entry.PreferredGameId) == null)
-                    .Select(entry => BuildGameTitleChoiceLabel(entry.Name, entry.PlatformLabel))
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .OrderBy(entry => entry, StringComparer.OrdinalIgnoreCase)
-                    .ToList();
+                var unresolvedMasterRecords = importService.BuildUnresolvedManualMetadataMasterRecordLabels(gameRows, pendingItems);
                 if (unresolvedMasterRecords.Count > 0)
                 {
                     var preview = string.Join(Environment.NewLine, unresolvedMasterRecords.Take(8).Select(title => "- " + title).ToArray());
@@ -2916,19 +2900,7 @@ namespace PixelVaultNative
                         if (knownGameChoiceSet.Add(title)) knownGameChoices.Add(title);
                     }
                     refreshGameTitleChoices();
-                    foreach (var item in pendingItems)
-                    {
-                        if (item.DeleteBeforeProcessing) continue;
-                        var resolvedName = NormalizeGameIndexName(
-                            string.IsNullOrWhiteSpace(item.GameName)
-                                ? GetGameNameFromFileName(Path.GetFileNameWithoutExtension(item.FilePath))
-                                : item.GameName);
-                        var resolvedPlatform = DetermineManualMetadataPlatformLabel(item);
-                        var preferredGameId = ManualMetadataChangesGroupingIdentity(item) ? string.Empty : item.GameId;
-                        if (FindSavedGameIndexRowByIdentity(gameRows, resolvedName, resolvedPlatform) != null) continue;
-                        if (!string.IsNullOrWhiteSpace(preferredGameId) && FindSavedGameIndexRowById(gameRows, preferredGameId) != null) continue;
-                        EnsureGameIndexRowForAssignment(gameRows, resolvedName, resolvedPlatform, preferredGameId);
-                    }
+                    importService.EnsureNewManualMetadataMasterRecordsInGameIndex(gameRows, pendingItems);
                 }
                 var confirmText = libraryMode
                     ? pendingItems.Count + " selected image(s) will be renamed if needed, updated with metadata, and reorganized in the library if their title changes.\n\nApply changes now?"

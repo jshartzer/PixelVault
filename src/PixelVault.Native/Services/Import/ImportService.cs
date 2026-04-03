@@ -50,6 +50,16 @@ namespace PixelVaultNative
         /// from the game index, copy canonical name and Steam AppID onto the matched row, then persist the index.
         /// </summary>
         void FinalizeManualMetadataItemsAgainstGameIndex(string libraryRoot, List<GameIndexEditorRow> gameRows, IEnumerable<ManualMetadataItem> pendingItems);
+
+        /// <summary>
+        /// Before final confirm: distinct sorted UI labels for pending rows whose name/platform/id are not yet in <paramref name="gameRows"/> (drives “Add New Game” prompt).
+        /// </summary>
+        List<string> BuildUnresolvedManualMetadataMasterRecordLabels(List<GameIndexEditorRow> gameRows, IEnumerable<ManualMetadataItem> pendingItems);
+
+        /// <summary>
+        /// After user accepts adding new master records: ensure placeholder rows exist in the in-memory <paramref name="gameRows"/> list (not persisted until <see cref="FinalizeManualMetadataItemsAgainstGameIndex"/>).
+        /// </summary>
+        void EnsureNewManualMetadataMasterRecordsInGameIndex(List<GameIndexEditorRow> gameRows, IEnumerable<ManualMetadataItem> pendingItems);
     }
 
     /// <summary>Outcome of moving files back to source folders during undo (no UI).</summary>
@@ -123,6 +133,9 @@ namespace PixelVaultNative
 
         /// <summary>Resolve and persist game index rows for manual metadata finish.</summary>
         public IGameIndexEditorAssignmentService GameIndexEditorAssignment;
+
+        /// <summary>“Game Name | Console” label for manual metadata game-title combo (same as library edit UI).</summary>
+        public Func<string, string, string> BuildManualMetadataGameTitleChoiceLabel;
     }
 
     internal sealed class ImportService : IImportService
@@ -598,6 +611,70 @@ namespace PixelVaultNative
             }
 
             assignment.SaveSavedGameIndexRows(libraryRoot, gameRows);
+        }
+
+        public List<string> BuildUnresolvedManualMetadataMasterRecordLabels(List<GameIndexEditorRow> gameRows, IEnumerable<ManualMetadataItem> pendingItems)
+        {
+            if (gameRows == null) throw new ArgumentNullException(nameof(gameRows));
+            var assignment = d.GameIndexEditorAssignment;
+            var normalize = d.NormalizeGameIndexName;
+            var nameFromFile = d.GetGameNameFromFileName;
+            var platformFn = d.DetermineManualMetadataPlatformLabel;
+            var groupingFn = d.ManualMetadataChangesGroupingIdentity;
+            var choiceLabel = d.BuildManualMetadataGameTitleChoiceLabel;
+            if (assignment == null || normalize == null || nameFromFile == null || platformFn == null || groupingFn == null || choiceLabel == null)
+            {
+                throw new InvalidOperationException("ImportServiceDependencies must set GameIndexEditorAssignment, NormalizeGameIndexName, GetGameNameFromFileName, DetermineManualMetadataPlatformLabel, ManualMetadataChangesGroupingIdentity, and BuildManualMetadataGameTitleChoiceLabel.");
+            }
+
+            return (pendingItems ?? Enumerable.Empty<ManualMetadataItem>())
+                .Where(item => item != null && !item.DeleteBeforeProcessing)
+                .Select(item =>
+                {
+                    var normalizedName = normalize(
+                        string.IsNullOrWhiteSpace(item.GameName)
+                            ? nameFromFile(Path.GetFileNameWithoutExtension(item.FilePath))
+                            : item.GameName);
+                    return new
+                    {
+                        Name = normalizedName,
+                        PlatformLabel = platformFn(item),
+                        PreferredGameId = groupingFn(item) ? string.Empty : item.GameId
+                    };
+                })
+                .Where(e => !string.IsNullOrWhiteSpace(e.Name))
+                .Where(e => assignment.ManualMetadataMasterRecordNeedsNewPlaceholder(gameRows, e.Name, e.PlatformLabel, e.PreferredGameId))
+                .Select(e => choiceLabel(e.Name, e.PlatformLabel))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(s => s, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        public void EnsureNewManualMetadataMasterRecordsInGameIndex(List<GameIndexEditorRow> gameRows, IEnumerable<ManualMetadataItem> pendingItems)
+        {
+            if (gameRows == null) throw new ArgumentNullException(nameof(gameRows));
+            var assignment = d.GameIndexEditorAssignment;
+            var normalize = d.NormalizeGameIndexName;
+            var nameFromFile = d.GetGameNameFromFileName;
+            var platformFn = d.DetermineManualMetadataPlatformLabel;
+            var groupingFn = d.ManualMetadataChangesGroupingIdentity;
+            if (assignment == null || normalize == null || nameFromFile == null || platformFn == null || groupingFn == null)
+            {
+                throw new InvalidOperationException("ImportServiceDependencies must set GameIndexEditorAssignment, NormalizeGameIndexName, GetGameNameFromFileName, DetermineManualMetadataPlatformLabel, and ManualMetadataChangesGroupingIdentity.");
+            }
+
+            foreach (var item in pendingItems ?? Enumerable.Empty<ManualMetadataItem>())
+            {
+                if (item == null || item.DeleteBeforeProcessing) continue;
+                var resolvedName = normalize(
+                    string.IsNullOrWhiteSpace(item.GameName)
+                        ? nameFromFile(Path.GetFileNameWithoutExtension(item.FilePath))
+                        : item.GameName);
+                var resolvedPlatform = platformFn(item);
+                var preferredGameId = groupingFn(item) ? string.Empty : item.GameId;
+                if (!assignment.ManualMetadataMasterRecordNeedsNewPlaceholder(gameRows, resolvedName, resolvedPlatform, preferredGameId)) continue;
+                assignment.EnsureManualMetadataMasterRow(gameRows, resolvedName, resolvedPlatform, preferredGameId);
+            }
         }
 
         string ResolveUndoCurrentPath(UndoImportEntry entry, HashSet<string> usedPaths, string destinationRoot, string libraryRoot)

@@ -88,12 +88,20 @@ sealed class StubGameIndexEditorAssignmentService : IGameIndexEditorAssignmentSe
 {
     public Func<IEnumerable<GameIndexEditorRow>, string, string, string, GameIndexEditorRow> Resolve;
     public Action<string, IEnumerable<GameIndexEditorRow>> Save;
+    public Func<IEnumerable<GameIndexEditorRow>, string, string, string, bool> NeedsPlaceholder;
+    public Func<List<GameIndexEditorRow>, string, string, string, GameIndexEditorRow> EnsureMaster;
 
     public GameIndexEditorRow ResolveExistingGameIndexRowForAssignment(IEnumerable<GameIndexEditorRow> rows, string name, string platformLabel, string preferredGameId) =>
         Resolve == null ? null : Resolve(rows, name, platformLabel, preferredGameId);
 
     public void SaveSavedGameIndexRows(string root, IEnumerable<GameIndexEditorRow> rows) =>
         Save?.Invoke(root, rows);
+
+    public bool ManualMetadataMasterRecordNeedsNewPlaceholder(IEnumerable<GameIndexEditorRow> rows, string normalizedName, string platformLabel, string preferredGameId) =>
+        NeedsPlaceholder != null && NeedsPlaceholder(rows, normalizedName, platformLabel, preferredGameId);
+
+    public GameIndexEditorRow EnsureManualMetadataMasterRow(List<GameIndexEditorRow> rows, string name, string platformLabel, string preferredGameId) =>
+        EnsureMaster == null ? null : EnsureMaster(rows, name, platformLabel, preferredGameId);
 }
 
 public sealed class ImportServiceManualMetadataTests
@@ -117,7 +125,8 @@ public sealed class ImportServiceManualMetadataTests
             GetGameNameFromFileName = fn => Path.GetFileNameWithoutExtension(fn ?? string.Empty),
             DetermineManualMetadataPlatformLabel = platformLabel,
             ManualMetadataChangesGroupingIdentity = groupingIdentity,
-            GameIndexEditorAssignment = stub
+            GameIndexEditorAssignment = stub,
+            BuildManualMetadataGameTitleChoiceLabel = (name, platform) => (name ?? "") + " | " + (platform ?? "")
         });
     }
 
@@ -198,5 +207,77 @@ public sealed class ImportServiceManualMetadataTests
         Assert.Equal("Canonical Name", item.GameName);
         Assert.Equal("999", row.SteamAppId);
         Assert.False(row.SuppressSteamAppIdAutoResolve);
+    }
+
+    [Fact]
+    public void BuildUnresolvedManualMetadataMasterRecordLabels_Returns_Only_Unresolved_And_Sorted()
+    {
+        var stub = new StubGameIndexEditorAssignmentService
+        {
+            NeedsPlaceholder = (_, name, _, _) =>
+                string.Equals(name, "NewGame", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(name, "Alpha", StringComparison.OrdinalIgnoreCase)
+        };
+        var svc = CreateServiceWithManualMetadataDeps(
+            new StubCoverService(),
+            s => s.Trim(),
+            stub,
+            _ => "Steam",
+            _ => false);
+        var rows = new List<GameIndexEditorRow>();
+        var items = new[]
+        {
+            new ManualMetadataItem { GameName = "Zeta", FilePath = @"x\z.png", DeleteBeforeProcessing = false },
+            new ManualMetadataItem { GameName = "NewGame", FilePath = @"x\a.png", DeleteBeforeProcessing = false },
+            new ManualMetadataItem { GameName = "Alpha", FilePath = @"x\al.png", DeleteBeforeProcessing = false },
+            new ManualMetadataItem { GameName = "Existing", FilePath = @"x\b.png", DeleteBeforeProcessing = false }
+        };
+        var labels = svc.BuildUnresolvedManualMetadataMasterRecordLabels(rows, items);
+        Assert.Equal(2, labels.Count);
+        Assert.Equal("Alpha | Steam", labels[0]);
+        Assert.Equal("NewGame | Steam", labels[1]);
+    }
+
+    [Fact]
+    public void BuildUnresolvedManualMetadataMasterRecordLabels_Skips_DeleteBeforeProcessing()
+    {
+        var stub = new StubGameIndexEditorAssignmentService { NeedsPlaceholder = (_, _, _, _) => true };
+        var svc = CreateServiceWithManualMetadataDeps(
+            new StubCoverService(),
+            s => s,
+            stub,
+            _ => "PC",
+            _ => false);
+        var items = new[]
+        {
+            new ManualMetadataItem { GameName = "SkipMe", FilePath = @"c\f.png", DeleteBeforeProcessing = true }
+        };
+        var labels = svc.BuildUnresolvedManualMetadataMasterRecordLabels(new List<GameIndexEditorRow>(), items);
+        Assert.Empty(labels);
+    }
+
+    [Fact]
+    public void EnsureNewManualMetadataMasterRecordsInGameIndex_Calls_Ensure_When_Placeholder_Needed()
+    {
+        var ensureCalls = 0;
+        var stub = new StubGameIndexEditorAssignmentService
+        {
+            NeedsPlaceholder = (_, _, _, _) => true,
+            EnsureMaster = (list, n, p, pref) =>
+            {
+                ensureCalls++;
+                return null;
+            }
+        };
+        var svc = CreateServiceWithManualMetadataDeps(
+            new StubCoverService(),
+            s => s,
+            stub,
+            _ => "PC",
+            _ => false);
+        var rows = new List<GameIndexEditorRow>();
+        var items = new[] { new ManualMetadataItem { GameName = "G", FilePath = @"c\f.png" } };
+        svc.EnsureNewManualMetadataMasterRecordsInGameIndex(rows, items);
+        Assert.Equal(1, ensureCalls);
     }
 }

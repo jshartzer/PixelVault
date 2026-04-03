@@ -17,33 +17,7 @@ namespace PixelVaultNative
 
         GameIndexEditorRow EnsureGameIndexRowForAssignment(List<GameIndexEditorRow> rows, string name, string platformLabel, string preferredGameId = null)
         {
-            var normalizedName = NormalizeGameIndexName(name);
-            var normalizedPlatform = NormalizeConsoleLabel(platformLabel);
-            var normalizedGameId = NormalizeGameId(preferredGameId);
-            if (!string.IsNullOrWhiteSpace(normalizedGameId))
-            {
-                var byId = FindSavedGameIndexRowById(rows, normalizedGameId);
-                if (byId != null && string.Equals(BuildGameIndexIdentity(byId.Name, byId.PlatformLabel), BuildGameIndexIdentity(normalizedName, normalizedPlatform), StringComparison.OrdinalIgnoreCase))
-                {
-                    return byId;
-                }
-            }
-            var byIdentity = FindSavedGameIndexRowByIdentity(rows, normalizedName, normalizedPlatform);
-            if (byIdentity != null) return byIdentity;
-            var created = new GameIndexEditorRow
-            {
-                GameId = !string.IsNullOrWhiteSpace(normalizedGameId) ? normalizedGameId : CreateGameId(rows.Select(row => row.GameId)),
-                Name = normalizedName,
-                PlatformLabel = normalizedPlatform,
-                SteamAppId = string.Empty,
-                SteamGridDbId = string.Empty,
-                FileCount = 0,
-                FolderPath = string.Empty,
-                PreviewImagePath = string.Empty,
-                FilePaths = new string[0]
-            };
-            rows.Add(created);
-            return created;
+            return gameIndexEditorAssignmentService.EnsureManualMetadataMasterRow(rows, name, platformLabel, preferredGameId);
         }
 
         void EnsureSteamAppIdInGameIndex(string root, string name, string steamAppId)
