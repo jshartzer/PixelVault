@@ -41,6 +41,7 @@ Before making app changes, read:
 
 Then use these based on the task:
 
+- `C:\Codex\docs\ARCHITECTURE_REFACTOR_PLAN.md` for refactor **principles** (tiered MainWindow bar, `ILibraryScanHost` as port, FS/async scope)—pairs with extraction and service docs below
 - `C:\Codex\docs\PROJECT_CONTEXT.md` for architecture and data model
 - `C:\Codex\docs\ROADMAP.md` for sequencing and larger direction
 - `C:\Codex\docs\MAINWINDOW_EXTRACTION_ROADMAP.md` for MainWindow split work

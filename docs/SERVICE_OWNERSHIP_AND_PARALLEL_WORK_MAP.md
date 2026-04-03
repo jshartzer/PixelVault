@@ -4,6 +4,8 @@ Purpose
 -------
 This is the practical coordination map for continuing the MainWindow split without stepping on each other.
 
+Refactor **principles** (tiered goals for `MainWindow`, **`ILibraryScanHost`** as a non-UI port, **`IFileSystemService`** and async scope): **`C:\Codex\docs\ARCHITECTURE_REFACTOR_PLAN.md`**.
+
 Use it to answer three questions:
 
 1. What already counts as a real service or host?

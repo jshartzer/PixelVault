@@ -184,6 +184,7 @@ Use the docs by role:
 - `C:\Codex\docs\CHANGELOG.md`: published version history
 - `C:\Codex\docs\CURRENT_BUILD.txt`: current published build pointer
 - `C:\Codex\docs\ROADMAP.md`: long-term sequencing
+- `C:\Codex\docs\ARCHITECTURE_REFACTOR_PLAN.md`: refactor contract (tiered goals, service ports, FS/async scope) aligned with extraction and service split
 - `C:\Codex\docs\MAINWINDOW_EXTRACTION_ROADMAP.md`: concrete MainWindow extraction slices
 - `C:\Codex\docs\PERFORMANCE_TODO.md`: active responsiveness and scalability backlog
 - `C:\Codex\docs\MANUAL_GOLDEN_PATH_CHECKLIST.md`: short manual verification path for risky changes

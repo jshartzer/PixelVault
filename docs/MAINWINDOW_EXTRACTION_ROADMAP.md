@@ -2,6 +2,8 @@
 
 This document is the **execution roadmap** for slicing responsibilities off `MainWindow`. It extends **Phase 3: Shrink MainWindow** in `C:\Codex\docs\ROADMAP.md` and aligns with `C:\Codex\docs\pixelvault_service_split_plan.txt` and `C:\Codex\docs\CODE_QUALITY_IMPROVEMENT_PLAN.md`.
 
+**Principles and scope (tiered MainWindow bar, `ILibraryScanHost` as application port, `IFileSystemService` / async expectations):** `C:\Codex\docs\ARCHITECTURE_REFACTOR_PLAN.md`. This roadmap stays the **how/where** checklist; that file is the **why/what counts as done** contract.
+
 **Not a duplicate of `PERFORMANCE_FIX_PLAN.txt`:** that file tracks **Library performance** (virtualization, sort cost, batch reads, threading). This file tracks **where UI and orchestration code lives** (partials, hosts). The **service split** (`ILibraryScanner`, `IImportService`, …) is in `pixelvault_service_split_plan.txt` — see **Service split alignment** below.
 
 **Notion (Project Wiki):** [MainWindow extraction roadmap](https://www.notion.so/33573adc59b681d88b7dcd88cad53cb6)

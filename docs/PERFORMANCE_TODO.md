@@ -2,6 +2,8 @@
 
 Focused backlog for responsiveness, scalability, and long-operation polish in the live native app.
 
+**Refactor contract** (tiered MainWindow bar, background async expectations, file-system scope): `C:\Codex\docs\ARCHITECTURE_REFACTOR_PLAN.md`.
+
 Use this alongside:
 
 - `C:\Codex\PixelVaultData\TODO.md` for general rolling tasks
