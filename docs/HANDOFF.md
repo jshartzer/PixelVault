@@ -99,11 +99,11 @@ Recent extraction progress (repo):
 
 - **E1–E3:** Library browser: **`LibraryBrowserHost`** entry + **`ShowLibraryBrowserCore`** on the **`MainWindow`** partial (`UI/Library/`), **`ILibrarySession`** / **`LibrarySession`** (workspace + scanner + **`IFileSystemService`** + root), **`LibraryWorkspaceContext`** caches, virtualization unchanged in **`LibraryVirtualization.cs`**
 - **Responsiveness:** **`PERFORMANCE_TODO.md`** — item 5 long-workflow spot-check; item 10 first slice (**`LibraryBrowserHost`**); manual-metadata game-title list off UI thread when rebuilding choices
-- **F1–F2:** Settings shell partial (incl. path settings dialog), photography gallery + Steam picker partial; photography wired from Library + Settings
+- **F1–F2:** Settings shell partial (incl. path settings dialog, **`ShowSettingsWindow`** modal), photography gallery + Steam picker partial; photography wired from Library + Settings
 - **Phase 5 (import):** Import-and-edit **Steam store title** when the user leaves the loaded title unchanged — **`IImportService.ApplyImportAndEditSteamStoreTitlesWhenGameNameUnchangedAsync`** (**`ICoverService.SteamNameAsync`**). Manual metadata **finish** (normalize name, **`GameId`** assignment, Steam AppID on **`GameIndexEditorRow`**, save index) — **`IImportService.FinalizeManualMetadataItemsAgainstGameIndex`**; **`MainWindow`** still wires resolve/platform/save delegates into **`ImportServiceDependencies`**. Unit tests: **`tests/PixelVault.Native.Tests/ImportServiceManualMetadataTests.cs`**.
 - **Publish:** script copies full native + test sources under `dist/.../source/`
 
-Next likely slices: keep broadening **`ILibrarySession`** / **`ILibraryScanner`** at Library + game-index call sites (folder cache loads now use **`Scanner.LoadLibraryFoldersCached`** directly), move row-resolution + save behind a future **`IGameIndexService`** so **`ImportService`** stops depending on **`MainWindow`** lambdas, **`ShowSettingsWindow`** shell move (F1 tail), or further **`await`** cleanup per `PERFORMANCE_TODO.md` item 11.
+Next likely slices: keep broadening **`ILibrarySession`** / **`ILibraryScanner`** at Library + game-index call sites (folder cache loads now use **`Scanner.LoadLibraryFoldersCached`** directly), move row-resolution + save behind a future **`IGameIndexService`** so **`ImportService`** stops depending on **`MainWindow`** lambdas, or further **`await`** cleanup per `PERFORMANCE_TODO.md` item 11. **F1:** **`ShowSettingsWindow`** now lives on **`MainWindow.SettingsShell`** (see **`MAINWINDOW_EXTRACTION_ROADMAP.md`**).
 
 If you are picking work up midstream:
 

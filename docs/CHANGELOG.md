@@ -3,6 +3,7 @@
 - **Library (screenshots / detail):** Incremental detail rerender restores a **saved scroll offset only on the first snapshot** for a render pass; the **metadata-refined** second pass no longer reapplies that offset, so scrolling after the quick paint is not yanked back.
 - **Import and Edit:** Steam store title resolution on finish keeps **`ManualMetadataItem`** updates on the **captured UI synchronization context** (no **`ConfigureAwait(false)`** before mutating **`GameName`** in **`ImportService`**; aligns with **`MainWindow`** **`ConfigureAwait(true)`** on the outer **`await`**).
 - **Docs:** **`docs/PERFORMANCE_TODO.md`** item 11 clarifies UI-thread expectations for **`ApplyImportAndEditSteamStoreTitlesWhenGameNameUnchangedAsync`**. **`docs/MANUAL_GOLDEN_PATH_CHECKLIST.md`** adds spot checks for detail scroll and import-and-edit Steam title finish.
+- **Engineering / structure (MainWindow extraction Phase F1):** **`ShowSettingsWindow`** moved from **`PixelVault.Native.cs`** to **`UI/Settings/MainWindow.SettingsShell.cs`** with **`BuildUi`** / path dialog (no behavior change).
 
 ## 0.835
 - **Release:** Version **0.835** — publish refresh. Continues **Phase 5** import service extraction and structural work from **0.834**; Library responsiveness fixes below are user-visible.

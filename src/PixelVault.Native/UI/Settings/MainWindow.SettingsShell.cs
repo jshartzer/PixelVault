@@ -295,5 +295,44 @@ namespace PixelVaultNative
             cancel.Click += delegate { window.Close(); };
             window.ShowDialog();
         }
+
+        void ShowSettingsWindow()
+        {
+            var window = new Window
+            {
+                Title = "PixelVault " + AppVersion + " Settings",
+                Width = 1460,
+                Height = PreferredSettingsWindowHeight(),
+                MinWidth = 1220,
+                MinHeight = 820,
+                Owner = this,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Background = Brushes.White
+            };
+
+            var previousStatus = status;
+            var previousPreviewBox = previewBox;
+            var previousLogBox = logBox;
+            var previousRecurseBox = recurseBox;
+            var previousKeywordsBox = keywordsBox;
+            var previousConflictBox = conflictBox;
+            window.Content = BuildUi();
+            recurseBox.IsChecked = true;
+            keywordsBox.IsChecked = true;
+            conflictBox.SelectedIndex = 0;
+            LoadLogView();
+            RefreshPreview();
+            window.Closed += delegate
+            {
+                status = previousStatus;
+                previewBox = previousPreviewBox;
+                logBox = previousLogBox;
+                recurseBox = previousRecurseBox;
+                keywordsBox = previousKeywordsBox;
+                conflictBox = previousConflictBox;
+                SyncIncludeGameCaptureKeywordsMirror();
+            };
+            window.ShowDialog();
+        }
     }
 }

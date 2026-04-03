@@ -177,13 +177,13 @@ Review feedback matches the plan: **`LibraryBrowserHost`** is intentionally a **
 
 | Slice | Move to | Notes |
 |-------|---------|--------|
-| F1 | `UI/Settings/MainWindow.SettingsShell.cs` (or `SettingsShellBuilder`) | `BuildUi`, path summary, top buttons, **`ShowPathSettingsWindow`**. **Done** as `MainWindow` partial; **`ShowSettingsWindow`** still in `PixelVault.Native.cs`. |
+| F1 | `UI/Settings/MainWindow.SettingsShell.cs` (or `SettingsShellBuilder`) | `BuildUi`, path summary, top buttons, **`ShowPathSettingsWindow`**, **`ShowSettingsWindow`**. **Done** as `MainWindow` partial. |
 | F2 | `UI/Photography/MainWindow.PhotographyAndSteam.cs` (roadmap name: `PhotographyWindowHost`) | **`ShowPhotographyGallery`** + **`ShowSteamAppMatchWindow`** as `MainWindow` partial. |
 | F3 | `Services/Config` (optional) | Persisted settings read/write if still embedded in `MainWindow`. |
 
 **Exit:** `PixelVault.Native.cs` is mostly **constructor wiring**, `MainWindow` lifecycle, and delegation to hosts.
 
-**Progress (F1):** **`UI/Settings/MainWindow.SettingsShell.cs`** — **`BuildUi`**, **`BuildSettingsSummary`**, **`Card`**, **`TitleBlock`**, and **`ShowPathSettingsWindow`**. **`ShowSettingsWindow`** remains in **`PixelVault.Native.cs`** (dialog wrapper + field swap).
+**Progress (F1):** **`UI/Settings/MainWindow.SettingsShell.cs`** — **`BuildUi`**, **`BuildSettingsSummary`**, **`Card`**, **`TitleBlock`**, **`ShowPathSettingsWindow`**, and **`ShowSettingsWindow`** (modal dialog wrapper + temporary field swap / restore on close).
 
 **Progress (F2):** **`UI/Photography/MainWindow.PhotographyAndSteam.cs`** — **`ShowPhotographyGallery`** (uses **`libraryWorkspace.LibraryRoot`** for paths) and **`ShowSteamAppMatchWindow`** (manual metadata Steam search picker).
 
