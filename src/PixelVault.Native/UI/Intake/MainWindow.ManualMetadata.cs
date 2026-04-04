@@ -313,64 +313,6 @@ namespace PixelVaultNative
                 refreshSelectionStatus();
             };
 
-            Func<ManualMetadataItem, string> manualBadgeLabel = delegate(ManualMetadataItem item)
-            {
-                if (item != null && item.IntakeRuleMatched) return "Auto";
-                if (item.TagSteam) return "Steam";
-                if (item.TagPc) return "PC";
-                if (item.TagPs5) return "PS5";
-                if (item.TagXbox) return "Xbox";
-                if (item.TagOther && !string.IsNullOrWhiteSpace(item.CustomPlatformTag)) return CleanTag(item.CustomPlatformTag);
-                return "Manual";
-            };
-
-            Func<string, Brush> manualBadgeBrush = delegate(string label)
-            {
-                if (string.Equals(label, "Auto", StringComparison.OrdinalIgnoreCase)) return Brush("#5CB88A");
-                if (string.Equals(label, "Steam", StringComparison.OrdinalIgnoreCase)) return Brush("#69A7FF");
-                if (string.Equals(label, "PC", StringComparison.OrdinalIgnoreCase)) return Brush("#7F8EA3");
-                if (string.Equals(label, "PS5", StringComparison.OrdinalIgnoreCase)) return Brush("#4F83FF");
-                if (string.Equals(label, "Xbox", StringComparison.OrdinalIgnoreCase)) return Brush("#66C47A");
-                return Brush("#D0A15F");
-            };
-
-            Func<IEnumerable<ManualMetadataItem>, Func<ManualMetadataItem, string>, string> sharedText = delegate(IEnumerable<ManualMetadataItem> selection, Func<ManualMetadataItem, string> getter)
-            {
-                var values = selection.Select(getter).Select(v => (v ?? string.Empty).Trim()).Distinct(StringComparer.Ordinal).ToArray();
-                return values.Length == 1 ? values[0] : string.Empty;
-            };
-
-            Func<IEnumerable<ManualMetadataItem>, Func<ManualMetadataItem, bool>, bool?> sharedBool = delegate(IEnumerable<ManualMetadataItem> selection, Func<ManualMetadataItem, bool> getter)
-            {
-                var values = selection.Select(getter).Distinct().ToArray();
-                return values.Length == 1 ? (bool?)values[0] : null;
-            };
-
-            Func<IEnumerable<ManualMetadataItem>, string> sharedFilenameGuess = delegate(IEnumerable<ManualMetadataItem> selection)
-            {
-                var guesses = selection.Select(item => FilenameGuessLabel(item == null ? string.Empty : item.FileName)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-                if (guesses.Length == 0) return "Best Guess | No confident match";
-                if (guesses.Length == 1) return "Best Guess | " + guesses[0];
-                return "Best Guess | Mixed guesses";
-            };
-
-            Func<int, UIElement> buildMultiPreview = delegate(int count)
-            {
-                var multiH = useFlexiblePreview ? Math.Min(400, Math.Max(240, previewImage.MaxHeight)) : 320;
-                var grid = new Grid { Height = multiH };
-                var art = new Grid { Width = 260, Height = 190, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
-                var back = new Border { Width = 136, Height = 104, Background = Brushes.White, BorderBrush = Brush("#2E2A2A"), BorderThickness = new Thickness(6), CornerRadius = new CornerRadius(8), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(64, -44, 0, 0) };
-                var mid = new Border { Width = 148, Height = 112, Background = Brushes.White, BorderBrush = Brush("#2E2A2A"), BorderThickness = new Thickness(6), CornerRadius = new CornerRadius(8), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(30, -20, 0, 0) };
-                var front = new Border { Width = 160, Height = 120, Background = Brushes.White, BorderBrush = Brush("#2E2A2A"), BorderThickness = new Thickness(6), CornerRadius = new CornerRadius(8), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 8, 0, 0) };
-                var frontGrid = new Grid();                frontGrid.Children.Add(new Border { Width = 78, Height = 78, Background = Brush("#161C20"), CornerRadius = new CornerRadius(39), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Child = new TextBlock { Text = count.ToString(), Foreground = Brushes.White, FontSize = 28, FontWeight = FontWeights.Bold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, TextAlignment = TextAlignment.Center } });
-                front.Child = frontGrid;
-                art.Children.Add(back);
-                art.Children.Add(mid);
-                art.Children.Add(front);
-                grid.Children.Add(art);
-                return grid;
-            };
-
             Action refreshDateControls = delegate
             {
                 var enabled = useCustomTimeBox.IsChecked == true;
@@ -381,27 +323,13 @@ namespace PixelVaultNative
                 otherPlatformBox.IsEnabled = otherBox.IsChecked == true;
             };
 
-            Action<IEnumerable<ManualMetadataItem>, string> applyConsoleSelection = delegate(IEnumerable<ManualMetadataItem> selection, string platform)
-            {
-                foreach (var item in selection)
-                {
-                    item.TagSteam = string.Equals(platform, "Steam", StringComparison.OrdinalIgnoreCase);
-                    item.TagPc = string.Equals(platform, "PC", StringComparison.OrdinalIgnoreCase);
-                    item.TagPs5 = string.Equals(platform, "PS5", StringComparison.OrdinalIgnoreCase);
-                    item.TagXbox = string.Equals(platform, "Xbox", StringComparison.OrdinalIgnoreCase);
-                    item.TagOther = string.Equals(platform, "Other", StringComparison.OrdinalIgnoreCase);
-                    if (!item.TagOther) item.CustomPlatformTag = string.Empty;
-                    item.ForceTagMetadataWrite = true;
-                }
-            };
-
             Action refreshTileBadges = delegate
             {
                 foreach (var pair in badgeBlocks)
                 {
-                    var label = manualBadgeLabel(pair.Key);
+                    var label = GetManualMetadataBadgeLabel(pair.Key);
                     pair.Value.Text = "[" + label + "]";
-                    pair.Value.Foreground = manualBadgeBrush(label);
+                    pair.Value.Foreground = GetManualMetadataBadgeBrush(label);
                 }
             };
 
@@ -468,7 +396,7 @@ namespace PixelVaultNative
                     selectedTitle.Text = "Select one or more captures";
                     selectedMeta.Text = emptySelectionText;
                     guessText.Text = "Best Guess | No confident match";
-                    previewBorder.Child = buildMultiPreview(0);
+                    previewBorder.Child = BuildManualMetadataMultiPreviewStack(0, useFlexiblePreview, previewImage.MaxHeight);
                     suppressSync = true;
                     steamSearchBox.Text = string.Empty;
                     steamAppIdBox.Text = string.Empty;
@@ -502,7 +430,7 @@ namespace PixelVaultNative
                     var item = selectedItems[0];
                     selectedTitle.Text = item.FileName;
                     selectedMeta.Text = singleSelectionMetaPrefix + FormatFriendlyTimestamp(GetLibraryDate(item.FilePath));
-                    guessText.Text = sharedFilenameGuess(selectedItems);
+                    guessText.Text = GetManualMetadataFilenameGuessSummary(selectedItems);
                     steamLookupStatus.Text = string.IsNullOrWhiteSpace(item.SteamAppId)
                         ? (IsSteamManualExportWithoutAppId(item.FileName) ? "Steam-style export detected. Search the game name to attach its AppID before import." : "Search by game name to fetch a Steam AppID, or paste one directly.")
                         : "Steam AppID " + item.SteamAppId + " will be saved with this import.";
@@ -528,33 +456,33 @@ namespace PixelVaultNative
                 {
                     selectedTitle.Text = selectedItems.Count + " captures selected";
                     selectedMeta.Text = "Edits here apply to all selected files. Mixed values show as blank or indeterminate.";
-                    guessText.Text = sharedFilenameGuess(selectedItems);
+                    guessText.Text = GetManualMetadataFilenameGuessSummary(selectedItems);
                     steamLookupStatus.Text = "Search by title or Steam AppID to apply one AppID to the selected captures, or paste it directly.";
-                    previewBorder.Child = buildMultiPreview(selectedItems.Count);
+                    previewBorder.Child = BuildManualMetadataMultiPreviewStack(selectedItems.Count, useFlexiblePreview, previewImage.MaxHeight);
                     previewImage.Source = null;
                 }
 
-                steamSearchBox.Text = sharedText(selectedItems, delegate(ManualMetadataItem item)
+                steamSearchBox.Text = GetSharedManualMetadataFieldText(selectedItems, delegate(ManualMetadataItem item)
                 {
                     return item.GameName;
                 });
-                steamAppIdBox.Text = sharedText(selectedItems, delegate(ManualMetadataItem item) { return item.SteamAppId; });
-                gameNameBox.Text = sharedText(selectedItems, delegate(ManualMetadataItem item)
+                steamAppIdBox.Text = GetSharedManualMetadataFieldText(selectedItems, delegate(ManualMetadataItem item) { return item.SteamAppId; });
+                gameNameBox.Text = GetSharedManualMetadataFieldText(selectedItems, delegate(ManualMetadataItem item)
                 {
                     var displayLabel = BuildGameTitleChoiceLabel(item.GameName, DetermineManualMetadataPlatformLabel(item));
                     return knownGameChoiceSet.Contains(displayLabel) ? displayLabel : item.GameName;
                 });
-                tagsBox.Text = sharedText(selectedItems, delegate(ManualMetadataItem item) { return item.TagText; });
-                commentBox.Text = sharedText(selectedItems, delegate(ManualMetadataItem item) { return item.Comment; });
-                photographyBox.IsChecked = sharedBool(selectedItems, delegate(ManualMetadataItem item) { return item.AddPhotographyTag; });
-                useCustomTimeBox.IsChecked = sharedBool(selectedItems, delegate(ManualMetadataItem item) { return item.UseCustomCaptureTime; });
-                steamBox.IsChecked = sharedBool(selectedItems, delegate(ManualMetadataItem item) { return item.TagSteam; });
-                pcBox.IsChecked = sharedBool(selectedItems, delegate(ManualMetadataItem item) { return item.TagPc; });
-                ps5Box.IsChecked = sharedBool(selectedItems, delegate(ManualMetadataItem item) { return item.TagPs5; });
-                xboxBox.IsChecked = sharedBool(selectedItems, delegate(ManualMetadataItem item) { return item.TagXbox; });
-                otherBox.IsChecked = sharedBool(selectedItems, delegate(ManualMetadataItem item) { return item.TagOther; });
-                otherPlatformBox.Text = sharedText(selectedItems, delegate(ManualMetadataItem item) { return item.CustomPlatformTag; });
-                if (importAndEditMode) deleteBeforeBox.IsChecked = sharedBool(selectedItems, delegate(ManualMetadataItem item) { return item.DeleteBeforeProcessing; });
+                tagsBox.Text = GetSharedManualMetadataFieldText(selectedItems, delegate(ManualMetadataItem item) { return item.TagText; });
+                commentBox.Text = GetSharedManualMetadataFieldText(selectedItems, delegate(ManualMetadataItem item) { return item.Comment; });
+                photographyBox.IsChecked = GetSharedManualMetadataFieldBool(selectedItems, delegate(ManualMetadataItem item) { return item.AddPhotographyTag; });
+                useCustomTimeBox.IsChecked = GetSharedManualMetadataFieldBool(selectedItems, delegate(ManualMetadataItem item) { return item.UseCustomCaptureTime; });
+                steamBox.IsChecked = GetSharedManualMetadataFieldBool(selectedItems, delegate(ManualMetadataItem item) { return item.TagSteam; });
+                pcBox.IsChecked = GetSharedManualMetadataFieldBool(selectedItems, delegate(ManualMetadataItem item) { return item.TagPc; });
+                ps5Box.IsChecked = GetSharedManualMetadataFieldBool(selectedItems, delegate(ManualMetadataItem item) { return item.TagPs5; });
+                xboxBox.IsChecked = GetSharedManualMetadataFieldBool(selectedItems, delegate(ManualMetadataItem item) { return item.TagXbox; });
+                otherBox.IsChecked = GetSharedManualMetadataFieldBool(selectedItems, delegate(ManualMetadataItem item) { return item.TagOther; });
+                otherPlatformBox.Text = GetSharedManualMetadataFieldText(selectedItems, delegate(ManualMetadataItem item) { return item.CustomPlatformTag; });
+                if (importAndEditMode) deleteBeforeBox.IsChecked = GetSharedManualMetadataFieldBool(selectedItems, delegate(ManualMetadataItem item) { return item.DeleteBeforeProcessing; });
 
                 var first = selectedItems[0];
                 captureDatePicker.SelectedDate = first.CaptureTime.Date;
@@ -700,7 +628,7 @@ namespace PixelVaultNative
                             item.SteamAppId = resolvedAppId;
                             if (!string.IsNullOrWhiteSpace(resolvedTitle)) item.GameName = resolvedTitle;
                         }
-                        applyConsoleSelection(selectedItems, "Steam");
+                        ApplyConsolePlatformToManualMetadataItems(selectedItems, "Steam");
                         refreshTileBadges();
                         if (!string.IsNullOrWhiteSpace(resolvedTitle))
                         {
@@ -759,7 +687,7 @@ namespace PixelVaultNative
             steamBox.Checked += delegate
             {
                 if (suppressSync || selectedItems.Count == 0) return;
-                applyConsoleSelection(selectedItems, "Steam");
+                ApplyConsolePlatformToManualMetadataItems(selectedItems, "Steam");
                 refreshTileBadges();
                 refreshSelectionUi();
             };
@@ -778,7 +706,7 @@ namespace PixelVaultNative
             pcBox.Checked += delegate
             {
                 if (suppressSync || selectedItems.Count == 0) return;
-                applyConsoleSelection(selectedItems, "PC");
+                ApplyConsolePlatformToManualMetadataItems(selectedItems, "PC");
                 refreshTileBadges();
                 refreshSelectionUi();
             };
@@ -797,7 +725,7 @@ namespace PixelVaultNative
             ps5Box.Checked += delegate
             {
                 if (suppressSync || selectedItems.Count == 0) return;
-                applyConsoleSelection(selectedItems, "PS5");
+                ApplyConsolePlatformToManualMetadataItems(selectedItems, "PS5");
                 refreshTileBadges();
                 refreshSelectionUi();
             };
@@ -816,7 +744,7 @@ namespace PixelVaultNative
             xboxBox.Checked += delegate
             {
                 if (suppressSync || selectedItems.Count == 0) return;
-                applyConsoleSelection(selectedItems, "Xbox");
+                ApplyConsolePlatformToManualMetadataItems(selectedItems, "Xbox");
                 refreshTileBadges();
                 refreshSelectionUi();
             };
@@ -836,7 +764,7 @@ namespace PixelVaultNative
             {
                 refreshDateControls();
                 if (suppressSync || selectedItems.Count == 0) return;
-                applyConsoleSelection(selectedItems, "Other");
+                ApplyConsolePlatformToManualMetadataItems(selectedItems, "Other");
                 foreach (var item in selectedItems)
                 {
                     item.CustomPlatformTag = otherPlatformBox.Text;
