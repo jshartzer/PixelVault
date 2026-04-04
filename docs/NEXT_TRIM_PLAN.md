@@ -4,6 +4,8 @@
 
 **Notion (Project Wiki):** [Next trim and optimization plan (post-0.854)](https://www.notion.so/33873adc59b68131ae12f82c97363684) — mirror of this doc; update when tiers complete (`DOC_SYNC_POLICY.md`).
 
+**Small UI / polish backlog (tiered by effort):** `docs/SMALL_FEATURE_TODO.md` — same items as [PixelVault HQ — Small Feature To-Do](https://www.notion.so/cf63eb7c2524470d9b9a601ab46f4cc6), grouped into quick vs medium vs larger work.
+
 **Baseline (Apr 2026):** `PixelVault.Native.cs` is still the largest single file (**~2.9k lines**). Monolith slice plan target remains **under ~2k lines** for the primary file, via coherent vertical moves—not cosmetic churn.
 
 ---
