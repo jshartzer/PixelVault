@@ -87,7 +87,8 @@ namespace PixelVaultNative
             Window libraryWindow,
             Action<string> openSingleFileMetadataEditor,
             Action<string, ModifierKeys> updateDetailSelection,
-            Action refreshDetailSelectionUi);
+            Action refreshDetailSelectionUi,
+            Action redrawSelectedFolderDetail);
 
         Button LibraryBrowserBuildFolderTile(
             MainWindow.LibraryBrowserFolderView folder,

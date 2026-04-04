@@ -242,7 +242,7 @@ namespace PixelVaultNative
             return Math.Max(1, columns);
         }
 
-        Border CreateLibraryDetailTile(string file, int size, Func<bool> shouldLoad, Action<string> openSingleFileMetadataEditor, Action<string, ModifierKeys> updateDetailSelection, HashSet<string> selectedDetailFiles, Action refreshDetailSelectionUi)
+        Border CreateLibraryDetailTile(string file, int size, Func<bool> shouldLoad, Action<string> openSingleFileMetadataEditor, Action<string, ModifierKeys> updateDetailSelection, HashSet<string> selectedDetailFiles, Action refreshDetailSelectionUi, Action redrawDetailPane)
         {
             var isVideoFile = IsVideo(file);
             var tileIsActive = true;
@@ -284,6 +284,58 @@ namespace PixelVaultNative
             };
             presenter.Children.Add(placeholder);
             presenter.Children.Add(image);
+            Button detailStarButton = null;
+            TextBlock detailStarGlyph = null;
+            Action applyDetailStarVisual = null;
+            Action<bool> showDetailStarChrome = null;
+            if (!isVideoFile)
+            {
+                detailStarGlyph = new TextBlock
+                {
+                    FontSize = Math.Max(15d, Math.Min(22d, size / 11d)),
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Text = "\u2606"
+                };
+                applyDetailStarVisual = delegate
+                {
+                    if (detailStarGlyph == null) return;
+                    var starred = TryGetLibraryFileStarredFromIndex(file, out var st) && st;
+                    detailStarGlyph.Text = starred ? "\u2605" : "\u2606";
+                    detailStarGlyph.Foreground = starred ? Brush("#EAC54F") : Brush("#C8FFFFFF");
+                };
+                detailStarButton = new Button
+                {
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    VerticalAlignment = VerticalAlignment.Top,
+                    Margin = new Thickness(0, 6, 6, 0),
+                    Width = 32,
+                    Height = 32,
+                    Padding = new Thickness(0),
+                    Background = Brush("#66000000"),
+                    BorderThickness = new Thickness(0),
+                    Cursor = System.Windows.Input.Cursors.Hand,
+                    Opacity = 0,
+                    IsHitTestVisible = false,
+                    ToolTip = "Star / unstar (saved in photo index)",
+                    Content = detailStarGlyph
+                };
+                showDetailStarChrome = delegate(bool show)
+                {
+                    if (detailStarButton == null) return;
+                    detailStarButton.Opacity = show ? 1d : 0d;
+                    detailStarButton.IsHitTestVisible = show;
+                };
+                applyDetailStarVisual();
+                showDetailStarChrome(false);
+                detailStarButton.Click += delegate
+                {
+                    ToggleLibraryFileStarredByPath(file);
+                    applyDetailStarVisual();
+                    if (redrawDetailPane != null) redrawDetailPane();
+                };
+                presenter.Children.Add(detailStarButton);
+            }
             if (isVideoFile)
             {
                 videoPreviewMedia = new MediaElement
@@ -392,6 +444,11 @@ namespace PixelVaultNative
             };
             tile.MouseEnter += delegate
             {
+                if (!isVideoFile && showDetailStarChrome != null && applyDetailStarVisual != null)
+                {
+                    applyDetailStarVisual();
+                    showDetailStarChrome(true);
+                }
                 if (!isVideoFile) return;
                 if (videoPreviewMedia == null || videoPreviewStatus == null) return;
                 if (!shouldKeepLoading()) return;
@@ -431,6 +488,7 @@ namespace PixelVaultNative
             };
             tile.MouseLeave += delegate
             {
+                if (!isVideoFile && showDetailStarChrome != null) showDetailStarChrome(false);
                 if (!isVideoFile) return;
                 if (videoPreviewMedia == null || videoPreviewStatus == null) return;
                 videoPreviewHovered = false;
@@ -559,6 +617,25 @@ namespace PixelVaultNative
             openFolderItem.Click += delegate { OpenFolder(System.IO.Path.GetDirectoryName(file) ?? string.Empty); };
             var editItem = new MenuItem { Header = "Edit Metadata" };
             editItem.Click += delegate { openSingleFileMetadataEditor(file); };
+            var starMenuItem = new MenuItem { Header = "Add star" };
+            var photoTagMenuItem = new MenuItem { Header = "Add Game Photography tag" };
+            contextMenu.Opened += delegate
+            {
+                var starred = TryGetLibraryFileStarredFromIndex(file, out var st) && st;
+                starMenuItem.Header = starred ? "Remove star" : "Add star";
+                var hasPhoto = LibraryFileIndexHasGamePhotographyTag(file);
+                photoTagMenuItem.Header = hasPhoto ? "Remove Game Photography tag" : "Add Game Photography tag";
+            };
+            starMenuItem.Click += delegate
+            {
+                ToggleLibraryFileStarredByPath(file);
+                if (redrawDetailPane != null) redrawDetailPane();
+            };
+            photoTagMenuItem.Click += delegate
+            {
+                ToggleLibraryFileGamePhotographyTagByPath(file);
+                if (redrawDetailPane != null) redrawDetailPane();
+            };
             var copyPathItem = new MenuItem { Header = "Copy File Path" };
             copyPathItem.Click += delegate
             {
@@ -630,6 +707,8 @@ namespace PixelVaultNative
             }
             contextMenu.Items.Add(openFolderItem);
             contextMenu.Items.Add(editItem);
+            contextMenu.Items.Add(starMenuItem);
+            contextMenu.Items.Add(photoTagMenuItem);
             contextMenu.Items.Add(new Separator());
             contextMenu.Items.Add(copyPathItem);
             tile.ContextMenu = contextMenu;

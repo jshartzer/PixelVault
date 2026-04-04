@@ -204,7 +204,8 @@ namespace PixelVaultNative
             {
                 EnsureDir(libraryWorkspace.LibraryRoot, "Library folder");
                 var libraryRoot = libraryWorkspace.LibraryRoot;
-                var host = new PhotographyGalleryHost
+                PhotographyGalleryHost host = null;
+                host = new PhotographyGalleryHost
                 {
                     LibraryRoot = libraryRoot,
                     AppVersion = AppVersion,
@@ -220,9 +221,37 @@ namespace PixelVaultNative
                     QueueImageLoad = delegate(Image img, string path, int w, Action<BitmapImage> onDone)
                     {
                         QueueImageLoad(img, path, w, onDone, false, null);
-                    }
+                    },
+                    OpenContainingFolderForFile = delegate(string path)
+                    {
+                        var dir = Path.GetDirectoryName(path);
+                        if (!string.IsNullOrWhiteSpace(dir)) OpenFolder(dir);
+                    },
+                    OpenMetadataEditorForFile = OpenStandaloneLibraryMetadataEditor,
+                    ToggleGamePhotographyTagForFile = delegate(string path)
+                    {
+                        ToggleLibraryFileGamePhotographyTagByPath(path);
+                        host.RefreshTaggedGallery?.Invoke();
+                    },
+                    CopyFilePathToClipboard = delegate(string path)
+                    {
+                        try
+                        {
+                            Clipboard.SetText(path);
+                        }
+                        catch (Exception ex)
+                        {
+                            LogException("Photography gallery copy path", ex);
+                        }
+                    },
+                    GetFileHasGamePhotographyTag = LibraryFileIndexHasGamePhotographyTag
                 };
-                new PhotographyGalleryWindow(host, owner ?? this).Show();
+                var win = new PhotographyGalleryWindow(host, owner ?? this);
+                host.RefreshTaggedGallery = delegate
+                {
+                    win.Dispatcher.BeginInvoke(new Action(win.RequestGalleryReload));
+                };
+                win.Show();
                 if (status != null) status.Text = "Loading photography gallery…";
             }
             catch (Exception ex)

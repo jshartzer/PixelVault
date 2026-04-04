@@ -15,76 +15,100 @@ namespace PixelVaultNative
             var metadataSnapshots = ReadEmbeddedMetadataBatch(files);
             foreach (var file in files)
             {
-                var fileName = Path.GetFileName(file);
-                var indexEntry = TryGetLibraryMetadataIndexEntry(libraryRoot, file, null);
                 EmbeddedMetadataSnapshot snapshot;
                 if (!metadataSnapshots.TryGetValue(file, out snapshot) || snapshot == null) snapshot = new EmbeddedMetadataSnapshot();
-                var tags = snapshot.Tags ?? new string[0];
-                var consoleTags = ExtractConsolePlatformFamilies(tags);
-                var customPlatform = tags.FirstOrDefault(tag => tag.StartsWith(CustomPlatformPrefix, StringComparison.OrdinalIgnoreCase));
-                var customPlatformName = string.IsNullOrWhiteSpace(customPlatform) ? string.Empty : CleanTag(customPlatform.Substring(CustomPlatformPrefix.Length));
-                var normalizedCustomPlatform = NormalizeConsoleLabel(customPlatformName);
-                var useCustomPlatform = !string.IsNullOrWhiteSpace(customPlatformName)
-                    && !string.Equals(normalizedCustomPlatform, "Steam", StringComparison.OrdinalIgnoreCase)
-                    && !string.Equals(normalizedCustomPlatform, "PC", StringComparison.OrdinalIgnoreCase)
-                    && !string.Equals(normalizedCustomPlatform, "PS5", StringComparison.OrdinalIgnoreCase)
-                    && !string.Equals(normalizedCustomPlatform, "Xbox", StringComparison.OrdinalIgnoreCase)
-                    && !string.Equals(normalizedCustomPlatform, "Other", StringComparison.OrdinalIgnoreCase)
-                    && !string.Equals(normalizedCustomPlatform, "Multiple Tags", StringComparison.OrdinalIgnoreCase);
-                var captureTime = snapshot.CaptureTime ?? GetLibraryDate(file);
-                var currentComment = snapshot.Comment ?? string.Empty;
-                var filteredTagText = string.Join(", ", tags.Where(tag =>
-                    !string.Equals(tag, "Game Capture", StringComparison.OrdinalIgnoreCase) &&
-                    !string.Equals(tag, GamePhotographyTag, StringComparison.OrdinalIgnoreCase) &&
-                    !string.Equals(tag, "Photography", StringComparison.OrdinalIgnoreCase) &&
-                    !string.Equals(tag, "Steam", StringComparison.OrdinalIgnoreCase) &&
-                    !string.Equals(tag, "PC", StringComparison.OrdinalIgnoreCase) &&
-                    !string.Equals(tag, "PS5", StringComparison.OrdinalIgnoreCase) &&
-                    !string.Equals(tag, "PlayStation", StringComparison.OrdinalIgnoreCase) &&
-                    !string.Equals(tag, "Xbox", StringComparison.OrdinalIgnoreCase) &&
-                    !tag.StartsWith(CustomPlatformPrefix, StringComparison.OrdinalIgnoreCase)));
-                var addPhotographyTag = tags.Any(tag => string.Equals(tag, GamePhotographyTag, StringComparison.OrdinalIgnoreCase) || string.Equals(tag, "Photography", StringComparison.OrdinalIgnoreCase));
-                var tagSteam = consoleTags.Contains("Steam");
-                var tagPc = !consoleTags.Contains("Steam") && consoleTags.Contains("PC");
-                var tagPs5 = consoleTags.Contains("PS5");
-                var tagXbox = consoleTags.Contains("Xbox");
-                var customPlatformValue = useCustomPlatform ? customPlatformName : string.Empty;
-                items.Add(new ManualMetadataItem
-                {
-                    GameId = indexEntry == null ? (folder == null ? string.Empty : folder.GameId) : indexEntry.GameId,
-                    SteamAppId = folder == null ? string.Empty : (folder.SteamAppId ?? string.Empty),
-                    FilePath = file,
-                    FileName = fileName,
-                    OriginalFileName = fileName,
-                    CaptureTime = captureTime,
-                    UseCustomCaptureTime = false,
-                    GameName = folder.Name ?? string.Empty,
-                    Comment = currentComment,
-                    TagText = filteredTagText,
-                    AddPhotographyTag = addPhotographyTag,
-                    TagSteam = tagSteam,
-                    TagPc = tagPc,
-                    TagPs5 = tagPs5,
-                    TagXbox = tagXbox,
-                    TagOther = useCustomPlatform,
-                    CustomPlatformTag = customPlatformValue,
-                    OriginalGameId = indexEntry == null ? (folder == null ? string.Empty : folder.GameId) : indexEntry.GameId,
-                    OriginalSteamAppId = folder == null ? string.Empty : (folder.SteamAppId ?? string.Empty),
-                    OriginalCaptureTime = captureTime,
-                    OriginalUseCustomCaptureTime = false,
-                    OriginalGameName = folder.Name ?? string.Empty,
-                    OriginalComment = currentComment,
-                    OriginalTagText = filteredTagText,
-                    OriginalAddPhotographyTag = addPhotographyTag,
-                    OriginalTagSteam = tagSteam,
-                    OriginalTagPc = tagPc,
-                    OriginalTagPs5 = tagPs5,
-                    OriginalTagXbox = tagXbox,
-                    OriginalTagOther = useCustomPlatform,
-                    OriginalCustomPlatformTag = customPlatformValue
-                });
+                var item = BuildLibraryMetadataItemCore(file, folder, snapshot);
+                if (item != null) items.Add(item);
             }
             return items;
+        }
+
+        /// <summary>Builds a <see cref="ManualMetadataItem"/> from embedded metadata (single-file reads). <paramref name="folder"/> may be null when resolving outside an open library folder context.</summary>
+        ManualMetadataItem BuildLibraryMetadataItemForPath(string file, LibraryFolderInfo folder = null)
+        {
+            if (string.IsNullOrWhiteSpace(file) || !File.Exists(file)) return null;
+            var batch = ReadEmbeddedMetadataBatch(new[] { file });
+            EmbeddedMetadataSnapshot snapshot;
+            if (!batch.TryGetValue(file, out snapshot) || snapshot == null) snapshot = new EmbeddedMetadataSnapshot();
+            return BuildLibraryMetadataItemCore(file, folder, snapshot);
+        }
+
+        ManualMetadataItem BuildLibraryMetadataItemCore(string file, LibraryFolderInfo folder, EmbeddedMetadataSnapshot snapshot)
+        {
+            if (string.IsNullOrWhiteSpace(file) || !File.Exists(file)) return null;
+            var fileName = Path.GetFileName(file);
+            var indexEntry = TryGetLibraryMetadataIndexEntry(libraryRoot, file, null);
+            var tags = snapshot == null ? new string[0] : snapshot.Tags ?? new string[0];
+            var consoleTags = ExtractConsolePlatformFamilies(tags);
+            var customPlatform = tags.FirstOrDefault(tag => tag.StartsWith(CustomPlatformPrefix, StringComparison.OrdinalIgnoreCase));
+            var customPlatformName = string.IsNullOrWhiteSpace(customPlatform) ? string.Empty : CleanTag(customPlatform.Substring(CustomPlatformPrefix.Length));
+            var normalizedCustomPlatform = NormalizeConsoleLabel(customPlatformName);
+            var useCustomPlatform = !string.IsNullOrWhiteSpace(customPlatformName)
+                && !string.Equals(normalizedCustomPlatform, "Steam", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(normalizedCustomPlatform, "PC", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(normalizedCustomPlatform, "PS5", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(normalizedCustomPlatform, "Xbox", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(normalizedCustomPlatform, "Other", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(normalizedCustomPlatform, "Multiple Tags", StringComparison.OrdinalIgnoreCase);
+            var captureTime = (snapshot == null ? (DateTime?)null : snapshot.CaptureTime) ?? GetLibraryDate(file);
+            var currentComment = snapshot == null ? string.Empty : snapshot.Comment ?? string.Empty;
+            var filteredTagText = string.Join(", ", tags.Where(tag =>
+                !string.Equals(tag, "Game Capture", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(tag, GamePhotographyTag, StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(tag, "Photography", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(tag, "Steam", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(tag, "PC", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(tag, "PS5", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(tag, "PlayStation", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(tag, "Xbox", StringComparison.OrdinalIgnoreCase) &&
+                !tag.StartsWith(CustomPlatformPrefix, StringComparison.OrdinalIgnoreCase)));
+            var addPhotographyTag = tags.Any(tag => string.Equals(tag, GamePhotographyTag, StringComparison.OrdinalIgnoreCase) || string.Equals(tag, "Photography", StringComparison.OrdinalIgnoreCase));
+            var tagSteam = consoleTags.Contains("Steam");
+            var tagPc = !consoleTags.Contains("Steam") && consoleTags.Contains("PC");
+            var tagPs5 = consoleTags.Contains("PS5");
+            var tagXbox = consoleTags.Contains("Xbox");
+            var customPlatformValue = useCustomPlatform ? customPlatformName : string.Empty;
+            string gameName;
+            if (folder != null) gameName = folder.Name ?? string.Empty;
+            else
+            {
+                gameName = Path.GetFileName(Path.GetDirectoryName(file)) ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(gameName)) gameName = GetGameNameFromFileName(Path.GetFileNameWithoutExtension(file));
+            }
+            return new ManualMetadataItem
+            {
+                GameId = indexEntry == null ? (folder == null ? string.Empty : folder.GameId) : indexEntry.GameId,
+                SteamAppId = folder == null ? string.Empty : (folder.SteamAppId ?? string.Empty),
+                FilePath = file,
+                FileName = fileName,
+                OriginalFileName = fileName,
+                CaptureTime = captureTime,
+                UseCustomCaptureTime = false,
+                GameName = gameName,
+                Comment = currentComment,
+                TagText = filteredTagText,
+                AddPhotographyTag = addPhotographyTag,
+                TagSteam = tagSteam,
+                TagPc = tagPc,
+                TagPs5 = tagPs5,
+                TagXbox = tagXbox,
+                TagOther = useCustomPlatform,
+                CustomPlatformTag = customPlatformValue,
+                OriginalGameId = indexEntry == null ? (folder == null ? string.Empty : folder.GameId) : indexEntry.GameId,
+                OriginalSteamAppId = folder == null ? string.Empty : (folder.SteamAppId ?? string.Empty),
+                OriginalCaptureTime = captureTime,
+                OriginalUseCustomCaptureTime = false,
+                OriginalGameName = gameName,
+                OriginalComment = currentComment,
+                OriginalTagText = filteredTagText,
+                OriginalAddPhotographyTag = addPhotographyTag,
+                OriginalTagSteam = tagSteam,
+                OriginalTagPc = tagPc,
+                OriginalTagPs5 = tagPs5,
+                OriginalTagXbox = tagXbox,
+                OriginalTagOther = useCustomPlatform,
+                OriginalCustomPlatformTag = customPlatformValue
+            };
         }
 
         int OrganizeLibraryItems(List<ManualMetadataItem> items, Action<int, int, string> progress = null)

@@ -3,8 +3,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:PixelVaultNative"
         Title="Photography"
-        Width="980"
-        Height="880"
+        Width="1240"
+        Height="940"
         MinWidth="520"
         MinHeight="480"
         WindowStartupLocation="CenterOwner"
@@ -22,8 +22,7 @@
         <StackPanel>
           <Grid Margin="18,18,18,6"
                 HorizontalAlignment="Stretch">
-            <Image MaxHeight="840"
-                   HorizontalAlignment="Stretch"
+            <Image HorizontalAlignment="Stretch"
                    Stretch="Uniform" />
             <Button HorizontalAlignment="Right"
                     VerticalAlignment="Top"
@@ -42,7 +41,6 @@
               <TextBlock FontSize="21"
                          HorizontalAlignment="Center"
                          VerticalAlignment="Center"
-                         Foreground="#EAC54F"
                          Text="{Binding StarGlyph}" />
             </Button>
           </Grid>

@@ -51,5 +51,12 @@ namespace PixelVaultNative
         public Action OpenLibraryFolder { get; init; }
         public Action<string> OpenImageWithShell { get; init; }
         public Action<Image, string, int, Action<BitmapImage>> QueueImageLoad { get; init; }
+        public Action<string> OpenContainingFolderForFile { get; init; }
+        public Action<string> OpenMetadataEditorForFile { get; init; }
+        public Action<string> ToggleGamePhotographyTagForFile { get; init; }
+        public Action<string> CopyFilePathToClipboard { get; init; }
+        public Func<string, bool> GetFileHasGamePhotographyTag { get; init; }
+        /// <summary>Assigned after the gallery window is constructed so tag toggles can refresh the list.</summary>
+        public Action RefreshTaggedGallery { get; set; }
     }
 }

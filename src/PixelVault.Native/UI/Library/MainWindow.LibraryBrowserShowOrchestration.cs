@@ -166,7 +166,7 @@ namespace PixelVaultNative
 
                 renderSelectedFolder = delegate
                 {
-                    _shell.LibraryBrowserRenderSelectedFolderDetail(ws, libraryWindow, openSingleFileMetadataEditor, updateDetailSelection, refreshDetailSelectionUi);
+                    _shell.LibraryBrowserRenderSelectedFolderDetail(ws, libraryWindow, openSingleFileMetadataEditor, updateDetailSelection, refreshDetailSelectionUi, renderSelectedFolder);
                     if (ws.Current == null) ws.DetailSelectionAnchorIndex = -1;
                 };
 

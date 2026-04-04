@@ -19,7 +19,8 @@ namespace PixelVaultNative
             Window libraryWindow,
             Action<string> openSingleFileMetadataEditor,
             Action<string, ModifierKeys> updateDetailSelection,
-            Action refreshDetailSelectionUi)
+            Action refreshDetailSelectionUi,
+            Action redrawSelectedFolderDetail)
         {
             var panes = ws.Panes;
             var renderStopwatch = Stopwatch.StartNew();
@@ -188,7 +189,8 @@ namespace PixelVaultNative
                                             openSingleFileMetadataEditor,
                                             updateDetailSelection,
                                             ws.SelectedDetailFiles,
-                                            refreshDetailSelectionUi);
+                                            refreshDetailSelectionUi,
+                                            redrawSelectedFolderDetail);
                                         tile.Margin = new Thickness(0, 0, fileIndex < rowFiles.Count - 1 ? detailTileGap : 0, 0);
                                         ws.DetailTiles.Add(tile);
                                         rowPanel.Children.Add(tile);
