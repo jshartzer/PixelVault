@@ -1,3 +1,8 @@
+## 0.845
+- **Release:** Version **0.845** — publish refresh for the Library detail-pane stability fix.
+- **Library (detail switching):** Fixed rapid folder switching so a real selection change now resets the screenshot pane cleanly instead of leaving the previous game's captures visible while only the title updates.
+- **Library (render behavior):** Kept the smoother same-folder rerender path for metadata/detail refreshes, but restored an explicit loading handoff for actual game-to-game navigation so the right-hand pane no longer appears frozen.
+
 ## 0.844
 - **Release:** Version **0.844** — publish refresh for the next game-first Library polish slice.
 - **Library (selected cover context):** Replaced the selected-game platform chip row with the existing console badge overlay on the displayed cover art, so game-first browse stays clean while the current cover still shows its console at a glance.

@@ -42,9 +42,9 @@ namespace PixelVaultNative
                 root.Children.Add(navChrome.NavBar);
 
                 var contentGrid = new Grid();
-                contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(62, GridUnitType.Star) });
+                contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(62, GridUnitType.Star), MinWidth = 280 });
                 contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(38, GridUnitType.Star) });
+                contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(38, GridUnitType.Star), MinWidth = 260 });
                 Grid.SetRow(contentGrid, 1);
                 root.Children.Add(contentGrid);
 

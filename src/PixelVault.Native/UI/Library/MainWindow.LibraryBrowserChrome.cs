@@ -33,8 +33,8 @@ namespace PixelVaultNative
                 Title = "PixelVault " + AppVersion + " Library",
                 Width = PreferredLibraryWindowWidth(),
                 Height = PreferredLibraryWindowHeight(),
-                MinWidth = 1200,
-                MinHeight = 780,
+                MinWidth = 720,
+                MinHeight = 520,
                 Owner = this,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
                 Background = Brush("#0F1519")
@@ -42,8 +42,8 @@ namespace PixelVaultNative
             libraryWindow.Title = "PixelVault " + AppVersion + " Library";
             libraryWindow.Width = PreferredLibraryWindowWidth();
             libraryWindow.Height = PreferredLibraryWindowHeight();
-            libraryWindow.MinWidth = 1200;
-            libraryWindow.MinHeight = 780;
+            libraryWindow.MinWidth = 720;
+            libraryWindow.MinHeight = 520;
             libraryWindow.Background = Brush("#0F1519");
             return libraryWindow;
         }
@@ -85,8 +85,15 @@ namespace PixelVaultNative
             importActions.Children.Add(chrome.ImportButton);
             importActions.Children.Add(chrome.ImportCommentsButton);
             importActions.Children.Add(chrome.ManualImportButton);
-            Grid.SetColumn(importActions, 0);
-            navGrid.Children.Add(importActions);
+            var importScroll = new ScrollViewer
+            {
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                VerticalContentAlignment = VerticalAlignment.Center,
+                Content = importActions
+            };
+            Grid.SetColumn(importScroll, 0);
+            navGrid.Children.Add(importScroll);
             chrome.SettingsButton = Btn("Settings", null, "#20343A", Brushes.White);
             chrome.SettingsButton.Width = 122;
             chrome.SettingsButton.Height = 42;
@@ -189,8 +196,16 @@ namespace PixelVaultNative
             headerActions.Children.Add(chrome.RefreshButton);
             headerActions.Children.Add(chrome.FetchButton);
             headerActions.Children.Add(chrome.IntakeReviewButton);
-            Grid.SetColumn(headerActions, 2);
-            navGrid.Children.Add(headerActions);
+            var headerScroll = new ScrollViewer
+            {
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                VerticalContentAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(12, 0, 0, 0),
+                Content = headerActions
+            };
+            Grid.SetColumn(headerScroll, 2);
+            navGrid.Children.Add(headerScroll);
             chrome.NavBar.Child = navGrid;
             return chrome;
         }

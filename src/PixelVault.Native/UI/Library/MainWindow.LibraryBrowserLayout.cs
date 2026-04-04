@@ -43,7 +43,8 @@ namespace PixelVaultNative
                 Background = Brush("#11181D"),
                 BorderBrush = Brush("#27313A"),
                 BorderThickness = new Thickness(0, 0, 1, 0),
-                Padding = new Thickness(18, 16, 18, 12)
+                Padding = new Thickness(18, 16, 18, 12),
+                MinWidth = 0
             };
             var leftGrid = new Grid();
             leftGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -70,7 +71,7 @@ namespace PixelVaultNative
                 BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(12),
                 Padding = new Thickness(12, 0, 12, 0),
-                Height = 42
+                MinHeight = 42
             };
             var searchBoxRow = new Grid();
             searchBoxRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -134,8 +135,15 @@ namespace PixelVaultNative
             browserToolbar.Children.Add(panes.GroupAllButton);
             Grid.SetColumn(panes.GroupConsoleButton, 5);
             browserToolbar.Children.Add(panes.GroupConsoleButton);
-            Grid.SetRow(browserToolbar, 1);
-            filterGrid.Children.Add(browserToolbar);
+            var toolbarScroll = new ScrollViewer
+            {
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                Margin = new Thickness(0, 4, 0, 0),
+                Content = browserToolbar
+            };
+            Grid.SetRow(toolbarScroll, 1);
+            filterGrid.Children.Add(toolbarScroll);
             filterShell.Child = filterGrid;
             Grid.SetRow(filterShell, 0);
             leftGrid.Children.Add(filterShell);
@@ -144,6 +152,7 @@ namespace PixelVaultNative
             panes.TileRows.RecycleVisibleRowElements = true;
             panes.TileScroll = panes.TileRows.ScrollViewer;
             panes.TileScroll.Padding = new Thickness(0, 4, 0, 0);
+            panes.TileScroll.HorizontalScrollBarVisibility = ScrollBarVisibility.Auto;
             Grid.SetRow(panes.TileScroll, 1);
             leftGrid.Children.Add(panes.TileScroll);
             Grid.SetRow(status, 2);
@@ -166,7 +175,7 @@ namespace PixelVaultNative
             Grid.SetColumn(splitter, 1);
             contentGrid.Children.Add(splitter);
 
-            var right = new Border { Background = Brush("#10171C"), Padding = new Thickness(26, 22, 26, 18) };
+            var right = new Border { Background = Brush("#10171C"), Padding = new Thickness(26, 22, 26, 18), MinWidth = 0 };
             Grid.SetColumn(right, 2);
             var rightGrid = new Grid();
             rightGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -175,12 +184,16 @@ namespace PixelVaultNative
 
             var banner = new Border { Background = Brushes.Transparent, Padding = new Thickness(0), Margin = new Thickness(0, 0, 0, 18) };
             var bannerGrid = new Grid();
-            bannerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(230) });
-            bannerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            bannerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto, MinWidth = 96, MaxWidth = 240 });
+            bannerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = 140 });
             var previewFrame = new Border
             {
-                Width = 210,
-                Height = 315,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                VerticalAlignment = VerticalAlignment.Top,
+                MinWidth = 96,
+                MinHeight = 144,
+                MaxWidth = 210,
+                MaxHeight = 315,
                 CornerRadius = new CornerRadius(14),
                 Background = Brush("#0D1216"),
                 BorderBrush = Brush("#24323A"),
@@ -188,10 +201,10 @@ namespace PixelVaultNative
                 Margin = new Thickness(0, 0, 18, 0),
                 ClipToBounds = true
             };
-            panes.PreviewImage = new Image { Width = 210, Height = 315, Stretch = Stretch.UniformToFill };
+            panes.PreviewImage = new Image { Stretch = Stretch.Uniform, MaxWidth = 210, MaxHeight = 315, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
             previewFrame.Child = panes.PreviewImage;
             bannerGrid.Children.Add(previewFrame);
-            var textStack = new StackPanel();
+            var textStack = new StackPanel { MinWidth = 0 };
             var titleRow = new Grid { Margin = new Thickness(0, 0, 0, 0) };
             titleRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             titleRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -259,6 +272,7 @@ namespace PixelVaultNative
 
             panes.DetailRows = CreateVirtualizedRowHost(new Thickness(0), Brush("#0F151A"));
             panes.ThumbScroll = panes.DetailRows.ScrollViewer;
+            panes.ThumbScroll.HorizontalScrollBarVisibility = ScrollBarVisibility.Auto;
             Grid.SetRow(panes.ThumbScroll, 2);
             rightGrid.Children.Add(panes.ThumbScroll);
             right.Child = rightGrid;
