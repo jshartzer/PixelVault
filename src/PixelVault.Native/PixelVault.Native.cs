@@ -85,6 +85,7 @@ namespace PixelVaultNative
         int libraryFolderTileSize = 240;
         string libraryFolderSortMode = "platform";
         string libraryGroupingMode = "all";
+        bool troubleshootingLoggingEnabled;
         string _libraryBrowserPersistedSearch = string.Empty;
         string _libraryBrowserPersistedLastViewKey = string.Empty;
         double _libraryBrowserPersistedFolderScroll;
@@ -3737,7 +3738,8 @@ namespace PixelVaultNative
                 LibraryBrowserSearchText = _libraryBrowserPersistedSearch ?? string.Empty,
                 LibraryBrowserLastViewKey = _libraryBrowserPersistedLastViewKey ?? string.Empty,
                 LibraryBrowserFolderScroll = Math.Max(0, _libraryBrowserPersistedFolderScroll),
-                LibraryBrowserDetailScroll = Math.Max(0, _libraryBrowserPersistedDetailScroll)
+                LibraryBrowserDetailScroll = Math.Max(0, _libraryBrowserPersistedDetailScroll),
+                TroubleshootingLoggingEnabled = troubleshootingLoggingEnabled
             };
         }
 
@@ -3757,6 +3759,7 @@ namespace PixelVaultNative
             _libraryBrowserPersistedLastViewKey = s.LibraryBrowserLastViewKey ?? string.Empty;
             _libraryBrowserPersistedFolderScroll = Math.Max(0, s.LibraryBrowserFolderScroll);
             _libraryBrowserPersistedDetailScroll = Math.Max(0, s.LibraryBrowserDetailScroll);
+            troubleshootingLoggingEnabled = s.TroubleshootingLoggingEnabled;
         }
 
         void LoadSettings()
@@ -3776,6 +3779,7 @@ namespace PixelVaultNative
         }
 
         string LogFilePath() { return Path.Combine(logsRoot, "PixelVault-native.log"); }
+        string TroubleshootingLogFilePath() { return Path.Combine(logsRoot, "PixelVault-troubleshooting.log"); }
         string TryReadLogFile()
         {
             var path = LogFilePath();
@@ -3797,9 +3801,9 @@ namespace PixelVaultNative
             }
             return string.Empty;
         }
-        void AppendLogFileLine(string line)
+        void AppendLogFileLine(string path, string line)
         {
-            var path = LogFilePath();
+            if (string.IsNullOrWhiteSpace(path)) return;
             Directory.CreateDirectory(logsRoot);
             lock (logFileSync)
             {
@@ -3823,6 +3827,10 @@ namespace PixelVaultNative
                 }
             }
         }
+        void AppendLogFileLine(string line)
+        {
+            AppendLogFileLine(LogFilePath(), line);
+        }
         void LoadLogView()
         {
             if (logBox == null) return;
@@ -3844,6 +3852,16 @@ namespace PixelVaultNative
                 else logBox.Dispatcher.BeginInvoke(append);
             }
             AppendLogFileLine(line);
+        }
+        void LogTroubleshooting(string area, string message)
+        {
+            if (!troubleshootingLoggingEnabled) return;
+            var line = "[" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "] "
+                + "DIAG"
+                + " | T" + Environment.CurrentManagedThreadId
+                + " | " + (string.IsNullOrWhiteSpace(area) ? "General" : area.Trim())
+                + " | " + (message ?? string.Empty);
+            AppendLogFileLine(TroubleshootingLogFilePath(), line);
         }
     }
 }

@@ -87,6 +87,15 @@ namespace PixelVaultNative
                 {
                     if (double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var dy)) s.LibraryBrowserDetailScroll = Math.Max(0, dy);
                 }
+                else if (key == "troubleshooting_logging_enabled")
+                {
+                    var normalizedValue = (value ?? string.Empty).Trim();
+                    s.TroubleshootingLoggingEnabled =
+                        string.Equals(normalizedValue, "1", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(normalizedValue, "true", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(normalizedValue, "yes", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(normalizedValue, "on", StringComparison.OrdinalIgnoreCase);
+                }
             }
 
             var bundledExifTool = Path.Combine(appRoot ?? string.Empty, "tools", "exiftool.exe");
@@ -123,7 +132,8 @@ namespace PixelVaultNative
                 "library_browser_search=" + (state.LibraryBrowserSearchText ?? string.Empty).Replace("\r", " ").Replace("\n", " "),
                 "library_browser_last_view_key=" + (state.LibraryBrowserLastViewKey ?? string.Empty).Replace("\r", " ").Replace("\n", " "),
                 "library_browser_folder_scroll=" + Math.Max(0, state.LibraryBrowserFolderScroll).ToString(CultureInfo.InvariantCulture),
-                "library_browser_detail_scroll=" + Math.Max(0, state.LibraryBrowserDetailScroll).ToString(CultureInfo.InvariantCulture)
+                "library_browser_detail_scroll=" + Math.Max(0, state.LibraryBrowserDetailScroll).ToString(CultureInfo.InvariantCulture),
+                "troubleshooting_logging_enabled=" + (state.TroubleshootingLoggingEnabled ? "1" : "0")
             });
         }
     }

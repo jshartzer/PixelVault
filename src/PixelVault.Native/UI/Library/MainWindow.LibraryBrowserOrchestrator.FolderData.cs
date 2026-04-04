@@ -13,6 +13,11 @@ namespace PixelVaultNative
             var loadingStatusText = forceRefresh || ws.Folders.Count > 0
                 ? "Refreshing library folders..."
                 : "Loading library folders...";
+            LogTroubleshooting("LibraryFolderRefreshStart",
+                "version=" + refreshVersion
+                + "; forceRefresh=" + forceRefresh
+                + "; existingFolders=" + ws.Folders.Count
+                + "; grouping=" + NormalizeLibraryGroupingMode(libraryGroupingMode));
             ws.LibraryFoldersLoading = true;
             if (status != null) status.Text = loadingStatusText;
             if (renderTiles != null) renderTiles();
@@ -23,7 +28,13 @@ namespace PixelVaultNative
             {
                 libraryWindow.Dispatcher.BeginInvoke(new Action(delegate
                 {
-                    if (refreshVersion != ws.LibraryFolderRefreshVersion) return;
+                    if (refreshVersion != ws.LibraryFolderRefreshVersion)
+                    {
+                        LogTroubleshooting("LibraryFolderRefreshStale",
+                            "version=" + refreshVersion
+                            + "; activeVersion=" + ws.LibraryFolderRefreshVersion);
+                        return;
+                    }
                     ws.LibraryFoldersLoading = false;
                     if (loadTask.IsFaulted)
                     {
@@ -31,6 +42,10 @@ namespace PixelVaultNative
                         var loadError = flattened == null ? new Exception("Library load failed.") : flattened.InnerExceptions.First();
                         if (status != null && string.Equals(status.Text, loadingStatusText, StringComparison.Ordinal)) status.Text = "Library load failed";
                         Log(loadError.ToString());
+                        LogTroubleshooting("LibraryFolderRefreshFail",
+                            "version=" + refreshVersion
+                            + "; forceRefresh=" + forceRefresh
+                            + "; message=" + loadError.Message);
                         if (renderTiles != null) renderTiles();
                         MessageBox.Show(loadError.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
                         return;
@@ -40,6 +55,10 @@ namespace PixelVaultNative
                     if (loadTask.Status == TaskStatus.RanToCompletion && loadTask.Result != null)
                         ws.Folders.AddRange(loadTask.Result);
                     if (status != null && string.Equals(status.Text, loadingStatusText, StringComparison.Ordinal)) status.Text = "Library ready";
+                    LogTroubleshooting("LibraryFolderRefreshComplete",
+                        "version=" + refreshVersion
+                        + "; forceRefresh=" + forceRefresh
+                        + "; folders=" + ws.Folders.Count);
                     if (renderTiles != null) renderTiles();
                 }));
             }, TaskScheduler.Default);
@@ -62,6 +81,9 @@ namespace PixelVaultNative
                     ws.Folders.Clear();
                     ws.Folders.AddRange(snapshotFolders);
                     if (status != null) status.Text = "Library ready";
+                    LogTroubleshooting("LibraryFolderSnapshotApplied",
+                        "folders=" + snapshotFolders.Count
+                        + "; grouping=" + NormalizeLibraryGroupingMode(libraryGroupingMode));
                     if (renderTiles != null) renderTiles();
                 }));
             }, TaskScheduler.Default);

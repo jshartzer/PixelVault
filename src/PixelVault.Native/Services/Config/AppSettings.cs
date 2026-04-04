@@ -18,6 +18,7 @@ namespace PixelVaultNative
         public string LibraryBrowserLastViewKey = string.Empty;
         public double LibraryBrowserFolderScroll;
         public double LibraryBrowserDetailScroll;
+        public bool TroubleshootingLoggingEnabled;
 
         public static AppSettings Clone(AppSettings s)
         {
@@ -36,7 +37,8 @@ namespace PixelVaultNative
                 LibraryBrowserSearchText = s.LibraryBrowserSearchText ?? string.Empty,
                 LibraryBrowserLastViewKey = s.LibraryBrowserLastViewKey ?? string.Empty,
                 LibraryBrowserFolderScroll = s.LibraryBrowserFolderScroll,
-                LibraryBrowserDetailScroll = s.LibraryBrowserDetailScroll
+                LibraryBrowserDetailScroll = s.LibraryBrowserDetailScroll,
+                TroubleshootingLoggingEnabled = s.TroubleshootingLoggingEnabled
             };
         }
     }

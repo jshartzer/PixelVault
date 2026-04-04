@@ -78,6 +78,7 @@ namespace PixelVaultNative
             leftStack.Children.Add(TitleBlock("Control Center"));
             leftStack.Children.Add(new TextBlock { Text = "Use Path Settings for locations and tools, then run imports or maintenance from here whenever you need them.", Foreground = Brush("#5F6970"), Margin = new Thickness(0, 0, 0, 14), TextWrapping = TextWrapping.Wrap });
             leftStack.Children.Add(BuildSettingsSummary());
+            leftStack.Children.Add(BuildDiagnosticsSummary());
 
             leftStack.Children.Add(new TextBlock { Text = "Import options", FontSize = 14, FontWeight = FontWeights.SemiBold, Foreground = Brush("#1F2A30"), Margin = new Thickness(0, 16, 0, 8) });
             recurseBox = new CheckBox { Content = "Search subfolders for rename", Margin = new Thickness(0, 0, 0, 8) };
@@ -216,6 +217,34 @@ namespace PixelVaultNative
             stack.Children.Add(new TextBlock { Text = "ExifTool: " + exifToolPath, TextWrapping = TextWrapping.Wrap, Foreground = Brush("#4C463F"), Margin = new Thickness(0, 0, 0, 4) });
             stack.Children.Add(new TextBlock { Text = "FFmpeg: " + (string.IsNullOrWhiteSpace(ffmpegPath) ? "(not configured)" : ffmpegPath), TextWrapping = TextWrapping.Wrap, Foreground = Brush("#4C463F"), Margin = new Thickness(0, 0, 0, 4) });
             stack.Children.Add(new TextBlock { Text = "SteamGridDB: " + (HasSteamGridDbApiToken() ? "token configured" : "(token not configured)"), TextWrapping = TextWrapping.Wrap, Foreground = Brush("#4C463F") });
+            border.Child = stack;
+            return border;
+        }
+
+        Border BuildDiagnosticsSummary()
+        {
+            var border = new Border { Background = Brush("#F7FAFC"), CornerRadius = new CornerRadius(14), Padding = new Thickness(14), BorderBrush = Brush("#D7E1E8"), BorderThickness = new Thickness(1), Margin = new Thickness(0, 14, 0, 0) };
+            var stack = new StackPanel();
+            stack.Children.Add(new TextBlock { Text = "Diagnostics", FontWeight = FontWeights.SemiBold, Foreground = Brush("#1F2A30"), Margin = new Thickness(0, 0, 0, 8) });
+            stack.Children.Add(new TextBlock { Text = "Turn this on when you want a cleaner troubleshooting trail for Library and async UI behavior. The diagnostics log is separate from the normal run-history log.", Foreground = Brush("#4C463F"), Margin = new Thickness(0, 0, 0, 10), TextWrapping = TextWrapping.Wrap });
+            var enableTroubleshootingBox = new CheckBox { Content = "Enable troubleshooting logging", IsChecked = troubleshootingLoggingEnabled, Margin = new Thickness(0, 0, 0, 8) };
+            enableTroubleshootingBox.Checked += delegate
+            {
+                troubleshootingLoggingEnabled = true;
+                SaveSettings();
+                Log("Troubleshooting logging enabled.");
+                LogTroubleshooting("Session", "Troubleshooting logging enabled.");
+            };
+            enableTroubleshootingBox.Unchecked += delegate
+            {
+                LogTroubleshooting("Session", "Troubleshooting logging disabled.");
+                troubleshootingLoggingEnabled = false;
+                SaveSettings();
+                Log("Troubleshooting logging disabled.");
+            };
+            stack.Children.Add(enableTroubleshootingBox);
+            stack.Children.Add(new TextBlock { Text = "Normal log: " + LogFilePath(), Foreground = Brush("#5F6970"), Margin = new Thickness(0, 0, 0, 4), TextWrapping = TextWrapping.Wrap });
+            stack.Children.Add(new TextBlock { Text = "Troubleshooting log: " + TroubleshootingLogFilePath(), Foreground = Brush("#5F6970"), TextWrapping = TextWrapping.Wrap });
             border.Child = stack;
             return border;
         }

@@ -30,7 +30,8 @@ public sealed class SettingsServiceTests
                 "steamgriddb_token=secret",
                 "library_folder_tile_size=200",
                 "library_folder_sort_mode=recent",
-                "library_grouping_mode=console"
+                "library_grouping_mode=console",
+                "troubleshooting_logging_enabled=1"
             });
 
             var initial = new AppSettings
@@ -43,7 +44,8 @@ public sealed class SettingsServiceTests
                 SteamGridDbApiToken = string.Empty,
                 LibraryFolderTileSize = 240,
                 LibraryFolderSortMode = "platform",
-                LibraryGroupingMode = "all"
+                LibraryGroupingMode = "all",
+                TroubleshootingLoggingEnabled = false
             };
 
             var svc = new SettingsService();
@@ -58,6 +60,7 @@ public sealed class SettingsServiceTests
             Assert.Equal(200, loaded.LibraryFolderTileSize);
             Assert.Equal("recent", loaded.LibraryFolderSortMode);
             Assert.Equal("console", loaded.LibraryGroupingMode);
+            Assert.True(loaded.TroubleshootingLoggingEnabled);
         }
         finally
         {
@@ -86,7 +89,8 @@ public sealed class SettingsServiceTests
                 SteamGridDbApiToken = "tok",
                 LibraryFolderTileSize = 180,
                 LibraryFolderSortMode = "photos",
-                LibraryGroupingMode = "console"
+                LibraryGroupingMode = "console",
+                TroubleshootingLoggingEnabled = true
             };
 
             var svc = new SettingsService();
@@ -104,6 +108,7 @@ public sealed class SettingsServiceTests
             Assert.Equal(SettingsService.NormalizeLibraryFolderTileSize(original.LibraryFolderTileSize), loaded.LibraryFolderTileSize);
             Assert.Equal("photos", loaded.LibraryFolderSortMode);
             Assert.Equal("console", loaded.LibraryGroupingMode);
+            Assert.True(loaded.TroubleshootingLoggingEnabled);
         }
         finally
         {

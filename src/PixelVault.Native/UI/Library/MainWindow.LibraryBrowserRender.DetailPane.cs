@@ -49,6 +49,13 @@ namespace PixelVaultNative
             var resetRowsToLoading = ws.ResetDetailRowsToLoadingOnNextRender;
             ws.ResetDetailRowsToLoadingOnNextRender = false;
             var renderFolder = ws.Current;
+            LogTroubleshooting("LibraryDetailRenderStart",
+                "renderVersion=" + renderVersion
+                + "; resetToLoading=" + resetRowsToLoading
+                + "; restoreScroll=" + shouldRestoreDetailScroll
+                + "; detailColumns=" + targetDetailColumns
+                + "; detailSize=" + size
+                + "; " + BuildLibraryBrowserTroubleshootingLabel(renderFolder));
             var displayFolder = BuildLibraryBrowserDisplayFolder(renderFolder);
             if (resetRowsToLoading || panes.DetailRows.Rows == null || panes.DetailRows.Rows.Count == 0)
             {
@@ -63,6 +70,9 @@ namespace PixelVaultNative
                         }
                     }
                 }, true, null);
+                LogTroubleshooting("LibraryDetailRenderLoadingState",
+                    "renderVersion=" + renderVersion
+                    + "; reason=" + (resetRowsToLoading ? "selection-change" : "empty-pane"));
             }
             if (refreshDetailSelectionUi != null) refreshDetailSelectionUi();
             Task.Run(async delegate
@@ -70,8 +80,26 @@ namespace PixelVaultNative
                 Action<LibraryDetailRenderSnapshot, bool> applyDetailSnapshot = null;
                 applyDetailSnapshot = delegate(LibraryDetailRenderSnapshot snapshot, bool logCompletion)
                 {
-                    if (renderVersion != ws.DetailRenderSequence) return;
-                    if (!SameLibraryBrowserSelection(ws.Current, renderFolder)) return;
+                    var snapshotStage = logCompletion ? "initial" : "refined";
+                    if (renderVersion != ws.DetailRenderSequence)
+                    {
+                        LogTroubleshooting("LibraryDetailRenderSkipped",
+                            "renderVersion=" + renderVersion
+                            + "; activeVersion=" + ws.DetailRenderSequence
+                            + "; stage=" + snapshotStage
+                            + "; reason=stale-render");
+                        return;
+                    }
+                    if (!SameLibraryBrowserSelection(ws.Current, renderFolder))
+                    {
+                        LogTroubleshooting("LibraryDetailRenderSkipped",
+                            "renderVersion=" + renderVersion
+                            + "; stage=" + snapshotStage
+                            + "; reason=selection-changed"
+                            + "; active=" + BuildLibraryBrowserTroubleshootingLabel(ws.Current)
+                            + "; expected=" + BuildLibraryBrowserTroubleshootingLabel(renderFolder));
+                        return;
+                    }
                     var visibleFiles = snapshot == null ? new List<string>() : (snapshot.VisibleFiles ?? new List<string>());
                     var visibleSet = new HashSet<string>(visibleFiles, StringComparer.OrdinalIgnoreCase);
                     foreach (var stale in ws.SelectedDetailFiles.Where(path => !visibleSet.Contains(path)).ToList()) ws.SelectedDetailFiles.Remove(stale);
@@ -97,6 +125,10 @@ namespace PixelVaultNative
                         }, !restoreDetailScrollPending, restoreDetailScrollPending ? restoreDetailScrollOffset : null);
                         restoreDetailScrollPending = false;
                         if (refreshDetailSelectionUi != null) refreshDetailSelectionUi();
+                        LogTroubleshooting("LibraryDetailRenderApplied",
+                            "renderVersion=" + renderVersion
+                            + "; stage=" + snapshotStage
+                            + "; groups=0; files=0; rows=1; " + BuildLibraryBrowserTroubleshootingLabel(renderFolder));
                         if (logCompletion)
                         {
                             renderStopwatch.Stop();
@@ -159,6 +191,14 @@ namespace PixelVaultNative
                     SetVirtualizedRows(panes.DetailRows, virtualRows, !restoreDetailScrollPending, restoreDetailScrollPending ? restoreDetailScrollOffset : null);
                     restoreDetailScrollPending = false;
                     if (refreshDetailSelectionUi != null) refreshDetailSelectionUi();
+                    LogTroubleshooting("LibraryDetailRenderApplied",
+                        "renderVersion=" + renderVersion
+                        + "; stage=" + snapshotStage
+                        + "; groups=" + snapshot.Groups.Count
+                        + "; files=" + visibleFiles.Count
+                        + "; rows=" + virtualRows.Count
+                        + "; columns=" + detailColumns
+                        + "; " + BuildLibraryBrowserTroubleshootingLabel(renderFolder));
                     if (logCompletion)
                     {
                         renderStopwatch.Stop();
@@ -215,6 +255,10 @@ namespace PixelVaultNative
 
                     if (filesMissingCaptureTicks.Count > 0)
                     {
+                        LogTroubleshooting("LibraryDetailMetadataRepairStart",
+                            "renderVersion=" + renderVersion
+                            + "; files=" + filesMissingCaptureTicks.Count
+                            + "; " + BuildLibraryBrowserTroubleshootingLabel(renderFolder));
                         try
                         {
                             var savedGameRows = librarySession.LoadSavedGameIndexRows();
@@ -242,10 +286,19 @@ namespace PixelVaultNative
                             }
                             if (gameRowsChanged) librarySession.PersistGameIndexRows(savedGameRows);
                             if (indexChanged) librarySession.SaveLibraryMetadataIndex(metadataIndex);
+                            LogTroubleshooting("LibraryDetailMetadataRepairComplete",
+                                "renderVersion=" + renderVersion
+                                + "; files=" + filesMissingCaptureTicks.Count
+                                + "; indexChanged=" + indexChanged
+                                + "; gameRowsChanged=" + gameRowsChanged);
                         }
                         catch (Exception repairEx)
                         {
                             Log("Library detail metadata repair failed for " + (renderFolder.Name ?? renderFolder.PrimaryFolderPath ?? "(unknown)") + ". " + repairEx.Message);
+                            LogTroubleshooting("LibraryDetailMetadataRepairFail",
+                                "renderVersion=" + renderVersion
+                                + "; message=" + repairEx.Message
+                                + "; " + BuildLibraryBrowserTroubleshootingLabel(renderFolder));
                         }
 
                         var refinedSnapshot = buildSnapshot();
@@ -272,6 +325,11 @@ namespace PixelVaultNative
                                 }
                             }
                         }
+                        LogTroubleshooting("LibraryDetailMetadataRepairDiff",
+                            "renderVersion=" + renderVersion
+                            + "; layoutUnchanged=" + layoutUnchanged
+                            + "; quickGroups=" + quickSnapshot.Groups.Count
+                            + "; refinedGroups=" + refinedSnapshot.Groups.Count);
                         if (!layoutUnchanged)
                         {
                             await libraryWindow.Dispatcher.InvokeAsync((Action)(delegate { applyDetailSnapshot(refinedSnapshot, false); }));
@@ -298,6 +356,10 @@ namespace PixelVaultNative
                         }, true, null);
                         if (refreshDetailSelectionUi != null) refreshDetailSelectionUi();
                         Log("Library detail render failed for " + (renderFolder.Name ?? renderFolder.PrimaryFolderPath ?? "(unknown)") + ". " + ex.Message);
+                        LogTroubleshooting("LibraryDetailRenderFail",
+                            "renderVersion=" + renderVersion
+                            + "; message=" + ex.Message
+                            + "; " + BuildLibraryBrowserTroubleshootingLabel(renderFolder));
                         renderStopwatch.Stop();
                     }));
                 }

@@ -234,6 +234,38 @@ namespace PixelVaultNative
             return CountLibraryBrowserSourceFolders(view) > 1 ? "Open Folders" : "Open Folder";
         }
 
+        string BuildLibraryBrowserTroubleshootingLabel(LibraryBrowserFolderView view)
+        {
+            if (view == null)
+            {
+                return "view=(none); grouping=" + NormalizeLibraryGroupingMode(libraryGroupingMode);
+            }
+
+            var platformText = string.Join(",",
+                (view.PlatformLabels ?? new string[0])
+                    .Where(label => !string.IsNullOrWhiteSpace(label))
+                    .Select(NormalizeConsoleLabel)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(label => PlatformGroupOrder(label))
+                    .ThenBy(label => label, StringComparer.OrdinalIgnoreCase));
+            if (string.IsNullOrWhiteSpace(platformText))
+            {
+                platformText = NormalizeConsoleLabel(view.PrimaryPlatformLabel);
+            }
+            if (string.IsNullOrWhiteSpace(platformText))
+            {
+                platformText = "(none)";
+            }
+
+            return "viewKey=" + (view.ViewKey ?? string.Empty)
+                + "; name=" + (view.Name ?? string.Empty)
+                + "; files=" + Math.Max(view.FileCount, 0)
+                + "; sourceFolders=" + CountLibraryBrowserSourceFolders(view)
+                + "; platforms=" + platformText
+                + "; primaryFolder=" + (view.PrimaryFolderPath ?? string.Empty)
+                + "; grouping=" + NormalizeLibraryGroupingMode(libraryGroupingMode);
+        }
+
         void ApplyRemovedFilesToLibraryBrowserState(LibraryBrowserWorkingSet ws, IEnumerable<string> removedFiles)
         {
             if (ws == null) return;

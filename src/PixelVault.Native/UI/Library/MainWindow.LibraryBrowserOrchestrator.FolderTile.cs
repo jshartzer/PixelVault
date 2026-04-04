@@ -273,6 +273,12 @@ namespace PixelVaultNative
                 panes.ThumbScroll.ScrollToVerticalOffset(0);
             }
             ws.Current = info;
+            LogTroubleshooting("LibrarySelection",
+                "selectionChanged=" + selectionChanged
+                + "; resetDetailRows=" + ws.ResetDetailRowsToLoadingOnNextRender
+                + "; restoreDetailScroll=" + ws.PreserveDetailScrollOnNextRender
+                + "; detailScrollOffset=" + ws.PreservedDetailScrollOffset.ToString("0.0")
+                + "; " + BuildLibraryBrowserTroubleshootingLabel(info));
             var displayFolder = BuildLibraryBrowserDisplayFolder(info);
             var actionFolder = GetLibraryBrowserPrimaryFolder(info) ?? displayFolder;
             activeSelectedLibraryFolder = CloneLibraryFolderInfo(actionFolder);
@@ -313,6 +319,8 @@ namespace PixelVaultNative
                     _ = libraryWindow.Dispatcher.BeginInvoke(new Action(delegate
                     {
                         Log("Library detail banner art resolve failed for " + (infoCapture.Name ?? "?") + ". " + ex.Message);
+                        LogTroubleshooting("LibraryBannerArtFail",
+                            "message=" + ex.Message + "; " + BuildLibraryBrowserTroubleshootingLabel(infoCapture));
                     }));
                 }
             });
