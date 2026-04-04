@@ -371,7 +371,7 @@ Track in git:
 
 Avoid tracking in git:
 
-- the actual screenshot / video library on `Y:\`
+- the actual screenshot / video library on `E:\`
 - logs
 - cover cache
 - generated thumbnails

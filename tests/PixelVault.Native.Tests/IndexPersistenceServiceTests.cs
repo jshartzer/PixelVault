@@ -73,7 +73,7 @@ public sealed class IndexPersistenceServiceTests
                     SteamAppId = "108710",
                     SteamGridDbId = "9991",
                     FileCount = 12,
-                    FolderPath = "Y:\\Game Captures\\Alan Wake",
+                    FolderPath = "E:\\Game Captures\\Alan Wake",
                     FilePaths = Array.Empty<string>()
                 }
             });

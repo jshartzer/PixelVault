@@ -168,7 +168,7 @@ This repo is intended to track:
 
 It should not track:
 
-- the actual screenshot/video library on `Y:\` (or other capture volumes)
+- the actual screenshot/video library on `E:\` (or other capture volumes)
 - runtime logs
 - cover cache
 - thumbnail cache

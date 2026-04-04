@@ -326,8 +326,8 @@ namespace PixelVaultNative
             EnsureSavedCoversReadme();
             if (!File.Exists(changelogPath)) File.WriteAllText(changelogPath, "# PixelVault Changelog\r\n\r\n## 0.530\r\n- Replaced the broken library separator glyph with a plain pipe so folder details read cleanly.\r\n- Grouped the Game Library folders into collapsible Steam, PS5, Xbox, Multiple Tags, and Other sections.\r\n- Increased the library folder art size a bit and tightened the caption text underneath for a cleaner browse view.\r\n");
             MigratePersistentDataFromLegacyVersions();
-            sourceRoot = @"Y:\Game Capture Uploads";
-            destinationRoot = @"Y:\Game Captures";
+            sourceRoot = @"E:\Game Capture Uploads";
+            destinationRoot = @"E:\Game Captures";
             libraryRoot = destinationRoot;
             exifToolPath = Path.Combine(appRoot, "tools", "exiftool.exe");
             ffmpegPath = Path.Combine(appRoot, "tools", "ffmpeg.exe");
