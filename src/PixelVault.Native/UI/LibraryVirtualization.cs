@@ -34,6 +34,26 @@ namespace PixelVaultNative
             /// <summary>When true, visible row <see cref="FrameworkElement"/>s are keyed by row index and reused across scroll refreshes (same <see cref="Rows"/> model). Cleared on <see cref="SetVirtualizedRows"/>. Do not use when <see cref="BeforeVisibleRowsRebuilt"/> assumes a full rebuild every time (e.g. detail pane repopulates parallel tile lists).</summary>
             public bool RecycleVisibleRowElements;
             public readonly Dictionary<int, FrameworkElement> RecycledRowElements = new Dictionary<int, FrameworkElement>();
+            /// <summary>Batches <see cref="RefreshVirtualizedRowHost"/> during window/pane resize so ScrollViewer layout storms do not queue hundreds of full virtual passes.</summary>
+            internal DispatcherTimer ViewportResizeCoalesceTimer;
+        }
+
+        const int VirtualizedRowHostViewportRefreshDebounceMs = 85;
+
+        void ScheduleVirtualizedRowHostViewportRefresh(VirtualizedRowHost host)
+        {
+            if (host == null || host.ScrollViewer == null) return;
+            if (host.ViewportResizeCoalesceTimer == null)
+            {
+                host.ViewportResizeCoalesceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(VirtualizedRowHostViewportRefreshDebounceMs) };
+                host.ViewportResizeCoalesceTimer.Tick += delegate
+                {
+                    host.ViewportResizeCoalesceTimer.Stop();
+                    RefreshVirtualizedRowHost(host);
+                };
+            }
+            host.ViewportResizeCoalesceTimer.Stop();
+            host.ViewportResizeCoalesceTimer.Start();
         }
 
         VirtualizedRowHost CreateVirtualizedRowHost(Thickness margin, Brush background)
@@ -55,21 +75,23 @@ namespace PixelVaultNative
             };
             host.ScrollViewer.ScrollChanged += delegate(object sender, ScrollChangedEventArgs e)
             {
-                if (Math.Abs(e.VerticalChange) > 0.1 || Math.Abs(e.ViewportHeightChange) > 0.1) RefreshVirtualizedRowHost(host);
-            };
-            host.ScrollViewer.SizeChanged += delegate
-            {
-                host.ScrollViewer.Dispatcher.BeginInvoke(new Action(delegate
+                if (Math.Abs(e.VerticalChange) > 0.1 || Math.Abs(e.HorizontalChange) > 0.1)
                 {
+                    host.ViewportResizeCoalesceTimer?.Stop();
                     RefreshVirtualizedRowHost(host);
-                }), DispatcherPriority.Background);
+                    return;
+                }
+                if (Math.Abs(e.ViewportHeightChange) > 0.1 || Math.Abs(e.ViewportWidthChange) > 0.1)
+                    ScheduleVirtualizedRowHostViewportRefresh(host);
             };
+            host.ScrollViewer.SizeChanged += delegate { ScheduleVirtualizedRowHostViewportRefresh(host); };
             return host;
         }
 
         void SetVirtualizedRows(VirtualizedRowHost host, IEnumerable<VirtualizedRowDefinition> rows, bool resetScroll = false, double? restoreOffset = null)
         {
             if (host == null) return;
+            host.ViewportResizeCoalesceTimer?.Stop();
             host.Rows = rows == null ? new List<VirtualizedRowDefinition>() : new List<VirtualizedRowDefinition>(rows);
             host.FirstVisibleIndex = -1;
             host.LastVisibleIndex = -1;

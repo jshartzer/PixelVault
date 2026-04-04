@@ -1,6 +1,8 @@
 # Game-First Library Grouping Plan
 
-This document outlines a low-risk path to make the Library feel game-first by default while preserving console tags, console-aware sorting, and console-specific data where it still matters.
+Last updated for published build `0.845`.
+
+This document tracks the low-risk path to make the Library feel game-first by default while preserving console tags, console-aware sorting, and console-specific data where it still matters.
 
 The target user experience is:
 
@@ -10,6 +12,34 @@ The target user experience is:
 - physical on-disk storage stays unchanged for the first implementation pass
 
 This plan is intentionally scoped as a UI/view-model change first. A future storage/layout rewrite can follow once the browse model proves out.
+
+## Current status
+
+High-level progress:
+
+- Phase 1: complete
+- Phase 2: in progress
+- Phase 3: not started
+
+What is already live:
+
+- persisted `LibraryGroupingMode` with `All` and `By Console`
+- browser-only `LibraryBrowserFolderView` projection layer
+- real game-first merge in `All`, including cross-platform same-title collapse
+- merged detail timeline built from combined `FilePaths`
+- `ViewKey`-based selection identity for browser rows
+- immediate delete refresh in the right-hand screenshot pane
+- `Open Folders` for merged rows with multiple source folders
+- merged-row `Fetch Cover Art` fanout across source folders
+- merged-row custom-cover set / clear fanout across source folders
+- console badges moved into the detail header beside the game title
+- detail-pane stability fix so real folder switches no longer leave stale screenshots onscreen
+
+What is still intentionally limited:
+
+- merged-row `Edit IDs` remains guarded
+- storage and saved-row identity are still platform-shaped under the hood
+- custom-cover identity is still per-source-folder, even though the UI now fans the action out across merged rows
 
 ## Goals
 
@@ -55,7 +85,7 @@ Behavior:
 
 Placement:
 
-- above the preview image / banner area in the Library browser, using the same pill style as the existing sort/filter controls
+- in the left-side Library toolbar row, right-aligned opposite the sort/filter pills
 
 ### View semantics
 
@@ -63,7 +93,9 @@ Placement:
 
 - show one card per game
 - merge captures across Steam, PS5, Xbox, PC, and other tags into one timeline
-- show a platform summary on the card, e.g. `Steam + PS5 | 42 captures`
+- keep the card game-first by default
+- show capture count and source-folder count on the card subtitle
+- show console context beside the selected game title in the detail header
 - allow sorting by the existing sort modes
 
 #### `By Console`
@@ -89,9 +121,15 @@ That means the cached Library rows are not purely a direct reflection of physica
 
 That makes a merged game-first timeline feasible without changing storage.
 
+The browser also now projects raw rows into a dedicated game-first view model in:
+
+- `src/PixelVault.Native/UI/Library/MainWindow.LibraryBrowserViewModel.cs`
+
+That layer is where `All` vs `By Console` semantics now live.
+
 ### What is still platform-coupled
 
-The current `LibraryFolderInfo` model assumes one concrete platform label:
+The current `LibraryFolderInfo` model still assumes one concrete platform label:
 
 - `src/PixelVault.Native/Models/IndexModels.cs`
 
@@ -103,7 +141,7 @@ The browser uses `PlatformLabel` heavily for:
 - cover and external ID matching fallbacks
 - saved-row lookup in game-index alignment
 
-Important coupled spots:
+Important remaining coupled spots:
 
 - `SameLibraryFolderSelection` in `src/PixelVault.Native/PixelVault.Native.cs`
 - `BuildLibraryFolderMasterKey` in `src/PixelVault.Native/Indexing/GameIndexCore.cs`
@@ -126,9 +164,11 @@ Instead:
 
 This keeps the first implementation focused on browse experience instead of forcing an identity rewrite across indexing, covers, and saved rows.
 
-## Proposed architecture
+## Architecture lanes
 
 ### 1. Add a persisted grouping setting
+
+Status: done
 
 Add a new setting:
 
@@ -147,6 +187,8 @@ Notes:
 - do not overload the existing sort mode to also mean grouping
 
 ### 2. Introduce a UI-only browser view model
+
+Status: done
 
 Add a new type under `UI/Library/`, e.g.:
 
@@ -178,6 +220,8 @@ Rationale:
 
 ### 3. Build a view-projection step in the browser layer
 
+Status: done
+
 Add a projection step that converts raw `LibraryFolderInfo` rows into browser view rows.
 
 Likely home:
@@ -197,17 +241,19 @@ Suggested behavior:
   - `GameId` first when available
   - normalized game name as fallback
 
-Merge rules:
+Current merge rules:
 
 - `FilePaths`: union, distinct, date-sorted
-- `FileCount`: sum or `FilePaths.Length`
+- `FileCount`: merged from combined file list
 - `PlatformLabels`: distinct set from source rows
-- `PlatformSummaryText`: render `Steam + PS5`, `Xbox`, or `3 platforms`
-- `PreviewImagePath`: prefer a custom/cover-friendly preview, else most recent image file
-- `PrimaryFolderPath`: pick the dominant or canonical folder path from source rows
-- `SteamAppId` / `SteamGridDbId`: carry only when clearly unambiguous, otherwise leave empty in the merged view
+- `PlatformSummaryText`: still available for search/filter text and grouped mode support
+- `PreviewImagePath`: prefer the primary source row's explicit preview, then fallback to a merged image path
+- `PrimaryFolderPath`: primary source folder path from the current merge result
+- `SteamAppId` / `SteamGridDbId`: only carried when unambiguous
 
 ### 4. Update folder-list rendering to use the view model
+
+Status: done
 
 Primary file:
 
@@ -230,6 +276,8 @@ Sort behavior:
 
 ### 5. Add the `All | By Console` pill controls
 
+Status: done
+
 Primary files:
 
 - `src/PixelVault.Native/UI/Library/MainWindow.LibraryBrowserLayout.cs`
@@ -245,6 +293,8 @@ Implementation notes:
 
 ### 6. Update selection identity for browser rows
 
+Status: done
+
 Current selection logic still assumes concrete folder identity:
 
 - `SameLibraryFolderSelection` in `src/PixelVault.Native/PixelVault.Native.cs`
@@ -258,6 +308,8 @@ This is important because `All` mode will intentionally merge multiple platform 
 
 ### 7. Make detail rendering consume merged file sets
 
+Status: done
+
 Primary files:
 
 - `src/PixelVault.Native/UI/Library/MainWindow.LibraryBrowserRender.DetailPane.cs`
@@ -265,13 +317,16 @@ Primary files:
 
 This should work well because the detail pane already consumes `GetFilesForLibraryFolderEntry`, and that method already favors `FilePaths`.
 
-Needed changes:
+Current behavior:
 
-- allow detail rendering to operate from the merged view row’s `FilePaths`
-- show platform summary metadata when the row spans multiple consoles
-- keep the per-capture metadata/tags intact
+- detail rendering operates from the merged view row’s `FilePaths`
+- detail metadata uses game-first copy and source-folder count in `All`
+- per-capture metadata and tags remain intact
+- console context is now surfaced in the detail header beside the game title, not over the imagery
 
 ### 8. Put guardrails around actions in merged mode
+
+Status: partially done
 
 Some actions still assume one concrete folder or one saved game-index row.
 
@@ -283,28 +338,31 @@ Affected areas:
 - custom cover assignment / clearing
 - cover refresh scoped to a single row
 
-First-pass behavior should be explicit:
+Current merged-row behavior:
 
-#### Safe to support in `All`
+#### Safe in `All` today
 
 - browse captures
 - select captures
 - edit selected capture metadata
 - delete selected captures
 - sort and search
+- `Open Folders` across source folders
+- `Fetch Cover Art` across source folders
+- set / clear custom covers across source folders
 
-#### Needs guardrails in `All`
+#### Still guarded or intentionally limited
 
-- `Open Folder`
-  - open the primary folder path or prompt if there are multiple meaningful source folders
 - `Edit IDs`
-  - either disable for merged rows or route to the primary raw row only
-- `Set Custom Cover` / `Clear Custom Cover`
-  - either disable for merged rows in phase 1 or define a canonical custom-cover target
-- `Fetch Cover Art`
-  - either use the merged row’s canonical game identity or restrict to non-merged rows in phase 1
+  - still disabled for merged rows
+- canonical custom-cover ownership
+  - the UI now fans the action out across source folders, but there is not yet a true game-level custom-cover identity
+- platform-specific external IDs
+  - still intentionally conservative when the merged row spans ambiguous platform-specific data
 
 ### 9. Leave storage and disk layout for a later phase
+
+Status: not started
 
 The eventual idea of storing all captures for a game in one folder is valid, but it should be a separate follow-up after the view model proves out.
 
@@ -320,14 +378,17 @@ Later work would need to revisit:
 
 ### Phase 1: game-first browse mode
 
-Deliver:
+Status: complete
+
+Delivered:
 
 - persisted `LibraryGroupingMode`
 - `All | By Console` pill controls
 - browser view model
 - merged `All` mode in folder list
 - merged detail timeline
-- platform summary text/badges
+- view-key selection identity
+- game-first card/detail presentation
 
 Do not change:
 
@@ -337,14 +398,25 @@ Do not change:
 
 ### Phase 2: action hardening
 
-Deliver:
+Status: in progress
 
-- clear behavior for `Open Folder` in merged mode
-- explicit cover-action behavior for merged rows
-- explicit ID-edit behavior for merged rows
-- manual checks for merged metadata-edit flow
+Delivered so far:
+
+- `Open Folders` for merged rows
+- merged-row `Fetch Cover Art`
+- merged-row custom-cover set / clear fanout
+- delete flow that refreshes the screenshot pane immediately
+- detail-pane stability fix for rapid folder switching
+
+Still to do:
+
+- explicit merged-row `Edit IDs` behavior
+- decide whether any merged-row action needs a chooser instead of direct fanout
+- more manual verification of merged-row metadata and action flows
 
 ### Phase 3: optional storage/layout evolution
+
+Status: not started
 
 Explore:
 
@@ -382,6 +454,8 @@ Some folder actions are conceptually “which real folder do you mean?” in `Al
 
 ## Suggested implementation order
 
+Completed:
+
 1. Add `LibraryGroupingMode` to settings.
 2. Add the `All | By Console` pill controls.
 3. Add `LibraryBrowserFolderView`.
@@ -389,9 +463,15 @@ Some folder actions are conceptually “which real folder do you mean?” in `Al
 5. Update folder-list rendering to consume browser rows.
 6. Update selection identity to use a view key.
 7. Update detail pane to render merged `FilePaths`.
-8. Add platform summary/badges to merged cards.
-9. Add guardrails for cover, folder-open, and ID-edit actions in merged mode.
-10. Manual verification and tuning.
+8. Move console context into cleaner game-first presentation.
+9. Add first merged-row action hardening for folder-open, cover refresh, and custom covers.
+
+Next recommended order:
+
+1. Define merged-row `Edit IDs` behavior.
+2. Decide whether merged rows need a small platform/action chooser for ambiguous actions.
+3. Expand manual verification around fast switching, merged metadata edits, and multi-source cover behavior.
+4. Only then revisit storage/layout evolution.
 
 ## Manual verification
 
@@ -400,7 +480,7 @@ Some folder actions are conceptually “which real folder do you mean?” in `Al
 - open Library in default `All` mode
 - confirm one card per game when multiple consoles exist
 - confirm the detail timeline includes captures from each console
-- confirm card subtitle reflects multiple platforms
+- confirm card subtitle reflects captures and source-folder count
 
 ### Toggle behavior
 
@@ -413,13 +493,20 @@ Some folder actions are conceptually “which real folder do you mean?” in `Al
 
 - edit metadata on captures from a merged game
 - confirm console tags are preserved
-- test `Open Folder` on a merged row
-- test custom cover and ID actions and confirm guardrail behavior is understandable
+- test `Open Folders` on a merged row
+- test merged custom-cover set / clear behavior
+- test merged cover refresh behavior
+- test `Edit IDs` and confirm the current guardrail behavior is still understandable
 
 ### Settings persistence
 
 - close and reopen the Library window
 - confirm grouping mode persists
+
+### Stability
+
+- click through folders rapidly and confirm the title, cover, and screenshot pane stay in sync
+- confirm same-folder metadata refreshes still avoid unnecessary visual churn
 
 ## File map
 
@@ -430,10 +517,12 @@ High-confidence touch list:
 - `src/PixelVault.Native/PixelVault.Native.cs`
 - `src/PixelVault.Native/UI/Library/MainWindow.LibraryBrowserLayout.cs`
 - `src/PixelVault.Native/UI/Library/MainWindow.LibraryBrowserOrchestrator.cs`
+- `src/PixelVault.Native/UI/Library/MainWindow.LibraryBrowserViewModel.cs`
 - `src/PixelVault.Native/UI/Library/MainWindow.LibraryBrowserRender.FolderList.cs`
 - `src/PixelVault.Native/UI/Library/MainWindow.LibraryBrowserRender.DetailPane.cs`
 - `src/PixelVault.Native/UI/Library/MainWindow.LibraryBrowserWorkingSet.cs`
 - `src/PixelVault.Native/UI/Library/MainWindow.LibraryBrowserOrchestrator.FolderTile.cs`
+- `src/PixelVault.Native/UI/LibraryVirtualization.cs`
 - `src/PixelVault.Native/Metadata/LibraryMetadataEditing.cs`
 
 Secondary review/watch list:

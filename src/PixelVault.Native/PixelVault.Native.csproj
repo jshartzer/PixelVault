@@ -69,6 +69,7 @@
     <Compile Include="UI\Library\MainWindow.LibraryBrowserRender.FolderList.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserRender.DetailPane.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserOrchestrator.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryBrowserOrchestrator.CoverRefresh.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserOrchestrator.FolderTile.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryScannerBridge.cs" />
     <Compile Include="UI\LibraryVirtualization.cs" />
