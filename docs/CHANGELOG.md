@@ -1,3 +1,9 @@
+## 0.842
+- **Release:** Version **0.842** — publish refresh focused on Library browse polish after the game-first grouping rollout.
+- **Library (layout):** Moved the **`All` / `By Console`** grouping pills into the right-side cover pane so the main browse controls stay on the left and the grouping mode reads as part of the selected game context.
+- **Library (detail header):** Removed the **“Selected game”** eyebrow text from the right-hand pane for a cleaner presentation.
+- **Library (delete refresh):** Deleting selected captures now removes them from the in-memory Library state immediately, rerenders the screenshot grid right away, and then forces a folder refresh to reconcile cache/state in the background. Deleted photos should disappear from the right-hand pane without waiting for a slower full refresh.
+
 ## 0.841
 - **Release:** Version **0.841** — publish refresh focused on the new game-first Library grouping behavior.
 - **Library (grouping):** Fixed the default **`All`** view so same-title folders now merge by normalized game name instead of staying split behind platform-specific saved row IDs. Cross-platform libraries like **Diablo IV** now collapse into one game row in the default browse mode.

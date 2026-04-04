@@ -198,6 +198,57 @@ namespace PixelVaultNative
                 : ((view.Name ?? string.Empty) + " | " + platformText);
         }
 
+        void ApplyRemovedFilesToLibraryBrowserState(LibraryBrowserWorkingSet ws, IEnumerable<string> removedFiles)
+        {
+            if (ws == null) return;
+            var removedSet = new HashSet<string>((removedFiles ?? Enumerable.Empty<string>())
+                .Where(path => !string.IsNullOrWhiteSpace(path)), StringComparer.OrdinalIgnoreCase);
+            if (removedSet.Count == 0) return;
+
+            foreach (var folder in ws.Folders.ToList())
+            {
+                if (folder == null) continue;
+                var existingPaths = (folder.FilePaths ?? new string[0])
+                    .Where(path => !string.IsNullOrWhiteSpace(path))
+                    .ToArray();
+                if (existingPaths.Length == 0) continue;
+                if (!existingPaths.Any(path => removedSet.Contains(path))) continue;
+
+                var remainingPaths = existingPaths
+                    .Where(path => !removedSet.Contains(path) && File.Exists(path))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderByDescending(path => ResolveIndexedLibraryDate(libraryRoot, path))
+                    .ThenBy(path => path, StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
+
+                if (remainingPaths.Length == 0)
+                {
+                    ws.Folders.Remove(folder);
+                    continue;
+                }
+
+                folder.FilePaths = remainingPaths;
+                folder.FileCount = remainingPaths.Length;
+                var newest = remainingPaths
+                    .Select(path => ResolveIndexedLibraryDate(libraryRoot, path))
+                    .DefaultIfEmpty(DateTime.MinValue)
+                    .Max();
+                folder.NewestCaptureUtcTicks = newest > DateTime.MinValue ? newest.ToUniversalTime().Ticks : 0;
+
+                var previewPath = folder.PreviewImagePath ?? string.Empty;
+                if (removedSet.Contains(previewPath) || string.IsNullOrWhiteSpace(previewPath) || !File.Exists(previewPath))
+                {
+                    folder.PreviewImagePath = remainingPaths.FirstOrDefault(IsImage) ?? remainingPaths.FirstOrDefault() ?? string.Empty;
+                }
+            }
+
+            ws.DetailFilesDisplayOrder.RemoveAll(path => removedSet.Contains(path) || string.IsNullOrWhiteSpace(path) || !File.Exists(path));
+            foreach (var stale in ws.SelectedDetailFiles.Where(path => removedSet.Contains(path) || string.IsNullOrWhiteSpace(path) || !File.Exists(path)).ToList())
+            {
+                ws.SelectedDetailFiles.Remove(stale);
+            }
+        }
+
         LibraryBrowserFolderView FindMatchingLibraryBrowserView(LibraryBrowserFolderView current, IList<LibraryBrowserFolderView> candidates)
         {
             if (current == null || candidates == null || candidates.Count == 0) return null;

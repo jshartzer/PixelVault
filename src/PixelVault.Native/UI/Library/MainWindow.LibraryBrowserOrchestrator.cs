@@ -58,6 +58,7 @@ namespace PixelVaultNative
                 Action<LibraryBrowserFolderView> openLibraryMetadataEditor = null;
                 Action<string> openSingleFileMetadataEditor = null;
                 Action renderTiles = null;
+                Action renderSelectedFolder = null;
                 Action<bool> refreshLibraryFoldersAsync = null;
                 Action prefillLibraryFoldersFromSnapshotAsync = null;
                 Action applySearchFilter = null;
@@ -388,13 +389,16 @@ namespace PixelVaultNative
                         librarySession.RemoveLibraryMetadataIndexEntries(removedFiles);
                     }
                     foreach (var directory in touchedDirectories) TryDeleteEmptyDirectory(directory);
+                    ApplyRemovedFilesToLibraryBrowserState(ws, removedFiles);
                     ws.SelectedDetailFiles.Clear();
                     ws.DetailSelectionAnchorIndex = -1;
                     var currentSelection = CloneLibraryBrowserFolderView(ws.Current);
                     ws.Current = currentSelection == null || string.IsNullOrWhiteSpace(currentSelection.PrimaryFolderPath)
                         ? currentSelection
                         : CloneLibraryBrowserFolderView(currentSelection);
-                    if (refreshLibraryFoldersAsync != null) refreshLibraryFoldersAsync(false);
+                    if (renderTiles != null) renderTiles();
+                    if (ws.Current != null) renderSelectedFolder();
+                    if (refreshLibraryFoldersAsync != null) refreshLibraryFoldersAsync(true);
                     status.Text = removedFiles.Count == 0
                         ? "No captures deleted"
                         : (failures.Count == 0
@@ -410,7 +414,7 @@ namespace PixelVaultNative
                     }
                 };
 
-                Action renderSelectedFolder = delegate
+                renderSelectedFolder = delegate
                 {
                     LibraryBrowserRenderSelectedFolderDetail(ws, libraryWindow, openSingleFileMetadataEditor, updateDetailSelection, refreshDetailSelectionUi);
                     if (ws.Current == null) ws.DetailSelectionAnchorIndex = -1;
