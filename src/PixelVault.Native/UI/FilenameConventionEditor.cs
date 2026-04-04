@@ -269,49 +269,49 @@ namespace PixelVaultNative
             return rule;
         }
 
-        void OpenFilenameConventionEditor()
-        {
-            if (string.IsNullOrWhiteSpace(libraryRoot) || !Directory.Exists(libraryRoot))
-            {
-                MessageBox.Show("Library folder not found. Check Settings before opening filename rules.", "PixelVault");
-                return;
-            }
-            if (filenameConventionEditorWindow != null)
-            {
-                if (filenameConventionEditorWindow.IsVisible)
-                {
-                    filenameConventionEditorWindow.Activate();
-                    return;
-                }
-                filenameConventionEditorWindow = null;
-            }
-
-            try
-            {
-                FilenameConventionEditorWindow.Show(
-                    this,
-                    AppVersion,
-                    libraryRoot,
-                    w => filenameConventionEditorWindow = w,
-                    w => { if (ReferenceEquals(filenameConventionEditorWindow, w)) filenameConventionEditorWindow = null; },
-                    new FilenameConventionEditorServices
-                    {
-                        RulesService = filenameRulesService,
-                        ParserService = filenameParserService,
-                        SetStatus = delegate(string text) { if (status != null) status.Text = text; },
-                        Log = Log,
-                        RefreshPreviewIfNeeded = delegate { if (previewBox != null) RefreshPreview(); },
-                        CreateButton = Btn,
-                        NormalizeConsoleLabel = NormalizeConsoleLabel,
-                        CleanTag = CleanTag
-                    });
-            }
-            catch (Exception ex)
-            {
-                status.Text = "Filename rules unavailable";
-                Log("Failed to open filename rules. " + ex.Message);
-                MessageBox.Show("Could not open the filename rules." + Environment.NewLine + Environment.NewLine + ex.Message, "PixelVault");
-            }
+        void OpenFilenameConventionEditor()
+        {
+            if (string.IsNullOrWhiteSpace(libraryRoot) || !Directory.Exists(libraryRoot))
+            {
+                MessageBox.Show("Library folder not found. Check Settings before opening filename rules.", "PixelVault");
+                return;
+            }
+            if (filenameConventionEditorWindow != null)
+            {
+                if (filenameConventionEditorWindow.IsVisible)
+                {
+                    filenameConventionEditorWindow.Activate();
+                    return;
+                }
+                filenameConventionEditorWindow = null;
+            }
+
+            try
+            {
+                FilenameConventionEditorWindow.Show(
+                    this,
+                    AppVersion,
+                    libraryRoot,
+                    w => filenameConventionEditorWindow = w,
+                    w => { if (ReferenceEquals(filenameConventionEditorWindow, w)) filenameConventionEditorWindow = null; },
+                    new FilenameConventionEditorServices
+                    {
+                        RulesService = filenameRulesService,
+                        ParserService = filenameParserService,
+                        SetStatus = delegate(string text) { if (status != null) status.Text = text; },
+                        Log = Log,
+                        RefreshPreviewIfNeeded = delegate { RefreshPreview(); },
+                        CreateButton = Btn,
+                        NormalizeConsoleLabel = NormalizeConsoleLabel,
+                        CleanTag = CleanTag
+                    });
+            }
+            catch (Exception ex)
+            {
+                status.Text = "Filename rules unavailable";
+                Log("Failed to open filename rules. " + ex.Message);
+                MessageBox.Show("Could not open the filename rules." + Environment.NewLine + Environment.NewLine + ex.Message, "PixelVault");
+            }
         }
     }
 }

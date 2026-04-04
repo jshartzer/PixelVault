@@ -1,3 +1,8 @@
+## 0.849
+- **Release:** Version **0.849** — publish refresh for the thumbnail cache contention cleanup.
+- **Thumbnail cache:** Fixed `SaveThumbnailCache` so concurrent thumbnail writes no longer share a single `.tmp` path per cache key. Each writer now uses its own temp file and treats an already-created destination thumbnail as a benign race instead of an error.
+- **Diagnostics:** This should eliminate the noisy `SaveThumbnailCache failed ... .tmp ... being used by another process` log spam during heavy browsing without changing the final thumbnail output.
+
 ## 0.848
 - **Release:** Version **0.848** — publish refresh for the Library detail-render starvation fix.
 - **Library stability:** Fixed a background scheduling issue where rapid browsing could queue lots of image/video warmup tasks that blocked on semaphores and starved the detail-render work. Image loads and video warmers now wait asynchronously instead of occupying worker threads while queued.

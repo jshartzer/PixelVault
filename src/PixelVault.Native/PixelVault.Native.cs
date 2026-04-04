@@ -12,7 +12,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Effects;
@@ -40,7 +39,7 @@ namespace PixelVaultNative
 
     public sealed partial class MainWindow : Window
     {
-        const string AppVersion = "0.848";
+        const string AppVersion = "0.849";
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
         const string ClearedExternalIdSentinel = "__PV_CLEARED__";
@@ -93,19 +92,16 @@ namespace PixelVaultNative
         Action<bool> activeLibraryFolderRefresh;
         LibraryFolderInfo activeSelectedLibraryFolder;
 
-        RichTextBox previewBox;
         TextBox logBox;
         TextBlock status;
-        CheckBox recurseBox, keywordsBox;
-        /// <summary>Thread-safe mirror of keywordsBox.IsChecked for background metadata (avoid Dispatcher.Invoke).</summary>
-        volatile bool _includeGameCaptureKeywordsMirror;
-        ComboBox conflictBox;
+        bool importSearchSubfoldersForRename = true;
+        string importMoveConflictMode = "Rename";
+        /// <summary>Thread-safe mirror for background metadata (avoid Dispatcher.Invoke); default matches former Settings checkbox.</summary>
+        volatile bool _includeGameCaptureKeywordsMirror = true;
         Window photoIndexEditorWindow;
         Window gameIndexEditorWindow;
         bool gameIndexEditorLoadPending;
         Window filenameConventionEditorWindow;
-        int previewRefreshVersion;
-        CancellationTokenSource previewRefreshCancellation;
         readonly ICoverService coverService;
         readonly IFilenameParserService filenameParserService;
         readonly IFilenameRulesService filenameRulesService;
@@ -452,8 +448,8 @@ namespace PixelVaultNative
         }
         double PreferredSettingsWindowHeight()
         {
-            var available = Math.Max(820, SystemParameters.WorkArea.Height - 32);
-            return Math.Min(available, 1480);
+            var available = Math.Max(600, SystemParameters.WorkArea.Height - 32);
+            return Math.Min(available, 1200);
         }
         string ResolveWorkspaceAssetPath(string fileName)
         {
@@ -1217,13 +1213,20 @@ namespace PixelVaultNative
             summaryWindow.ShowDialog();
         }
 
-        TextBox SettingsTextBox(Grid panel, int row, string label, string value)
+        TextBox SettingsTextBox(Grid panel, int row, string label, string value, Brush labelForeground = null, Brush boxBackground = null, Brush boxForeground = null, Brush boxBorderBrush = null, Brush boxCaretBrush = null)
         {
             while (panel.RowDefinitions.Count <= row) panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            var text = new TextBlock { Text = label, Margin = new Thickness(0, row == 0 ? 0 : 12, 12, 0), VerticalAlignment = VerticalAlignment.Center };
+            var text = new TextBlock { Text = label, Margin = new Thickness(0, row == 0 ? 0 : 12, 12, 0), VerticalAlignment = VerticalAlignment.Center, Foreground = labelForeground ?? Brushes.Black };
             Grid.SetRow(text, row);
             panel.Children.Add(text);
             var box = new TextBox { Text = value, Margin = new Thickness(0, row == 0 ? 0 : 12, 12, 0), Padding = new Thickness(8) };
+            if (boxBackground != null) box.Background = boxBackground;
+            if (boxForeground != null)
+            {
+                box.Foreground = boxForeground;
+                box.CaretBrush = boxCaretBrush ?? boxForeground;
+            }
+            if (boxBorderBrush != null) box.BorderBrush = boxBorderBrush;
             Grid.SetRow(box, row);
             Grid.SetColumn(box, 1);
             panel.Children.Add(box);
@@ -1642,38 +1645,14 @@ namespace PixelVaultNative
                 ManualItems = manualItems
             };
         }
-        void LogPreviewSummary(IntakePreviewSummary summary)
+        void LogIntakePreviewSummary(IntakePreviewSummary summary)
         {
             if (summary == null) return;
-            Log("Preview refreshed. Sources=" + (summary.SourceRoots.Count == 0 ? "(none)" : string.Join(" | ", summary.SourceRoots.ToArray())) + "; RenameCandidates=" + summary.RenameCandidateCount + "; MetadataCandidates=" + summary.MetadataCandidateCount + "; MoveCandidates=" + summary.MoveCandidateCount + "; ManualCandidates=" + summary.ManualItemCount + ".");
+            Log("Intake preview refreshed. Sources=" + (summary.SourceRoots.Count == 0 ? "(none)" : string.Join(" | ", summary.SourceRoots.ToArray())) + "; RenameCandidates=" + summary.RenameCandidateCount + "; MetadataCandidates=" + summary.MetadataCandidateCount + "; MoveCandidates=" + summary.MoveCandidateCount + "; ManualCandidates=" + summary.ManualItemCount + ".");
         }
+
         void RefreshPreview()
         {
-            var refreshVersion = ++previewRefreshVersion;
-            var recurseRename = recurseBox != null && recurseBox.IsChecked == true;
-            if (previewRefreshCancellation != null)
-            {
-                previewRefreshCancellation.Cancel();
-                previewRefreshCancellation.Dispose();
-            }
-            previewRefreshCancellation = new CancellationTokenSource();
-            var refreshCancellationToken = previewRefreshCancellation.Token;
-            status.Text = "Refreshing preview";
-            RenderPreviewLoading("Refreshing upload preview...");
-            LoadIntakePreviewSummaryAsync(recurseRename, refreshCancellationToken, delegate(IntakePreviewSummary summary)
-            {
-                if (refreshVersion != previewRefreshVersion) return;
-                RenderPreview(summary);
-                status.Text = "Preview ready";
-                LogPreviewSummary(summary);
-            }, delegate(Exception ex)
-            {
-                if (refreshVersion != previewRefreshVersion) return;
-                if (ex is OperationCanceledException) return;
-                RenderPreviewError(ex.Message);
-                status.Text = "Preview failed";
-                Log(ex.Message);
-            });
         }
 
         void ShowIntakePreviewWindow(bool recurseRename)
@@ -1683,71 +1662,17 @@ namespace PixelVaultNative
                 LoadSummaryAsync = LoadIntakePreviewSummaryAsync,
                 OpenSourceFolders = OpenSourceFolders,
                 OpenManualIntake = OpenManualIntakeWindow,
-                SyncSettingsDocument = RenderPreview,
-                SyncSettingsDocumentError = RenderPreviewError,
+                SyncSettingsDocument = null,
+                SyncSettingsDocumentError = null,
                 SetStatus = delegate(string text) { if (status != null) status.Text = text; },
                 Log = Log,
-                LogSummary = LogPreviewSummary,
+                LogSummary = LogIntakePreviewSummary,
                 CreateButton = Btn,
                 PreviewBadge = PreviewBadgeBrush,
                 PlatformOrder = PlatformGroupOrder,
                 FormatTimestamp = FormatFriendlyTimestamp,
                 FilenameGuess = FilenameGuessLabel
             });
-        }
-
-
-        void RenderPreview(IntakePreviewSummary summary)
-        {
-            if (previewBox == null) return;
-            var doc = new FlowDocument { PagePadding = new Thickness(0), FontFamily = new FontFamily("Cascadia Mono"), FontSize = 13.5, Background = Brushes.White };
-            doc.Blocks.Add(new Paragraph(new Run("Queue: " + summary.TopLevelMediaCount + " top-level media item(s) waiting")) { Margin = new Thickness(0), FontWeight = FontWeights.SemiBold });
-            doc.Blocks.Add(new Paragraph(new Run("Rename: " + summary.RenameCandidateCount + " candidate(s) out of " + summary.RenameScopeCount)) { Margin = new Thickness(0, 2, 0, 0) });
-            doc.Blocks.Add(new Paragraph(new Run("Auto-ready: " + summary.MoveCandidateCount + " candidate(s)")) { Margin = new Thickness(0, 2, 0, 0) });
-            doc.Blocks.Add(new Paragraph(new Run("Manual Intake: " + summary.ManualItemCount + " unmatched item(s) waiting")) { Margin = new Thickness(0, 2, 0, 0) });
-            doc.Blocks.Add(new Paragraph(new Run("Move conflicts: " + summary.ConflictCount)) { Margin = new Thickness(0, 2, 0, 10) });
-            doc.Blocks.Add(new Paragraph(new Run("Files by console:")) { Margin = new Thickness(0, 0, 0, 6), FontWeight = FontWeights.SemiBold });
-            if (summary.ReviewItems.Count == 0)
-            {
-                doc.Blocks.Add(new Paragraph(new Run("No auto-ready media files found.")) { Margin = new Thickness(0) });
-            }
-            else
-            {
-                var grouped = summary.ReviewItems.GroupBy(item => item.PlatformLabel).OrderBy(group => PlatformGroupOrder(group.Key)).ThenBy(group => group.Key);
-                foreach (var group in grouped)
-                {
-                    doc.Blocks.Add(new Paragraph(new Run(group.Key + " (" + group.Count() + ")")) { Margin = new Thickness(0, 6, 0, 4), FontWeight = FontWeights.SemiBold, Foreground = PreviewBadgeBrush(group.Key) });
-                    foreach (var item in group)
-                    {
-                        doc.Blocks.Add(new Paragraph(new Run(item.FileName) { Foreground = Brush("#1F2A30") }) { Margin = new Thickness(12, 0, 0, 2) });
-                    }
-                }
-            }
-            if (summary.ManualItems.Count > 0)
-            {
-                doc.Blocks.Add(new Paragraph(new Run("Unmatched files waiting for Manual Intake:")) { Margin = new Thickness(0, 12, 0, 6), FontWeight = FontWeights.SemiBold, Foreground = Brush("#A16C2E") });
-                foreach (var item in summary.ManualItems.OrderBy(i => i.FileName))
-                {
-                    doc.Blocks.Add(new Paragraph(new Run(item.FileName) { Foreground = Brush("#5B5048") }) { Margin = new Thickness(12, 0, 0, 2) });
-                }
-            }
-            previewBox.Document = doc;
-        }
-
-        void RenderPreviewLoading(string message)
-        {
-            if (previewBox == null) return;
-            var doc = new FlowDocument { PagePadding = new Thickness(0), FontFamily = new FontFamily("Cascadia Mono"), FontSize = 14, Background = Brushes.White };
-            doc.Blocks.Add(new Paragraph(new Run(message)) { Margin = new Thickness(0) });
-            previewBox.Document = doc;
-        }
-
-        void RenderPreviewError(string message)
-        {
-            if (previewBox == null) return;
-            var doc = new FlowDocument { PagePadding = new Thickness(0), FontFamily = new FontFamily("Cascadia Mono"), FontSize = 14, Background = Brushes.White };
-            doc.Blocks.Add(new Paragraph(new Run(message)) { Margin = new Thickness(0) });
-            previewBox.Document = doc;
         }
 
         int CalculateLibraryFolderArtDecodeWidth(int tileWidth)
@@ -3400,30 +3325,42 @@ namespace PixelVaultNative
         void SaveThumbnailCache(BitmapSource source, string destinationPath)
         {
             if (source == null || string.IsNullOrWhiteSpace(destinationPath)) return;
+            string tempPath = null;
             try
             {
                 var directory = Path.GetDirectoryName(destinationPath);
                 if (!string.IsNullOrWhiteSpace(directory)) Directory.CreateDirectory(directory);
-                var tempPath = destinationPath + ".tmp";
-                using (var stream = File.Create(tempPath))
+                if (File.Exists(destinationPath)) return;
+                tempPath = Path.Combine(
+                    directory ?? string.Empty,
+                    Path.GetFileName(destinationPath) + "." + Guid.NewGuid().ToString("N") + ".tmp");
+                using (var stream = new FileStream(tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
                 {
                     var encoder = new PngBitmapEncoder();
                     encoder.Frames.Add(BitmapFrame.Create(source));
                     encoder.Save(stream);
                 }
-                if (File.Exists(destinationPath)) File.Delete(destinationPath);
+                if (File.Exists(destinationPath)) return;
                 File.Move(tempPath, destinationPath);
+                tempPath = null;
             }
             catch (Exception ex)
             {
+                if (File.Exists(destinationPath)) return;
                 Log("SaveThumbnailCache failed for " + destinationPath + ". " + ex.Message);
-                try
+            }
+            finally
+            {
+                if (!string.IsNullOrWhiteSpace(tempPath) && File.Exists(tempPath))
                 {
-                    if (File.Exists(destinationPath + ".tmp")) File.Delete(destinationPath + ".tmp");
-                }
-                catch (Exception inner)
-                {
-                    Log("SaveThumbnailCache: could not remove temp file. " + inner.Message);
+                    try
+                    {
+                        File.Delete(tempPath);
+                    }
+                    catch (Exception inner)
+                    {
+                        Log("SaveThumbnailCache: could not remove temp file. " + inner.Message);
+                    }
                 }
             }
         }

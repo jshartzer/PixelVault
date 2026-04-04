@@ -27,13 +27,10 @@ namespace PixelVaultNative
 
         void SyncIncludeGameCaptureKeywordsMirror()
         {
-            if (keywordsBox == null) return;
-            _includeGameCaptureKeywordsMirror = keywordsBox.IsChecked == true;
         }
 
         bool ShouldIncludeGameCaptureKeywords()
         {
-            if (keywordsBox == null) return true;
             return _includeGameCaptureKeywordsMirror;
         }
 

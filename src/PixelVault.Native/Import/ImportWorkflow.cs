@@ -47,7 +47,7 @@ namespace PixelVaultNative
                 EnsureExifTool();
                 Directory.CreateDirectory(destinationRoot);
                 var prepStopwatch = Stopwatch.StartNew();
-                var renameInventory = importService.BuildSourceInventory(recurseBox != null && recurseBox.IsChecked == true);
+                var renameInventory = importService.BuildSourceInventory(importSearchSubfoldersForRename);
                 var inventory = importService.BuildSourceInventory(false);
                 var reviewItems = BuildReviewItems(inventory.TopLevelMediaFiles);
                 var recognizedPaths = new HashSet<string>(reviewItems.Select(i => i.FilePath), StringComparer.OrdinalIgnoreCase);
@@ -520,7 +520,7 @@ namespace PixelVaultNative
 
         RenameStepResult RunRename()
         {
-            return RunRename(importService.BuildSourceInventory(recurseBox != null && recurseBox.IsChecked == true).RenameScopeFiles);
+            return RunRename(importService.BuildSourceInventory(importSearchSubfoldersForRename).RenameScopeFiles);
         }
 
         RenameStepResult RunRename(IEnumerable<string> sourceFiles, Action<int, int, string> progress = null, CancellationToken cancellationToken = default(CancellationToken))
@@ -644,8 +644,7 @@ namespace PixelVaultNative
 
         string CurrentConflictMode()
         {
-            var selected = conflictBox == null ? null : Convert.ToString(conflictBox.SelectedItem);
-            return string.IsNullOrWhiteSpace(selected) ? "Rename" : selected;
+            return string.IsNullOrWhiteSpace(importMoveConflictMode) ? "Rename" : importMoveConflictMode;
         }
 
         void SortDestinationFolders()

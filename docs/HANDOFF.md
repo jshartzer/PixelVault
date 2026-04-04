@@ -53,11 +53,11 @@ Then use these based on the task:
 
 Current live build:
 
-- `0.848`
+- `0.849`
 
 Current executable:
 
-- `C:\Codex\dist\PixelVault-0.848\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.849\PixelVault.exe`
 
 Current build pointer:
 
@@ -91,9 +91,9 @@ Practical current focus:
 
 ## Current Stop Point
 
-The app is currently published at `0.848`.
+The app is currently published at `0.849`.
 
-**Notion:** release sync for **0.848** is currently pending because the Notion connector token expired during publish prep. [MainWindow extraction roadmap](https://www.notion.so/33573adc59b681d88b7dcd88cad53cb6) remains the active extraction tracker. Further releases: `docs/DOC_SYNC_POLICY.md`.
+**Notion:** release sync for **0.849** is currently pending because the Notion connector token expired during publish prep. [MainWindow extraction roadmap](https://www.notion.so/33573adc59b681d88b7dcd88cad53cb6) remains the active extraction tracker. Further releases: `docs/DOC_SYNC_POLICY.md`.
 
 Recent extraction progress (repo):
 
@@ -103,6 +103,7 @@ Recent extraction progress (repo):
 - **Diagnostics (current publish):** Settings now includes an opt-in troubleshooting logging toggle that writes a separate `PixelVault-troubleshooting.log`. Library refresh, selection, detail render, metadata repair, and banner-art events now leave a cleaner breadcrumb trail for async UI bug hunts. See `docs/TROUBLESHOOTING_LOGGING.md`.
 - **Diagnostics (current publish, deeper tracing):** Library detail rendering now logs metadata-index load, file enumeration, quick/refined snapshot build, and dispatcher handoff start/complete so the next stalled right-pane repro can be pinned to a specific render step.
 - **Library stability (current publish):** Rapid browsing no longer lets queued image/video warmup tasks occupy thread-pool workers while waiting on semaphores, so detail-render background work is much less likely to get starved before it starts.
+- **Thumbnail cache (current publish):** Thumbnail cache writes now use unique temp files per writer instead of a shared `destination.tmp` path, so concurrent cache saves no longer fight over the same temp file or spam the log with benign access-denied races.
 - **E1–E3:** Library browser: **`LibraryBrowserHost`** entry + **`ShowLibraryBrowserCore`** on **`MainWindow`** in **`UI/Library/MainWindow.LibraryBrowserOrchestrator.cs`**; top nav / window chrome in **`MainWindow.LibraryBrowserChrome.cs`**; folder + detail layout in **`MainWindow.LibraryBrowserLayout.cs`**; folder-tile + detail-pane rendering in **`MainWindow.LibraryBrowserRender.FolderList.cs`** / **`MainWindow.LibraryBrowserRender.DetailPane.cs`**. **`ILibrarySession`** / **`LibrarySession`** (workspace + scanner + **`IFileSystemService`** + root), **`LibraryWorkspaceContext`** caches, virtualization unchanged in **`LibraryVirtualization.cs`**
 - **Responsiveness:** **`PERFORMANCE_TODO.md`** — item 5 long-workflow spot-check; item 10 **`ShowLibraryBrowserCore`** in **`MainWindow.LibraryBrowserOrchestrator.cs`** (**`LibraryBrowserHost`** entry); manual-metadata game-title list off UI thread when rebuilding choices
 - **F1–F2:** Settings shell partial (incl. path settings dialog, **`ShowSettingsWindow`** modal), photography gallery + Steam picker partial; photography wired from Library + Settings
