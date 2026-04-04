@@ -3107,24 +3107,66 @@ namespace PixelVaultNative
             if (ex == null) return string.Empty;
             var s = ex.ToString();
             const int max = 32768;
-            if (s.Length <= max) return s;
-            return s.Substring(0, max) + "... (truncated)";
+            if (s.Length > max) s = s.Substring(0, max) + "... (truncated)";
+            return s;
         }
 
         /// <summary>
-        /// Troubleshooting-only log file line shape:
+        /// Strips absolute path-shaped fragments from free text when <see cref="troubleshootingLogRedactPaths"/> is on (exception messages, stack lines, IO errors).
+        /// </summary>
+        string RedactEmbeddedPathsForTroubleshooting(string text)
+        {
+            if (string.IsNullOrEmpty(text) || !troubleshootingLogRedactPaths) return text ?? string.Empty;
+            try
+            {
+                var s = text;
+                // Long/Win32 extended: \\?\C:\... or \\?\UNC\...
+                s = Regex.Replace(s, @"\\{2}\?\\[^\s|""]+", RedactPathMatchForTroubleshooting, RegexOptions.CultureInvariant);
+                // Standard UNC \\server\share\...
+                s = Regex.Replace(s, @"\\{2}(?!\?\\)[^\s|""]+", RedactPathMatchForTroubleshooting, RegexOptions.CultureInvariant);
+                // Drive-letter paths (UTF-16 style); optional forward-slash form
+                s = Regex.Replace(s, @"(?<![\w/:])(?:[A-Za-z]:\\[^\s|""]+|[A-Za-z]:/[^\s|""]+)", RedactPathMatchForTroubleshooting, RegexOptions.CultureInvariant);
+                return s;
+            }
+            catch
+            {
+                return text;
+            }
+        }
+
+        string RedactPathMatchForTroubleshooting(Match m)
+        {
+            if (m == null || string.IsNullOrEmpty(m.Value)) return string.Empty;
+            var raw = m.Value.TrimEnd('"', '\'', ')', ']', ',', ';');
+            if (string.IsNullOrWhiteSpace(raw)) return m.Value;
+            // Stack / compiler snippets like "…\Foo.cs:line 42" or "…\Foo.cs:12" — strip :line so we do not treat ":12" as path.
+            if (Regex.IsMatch(raw, @"\.[A-Za-z0-9]{1,12}:\d+$", RegexOptions.CultureInvariant))
+                raw = Regex.Replace(raw, @":\d+$", string.Empty, RegexOptions.CultureInvariant);
+            try
+            {
+                return FormatPathForTroubleshooting(raw.Replace('/', Path.DirectorySeparatorChar));
+            }
+            catch
+            {
+                return "(redacted)";
+            }
+        }
+
+        /// <summary>
+        /// Troubleshooting-only log file shape:
         /// <c>[UTC] DIAG | S&lt;session&gt; | T&lt;managedThreadId&gt; | &lt;Area&gt; | &lt;message&gt;</c>.
-        /// The session id is fixed for one <see cref="MainWindow"/> instance so you can grep a single run across the normal and troubleshooting logs.
+        /// When path redaction is enabled, <paramref name="message"/> is passed through <see cref="RedactEmbeddedPathsForTroubleshooting"/> so IO exceptions cannot bypass folder-path redaction via <c>ex.Message</c> / stack text.
         /// </summary>
         void LogTroubleshooting(string area, string message)
         {
             if (!troubleshootingLoggingEnabled) return;
+            var safeBody = RedactEmbeddedPathsForTroubleshooting(message ?? string.Empty);
             var line = "[" + FormatLogUtcTimestamp() + "] "
                 + "DIAG"
                 + " | S=" + _diagnosticsSessionId
                 + " | T=" + Environment.CurrentManagedThreadId
                 + " | " + (string.IsNullOrWhiteSpace(area) ? "General" : area.Trim())
-                + " | " + (message ?? string.Empty);
+                + " | " + safeBody;
             AppendLogFileLine(TroubleshootingLogFilePath(), line);
         }
 
