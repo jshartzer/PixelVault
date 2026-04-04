@@ -27,25 +27,23 @@ namespace PixelVaultNative
             var sortMode = NormalizeLibraryFolderSortMode(libraryFolderSortMode);
             var flattenGroups = !string.Equals(groupingMode, "console", StringComparison.OrdinalIgnoreCase);
             var searchText = ws.AppliedLibrarySearchText;
+            var searchNormalized = string.IsNullOrWhiteSpace(searchText) ? null : searchText.Trim().ToLowerInvariant();
             var projectionStopwatch = Stopwatch.StartNew();
-            var browserFolders = BuildLibraryBrowserFolderViews(folders, groupingMode);
+            var browserFolders = GetOrBuildLibraryBrowserFolderViews(folders, groupingMode);
             projectionStopwatch.Stop();
             ws.ViewFolders.Clear();
             ws.ViewFolders.AddRange(browserFolders);
             var filterSortStopwatch = Stopwatch.StartNew();
-            var visibleFolders = string.IsNullOrWhiteSpace(searchText)
+            var visibleFolders = searchNormalized == null
                 ? browserFolders
                 : browserFolders.Where(folder =>
-                    (!string.IsNullOrWhiteSpace(folder.Name) && folder.Name.IndexOf(searchText, StringComparison.OrdinalIgnoreCase) >= 0) ||
-                    (!string.IsNullOrWhiteSpace(folder.PlatformSummaryText) && folder.PlatformSummaryText.IndexOf(searchText, StringComparison.OrdinalIgnoreCase) >= 0) ||
-                    (!string.IsNullOrWhiteSpace(folder.PrimaryFolderPath) && folder.PrimaryFolderPath.IndexOf(searchText, StringComparison.OrdinalIgnoreCase) >= 0) ||
-                    (!string.IsNullOrWhiteSpace(folder.GameId) && folder.GameId.IndexOf(searchText, StringComparison.OrdinalIgnoreCase) >= 0) ||
-                    folder.SourceFolders.Any(source => !string.IsNullOrWhiteSpace(source.FolderPath) && source.FolderPath.IndexOf(searchText, StringComparison.OrdinalIgnoreCase) >= 0))
+                    !string.IsNullOrEmpty(folder.SearchBlob)
+                    && folder.SearchBlob.IndexOf(searchNormalized, StringComparison.Ordinal) >= 0)
                 .ToList();
             var orderedVisibleFolders = visibleFolders
-                .OrderByDescending(folder => string.Equals(sortMode, "recent", StringComparison.OrdinalIgnoreCase) ? GetLibraryFolderNewestDate(BuildLibraryBrowserDisplayFolder(folder)) : DateTime.MinValue)
+                .OrderByDescending(folder => string.Equals(sortMode, "recent", StringComparison.OrdinalIgnoreCase) ? GetLibraryBrowserFolderViewSortNewest(folder) : DateTime.MinValue)
                 .ThenByDescending(folder => string.Equals(sortMode, "photos", StringComparison.OrdinalIgnoreCase) ? folder.FileCount : 0)
-                .ThenByDescending(folder => string.Equals(sortMode, "photos", StringComparison.OrdinalIgnoreCase) ? GetLibraryFolderNewestDate(BuildLibraryBrowserDisplayFolder(folder)) : DateTime.MinValue)
+                .ThenByDescending(folder => string.Equals(sortMode, "photos", StringComparison.OrdinalIgnoreCase) ? GetLibraryBrowserFolderViewSortNewest(folder) : DateTime.MinValue)
                 .ThenBy(folder => string.Equals(sortMode, "platform", StringComparison.OrdinalIgnoreCase) ? PlatformGroupOrder(DetermineLibraryBrowserGroup(folder)) : 0)
                 .ThenBy(folder => DetermineLibraryBrowserGroup(folder))
                 .ThenBy(folder => folder.Name ?? string.Empty, StringComparer.OrdinalIgnoreCase)

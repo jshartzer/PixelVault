@@ -7,6 +7,9 @@ namespace PixelVaultNative
 {
     public sealed partial class MainWindow
     {
+        long _libraryBrowserAllMergeProjectionFingerprint = long.MinValue;
+        List<LibraryBrowserFolderView> _libraryBrowserAllMergeProjection;
+
         internal sealed class LibraryBrowserFolderView
         {
             internal string ViewKey;
@@ -27,6 +30,8 @@ namespace PixelVaultNative
             internal bool SuppressSteamAppIdAutoResolve;
             internal bool SuppressSteamGridDbIdAutoResolve;
             internal bool IsMergedAcrossPlatforms;
+            /// <summary>Lowercase, newline-separated tokens for library search (name, paths, ids, platforms).</summary>
+            internal string SearchBlob;
         }
 
         LibraryBrowserFolderView CloneLibraryBrowserFolderView(LibraryBrowserFolderView view)
@@ -50,10 +55,30 @@ namespace PixelVaultNative
                 SteamGridDbId = view.SteamGridDbId,
                 SuppressSteamAppIdAutoResolve = view.SuppressSteamAppIdAutoResolve,
                 SuppressSteamGridDbIdAutoResolve = view.SuppressSteamGridDbIdAutoResolve,
-                IsMergedAcrossPlatforms = view.IsMergedAcrossPlatforms
+                IsMergedAcrossPlatforms = view.IsMergedAcrossPlatforms,
+                SearchBlob = view.SearchBlob
             };
             clone.SourceFolders.AddRange(view.SourceFolders.Where(folder => folder != null));
             return clone;
+        }
+
+        void PopulateLibraryBrowserFolderViewSearchBlob(LibraryBrowserFolderView view)
+        {
+            if (view == null) return;
+            var parts = new List<string>();
+            if (!string.IsNullOrWhiteSpace(view.Name)) parts.Add(view.Name.Trim());
+            if (!string.IsNullOrWhiteSpace(view.PlatformSummaryText)) parts.Add(view.PlatformSummaryText.Trim());
+            if (!string.IsNullOrWhiteSpace(view.PrimaryFolderPath)) parts.Add(view.PrimaryFolderPath.Trim());
+            if (!string.IsNullOrWhiteSpace(view.GameId)) parts.Add(view.GameId.Trim());
+            if (!string.IsNullOrWhiteSpace(view.SteamAppId)) parts.Add(view.SteamAppId.Trim());
+            if (!string.IsNullOrWhiteSpace(view.SteamGridDbId)) parts.Add(view.SteamGridDbId.Trim());
+            foreach (var source in view.SourceFolders)
+            {
+                if (source == null) continue;
+                var p = source.FolderPath;
+                if (!string.IsNullOrWhiteSpace(p)) parts.Add(p.Trim());
+            }
+            view.SearchBlob = string.Join("\n", parts).ToLowerInvariant();
         }
 
         LibraryFolderInfo GetLibraryBrowserPrimaryFolder(LibraryBrowserFolderView view)
@@ -358,6 +383,86 @@ namespace PixelVaultNative
             return candidates.FirstOrDefault(c => c != null && string.Equals(c.ViewKey ?? string.Empty, viewKey, StringComparison.OrdinalIgnoreCase));
         }
 
+        /// <summary>Stable fingerprint of folder list order + merge-relevant fields; used to skip rebuilding merged "All" projection.</summary>
+        static long ComputeLibraryBrowserFoldersMergeFingerprint(IReadOnlyList<LibraryFolderInfo> folders)
+        {
+            unchecked
+            {
+                if (folders == null || folders.Count == 0) return 0;
+                long h = folders.Count;
+                for (var i = 0; i < folders.Count; i++)
+                {
+                    var folder = folders[i];
+                    if (folder == null)
+                    {
+                        h = h * 397 ^ i;
+                        continue;
+                    }
+                    h = h * 397 ^ i;
+                    h = h * 397 ^ (folder.FolderPath ?? string.Empty).GetHashCode(StringComparison.OrdinalIgnoreCase);
+                    h = h * 397 ^ (folder.Name ?? string.Empty).GetHashCode(StringComparison.OrdinalIgnoreCase);
+                    h = h * 397 ^ (folder.GameId ?? string.Empty).GetHashCode(StringComparison.OrdinalIgnoreCase);
+                    h = h * 397 ^ (folder.PlatformLabel ?? string.Empty).GetHashCode(StringComparison.OrdinalIgnoreCase);
+                    h = h * 397 ^ folder.FileCount;
+                    h = h * 397 ^ folder.NewestCaptureUtcTicks;
+                    h = h * 397 ^ (folder.PreviewImagePath ?? string.Empty).GetHashCode(StringComparison.OrdinalIgnoreCase);
+                    h = h * 397 ^ (folder.SteamAppId ?? string.Empty).GetHashCode(StringComparison.OrdinalIgnoreCase);
+                    h = h * 397 ^ (folder.SteamGridDbId ?? string.Empty).GetHashCode(StringComparison.OrdinalIgnoreCase);
+                    h = h * 397 ^ (folder.SuppressSteamAppIdAutoResolve ? 1 : 0);
+                    h = h * 397 ^ (folder.SuppressSteamGridDbIdAutoResolve ? 1 : 0);
+                    var paths = folder.FilePaths;
+                    var len = paths == null ? 0 : paths.Length;
+                    h = h * 397 ^ len;
+                    if (len > 0)
+                    {
+                        h = h * 397 ^ (paths[0] ?? string.Empty).GetHashCode(StringComparison.OrdinalIgnoreCase);
+                        if (len > 1) h = h * 397 ^ (paths[len - 1] ?? string.Empty).GetHashCode(StringComparison.OrdinalIgnoreCase);
+                    }
+                }
+                return h;
+            }
+        }
+
+        /// <summary>Returns cached merged rows for "All" grouping when folder data unchanged; console mode is always rebuilt and clears the cache.</summary>
+        List<LibraryBrowserFolderView> GetOrBuildLibraryBrowserFolderViews(IReadOnlyList<LibraryFolderInfo> folders, string groupingMode)
+        {
+            var normalizedGrouping = NormalizeLibraryGroupingMode(groupingMode);
+            if (string.Equals(normalizedGrouping, "console", StringComparison.OrdinalIgnoreCase))
+            {
+                _libraryBrowserAllMergeProjection = null;
+                _libraryBrowserAllMergeProjectionFingerprint = long.MinValue;
+                return BuildLibraryBrowserFolderViews(folders, groupingMode);
+            }
+
+            var fp = ComputeLibraryBrowserFoldersMergeFingerprint(folders);
+            if (_libraryBrowserAllMergeProjection != null && fp == _libraryBrowserAllMergeProjectionFingerprint)
+            {
+                return _libraryBrowserAllMergeProjection;
+            }
+
+            var built = BuildLibraryBrowserFolderViews(folders, groupingMode);
+            _libraryBrowserAllMergeProjection = built;
+            _libraryBrowserAllMergeProjectionFingerprint = fp;
+            return built;
+        }
+
+        /// <summary>Sort key for folder tiles: prefer precomputed UTC ticks on the view; avoid Alloc in OrderBy hot path.</summary>
+        DateTime GetLibraryBrowserFolderViewSortNewest(LibraryBrowserFolderView view)
+        {
+            if (view == null) return DateTime.MinValue;
+            if (view.NewestCaptureUtcTicks > 0)
+            {
+                try
+                {
+                    return new DateTime(view.NewestCaptureUtcTicks, DateTimeKind.Utc).ToLocalTime();
+                }
+                catch
+                {
+                }
+            }
+            return GetLibraryFolderNewestDate(BuildLibraryBrowserDisplayFolder(view));
+        }
+
         List<LibraryBrowserFolderView> BuildLibraryBrowserFolderViews(IEnumerable<LibraryFolderInfo> folders, string groupingMode)
         {
             var rawFolders = (folders ?? Enumerable.Empty<LibraryFolderInfo>())
@@ -389,6 +494,7 @@ namespace PixelVaultNative
                         IsMergedAcrossPlatforms = false
                     };
                     view.SourceFolders.Add(folder);
+                    PopulateLibraryBrowserFolderViewSearchBlob(view);
                     return view;
                 }).ToList();
             }
@@ -403,13 +509,17 @@ namespace PixelVaultNative
                         .ThenBy(folder => folder.Name ?? string.Empty, StringComparer.OrdinalIgnoreCase)
                         .ToList();
                     var primary = sourceFolders.FirstOrDefault();
-                    var allFilePaths = sourceFolders
+                    var pathList = sourceFolders
                         .SelectMany(folder => folder.FilePaths ?? new string[0])
-                        .Where(path => !string.IsNullOrWhiteSpace(path) && File.Exists(path))
+                        .Where(path => !string.IsNullOrWhiteSpace(path))
                         .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .ToList();
+                    var orderedPaths = pathList
                         .OrderByDescending(path => ResolveIndexedLibraryDate(libraryRoot, path))
                         .ThenBy(path => path, StringComparer.OrdinalIgnoreCase)
                         .ToArray();
+                    var pathBackedCount = orderedPaths.Length;
+                    var sumFolderCounts = sourceFolders.Sum(folder => folder == null ? 0 : Math.Max(folder.FileCount, 0));
                     var platformLabels = sourceFolders
                         .Select(folder => NormalizeConsoleLabel(folder.PlatformLabel))
                         .Where(label => !string.IsNullOrWhiteSpace(label))
@@ -432,9 +542,24 @@ namespace PixelVaultNative
                         .Where(value => !string.IsNullOrWhiteSpace(value))
                         .Distinct(StringComparer.OrdinalIgnoreCase)
                         .ToList();
-                    var previewImagePath = !string.IsNullOrWhiteSpace(primary == null ? string.Empty : primary.PreviewImagePath) && File.Exists(primary.PreviewImagePath)
+                    var tickMax = sourceFolders.Max(folder => folder == null ? 0L : folder.NewestCaptureUtcTicks);
+                    if (tickMax == 0 && orderedPaths.Length > 0)
+                    {
+                        var fromIndex = ResolveIndexedLibraryDate(libraryRoot, orderedPaths[0]);
+                        if (fromIndex > DateTime.MinValue)
+                        {
+                            try
+                            {
+                                tickMax = fromIndex.ToUniversalTime().Ticks;
+                            }
+                            catch
+                            {
+                            }
+                        }
+                    }
+                    var previewImagePath = primary != null && !string.IsNullOrWhiteSpace(primary.PreviewImagePath)
                         ? primary.PreviewImagePath
-                        : (allFilePaths.FirstOrDefault(IsImage) ?? allFilePaths.FirstOrDefault() ?? string.Empty);
+                        : (orderedPaths.FirstOrDefault(IsImage) ?? orderedPaths.FirstOrDefault() ?? string.Empty);
                     var view = new LibraryBrowserFolderView
                     {
                         ViewKey = BuildLibraryBrowserViewKey("all", primary == null ? string.Empty : primary.GameId, primary == null ? string.Empty : primary.Name, primary == null ? string.Empty : primary.FolderPath, primary == null ? string.Empty : primary.PlatformLabel),
@@ -445,10 +570,10 @@ namespace PixelVaultNative
                         PrimaryPlatformLabel = platformLabels.FirstOrDefault() ?? NormalizeConsoleLabel(primary == null ? string.Empty : primary.PlatformLabel),
                         PlatformLabels = platformLabels,
                         PlatformSummaryText = BuildLibraryBrowserPlatformSummary(platformLabels),
-                        FileCount = allFilePaths.Length > 0 ? allFilePaths.Length : sourceFolders.Sum(folder => Math.Max(folder.FileCount, 0)),
-                        PreviewImagePath = previewImagePath,
-                        FilePaths = allFilePaths,
-                        NewestCaptureUtcTicks = sourceFolders.Max(folder => folder == null ? 0 : folder.NewestCaptureUtcTicks),
+                        FileCount = pathBackedCount > 0 ? pathBackedCount : sumFolderCounts,
+                        PreviewImagePath = previewImagePath ?? string.Empty,
+                        FilePaths = orderedPaths,
+                        NewestCaptureUtcTicks = tickMax,
                         SteamAppId = distinctSteamAppIds.Count == 1 ? distinctSteamAppIds[0] : string.Empty,
                         SteamGridDbId = distinctSteamGridDbIds.Count == 1 ? distinctSteamGridDbIds[0] : string.Empty,
                         SuppressSteamAppIdAutoResolve = sourceFolders.All(folder => folder != null && folder.SuppressSteamAppIdAutoResolve),
@@ -456,6 +581,7 @@ namespace PixelVaultNative
                         IsMergedAcrossPlatforms = platformLabels.Length > 1
                     };
                     view.SourceFolders.AddRange(sourceFolders);
+                    PopulateLibraryBrowserFolderViewSearchBlob(view);
                     return view;
                 })
                 .ToList();
