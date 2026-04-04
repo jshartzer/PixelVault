@@ -301,7 +301,7 @@ Fill this in during **Phase A** (region name, primary file lines if known, Dispa
 
 - `C:\Codex\docs\ROADMAP.md` — Phase 3 strategy and definition of done  
 - `C:\Codex\docs\pixelvault_service_split_plan.txt` — service map and folder ideas  
-- `C:\Codex\docs\CODE_QUALITY_IMPROVEMENT_PLAN.md` — threading, HTTP, catches  
+- `C:\Codex\docs\CODE_QUALITY_IMPROVEMENT_PLAN.md` — hardening backlog (HTTP/catches/cover locks largely landed; see active tables there)  
 - `C:\Codex\docs\PERFORMANCE_TODO.md` — short active checklist for Library / thread work  
 - `C:\Codex\docs\PERFORMANCE_FIX_PLAN.txt` — Library perf **stub**; narrative log in `docs/archive/PERFORMANCE_FIX_PLAN_HISTORICAL_2026-03.txt` (not the same axis as extraction phases A–F)  
 - `C:\Codex\PixelVaultData\TODO.md` — rolling tasks; link individual slices here when active  

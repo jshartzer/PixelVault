@@ -44,16 +44,9 @@ For **splitting `MainWindow` / shrinking `PixelVault.Native.cs`**, use:
 
 ## Code quality and hardening (from review)
 
-Work items live in `C:\Codex\docs\CODE_QUALITY_IMPROVEMENT_PLAN.md`. Short picks:
+**Active checklist:** `C:\Codex\docs\CODE_QUALITY_IMPROVEMENT_PLAN.md` (landed vs open is split there). **Original full tables:** `C:\Codex\docs\archive\CODE_QUALITY_IMPROVEMENT_PLAN_HISTORICAL.md`.
 
-- Cap `TimeoutWebClient` / HTTP string download size; avoid buffering unbounded bodies.
-- Audit empty `catch` blocks; log or narrow exception types.
-- Make `CoverService` caches thread-safe if cover work runs in parallel (`ConcurrentDictionary` or locking).
-- Tighten Steam rename “numeric prefix” detection (separator + length); consider normalized title vs hint.
-- Debounce Library virtualization `SizeChanged` refresh (similar to search debounce).
-- ReDoS guardrails for user-defined filename convention regexes.
-- Redact SteamGridDB token from any HTTP error logging.
-- Continue peeling `MainWindow` into partials/services; document Steam rename rules in one place.
+Remaining highlights: Steam rename edge cases (`SteamAppIdLooksLikeFilenamePrefix`), optional `SizeChanged` debounce, regex/ReDoS guardrails when editing rules, opportunistic SQLite/`Process.Start`/log-hygiene audits, ongoing MainWindow shrink.
 
 ## As I Think Of It
 - Add a recurring automation that checks repo docs vs Notion for drift:

@@ -190,6 +190,7 @@ Use the docs by role:
 - `C:\Codex\docs\completed-projects\README.md`: **completed initiatives** (e.g. MainWindow extraction A–F)
 - `C:\Codex\docs\MAINWINDOW_EXTRACTION_ROADMAP.md`: full historical record for MainWindow extraction (complete)
 - `C:\Codex\docs\PERFORMANCE_TODO.md`: active responsiveness and scalability backlog
+- `C:\Codex\docs\CODE_QUALITY_IMPROVEMENT_PLAN.md`: security, edge cases, and hardening backlog (slim); archive snapshot in `docs/archive/`
 - `C:\Codex\docs\archive\README.md`: frozen snapshots of older perf / service-split plans (not a live backlog)
 - `C:\Codex\docs\MANUAL_GOLDEN_PATH_CHECKLIST.md`: short manual verification path for risky changes
 - `C:\Codex\docs\SERVICE_OWNERSHIP_AND_PARALLEL_WORK_MAP.md`: service boundaries and safe parallel-work lanes
