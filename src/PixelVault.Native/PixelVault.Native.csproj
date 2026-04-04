@@ -63,6 +63,10 @@
     <Compile Include="UI\Editors\PhotoIndexEditorHost.cs" />
     <Compile Include="UI\FilenameConventionEditor.cs" />
     <Compile Include="UI\Photography\MainWindow.PhotographyAndSteam.cs" />
+    <Compile Include="UI\Photography\PhotographyGalleryTypes.cs" />
+    <Compile Include="UI\Photography\PhotographyGalleryWindow.xaml.cs">
+      <DependentUpon>PhotographyGalleryWindow.xaml</DependentUpon>
+    </Compile>
     <Compile Include="UI\Settings\MainWindow.SettingsShell.cs" />
     <Compile Include="UI\Settings\SettingsShellDependencies.cs" />
     <Compile Include="UI\Settings\SettingsShellHost.cs" />

@@ -54,11 +54,11 @@ Then use these based on the task:
 
 Current live build:
 
-- `0.851`
+- `0.852`
 
 Current executable:
 
-- `C:\Codex\dist\PixelVault-0.851\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.852\PixelVault.exe`
 
 Current build pointer:
 
@@ -92,7 +92,7 @@ Practical current focus:
 
 ## Current Stop Point
 
-The app is currently published at `0.851`.
+The app is currently published at `0.852`.
 
 **Notion:** [MainWindow extraction roadmap](https://www.notion.so/33573adc59b681d88b7dcd88cad53cb6) updated for Phase **E** capstone (**`ILibraryBrowserShell`**). If release rows in Notion lag `docs/CURRENT_BUILD.txt`, re-sync per `docs/DOC_SYNC_POLICY.md`.
 
@@ -106,6 +106,7 @@ Recent extraction progress (repo):
 - **Library stability (current publish):** Rapid browsing no longer lets queued image/video warmup tasks occupy thread-pool workers while waiting on semaphores, so detail-render background work is much less likely to get starved before it starts.
 - **Thumbnail cache (current publish):** Thumbnail cache writes now use unique temp files per writer instead of a shared `destination.tmp` path, so concurrent cache saves no longer fight over the same temp file or spam the log with benign access-denied races.
 - **Monolith shrink (0.851):** **`LibraryThumbnailPipeline`** centralizes library thumbnail decode/cache/poster I/O; intake preview glue is **`UI/Intake/MainWindow.IntakePreview.cs`** (**`PERFORMANCE_MONOLITH_SLICE_PLAN`** Phase 2 follow-up + Phase 3). Details in **`docs/CHANGELOG.md`** **0.851**.
+- **Library + photography (0.852):** **`All`**-mode projection cache, cheaper sort/search/merge paths, and photography window as **`UI/Photography/PhotographyGalleryWindow.xaml`** with index-first gallery load. See **`docs/CHANGELOG.md`** **0.852**.
 - **E1–E3 (complete):** Library browser: **`LibraryBrowserHost.Show`** (try/catch + **`ILibrarySession`**) → **`LibraryBrowserShowOrchestration`**(**`ILibraryBrowserShell`** via **`LibraryBrowserShellBridge`**) for open/show/delegate wiring; top nav **`MainWindow.LibraryBrowserChrome.cs`**; layout **`MainWindow.LibraryBrowserLayout.cs`**; render **`MainWindow.LibraryBrowserRender.*.cs`**; toolbar/pane/cover/detail partials **`MainWindow.LibraryBrowserOrchestrator.*.cs`**. **`ILibrarySession`**, **`LibraryWorkspaceContext`**, **`LibraryVirtualization.cs`**
 - **Responsiveness:** **`PERFORMANCE_TODO.md`** — item 5 long-workflow spot-check; item 10 **`LibraryBrowserHost`** + **`ILibraryBrowserShell`** / **`LibraryBrowserShowOrchestration`**; manual-metadata game-title list off UI thread when rebuilding choices
 - **F1–F3 (complete):** **`SettingsShellHost`** + **`SettingsShellDependencies`** + thin **`MainWindow.SettingsShell`** bridge; **`MainWindow.SettingsPersistence`**; photography — **`MainWindow.PhotographyAndSteam.cs`**

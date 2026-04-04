@@ -122,7 +122,8 @@ namespace PixelVaultNative
                 GameId = resolvedGameId,
                 ConsoleLabel = platformLabel,
                 TagText = string.Join(", ", tags),
-                CaptureUtcTicks = ResolveLibraryMetadataCaptureUtcTicks(file, stamp, snapshot, existingEntry)
+                CaptureUtcTicks = ResolveLibraryMetadataCaptureUtcTicks(file, stamp, snapshot, existingEntry),
+                Starred = existingEntry != null && existingEntry.Starred
             };
         }
 

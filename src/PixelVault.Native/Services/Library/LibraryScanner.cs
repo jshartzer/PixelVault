@@ -241,6 +241,8 @@ namespace PixelVaultNative
                     var resolvedRow = host.ResolveExistingGameIndexRowForAssignment(gameRows, item.GameName, platformLabel, preferredGameId);
                     item.GameId = resolvedRow == null ? string.Empty : resolvedRow.GameId;
                     if (resolvedRow != null && !string.IsNullOrWhiteSpace(resolvedRow.Name)) item.GameName = resolvedRow.Name;
+                    LibraryMetadataIndexEntry priorEntry;
+                    index.TryGetValue(item.FilePath, out priorEntry);
                     index[item.FilePath] = new LibraryMetadataIndexEntry
                     {
                         FilePath = item.FilePath,
@@ -248,7 +250,8 @@ namespace PixelVaultNative
                         GameId = item.GameId,
                         ConsoleLabel = platformLabel,
                         TagText = string.Join(", ", tags),
-                        CaptureUtcTicks = host.ToCaptureUtcTicks(item.CaptureTime)
+                        CaptureUtcTicks = host.ToCaptureUtcTicks(item.CaptureTime),
+                        Starred = priorEntry != null && priorEntry.Starred
                     };
                     host.SetCachedFileTagsForLibraryScan(item.FilePath, tags, host.MetadataCacheStamp(item.FilePath));
                 }
@@ -358,7 +361,8 @@ namespace PixelVaultNative
                     Stamp = entry.Stamp ?? string.Empty,
                     GameId = host.NormalizeGameId(entry.GameId),
                     ConsoleLabel = host.NormalizeConsoleLabel(entry.ConsoleLabel),
-                    TagText = entry.TagText ?? string.Empty
+                    TagText = entry.TagText ?? string.Empty,
+                    Starred = entry.Starred
                 })
                 .OrderBy(row => row.FilePath ?? string.Empty, StringComparer.OrdinalIgnoreCase)
                 .ToList();

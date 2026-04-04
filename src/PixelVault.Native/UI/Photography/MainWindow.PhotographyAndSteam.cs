@@ -4,7 +4,6 @@ using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
@@ -14,9 +13,10 @@ namespace PixelVaultNative
     {
         List<string> GetTaggedImagesCached(string root, bool forceRefresh, params string[] tagCandidates)
         {
-            var stamp = BuildImageInventoryStamp(root);
+            var index = LoadLibraryMetadataIndex(root, false);
             if (!forceRefresh)
             {
+                var stamp = BuildPhotographyGalleryCacheStampFromIndex(index);
                 var cached = LoadTaggedImageCache(root, stamp);
                 if (cached != null)
                 {
@@ -24,23 +24,85 @@ namespace PixelVaultNative
                     return cached;
                 }
             }
-            Log("Refreshing photography gallery cache.");
-            var fresh = FindTaggedImages(root, tagCandidates);
-            SaveTaggedImageCache(root, stamp, fresh);
+
+            List<string> fresh;
+            if (forceRefresh)
+            {
+                Log("Refreshing photography gallery cache (full library Exif scan).");
+                fresh = FindTaggedImages(root, tagCandidates);
+            }
+            else
+            {
+                Log("Rebuilding photography gallery from metadata index.");
+                fresh = FindTaggedImagesFromMetadataIndex(index, tagCandidates);
+                if (fresh.Count == 0 && index.Count == 0)
+                {
+                    Log("Photography gallery: metadata index empty; scanning library with Exif (first-time cost).");
+                    fresh = FindTaggedImages(root, tagCandidates);
+                }
+            }
+
+            var stampForSave = BuildPhotographyGalleryCacheStampFromIndex(LoadLibraryMetadataIndex(root, false));
+            SaveTaggedImageCache(root, stampForSave, fresh);
             return fresh;
         }
 
-        string BuildImageInventoryStamp(string root)
+        /// <summary>Cache invalidation tied to persisted metadata index content (not a full media-tree walk).</summary>
+        static string BuildPhotographyGalleryCacheStampFromIndex(Dictionary<string, LibraryMetadataIndexEntry> index)
         {
-            long latestTicks = 0;
-            int count = 0;
-            foreach (var file in Directory.EnumerateFiles(root, "*.*", SearchOption.AllDirectories).Where(IsMedia))
+            if (index == null || index.Count == 0) return "idx|0|0";
+            unchecked
             {
-                count++;
-                var ticks = MetadataCacheStamp(file);
-                if (ticks > latestTicks) latestTicks = ticks;
+                long h = index.Count;
+                foreach (var kv in index.OrderBy(k => k.Key, StringComparer.OrdinalIgnoreCase))
+                {
+                    var e = kv.Value;
+                    if (e == null) continue;
+                    h = h * 397 ^ (e.FilePath ?? string.Empty).GetHashCode(StringComparison.OrdinalIgnoreCase);
+                    h = h * 397 ^ (e.Stamp ?? string.Empty).GetHashCode(StringComparison.Ordinal);
+                    h = h * 397 ^ (e.TagText ?? string.Empty).GetHashCode(StringComparison.OrdinalIgnoreCase);
+                    h = h * 397 ^ e.CaptureUtcTicks;
+                    h = h * 397 ^ (e.Starred ? 1 : 0);
+                }
+                return "idx|" + index.Count + "|" + h;
             }
-            return count + "|" + latestTicks;
+        }
+
+        static bool MetadataIndexTagTextMatchesCandidates(string tagText, List<string> candidates)
+        {
+            if (candidates == null || candidates.Count == 0 || string.IsNullOrWhiteSpace(tagText)) return false;
+            foreach (var part in tagText.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                var piece = part.Trim();
+                if (piece.Length == 0) continue;
+                foreach (var want in candidates)
+                {
+                    if (string.Equals(piece, want, StringComparison.OrdinalIgnoreCase)) return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>Uses <see cref="LibraryMetadataIndexEntry.TagText"/> (comma-separated embedded tags) — avoids enumerating every media file and batch Exif reads when the index is populated.</summary>
+        List<string> FindTaggedImagesFromMetadataIndex(Dictionary<string, LibraryMetadataIndexEntry> index, params string[] tagCandidates)
+        {
+            var wanted = tagCandidates
+                .Where(t => !string.IsNullOrWhiteSpace(t))
+                .Select(t => t.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (wanted.Count == 0 || index == null || index.Count == 0) return new List<string>();
+            var result = new List<string>();
+            foreach (var kv in index)
+            {
+                var path = kv.Key;
+                if (string.IsNullOrWhiteSpace(path) || !File.Exists(path) || !IsMedia(path)) continue;
+                var entry = kv.Value;
+                var tagText = entry == null ? string.Empty : entry.TagText ?? string.Empty;
+                if (!MetadataIndexTagTextMatchesCandidates(tagText, wanted)) continue;
+                result.Add(path);
+            }
+            return result.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         }
 
         string TaggedImageCachePath(string root)
@@ -83,136 +145,84 @@ namespace PixelVaultNative
                 .ToList();
         }
 
+        string BuildPhotographyGalleryCaption(string file)
+        {
+            var folder = Path.GetFileName(Path.GetDirectoryName(file));
+            var dt = GetLibraryDate(file);
+            var datePart = dt > DateTime.MinValue && dt.Year > 1 ? FormatFriendlyTimestamp(dt) : string.Empty;
+            if (string.IsNullOrEmpty(folder)) return datePart ?? string.Empty;
+            return string.IsNullOrEmpty(datePart) ? folder : folder + "  ·  " + datePart;
+        }
+
+        List<PhotographyGalleryEntry> BuildPhotographyGalleryEntries(IEnumerable<string> files)
+        {
+            var index = LoadLibraryMetadataIndex(libraryWorkspace.LibraryRoot, false);
+            return (files ?? Enumerable.Empty<string>())
+                .Where(f => !string.IsNullOrWhiteSpace(f))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderByDescending(GetLibraryDate)
+                .ThenBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase)
+                .Select(f =>
+                {
+                    var starred = false;
+                    LibraryMetadataIndexEntry row;
+                    if (index != null && index.TryGetValue(f, out row) && row != null) starred = row.Starred;
+                    return new PhotographyGalleryEntry
+                    {
+                        FullPath = f,
+                        Title = Path.GetFileName(f) ?? f,
+                        Caption = BuildPhotographyGalleryCaption(f),
+                        Starred = starred
+                    };
+                })
+                .ToList();
+        }
+
+        void TogglePhotographyGalleryEntryStarred(PhotographyGalleryEntry entry)
+        {
+            if (entry == null || string.IsNullOrWhiteSpace(entry.FullPath) || !File.Exists(entry.FullPath)) return;
+            try
+            {
+                var root = libraryWorkspace.LibraryRoot;
+                if (string.IsNullOrWhiteSpace(root)) return;
+                var index = LoadLibraryMetadataIndex(root, true);
+                LibraryMetadataIndexEntry row;
+                if (!index.TryGetValue(entry.FullPath, out row) || row == null) return;
+                row.Starred = !row.Starred;
+                SaveLibraryMetadataIndex(root, index);
+                entry.Starred = row.Starred;
+            }
+            catch (Exception ex)
+            {
+                LogException("TogglePhotographyGalleryEntryStarred", ex);
+            }
+        }
+
         void ShowPhotographyGallery(Window owner)
         {
             try
             {
                 EnsureDir(libraryWorkspace.LibraryRoot, "Library folder");
-                EnsureExifTool();
-                status.Text = "Loading photography gallery";
-                var files = GetTaggedImagesCached(libraryWorkspace.LibraryRoot, false, GamePhotographyTag, "Photography");
-                var galleryWindow = new Window
+                var libraryRoot = libraryWorkspace.LibraryRoot;
+                var host = new PhotographyGalleryHost
                 {
-                    Title = "PixelVault " + AppVersion + " Photography",
-                    Width = 1320,
-                    Height = 900,
-                    MinWidth = 1080,
-                    MinHeight = 760,
-                    Owner = owner ?? this,
-                    WindowStartupLocation = WindowStartupLocation.CenterOwner,
-                    Background = Brush("#080A0D")
-                };
-
-                var root = new Grid { Margin = new Thickness(24), Background = Brushes.White };
-                root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-                root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-
-                var header = new Border { Background = Brush("#11161B"), CornerRadius = new CornerRadius(18), Padding = new Thickness(22), Margin = new Thickness(0, 0, 0, 18), BorderBrush = Brush("#273039"), BorderThickness = new Thickness(1) };
-                var headerGrid = new Grid();
-                headerGrid.ColumnDefinitions.Add(new ColumnDefinition());
-                headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                var headerStack = new StackPanel();
-                var galleryTitle = new TextBlock { Text = GamePhotographyTag, FontSize = 28, FontWeight = FontWeights.SemiBold, Foreground = Brush("#F5EFE4") };
-                var galleryMeta = new TextBlock { Text = string.Empty, Margin = new Thickness(0, 8, 0, 0), Foreground = Brush("#B8B2A7"), FontSize = 14, TextWrapping = TextWrapping.Wrap };
-                headerStack.Children.Add(galleryTitle);
-                headerStack.Children.Add(galleryMeta);
-                headerGrid.Children.Add(headerStack);
-                var actions = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-                var openLibraryButton = Btn("Open Library", null, "#1B232B", Brushes.White);
-                openLibraryButton.Margin = new Thickness(12, 0, 0, 0);
-                var refreshGalleryButton = Btn("Refresh", null, "#275D47", Brushes.White);
-                refreshGalleryButton.Margin = new Thickness(12, 0, 0, 0);
-                actions.Children.Add(openLibraryButton);
-                actions.Children.Add(refreshGalleryButton);
-                Grid.SetColumn(actions, 1);
-                headerGrid.Children.Add(actions);
-                header.Child = headerGrid;
-                root.Children.Add(header);
-
-                var body = new Border { Background = Brush("#0D1115"), CornerRadius = new CornerRadius(18), Padding = new Thickness(22), BorderBrush = Brush("#20272F"), BorderThickness = new Thickness(1) };
-                Grid.SetRow(body, 1);
-                var bodyGrid = new Grid();
-                bodyGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-                bodyGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-                var controls = new DockPanel { Margin = new Thickness(0, 0, 0, 14) };
-                var thumbLabel = new TextBlock { Text = "Curated gallery", FontSize = 18, FontWeight = FontWeights.SemiBold, Foreground = Brush("#F5EFE4"), VerticalAlignment = VerticalAlignment.Center };
-                controls.Children.Add(thumbLabel);
-                var sliderPanel = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
-                var sliderLabel = new TextBlock { Text = "Frame width", Foreground = Brush("#B8B2A7"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) };
-                var sizeValue = new TextBlock { Text = "600", Foreground = Brush("#B8B2A7"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0), Width = 38 };
-                var sizeSlider = new Slider { Minimum = 440, Maximum = 840, Value = 600, Width = 180, TickFrequency = 20, IsSnapToTickEnabled = true };
-                sliderPanel.Children.Add(sliderLabel);
-                sliderPanel.Children.Add(sizeSlider);
-                sliderPanel.Children.Add(sizeValue);
-                DockPanel.SetDock(sliderPanel, Dock.Right);
-                controls.Children.Add(sliderPanel);
-                bodyGrid.Children.Add(controls);
-                var scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Background = Brush("#0D1115") };
-                var panel = new WrapPanel { Orientation = Orientation.Horizontal };
-                scroll.Content = panel;
-                Grid.SetRow(scroll, 1);
-                bodyGrid.Children.Add(scroll);
-                body.Child = bodyGrid;
-                root.Children.Add(body);
-                galleryWindow.Content = root;
-
-                Action render = delegate
-                {
-                    panel.Children.Clear();
-                    var ordered = files.OrderByDescending(GetLibraryDate).ThenBy(Path.GetFileName).ToList();
-                    galleryMeta.Text = ordered.Count + " capture(s) tagged for game photography in " + libraryWorkspace.LibraryRoot;
-                    sizeValue.Text = ((int)sizeSlider.Value).ToString();
-                    if (ordered.Count == 0)
+                    LibraryRoot = libraryRoot,
+                    AppVersion = AppVersion,
+                    GamePhotographyTag = GamePhotographyTag,
+                    LoadTaggedImagePaths = force => GetTaggedImagesCached(libraryRoot, force, GamePhotographyTag, "Photography"),
+                    BuildEntries = BuildPhotographyGalleryEntries,
+                    PrepareExifOnBackgroundThread = EnsureExifTool,
+                    SetAppStatus = delegate(string text) { if (status != null) status.Text = text; },
+                    LogError = LogException,
+                    OpenLibraryFolder = delegate { OpenFolder(libraryRoot); },
+                    OpenImageWithShell = OpenWithShell,
+                    QueueImageLoad = delegate(Image img, string path, int w, Action<BitmapImage> onDone)
                     {
-                        panel.Children.Add(new TextBlock { Text = "No " + GamePhotographyTag + " captures found yet.", Foreground = Brush("#B8B2A7"), FontSize = 15, Margin = new Thickness(8) });
-                        return;
-                    }
-                    var width = (int)sizeSlider.Value;
-                    foreach (var file in ordered)
-                    {
-                        var tile = new Border { Width = width, Margin = new Thickness(0, 0, 18, 22), Background = Brush("#12181E"), CornerRadius = new CornerRadius(10), BorderBrush = Brush("#262F38"), BorderThickness = new Thickness(1), Tag = file };
-                        var tileStack = new StackPanel();
-                        var frame = new Border { Background = Brush("#050607"), Margin = new Thickness(14, 14, 14, 10), Padding = new Thickness(10), CornerRadius = new CornerRadius(4) };
-                        var presenter = new Grid();
-                        var placeholder = new TextBlock { Text = Path.GetFileName(file), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(10), Foreground = Brush("#F5EFE4"), TextAlignment = TextAlignment.Center };
-                        var image = new Image { Width = width - 48, Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Center, Visibility = Visibility.Collapsed };
-                        presenter.Children.Add(placeholder);
-                        presenter.Children.Add(image);
-                        frame.Child = presenter;
-                        QueueImageLoad(image, file, width * 2, delegate(BitmapImage loaded)
-                        {
-                            image.Source = loaded;
-                            image.Visibility = Visibility.Visible;
-                            placeholder.Visibility = Visibility.Collapsed;
-                        });
-                        tileStack.Children.Add(frame);
-                        tileStack.Children.Add(new TextBlock { Text = Path.GetFileName(Path.GetDirectoryName(file)), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(14, 0, 14, 14), Foreground = Brush("#F5EFE4"), FontWeight = FontWeights.SemiBold, FontSize = 16, TextAlignment = TextAlignment.Center });
-                        tile.Child = tileStack;
-                        tile.MouseLeftButtonDown += delegate(object sender, MouseButtonEventArgs e)
-                        {
-                            if (e.ClickCount >= 2)
-                            {
-                                var clicked = sender as Border;
-                                if (clicked != null && clicked.Tag is string) OpenWithShell((string)clicked.Tag);
-                            }
-                        };
-                        panel.Children.Add(tile);
+                        QueueImageLoad(img, path, w, onDone, false, null);
                     }
                 };
-
-                refreshGalleryButton.Click += delegate
-                {
-                    status.Text = "Refreshing photography gallery";
-                    files = GetTaggedImagesCached(libraryWorkspace.LibraryRoot, true, GamePhotographyTag, "Photography");
-                    render();
-                    status.Text = "Photography gallery ready";
-                };
-                openLibraryButton.Click += delegate { OpenFolder(libraryWorkspace.LibraryRoot); };
-                sizeSlider.ValueChanged += delegate { render(); };
-
-                render();
-                galleryWindow.Show();
-                status.Text = "Photography gallery ready";
+                new PhotographyGalleryWindow(host, owner ?? this).Show();
+                if (status != null) status.Text = "Loading photography gallery…";
             }
             catch (Exception ex)
             {

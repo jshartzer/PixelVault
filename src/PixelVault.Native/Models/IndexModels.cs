@@ -40,6 +40,7 @@ namespace PixelVaultNative
         public string GameId { get; set; }
         public string ConsoleLabel { get; set; }
         public string TagText { get; set; }
+        public bool Starred { get; set; }
     }
 
     sealed class LibraryMetadataIndexEntry
@@ -50,6 +51,7 @@ namespace PixelVaultNative
         public string ConsoleLabel;
         public string TagText;
         public long CaptureUtcTicks;
+        public bool Starred;
     }
 
     sealed class VideoClipInfo

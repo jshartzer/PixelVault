@@ -1,3 +1,8 @@
+## 0.852
+- **Release:** Version **0.852** — Library browse performance polish, photography gallery refresh (XAML + load path), publish for manual test.
+- **Library (`All` grouping / game-first):** Cached merged folder projection when folder model unchanged (`GetOrBuildLibraryBrowserFolderViews` + index fingerprint). Sort uses view **`NewestCaptureUtcTicks`** / **`FileCount`** instead of **`BuildLibraryBrowserDisplayFolder`** in **`OrderBy`**. Precomputed **`SearchBlob`** for search filter. Merge path trusts scanner file lists (no per-path **`File.Exists`**); preview + fallback sort ticks derived from index-ordered paths.
+- **Photography gallery:** **`PhotographyGalleryWindow.xaml`** (+ code-behind) — display-first list, async open off UI thread, tag list from **metadata index** when possible with full Exif scan only when index empty or **Refresh**; on-disk cache uses index-derived stamp (no full media-tree stamp on cache hit). **`PhotographyGalleryTypes.cs`** holds **`PhotographyGalleryEntry`** / **`PhotographyGalleryHost`**.
+
 ## 0.851
 - **Release:** Version **0.851** — publish refresh for MainWindow performance/monolith slices (**Phase 2 follow-up** + **Phase 3** per `docs/PERFORMANCE_MONOLITH_SLICE_PLAN.md`).
 - **Library thumbnails (Phase 2 follow-up):** **`LibraryThumbnailPipeline`** (`UI/Library/LibraryThumbnailPipeline.cs`) owns decode-width normalization, **`BitmapImage`** / frozen bitmap load, disk thumbnail cache I/O, and video poster path resolution; **`MainWindow.LibraryImageLoading.cs`** delegates to it. **`MediaToolHelpers`** uses the shared **`NormalizeDecodePixelWidth`** helper.
