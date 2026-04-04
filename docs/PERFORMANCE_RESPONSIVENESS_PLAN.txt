@@ -1,106 +1,43 @@
-PixelVault Native — UI responsiveness and performance plan
-============================================================
+STATUS (Apr 2026): Historical. Most recommendations below are **implemented** (background folder work, batch reads, debounced search, capture viewport cancel, keyword mirror, etc.). For the live checklist use **`docs/PERFORMANCE_TODO.md`**. For the March 2026 narrative log see **`docs/archive/PERFORMANCE_FIX_PLAN_HISTORICAL_2026-03.txt`**.
+
+---
+
+PixelVault Native — UI responsiveness and performance plan (reference only)
+==========================================================================
 Derived from a review of PixelVault.Native (library load, virtualization,
-intake preview, thumbnails). Complements docs/LIBRARY_UI_SCALABILITY_NOTES.txt.
+intake preview, thumbnails). Older scalability notes: `LIBRARY_UI_SCALABILITY_NOTES.txt`.
 
+1) Library load / refresh
+-------------------------
+**Was:** Heavy synchronous index backfill on UI thread for large libraries.  
+**Now:** Rebuild/backfill patterns use background work + marshaling; batch tag reads for cold paths. Keep this pattern when changing folder cache or index load.
 
-1) Library load / refresh — heavy work on the UI thread (highest impact)
--------------------------------------------------------------------------
-Where: LoadLibraryFoldersCached -> LoadLibraryFolders (LibraryFolderIndexing.cs)
-when the folder cache misses or is forced to rebuild.
+2) Capture grid
+---------------
+**Was:** StackPanel queued append; every tile stayed in the tree.  
+**Now:** Viewport-driven construction; off-screen work canceled. Optional future: full virtualizing panel if profiling requires it.
 
-What happens:
-- Enumerates every game subfolder and every media file under the library root
-  into a single allFiles list.
-- For any file not already in the metadata index, calls
-  ReadEmbeddedKeywordTagsDirect (EXIF-style I/O via MetadataService) per file.
+3) Sort + search
+-----------------
+**Was:** Repeated filesystem walks for “Recently Added”; search on every keystroke.  
+**Now:** Cached sort keys / capture ticks; debounced committed search term.
 
-Effect: Large libraries or a stale index => thousands of blocking file/metadata
-reads on the UI thread => frozen window.
+4) Thumbnails
+--------------
+QueueImageLoad + thread-pool + dispatcher remains appropriate; LRU / pipeline split in `LibraryThumbnailPipeline` + `LibraryImageLoadCoordinator`.
 
-Improvements:
-- Move cache rebuild (or at least the "backfill missing index entries" loop) to
-  Task.Run + progress, then marshal results with Dispatcher.BeginInvoke (same
-  pattern as LoadIntakePreviewSummaryAsync).
-- Prefer batch reads where available (ReadEmbeddedKeywordTagsBatch in
-  MetadataService) instead of one-at-a-time for cold index builds.
-- Keep folder cache + stable BuildLibraryFolderInventoryStamp; treat full
-  rebuild as a background job with a lightweight "Loading library..." state.
+5) Intake preview
+-----------------
+Build summary off UI thread; marshal results with `BeginInvoke` — keep for similar workflows.
 
+6) Threading
+-------------
+Game-capture keyword inclusion: **landed** — cached mirror on `MainWindow`, no hot-path `Dispatcher.Invoke` (see `PERFORMANCE_TODO.md` 5a).
 
-2) Capture grid — not virtualized (large folders)
--------------------------------------------------
-See docs/LIBRARY_UI_SCALABILITY_NOTES.txt: right-hand capture list builds rows
-into a StackPanel and keeps every tile once the queue drains. Large folders =>
-large visual tree, layout cost, concurrent image/video work.
+Priority summary (obsolete — use PERFORMANCE_TODO)
+----------------------------------------------------
+Older P0–P4 ordering reflected pre-0.815 investigations. Active priorities: **service/monolith follow-through**, spot-checks on new long workflows, optional deeper virtualization/video polish.
 
-Improvements:
-- Virtualize captures (e.g. ListBox + VirtualizingStackPanel, or a second
-  viewport-based recycler like the folder side).
-- Interim: cap visible work (first N files + "Load more") or lazy rows tied to
-  scroll position.
-
-
-3) "Recently added" / sort + search
------------------------------------
-renderTiles can redo heavy work; "Recently Added" can walk FilePaths and call
-GetLibraryDate (filesystem when filename does not parse).
-
-Improvements:
-- Precompute NewestCaptureUtcTicks (or equivalent) when building
-  LibraryFolderInfo / folder cache so sort does not rescan files every
-  renderTiles. Invalidate when folder stamp or metadata index changes.
-- Library search already uses a debounced timer (searchDebounceTimer) — keep
-  other filters consistent with that pattern.
-
-
-4) Thumbnails — mostly async (good)
------------------------------------
-QueueImageLoad uses Task.Run + semaphore (2–6 concurrent) and applies bitmaps on
-the dispatcher — appropriate.
-
-Caveats:
-- Video tiles still start MediaElement and WarmVideoPreviewClip when created;
-  many visible clips => decode/disk/GPU contention.
-- Folder virtualization clears and rebuilds visible rows on scroll (no recycling)
-  — OK for moderate counts; still allocates UI trees on scroll.
-
-
-5) Intake preview — off UI thread (good)
-----------------------------------------
-LoadIntakePreviewSummaryAsync builds on a thread-pool task and updates UI via
-ContinueWith -> Dispatcher.BeginInvoke — keep this pattern for similar work.
-
-
-6) Threading nit — Dispatcher.Invoke in metadata paths
-------------------------------------------------------
-ShouldIncludeGameCaptureKeywords (MetadataHelpers.cs) uses Dispatcher.Invoke
-when not on the UI thread — blocks the caller until the UI runs the delegate.
-If more metadata work moves to background threads, prefer BeginInvoke with a
-cached value, or pass the flag into background workers so the UI is not
-synchronously pinged from many workers.
-
-
-Priority summary
-----------------
-P0 — Background library index / folder list rebuild + batch tag reads
-      (removes multi-second UI freezes on large libraries).
-
-P1 — Virtualize or cap the capture grid
-      (bounds memory and layout for huge folders).
-
-P2 — Precomputed sort keys for folder list
-      (cuts repeated O(files) work on each renderTiles).
-
-P3 — Soften video tile warmup / limit concurrent clip work
-      (reduces jank when scrolling folders with many videos).
-
-P4 — Replace Dispatcher.Invoke in hot metadata paths
-      (avoids background threads stalling on UI). [Game-capture keywords: landed
-      — mirror flag on MainWindow, see PERFORMANCE_TODO 5a.]
-
-Suggested first implementation step
-----------------------------------
-Offload LoadLibraryFolders / index backfill from the UI thread while showing
-non-blocking progress in the library window. Choose either full background
-rebuild or only the EXIF backfill loop first, depending on risk tolerance.
+Suggested first implementation step (historical)
+-----------------------------------------------
+Was: offload `LoadLibraryFolders` / index backfill from UI thread. **Done** for current architecture — verify any new cache entry points follow the same discipline.

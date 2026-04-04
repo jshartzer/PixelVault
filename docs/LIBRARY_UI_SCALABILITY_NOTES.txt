@@ -1,94 +1,22 @@
-PixelVault — Main Library form: efficiency and scalability notes
-================================================================
-(Saved from a codebase review of ShowLibraryBrowser in PixelVault.Native.cs
-and LibraryVirtualization.cs.)
+PixelVault — Main Library: scalability notes (Apr 2026 update)
+==============================================================
+Original review described `ShowLibraryBrowser` + `LibraryVirtualization.cs` before many perf slices landed.
+
+**Implemented since this review:** folder sort-key caching, debounced search, batch cold-index reads, detail render off UI thread, startup cache gating, capture-grid viewport work cancellation, folder-side row recycling (`RecycleVisibleRowElements`), Library browser host extraction (`LibraryBrowserHost`), async/metadata/cover service seams. See `PERFORMANCE_TODO.md` landed summary and `CHANGELOG.md`.
+
+HOW IT IS BUILT (still directionally true)
+----------------------------------------
+- Left: custom row virtualizer with viewport + overscan.
+- Right: capture grid uses virtualization-friendly patterns; off-screen thumbnail/video work is dropped when items leave the viewport (not an unbounded “queue everything forever” model).
 
 
-HOW IT IS BUILT
----------------
-The Library is one large imperative setup: left column (folder grid + search/sort),
-right column (folder banner + capture grid). Folder tiles sit in a custom row
-virtualizer; the capture list uses a ScrollViewer + StackPanel + incremental
-WrapPanel rows built through a queue.
-
-Folder list (left) — row virtualization:
-  - CreateVirtualizedRowHost, tileScroll in left grid (around PixelVault.Native.cs
-    lines 2827–2830).
-
-Capture list (right) — queued row appends into a flat StackPanel:
-  - thumbScroll, thumbContent StackPanel (around lines 2914–2916).
-
-
-IS IT EFFICIENT?
-----------------
-
-Folder side: mostly yes, for large COUNTS OF GAMES.
-  - RefreshVirtualizedRowHost only keeps rows that intersect the viewport (plus
-    overscan), so you are not hanging thousands of folder tiles in the tree at
-    once (see LibraryVirtualization.cs ~102–156).
-
-Caveats on the folder side:
-  - On scroll, visible rows are Cleared and rebuilt (no control recycling).
-    Acceptable for moderate row counts but still creates new WrapPanel/Button
-    trees and decode scheduling when the visible slice changes.
-  - Folder cover loads are async (good).
-
-Capture side: weak for large FILES PER FOLDER.
-  - renderSelectedFolder enumerates and groups ALL files for the folder, then
-    enqueues UI work row-by-row (~3196–3251).
-  - Scrolling eventually drains the queue and keeps every built row in
-    thumbContent.
-  - Result: progressive construction (good time-to-first-paint) but NOT a
-    bounded visual tree. A folder with thousands of images/videos ends up with
-    thousands of tiles in memory and heavy layout. This is the main scalability
-    ceiling.
-
-Sort + search:
-  - Each renderTiles pass filters and re-sorts the full visible folder list.
-  - For “Recently Added”, GetLibraryFolderNewestDate walks FilePaths and
-    GetLibraryDate may hit the filesystem when the filename does not parse
-    (~355–364 and ~5325–5338).
-  - Every Library refresh that runs renderTiles with “recent” sort can do
-    O(files across folders) work (and I/O where names do not match parsers).
-
-Search:
-  - TextChanged calls renderTiles immediately (~3999).
-  - With a big library and “recent” sort, typing in search can trigger a lot of
-    repeated work.
-
-
-WHAT TO CHANGE (PRIORITIZED)
-----------------------------
-
-1. True virtualization for captures (highest impact)
-   Replace “queue everything into one StackPanel” with something that only
-   materializes near the viewport: e.g. ListBox/ItemsControl +
-   VirtualizingStackPanel (flat list with group headers as items, or a single
-   virtualized list of rows), or a second VirtualizedRowHost-style recycler for
-   date groups + wrap rows. Goal: bound child count regardless of folder size.
-
-2. Precompute sort keys when loading/caching folders
-   Store NewestCaptureUtc (or similar) on LibraryFolderInfo when building
-   LoadLibraryFolders / updating the folder cache, so “Recently Added” does not
-   rescan every file on each renderTiles. Invalidate when folder stamp or
-   metadata index changes.
-
-3. Debounce search (~150–300 ms) so renderTiles does not run on every character
-   for large libraries.
-
-4. Optional: recycle row elements on the left
-   Instead of Children.Clear() + rebuild, pool a few WrapPanel hosts and
-   repopulate. Lower priority than capture virtualization.
-
-5. Structure
-   Moving ShowLibraryBrowser into a dedicated type (e.g. LibraryBrowserView)
-   does not fix performance by itself but makes it easier to iterate on the
-   above without a very large single file.
+REMAINING GAPS (optional / profile-driven)
+------------------------------------------
+- If traces show **N-limited** memory on huge folders: consider a **full** virtualizing ItemsControl or recycler for every wrap/date-group layout.
+- Video-heavy folders: optional poster-first tiles, stricter unload, concurrency caps.
+- Folder side: recycling is on for `tileRows`; further pooling is optional.
 
 
 BOTTOM LINE
 -----------
-The game grid is built in a scalable way; the per-folder capture grid is the main
-bottleneck (full tree + grouping work up front). Pair capture virtualization
-with cached “newest date” for sort and debounced search for the biggest wins
-with minimal UX change.
+The highest-risk “unbounded capture grid + UI-thread cold index” issues from the original review are **addressed**. Treat this file as **context**, not a task list — use `PERFORMANCE_TODO.md` for open work.

@@ -6,7 +6,7 @@ This document is the **execution roadmap** for slicing responsibilities off `Mai
 
 **Principles and scope (tiered MainWindow bar, `ILibraryScanHost` as application port, `IFileSystemService` / async expectations):** `C:\Codex\docs\ARCHITECTURE_REFACTOR_PLAN.md`. This roadmap stays the **how/where** checklist; that file is the **why/what counts as done** contract.
 
-**Not a duplicate of `PERFORMANCE_FIX_PLAN.txt`:** that file tracks **Library performance** (virtualization, sort cost, batch reads, threading). This file tracks **where UI and orchestration code lives** (partials, hosts). The **service split** (`ILibraryScanner`, `IImportService`, …) is in `pixelvault_service_split_plan.txt` — see **Service split alignment** below.
+**Not a duplicate of `PERFORMANCE_FIX_PLAN.txt`:** that file is a **short stub**; the old Library performance phase write-up lives in **`docs/archive/PERFORMANCE_FIX_PLAN_HISTORICAL_2026-03.txt`**. This roadmap tracks **where UI and orchestration code lives** (partials, hosts). The **service split** summary is **`pixelvault_service_split_plan.txt`** (full historical task lists in **`docs/archive/pixelvault_service_split_plan_HISTORICAL.txt`**) — see **Service split alignment** below.
 
 **Notion (Project Wiki):** [Completed projects](https://www.notion.so/33873adc59b681c6a7ffe22e8bcab2a5) · [MainWindow extraction roadmap](https://www.notion.so/33573adc59b681d88b7dcd88cad53cb6)
 
@@ -303,5 +303,5 @@ Fill this in during **Phase A** (region name, primary file lines if known, Dispa
 - `C:\Codex\docs\pixelvault_service_split_plan.txt` — service map and folder ideas  
 - `C:\Codex\docs\CODE_QUALITY_IMPROVEMENT_PLAN.md` — threading, HTTP, catches  
 - `C:\Codex\docs\PERFORMANCE_TODO.md` — short active checklist for Library / thread work  
-- `C:\Codex\docs\PERFORMANCE_FIX_PLAN.txt` — Library **performance** phases and completion log (not the same as extraction phases A–F)  
+- `C:\Codex\docs\PERFORMANCE_FIX_PLAN.txt` — Library perf **stub**; narrative log in `docs/archive/PERFORMANCE_FIX_PLAN_HISTORICAL_2026-03.txt` (not the same axis as extraction phases A–F)  
 - `C:\Codex\PixelVaultData\TODO.md` — rolling tasks; link individual slices here when active  

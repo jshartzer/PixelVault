@@ -1,7 +1,7 @@
-# Performance, stability, and MainWindow shrink — slice plan (draft for review)
+# Performance, stability, and MainWindow shrink — slice plan
 
-**Status:** Active — Phase 1 approach and sequencing agreed; **publish** when you want to test (version bump / `CHANGELOG` / `CURRENT_BUILD` follow normal publish flow).  
-**Supersedes nothing:** This is an organizing document; backlog detail remains in `PERFORMANCE_TODO.md`, phase framing in `ROADMAP.md` Phase 3, and completed extraction history in `completed-projects/`.
+**Status:** Active for **ongoing** monolith shrink and routing glue. Phases **1–3** below are **landed** in source (game-index seam, image pipeline, intake partials + metadata-review partial). **Publish** still follows the normal release flow (`CHANGELOG` / `CURRENT_BUILD.txt`) when shipping behavior changes.  
+**Supersedes nothing:** Backlog detail in `PERFORMANCE_TODO.md`; MainWindow extraction history in `completed-projects/`; old Library perf narrative in `docs/archive/PERFORMANCE_FIX_PLAN_HISTORICAL_2026-03.txt`.
 
 ## Decisions (locked)
 
@@ -32,8 +32,8 @@
 
 ## Current baseline (reference)
 
-- Large Library perf items (virtualization, search debounce, sort-key caching, instrumentation, cache locking on hot paths, `IFileSystemService`, async-first paths for major workflows) are **landed** per `PERFORMANCE_TODO.md`.
-- MainWindow extraction **Phases A–F** are **complete**; remaining work is **Phase 3 style**: thinner shell, smaller `PixelVault.Native.cs`, clearer services (`ROADMAP.md`, `completed-projects/README.md`).
+- Large Library perf items (virtualization, search debounce, sort-key caching, instrumentation, cache locking on hot paths, `IFileSystemService`, async-first paths for major workflows) are **landed** per `PERFORMANCE_TODO.md` (summary table there).
+- MainWindow extraction **Phases A–F** are **complete**; remaining work is **incremental**: thinner shell, smaller `PixelVault.Native.cs`, clearer services (`ROADMAP.md`, `completed-projects/README.md`).
 
 ## Recommended phases
 
@@ -73,7 +73,7 @@
 
 **Why:** **Monolith** line reduction without a big-bang import rewrite; **stability** by extending existing service boundaries.
 
-**Status (landed):** Intake preview orchestration is in **`UI/Intake/MainWindow.IntakePreview.cs`** (preview summary async/build, review/manual/import-edit metadata item builders, **`IntakePreviewFileAnalysis`**). **`PixelVault.Native.cs`** still holds **`ShowMetadataReviewWindow`** and library folder/banner/detail decode-width helpers adjacent to Library metadata UI.
+**Status (landed):** Intake preview orchestration is in **`UI/Intake/MainWindow.IntakePreview.cs`**. **`ShowMetadataReviewWindow`** is in **`UI/Intake/MainWindow.MetadataReview.cs`**. Library art decode-width helpers (**`CalculateLibrary*DecodeWidth`**) live with image load in **`MainWindow.LibraryImageLoading.cs`**. Further **`PixelVault.Native.cs`** shrink is opportunistic when touching related areas.
 
 ---
 
@@ -93,13 +93,9 @@
 
 ## Doc hygiene
 
-- Refresh **`PixelVaultData/TODO.md` “Current Focus”** so it matches landed work (e.g. Dispatcher keyword cleanup, F3—already done per `PERFORMANCE_TODO.md`).
-- Align **Notion** Roadmap / Project Wiki only when milestones complete, per `DOC_SYNC_POLICY.md`.
+- Keep **`PixelVaultData/TODO.md`** aligned with **`PERFORMANCE_TODO.md`** / **`HANDOFF.md`** (avoid duplicating completed perf items as “current focus”).
+- Align **Notion** Roadmap / Project Wiki when milestones complete, per `DOC_SYNC_POLICY.md`.
 
 ## Next step
 
-- **1a (landed in source):** `IGameIndexService`, `GameIndexService`, `GameIndexServiceDependencies` — editor **`LoadEditorRowsCore`** / **`SaveEditorRows`** orchestration (active root → `ILibrarySession`, else `ILibraryScanner`); alignment / alias / cache callbacks remain on `MainWindow` until a later slice.
-- **1b (landed in source):** **`GetSavedRowsForRoot`** on **`IGameIndexService`** (host **`HostLibraryRoot`** + session vs **`IIndexPersistenceService`**); startup preload calls **`gameIndexService.GetSavedRowsForRoot(libraryRoot)`**; **`GetSavedGameIndexRowsForRoot`** forwards to the service.
-- **1c (landed in source):** **`ILibraryScanHost.LoadSavedGameIndexRows`** → **`GetSavedGameIndexRowsForRoot`**; **`FilenameParserService`** load delegate → same; folder alignment, Steam AppID ensure, metadata edit preserve use **`GetSavedGameIndexRowsForRoot`**. **`LibrarySession`** ctor still receives persistence-only **`LoadSavedGameIndexRows`** (avoids **`GetSavedRowsForRoot` → session → …** recursion). **`GetSavedGameIndexRowsForRoot`** keeps a short fallback when **`gameIndexService`** is not yet assigned.
-- **Phase 2 (landed):** **`LibraryBitmapLruCache`**, **`LibraryImageLoadCoordinator`**, **`LibraryThumbnailPipeline`** — see Phase 2 **Status** above.
-- **Phase 3 (landed):** Intake preview → **`MainWindow.IntakePreview.cs`** — see Phase 3 **Status** above. **Next:** Phase 4 optional wins or further **`PixelVault.Native.cs`** shrink when touching related areas.
+Phases **1–3** are **done in source**. Prefer **Phase 4** optional items (virtualization `SizeChanged` debounce, etc.) only if traces justify them; otherwise continue **`PERFORMANCE_TODO.md` item 7** and monolith shrink when editing orchestration or non-active-root persistence call sites.

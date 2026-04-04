@@ -1,0 +1,340 @@
+PixelVault 0.8x — Library responsiveness & scalability plan
+=============================================================
+Copy-paste friendly. Complements docs/PERFORMANCE_TODO.md,
+docs/PERFORMANCE_RESPONSIVENESS_PLAN.txt, docs/LIBRARY_UI_SCALABILITY_NOTES.txt
+
+How this doc fits (consolidation — do not merge into one file)
+---------------------------------------------------------------
+- **This file (PERFORMANCE_FIX_PLAN):** Library **performance** phases (virtualization,
+  sort keys, batch reads, video, threading). Keeps the **“Current status”** log and
+  **“Next up”** queue for perf work.
+- **docs/MAINWINDOW_EXTRACTION_ROADMAP.md:** **UI extraction** (partials, hosts,
+  `ShowLibraryBrowser` location). Different phase letters (A–F); same app, different axis.
+- **docs/pixelvault_service_split_plan.txt:** **Business-logic services**
+  (`ILibraryScanner`, `IImportService`, etc.). Overlaps *operationally* with scan/import
+  paths but is not a substitute for capture-grid virtualization.
+- **docs/PERFORMANCE_TODO.md:** Short **active** checklist; link here for narrative context.
+
+Cross-link these headers instead of duplicating long plans in multiple places.
+
+Goals
+-----
+- No multi-second UI freezes when opening the Library, switching sort, searching,
+  or selecting large folders.
+- Bounded memory and visual-tree size for folders with thousands of captures.
+- Predictable behavior under load (disk/network/CPU): progress, cancellation where
+  it exists, fewer concurrent heavy operations.
+
+Non-goals (this pass)
+---------------------
+- Redesigning Library UX layout or navigation.
+- Rewriting the entire MainWindow / ShowLibraryBrowser into a new type (optional
+  follow-up once hot paths are fixed).
+
+
+Phase 0 — Measure (short, high leverage)
+----------------------------------------
+Purpose: Know which subsystem dominates your typical library (folder count, files
+per folder, video ratio).
+
+Work:
+- Add timing logs (existing LogPerformanceSample pattern) around:
+  - renderTiles (already partial): split filter/sort vs virtual row build.
+  - renderSelectedFolder (or equivalent): enumeration/grouping vs queued UI row
+    creation vs queue drain.
+  - First paint vs full drain for the capture grid.
+- Optionally log: folder count, visible folder count after search, file count
+  for selected folder, sort mode.
+
+Acceptance:
+- Repro steps: open Library, pick a large folder, toggle Recently Added, type
+  search, resize window — logs show where time goes.
+
+Risk: Low.
+
+
+Phase 1 — Capture grid: true virtualization (P0)
+-------------------------------------------------
+Problem: Right pane uses a queued append into a flat StackPanel; every tile stays
+in the tree. This is the main scalability ceiling for large folders.
+
+Direction (pick one and commit):
+1) Preferred: ItemsControl / ListBox with VirtualizingStackPanel (and ScrollViewer /
+   VirtualizingPanel settings aligned), items = either flat tiles or row items if
+   you must keep wrap layout.
+2) Alternative: Second VirtualizedRowHost-style recycler (like folder side) for
+   capture rows, driven by scroll viewport + overscan.
+
+Work:
+- Replace enqueue-all-rows until everything is built with data-bound or explicit
+  viewport windowing so only ~visible rows + overscan exist.
+- Ensure selection and bulk actions still operate on logical file lists, not only
+  visible UI elements.
+- Thumbnail loading: keep Task.Run + dispatcher pattern; ensure loads are
+  cancelled or ignored when virtualized items scroll out (reuse existing same-
+  selection guards if present).
+
+Acceptance:
+- Folder with N >> 500 images: scroll stays usable; memory does not grow linearly
+  with N after scrolling through; CPU spikes bounded when idle.
+- No regression: single-folder browse, metadata edit entry points, delete
+  selection, cover refresh for selection.
+
+Risk: Medium (most UI churn; needs careful testing on wrap layout and date
+grouping).
+
+Primary touchpoints: PixelVault.Native.cs (thumbScroll / thumbContent,
+renderSelectedFolder), possibly extract to a small helper class later.
+
+
+Phase 2 — Folder list: cheaper sort / search (P1)
+-------------------------------------------------
+Problem: Each renderTiles pass filters and sorts the full list. Recently added /
+photos paths call GetLibraryFolderNewestDate; cache via NewestCaptureUtcTicks
+helps but fallbacks can still hit GetLibraryDate across files.
+
+Work:
+- Invariant: Whenever folder inventory or metadata index changes, recompute and
+  persist NewestCaptureUtcTicks (and any similar key) so sort rarely touches the
+  filesystem.
+- On cache load path, ensure PopulateMissingLibraryFolderSortKeys fills gaps once,
+  not repeatedly per render.
+- Consider pre-sorting in one place when folders is replaced after background
+  load, instead of re-allocating OrderBy* chains on every minor UI tick (only if
+  profiling shows sort cost).
+
+Acceptance:
+- With Recently Added selected, typing debounced search and resizing does not cause
+  noticeable stalls on 10k+ files across folders (beyond unavoidable first-time
+  key fill).
+
+Risk: Low–medium (cache invalidation must match folder stamp / index updates).
+
+Touchpoints: LibraryFolderIndexing.cs (LoadLibraryFolders, grouping),
+PixelVault.Native.cs (GetLibraryFolderNewestDate, renderTiles, cache load/save).
+
+
+Phase 3 — Cold library index: fewer per-file metadata round-trips (P1)
+-----------------------------------------------------------------------
+Problem: LoadLibraryFolders still does ReadEmbeddedKeywordTagsDirect per missing
+index entry. Correct but slow on first run or after index invalidation.
+
+Work:
+- Prefer batch APIs where they already exist (e.g. ReadEmbeddedKeywordTagsBatch)
+  for the missing-from-index set, then merge into index in memory.
+- Keep saves batched: one SaveLibraryMetadataIndex after the pass (already mostly
+  true; verify no accidental per-file save).
+
+Acceptance:
+- Cold or partial index on large libraries: wall-clock for background load drops
+  materially; UI remains responsive (load already off UI thread via
+  refreshLibraryFoldersAsync).
+
+Risk: Medium (correctness of batch vs direct for edge file types — add tests or
+golden run on sample library).
+
+Touchpoints: LibraryFolderIndexing.cs, MetadataService / helpers.
+
+
+Phase 4 — Video tiles & concurrency (P2)
+----------------------------------------
+Problem: Many visible MediaElement instances and warmup cause decode/GPU/disk
+contention and jank.
+
+Work:
+- Cap concurrent video preview warmup (semaphore like thumbnails).
+- Pause / unload off-screen video elements when virtualized (natural fit after
+  Phase 1).
+- Optional: static poster + play-on-hover for grid tiles.
+
+Acceptance:
+- Scrolling through video-heavy folders: stable frame time vs everything loads at
+  once.
+
+Risk: Low–medium.
+
+
+Phase 5 — Threading hygiene (P2)
+--------------------------------
+Problem: Dispatcher.Invoke in MetadataHelpers can block background workers on the
+UI thread.
+
+Work:
+- Pass a bool (or cached setting) into background paths, or use BeginInvoke +
+  shared state with clear ownership — avoid synchronous UI ping from N workers.
+
+Acceptance:
+- No new deadlocks; metadata batch jobs do not stall on UI when the window is busy.
+
+Risk: Low.
+
+Touchpoints: MetadataHelpers.cs, callers on thread-pool.
+
+
+Phase 6 — Polish & consolidation (later)
+----------------------------------------
+- Recycle folder-row UI instead of clear+rebuild on scroll (smaller win than
+  capture virtualization).
+- Move ShowLibraryBrowser orchestration into a dedicated type when the above
+  stabilizes (iteration speed, not first perf win).
+- Broader async-first service APIs (IMetadataService, IFileSystemService) per
+  existing split plan — after Phases 1–3 prove the model.
+
+
+Suggested sequence & milestones
+-------------------------------
+Priority adjustment from field logs
+-----------------------------------
+The latest regressions show that the first fix should not be UI virtualization.
+On bad folders with only ~50 files, detail renders are still taking 14–28 seconds,
+which points to per-file parser / saved-game-index work on the UI path rather than
+visual-tree scale alone.
+
+New immediate order:
+1) Parser / game-index cache first:
+   - Avoid reopening / normalizing saved game-index rows from SQLite during
+     repeated filename parses for the same root.
+   - Invalidate that cache when saved game-index rows or filename rules change.
+2) Detail-date sourcing second:
+   - Stop deriving capture dates live on the UI thread when cached metadata or
+     precomputed sort keys already exist.
+3) Startup refresh gating third:
+   - Do not eagerly trigger a full library rebuild on every launch when a usable
+     snapshot is already present.
+4) Then proceed with capture-grid virtualization and the remaining phases below.
+
+Revised milestones:
+M0 — Phase 0 logging in hand for one bad library
+M1 — Parser / game-index cache + detail-date hot-path fix
+M2 — Startup refresh gating
+M3 — Virtualized capture grid + basic regression pass
+M4 — Sort keys + batch index backfill
+M5 — Debounced Library search + follow-up validation pass
+M6 — Remaining manual provider-search cancellation cleanup
+M7 — Background-thread audit of the remaining long-running UI workflows
+
+Current status
+--------------
+Completed on March 30, 2026:
+- Parser-side caching now avoids reopening and normalizing saved game-index rows
+  from SQLite on every filename parse for the same library root.
+- The cache invalidates when saved game-index rows are written, so Steam rename
+  detection stays fresh after edits.
+- Library metadata index rows now cache `CaptureUtcTicks`, and existing SQLite
+  `photo_index` databases upgrade in place with a `capture_utc_ticks` column
+  instead of requiring a reset.
+- Metadata scan, file upsert, manual metadata save, and folder-alignment paths
+  now populate or preserve cached capture timestamps when they write library
+  metadata index rows.
+- Background folder-cache rebuilds now treat rows without cached capture times as
+  incomplete metadata, batch-read embedded metadata for them, and reuse cached
+  capture times for folder ordering and newest-date derivation.
+- Library detail rendering now moves capture-date derivation and grouping off the
+  UI thread and shows a loading placeholder while the work completes.
+- Selected-folder detail rendering now batch-backfills missing capture times on a
+  background thread before grouping, so cached-startup sessions do not have to
+  wait for a manual Library refresh before benefiting from the metadata cache.
+- Library startup now skips the automatic folder-cache refresh when a valid cache
+  snapshot already exists, so launch relies on the cached snapshot instead of
+  immediately walking the full library again.
+- Repo-launched local builds now resolve to the shared `C:\Codex\PixelVaultData`
+  root, which keeps existing cover caches and settings visible during live perf
+  checks.
+- Capture-grid tiles now stop background work when they scroll out of the
+  virtualized viewport, and video tiles no longer pre-generate preview clips
+  just by becoming visible.
+- Cold library folder loads and multi-file metadata upserts now batch embedded
+  tag reads for missing entries instead of falling back to one ExifTool read per
+  file.
+- Legacy folder-cache sort-key backfill now derives `NewestCaptureUtcTicks` from
+  the first surviving cached file path instead of rescanning every file in the
+  folder to find the newest date.
+- Library folder search now filters against a committed debounced search term
+  instead of the live textbox value, so large library lists no longer re-filter
+  and re-sort on case-only or still-typing changes.
+- Manual Steam search in the metadata editor now uses a real in-flight
+  cancellation token, lets the same button cancel the active request, and
+  cancels automatically when the dialog closes.
+
+Observed result from live click-through on the bad folder:
+- Packaged `PixelVault-current` still reproduced a `LibraryDetailRender` stall of
+  17338 ms for `Horizon Zero Dawn™ Remastered`.
+- Fresh local Release build showed `Loading captures...` within ~216 ms and then
+  completed the same `LibraryDetailRender` in 2182 ms.
+- After caching capture timestamps in the library metadata index and backfilling
+  missing capture times on first selection, a fresh local Release launch with a
+  cached folder list rendered the same `Horizon Zero Dawn™ Remastered` folder in
+  1448 ms on the first automated click-through.
+- Fresh local Release launch now logs `PixelVault 0.814 ready` plus a
+  `LibraryFolderRender` sample without immediately logging `Refreshing library
+  folder cache.` or a `LibraryFolderCache` rebuild.
+- Live Library search validation against the shared folder cache produced a
+  single `LibraryFolderRender` sample for a rapid `D -> De -> Dea -> Deat ->
+  Death` typing burst, and a later case-only change to `death` did not produce
+  another render sample.
+
+Next up (Apr 2026 — still accurate):
+- Remove the remaining `Dispatcher.Invoke` path from
+  `ShouldIncludeGameCaptureKeywords` (`MetadataHelpers.cs` → `keywordsBox.Dispatcher.Invoke`)
+  so metadata/tag work no longer pings the UI thread synchronously.
+- Then audit the remaining scan / rebuild / import / manual-import paths for work
+  that still starts too close to the UI thread. (Some orchestration now lives in
+  `LibraryScanner` / `ImportService` per `pixelvault_service_split_plan.txt` — audit
+  call chains from UI entry points, not only `MainWindow` body.)
+- Keep an eye on mixed-media folder scrolling and manual Steam search behavior in
+  click-through testing.
+
+Phase checklist vs this document (Apr 2026)
+-------------------------------------------
+Legend: [x] largely done   [~] partial / follow-up   [ ] not done
+
+Phase 0 Measure                    [~] LogPerformanceSample in use; optional finer splits
+                                   (filter vs row build) still optional.
+Phase 1 Capture grid virtualize    [~] Off-screen tiles drop work; full preferred approach
+                                   (ItemsControl + VirtualizingStackPanel / row recycler)
+                                   not fully adopted — still main ceiling for N >> 500.
+Phase 2 Folder sort / search       [x] Cached ticks, backfill, debounced search, etc.
+                                   (see “Completed on March 30, 2026” above).
+Phase 3 Cold index batch reads     [x] Batch embedded reads for missing index entries.
+Phase 4 Video tiles / concurrency  [~] No eager clip pre-gen when visible; cap / poster /
+                                   unload-off-screen polish may remain.
+Phase 5 Threading hygiene        [ ] Dispatcher.Invoke in ShouldIncludeGameCaptureKeywords.
+Phase 6 Polish / consolidation   [ ] Folder-row recycle, async service APIs, etc.
+
+Revised milestones (same doc, re-read against repo)
+---------------------------------------------------
+M0 logging              [~] usable; can deepen
+M1 parser / game-index  [x] per March 30 log
+M2 detail-date off UI   [x] per March 30 log
+M3 startup gating       [x] per March 30 log
+M4 virtualized grid     [~] partial (see Phase 1)
+M5 sort keys + batch    [x] overlaps Phase 2–3
+M6 debounced search     [x] per March 30 log
+M7 Steam search cancel  [x] per March 30 log
+M8 background UI audit  [~] ongoing (“Next up”)
+
+Service split note (Apr 2026, for reviewers)
+--------------------------------------------
+- **Phase 4 (plan):** `ILibraryScanner` / `LibraryScanner` — metadata scan, folder load,
+  folder cache rebuild/cached load; uses `IMetadataService` for batch reads.
+- **Phase 5 (initial):** `IImportService` / `ImportService` — move-to-destination,
+  undo manifest, sort destination root, undo moves.
+These improve **structure and test seams**; they do **not** by themselves complete
+Phase 1 capture-grid virtualization.
+
+Verification checklist (manual)
+-------------------------------
+- Open Library with large folder list; force refresh; UI stays interactive.
+- Select folder with 1000+ files; scroll; memory stable; no progressive freeze.
+- Switch sort modes; search with debounce; resize detail pane.
+- Cover fetch / scan / import: progress UI, cancel where supported, no long UI
+  block.
+
+
+References in repo
+------------------
+- docs/PERFORMANCE_TODO.md
+- docs/PERFORMANCE_RESPONSIVENESS_PLAN.txt
+- docs/LIBRARY_UI_SCALABILITY_NOTES.txt
+- docs/MAINWINDOW_EXTRACTION_ROADMAP.md (UI partials / hosts — separate from perf phases)
+- docs/pixelvault_service_split_plan.txt (services: Library, Import, etc.)

@@ -149,7 +149,7 @@ Candidate scope:
 - extract Steam and SteamGridDB cover workflows into a service
 - keep pushing import orchestration into `Import/` or dedicated types
 - isolate non-UI business logic so new work does not flow back into `MainWindow`
-- follow **MAINWINDOW_EXTRACTION_ROADMAP.md** phases B–F for concrete UI and host extractions from `PixelVault.Native.cs`
+- continue incremental extractions from **`PixelVault.Native.cs`** per **HANDOFF.md**, **PERFORMANCE_MONOLITH_SLICE_PLAN.md**, and **MAINWINDOW_EXTRACTION_ROADMAP.md** (phases A–F complete; further slices are opportunistic)
 
 Definition of done:
 

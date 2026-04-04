@@ -26,21 +26,18 @@ For **splitting `MainWindow` / shrinking `PixelVault.Native.cs`**, use:
 
 - `C:\Codex\docs\MAINWINDOW_EXTRACTION_ROADMAP.md` (phases A–F; ties to `ROADMAP.md` Phase 3)
 - Notion: [MainWindow extraction roadmap](https://www.notion.so/33573adc59b681d88b7dcd88cad53cb6) (under **Project Wiki**; mirror of the doc; **status updated Mar 2026**)
-- **Done in source:** through **Phase D** (editors/intake), **E1–E3** (library partial + `LibraryWorkspaceContext`), **F1–F2** (settings shell incl. path window; photography + Steam picker partial; gallery toolbar buttons). **Next:** F3 / library host polish / Phase 2 responsiveness. **Releases:** [0.832](https://www.notion.so/33673adc59b68139b705c987dd98d2fd).
+- **Done in source:** MainWindow extraction **Phases A–F** (library host + `ILibraryBrowserShell`, settings `SettingsShellHost`, photography partial, settings persistence partial, etc.). See `C:\Codex\docs\completed-projects\README.md`.
 
 ## Current Focus
-1. Keep moving through Phase 2 UI-thread responsiveness and cancellation work.
-- Cover refresh, game-index ID resolution, and library scan now cancel active provider or ExifTool work instead of waiting only between titles or batches.
-- Debounced Library search is in and the quick live validation pass looked good.
-- Manual Steam search now supports in-flight cancellation from the metadata editor.
-- Library metadata index rows now cache capture timestamps, and the Library detail path batch-backfills missing capture times on first selection.
-- Next cleanup: remove the remaining `Dispatcher.Invoke` path from game-capture keyword tagging, then audit the remaining scan/rebuild/import/manual-import paths for work that still starts too close to the UI thread.
+1. **Incremental monolith shrink + service routing** (when touching related files).
+- Narrow remaining direct persistence/scanner glue in `MainWindow`; prefer `ILibrarySession` / `IGameIndexService` / dedicated partials per `HANDOFF.md` and `PERFORMANCE_TODO.md` item 7.
+- Large perf slices (virtualization, debounced search, batch cold index, cancellation, keyword mirror / 5a) are **landed** — track only **new** regressions or optional polish there.
 
 2. Keep repo docs and Notion in sync when releases, phase status, or workflow rules change.
 - Follow `C:\Codex\docs\DOC_SYNC_POLICY.md` instead of relying on memory.
 
 3. Pull performance-specific work from the dedicated backlog instead of mixing it into this general list.
-- Capture virtualization, cached sort keys, debounced Library search, manual provider-search cancellation cleanup, and cached library capture timestamps are in; next up is the keyword-threading cleanup, then the broader background-thread audit.
+- **`C:\Codex\docs\PERFORMANCE_TODO.md`** is the short active checklist; **`docs/archive/`** holds long historical plans that are mostly complete.
 
 4. Rebuild the Filename Rules screen from a workflow spec instead of adding more controls to the current dense grid.
 - Use `C:\Codex\docs\FILENAME_RULES_FORM_SPEC.md` as the source of truth for the next UI pass.

@@ -6,7 +6,12 @@ This folder indexes **finished initiatives** in the **C:\Codex** repo: enough co
 
 - `C:\Codex\docs\ROADMAP.md`
 - `C:\Codex\docs\HANDOFF.md`
+- `C:\Codex\docs\PERFORMANCE_TODO.md`
 - `C:\Codex\PixelVaultData\TODO.md`
+
+**Frozen / historical plan snapshots** (do not treat as backlog):
+
+- `C:\Codex\docs\archive\README.md`
 
 **Notion:** [Completed projects](https://www.notion.so/33873adc59b681c6a7ffe22e8bcab2a5) (Project Wiki). Keep repo paths here authoritative for file locations; keep Notion aligned per `C:\Codex\docs\DOC_SYNC_POLICY.md`.
 
