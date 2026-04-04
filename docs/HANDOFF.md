@@ -53,11 +53,11 @@ Then use these based on the task:
 
 Current live build:
 
-- `0.845`
+- `0.848`
 
 Current executable:
 
-- `C:\Codex\dist\PixelVault-0.845\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.848\PixelVault.exe`
 
 Current build pointer:
 
@@ -91,15 +91,18 @@ Practical current focus:
 
 ## Current Stop Point
 
-The app is currently published at `0.845`.
+The app is currently published at `0.848`.
 
-**Notion:** release sync for **0.845** is currently pending because the Notion connector token expired during publish prep. [MainWindow extraction roadmap](https://www.notion.so/33573adc59b681d88b7dcd88cad53cb6) remains the active extraction tracker. Further releases: `docs/DOC_SYNC_POLICY.md`.
+**Notion:** release sync for **0.848** is currently pending because the Notion connector token expired during publish prep. [MainWindow extraction roadmap](https://www.notion.so/33573adc59b681d88b7dcd88cad53cb6) remains the active extraction tracker. Further releases: `docs/DOC_SYNC_POLICY.md`.
 
 Recent extraction progress (repo):
 
 - **Library grouping (game-first browse):** Added persisted **`LibraryGroupingMode`** with **`All`** and **`By Console`** controls in the Library banner area. Browser rows now project from raw **`LibraryFolderInfo`** into **`LibraryBrowserFolderView`** so the default view can merge same-game captures across consoles without changing storage or scanner persistence. The `All` merge key now prefers normalized game name instead of platform-specific saved row IDs, so cross-platform titles actually collapse into one game row. In `All`, folder cards and the detail header now suppress console-first badge/text chrome so the browse experience reads game-first by default. Merged rows intentionally use **Open Primary Folder** and keep cover / ID actions constrained until the next hardening slice.
 - **Library polish (current publish):** The detail header now carries platform badges beside the game title instead of placing them over the cover art or screenshot tiles, keeping the game-first Library cleaner while preserving console context.
 - **Library action hardening (current publish):** Real game-to-game selection changes now reset the screenshot pane cleanly instead of reusing the previous game’s detail rows, while same-folder rerenders still use the smoother refresh path. Merged rows still support shared custom covers, **Open Folders**, and merged **Fetch Cover Art** behavior from the previous slices.
+- **Diagnostics (current publish):** Settings now includes an opt-in troubleshooting logging toggle that writes a separate `PixelVault-troubleshooting.log`. Library refresh, selection, detail render, metadata repair, and banner-art events now leave a cleaner breadcrumb trail for async UI bug hunts. See `docs/TROUBLESHOOTING_LOGGING.md`.
+- **Diagnostics (current publish, deeper tracing):** Library detail rendering now logs metadata-index load, file enumeration, quick/refined snapshot build, and dispatcher handoff start/complete so the next stalled right-pane repro can be pinned to a specific render step.
+- **Library stability (current publish):** Rapid browsing no longer lets queued image/video warmup tasks occupy thread-pool workers while waiting on semaphores, so detail-render background work is much less likely to get starved before it starts.
 - **E1–E3:** Library browser: **`LibraryBrowserHost`** entry + **`ShowLibraryBrowserCore`** on **`MainWindow`** in **`UI/Library/MainWindow.LibraryBrowserOrchestrator.cs`**; top nav / window chrome in **`MainWindow.LibraryBrowserChrome.cs`**; folder + detail layout in **`MainWindow.LibraryBrowserLayout.cs`**; folder-tile + detail-pane rendering in **`MainWindow.LibraryBrowserRender.FolderList.cs`** / **`MainWindow.LibraryBrowserRender.DetailPane.cs`**. **`ILibrarySession`** / **`LibrarySession`** (workspace + scanner + **`IFileSystemService`** + root), **`LibraryWorkspaceContext`** caches, virtualization unchanged in **`LibraryVirtualization.cs`**
 - **Responsiveness:** **`PERFORMANCE_TODO.md`** — item 5 long-workflow spot-check; item 10 **`ShowLibraryBrowserCore`** in **`MainWindow.LibraryBrowserOrchestrator.cs`** (**`LibraryBrowserHost`** entry); manual-metadata game-title list off UI thread when rebuilding choices
 - **F1–F2:** Settings shell partial (incl. path settings dialog, **`ShowSettingsWindow`** modal), photography gallery + Steam picker partial; photography wired from Library + Settings

@@ -40,7 +40,7 @@ namespace PixelVaultNative
 
     public sealed partial class MainWindow : Window
     {
-        const string AppVersion = "0.845";
+        const string AppVersion = "0.848";
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
         const string ClearedExternalIdSentinel = "__PV_CLEARED__";
@@ -1493,9 +1493,9 @@ namespace PixelVaultNative
             {
                 imageControl.Visibility = Visibility.Collapsed;
             }
-            Task.Run(delegate
+            Task.Run(async delegate
             {
-                limiter.Wait();
+                await limiter.WaitAsync().ConfigureAwait(false);
                 try
                 {
                     if (shouldLoad != null && !shouldLoad()) return null;

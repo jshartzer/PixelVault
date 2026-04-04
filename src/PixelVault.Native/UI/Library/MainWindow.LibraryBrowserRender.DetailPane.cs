@@ -77,6 +77,15 @@ namespace PixelVaultNative
             if (refreshDetailSelectionUi != null) refreshDetailSelectionUi();
             Task.Run(async delegate
             {
+                Action<string, string> traceStep = delegate(string area, string details)
+                {
+                    LogTroubleshooting(area,
+                        "renderVersion=" + renderVersion
+                        + "; elapsedMs=" + renderStopwatch.ElapsedMilliseconds
+                        + "; " + (details ?? string.Empty)
+                        + (string.IsNullOrWhiteSpace(details) ? string.Empty : "; ")
+                        + BuildLibraryBrowserTroubleshootingLabel(renderFolder));
+                };
                 Action<LibraryDetailRenderSnapshot, bool> applyDetailSnapshot = null;
                 applyDetailSnapshot = delegate(LibraryDetailRenderSnapshot snapshot, bool logCompletion)
                 {
@@ -208,11 +217,14 @@ namespace PixelVaultNative
 
                 try
                 {
+                    traceStep("LibraryDetailBackgroundStart", "thread=" + Environment.CurrentManagedThreadId);
                     var metadataIndex = librarySession.LoadLibraryMetadataIndex(false);
+                    traceStep("LibraryDetailMetadataIndexLoaded", "entries=" + metadataIndex.Count);
                     var detailFiles = GetFilesForLibraryFolderEntry(displayFolder, false)
                         .Where(file => !string.IsNullOrWhiteSpace(file) && File.Exists(file))
                         .Distinct(StringComparer.OrdinalIgnoreCase)
                         .ToList();
+                    traceStep("LibraryDetailFilesEnumerated", "files=" + detailFiles.Count);
                     var filesMissingCaptureTicks = new List<string>();
                     if (librarySession.HasLibraryRoot && detailFiles.Count > 0)
                     {
@@ -225,6 +237,10 @@ namespace PixelVaultNative
                             })
                             .ToList();
                     }
+                    traceStep("LibraryDetailFilesClassified",
+                        "files=" + detailFiles.Count
+                        + "; missingCaptureTicks=" + filesMissingCaptureTicks.Count
+                        + "; hasLibraryRoot=" + librarySession.HasLibraryRoot);
 
                     Func<LibraryDetailRenderSnapshot> buildSnapshot = delegate
                     {
@@ -250,8 +266,14 @@ namespace PixelVaultNative
                         return snapshot;
                     };
 
+                    traceStep("LibraryDetailQuickSnapshotBuildStart", "files=" + detailFiles.Count);
                     var quickSnapshot = buildSnapshot();
+                    traceStep("LibraryDetailQuickSnapshotBuilt",
+                        "groups=" + quickSnapshot.Groups.Count
+                        + "; visibleFiles=" + quickSnapshot.VisibleFiles.Count);
+                    traceStep("LibraryDetailQuickSnapshotDispatchStart", "stage=initial");
                     await libraryWindow.Dispatcher.InvokeAsync((Action)(delegate { applyDetailSnapshot(quickSnapshot, true); }));
+                    traceStep("LibraryDetailQuickSnapshotDispatchComplete", "stage=initial");
 
                     if (filesMissingCaptureTicks.Count > 0)
                     {
@@ -262,7 +284,9 @@ namespace PixelVaultNative
                         try
                         {
                             var savedGameRows = librarySession.LoadSavedGameIndexRows();
+                            traceStep("LibraryDetailMetadataRepairRowsLoaded", "savedGameRows=" + savedGameRows.Count);
                             var metadataByFile = await metadataService.ReadEmbeddedMetadataBatchAsync(filesMissingCaptureTicks, CancellationToken.None).ConfigureAwait(false);
+                            traceStep("LibraryDetailMetadataRepairBatchRead", "metadataResults=" + metadataByFile.Count);
                             var indexChanged = false;
                             var gameRowsChanged = false;
                             foreach (var file in filesMissingCaptureTicks)
@@ -301,7 +325,11 @@ namespace PixelVaultNative
                                 + "; " + BuildLibraryBrowserTroubleshootingLabel(renderFolder));
                         }
 
+                        traceStep("LibraryDetailRefinedSnapshotBuildStart", "files=" + detailFiles.Count);
                         var refinedSnapshot = buildSnapshot();
+                        traceStep("LibraryDetailRefinedSnapshotBuilt",
+                            "groups=" + refinedSnapshot.Groups.Count
+                            + "; visibleFiles=" + refinedSnapshot.VisibleFiles.Count);
                         var layoutUnchanged = quickSnapshot.Groups.Count == refinedSnapshot.Groups.Count;
                         if (layoutUnchanged)
                         {
@@ -332,9 +360,12 @@ namespace PixelVaultNative
                             + "; refinedGroups=" + refinedSnapshot.Groups.Count);
                         if (!layoutUnchanged)
                         {
+                            traceStep("LibraryDetailRefinedSnapshotDispatchStart", "stage=refined");
                             await libraryWindow.Dispatcher.InvokeAsync((Action)(delegate { applyDetailSnapshot(refinedSnapshot, false); }));
+                            traceStep("LibraryDetailRefinedSnapshotDispatchComplete", "stage=refined");
                         }
                     }
+                    traceStep("LibraryDetailBackgroundComplete", "done=true");
                 }
                 catch (Exception ex)
                 {

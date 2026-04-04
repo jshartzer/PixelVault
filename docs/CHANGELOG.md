@@ -1,3 +1,19 @@
+## 0.848
+- **Release:** Version **0.848** — publish refresh for the Library detail-render starvation fix.
+- **Library stability:** Fixed a background scheduling issue where rapid browsing could queue lots of image/video warmup tasks that blocked on semaphores and starved the detail-render work. Image loads and video warmers now wait asynchronously instead of occupying worker threads while queued.
+- **Troubleshooting:** The diagnostics trail now has enough fidelity to distinguish “render logic hung” from “render task never got a thread,” which is how this issue was isolated.
+
+## 0.847
+- **Release:** Version **0.847** — publish refresh for deeper Library detail-render diagnostics.
+- **Diagnostics:** Added more granular troubleshooting breadcrumbs inside the Library detail-render pipeline, including metadata-index load, file enumeration, quick/refined snapshot build, and dispatcher handoff start/complete.
+- **Troubleshooting:** The next “click around too fast and images stop loading” repro should now tell us the exact step where the render stalls instead of just showing `start` with no completion.
+
+## 0.846
+- **Release:** Version **0.846** — publish refresh for the new troubleshooting diagnostics logging.
+- **Diagnostics:** Added an opt-in **Diagnostics** section in Settings with **Enable troubleshooting logging**, plus a separate **`PixelVault-troubleshooting.log`** file next to the normal app log.
+- **Library troubleshooting:** The diagnostics log now records Library refresh, selection, detail render, metadata repair, and banner-art events so async UI issues are much easier to trace after a bad run.
+- **Docs:** Added **`docs/TROUBLESHOOTING_LOGGING.md`** with the enable/reproduce/open-logs workflow.
+
 ## 0.845
 - **Release:** Version **0.845** — publish refresh for the Library detail-pane stability fix.
 - **Library (detail switching):** Fixed rapid folder switching so a real selection change now resets the screenshot pane cleanly instead of leaving the previous game's captures visible while only the title updates.

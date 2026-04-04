@@ -1,6 +1,6 @@
 # Game-First Library Grouping Plan
 
-Last updated for published build `0.845`.
+Last updated for published build `0.846`.
 
 This document tracks the low-risk path to make the Library feel game-first by default while preserving console tags, console-aware sorting, and console-specific data where it still matters.
 

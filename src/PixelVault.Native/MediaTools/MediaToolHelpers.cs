@@ -480,14 +480,14 @@ namespace PixelVaultNative
             }
             var cachePath = VideoClipInfoCachePath(videoPath);
             if (string.IsNullOrWhiteSpace(cachePath) || !activeVideoInfoGenerations.TryAdd(cachePath, 0)) return;
-            Task.Run(delegate
+            Task.Run(async delegate
             {
                 VideoClipInfo loaded = null;
                 var lockAcquired = false;
                 try
                 {
                     if (shouldContinue != null && !shouldContinue()) return;
-                    videoClipInfoWarmLimiter.Wait();
+                    await videoClipInfoWarmLimiter.WaitAsync().ConfigureAwait(false);
                     lockAcquired = true;
                     if (shouldContinue != null && !shouldContinue()) return;
                     loaded = EnsureVideoClipInfo(videoPath);
@@ -688,13 +688,13 @@ namespace PixelVaultNative
             var previewPath = VideoPreviewClipPath(videoPath, decodePixelWidth);
             if (string.IsNullOrWhiteSpace(previewPath) || File.Exists(previewPath)) return;
             if (!activeVideoPreviewGenerations.TryAdd(previewPath, 0)) return;
-            Task.Run(delegate
+            Task.Run(async delegate
             {
                 var lockAcquired = false;
                 try
                 {
                     if (shouldContinue != null && !shouldContinue()) return;
-                    videoPreviewWarmLimiter.Wait();
+                    await videoPreviewWarmLimiter.WaitAsync().ConfigureAwait(false);
                     lockAcquired = true;
                     if (shouldContinue != null && !shouldContinue()) return;
                     EnsureVideoPreviewClip(videoPath, decodePixelWidth);
