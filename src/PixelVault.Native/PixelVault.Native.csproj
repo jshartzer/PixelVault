@@ -58,6 +58,9 @@
     <Compile Include="UI\Intake\MainWindow.MetadataReview.cs" />
     <Compile Include="UI\Intake\MainWindow.ManualMetadata.cs" />
     <Compile Include="UI\Intake\MainWindow.ManualMetadata.Helpers.cs" />
+    <Compile Include="UI\Intake\MainWindow.ManualMetadata.Layout.cs" />
+    <Compile Include="UI\Intake\MainWindow.ManualMetadata.SteamSearch.cs" />
+    <Compile Include="UI\Intake\MainWindow.ManualMetadata.Finish.cs" />
     <Compile Include="UI\UiBrushHelper.cs" />
     <Compile Include="UI\Progress\WorkflowProgressWindow.cs" />
     <Compile Include="UI\Editors\FilenameConventionEditorWindow.cs" />
