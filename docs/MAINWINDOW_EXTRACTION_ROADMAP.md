@@ -24,16 +24,19 @@ This document is the **execution roadmap** for slicing responsibilities off `Mai
 
 | File | ~Lines | Role |
 |------|--------|------|
-| `PixelVault.Native.cs` | ~4,900 | Constructor, fields, `ShowSettingsWindow`, intake preview, manual metadata / Steam search glue, logging, image cache, helpers (library, settings path UI, photography/Steam pickers → `UI/` partials) |
+| `PixelVault.Native.cs` | ~3,330 | Constructor, fields, intake preview wiring, logging, image cache, `QueueImageLoad`, Steam/cover/library-cache helpers, settings path textbox helpers; scan monitor + import summary dialogs moved to library/import partials (Apr 2026) |
 | `Import/ImportWorkflow.cs` | ~970 | Import / manual intake / rename-move-sort orchestration (move-to-destination, undo manifest, destination sort → **`ImportService`**) |
+| `Import/MainWindow.ImportSummaryDialogs.cs` | ~155 | `BuildImportSummaryLines`, `ShowImportSummaryWindow` (`MainWindow` partial) |
 | `UI/FilenameConventionEditor.cs` | ~315 | Filename rule helpers + `OpenFilenameConventionEditor` shell |
 | `UI/Editors/FilenameConventionEditorWindow.cs` | ~925 | Filename rules editor UI (`FilenameConventionEditorWindow.Show` + `FilenameConventionEditorServices`, Phase D1) |
 | `UI/Editors/GameIndexEditorHost.cs` | ~410 | Game index editor UI (`GameIndexEditorHost.Show` + `GameIndexEditorServices`, Phase D2) |
 | `UI/Editors/PhotoIndexEditorHost.cs` | ~370 | Photo index editor UI (`PhotoIndexEditorHost.Show` + `PhotoIndexEditorServices`, Phase D3) |
 | `MediaTools/MediaToolHelpers.cs` | ~700 | Exe runners, FFmpeg helpers |
 | `UI/Library/LibraryWorkspaceContext.cs` | ~175 | Library root + folder listing + file-tag cache facade (Phase E2) |
-| `UI/Library/MainWindow.LibraryBrowserOrchestrator.cs` | ~1,760 | `ShowLibraryBrowser` / `ShowLibraryBrowserCore` (Phase E1; same `MainWindow` partial; renamed from `MainWindow.LibraryBrowser.cs` Mar 2026) |
-| `UI/Settings/MainWindow.SettingsShell.cs` | ~300 | `BuildUi`, `BuildSettingsSummary`, `ShowPathSettingsWindow`, `Card`, `TitleBlock` (Phase F1) |
+| `UI/Library/MainWindow.LibraryBrowserOrchestrator.cs` | ~390 | `ShowLibraryBrowserCore` shell: nav, panes, delegates wiring into folder/detail partials (Phase E1) |
+| `UI/Library/MainWindow.LibraryBrowserOrchestrator.Selection.cs` | ~150 | Detail multi-select helpers + shared sort/group pill chrome; replaces large inline lambdas in **`ShowLibraryBrowserCore`** (E2 follow-on, Apr 2026) |
+| `UI/Library/MainWindow.LibraryMetadataScan.cs` | ~195 | **`ShowLibraryMetadataScanWindow`** — metadata index scan progress UI (`MainWindow` partial; Apr 2026) |
+| `UI/Settings/MainWindow.SettingsShell.cs` | ~310 | `BuildUi`, `BuildSettingsSummary`, `BuildDiagnosticsSummary`, `ShowPathSettingsWindow`, `ShowSettingsWindow` (Phase F1); library-aligned dark theme; no import/maintenance panel |
 | `UI/Photography/MainWindow.PhotographyAndSteam.cs` | ~265 | `ShowPhotographyGallery`, `ShowSteamAppMatchWindow` (Phase F2) |
 | `UI/LibraryVirtualization.cs` | ~570 | Virtualized rows / scroll hosts |
 | `Services/Library/LibraryScanner.cs` | — | **`ILibraryScanner`**: metadata index scan, folder grouping, folder cache rebuild/cached load; uses **`IMetadataService`** + **`ILibraryScanHost`**. |
@@ -171,7 +174,11 @@ Review feedback matches the plan: **`LibraryBrowserHost`** is intentionally a **
 
 **Progress (E2 slice, continued):** Additional **`ShowLibraryBrowserCore`** blocks moved to **`MainWindow`** partials — detail delete + metadata editor + “edit metadata for folder” in **`MainWindow.LibraryBrowserOrchestrator.DetailCommands.cs`**; folder list refresh, snapshot prefill, and metadata scan callback in **`MainWindow.LibraryBrowserOrchestrator.FolderData.cs`**; intake review badge refresh in **`MainWindow.LibraryBrowserOrchestrator.IntakeBadge.cs`**. Orchestrator keeps thin delegates (no intended behavior change).
 
+**Progress (E2 slice, Apr 2026 — selection + chrome):** **`UI/Library/MainWindow.LibraryBrowserOrchestrator.Selection.cs`** — named factories/helpers for **`getVisibleDetailFilesOrdered`**, **`getSelectedDetailFiles`**, **`updateDetailSelection`**, **`refreshDetailSelectionUi`** (**`LibraryBrowserCreate*`** / **`LibraryBrowserApplyDetailSelectionChange`**) plus **`LibraryBrowserApplySortGroupPillState`** for sort/group buttons. **`ShowLibraryBrowserCore`** wires these instead of large nested delegates (no intended behavior change).
+
 **Progress (E3):** Library virtualization stays in **`UI/LibraryVirtualization.cs`**; **`ShowLibraryBrowser`** already consumes it via **`MainWindow`** partial methods — **no further structural change** for this slice.
+
+**Progress (`PixelVault.Native.cs` shrink, Apr 2026):** **`ShowLibraryMetadataScanWindow`** moved to **`UI/Library/MainWindow.LibraryMetadataScan.cs`** (**`LibrarySession`** still receives the same partial method reference). **`BuildImportSummaryLines`** + **`ShowImportSummaryWindow`** moved to **`Import/MainWindow.ImportSummaryDialogs.cs`**.
 
 ---
 
@@ -187,7 +194,7 @@ Review feedback matches the plan: **`LibraryBrowserHost`** is intentionally a **
 
 **Exit:** `PixelVault.Native.cs` is mostly **constructor wiring**, `MainWindow` lifecycle, and delegation to hosts.
 
-**Progress (F1):** **`UI/Settings/MainWindow.SettingsShell.cs`** — **`BuildUi`**, **`BuildSettingsSummary`**, **`Card`**, **`TitleBlock`**, **`ShowPathSettingsWindow`**, and **`ShowSettingsWindow`** (modal dialog wrapper + temporary field swap / restore on close).
+**Progress (F1):** **`UI/Settings/MainWindow.SettingsShell.cs`** — **`BuildUi`**, **`BuildSettingsSummary`**, **`BuildDiagnosticsSummary`**, **`ShowPathSettingsWindow`**, and **`ShowSettingsWindow`** (modal wrapper + field restore on close). **Apr 2026:** Library-first settings chrome (dark theme aligned with Library); import actions and intake preview pane removed from Settings (import lives on Library toolbar).
 
 **Progress (F2):** **`UI/Photography/MainWindow.PhotographyAndSteam.cs`** — **`ShowPhotographyGallery`** (uses **`libraryWorkspace.LibraryRoot`** for paths) and **`ShowSteamAppMatchWindow`** (manual metadata Steam search picker).
 

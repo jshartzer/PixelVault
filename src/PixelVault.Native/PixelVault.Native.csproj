@@ -24,6 +24,7 @@
     <Compile Include="Indexing\LibraryFolderIndexing.cs" />
     <Compile Include="Indexing\LibraryMetadataIndexing.cs" />
     <Compile Include="Import\ImportWorkflow.cs" />
+    <Compile Include="Import\MainWindow.ImportSummaryDialogs.cs" />
     <Compile Include="MediaTools\MediaToolHelpers.cs" />
     <Compile Include="Metadata\LibraryMetadataEditing.cs" />
     <Compile Include="Metadata\MetadataHelpers.cs" />
@@ -71,6 +72,8 @@
     <Compile Include="UI\Library\MainWindow.LibraryBrowserSessionPersistence.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserRender.DetailPane.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserOrchestrator.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryBrowserOrchestrator.Selection.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryMetadataScan.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserOrchestrator.CoverRefresh.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserOrchestrator.DetailCommands.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserOrchestrator.FolderData.cs" />

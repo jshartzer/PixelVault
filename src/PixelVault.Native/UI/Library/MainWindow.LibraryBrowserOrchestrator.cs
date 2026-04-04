@@ -91,100 +91,18 @@ namespace PixelVaultNative
                     return GetLibraryBrowserPrimaryFolder(view) ?? BuildLibraryBrowserDisplayFolder(view);
                 };
 
-                Func<List<string>> getVisibleDetailFilesOrdered = delegate
-                {
-                    if (ws.Current == null) return new List<string>();
-                    if (ws.DetailFilesDisplayOrder != null && ws.DetailFilesDisplayOrder.Count > 0)
-                    {
-                        return ws.DetailFilesDisplayOrder
-                            .Where(file => !string.IsNullOrWhiteSpace(file) && File.Exists(file))
-                            .Distinct(StringComparer.OrdinalIgnoreCase)
-                            .ToList();
-                    }
-                    return GetFilesForLibraryFolderEntry(getDisplayFolder(ws.Current), false)
-                        .Where(file => !string.IsNullOrWhiteSpace(file) && File.Exists(file))
-                        .Distinct(StringComparer.OrdinalIgnoreCase)
-                        .ToList();
-                };
+                Func<List<string>> getVisibleDetailFilesOrdered =
+                    LibraryBrowserCreateVisibleDetailFilesOrdered(ws, getDisplayFolder);
 
-                Func<List<string>> getSelectedDetailFiles = delegate
-                {
-                    if (ws.Current == null) return new List<string>();
-                    var visibleFiles = getVisibleDetailFilesOrdered();
-                    var visibleSet = new HashSet<string>(visibleFiles, StringComparer.OrdinalIgnoreCase);
-                    foreach (var stale in ws.SelectedDetailFiles.Where(path => !visibleSet.Contains(path)).ToList()) ws.SelectedDetailFiles.Remove(stale);
-                    return visibleFiles.Where(path => ws.SelectedDetailFiles.Contains(path)).ToList();
-                };
+                Func<List<string>> getSelectedDetailFiles =
+                    LibraryBrowserCreateSelectedDetailFiles(ws, getVisibleDetailFilesOrdered);
 
-                Action<string, ModifierKeys> updateDetailSelection = delegate(string filePath, ModifierKeys mods)
-                {
-                    if (string.IsNullOrWhiteSpace(filePath))
-                    {
-                        if ((mods & ModifierKeys.Control) == 0 && (mods & ModifierKeys.Shift) == 0)
-                        {
-                            ws.SelectedDetailFiles.Clear();
-                            ws.DetailSelectionAnchorIndex = -1;
-                        }
-                        if (refreshDetailSelectionUi != null) refreshDetailSelectionUi();
-                        return;
-                    }
-                    var visibleFiles = getVisibleDetailFilesOrdered();
-                    var idx = -1;
-                    for (var i = 0; i < visibleFiles.Count; i++)
-                    {
-                        if (string.Equals(visibleFiles[i], filePath, StringComparison.OrdinalIgnoreCase))
-                        {
-                            idx = i;
-                            break;
-                        }
-                    }
-                    if (idx < 0) return;
+                Action<string, ModifierKeys> updateDetailSelection = LibraryBrowserCreateUpdateDetailSelection(
+                    ws,
+                    getVisibleDetailFilesOrdered,
+                    delegate { if (refreshDetailSelectionUi != null) refreshDetailSelectionUi(); });
 
-                    var ctrl = (mods & ModifierKeys.Control) != 0;
-                    var shift = (mods & ModifierKeys.Shift) != 0;
-
-                    if (shift && ws.DetailSelectionAnchorIndex >= 0 && ws.DetailSelectionAnchorIndex < visibleFiles.Count)
-                    {
-                        var a = ws.DetailSelectionAnchorIndex;
-                        var b = idx;
-                        if (a > b)
-                        {
-                            var t = a;
-                            a = b;
-                            b = t;
-                        }
-                        ws.SelectedDetailFiles.Clear();
-                        for (var i = a; i <= b; i++) ws.SelectedDetailFiles.Add(visibleFiles[i]);
-                    }
-                    else if (ctrl)
-                    {
-                        if (ws.SelectedDetailFiles.Contains(filePath)) ws.SelectedDetailFiles.Remove(filePath);
-                        else ws.SelectedDetailFiles.Add(filePath);
-                        ws.DetailSelectionAnchorIndex = idx;
-                    }
-                    else
-                    {
-                        ws.SelectedDetailFiles.Clear();
-                        ws.SelectedDetailFiles.Add(filePath);
-                        ws.DetailSelectionAnchorIndex = idx;
-                    }
-                    if (refreshDetailSelectionUi != null) refreshDetailSelectionUi();
-                };
-
-                refreshDetailSelectionUi = delegate
-                {
-                    var selectedFiles = getSelectedDetailFiles();
-                    foreach (var tile in ws.DetailTiles)
-                    {
-                        var file = tile == null ? string.Empty : tile.Tag as string;
-                        var isSelected = !string.IsNullOrWhiteSpace(file) && ws.SelectedDetailFiles.Contains(file);
-                        tile.Background = isSelected ? Brush("#1D2730") : Brush("#10181D");
-                        tile.BorderBrush = isSelected ? Brush("#D46C63") : Brush("#2B3A44");
-                        tile.BorderThickness = isSelected ? new Thickness(2) : new Thickness(1);
-                    }
-                    panes.DeleteSelectedButton.IsEnabled = ws.Current != null && selectedFiles.Count > 0;
-                    panes.ThumbLabel.Text = selectedFiles.Count > 0 ? selectedFiles.Count + " selected" : "Screenshots";
-                };
+                refreshDetailSelectionUi = LibraryBrowserCreateRefreshDetailSelectionUi(ws, panes, getSelectedDetailFiles);
                 panes.DetailRows.BeforeVisibleRowsRebuilt = delegate
                 {
                     ws.DetailTiles.Clear();
@@ -199,28 +117,16 @@ namespace PixelVaultNative
                 refreshSortButtons = delegate
                 {
                     var normalized = NormalizeLibraryFolderSortMode(libraryFolderSortMode);
-                    Action<Button, bool> applyState = delegate(Button button, bool active)
-                    {
-                        if (button == null) return;
-                        if (active) ApplyLibraryPillChrome(button, "#3A4652", "#566676", "#455463", "#2C3742", "#F4F7FA");
-                        else ApplyLibraryPillChrome(button, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
-                    };
-                    applyState(panes.SortPlatformButton, string.Equals(normalized, "platform", StringComparison.OrdinalIgnoreCase));
-                    applyState(panes.SortRecentButton, string.Equals(normalized, "recent", StringComparison.OrdinalIgnoreCase));
-                    applyState(panes.SortPhotosButton, string.Equals(normalized, "photos", StringComparison.OrdinalIgnoreCase));
+                    LibraryBrowserApplySortGroupPillState(panes.SortPlatformButton, string.Equals(normalized, "platform", StringComparison.OrdinalIgnoreCase));
+                    LibraryBrowserApplySortGroupPillState(panes.SortRecentButton, string.Equals(normalized, "recent", StringComparison.OrdinalIgnoreCase));
+                    LibraryBrowserApplySortGroupPillState(panes.SortPhotosButton, string.Equals(normalized, "photos", StringComparison.OrdinalIgnoreCase));
                 };
 
                 refreshGroupingButtons = delegate
                 {
                     var normalized = NormalizeLibraryGroupingMode(libraryGroupingMode);
-                    Action<Button, bool> applyState = delegate(Button button, bool active)
-                    {
-                        if (button == null) return;
-                        if (active) ApplyLibraryPillChrome(button, "#3A4652", "#566676", "#455463", "#2C3742", "#F4F7FA");
-                        else ApplyLibraryPillChrome(button, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
-                    };
-                    applyState(panes.GroupAllButton, string.Equals(normalized, "all", StringComparison.OrdinalIgnoreCase));
-                    applyState(panes.GroupConsoleButton, string.Equals(normalized, "console", StringComparison.OrdinalIgnoreCase));
+                    LibraryBrowserApplySortGroupPillState(panes.GroupAllButton, string.Equals(normalized, "all", StringComparison.OrdinalIgnoreCase));
+                    LibraryBrowserApplySortGroupPillState(panes.GroupConsoleButton, string.Equals(normalized, "console", StringComparison.OrdinalIgnoreCase));
                 };
 
                 setLibrarySortMode = delegate(string mode)
