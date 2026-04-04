@@ -54,11 +54,11 @@ Then use these based on the task:
 
 Current live build:
 
-- `0.850`
+- `0.851`
 
 Current executable:
 
-- `C:\Codex\dist\PixelVault-0.850\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.851\PixelVault.exe`
 
 Current build pointer:
 
@@ -92,7 +92,7 @@ Practical current focus:
 
 ## Current Stop Point
 
-The app is currently published at `0.850`.
+The app is currently published at `0.851`.
 
 **Notion:** [MainWindow extraction roadmap](https://www.notion.so/33573adc59b681d88b7dcd88cad53cb6) updated for Phase **E** capstone (**`ILibraryBrowserShell`**). If release rows in Notion lag `docs/CURRENT_BUILD.txt`, re-sync per `docs/DOC_SYNC_POLICY.md`.
 
@@ -105,6 +105,7 @@ Recent extraction progress (repo):
 - **Diagnostics (current publish, deeper tracing):** Library detail rendering now logs metadata-index load, file enumeration, quick/refined snapshot build, and dispatcher handoff start/complete so the next stalled right-pane repro can be pinned to a specific render step.
 - **Library stability (current publish):** Rapid browsing no longer lets queued image/video warmup tasks occupy thread-pool workers while waiting on semaphores, so detail-render background work is much less likely to get starved before it starts.
 - **Thumbnail cache (current publish):** Thumbnail cache writes now use unique temp files per writer instead of a shared `destination.tmp` path, so concurrent cache saves no longer fight over the same temp file or spam the log with benign access-denied races.
+- **Monolith shrink (0.851):** **`LibraryThumbnailPipeline`** centralizes library thumbnail decode/cache/poster I/O; intake preview glue is **`UI/Intake/MainWindow.IntakePreview.cs`** (**`PERFORMANCE_MONOLITH_SLICE_PLAN`** Phase 2 follow-up + Phase 3). Details in **`docs/CHANGELOG.md`** **0.851**.
 - **E1–E3 (complete):** Library browser: **`LibraryBrowserHost.Show`** (try/catch + **`ILibrarySession`**) → **`LibraryBrowserShowOrchestration`**(**`ILibraryBrowserShell`** via **`LibraryBrowserShellBridge`**) for open/show/delegate wiring; top nav **`MainWindow.LibraryBrowserChrome.cs`**; layout **`MainWindow.LibraryBrowserLayout.cs`**; render **`MainWindow.LibraryBrowserRender.*.cs`**; toolbar/pane/cover/detail partials **`MainWindow.LibraryBrowserOrchestrator.*.cs`**. **`ILibrarySession`**, **`LibraryWorkspaceContext`**, **`LibraryVirtualization.cs`**
 - **Responsiveness:** **`PERFORMANCE_TODO.md`** — item 5 long-workflow spot-check; item 10 **`LibraryBrowserHost`** + **`ILibraryBrowserShell`** / **`LibraryBrowserShowOrchestration`**; manual-metadata game-title list off UI thread when rebuilding choices
 - **F1–F3 (complete):** **`SettingsShellHost`** + **`SettingsShellDependencies`** + thin **`MainWindow.SettingsShell`** bridge; **`MainWindow.SettingsPersistence`**; photography — **`MainWindow.PhotographyAndSteam.cs`**
@@ -113,7 +114,7 @@ Recent extraction progress (repo):
 - **Library covers (UI thread):** Removed sync **`ResolveLibraryArt`**; tiles use **`GetLibraryArtPathForDisplayOnly`**; folder-detail banner runs **`GetLibraryArtPathForDisplayOnly`** + **`File.Exists`** on the thread pool, then dispatcher **`QueueImageLoad`**. **`ResolveLibraryArtAsync(..., false)`** returns **`Task.FromResult`** (**`GetLibraryArtPathForDisplayOnly`**) so there is no async state machine on the no-download path.
 - **Publish:** script copies full native + test sources under `dist/.../source/`
 
-**Refactor (Apr 2026):** **`GetSavedGameIndexRowsForRoot`** + **`ILibrarySession`** for active-root game index reads / metadata upsert; **`IImportService.RunSteamRenameAsync`**, **`LoadManualMetadataGameTitleRowsAsync`**, async **`RunBackgroundWorkflowWithProgress`** / game-index resolve host; Library **`NavChromeAndToolbar`** + **`PaneEvents`** partials. **Refactor (continued):** **`ILibrarySession`** now exposes **`UpsertLibraryMetadataIndexEntries`** (both overloads), **`RefreshFolderCacheAfterGameIndexChange`**, and **`EnsureGameIndexFolderContext`**; removed unused **`MainWindow.LoadLibraryFoldersCached(root, …)`**. **Phase 3 extraction roadmap:** **A–E** complete (**E** includes **`ILibraryBrowserShell`** + bridge). **Phase F** complete: **`SettingsShellHost`** / **`SettingsShellDependencies`**, **`MainWindow.SettingsShell`** bridge, **`MainWindow.SettingsPersistence`**, photography partial — **`docs/MAINWINDOW_EXTRACTION_ROADMAP.md`**. **Next plan:** shrink **`PixelVault.Native.cs`** (image cache, intake, etc.), import **`IImportService`** depth, **`IFileSystemService`** sweep where touched, nullable, etc.
+**Refactor (Apr 2026):** **`GetSavedGameIndexRowsForRoot`** + **`ILibrarySession`** for active-root game index reads / metadata upsert; **`IImportService.RunSteamRenameAsync`**, **`LoadManualMetadataGameTitleRowsAsync`**, async **`RunBackgroundWorkflowWithProgress`** / game-index resolve host; Library **`NavChromeAndToolbar`** + **`PaneEvents`** partials. **Refactor (continued):** **`ILibrarySession`** now exposes **`UpsertLibraryMetadataIndexEntries`** (both overloads), **`RefreshFolderCacheAfterGameIndexChange`**, and **`EnsureGameIndexFolderContext`**; removed unused **`MainWindow.LoadLibraryFoldersCached(root, …)`**. **Phase 3 extraction roadmap:** **A–E** complete (**E** includes **`ILibraryBrowserShell`** + bridge). **Phase F** complete: **`SettingsShellHost`** / **`SettingsShellDependencies`**, **`MainWindow.SettingsShell`** bridge, **`MainWindow.SettingsPersistence`**, photography partial — **`docs/MAINWINDOW_EXTRACTION_ROADMAP.md`**. **Next plan:** shrink **`PixelVault.Native.cs`** further (remaining orchestration glue), deepen import **`IImportService`** where touched, **`IFileSystemService`** sweep, nullable, etc.
 
 If you are picking work up midstream:
 

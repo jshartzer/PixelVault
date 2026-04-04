@@ -1,3 +1,9 @@
+## 0.851
+- **Release:** Version **0.851** — publish refresh for MainWindow performance/monolith slices (**Phase 2 follow-up** + **Phase 3** per `docs/PERFORMANCE_MONOLITH_SLICE_PLAN.md`).
+- **Library thumbnails (Phase 2 follow-up):** **`LibraryThumbnailPipeline`** (`UI/Library/LibraryThumbnailPipeline.cs`) owns decode-width normalization, **`BitmapImage`** / frozen bitmap load, disk thumbnail cache I/O, and video poster path resolution; **`MainWindow.LibraryImageLoading.cs`** delegates to it. **`MediaToolHelpers`** uses the shared **`NormalizeDecodePixelWidth`** helper.
+- **Intake preview (Phase 3):** Intake preview glue lives in **`UI/Intake/MainWindow.IntakePreview.cs`** (`LoadIntakePreviewSummaryAsync`, **`BuildIntakePreviewSummary`**, review and manual-metadata item builders, **`BuildImportAndEditMetadataItems`**, **`IntakePreviewFileAnalysis`**). **`PixelVault.Native.cs`** keeps folder-art decode-width helpers and **`ShowMetadataReviewWindow`** next to related Library UI.
+- **Engineering:** No intentional user-visible behavior change; **`PixelVault.Native.Tests`** green.
+
 ## 0.850
 - **Republish (2026-04-03):** Fresh `dotnet publish` to `dist\PixelVault-0.850`; `dist\PixelVault-current` junction and repo-root `PixelVault.lnk` updated to the new build.
 - **Release:** Version **0.850** — publish refresh for library/import orchestration refactors and troubleshooting privacy hardening.
