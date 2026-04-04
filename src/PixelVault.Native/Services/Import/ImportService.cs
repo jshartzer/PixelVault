@@ -33,6 +33,9 @@ namespace PixelVaultNative
         /// <summary>Steam AppID-based renames in the upload folder (canonical store title + timestamp suffix rules).</summary>
         RenameStepResult RunSteamRename(IEnumerable<string> sourceFiles, Action<int, int, string> progress = null, CancellationToken cancellationToken = default);
 
+        /// <summary>Lets import use <see cref="ILibrarySession.EnsureSteamAppIdInActiveLibrary"/> when the active library root matches the rename target root.</summary>
+        void AttachLibrarySessionAccessor(Func<ILibrarySession> getSession);
+
         /// <summary>Prefix filenames with sanitized game title for manual metadata / library edit flows (mutates item paths).</summary>
         RenameStepResult RunManualRename(List<ManualMetadataItem> items, Action<int, int, string> progress = null, CancellationToken cancellationToken = default);
 
@@ -165,6 +168,7 @@ namespace PixelVaultNative
     {
         readonly ImportServiceDependencies d;
         readonly IFileSystemService fs;
+        Func<ILibrarySession> _getLibrarySession;
 
         public ImportService(ImportServiceDependencies dependencies)
         {
@@ -175,6 +179,11 @@ namespace PixelVaultNative
             if (d.GetFileLastWriteTime == null) throw new ArgumentNullException(nameof(dependencies) + "." + nameof(dependencies.GetFileLastWriteTime));
             if (d.CoverService == null) throw new ArgumentNullException(nameof(dependencies) + "." + nameof(dependencies.CoverService));
             if (d.NormalizeGameIndexName == null) throw new ArgumentNullException(nameof(dependencies) + "." + nameof(dependencies.NormalizeGameIndexName));
+        }
+
+        public void AttachLibrarySessionAccessor(Func<ILibrarySession> getSession)
+        {
+            _getLibrarySession = getSession;
         }
 
         string UndoPath => d.UndoManifestPath == null ? string.Empty : (d.UndoManifestPath() ?? string.Empty);
@@ -415,14 +424,22 @@ namespace PixelVaultNative
                 }
                 string game = null;
                 if (d.ResolveSteamStoreTitle != null) game = d.ResolveSteamStoreTitle(appId);
-                else game = d.CoverService.SteamNameAsync(appId, cancellationToken).ConfigureAwait(false).GetAwaiter().GetResult();
+                else game = d.CoverService.SteamName(appId, cancellationToken);
                 if (string.IsNullOrWhiteSpace(game))
                 {
                     skipped++;
                     if (progress != null) progress(i + 1, total, "Skipped rename " + (i + 1) + " of " + total + " | " + remaining + " remaining | no Steam title match");
                     continue;
                 }
-                if (recordedSteamAppIds.Add(appId)) d.EnsureSteamAppIdInGameIndex?.Invoke(libraryRoot, game, appId);
+                if (recordedSteamAppIds.Add(appId))
+                {
+                    var session = _getLibrarySession?.Invoke();
+                    if (session != null && session.HasLibraryRoot
+                        && string.Equals(libraryRoot, session.LibraryRoot, StringComparison.OrdinalIgnoreCase))
+                        session.EnsureSteamAppIdInActiveLibrary(game, appId);
+                    else
+                        d.EnsureSteamAppIdInGameIndex?.Invoke(libraryRoot, game, appId);
+                }
                 var baseName = Path.GetFileNameWithoutExtension(file);
                 string newBase;
                 var titleHint = parsed == null ? null : parsed.GameTitleHint;

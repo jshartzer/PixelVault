@@ -87,5 +87,8 @@ namespace PixelVaultNative
 
         /// <summary>Show metadata scan progress for <see cref="LibraryRoot"/> (no-op when root unset).</summary>
         void RunLibraryMetadataScan(Window owner, string folderPath, bool forceRescan, Action<bool> setBusyState, Action onSuccess);
+
+        /// <summary>Record Steam AppID on the saved game index for <paramref name="gameDisplayName"/> when first seen (active library root only).</summary>
+        void EnsureSteamAppIdInActiveLibrary(string gameDisplayName, string steamAppId);
     }
 }

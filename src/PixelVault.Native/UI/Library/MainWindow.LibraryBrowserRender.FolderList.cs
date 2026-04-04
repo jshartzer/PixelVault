@@ -136,6 +136,7 @@ namespace PixelVaultNative
                 LibraryBrowserTryRestoreSessionSelection(ws, browserFolders, orderedVisibleFolders, showFolder);
                 renderStopwatch.Stop();
                 LogPerformanceSample("LibraryFolderRender", renderStopwatch, "mode=flat; foldersLoaded=" + folders.Count + "; views=" + browserFolders.Count + "; visible=" + orderedVisibleFolders.Count + "; rows=" + virtualRows.Count + "; columns=" + folderColumns + "; grouping=" + groupingMode + "; search=" + (string.IsNullOrWhiteSpace(searchText) ? "(none)" : searchText) + "; sort=" + sortMode + "; projectMs=" + projectionStopwatch.ElapsedMilliseconds + "; filterMs=" + filterSortStopwatch.ElapsedMilliseconds, 40);
+                LogLibraryBrowserFirstFolderListPaintOnce("mode=flat; visible=" + orderedVisibleFolders.Count + "; rows=" + virtualRows.Count);
                 return;
             }
 
@@ -194,6 +195,7 @@ namespace PixelVaultNative
             LibraryBrowserTryRestoreSessionSelection(ws, browserFolders, orderedVisibleFolders, showFolder);
             renderStopwatch.Stop();
             LogPerformanceSample("LibraryFolderRender", renderStopwatch, "mode=grouped; foldersLoaded=" + folders.Count + "; views=" + browserFolders.Count + "; visible=" + orderedVisibleFolders.Count + "; rows=" + virtualRows.Count + "; columns=" + folderColumns + "; grouping=" + groupingMode + "; search=" + (string.IsNullOrWhiteSpace(searchText) ? "(none)" : searchText) + "; sort=" + sortMode + "; projectMs=" + projectionStopwatch.ElapsedMilliseconds + "; filterMs=" + filterSortStopwatch.ElapsedMilliseconds, 40);
+            LogLibraryBrowserFirstFolderListPaintOnce("mode=grouped; visible=" + orderedVisibleFolders.Count + "; rows=" + virtualRows.Count);
         }
 
         void LibraryBrowserTryRestoreSessionSelection(

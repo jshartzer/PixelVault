@@ -159,5 +159,16 @@ namespace PixelVaultNative
             if (string.IsNullOrWhiteSpace(LibraryRoot)) return;
             _runLibraryMetadataScan(owner, LibraryRoot, folderPath, forceRescan, setBusyState, onSuccess);
         }
+
+        public void EnsureSteamAppIdInActiveLibrary(string gameDisplayName, string steamAppId)
+        {
+            if (!HasLibraryRoot || string.IsNullOrWhiteSpace(gameDisplayName) || string.IsNullOrWhiteSpace(steamAppId)) return;
+            var rows = LoadSavedGameIndexRows();
+            var row = _gameIndexAssignment.EnsureManualMetadataMasterRow(rows, gameDisplayName, "Steam", null);
+            if (row == null) return;
+            if (string.Equals(row.SteamAppId ?? string.Empty, steamAppId, StringComparison.Ordinal)) return;
+            row.SteamAppId = steamAppId;
+            PersistGameIndexRows(rows);
+        }
     }
 }
