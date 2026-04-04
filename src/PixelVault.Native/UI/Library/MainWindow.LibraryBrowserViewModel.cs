@@ -174,13 +174,6 @@ namespace PixelVaultNative
             return string.Equals(NormalizeLibraryGroupingMode(libraryGroupingMode), "console", StringComparison.OrdinalIgnoreCase);
         }
 
-        bool ShouldShowLibraryBrowserDetailPlatformChips(LibraryBrowserFolderView view)
-        {
-            return view != null
-                && !ShouldShowLibraryBrowserPlatformContext()
-                && (view.PlatformLabels ?? new string[0]).Any(label => !string.IsNullOrWhiteSpace(label));
-        }
-
         string BuildLibraryBrowserFolderTileSubtitle(LibraryBrowserFolderView view)
         {
             var captureCount = view == null ? 0 : Math.Max(view.FileCount, 0);

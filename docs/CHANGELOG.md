@@ -1,6 +1,12 @@
+## 0.843
+- **Release:** Version **0.843** — publish refresh for the first game-first Library action-hardening slice.
+- **Library (platform context):** In default **`All`** mode, the selected-game pane now shows subtle platform chips so merged game rows still surface console context without reverting to console-first card chrome.
+- **Library (merged-row actions):** Multi-source game rows now use **`Open Folders`** instead of **`Open Primary Folder`**, both in the right-side action button and the tile context menu.
+- **Library (merged cover refresh):** **Fetch Cover Art** is now allowed for merged game rows and fans out across the row’s source folders instead of staying disabled.
+
 ## 0.842
 - **Release:** Version **0.842** — publish refresh focused on Library browse polish after the game-first grouping rollout.
-- **Library (layout):** Moved the **`All` / `By Console`** grouping pills into the right-side cover pane so the main browse controls stay on the left and the grouping mode reads as part of the selected game context.
+- **Library (layout):** Moved the **`All` / `By Console`** grouping pills into the left-side Library toolbar, right-aligned opposite the sort/filter buttons.
 - **Library (detail header):** Removed the **“Selected game”** eyebrow text from the right-hand pane for a cleaner presentation.
 - **Library (delete refresh):** Deleting selected captures now removes them from the in-memory Library state immediately, rerenders the screenshot grid right away, and then forces a folder refresh to reconcile cache/state in the background. Deleted photos should disappear from the right-hand pane without waiting for a slower full refresh.
 

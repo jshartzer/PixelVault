@@ -12,47 +12,26 @@ namespace PixelVaultNative
 {
     public sealed partial class MainWindow
     {
-        Border BuildLibraryBrowserDetailPlatformChip(string platformLabel)
+        FrameworkElement BuildLibraryBrowserPreviewPlatformBadge(string platformLabel)
         {
             var resolvedLabel = NormalizeConsoleLabel(platformLabel);
-            var accent = LibrarySectionAccentBrush(resolvedLabel);
-            return new Border
-            {
-                Background = Brush("#162129"),
-                BorderBrush = accent,
-                BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(999),
-                Padding = new Thickness(10, 4, 10, 4),
-                Margin = new Thickness(0, 0, 8, 8),
-                Child = new TextBlock
-                {
-                    Text = resolvedLabel,
-                    Foreground = Brush("#D8E4EA"),
-                    FontSize = 11,
-                    FontWeight = FontWeights.SemiBold
-                }
-            };
+            return string.IsNullOrWhiteSpace(resolvedLabel) ? null : BuildLibraryTilePlatformBadge(resolvedLabel);
         }
 
-        void UpdateLibraryBrowserDetailPlatformChips(LibraryBrowserPaneRefs panes, LibraryBrowserFolderView view)
+        void UpdateLibraryBrowserPreviewPlatformBadge(LibraryBrowserPaneRefs panes, LibraryBrowserFolderView view, bool shouldShow)
         {
-            if (panes == null || panes.DetailPlatformChipsPanel == null) return;
-            panes.DetailPlatformChipsPanel.Children.Clear();
-            if (!ShouldShowLibraryBrowserDetailPlatformChips(view))
+            if (panes == null || panes.PreviewPlatformBadgeHost == null) return;
+            panes.PreviewPlatformBadgeHost.Content = null;
+            panes.PreviewPlatformBadgeHost.Visibility = Visibility.Collapsed;
+            if (!shouldShow || view == null)
             {
-                panes.DetailPlatformChipsPanel.Visibility = Visibility.Collapsed;
                 return;
             }
 
-            foreach (var platformLabel in (view.PlatformLabels ?? new string[0])
-                .Where(label => !string.IsNullOrWhiteSpace(label))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(label => PlatformGroupOrder(label))
-                .ThenBy(label => label, StringComparer.OrdinalIgnoreCase))
-            {
-                panes.DetailPlatformChipsPanel.Children.Add(BuildLibraryBrowserDetailPlatformChip(platformLabel));
-            }
-            panes.DetailPlatformChipsPanel.Visibility = panes.DetailPlatformChipsPanel.Children.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+            var badge = BuildLibraryBrowserPreviewPlatformBadge(view.PrimaryPlatformLabel);
+            if (badge == null) return;
+            panes.PreviewPlatformBadgeHost.Content = badge;
+            panes.PreviewPlatformBadgeHost.Visibility = Visibility.Visible;
         }
 
         Button LibraryBrowserBuildFolderTile(
@@ -136,24 +115,28 @@ namespace PixelVaultNative
             var contextMenu = new ContextMenu();
             var openMyCoversItem = new MenuItem { Header = "Open My Covers Folder" };
             openMyCoversItem.Click += delegate { OpenSavedCoversFolder(); };
-            var setCoverItem = new MenuItem { Header = "Set Custom Cover...", IsEnabled = folder != null && !folder.IsMergedAcrossPlatforms };
+            var setCoverItem = new MenuItem { Header = "Set Custom Cover...", IsEnabled = actionFolders.Count > 0 };
             setCoverItem.Click += delegate
             {
                 Directory.CreateDirectory(savedCoversRoot);
                 var pickedCover = PickFile(string.Empty, "Image Files|*.jpg;*.jpeg;*.png;*.bmp;*.gif|All Files|*.*", savedCoversRoot);
                 if (string.IsNullOrWhiteSpace(pickedCover)) return;
-                SaveCustomCover(actionFolder, pickedCover);
+                foreach (var targetFolder in actionFolders) SaveCustomCover(targetFolder, pickedCover);
                 showFolder(folder);
                 if (renderTiles != null) renderTiles();
-                Log("Custom cover set for " + BuildLibraryBrowserScopeLabel(folder) + ".");
+                Log("Custom cover set for " + BuildLibraryBrowserActionScopeLabel(folder) + ".");
             };
-            var clearCoverItem = new MenuItem { Header = "Clear Custom Cover", IsEnabled = folder != null && !folder.IsMergedAcrossPlatforms && !string.IsNullOrWhiteSpace(CustomCoverPath(actionFolder)) };
+            var clearCoverItem = new MenuItem
+            {
+                Header = "Clear Custom Cover",
+                IsEnabled = actionFolders.Any(targetFolder => !string.IsNullOrWhiteSpace(CustomCoverPath(targetFolder)))
+            };
             clearCoverItem.Click += delegate
             {
-                ClearCustomCover(actionFolder);
+                foreach (var targetFolder in actionFolders.Where(targetFolder => !string.IsNullOrWhiteSpace(CustomCoverPath(targetFolder)))) ClearCustomCover(targetFolder);
                 showFolder(folder);
                 if (renderTiles != null) renderTiles();
-                Log("Custom cover cleared for " + BuildLibraryBrowserScopeLabel(folder) + ".");
+                Log("Custom cover cleared for " + BuildLibraryBrowserActionScopeLabel(folder) + ".");
             };
             var openFolderItem = new MenuItem { Header = BuildLibraryBrowserOpenFoldersLabel(folder) };
             openFolderItem.Click += delegate
@@ -219,10 +202,7 @@ namespace PixelVaultNative
             activeSelectedLibraryFolder = CloneLibraryFolderInfo(actionFolder);
             panes.DetailTitle.Text = info.Name;
             panes.DetailMeta.Text = BuildLibraryBrowserDetailMetaText(info, actionFolder);
-            UpdateLibraryBrowserDetailPlatformChips(panes, info);
             panes.OpenFolderButton.Content = BuildToolbarButtonContent("\uE8B7", BuildLibraryBrowserOpenFoldersLabel(info));
-            panes.PreviewImage.Source = null;
-            panes.PreviewImage.Visibility = Visibility.Collapsed;
             var infoCapture = info;
             _ = Task.Run(() =>
             {
@@ -237,6 +217,7 @@ namespace PixelVaultNative
                         {
                             panes.PreviewImage.Source = null;
                             panes.PreviewImage.Visibility = Visibility.Collapsed;
+                            UpdateLibraryBrowserPreviewPlatformBadge(panes, infoCapture, false);
                         }
                         else
                         {
@@ -244,6 +225,7 @@ namespace PixelVaultNative
                             {
                                 panes.PreviewImage.Source = loaded;
                                 panes.PreviewImage.Visibility = Visibility.Visible;
+                                UpdateLibraryBrowserPreviewPlatformBadge(panes, infoCapture, true);
                             }, true, delegate { return SameLibraryBrowserSelection(ws.Current, infoCapture); });
                         }
                     }));

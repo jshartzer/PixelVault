@@ -53,11 +53,11 @@ Then use these based on the task:
 
 Current live build:
 
-- `0.842`
+- `0.843`
 
 Current executable:
 
-- `C:\Codex\dist\PixelVault-0.842\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.843\PixelVault.exe`
 
 Current build pointer:
 
@@ -91,14 +91,15 @@ Practical current focus:
 
 ## Current Stop Point
 
-The app is currently published at `0.842`.
+The app is currently published at `0.843`.
 
-**Notion:** release sync for **0.842** is currently pending because the Notion connector token expired during publish prep. [MainWindow extraction roadmap](https://www.notion.so/33573adc59b681d88b7dcd88cad53cb6) remains the active extraction tracker. Further releases: `docs/DOC_SYNC_POLICY.md`.
+**Notion:** release sync for **0.843** is currently pending because the Notion connector token expired during publish prep. [MainWindow extraction roadmap](https://www.notion.so/33573adc59b681d88b7dcd88cad53cb6) remains the active extraction tracker. Further releases: `docs/DOC_SYNC_POLICY.md`.
 
 Recent extraction progress (repo):
 
 - **Library grouping (game-first browse):** Added persisted **`LibraryGroupingMode`** with **`All`** and **`By Console`** controls in the Library banner area. Browser rows now project from raw **`LibraryFolderInfo`** into **`LibraryBrowserFolderView`** so the default view can merge same-game captures across consoles without changing storage or scanner persistence. The `All` merge key now prefers normalized game name instead of platform-specific saved row IDs, so cross-platform titles actually collapse into one game row. In `All`, folder cards and the detail header now suppress console-first badge/text chrome so the browse experience reads game-first by default. Merged rows intentionally use **Open Primary Folder** and keep cover / ID actions constrained until the next hardening slice.
 - **Library polish (current publish):** Grouping pills now sit in the right-side cover pane instead of the left filter row, the detail eyebrow label is removed, and deleting captures updates the in-memory folder/detail state immediately before the forced refresh so removed screenshots disappear from the right-hand pane right away.
+- **Library action hardening (current publish):** In `All`, the selected-game pane now shows subtle platform chips, merged rows use **Open Folders** when multiple source folders exist, and **Fetch Cover Art** can now run across merged-row source folders instead of staying disabled.
 - **E1–E3:** Library browser: **`LibraryBrowserHost`** entry + **`ShowLibraryBrowserCore`** on **`MainWindow`** in **`UI/Library/MainWindow.LibraryBrowserOrchestrator.cs`**; top nav / window chrome in **`MainWindow.LibraryBrowserChrome.cs`**; folder + detail layout in **`MainWindow.LibraryBrowserLayout.cs`**; folder-tile + detail-pane rendering in **`MainWindow.LibraryBrowserRender.FolderList.cs`** / **`MainWindow.LibraryBrowserRender.DetailPane.cs`**. **`ILibrarySession`** / **`LibrarySession`** (workspace + scanner + **`IFileSystemService`** + root), **`LibraryWorkspaceContext`** caches, virtualization unchanged in **`LibraryVirtualization.cs`**
 - **Responsiveness:** **`PERFORMANCE_TODO.md`** — item 5 long-workflow spot-check; item 10 **`ShowLibraryBrowserCore`** in **`MainWindow.LibraryBrowserOrchestrator.cs`** (**`LibraryBrowserHost`** entry); manual-metadata game-title list off UI thread when rebuilding choices
 - **F1–F2:** Settings shell partial (incl. path settings dialog, **`ShowSettingsWindow`** modal), photography gallery + Steam picker partial; photography wired from Library + Settings

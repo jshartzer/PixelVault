@@ -48,17 +48,20 @@ namespace PixelVaultNative
             ws.PreserveDetailScrollOnNextRender = false;
             var renderFolder = ws.Current;
             var displayFolder = BuildLibraryBrowserDisplayFolder(renderFolder);
-            SetVirtualizedRows(panes.DetailRows, new[]
+            if (panes.DetailRows.Rows == null || panes.DetailRows.Rows.Count == 0)
             {
-                new VirtualizedRowDefinition
+                SetVirtualizedRows(panes.DetailRows, new[]
                 {
-                    Height = 44,
-                    Build = delegate
+                    new VirtualizedRowDefinition
                     {
-                        return new TextBlock { Text = "Loading captures...", Foreground = Brush("#A7B5BD") };
+                        Height = 44,
+                        Build = delegate
+                        {
+                            return new TextBlock { Text = "Loading captures...", Foreground = Brush("#A7B5BD") };
+                        }
                     }
-                }
-            }, true, null);
+                }, true, null);
+            }
             if (refreshDetailSelectionUi != null) refreshDetailSelectionUi();
             Task.Run(async delegate
             {
