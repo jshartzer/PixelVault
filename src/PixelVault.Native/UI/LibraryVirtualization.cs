@@ -13,13 +13,13 @@ namespace PixelVaultNative
 {
     public sealed partial class MainWindow
     {
-        sealed class VirtualizedRowDefinition
+        internal sealed class VirtualizedRowDefinition
         {
             public double Height;
             public Func<FrameworkElement> Build;
         }
 
-        sealed class VirtualizedRowHost
+        internal sealed class VirtualizedRowHost
         {
             public ScrollViewer ScrollViewer;
             public Border TopSpacer;

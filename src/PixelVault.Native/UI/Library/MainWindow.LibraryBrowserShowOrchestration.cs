@@ -9,29 +9,28 @@ namespace PixelVaultNative
     public sealed partial class MainWindow
     {
         /// <summary>
-        /// Imperative Library browser open/show wiring (folder grid, detail pane, toolbar delegates).
-        /// Keeps <see cref="ShowLibraryBrowserCore"/> thin and gives Library orchestration a named home (Phase E depth).
+        /// Imperative Library browser open/show wiring (folder grid, detail pane, toolbar delegates). Invoked from <see cref="LibraryBrowserHost.Show"/>.
         /// </summary>
-        sealed class LibraryBrowserShowOrchestration
+        internal sealed class LibraryBrowserShowOrchestration
         {
-            readonly MainWindow _host;
+            readonly ILibraryBrowserShell _shell;
 
-            internal LibraryBrowserShowOrchestration(MainWindow host)
+            internal LibraryBrowserShowOrchestration(ILibraryBrowserShell shell)
             {
-                _host = host ?? throw new ArgumentNullException(nameof(host));
+                _shell = shell ?? throw new ArgumentNullException(nameof(shell));
             }
 
             internal void Run(bool reuseMainWindow)
             {
-                _host.MarkLibraryBrowserSessionFirstPaintTracking();
-                _host.librarySession.EnsureLibraryRootAccessible("Library folder");
+                _shell.MarkLibraryBrowserSessionFirstPaintTracking();
+                _shell.LibrarySession.EnsureLibraryRootAccessible("Library folder");
                 Action refreshIntakeReviewBadge = null;
-                var libraryWindow = _host.GetOrCreateLibraryBrowserWindow(reuseMainWindow);
-                var root = new Grid { Background = _host.Brush("#0F1519") };
+                var libraryWindow = _shell.GetOrCreateLibraryBrowserWindow(reuseMainWindow);
+                var root = new Grid { Background = _shell.BrushFromHex("#0F1519") };
                 root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
                 root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
 
-                var navChrome = _host.BuildLibraryBrowserNavChrome();
+                var navChrome = _shell.BuildLibraryBrowserNavChrome();
                 root.Children.Add(navChrome.NavBar);
 
                 var contentGrid = new Grid();
@@ -41,23 +40,23 @@ namespace PixelVaultNative
                 Grid.SetRow(contentGrid, 1);
                 root.Children.Add(contentGrid);
 
-                var panes = _host.BuildLibraryBrowserContentPanes(contentGrid);
+                var panes = _shell.BuildLibraryBrowserContentPanes(contentGrid);
                 libraryWindow.Content = root;
 
                 var ws = new LibraryBrowserWorkingSet { Panes = panes };
-                ws.AppliedLibrarySearchText = _host._libraryBrowserPersistedSearch ?? string.Empty;
+                ws.AppliedLibrarySearchText = _shell.LibraryBrowserPersistedSearch;
                 ws.PendingLibrarySearchText = ws.AppliedLibrarySearchText;
                 panes.SearchBox.Text = ws.AppliedLibrarySearchText;
-                if (_host._libraryBrowserPersistedFolderScroll > 0.1d)
+                if (_shell.LibraryBrowserPersistedFolderScroll > 0.1d)
                 {
                     ws.PreserveFolderScrollOnNextRender = true;
-                    ws.PreservedFolderScrollOffset = _host._libraryBrowserPersistedFolderScroll;
+                    ws.PreservedFolderScrollOffset = _shell.LibraryBrowserPersistedFolderScroll;
                 }
-                if (!string.IsNullOrWhiteSpace(_host._libraryBrowserPersistedLastViewKey))
+                if (!string.IsNullOrWhiteSpace(_shell.LibraryBrowserPersistedLastViewKey))
                 {
                     ws.PendingSessionRestore = true;
-                    ws.PendingRestoreViewKey = _host._libraryBrowserPersistedLastViewKey;
-                    ws.PendingRestoreDetailScrollAfterShow = Math.Max(0, _host._libraryBrowserPersistedDetailScroll);
+                    ws.PendingRestoreViewKey = _shell.LibraryBrowserPersistedLastViewKey;
+                    ws.PendingRestoreDetailScrollAfterShow = Math.Max(0, _shell.LibraryBrowserPersistedDetailScroll);
                 }
 
                 Action<string, bool> runLibraryScan = null;
@@ -80,25 +79,25 @@ namespace PixelVaultNative
                 Action openSelectedLibraryMetadataEditor = null;
                 Func<LibraryBrowserFolderView, LibraryFolderInfo> getDisplayFolder = delegate(LibraryBrowserFolderView view)
                 {
-                    return _host.BuildLibraryBrowserDisplayFolder(view);
+                    return _shell.BuildLibraryBrowserDisplayFolder(view);
                 };
                 Func<LibraryBrowserFolderView, LibraryFolderInfo> getActionFolder = delegate(LibraryBrowserFolderView view)
                 {
-                    return _host.GetLibraryBrowserPrimaryFolder(view) ?? _host.BuildLibraryBrowserDisplayFolder(view);
+                    return _shell.GetLibraryBrowserPrimaryFolder(view) ?? _shell.BuildLibraryBrowserDisplayFolder(view);
                 };
 
                 Func<List<string>> getVisibleDetailFilesOrdered =
-                    _host.LibraryBrowserCreateVisibleDetailFilesOrdered(ws, getDisplayFolder);
+                    _shell.LibraryBrowserCreateVisibleDetailFilesOrdered(ws, getDisplayFolder);
 
                 Func<List<string>> getSelectedDetailFiles =
-                    _host.LibraryBrowserCreateSelectedDetailFiles(ws, getVisibleDetailFilesOrdered);
+                    _shell.LibraryBrowserCreateSelectedDetailFiles(ws, getVisibleDetailFilesOrdered);
 
-                Action<string, ModifierKeys> updateDetailSelection = _host.LibraryBrowserCreateUpdateDetailSelection(
+                Action<string, ModifierKeys> updateDetailSelection = _shell.LibraryBrowserCreateUpdateDetailSelection(
                     ws,
                     getVisibleDetailFilesOrdered,
                     delegate { if (refreshDetailSelectionUi != null) refreshDetailSelectionUi(); });
 
-                refreshDetailSelectionUi = _host.LibraryBrowserCreateRefreshDetailSelectionUi(ws, panes, getSelectedDetailFiles);
+                refreshDetailSelectionUi = _shell.LibraryBrowserCreateRefreshDetailSelectionUi(ws, panes, getSelectedDetailFiles);
                 panes.DetailRows.BeforeVisibleRowsRebuilt = delegate
                 {
                     ws.DetailTiles.Clear();
@@ -108,31 +107,31 @@ namespace PixelVaultNative
                     if (refreshDetailSelectionUi != null) refreshDetailSelectionUi();
                 };
 
-                refreshIntakeReviewBadge = delegate { _host.LibraryBrowserScheduleIntakeReviewBadgeRefresh(libraryWindow, ws, navChrome); };
+                refreshIntakeReviewBadge = delegate { _shell.LibraryBrowserScheduleIntakeReviewBadgeRefresh(libraryWindow, ws, navChrome); };
 
                 refreshSortButtons = delegate
                 {
-                    var normalized = _host.NormalizeLibraryFolderSortMode(_host.libraryFolderSortMode);
-                    _host.LibraryBrowserApplySortGroupPillState(panes.SortPlatformButton, string.Equals(normalized, "platform", StringComparison.OrdinalIgnoreCase));
-                    _host.LibraryBrowserApplySortGroupPillState(panes.SortRecentButton, string.Equals(normalized, "recent", StringComparison.OrdinalIgnoreCase));
-                    _host.LibraryBrowserApplySortGroupPillState(panes.SortPhotosButton, string.Equals(normalized, "photos", StringComparison.OrdinalIgnoreCase));
+                    var normalized = _shell.NormalizeLibraryFolderSortMode(_shell.LibraryFolderSortMode);
+                    _shell.LibraryBrowserApplySortGroupPillState(panes.SortPlatformButton, string.Equals(normalized, "platform", StringComparison.OrdinalIgnoreCase));
+                    _shell.LibraryBrowserApplySortGroupPillState(panes.SortRecentButton, string.Equals(normalized, "recent", StringComparison.OrdinalIgnoreCase));
+                    _shell.LibraryBrowserApplySortGroupPillState(panes.SortPhotosButton, string.Equals(normalized, "photos", StringComparison.OrdinalIgnoreCase));
                 };
 
                 refreshGroupingButtons = delegate
                 {
-                    var normalized = _host.NormalizeLibraryGroupingMode(_host.libraryGroupingMode);
-                    _host.LibraryBrowserApplySortGroupPillState(panes.GroupAllButton, string.Equals(normalized, "all", StringComparison.OrdinalIgnoreCase));
-                    _host.LibraryBrowserApplySortGroupPillState(panes.GroupConsoleButton, string.Equals(normalized, "console", StringComparison.OrdinalIgnoreCase));
+                    var normalized = _shell.NormalizeLibraryGroupingMode(_shell.LibraryGroupingMode);
+                    _shell.LibraryBrowserApplySortGroupPillState(panes.GroupAllButton, string.Equals(normalized, "all", StringComparison.OrdinalIgnoreCase));
+                    _shell.LibraryBrowserApplySortGroupPillState(panes.GroupConsoleButton, string.Equals(normalized, "console", StringComparison.OrdinalIgnoreCase));
                 };
 
                 setLibrarySortMode = delegate(string mode)
                 {
-                    var normalized = _host.NormalizeLibraryFolderSortMode(mode);
+                    var normalized = _shell.NormalizeLibraryFolderSortMode(mode);
                     if (string.Equals(normalized, "played", StringComparison.OrdinalIgnoreCase)) normalized = "recent";
-                    if (!string.Equals(normalized, _host.NormalizeLibraryFolderSortMode(_host.libraryFolderSortMode), StringComparison.OrdinalIgnoreCase))
+                    if (!string.Equals(normalized, _shell.NormalizeLibraryFolderSortMode(_shell.LibraryFolderSortMode), StringComparison.OrdinalIgnoreCase))
                     {
-                        _host.libraryFolderSortMode = normalized;
-                        _host.SaveSettings();
+                        _shell.LibraryFolderSortMode = normalized;
+                        _shell.SaveSettings();
                         if (renderTiles != null) renderTiles();
                     }
                     refreshSortButtons();
@@ -140,11 +139,11 @@ namespace PixelVaultNative
 
                 setLibraryGroupingMode = delegate(string mode)
                 {
-                    var normalized = _host.NormalizeLibraryGroupingMode(mode);
-                    if (!string.Equals(normalized, _host.NormalizeLibraryGroupingMode(_host.libraryGroupingMode), StringComparison.OrdinalIgnoreCase))
+                    var normalized = _shell.NormalizeLibraryGroupingMode(mode);
+                    if (!string.Equals(normalized, _shell.NormalizeLibraryGroupingMode(_shell.LibraryGroupingMode), StringComparison.OrdinalIgnoreCase))
                     {
-                        _host.libraryGroupingMode = normalized;
-                        _host.SaveSettings();
+                        _shell.LibraryGroupingMode = normalized;
+                        _shell.SaveSettings();
                         if (renderTiles != null) renderTiles();
                     }
                     refreshGroupingButtons();
@@ -152,28 +151,28 @@ namespace PixelVaultNative
 
                 openSingleFileMetadataEditor = delegate(string filePath)
                 {
-                    _host.LibraryBrowserOpenSingleFileMetadataEditor(ws, filePath, getVisibleDetailFilesOrdered, getSelectedDetailFiles, getDisplayFolder, getActionFolder, refreshLibraryFoldersAsync);
+                    _shell.LibraryBrowserOpenSingleFileMetadataEditor(ws, filePath, getVisibleDetailFilesOrdered, getSelectedDetailFiles, getDisplayFolder, getActionFolder, refreshLibraryFoldersAsync);
                 };
 
                 openSelectedLibraryMetadataEditor = delegate
                 {
-                    _host.LibraryBrowserOpenSingleFileMetadataEditor(ws, null, getVisibleDetailFilesOrdered, getSelectedDetailFiles, getDisplayFolder, getActionFolder, refreshLibraryFoldersAsync);
+                    _shell.LibraryBrowserOpenSingleFileMetadataEditor(ws, null, getVisibleDetailFilesOrdered, getSelectedDetailFiles, getDisplayFolder, getActionFolder, refreshLibraryFoldersAsync);
                 };
 
                 deleteSelectedLibraryFiles = delegate
                 {
-                    _host.LibraryBrowserDeleteSelectedCaptures(ws, getSelectedDetailFiles, renderTiles, renderSelectedFolder, refreshLibraryFoldersAsync);
+                    _shell.LibraryBrowserDeleteSelectedCaptures(ws, getSelectedDetailFiles, renderTiles, renderSelectedFolder, refreshLibraryFoldersAsync);
                 };
 
                 renderSelectedFolder = delegate
                 {
-                    _host.LibraryBrowserRenderSelectedFolderDetail(ws, libraryWindow, openSingleFileMetadataEditor, updateDetailSelection, refreshDetailSelectionUi);
+                    _shell.LibraryBrowserRenderSelectedFolderDetail(ws, libraryWindow, openSingleFileMetadataEditor, updateDetailSelection, refreshDetailSelectionUi);
                     if (ws.Current == null) ws.DetailSelectionAnchorIndex = -1;
                 };
 
                 Func<LibraryBrowserFolderView, int, int, bool, Button> buildFolderTile = delegate(LibraryBrowserFolderView folder, int tileWidth, int tileHeight, bool showPlatformBadge)
                 {
-                    return _host.LibraryBrowserBuildFolderTile(
+                    return _shell.LibraryBrowserBuildFolderTile(
                         folder,
                         tileWidth,
                         tileHeight,
@@ -187,33 +186,33 @@ namespace PixelVaultNative
 
                 showFolder = delegate(LibraryBrowserFolderView info)
                 {
-                    _host.LibraryBrowserShowSelectedFolder(ws, panes, libraryWindow, info, renderSelectedFolder);
+                    _shell.LibraryBrowserShowSelectedFolder(ws, panes, libraryWindow, info, renderSelectedFolder);
                 };
 
                 Action renderFolderTilesCore = null;
                 renderFolderTilesCore = delegate
                 {
-                    _host.LibraryBrowserRenderFolderList(ws, buildFolderTile, showFolder, renderSelectedFolder, renderFolderTilesCore);
+                    _shell.LibraryBrowserRenderFolderList(ws, buildFolderTile, showFolder, renderSelectedFolder, renderFolderTilesCore);
                 };
                 renderTiles = renderFolderTilesCore;
 
                 refreshLibraryFoldersAsync = delegate(bool forceRefresh)
                 {
-                    _host.LibraryBrowserRefreshFoldersAsync(libraryWindow, ws, forceRefresh, renderTiles);
+                    _shell.LibraryBrowserRefreshFoldersAsync(libraryWindow, ws, forceRefresh, renderTiles);
                 };
-                _host.activeLibraryFolderRefresh = refreshLibraryFoldersAsync;
+                _shell.ActiveLibraryFolderRefresh = refreshLibraryFoldersAsync;
                 if (!reuseMainWindow)
                 {
                     libraryWindow.Closed += delegate
                     {
-                        if (_host.activeLibraryFolderRefresh == refreshLibraryFoldersAsync) _host.activeLibraryFolderRefresh = null;
-                        _host.activeSelectedLibraryFolder = null;
+                        if (_shell.ActiveLibraryFolderRefresh == refreshLibraryFoldersAsync) _shell.ActiveLibraryFolderRefresh = null;
+                        _shell.ActiveSelectedLibraryFolder = null;
                     };
                 }
 
                 prefillLibraryFoldersFromSnapshotAsync = delegate
                 {
-                    _host.LibraryBrowserPrefillFoldersFromSnapshot(libraryWindow, ws, renderTiles);
+                    _shell.LibraryBrowserPrefillFoldersFromSnapshot(libraryWindow, ws, renderTiles);
                 };
                 setLibraryBusyState = delegate(bool isBusy)
                 {
@@ -228,12 +227,12 @@ namespace PixelVaultNative
 
                 runLibraryScan = delegate(string folderPath, bool forceRescan)
                 {
-                    _host.LibraryBrowserRunFolderMetadataScan(libraryWindow, ws, folderPath, forceRescan, setLibraryBusyState, refreshLibraryFoldersAsync);
+                    _shell.LibraryBrowserRunFolderMetadataScan(libraryWindow, ws, folderPath, forceRescan, setLibraryBusyState, refreshLibraryFoldersAsync);
                 };
 
                 runScopedCoverRefresh = delegate(List<LibraryFolderInfo> requestedFolders, string scopeLabel, bool forceRefreshExistingCovers, bool rebuildFullCacheAfterRefresh)
                 {
-                    _host.RunLibraryBrowserScopedCoverRefresh(
+                    _shell.RunLibraryBrowserScopedCoverRefresh(
                         libraryWindow,
                         ws,
                         requestedFolders,
@@ -253,19 +252,19 @@ namespace PixelVaultNative
                     panes.SearchDebounceTimer.Stop();
                     if (string.Equals(ws.AppliedLibrarySearchText, ws.PendingLibrarySearchText, StringComparison.OrdinalIgnoreCase)) return;
                     ws.AppliedLibrarySearchText = ws.PendingLibrarySearchText;
-                    _host.PersistLibraryBrowserCommittedSearch(ws.AppliedLibrarySearchText);
+                    _shell.PersistLibraryBrowserCommittedSearch(ws.AppliedLibrarySearchText);
                     if (renderTiles != null) renderTiles();
                 };
-                _host.LibraryBrowserWirePaneEvents(libraryWindow, ws, panes, renderTiles, renderSelectedFolder, applySearchFilter);
+                _shell.LibraryBrowserWirePaneEvents(libraryWindow, ws, panes, renderTiles, renderSelectedFolder, applySearchFilter);
 
                 openLibraryMetadataEditor = delegate(LibraryBrowserFolderView focusFolder)
                 {
-                    _host.LibraryBrowserOpenLibraryMetadataForFolder(ws, focusFolder, showFolder, refreshDetailSelectionUi, delegate
+                    _shell.LibraryBrowserOpenLibraryMetadataForFolder(ws, focusFolder, showFolder, refreshDetailSelectionUi, delegate
                     {
-                        _host.LibraryBrowserOpenSingleFileMetadataEditor(ws, null, getVisibleDetailFilesOrdered, getSelectedDetailFiles, getDisplayFolder, getActionFolder, refreshLibraryFoldersAsync);
+                        _shell.LibraryBrowserOpenSingleFileMetadataEditor(ws, null, getVisibleDetailFilesOrdered, getSelectedDetailFiles, getDisplayFolder, getActionFolder, refreshLibraryFoldersAsync);
                     });
                 };
-                _host.LibraryBrowserWireNavChromeAndToolbar(
+                _shell.LibraryBrowserWireNavChromeAndToolbar(
                     libraryWindow,
                     ws,
                     panes,
@@ -287,8 +286,8 @@ namespace PixelVaultNative
                 if (!reuseMainWindow) libraryWindow.Show();
                 if (renderTiles != null) renderTiles();
                 if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge();
-                var autoRefreshLibraryFoldersOnStartup = !_host.librarySession.HasLibraryFolderCacheSnapshot();
-                if (!autoRefreshLibraryFoldersOnStartup && _host.status != null) _host.status.Text = "Loading cached library folders...";
+                var autoRefreshLibraryFoldersOnStartup = !_shell.LibrarySession.HasLibraryFolderCacheSnapshot();
+                if (!autoRefreshLibraryFoldersOnStartup && _shell.StatusLine != null) _shell.StatusLine.Text = "Loading cached library folders...";
                 if (prefillLibraryFoldersFromSnapshotAsync != null) prefillLibraryFoldersFromSnapshotAsync();
                 if (refreshLibraryFoldersAsync != null && autoRefreshLibraryFoldersOnStartup) refreshLibraryFoldersAsync(false);
             }

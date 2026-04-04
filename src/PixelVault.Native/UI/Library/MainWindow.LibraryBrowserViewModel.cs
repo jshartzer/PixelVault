@@ -7,7 +7,7 @@ namespace PixelVaultNative
 {
     public sealed partial class MainWindow
     {
-        sealed class LibraryBrowserFolderView
+        internal sealed class LibraryBrowserFolderView
         {
             internal string ViewKey;
             internal string GameId;

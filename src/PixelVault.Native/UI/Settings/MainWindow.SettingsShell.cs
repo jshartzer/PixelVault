@@ -339,5 +339,40 @@ namespace PixelVaultNative
             };
             window.ShowDialog();
         }
+
+        double PreferredSettingsWindowHeight()
+        {
+            var available = Math.Max(600, SystemParameters.WorkArea.Height - 32);
+            return Math.Min(available, 1200);
+        }
+
+        TextBox SettingsTextBox(Grid panel, int row, string label, string value, Brush labelForeground = null, Brush boxBackground = null, Brush boxForeground = null, Brush boxBorderBrush = null, Brush boxCaretBrush = null)
+        {
+            while (panel.RowDefinitions.Count <= row) panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            var text = new TextBlock { Text = label, Margin = new Thickness(0, row == 0 ? 0 : 12, 12, 0), VerticalAlignment = VerticalAlignment.Center, Foreground = labelForeground ?? Brushes.Black };
+            Grid.SetRow(text, row);
+            panel.Children.Add(text);
+            var box = new TextBox { Text = value, Margin = new Thickness(0, row == 0 ? 0 : 12, 12, 0), Padding = new Thickness(8) };
+            if (boxBackground != null) box.Background = boxBackground;
+            if (boxForeground != null)
+            {
+                box.Foreground = boxForeground;
+                box.CaretBrush = boxCaretBrush ?? boxForeground;
+            }
+            if (boxBorderBrush != null) box.BorderBrush = boxBorderBrush;
+            Grid.SetRow(box, row);
+            Grid.SetColumn(box, 1);
+            panel.Children.Add(box);
+            return box;
+        }
+
+        void SettingsBrowseButton(Grid panel, int row, RoutedEventHandler click, string label = "Browse")
+        {
+            var button = Btn(label, click, null, Brushes.Black);
+            button.Margin = new Thickness(0, row == 0 ? 0 : 12, 0, 0);
+            Grid.SetRow(button, row);
+            Grid.SetColumn(button, 2);
+            panel.Children.Add(button);
+        }
     }
 }

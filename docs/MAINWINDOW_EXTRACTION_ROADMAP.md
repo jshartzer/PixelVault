@@ -33,11 +33,14 @@ This document is the **execution roadmap** for slicing responsibilities off `Mai
 | `UI/Editors/PhotoIndexEditorHost.cs` | ~370 | Photo index editor UI (`PhotoIndexEditorHost.Show` + `PhotoIndexEditorServices`, Phase D3) |
 | `MediaTools/MediaToolHelpers.cs` | ~700 | Exe runners, FFmpeg helpers |
 | `UI/Library/LibraryWorkspaceContext.cs` | ~175 | Library root + folder listing + file-tag cache facade (Phase E2) |
-| `UI/Library/MainWindow.LibraryBrowserOrchestrator.cs` | ~390 | `ShowLibraryBrowserCore` shell: nav, panes, delegates wiring into folder/detail partials (Phase E1) |
-| `UI/Library/MainWindow.LibraryBrowserOrchestrator.Selection.cs` | ~150 | Detail multi-select helpers + shared sort/group pill chrome; replaces large inline lambdas in **`ShowLibraryBrowserCore`** (E2 follow-on, Apr 2026) |
+| `UI/Library/LibraryBrowserHost.cs` | ~55 | Phase **E** host: **`Show`** (try/catch, logging) + **`ILibrarySession`**; runs **`LibraryBrowserShowOrchestration`** with **`LibraryBrowserShellBridge`** → **`ILibraryBrowserShell`** |
+| `UI/Library/ILibraryBrowserShell.cs` | — | **`ILibraryBrowserShell`**: stable surface for Library show orchestration so it does not reference **`MainWindow`** as a type |
+| `UI/Library/MainWindow.LibraryBrowserShellBridge.cs` | — | Nested **`LibraryBrowserShellBridge`**: forwards **`ILibraryBrowserShell`** to **`MainWindow`** partial methods + persisted Library fields |
+| `UI/Library/MainWindow.LibraryBrowserShowOrchestration.cs` | ~290 | Nested **`LibraryBrowserShowOrchestration`**: nav, panes, delegate wiring; depends on **`ILibraryBrowserShell`** only (Phase E capstone, Apr 2026) |
+| `UI/Library/MainWindow.LibraryBrowserOrchestrator.Selection.cs` | ~150 | Detail multi-select helpers + shared sort/group pill chrome; wired from **`LibraryBrowserShowOrchestration.Run`** (E2 follow-on, Apr 2026) |
 | `UI/Library/MainWindow.LibraryMetadataScan.cs` | ~195 | **`ShowLibraryMetadataScanWindow`** — metadata index scan progress UI (`MainWindow` partial; Apr 2026) |
-| `UI/Settings/MainWindow.SettingsShell.cs` | ~310 | `BuildUi`, `BuildSettingsSummary`, `BuildDiagnosticsSummary`, `ShowPathSettingsWindow`, `ShowSettingsWindow` (Phase F1); library-aligned dark theme; no import/maintenance panel |
-| `UI/Photography/MainWindow.PhotographyAndSteam.cs` | ~265 | `ShowPhotographyGallery`, `ShowSteamAppMatchWindow` (Phase F2) |
+| `UI/Settings/MainWindow.SettingsShell.cs` | ~360 | Same + path grid helpers `SettingsTextBox`, `SettingsBrowseButton`, `PreferredSettingsWindowHeight` (Phase F1); library-aligned dark theme; no import/maintenance panel |
+| `UI/Photography/MainWindow.PhotographyAndSteam.cs` | ~340 | Gallery + Steam picker + **`GetTaggedImagesCached`** / inventory stamp / tag scan / cache IO (Phase F2) |
 | `UI/LibraryVirtualization.cs` | ~570 | Virtualized rows / scroll hosts |
 | `Services/Library/LibraryScanner.cs` | — | **`ILibraryScanner`**: metadata index scan, folder grouping, folder cache rebuild/cached load; uses **`IMetadataService`** + **`ILibraryScanHost`**. |
 | `Services/Import/ImportService.cs` | — | **`IImportService`**: move-to-destination, undo manifest, sort destination root, undo moves (`ImportServiceDependencies`). |
@@ -150,17 +153,17 @@ The **priority** is to shrink **`PixelVault.Native.cs`**, not to collapse partia
 
 **Dependency:** Prefer completing **Phase 2** responsiveness items that touch Library (debounce, image load paths) before E1, or do E1 behind a thin wrapper so background work stays correct.
 
-**Progress (E1):** `ShowLibraryBrowser` moved from `PixelVault.Native.cs` to **`UI/Library/MainWindow.LibraryBrowserOrchestrator.cs`** (was **`MainWindow.LibraryBrowser.cs`**) as a **`MainWindow` partial**; entry is **`LibraryBrowserHost`** (`UI/Library/LibraryBrowserHost.cs`) delegating to **`MainWindow.ShowLibraryBrowserCore`**. Next: **`ILibrarySession` / facade** per E2 when Library is touched again.
+**Progress (E1):** **`LibraryBrowserHost`** (`UI/Library/LibraryBrowserHost.cs`) is the **sole entry** for opening the Library: **`Show`** runs try/catch, **`LogException`**, and **`new LibraryBrowserShowOrchestration(new LibraryBrowserShellBridge(mainWindow)).Run(...)`**. `MainWindow.ShowLibraryBrowser` holds the lazy **`LibraryBrowserHost`** only. **Orchestration depth:** nested **`LibraryBrowserShowOrchestration`** (`UI/Library/MainWindow.LibraryBrowserShowOrchestration.cs`) depends on **`ILibraryBrowserShell`** only (session, persisted search/scroll/view, sort/group mode, nav/pane wiring, cover refresh, etc.); **`LibraryBrowserShellBridge`** implements that surface by forwarding to existing **`MainWindow`** partials. **`LibraryBrowserWorkingSet`**, **`LibraryBrowserFolderView`**, **`VirtualizedRowHost`**, and **`VirtualizedRowDefinition`** are **`internal`** so the shell contract and pane refs compile cleanly across files. **Phase E exit (roadmap):** new Library browser **show** behavior is added on **`LibraryBrowserHost`** / **`LibraryBrowserShowOrchestration`** / **`ILibraryBrowserShell`** implementations / services — not via a new top-level hop on **`MainWindow`**. Optional later: trim **`ILibraryBrowserShell`** if orchestration moves off-`Window` entirely.
 
-**Progress (E2):** **`UI/Library/LibraryWorkspaceContext.cs`** — owns **folder image listing cache** and **file-tag cache** (formerly `fileTagCache` / `fileTagCacheStamp` / `fileTagCacheSync`), exposes **`LibraryRoot`** (via `LibraryWorkspaceRoot`) and **`UiDispatcher`**. `RemoveCachedFolderListings`, `ClearFolderImageListings`, `GetCachedFolderImages`, `TryGetCachedFileTags`, `SetCachedFileTags`, `RemoveCachedFileTagEntries`, and `ClearFileTagCache` live on the context; **`MainWindow`** keeps thin wrappers for call sites in partials. **`ILibrarySession`** / **`LibrarySession`** aggregate **`Workspace`**, **`Scanner`**, **`FileSystem`**, **`LibraryRoot`**, and **`PersistGameIndexRows`** ( **`IGameIndexEditorAssignmentService`** ); **`ShowLibraryBrowserCore`** (**`MainWindow.LibraryBrowserOrchestrator.cs`**) uses **`librarySession.PersistGameIndexRows`** after detail-pane metadata repair. **`MainWindow`** constructs **`librarySession`** after **`gameIndexEditorAssignmentService`**. Bitmap decode cache remains on **`MainWindow`** for now.
+**Progress (E2):** **`UI/Library/LibraryWorkspaceContext.cs`** — owns **folder image listing cache** and **file-tag cache** (formerly `fileTagCache` / `fileTagCacheStamp` / `fileTagCacheSync`), exposes **`LibraryRoot`** (via `LibraryWorkspaceRoot`) and **`UiDispatcher`**. `RemoveCachedFolderListings`, `ClearFolderImageListings`, `GetCachedFolderImages`, `TryGetCachedFileTags`, `SetCachedFileTags`, `RemoveCachedFileTagEntries`, and `ClearFileTagCache` live on the context; **`MainWindow`** keeps thin wrappers for call sites in partials. **`ILibrarySession`** / **`LibrarySession`** aggregate **`Workspace`**, **`Scanner`**, **`FileSystem`**, **`LibraryRoot`**, and **`PersistGameIndexRows`** ( **`IGameIndexEditorAssignmentService`** ); detail-pane metadata repair uses **`librarySession.PersistGameIndexRows`** via existing partials. **`MainWindow`** constructs **`librarySession`** after **`gameIndexEditorAssignmentService`**. Bitmap decode cache remains on **`MainWindow`** for now.
 
 ### E2 follow-on — session facade scope and UI-adjacent async (Mar 2026)
 
-Review feedback matches the plan: **`LibraryBrowserHost`** is intentionally a **thin entry** into **`ShowLibraryBrowserCore`**. The next **substantive** Library slice is **not** moving code between partials for its own sake, but shaping a **library/session facade** (working name **`ILibrarySession`**, or an interface over **`LibraryWorkspaceContext`** plus scan/refresh seams) that:
+Review feedback matches the plan: **`LibraryBrowserHost`** is the **typed entry** for Library show (error boundary + session). Further Library slices are **not** about shuffling partials for their own sake, but about the **library/session facade** (**`ILibrarySession`** over **`LibraryWorkspaceContext`** plus scan/refresh seams) so that:
 
 - Surfaces **library root**, **folder refresh contracts**, and explicit rules for **thread-pool-safe** work vs **UI-thread-only** work (e.g. bitmap decode cache, **`Dispatcher.BeginInvoke`** boundaries).
 - Cuts down **behavior expressed as deep nested `Action` delegates** on **`MainWindow`**, which is the main place **async UI races** show up (stale task completions, double window open, combo refill after close).
-- Lets **`LibraryBrowserHost`** (and later, **`ShowLibraryBrowserCore`**) depend on **facade + services** (`ILibraryScanner`, `IMetadataService`, persistence) instead of **`MainWindow`** as a grab-bag of helpers.
+- Lets **`LibraryBrowserHost`** / **`LibraryBrowserShowOrchestration`** depend on **facade + services** (`ILibraryScanner`, `IMetadataService`, persistence) instead of **`MainWindow`** as a grab-bag of helpers.
 
 **Testing:** Unit coverage is solid for core logic; **UI-adjacent async** (pool load → marshal → show window or refill controls) is the weakest area. Mitigations, cheapest first:
 
@@ -170,11 +173,11 @@ Review feedback matches the plan: **`LibraryBrowserHost`** is intentionally a **
 
 **Coordination:** Prefer **not** pairing a large facade pass with heavy **`IImportService`** / **`ImportWorkflow`** edits in the same window; see **`docs/SERVICE_OWNERSHIP_AND_PARALLEL_WORK_MAP.md`**.
 
-**Progress (E2 slice, Apr 2026):** Scoped library cover refresh (progress window, cancel, folder reload) moved from an inline delegate in **`ShowLibraryBrowserCore`** to **`RunLibraryBrowserScopedCoverRefresh`** in **`UI/Library/MainWindow.LibraryBrowserOrchestrator.CoverRefresh.cs`** (**`MainWindow`** partial); orchestrator assigns **`runScopedCoverRefresh`** to call it (no intended behavior change).
+**Progress (E2 slice, Apr 2026):** Scoped library cover refresh (progress window, cancel, folder reload) is **`RunLibraryBrowserScopedCoverRefresh`** in **`UI/Library/MainWindow.LibraryBrowserOrchestrator.CoverRefresh.cs`**; **`LibraryBrowserShowOrchestration`** assigns **`runScopedCoverRefresh`** (no intended behavior change).
 
-**Progress (E2 slice, continued):** Additional **`ShowLibraryBrowserCore`** blocks moved to **`MainWindow`** partials — detail delete + metadata editor + “edit metadata for folder” in **`MainWindow.LibraryBrowserOrchestrator.DetailCommands.cs`**; folder list refresh, snapshot prefill, and metadata scan callback in **`MainWindow.LibraryBrowserOrchestrator.FolderData.cs`**; intake review badge refresh in **`MainWindow.LibraryBrowserOrchestrator.IntakeBadge.cs`**. Orchestrator keeps thin delegates (no intended behavior change).
+**Progress (E2 slice, continued):** Detail delete + metadata editor + “edit metadata for folder” live in **`MainWindow.LibraryBrowserOrchestrator.DetailCommands.cs`**; folder list refresh, snapshot prefill, and metadata scan callback in **`MainWindow.LibraryBrowserOrchestrator.FolderData.cs`**; intake review badge refresh in **`MainWindow.LibraryBrowserOrchestrator.IntakeBadge.cs`**.
 
-**Progress (E2 slice, Apr 2026 — selection + chrome):** **`UI/Library/MainWindow.LibraryBrowserOrchestrator.Selection.cs`** — named factories/helpers for **`getVisibleDetailFilesOrdered`**, **`getSelectedDetailFiles`**, **`updateDetailSelection`**, **`refreshDetailSelectionUi`** (**`LibraryBrowserCreate*`** / **`LibraryBrowserApplyDetailSelectionChange`**) plus **`LibraryBrowserApplySortGroupPillState`** for sort/group buttons. **`ShowLibraryBrowserCore`** wires these instead of large nested delegates (no intended behavior change).
+**Progress (E2 slice, Apr 2026 — selection + chrome):** **`UI/Library/MainWindow.LibraryBrowserOrchestrator.Selection.cs`** — factories/helpers for **`getVisibleDetailFilesOrdered`**, **`getSelectedDetailFiles`**, **`updateDetailSelection`**, **`refreshDetailSelectionUi`** (**`LibraryBrowserCreate*`** / **`LibraryBrowserApplyDetailSelectionChange`**) plus **`LibraryBrowserApplySortGroupPillState`**. **`LibraryBrowserShowOrchestration.Run`** wires these instead of large inline nests in one method.
 
 **Progress (E3):** Library virtualization stays in **`UI/LibraryVirtualization.cs`**; **`ShowLibraryBrowser`** already consumes it via **`MainWindow`** partial methods — **no further structural change** for this slice.
 
@@ -184,21 +187,52 @@ Review feedback matches the plan: **`LibraryBrowserHost`** is intentionally a **
 
 ## Phase F — Settings, photography, misc windows
 
-**Goal:** Remaining top-level flows.
+**Goal:** Remaining top-level flows; **shrink `PixelVault.Native.cs`** by colocating settings/photography UI + nearby helpers under `UI/`.
 
 | Slice | Move to | Notes |
 |-------|---------|--------|
-| F1 | `UI/Settings/MainWindow.SettingsShell.cs` (or `SettingsShellBuilder`) | `BuildUi`, path summary, top buttons, **`ShowPathSettingsWindow`**, **`ShowSettingsWindow`**. **Done** as `MainWindow` partial. |
-| F2 | `UI/Photography/MainWindow.PhotographyAndSteam.cs` (roadmap name: `PhotographyWindowHost`) | **`ShowPhotographyGallery`** + **`ShowSteamAppMatchWindow`** as `MainWindow` partial. |
-| F3 | `Services/Config` (optional) | Persisted settings read/write if still embedded in `MainWindow`. |
+| F1 | `UI/Settings/MainWindow.SettingsShell.cs` (or `SettingsShellBuilder`) | Main settings page, path modal, summaries, **`SettingsTextBox` / `SettingsBrowseButton` / `PreferredSettingsWindowHeight`** — **F1 bar complete**; **F3** optional host/persistence |
+| F2 | `UI/Photography/MainWindow.PhotographyAndSteam.cs` (roadmap name: `PhotographyWindowHost`) | Gallery, Steam picker (**`ShowSteamAppMatchWindow(Window owner, …)`**), photography index/cache helpers — **F2 bar complete** |
+| F3 | `UI/Settings/` + `Services/Config/` (optional) | Persistence already in **`ISettingsService`**; F3 is **optional** presentation/host extraction — see **F3 (optional recommendation)** below. |
 
 **Exit:** `PixelVault.Native.cs` is mostly **constructor wiring**, `MainWindow` lifecycle, and delegation to hosts.
 
 **Progress (F1):** **`UI/Settings/MainWindow.SettingsShell.cs`** — **`BuildUi`**, **`BuildSettingsSummary`**, **`BuildDiagnosticsSummary`**, **`ShowPathSettingsWindow`**, and **`ShowSettingsWindow`** (modal wrapper + field restore on close). **Apr 2026:** Library-first settings chrome (dark theme aligned with Library); import actions and intake preview pane removed from Settings (import lives on Library toolbar).
 
-**Progress (F2):** **`UI/Photography/MainWindow.PhotographyAndSteam.cs`** — **`ShowPhotographyGallery`** (uses **`libraryWorkspace.LibraryRoot`** for paths) and **`ShowSteamAppMatchWindow`** (manual metadata Steam search picker).
+**Progress (F2):** **`UI/Photography/MainWindow.PhotographyAndSteam.cs`** — **`ShowPhotographyGallery`** (**`LogException`** on failure), **`GetTaggedImagesCached`** + cache/inventory/tag-scan helpers, and **`ShowSteamAppMatchWindow(Window owner, …)`** (manual metadata passes **`manualWindow`**). **Apr 2026:** colocated off **`PixelVault.Native.cs`**.
 
-**Progress (F3):** **`ISettingsService`** / **`SettingsService`** already own settings load/save (`Services/Config/`). **`ShowSettingsWindow`** and path UI remain on **`MainWindow`**; no further F3 slice required unless settings UI moves out of `PixelVault.Native.cs`.
+---
+
+### F1 extraction bar (complete for current scope)
+
+These items are **about file placement and dependency edges**, not user-visible feature work.
+
+1. ~~**Colocate path-settings controls**~~ — **Done (Apr 2026):** **`SettingsTextBox`**, **`SettingsBrowseButton`**, and **`PreferredSettingsWindowHeight`** live in **`UI/Settings/MainWindow.SettingsShell.cs`** with **`ShowPathSettingsWindow`** / **`ShowSettingsWindow`**.
+2. **Acceptable on `MainWindow` until F3** — **`CaptureAppSettings`**, **`ApplyAppSettings`**, **`LoadSettings`**, and **`SaveSettings`** remain on **`MainWindow`**: they map **flat fields** ↔ **`AppSettings`** and **`ISettingsService`**. Optional **F3** can move presentation or persistence partials when desired.
+
+---
+
+### F2 extraction bar (complete for current scope)
+
+1. ~~**Colocate photography gallery indexing**~~ — **Done (Apr 2026):** **`GetTaggedImagesCached`**, **`BuildImageInventoryStamp`**, **`TaggedImageCachePath`**, **`LoadTaggedImageCache`**, **`SaveTaggedImageCache`**, **`FindTaggedImages`** live in **`MainWindow.PhotographyAndSteam.cs`**.
+2. ~~**Owner + errors (polish)**~~ — **Done (Apr 2026):** **`ShowSteamAppMatchWindow(Window owner, …)`** with **`Owner = owner ?? this`**; photography gallery **`catch`** uses **`LogException("ShowPhotographyGallery", ex)`** plus **`MessageBox`**.
+
+---
+
+### F3 — Optional recommendation (settings UI / host)
+
+**`ISettingsService`** / **`SettingsService`** already own **INI read/write** (`Services/Config/`). F3 is **not** duplicate persistence; it is optional **structure** when you want settings out of the **`Window` partial** entirely:
+
+1. **Preferred (clean host):** Add a **`SettingsShellHost`** (plain class under **`UI/Settings/`**) that owns **`ShowSettingsWindow`** / **`ShowPathSettingsWindow`** modal lifecycle and **`BuildUi`**, taking a **`SettingsShellDependencies`**-style record: path fields (or getters), **`ISettingsService`**, load/save/apply callbacks, **`RefreshMainUi`**, **`PickFolder`/`PickFile`**, log/troubleshooting hooks. **`MainWindow`** constructs the host once and calls **`host.ShowMainSettings()`** / **`host.ShowPathSettings()`**.
+2. **Smaller incremental:** Add **`MainWindow.SettingsPersistence.cs`** next to **`MainWindow.SettingsShell.cs`** and move only **`LoadSettings`**, **`SaveSettings`**, **`CaptureAppSettings`**, **`ApplyAppSettings`** there — drops a chunk of lines from **`PixelVault.Native.cs`** without a full host type.
+
+Pick (1) when settings UX keeps growing; pick (2) when the goal is a quick line-count win.
+
+---
+
+### Legacy progress note (F3 scope)
+
+**Progress (F3):** **`ISettingsService`** / **`SettingsService`** already own settings load/save to disk. Further work is **optional** and tracked in **F3 — Optional recommendation** above.
 
 ---
 
@@ -211,7 +245,7 @@ Tracked in **`docs/pixelvault_service_split_plan.txt`** (different numbering fro
 | Phase 1 Settings | Done | `ISettingsService` |
 | Phase 2 Metadata | Done | `IMetadataService` |
 | Phase 3 Index persistence | Done | `IIndexPersistenceService` |
-| Phase 4 Library scan | Done (current scope) | `ILibraryScanner` + `ILibraryScanHost`; `ShowLibraryBrowser` still **`MainWindow` partial** |
+| Phase 4 Library scan | Done (current scope) | `ILibraryScanner` + `ILibraryScanHost`; Library **show** entry is **`LibraryBrowserHost`** → **`ILibraryBrowserShell`** (**`LibraryBrowserShellBridge`**) + **`LibraryBrowserShowOrchestration`** (render remains **`MainWindow`** partials) |
 | Phase 5 Import | Initial slice done | `IImportService` — moves, undo manifest, destination sort; rename/metadata/delete steps still in **`ImportWorkflow`** / **`MainWindow`** |
 | Phase 6+ Covers / composition root | Not this roadmap’s focus | See service split plan |
 
@@ -258,7 +292,7 @@ Fill this in during **Phase A** (region name, primary file lines if known, Dispa
 
 | Region | Dispatcher / UI thread | Shared `MainWindow` state | Services |
 |--------|-------------------------|---------------------------|----------|
-| Library browser | Yes | `libraryWorkspace`, bitmap decode cache; orchestration split across **`LibraryBrowserOrchestrator`** (+ **`PaneEvents`**, **`NavChromeAndToolbar`**) | **`ILibrarySession`**, cover, metadata, **`libraryScanner`**, index persistence |
+| Library browser | Yes | `libraryWorkspace`, bitmap decode cache; **`LibraryBrowserHost`** + **`LibraryBrowserShowOrchestration`**; partials **`MainWindow.LibraryBrowserOrchestrator.*`**, **`PaneEvents`**, chrome, render | **`ILibrarySession`**, cover, metadata, **`libraryScanner`**, index persistence |
 | Import workflow | Progress on UI; work on pool | `sourceRoot`, `destinationRoot`, `conflictBox` | **`importService`**, **`metadataService`**, **`libraryScanner`** |
 | | | | |
 

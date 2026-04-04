@@ -5,7 +5,7 @@ namespace PixelVaultNative
 {
     public sealed partial class MainWindow
     {
-        /// <summary>Wires Library browser nav chrome and pane toolbar clicks (invoked from <see cref="ShowLibraryBrowserCore"/> after delegates exist).</summary>
+        /// <summary>Wires Library browser nav chrome and pane toolbar clicks (invoked from <see cref="LibraryBrowserHost.Show"/> after delegates exist).</summary>
         void LibraryBrowserWireNavChromeAndToolbar(
             Window libraryWindow,
             LibraryBrowserWorkingSet ws,

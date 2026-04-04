@@ -681,7 +681,7 @@ namespace PixelVaultNative
                             return;
                         }
 
-                        var chosenMatch = matches.Count == 1 ? matches[0] : ShowSteamAppMatchWindow(searchQuery, matches);
+                        var chosenMatch = matches.Count == 1 ? matches[0] : ShowSteamAppMatchWindow(manualWindow, searchQuery, matches);
                         if (chosenMatch == null)
                         {
                             steamLookupStatus.Text = "Steam search canceled. Pick a match or paste the AppID directly.";

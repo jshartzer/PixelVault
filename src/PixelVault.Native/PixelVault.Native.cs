@@ -459,11 +459,6 @@ namespace PixelVaultNative
             var available = Math.Max(520, SystemParameters.WorkArea.Height - 24);
             return Math.Min(available, 1280);
         }
-        double PreferredSettingsWindowHeight()
-        {
-            var available = Math.Max(600, SystemParameters.WorkArea.Height - 32);
-            return Math.Min(available, 1200);
-        }
         string ResolveWorkspaceAssetPath(string fileName)
         {
             if (string.IsNullOrWhiteSpace(fileName)) return string.Empty;
@@ -945,35 +940,6 @@ namespace PixelVaultNative
         {
             var refresh = activeLibraryFolderRefresh;
             if (refresh != null) refresh(forceRefresh);
-        }
-
-        TextBox SettingsTextBox(Grid panel, int row, string label, string value, Brush labelForeground = null, Brush boxBackground = null, Brush boxForeground = null, Brush boxBorderBrush = null, Brush boxCaretBrush = null)
-        {
-            while (panel.RowDefinitions.Count <= row) panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            var text = new TextBlock { Text = label, Margin = new Thickness(0, row == 0 ? 0 : 12, 12, 0), VerticalAlignment = VerticalAlignment.Center, Foreground = labelForeground ?? Brushes.Black };
-            Grid.SetRow(text, row);
-            panel.Children.Add(text);
-            var box = new TextBox { Text = value, Margin = new Thickness(0, row == 0 ? 0 : 12, 12, 0), Padding = new Thickness(8) };
-            if (boxBackground != null) box.Background = boxBackground;
-            if (boxForeground != null)
-            {
-                box.Foreground = boxForeground;
-                box.CaretBrush = boxCaretBrush ?? boxForeground;
-            }
-            if (boxBorderBrush != null) box.BorderBrush = boxBorderBrush;
-            Grid.SetRow(box, row);
-            Grid.SetColumn(box, 1);
-            panel.Children.Add(box);
-            return box;
-        }
-
-        void SettingsBrowseButton(Grid panel, int row, RoutedEventHandler click, string label = "Browse")
-        {
-            var button = Btn(label, click, null, Brushes.Black);
-            button.Margin = new Thickness(0, row == 0 ? 0 : 12, 0, 0);
-            Grid.SetRow(button, row);
-            Grid.SetColumn(button, 2);
-            panel.Children.Add(button);
         }
 
         string PickFolder(string current)
@@ -1542,77 +1508,6 @@ namespace PixelVaultNative
                 return System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase((name ?? string.Empty).ToLowerInvariant());
             }
             return name ?? string.Empty;
-        }
-
-        List<string> GetTaggedImagesCached(string root, bool forceRefresh, params string[] tagCandidates)
-        {
-            var stamp = BuildImageInventoryStamp(root);
-            if (!forceRefresh)
-            {
-                var cached = LoadTaggedImageCache(root, stamp);
-                if (cached != null)
-                {
-                    Log("Photography gallery cache hit.");
-                    return cached;
-                }
-            }
-            Log("Refreshing photography gallery cache.");
-            var fresh = FindTaggedImages(root, tagCandidates);
-            SaveTaggedImageCache(root, stamp, fresh);
-            return fresh;
-        }
-
-        string BuildImageInventoryStamp(string root)
-        {
-            long latestTicks = 0;
-            int count = 0;
-            foreach (var file in Directory.EnumerateFiles(root, "*.*", SearchOption.AllDirectories).Where(IsMedia))
-            {
-                count++;
-                var ticks = MetadataCacheStamp(file);
-                if (ticks > latestTicks) latestTicks = ticks;
-            }
-            return count + "|" + latestTicks;
-        }
-
-        string TaggedImageCachePath(string root)
-        {
-            return Path.Combine(cacheRoot, "photography-gallery-" + SafeCacheName(root) + ".cache");
-        }
-
-        List<string> LoadTaggedImageCache(string root, string stamp)
-        {
-            var path = TaggedImageCachePath(root);
-            if (!File.Exists(path)) return null;
-            var lines = File.ReadAllLines(path);
-            if (lines.Length < 2) return null;
-            if (!string.Equals(lines[0], root, StringComparison.OrdinalIgnoreCase)) return null;
-            if (!string.Equals(lines[1], stamp, StringComparison.Ordinal)) return null;
-            return lines.Skip(2).Where(File.Exists).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-        }
-
-        void SaveTaggedImageCache(string root, string stamp, List<string> files)
-        {
-            var path = TaggedImageCachePath(root);
-            var lines = new List<string>();
-            lines.Add(root);
-            lines.Add(stamp);
-            lines.AddRange(files.Distinct(StringComparer.OrdinalIgnoreCase));
-            File.WriteAllLines(path, lines.ToArray());
-        }
-
-        List<string> FindTaggedImages(string root, params string[] tagCandidates)
-        {
-            var tags = tagCandidates.Where(t => !string.IsNullOrWhiteSpace(t)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-            if (tags.Count == 0) return new List<string>();
-            var files = Directory.EnumerateFiles(root, "*.*", SearchOption.AllDirectories)
-                .Where(IsMedia)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList();
-            var tagMap = ReadEmbeddedKeywordTagsBatch(files);
-            return files
-                .Where(file => tagMap.ContainsKey(file) && tagMap[file].Any(tag => tags.Any(candidate => string.Equals(tag, candidate, StringComparison.OrdinalIgnoreCase))))
-                .ToList();
         }
 
         void OpenLibraryFolderIdEditor(LibraryFolderInfo folder, Action refreshLibrary)
@@ -2931,64 +2826,6 @@ namespace PixelVaultNative
         }
         void OpenWithShell(string path) { if (!string.IsNullOrWhiteSpace(path) && File.Exists(path)) Process.Start(new ProcessStartInfo(path) { UseShellExecute = true }); }
 
-        AppSettings CaptureAppSettings()
-        {
-            return new AppSettings
-            {
-                SourceRootsSerialized = sourceRoot ?? string.Empty,
-                DestinationRoot = destinationRoot ?? string.Empty,
-                LibraryRoot = libraryRoot ?? string.Empty,
-                ExifToolPath = exifToolPath ?? string.Empty,
-                FfmpegPath = ffmpegPath ?? string.Empty,
-                SteamGridDbApiToken = steamGridDbApiToken ?? string.Empty,
-                LibraryFolderTileSize = libraryFolderTileSize,
-                LibraryFolderSortMode = libraryFolderSortMode ?? "platform",
-                LibraryGroupingMode = libraryGroupingMode ?? "all",
-                LibraryBrowserSearchText = _libraryBrowserPersistedSearch ?? string.Empty,
-                LibraryBrowserLastViewKey = _libraryBrowserPersistedLastViewKey ?? string.Empty,
-                LibraryBrowserFolderScroll = Math.Max(0, _libraryBrowserPersistedFolderScroll),
-                LibraryBrowserDetailScroll = Math.Max(0, _libraryBrowserPersistedDetailScroll),
-                TroubleshootingLoggingEnabled = troubleshootingLoggingEnabled,
-                TroubleshootingLogRedactPaths = troubleshootingLogRedactPaths
-            };
-        }
-
-        void ApplyAppSettings(AppSettings s)
-        {
-            if (s == null) return;
-            sourceRoot = s.SourceRootsSerialized ?? string.Empty;
-            destinationRoot = s.DestinationRoot ?? string.Empty;
-            libraryRoot = s.LibraryRoot ?? string.Empty;
-            exifToolPath = s.ExifToolPath ?? string.Empty;
-            ffmpegPath = s.FfmpegPath ?? string.Empty;
-            steamGridDbApiToken = s.SteamGridDbApiToken ?? string.Empty;
-            libraryFolderTileSize = s.LibraryFolderTileSize;
-            libraryFolderSortMode = s.LibraryFolderSortMode ?? "platform";
-            libraryGroupingMode = s.LibraryGroupingMode ?? "all";
-            _libraryBrowserPersistedSearch = s.LibraryBrowserSearchText ?? string.Empty;
-            _libraryBrowserPersistedLastViewKey = s.LibraryBrowserLastViewKey ?? string.Empty;
-            _libraryBrowserPersistedFolderScroll = Math.Max(0, s.LibraryBrowserFolderScroll);
-            _libraryBrowserPersistedDetailScroll = Math.Max(0, s.LibraryBrowserDetailScroll);
-            troubleshootingLoggingEnabled = s.TroubleshootingLoggingEnabled;
-            troubleshootingLogRedactPaths = s.TroubleshootingLogRedactPaths;
-        }
-
-        void LoadSettings()
-        {
-            var merged = settingsService.LoadFromIni(
-                settingsPath,
-                CaptureAppSettings(),
-                appRoot,
-                () => FindExecutableOnPath("ffmpeg.exe") ?? string.Empty,
-                SettingsService.FindSteamGridDbApiTokenInEnvironment);
-            ApplyAppSettings(merged);
-        }
-
-        void SaveSettings()
-        {
-            settingsService.SaveToIni(settingsPath, CaptureAppSettings());
-        }
-
         string LogFilePath() { return Path.Combine(logsRoot, "PixelVault-native.log"); }
         string TroubleshootingLogFilePath() { return Path.Combine(logsRoot, "PixelVault-troubleshooting.log"); }
         string TryReadLogFile()
@@ -3090,7 +2927,7 @@ namespace PixelVaultNative
         }
 
         /// <summary>Writes a full exception (including stack trace) to the main log with ERROR prefix and managed thread id.</summary>
-        void LogException(string context, Exception ex)
+        internal void LogException(string context, Exception ex)
         {
             if (ex == null) return;
             var prefix = string.IsNullOrWhiteSpace(context) ? string.Empty : context + " | ";

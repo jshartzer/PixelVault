@@ -12,6 +12,77 @@ namespace PixelVaultNative
 {
     public sealed partial class MainWindow
     {
+        List<string> GetTaggedImagesCached(string root, bool forceRefresh, params string[] tagCandidates)
+        {
+            var stamp = BuildImageInventoryStamp(root);
+            if (!forceRefresh)
+            {
+                var cached = LoadTaggedImageCache(root, stamp);
+                if (cached != null)
+                {
+                    Log("Photography gallery cache hit.");
+                    return cached;
+                }
+            }
+            Log("Refreshing photography gallery cache.");
+            var fresh = FindTaggedImages(root, tagCandidates);
+            SaveTaggedImageCache(root, stamp, fresh);
+            return fresh;
+        }
+
+        string BuildImageInventoryStamp(string root)
+        {
+            long latestTicks = 0;
+            int count = 0;
+            foreach (var file in Directory.EnumerateFiles(root, "*.*", SearchOption.AllDirectories).Where(IsMedia))
+            {
+                count++;
+                var ticks = MetadataCacheStamp(file);
+                if (ticks > latestTicks) latestTicks = ticks;
+            }
+            return count + "|" + latestTicks;
+        }
+
+        string TaggedImageCachePath(string root)
+        {
+            return Path.Combine(cacheRoot, "photography-gallery-" + SafeCacheName(root) + ".cache");
+        }
+
+        List<string> LoadTaggedImageCache(string root, string stamp)
+        {
+            var path = TaggedImageCachePath(root);
+            if (!File.Exists(path)) return null;
+            var lines = File.ReadAllLines(path);
+            if (lines.Length < 2) return null;
+            if (!string.Equals(lines[0], root, StringComparison.OrdinalIgnoreCase)) return null;
+            if (!string.Equals(lines[1], stamp, StringComparison.Ordinal)) return null;
+            return lines.Skip(2).Where(File.Exists).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        }
+
+        void SaveTaggedImageCache(string root, string stamp, List<string> files)
+        {
+            var path = TaggedImageCachePath(root);
+            var lines = new List<string>();
+            lines.Add(root);
+            lines.Add(stamp);
+            lines.AddRange(files.Distinct(StringComparer.OrdinalIgnoreCase));
+            File.WriteAllLines(path, lines.ToArray());
+        }
+
+        List<string> FindTaggedImages(string root, params string[] tagCandidates)
+        {
+            var tags = tagCandidates.Where(t => !string.IsNullOrWhiteSpace(t)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            if (tags.Count == 0) return new List<string>();
+            var files = Directory.EnumerateFiles(root, "*.*", SearchOption.AllDirectories)
+                .Where(IsMedia)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            var tagMap = ReadEmbeddedKeywordTagsBatch(files);
+            return files
+                .Where(file => tagMap.ContainsKey(file) && tagMap[file].Any(tag => tags.Any(candidate => string.Equals(tag, candidate, StringComparison.OrdinalIgnoreCase))))
+                .ToList();
+        }
+
         void ShowPhotographyGallery(Window owner)
         {
             try
@@ -145,11 +216,12 @@ namespace PixelVaultNative
             }
             catch (Exception ex)
             {
-                Log(ex.Message);
+                LogException("ShowPhotographyGallery", ex);
                 MessageBox.Show(ex.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
-        Tuple<string, string> ShowSteamAppMatchWindow(string query, List<Tuple<string, string>> matches)
+
+        Tuple<string, string> ShowSteamAppMatchWindow(Window owner, string query, List<Tuple<string, string>> matches)
         {
             var candidates = (matches ?? new List<Tuple<string, string>>()).Where(match => match != null && !string.IsNullOrWhiteSpace(match.Item1) && !string.IsNullOrWhiteSpace(match.Item2)).Take(24).ToList();
             if (candidates.Count == 0) return null;
@@ -163,7 +235,7 @@ namespace PixelVaultNative
                 Height = 720,
                 MinWidth = 680,
                 MinHeight = 560,
-                Owner = this,
+                Owner = owner ?? this,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
                 Background = Brush("#0F1519")
             };

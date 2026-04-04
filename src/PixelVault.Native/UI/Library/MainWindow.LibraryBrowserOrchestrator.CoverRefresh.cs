@@ -11,7 +11,7 @@ namespace PixelVaultNative
 {
     public sealed partial class MainWindow
     {
-        /// <summary>Scoped cover refresh with progress UI; keeps <see cref="ShowLibraryBrowserCore"/> slimmer.</summary>
+        /// <summary>Scoped cover refresh with progress UI; used from Library browser show orchestration.</summary>
         void RunLibraryBrowserScopedCoverRefresh(
             Window libraryWindow,
             LibraryBrowserWorkingSet ws,

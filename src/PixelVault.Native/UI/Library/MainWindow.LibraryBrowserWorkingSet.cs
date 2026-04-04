@@ -6,8 +6,8 @@ namespace PixelVaultNative
 {
     public sealed partial class MainWindow
     {
-        /// <summary>Mutable per-open state for <see cref="ShowLibraryBrowserCore"/> (folder list, detail pane, search, scroll).</summary>
-        sealed class LibraryBrowserWorkingSet
+        /// <summary>Mutable per-open state for the Library browser window (folder list, detail pane, search, scroll).</summary>
+        internal sealed class LibraryBrowserWorkingSet
         {
             internal LibraryBrowserPaneRefs Panes;
             internal readonly List<LibraryFolderInfo> Folders = new List<LibraryFolderInfo>();

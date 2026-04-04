@@ -4,7 +4,7 @@ Date: 2026-04-02
 This note is a short handoff you can relay back through Cursor or a review thread.
 
 Fixed issue 1: incremental Library detail rerender could restore an old scroll position
-- Area: src/PixelVault.Native/UI/Library/MainWindow.LibraryBrowserOrchestrator.cs
+- Area: src/PixelVault.Native/UI/Library/LibraryBrowserHost.cs, MainWindow.LibraryBrowserShowOrchestration.cs, MainWindow.LibraryBrowserOrchestrator.*.cs
 - What changed: the detail view now treats scroll restoration as a one-time action for the first snapshot only.
 - Why this fixes it: after the quick snapshot is rendered, a later refined snapshot no longer replays the original preserved offset and yank the user back while they are already scrolling.
 

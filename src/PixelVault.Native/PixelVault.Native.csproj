@@ -60,7 +60,9 @@
     <Compile Include="UI\FilenameConventionEditor.cs" />
     <Compile Include="UI\Photography\MainWindow.PhotographyAndSteam.cs" />
     <Compile Include="UI\Settings\MainWindow.SettingsShell.cs" />
+    <Compile Include="UI\Settings\MainWindow.SettingsPersistence.cs" />
     <Compile Include="UI\Library\LibraryWorkspaceContext.cs" />
+    <Compile Include="UI\Library\ILibraryBrowserShell.cs" />
     <Compile Include="UI\Library\ILibrarySession.cs" />
     <Compile Include="UI\Library\LibrarySession.cs" />
     <Compile Include="UI\Library\LibraryBrowserHost.cs" />
@@ -71,7 +73,8 @@
     <Compile Include="UI\Library\MainWindow.LibraryBrowserRender.FolderList.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserSessionPersistence.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserRender.DetailPane.cs" />
-    <Compile Include="UI\Library\MainWindow.LibraryBrowserOrchestrator.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryBrowserShowOrchestration.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryBrowserShellBridge.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserOrchestrator.Selection.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryMetadataScan.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryImageLoading.cs" />

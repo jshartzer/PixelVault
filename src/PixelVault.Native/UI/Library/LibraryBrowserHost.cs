@@ -1,8 +1,12 @@
 using System;
+using System.Windows;
 
 namespace PixelVaultNative
 {
-    /// <summary>Opens the Library browser; orchestration body lives in <see cref="MainWindow.LibraryBrowserShowOrchestration"/> (<c>MainWindow.LibraryBrowserShowOrchestration.cs</c>).</summary>
+    /// <summary>
+    /// Phase E host: owns opening the Library browser (try/catch, logging) and exposes <see cref="ILibrarySession"/>.
+    /// Orchestration body: <see cref="MainWindow.LibraryBrowserShowOrchestration"/> with <see cref="ILibraryBrowserShell"/> (<see cref="MainWindow.LibraryBrowserShellBridge"/>).
+    /// </summary>
     internal sealed class LibraryBrowserHost
     {
         readonly MainWindow _owner;
@@ -18,7 +22,15 @@ namespace PixelVaultNative
 
         internal void Show(bool reuseMainWindow)
         {
-            _owner.ShowLibraryBrowserCore(reuseMainWindow);
+            try
+            {
+                new MainWindow.LibraryBrowserShowOrchestration(new MainWindow.LibraryBrowserShellBridge(_owner)).Run(reuseMainWindow);
+            }
+            catch (Exception ex)
+            {
+                _owner.LogException("LibraryBrowserHost.Show", ex);
+                MessageBox.Show(ex.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
     }
 

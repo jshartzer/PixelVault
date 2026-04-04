@@ -9,7 +9,7 @@ namespace PixelVaultNative
 {
     public sealed partial class MainWindow
     {
-        sealed class LibraryBrowserPaneRefs
+        internal sealed class LibraryBrowserPaneRefs
         {
             internal TextBox SearchBox;
             internal DispatcherTimer SearchDebounceTimer;

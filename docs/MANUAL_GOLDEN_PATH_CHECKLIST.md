@@ -38,7 +38,7 @@ If this path fails, stop and fix that first before spending time on deeper spot 
 
 ## Library detail scroll + import-and-edit Steam title (threading)
 
-Run after changes to **`MainWindow.LibraryBrowserOrchestrator`** / **`ShowLibraryBrowserCore`** (detail / screenshot grid), embedded-metadata repair, or **`ImportService.ApplyImportAndEditSteamStoreTitlesWhenGameNameUnchangedAsync`** / manual metadata finish. See **`docs/REVIEW_RESPONSE_2026-04-02.txt`**.
+Run after changes to **`LibraryBrowserHost`**, **`MainWindow.LibraryBrowserShowOrchestration`**, or Library partials under **`UI/Library/MainWindow.LibraryBrowser*.cs`** (detail / screenshot grid), embedded-metadata repair, or **`ImportService.ApplyImportAndEditSteamStoreTitlesWhenGameNameUnchangedAsync`** / manual metadata finish. See **`docs/REVIEW_RESPONSE_2026-04-02.txt`**.
 
 ### Library — preserved scroll vs. metadata-refined rerender
 

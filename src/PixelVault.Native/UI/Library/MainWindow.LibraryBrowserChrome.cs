@@ -6,7 +6,7 @@ namespace PixelVaultNative
 {
     public sealed partial class MainWindow
     {
-        sealed class LibraryBrowserNavChrome
+        internal sealed class LibraryBrowserNavChrome
         {
             internal Border NavBar;
             internal Button ImportButton;

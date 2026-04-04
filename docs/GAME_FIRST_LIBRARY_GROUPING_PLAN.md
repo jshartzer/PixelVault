@@ -281,7 +281,8 @@ Status: done
 Primary files:
 
 - `src/PixelVault.Native/UI/Library/MainWindow.LibraryBrowserLayout.cs`
-- `src/PixelVault.Native/UI/Library/MainWindow.LibraryBrowserOrchestrator.cs`
+- `src/PixelVault.Native/UI/Library/LibraryBrowserHost.cs`
+- `src/PixelVault.Native/UI/Library/MainWindow.LibraryBrowserShowOrchestration.cs`
 - `src/PixelVault.Native/PixelVault.Native.cs`
 
 Implementation notes:
@@ -516,7 +517,8 @@ High-confidence touch list:
 - `src/PixelVault.Native/Services/Config/SettingsService.cs`
 - `src/PixelVault.Native/PixelVault.Native.cs`
 - `src/PixelVault.Native/UI/Library/MainWindow.LibraryBrowserLayout.cs`
-- `src/PixelVault.Native/UI/Library/MainWindow.LibraryBrowserOrchestrator.cs`
+- `src/PixelVault.Native/UI/Library/LibraryBrowserHost.cs`
+- `src/PixelVault.Native/UI/Library/MainWindow.LibraryBrowserShowOrchestration.cs`
 - `src/PixelVault.Native/UI/Library/MainWindow.LibraryBrowserViewModel.cs`
 - `src/PixelVault.Native/UI/Library/MainWindow.LibraryBrowserRender.FolderList.cs`
 - `src/PixelVault.Native/UI/Library/MainWindow.LibraryBrowserRender.DetailPane.cs`

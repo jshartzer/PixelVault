@@ -34,12 +34,12 @@ If a change only fits by adding more deep delegate glue to `PixelVault.Native.cs
 
 Primary ownership:
 
-- `src/PixelVault.Native/UI/Library/MainWindow.LibraryBrowserOrchestrator.cs`
+- `src/PixelVault.Native/UI/Library/LibraryBrowserHost.cs`
+- `src/PixelVault.Native/UI/Library/MainWindow.LibraryBrowserShowOrchestration.cs`
 - `src/PixelVault.Native/UI/Library/MainWindow.LibraryBrowserChrome.cs`
 - `src/PixelVault.Native/UI/Library/MainWindow.LibraryBrowserLayout.cs`
 - `src/PixelVault.Native/UI/Library/MainWindow.LibraryBrowserRender.FolderList.cs`
 - `src/PixelVault.Native/UI/Library/MainWindow.LibraryBrowserRender.DetailPane.cs`
-- `src/PixelVault.Native/UI/Library/LibraryBrowserHost.cs`
 - `src/PixelVault.Native/UI/Library/LibrarySession.cs`
 - `src/PixelVault.Native/UI/Library/LibraryWorkspaceContext.cs`
 - `src/PixelVault.Native/Services/Library/LibraryScanner.cs`
@@ -64,7 +64,7 @@ Good follow-on slices:
 
 - persist and restore the last selected folder, search text, sort mode, and scroll anchor
 - add explicit timing for first folder list render and first detail render
-- move more Library orchestration from `ShowLibraryBrowserCore` into session/facade methods instead of nested closures
+- move more Library orchestration from `LibraryBrowserShowOrchestration` into session/facade methods instead of nested closures
 
 ### 2. Cover and metadata workflows become fully backgrounded and cancellable
 
@@ -103,7 +103,8 @@ Good follow-on slices:
 Primary ownership:
 
 - `src/PixelVault.Native/Services/Config/SettingsService.cs`
-- `src/PixelVault.Native/UI/Library/MainWindow.LibraryBrowserOrchestrator.cs`
+- `src/PixelVault.Native/UI/Library/LibraryBrowserHost.cs`
+- `src/PixelVault.Native/UI/Library/MainWindow.LibraryBrowserShowOrchestration.cs`
 - `src/PixelVault.Native/UI/Settings/MainWindow.SettingsShell.cs`
 - `src/PixelVault.Native/PixelVault.Native.cs`
 - editor hosts under `src/PixelVault.Native/UI/Editors/`
@@ -131,7 +132,8 @@ Good follow-on slices:
 
 Primary ownership:
 
-- `src/PixelVault.Native/UI/Library/MainWindow.LibraryBrowserOrchestrator.cs`
+- `src/PixelVault.Native/UI/Library/LibraryBrowserHost.cs`
+- `src/PixelVault.Native/UI/Library/MainWindow.LibraryBrowserShowOrchestration.cs`
 - `src/PixelVault.Native/UI/Settings/MainWindow.SettingsShell.cs`
 - `src/PixelVault.Native/UI/Editors/GameIndexEditorHost.cs`
 - `src/PixelVault.Native/UI/Editors/PhotoIndexEditorHost.cs`
@@ -193,7 +195,7 @@ Good follow-on slices:
 
 These can start now without waiting for a major architecture pass.
 
-- Add Library first-paint and first-selection timing around `ShowLibraryBrowserCore` and its refresh paths.
+- Add Library first-paint and first-selection timing around `LibraryBrowserHost.Show` / `LibraryBrowserShowOrchestration.Run` and refresh paths.
 - Persist and restore last Library context through `SettingsService` plus `LibrarySession` or `LibraryWorkspaceContext`.
 - Add a first keyboard shortcut pass in the Library shell and editor hosts.
 - Improve inline statuses in workflow and editor surfaces so users see "what is happening" immediately.
@@ -222,10 +224,10 @@ These are the moves that most strongly change how mature the app feels, but they
 
 When touching these areas, bias toward these goals:
 
-- `src/PixelVault.Native/UI/Library/MainWindow.LibraryBrowserOrchestrator.cs`
-  - first paint, selection responsiveness, keyboard flow, inline status, state restoration
 - `src/PixelVault.Native/UI/Library/LibraryBrowserHost.cs`
-  - host ownership, less delegate sprawl, safer async orchestration
+  - host ownership, try/catch boundary, **`ILibrarySession`**
+- `src/PixelVault.Native/UI/Library/MainWindow.LibraryBrowserShowOrchestration.cs`
+  - first paint wiring, selection responsiveness, keyboard flow, inline status, state restoration; less delegate sprawl over time
 - `src/PixelVault.Native/UI/Library/LibrarySession.cs`
   - session facade, persisted view context, safe access to scanner/file seams
 - `src/PixelVault.Native/UI/Library/LibraryWorkspaceContext.cs`
