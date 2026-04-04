@@ -53,11 +53,11 @@ Then use these based on the task:
 
 Current live build:
 
-- `0.835`
+- `0.840`
 
 Current executable:
 
-- `C:\Codex\dist\PixelVault-0.835\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.840\PixelVault.exe`
 
 Current build pointer:
 
@@ -91,12 +91,13 @@ Practical current focus:
 
 ## Current Stop Point
 
-The app is currently published at `0.835`.
+The app is currently published at `0.840`.
 
-**Notion:** **0.835** is in **Releases**; [release page](https://www.notion.so/33773adc59b681628cfdcb7e21044773). [MainWindow extraction roadmap](https://www.notion.so/33573adc59b681d88b7dcd88cad53cb6) status block updated (Phase 5 import slice + published **0.835**). Further releases: `docs/DOC_SYNC_POLICY.md`.
+**Notion:** **0.840** should be the current Releases entry once sync is complete. [MainWindow extraction roadmap](https://www.notion.so/33573adc59b681d88b7dcd88cad53cb6) remains the active extraction tracker. Further releases: `docs/DOC_SYNC_POLICY.md`.
 
 Recent extraction progress (repo):
 
+- **Library grouping (game-first browse):** Added persisted **`LibraryGroupingMode`** with **`All`** and **`By Console`** controls in the Library banner area. Browser rows now project from raw **`LibraryFolderInfo`** into **`LibraryBrowserFolderView`** so the default view can merge same-game captures across consoles without changing storage or scanner persistence. Detail rendering follows the merged file set; merged rows intentionally use **Open Primary Folder** and keep cover / ID actions constrained until the next hardening slice.
 - **E1–E3:** Library browser: **`LibraryBrowserHost`** entry + **`ShowLibraryBrowserCore`** on **`MainWindow`** in **`UI/Library/MainWindow.LibraryBrowserOrchestrator.cs`**; top nav / window chrome in **`MainWindow.LibraryBrowserChrome.cs`**; folder + detail layout in **`MainWindow.LibraryBrowserLayout.cs`**; folder-tile + detail-pane rendering in **`MainWindow.LibraryBrowserRender.FolderList.cs`** / **`MainWindow.LibraryBrowserRender.DetailPane.cs`**. **`ILibrarySession`** / **`LibrarySession`** (workspace + scanner + **`IFileSystemService`** + root), **`LibraryWorkspaceContext`** caches, virtualization unchanged in **`LibraryVirtualization.cs`**
 - **Responsiveness:** **`PERFORMANCE_TODO.md`** — item 5 long-workflow spot-check; item 10 **`ShowLibraryBrowserCore`** in **`MainWindow.LibraryBrowserOrchestrator.cs`** (**`LibraryBrowserHost`** entry); manual-metadata game-title list off UI thread when rebuilding choices
 - **F1–F2:** Settings shell partial (incl. path settings dialog, **`ShowSettingsWindow`** modal), photography gallery + Steam picker partial; photography wired from Library + Settings
