@@ -25,9 +25,12 @@ namespace PixelVaultNative
         {
             var displayFolder = BuildLibraryBrowserDisplayFolder(folder);
             var actionFolder = GetLibraryBrowserPrimaryFolder(folder) ?? displayFolder;
-            var badgePlatformLabel = folder != null && folder.IsMergedAcrossPlatforms
-                ? "Multiple Tags"
-                : (folder == null ? string.Empty : folder.PrimaryPlatformLabel);
+            var badgePlatformLabel = folder == null ? string.Empty : folder.PrimaryPlatformLabel;
+            var showPlatformContext = ShouldShowLibraryBrowserPlatformContext();
+            var showPlatformBadgeOnTile = showPlatformBadge && showPlatformContext && !string.IsNullOrWhiteSpace(badgePlatformLabel);
+            var tileFallbackText = string.IsNullOrWhiteSpace(folder == null ? string.Empty : folder.Name)
+                ? badgePlatformLabel
+                : folder.Name;
             var tile = new Button
             {
                 Width = tileWidth,
@@ -44,7 +47,7 @@ namespace PixelVaultNative
             tile.Template = BuildRoundedTileButtonTemplate();
             var tileStack = new StackPanel();
             var imageBorder = new Border { Width = tileWidth, Height = tileHeight, Background = Brush("#0E1418"), CornerRadius = new CornerRadius(18), ClipToBounds = true };
-            if (showPlatformBadge)
+            if (showPlatformBadgeOnTile)
             {
                 var imageGrid = new Grid();
                 imageGrid.Children.Add(CreateAsyncImageTile(
@@ -53,7 +56,7 @@ namespace PixelVaultNative
                     tileWidth,
                     tileHeight,
                     Stretch.UniformToFill,
-                    badgePlatformLabel,
+                    tileFallbackText,
                     Brushes.White,
                     new Thickness(0),
                     new Thickness(0),
@@ -72,7 +75,7 @@ namespace PixelVaultNative
                     tileWidth,
                     tileHeight,
                     Stretch.UniformToFill,
-                    badgePlatformLabel,
+                    tileFallbackText,
                     Brushes.White,
                     new Thickness(0),
                     new Thickness(0),
@@ -83,7 +86,7 @@ namespace PixelVaultNative
             }
             tileStack.Children.Add(imageBorder);
             tileStack.Children.Add(new TextBlock { Text = folder.Name, TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.CharacterEllipsis, Foreground = Brushes.White, Margin = new Thickness(10, 12, 10, 3), FontWeight = FontWeights.SemiBold, FontSize = 13.5, Height = 34 });
-            tileStack.Children.Add(new TextBlock { Text = folder.PlatformSummaryText + " | " + folder.FileCount + " capture" + (folder.FileCount == 1 ? string.Empty : "s"), Foreground = Brush("#8FA4B0"), Margin = new Thickness(10, 0, 10, 10), FontSize = 10.5, Height = 16 });
+            tileStack.Children.Add(new TextBlock { Text = BuildLibraryBrowserFolderTileSubtitle(folder), Foreground = Brush("#8FA4B0"), Margin = new Thickness(10, 0, 10, 10), FontSize = 10.5, Height = 16 });
             tile.Content = tileStack;
             tile.Click += delegate { showFolder(folder); };
             var contextMenu = new ContextMenu();
@@ -98,7 +101,7 @@ namespace PixelVaultNative
                 SaveCustomCover(actionFolder, pickedCover);
                 showFolder(folder);
                 if (renderTiles != null) renderTiles();
-                Log("Custom cover set for " + folder.Name + " | " + folder.PlatformSummaryText + ".");
+                Log("Custom cover set for " + BuildLibraryBrowserScopeLabel(folder) + ".");
             };
             var clearCoverItem = new MenuItem { Header = "Clear Custom Cover", IsEnabled = folder != null && !folder.IsMergedAcrossPlatforms && !string.IsNullOrWhiteSpace(CustomCoverPath(actionFolder)) };
             clearCoverItem.Click += delegate
@@ -106,7 +109,7 @@ namespace PixelVaultNative
                 ClearCustomCover(actionFolder);
                 showFolder(folder);
                 if (renderTiles != null) renderTiles();
-                Log("Custom cover cleared for " + folder.Name + " | " + folder.PlatformSummaryText + ".");
+                Log("Custom cover cleared for " + BuildLibraryBrowserScopeLabel(folder) + ".");
             };
             var openFolderItem = new MenuItem { Header = folder != null && folder.IsMergedAcrossPlatforms ? "Open Primary Folder" : "Open Folder" };
             openFolderItem.Click += delegate { OpenFolder(actionFolder.FolderPath); };
@@ -131,7 +134,7 @@ namespace PixelVaultNative
             fetchFolderCoverItem.Click += delegate
             {
                 showFolder(folder);
-                runScopedCoverRefresh(new List<LibraryFolderInfo> { actionFolder }, folder.Name + " | " + folder.PlatformSummaryText, true, false);
+                runScopedCoverRefresh(new List<LibraryFolderInfo> { actionFolder }, BuildLibraryBrowserScopeLabel(folder), true, false);
             };
             contextMenu.Items.Add(openFolderItem);
             contextMenu.Items.Add(editMetadataItem);
@@ -168,8 +171,7 @@ namespace PixelVaultNative
             var actionFolder = GetLibraryBrowserPrimaryFolder(info) ?? displayFolder;
             activeSelectedLibraryFolder = CloneLibraryFolderInfo(actionFolder);
             panes.DetailTitle.Text = info.Name;
-            var sourceFolderCount = info == null ? 0 : info.SourceFolders.Select(folder => folder == null ? string.Empty : folder.FolderPath ?? string.Empty).Where(path => !string.IsNullOrWhiteSpace(path)).Distinct(StringComparer.OrdinalIgnoreCase).Count();
-            panes.DetailMeta.Text = info.FileCount + " item(s) | " + info.PlatformSummaryText + " | " + (sourceFolderCount > 1 ? sourceFolderCount + " source folders" : (actionFolder == null ? string.Empty : actionFolder.FolderPath ?? string.Empty));
+            panes.DetailMeta.Text = BuildLibraryBrowserDetailMetaText(info, actionFolder);
             panes.OpenFolderButton.Content = BuildToolbarButtonContent("\uE8B7", info != null && info.IsMergedAcrossPlatforms ? "Open Primary Folder" : "Open Folder");
             panes.PreviewImage.Source = null;
             panes.PreviewImage.Visibility = Visibility.Collapsed;

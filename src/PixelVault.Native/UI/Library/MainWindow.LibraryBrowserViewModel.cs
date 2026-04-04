@@ -96,16 +96,18 @@ namespace PixelVaultNative
         {
             var normalizedGrouping = NormalizeLibraryGroupingMode(groupingMode);
             var normalizedGameId = NormalizeGameId(gameId);
-            if (!string.IsNullOrWhiteSpace(normalizedGameId))
-            {
-                return string.Equals(normalizedGrouping, "console", StringComparison.OrdinalIgnoreCase)
-                    ? normalizedGrouping + "|" + normalizedGameId + "|" + NormalizeConsoleLabel(platformLabel) + "|" + (folderPath ?? string.Empty).Trim()
-                    : normalizedGrouping + "|" + normalizedGameId;
-            }
             var normalizedName = NormalizeGameIndexName(name, folderPath);
-            return string.Equals(normalizedGrouping, "console", StringComparison.OrdinalIgnoreCase)
-                ? normalizedGrouping + "|" + normalizedName + "|" + NormalizeConsoleLabel(platformLabel) + "|" + (folderPath ?? string.Empty).Trim()
-                : normalizedGrouping + "|" + normalizedName;
+            if (string.Equals(normalizedGrouping, "console", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!string.IsNullOrWhiteSpace(normalizedGameId))
+                {
+                    return normalizedGrouping + "|" + normalizedGameId + "|" + NormalizeConsoleLabel(platformLabel) + "|" + (folderPath ?? string.Empty).Trim();
+                }
+                return normalizedGrouping + "|" + normalizedName + "|" + NormalizeConsoleLabel(platformLabel) + "|" + (folderPath ?? string.Empty).Trim();
+            }
+            if (!string.IsNullOrWhiteSpace(normalizedName)) return normalizedGrouping + "|name|" + normalizedName;
+            if (!string.IsNullOrWhiteSpace(normalizedGameId)) return normalizedGrouping + "|id|" + normalizedGameId;
+            return normalizedGrouping + "|folder|" + ((folderPath ?? string.Empty).Trim());
         }
 
         string BuildLibraryBrowserPlatformSummary(IEnumerable<string> platformLabels)
@@ -126,6 +128,74 @@ namespace PixelVaultNative
         string DetermineLibraryBrowserGroup(LibraryBrowserFolderView view)
         {
             return NormalizeConsoleLabel(view == null ? string.Empty : view.PrimaryPlatformLabel);
+        }
+
+        string BuildLibraryBrowserAllMergeKey(LibraryFolderInfo folder)
+        {
+            if (folder == null) return string.Empty;
+            var normalizedName = NormalizeGameIndexName(folder.Name, folder.FolderPath);
+            if (!string.IsNullOrWhiteSpace(normalizedName)) return "name|" + normalizedName;
+            var normalizedGameId = NormalizeGameId(folder.GameId);
+            if (!string.IsNullOrWhiteSpace(normalizedGameId)) return "id|" + normalizedGameId;
+            return "folder|" + ((folder.FolderPath ?? string.Empty).Trim());
+        }
+
+        int CountLibraryBrowserSourceFolders(LibraryBrowserFolderView view)
+        {
+            return (view == null ? Enumerable.Empty<LibraryFolderInfo>() : view.SourceFolders)
+                .Select(folder => folder == null ? string.Empty : folder.FolderPath ?? string.Empty)
+                .Where(path => !string.IsNullOrWhiteSpace(path))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Count();
+        }
+
+        bool ShouldShowLibraryBrowserPlatformContext()
+        {
+            return string.Equals(NormalizeLibraryGroupingMode(libraryGroupingMode), "console", StringComparison.OrdinalIgnoreCase);
+        }
+
+        string BuildLibraryBrowserFolderTileSubtitle(LibraryBrowserFolderView view)
+        {
+            var captureCount = view == null ? 0 : Math.Max(view.FileCount, 0);
+            var captureText = captureCount + " capture" + (captureCount == 1 ? string.Empty : "s");
+            if (ShouldShowLibraryBrowserPlatformContext())
+            {
+                var platformText = view == null ? string.Empty : CleanTag(view.PlatformSummaryText);
+                return string.IsNullOrWhiteSpace(platformText) ? captureText : platformText + " | " + captureText;
+            }
+
+            var sourceFolderCount = CountLibraryBrowserSourceFolders(view);
+            return sourceFolderCount > 1
+                ? captureText + " | " + sourceFolderCount + " folders"
+                : captureText;
+        }
+
+        string BuildLibraryBrowserDetailMetaText(LibraryBrowserFolderView view, LibraryFolderInfo actionFolder)
+        {
+            var itemCount = view == null ? 0 : Math.Max(view.FileCount, 0);
+            var itemText = itemCount + " item" + (itemCount == 1 ? string.Empty : "s");
+            var sourceFolderCount = CountLibraryBrowserSourceFolders(view);
+            var folderPathText = actionFolder == null ? string.Empty : actionFolder.FolderPath ?? string.Empty;
+            if (ShouldShowLibraryBrowserPlatformContext())
+            {
+                var platformText = view == null ? string.Empty : CleanTag(view.PlatformSummaryText);
+                var locationText = sourceFolderCount > 1 ? sourceFolderCount + " source folders" : folderPathText;
+                if (string.IsNullOrWhiteSpace(platformText)) return itemText + " | " + locationText;
+                return itemText + " | " + platformText + " | " + locationText;
+            }
+
+            if (sourceFolderCount > 1) return itemText + " | " + sourceFolderCount + " source folders";
+            return string.IsNullOrWhiteSpace(folderPathText) ? itemText : itemText + " | " + folderPathText;
+        }
+
+        string BuildLibraryBrowserScopeLabel(LibraryBrowserFolderView view)
+        {
+            if (view == null) return string.Empty;
+            if (!ShouldShowLibraryBrowserPlatformContext()) return view.Name ?? string.Empty;
+            var platformText = CleanTag(view.PlatformSummaryText);
+            return string.IsNullOrWhiteSpace(platformText)
+                ? (view.Name ?? string.Empty)
+                : ((view.Name ?? string.Empty) + " | " + platformText);
         }
 
         LibraryBrowserFolderView FindMatchingLibraryBrowserView(LibraryBrowserFolderView current, IList<LibraryBrowserFolderView> candidates)
@@ -199,12 +269,7 @@ namespace PixelVaultNative
             }
 
             return rawFolders
-                .GroupBy(folder =>
-                {
-                    var normalizedGameId = NormalizeGameId(folder.GameId);
-                    if (!string.IsNullOrWhiteSpace(normalizedGameId)) return "id|" + normalizedGameId;
-                    return "name|" + NormalizeGameIndexName(folder.Name, folder.FolderPath);
-                }, StringComparer.OrdinalIgnoreCase)
+                .GroupBy(BuildLibraryBrowserAllMergeKey, StringComparer.OrdinalIgnoreCase)
                 .Select(group =>
                 {
                     var sourceFolders = group
@@ -232,6 +297,11 @@ namespace PixelVaultNative
                         .Where(value => !string.IsNullOrWhiteSpace(value))
                         .Distinct(StringComparer.OrdinalIgnoreCase)
                         .ToList();
+                    var distinctGameIds = sourceFolders
+                        .Select(folder => NormalizeGameId(folder.GameId))
+                        .Where(value => !string.IsNullOrWhiteSpace(value))
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .ToList();
                     var distinctSteamGridDbIds = sourceFolders
                         .Select(folder => CleanTag(folder.SteamGridDbId))
                         .Where(value => !string.IsNullOrWhiteSpace(value))
@@ -243,11 +313,11 @@ namespace PixelVaultNative
                     var view = new LibraryBrowserFolderView
                     {
                         ViewKey = BuildLibraryBrowserViewKey("all", primary == null ? string.Empty : primary.GameId, primary == null ? string.Empty : primary.Name, primary == null ? string.Empty : primary.FolderPath, primary == null ? string.Empty : primary.PlatformLabel),
-                        GameId = NormalizeGameId(primary == null ? string.Empty : primary.GameId),
+                        GameId = distinctGameIds.Count == 1 ? distinctGameIds[0] : string.Empty,
                         Name = primary == null ? string.Empty : (primary.Name ?? string.Empty),
                         PrimaryFolderPath = primary == null ? string.Empty : (primary.FolderPath ?? string.Empty),
                         PrimaryFolder = primary,
-                        PrimaryPlatformLabel = platformLabels.Length > 1 ? "Multiple Tags" : (platformLabels.FirstOrDefault() ?? NormalizeConsoleLabel(primary == null ? string.Empty : primary.PlatformLabel)),
+                        PrimaryPlatformLabel = platformLabels.FirstOrDefault() ?? NormalizeConsoleLabel(primary == null ? string.Empty : primary.PlatformLabel),
                         PlatformLabels = platformLabels,
                         PlatformSummaryText = BuildLibraryBrowserPlatformSummary(platformLabels),
                         FileCount = allFilePaths.Length > 0 ? allFilePaths.Length : sourceFolders.Sum(folder => Math.Max(folder.FileCount, 0)),

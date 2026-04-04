@@ -1,3 +1,9 @@
+## 0.841
+- **Release:** Version **0.841** — publish refresh focused on the new game-first Library grouping behavior.
+- **Library (grouping):** Fixed the default **`All`** view so same-title folders now merge by normalized game name instead of staying split behind platform-specific saved row IDs. Cross-platform libraries like **Diablo IV** now collapse into one game row in the default browse mode.
+- **Library (game-first presentation):** In **`All`** mode, folder cards and the selected-folder header now use a cleaner game-first presentation: platform badges/icons are hidden, subtitles emphasize capture count and source-folder count, and the detail header no longer leads with console text.
+- **Library (console context):** **`By Console`** still preserves the console-grouped browse experience, including platform grouping and platform-facing card context, so the platform-specific view remains available when needed.
+
 ## 0.840
 - **Release:** Version **0.840** — publish refresh. Includes the prepped responsiveness / correctness fixes below plus the first game-first Library grouping slice.
 - **Library (grouping):** Added a persisted **`All` / `By Console`** grouping toggle in the Library. **`All`** is now the default and merges captures into one game-first row when the same title spans multiple platforms; **`By Console`** restores the console-section browse behavior.
