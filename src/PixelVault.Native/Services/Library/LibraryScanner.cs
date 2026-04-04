@@ -119,30 +119,25 @@ namespace PixelVaultNative
 
                 try
                 {
-                    using (var batchGate = new SemaphoreSlim(scanWorkerCount, scanWorkerCount))
-                    {
-                        var workTasks = batches.Select(batch => Task.Run(() =>
+                    Parallel.ForEach(
+                        batches,
+                        new ParallelOptions
                         {
-                            batchGate.Wait(cancellationToken);
-                            try
+                            MaxDegreeOfParallelism = scanWorkerCount,
+                            CancellationToken = cancellationToken
+                        },
+                        batch =>
+                        {
+                            cancellationToken.ThrowIfCancellationRequested();
+                            if (progress != null) progress(unchanged, fileList.Count, "Reading embedded metadata in batch " + batch.Item1 + " of " + batchCount + " (" + batch.Item2.Length + " file(s)).");
+                            var batchMetadata = metadataService.ReadEmbeddedMetadataBatch(batch.Item2, cancellationToken);
+                            foreach (var file in batch.Item2)
                             {
-                                cancellationToken.ThrowIfCancellationRequested();
-                                if (progress != null) progress(unchanged, fileList.Count, "Reading embedded metadata in batch " + batch.Item1 + " of " + batchCount + " (" + batch.Item2.Length + " file(s)).");
-                                var batchMetadata = metadataService.ReadEmbeddedMetadataBatch(batch.Item2, cancellationToken);
-                                foreach (var file in batch.Item2)
-                                {
-                                    EmbeddedMetadataSnapshot snapshot;
-                                    if (!batchMetadata.TryGetValue(file, out snapshot) || snapshot == null) snapshot = new EmbeddedMetadataSnapshot();
-                                    batchMetadataByFile[file] = snapshot;
-                                }
+                                EmbeddedMetadataSnapshot snapshot;
+                                if (!batchMetadata.TryGetValue(file, out snapshot) || snapshot == null) snapshot = new EmbeddedMetadataSnapshot();
+                                batchMetadataByFile[file] = snapshot;
                             }
-                            finally
-                            {
-                                batchGate.Release();
-                            }
-                        }, cancellationToken)).ToArray();
-                        Task.WaitAll(workTasks, cancellationToken);
-                    }
+                        });
                 }
                 catch (OperationCanceledException)
                 {
