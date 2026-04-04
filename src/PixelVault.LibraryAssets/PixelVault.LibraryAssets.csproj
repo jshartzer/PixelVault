@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>PixelVault.LibraryAssets</RootNamespace>
+    <AssemblyName>PixelVault.LibraryAssets</AssemblyName>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <Description>Canonical library asset model, scan diffs, root health gates, and reconciliation planning for PixelVault.</Description>
+  </PropertyGroup>
+</Project>

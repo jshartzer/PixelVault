@@ -153,6 +153,7 @@ namespace PixelVaultNative
                 RowHeaderWidth = 0,
                 Margin = new Thickness(0, 0, 0, 16)
             };
+            grid.Columns.Add(new DataGridCheckBoxColumn { Header = "\u2605", Binding = new System.Windows.Data.Binding("Starred") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.PropertyChanged }, Width = 46 });
             grid.Columns.Add(new DataGridTextColumn { Header = "Game ID", Binding = new System.Windows.Data.Binding("GameId") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus }, Width = 110 });
             grid.Columns.Add(new DataGridTextColumn { Header = "Console", Binding = new System.Windows.Data.Binding("ConsoleLabel") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus }, Width = 120 });
             grid.Columns.Add(new DataGridTextColumn { Header = "Tags", Binding = new System.Windows.Data.Binding("TagText") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus }, Width = new DataGridLength(1.05, DataGridLengthUnitType.Star) });
@@ -254,6 +255,10 @@ namespace PixelVaultNative
             searchBox.TextChanged += delegate { refreshGrid(); };
             grid.SelectionChanged += delegate { refreshStatus(); };
             grid.CellEditEnding += delegate { dirty = true; refreshStatus(); };
+            grid.PreviewMouseLeftButtonUp += delegate(object s, MouseButtonEventArgs ev)
+            {
+                if (ev.OriginalSource is CheckBox) { dirty = true; refreshStatus(); }
+            };
             pullFromFileButton.Click += delegate
             {
                 var selectedItems = selectedRows()

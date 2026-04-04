@@ -68,6 +68,7 @@ namespace PixelVaultNative
                 if (key == "source") s.SourceRootsSerialized = SerializeSourceRoots(value);
                 else if (key == "destination") s.DestinationRoot = value ?? string.Empty;
                 else if (key == "library") s.LibraryRoot = value ?? string.Empty;
+                else if (key == "library_index_anchor") s.LibraryIndexAnchor = value ?? string.Empty;
                 else if (key == "exiftool" && !string.IsNullOrWhiteSpace(value)) s.ExifToolPath = value;
                 else if (key == "ffmpeg" && !string.IsNullOrWhiteSpace(value)) s.FfmpegPath = value;
                 else if (key == "steamgriddb_token") s.SteamGridDbApiToken = value ?? string.Empty;
@@ -127,11 +128,37 @@ namespace PixelVaultNative
         public void SaveToIni(string path, AppSettings state)
         {
             if (string.IsNullOrWhiteSpace(path) || state == null) return;
+
+            var oldLib = TryReadIniValue(path, "library");
+            var oldAnchor = TryReadIniValue(path, "library_index_anchor");
+            var newLib = state.LibraryRoot ?? string.Empty;
+
+            string anchorOut;
+            if (!string.IsNullOrWhiteSpace(newLib)
+                && !string.IsNullOrWhiteSpace(oldAnchor)
+                && string.Equals(newLib, oldAnchor, StringComparison.OrdinalIgnoreCase))
+            {
+                anchorOut = newLib;
+            }
+            else if (!string.IsNullOrWhiteSpace(oldLib) && !string.Equals(oldLib, newLib, StringComparison.OrdinalIgnoreCase))
+            {
+                anchorOut = oldLib;
+            }
+            else if (!string.IsNullOrWhiteSpace(oldAnchor))
+            {
+                anchorOut = oldAnchor;
+            }
+            else
+            {
+                anchorOut = string.IsNullOrWhiteSpace(newLib) ? string.Empty : newLib;
+            }
+
             File.WriteAllLines(path, new[]
             {
                 "source=" + SerializeSourceRoots(state.SourceRootsSerialized),
                 "destination=" + (state.DestinationRoot ?? string.Empty),
                 "library=" + (state.LibraryRoot ?? string.Empty),
+                "library_index_anchor=" + anchorOut,
                 "exiftool=" + (state.ExifToolPath ?? string.Empty),
                 "ffmpeg=" + (state.FfmpegPath ?? string.Empty),
                 "steamgriddb_token=" + (state.SteamGridDbApiToken ?? string.Empty),
@@ -145,6 +172,26 @@ namespace PixelVaultNative
                 "troubleshooting_logging_enabled=" + (state.TroubleshootingLoggingEnabled ? "1" : "0"),
                 "troubleshooting_log_redact_paths=" + (state.TroubleshootingLogRedactPaths ? "1" : "0")
             });
+        }
+
+        static string TryReadIniValue(string path, string wantedKey)
+        {
+            if (string.IsNullOrWhiteSpace(path) || string.IsNullOrWhiteSpace(wantedKey) || !File.Exists(path)) return string.Empty;
+            try
+            {
+                foreach (var line in File.ReadAllLines(path))
+                {
+                    if (string.IsNullOrWhiteSpace(line) || !line.Contains('=')) continue;
+                    var i = line.IndexOf('=');
+                    var key = line.Substring(0, i);
+                    if (!string.Equals(key, wantedKey, StringComparison.OrdinalIgnoreCase)) continue;
+                    return line.Substring(i + 1) ?? string.Empty;
+                }
+            }
+            catch
+            {
+            }
+            return string.Empty;
         }
     }
 }

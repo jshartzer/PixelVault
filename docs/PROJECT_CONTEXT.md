@@ -49,6 +49,7 @@ Important:
 Primary areas:
 
 - `C:\Codex\src\PixelVault.Native`: live app source
+- `C:\Codex\src\PixelVault.LibraryAssets`: portable library for canonical asset records, scan diffs, root health gates, and reconciliation planning (see `README.md` there)
 - `C:\Codex\docs`: repo documentation
 - `C:\Codex\scripts`: publish and developer utility scripts
 - `C:\Codex\dist`: versioned published builds
@@ -70,6 +71,7 @@ The app is still a modular monolith.
 
 Key source areas:
 
+- `C:\Codex\src\PixelVault.LibraryAssets`: asset lifecycle, `ScanDiffComputer`, `LibraryRootHealthChecker`, `ScanReconciliationPlan` (not yet wired into the WPF app)
 - `C:\Codex\src\PixelVault.Native\Import`: intake, rename, move, sort, undo, and import orchestration
 - `C:\Codex\src\PixelVault.Native\Indexing`: game-index, folder-cache, and library-index logic
 - `C:\Codex\src\PixelVault.Native\Metadata`: metadata builders, tag helpers, and library edit flows

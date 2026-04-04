@@ -135,11 +135,36 @@ namespace PixelVaultNative
             if (sender is not Border border) return;
             if (border.DataContext is not PhotographyGalleryEntry entry || string.IsNullOrWhiteSpace(entry.FullPath)) return;
             if (border.Child is not StackPanel stack || stack.Children.Count < 1) return;
-            if (stack.Children[0] is not Image image) return;
+            if (stack.Children[0] is not Grid imageHost) return;
+            Image image = null;
+            Button starButton = null;
+            foreach (var child in imageHost.Children)
+            {
+                if (image == null && child is Image img) image = img;
+                else if (starButton == null && child is Button b) starButton = b;
+            }
+            if (image == null) return;
             image.Source = null;
             var winW = ActualWidth > 80 ? ActualWidth : 1200d;
             var decode = (int)Math.Max(960, Math.Min(4800, winW * 3.5));
             _host.QueueImageLoad(image, entry.FullPath, decode, loaded => { image.Source = loaded; });
+
+            if (starButton != null && _host.TogglePhotoStarred != null)
+            {
+                void ShowStarChrome(bool show)
+                {
+                    starButton.Opacity = show ? 1d : 0d;
+                    starButton.IsHitTestVisible = show;
+                }
+                ShowStarChrome(false);
+                border.MouseEnter += delegate { ShowStarChrome(true); };
+                border.MouseLeave += delegate { ShowStarChrome(false); };
+                starButton.Click += delegate(object s, RoutedEventArgs ev)
+                {
+                    ev.Handled = true;
+                    _host.TogglePhotoStarred(entry);
+                };
+            }
         }
     }
 }

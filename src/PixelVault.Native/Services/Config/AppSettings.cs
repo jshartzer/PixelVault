@@ -6,6 +6,9 @@ namespace PixelVaultNative
         public string SourceRootsSerialized = string.Empty;
         public string DestinationRoot = string.Empty;
         public string LibraryRoot = string.Empty;
+
+        /// <summary>Snapshot path used to detect library-folder changes: each folder gets its own index SQLite under the app cache.</summary>
+        public string LibraryIndexAnchor = string.Empty;
         public string ExifToolPath = string.Empty;
         public string FfmpegPath = string.Empty;
         public string SteamGridDbApiToken = string.Empty;
@@ -30,6 +33,7 @@ namespace PixelVaultNative
                 SourceRootsSerialized = s.SourceRootsSerialized ?? string.Empty,
                 DestinationRoot = s.DestinationRoot ?? string.Empty,
                 LibraryRoot = s.LibraryRoot ?? string.Empty,
+                LibraryIndexAnchor = s.LibraryIndexAnchor ?? string.Empty,
                 ExifToolPath = s.ExifToolPath ?? string.Empty,
                 FfmpegPath = s.FfmpegPath ?? string.Empty,
                 SteamGridDbApiToken = s.SteamGridDbApiToken ?? string.Empty,

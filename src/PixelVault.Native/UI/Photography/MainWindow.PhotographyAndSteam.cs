@@ -211,6 +211,7 @@ namespace PixelVaultNative
                     GamePhotographyTag = GamePhotographyTag,
                     LoadTaggedImagePaths = force => GetTaggedImagesCached(libraryRoot, force, GamePhotographyTag, "Photography"),
                     BuildEntries = BuildPhotographyGalleryEntries,
+                    TogglePhotoStarred = TogglePhotographyGalleryEntryStarred,
                     PrepareExifOnBackgroundThread = EnsureExifTool,
                     SetAppStatus = delegate(string text) { if (status != null) status.Text = text; },
                     LogError = LogException,

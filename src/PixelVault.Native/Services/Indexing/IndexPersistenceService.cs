@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using Microsoft.Data.Sqlite;
@@ -126,6 +127,91 @@ namespace PixelVaultNative
         string IndexDatabasePath(string root)
         {
             return Path.Combine(CacheRoot, "pixelvault-index-" + SafeCacheName(root) + ".sqlite");
+        }
+
+        /// <summary>Best-effort rolling snapshots of the library index SQLite file (game index + photo index + conventions).</summary>
+        const int IndexDatabaseBackupRetention = 12;
+
+        void TryRollingBackupIndexDatabase(string root, SqliteConnection liveConnection = null)
+        {
+            if (string.IsNullOrWhiteSpace(root) || string.IsNullOrWhiteSpace(CacheRoot)) return;
+            var dbPath = IndexDatabasePath(root);
+            if (!File.Exists(dbPath)) return;
+            try
+            {
+                if (new FileInfo(dbPath).Length < 1) return;
+
+                var backupDir = Path.Combine(CacheRoot, "index-sqlite-backups");
+                Directory.CreateDirectory(backupDir);
+                var stem = Path.GetFileNameWithoutExtension(dbPath);
+                var stamp = DateTime.UtcNow.ToString("yyyyMMdd'T'HHmmssfff", CultureInfo.InvariantCulture);
+                var destPath = Path.Combine(backupDir, stem + "." + stamp + ".sqlite");
+                if (File.Exists(destPath)) return;
+
+                if (liveConnection != null)
+                {
+                    using (var dest = new SqliteConnection(new SqliteConnectionStringBuilder
+                    {
+                        DataSource = destPath,
+                        Mode = SqliteOpenMode.ReadWriteCreate
+                    }.ToString()))
+                    {
+                        dest.Open();
+                        liveConnection.BackupDatabase(dest);
+                    }
+                }
+                else
+                {
+                    using (var src = new SqliteConnection(new SqliteConnectionStringBuilder
+                    {
+                        DataSource = dbPath,
+                        Mode = SqliteOpenMode.ReadOnly
+                    }.ToString()))
+                    {
+                        src.Open();
+                        using (var dest = new SqliteConnection(new SqliteConnectionStringBuilder
+                        {
+                            DataSource = destPath,
+                            Mode = SqliteOpenMode.ReadWriteCreate
+                        }.ToString()))
+                        {
+                            dest.Open();
+                            src.BackupDatabase(dest);
+                        }
+                    }
+                }
+
+                PruneOldIndexBackups(backupDir, stem + ".", IndexDatabaseBackupRetention);
+            }
+            catch
+            {
+                // Never block index writes on backup failure.
+            }
+        }
+
+        static void PruneOldIndexBackups(string backupDir, string fileNamePrefix, int keepNewest)
+        {
+            if (keepNewest <= 0 || string.IsNullOrWhiteSpace(backupDir) || !Directory.Exists(backupDir)) return;
+            try
+            {
+                var excess = Directory.EnumerateFiles(backupDir, "*.sqlite", SearchOption.TopDirectoryOnly)
+                    .Where(path =>
+                    {
+                        var name = Path.GetFileName(path);
+                        return !string.IsNullOrWhiteSpace(name)
+                            && name.StartsWith(fileNamePrefix, StringComparison.OrdinalIgnoreCase);
+                    })
+                    .OrderByDescending(path => File.GetLastWriteTimeUtc(path))
+                    .Skip(keepNewest)
+                    .ToList();
+                foreach (var path in excess)
+                {
+                    try { File.Delete(path); } catch { }
+                }
+            }
+            catch
+            {
+            }
         }
 
         string GameIndexPath(string root)
@@ -411,7 +497,9 @@ ORDER BY file_path COLLATE NOCASE;";
                     while (reader.Read())
                     {
                         var filePath = reader.IsDBNull(0) ? string.Empty : reader.GetString(0);
-                        if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath)) continue;
+                        // Do not skip missing files: a transient offline volume would empty the in-memory
+                        // index and the next Save would DELETE+INSERT a tiny subset, effectively wiping SQLite.
+                        if (string.IsNullOrWhiteSpace(filePath)) continue;
 
                         var currentGameId = NormalizeGameId(reader.IsDBNull(2) ? string.Empty : reader.GetString(2));
                         string mappedGameId;
@@ -427,7 +515,7 @@ ORDER BY file_path COLLATE NOCASE;";
                                 : storedConsoleLabel,
                             TagText = tagText,
                             CaptureUtcTicks = reader.IsDBNull(5) ? 0L : reader.GetInt64(5),
-                            Starred = !reader.IsDBNull(6) && reader.GetInt64(6) != 0
+                            Starred = ReadSqliteBoolLoose(reader, 6)
                         };
                     }
                 }
@@ -436,11 +524,24 @@ ORDER BY file_path COLLATE NOCASE;";
             return index;
         }
 
+        static bool ReadSqliteBoolLoose(SqliteDataReader reader, int ordinal)
+        {
+            if (reader == null || ordinal < 0 || reader.IsDBNull(ordinal)) return false;
+            try
+            {
+                return Convert.ToInt64(reader.GetValue(ordinal)) != 0L;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         void WriteLibraryMetadataIndexToDatabase(string root, Dictionary<string, LibraryMetadataIndexEntry> index, SqliteConnection connection)
         {
             var savedEntries = (index ?? new Dictionary<string, LibraryMetadataIndexEntry>(StringComparer.OrdinalIgnoreCase))
                 .Values
-                .Where(v => v != null && !string.IsNullOrWhiteSpace(v.FilePath) && File.Exists(v.FilePath))
+                .Where(v => v != null && !string.IsNullOrWhiteSpace(v.FilePath))
                 .OrderBy(v => v.FilePath, StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
@@ -780,6 +881,10 @@ WHERE root = $root AND game_id = $oldGameId;";
 
             var gameRowsInDb = CountIndexDatabaseRows(connection, "game_index", root);
             var photoRowsInDb = CountIndexDatabaseRows(connection, "photo_index", root);
+            // Avoid spamming backups on every launch when both sides are still empty; do snapshot when only one
+            // side is populated and we are about to import the other, or when one table will be overwritten.
+            var migratingOneSideFromEmpty = (gameRowsInDb > 0 || photoRowsInDb > 0) && (gameRowsInDb == 0 || photoRowsInDb == 0);
+            if (migratingOneSideFromEmpty) TryRollingBackupIndexDatabase(root, connection);
 
             List<GameIndexEditorRow> rawLegacyGameRows = null;
             List<GameIndexEditorRow> normalizedLegacyGameRows = null;
@@ -1039,6 +1144,7 @@ WHERE root = $root AND game_id = $oldGameId;";
         public void ApplyGameIdAliases(string root, Dictionary<string, string> aliasMap)
         {
             if (aliasMap == null || aliasMap.Count == 0) return;
+            TryRollingBackupIndexDatabase(root);
             using (var connection = OpenIndexDatabase(root))
             {
                 RewriteGameIdAliasesInLibraryMetadataIndexStorage(root, aliasMap, connection);
@@ -1056,6 +1162,7 @@ WHERE root = $root AND game_id = $oldGameId;";
                 var aliasMap = BuildGameIdAliasMap(rawRows, normalizedRows);
                 if (rawRows.Count > 0 && (HasGameIdAliasChanges(aliasMap) || normalizedRows.Count != rawRows.Count || rawRows.Any(row => string.IsNullOrWhiteSpace(row.GameId))))
                 {
+                    TryRollingBackupIndexDatabase(root, connection);
                     WriteSavedGameIndexRowsToDatabase(root, normalizedRows, connection);
                     RewriteGameIdAliasesInLibraryMetadataIndexStorage(root, aliasMap, connection);
                     if (HasGameIdAliasChanges(aliasMap))
@@ -1089,6 +1196,7 @@ WHERE root = $root AND game_id = $oldGameId;";
             var sourceRows = (rows ?? Enumerable.Empty<GameIndexEditorRow>()).Where(row => row != null).ToList();
             var mergedRows = MergeGameIndexRows(sourceRows);
             var aliasMap = BuildGameIdAliasMap(sourceRows, mergedRows);
+            TryRollingBackupIndexDatabase(root);
             using (var connection = OpenIndexDatabase(root))
             {
                 WriteSavedGameIndexRowsToDatabase(root, mergedRows, connection);
@@ -1106,6 +1214,7 @@ WHERE root = $root AND game_id = $oldGameId;";
 
         public void SaveFilenameConventions(string root, IEnumerable<FilenameConventionRule> rules)
         {
+            TryRollingBackupIndexDatabase(root);
             using (var connection = OpenIndexDatabase(root))
             {
                 WriteFilenameConventionsToDatabase(root, rules, connection);
@@ -1153,6 +1262,7 @@ WHERE root = $root AND sample_id = $sampleId;";
 
         public void SaveLibraryMetadataIndexEntries(string root, Dictionary<string, LibraryMetadataIndexEntry> index)
         {
+            TryRollingBackupIndexDatabase(root);
             using (var connection = OpenIndexDatabase(root))
             {
                 WriteLibraryMetadataIndexToDatabase(root, index, connection);

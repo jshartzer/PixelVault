@@ -6,6 +6,8 @@ The live app line is based in:
 
 - `C:\Codex`
 
+Solution (optional): `C:\Codex\Codex.slnx` includes `PixelVault.Native`, **`PixelVault.LibraryAssets`**, and test projects.
+
 Important workspace note:
 
 - work out of `C:\Codex`

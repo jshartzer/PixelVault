@@ -61,6 +61,31 @@ public sealed class SettingsServiceTests
             Assert.Equal("recent", loaded.LibraryFolderSortMode);
             Assert.Equal("console", loaded.LibraryGroupingMode);
             Assert.True(loaded.TroubleshootingLoggingEnabled);
+            Assert.Empty(loaded.LibraryIndexAnchor ?? string.Empty);
+        }
+        finally
+        {
+            try { if (File.Exists(path)) File.Delete(path); } catch { /* ignore */ }
+        }
+    }
+
+    [Fact]
+    public void SaveToIni_WhenLibraryPathChanges_PersistsPreviousPathAsLibraryIndexAnchor()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "pv-anchor-" + Guid.NewGuid().ToString("N") + ".ini");
+        try
+        {
+            var svc = new SettingsService();
+            svc.SaveToIni(path, new AppSettings { LibraryRoot = @"D:\lib-a", LibraryFolderTileSize = 200 });
+
+            var afterFirst = svc.LoadFromIni(path, new AppSettings(), Path.GetTempPath(), () => string.Empty, () => string.Empty);
+            Assert.Equal(@"D:\lib-a", afterFirst.LibraryRoot, ignoreCase: true);
+            Assert.Equal(@"D:\lib-a", afterFirst.LibraryIndexAnchor, ignoreCase: true);
+
+            svc.SaveToIni(path, new AppSettings { LibraryRoot = @"D:\lib-b", LibraryFolderTileSize = 200 });
+            var afterChange = svc.LoadFromIni(path, new AppSettings(), Path.GetTempPath(), () => string.Empty, () => string.Empty);
+            Assert.Equal(@"D:\lib-b", afterChange.LibraryRoot, ignoreCase: true);
+            Assert.Equal(@"D:\lib-a", afterChange.LibraryIndexAnchor, ignoreCase: true);
         }
         finally
         {
@@ -109,6 +134,7 @@ public sealed class SettingsServiceTests
             Assert.Equal("photos", loaded.LibraryFolderSortMode);
             Assert.Equal("console", loaded.LibraryGroupingMode);
             Assert.True(loaded.TroubleshootingLoggingEnabled);
+            Assert.Equal(loaded.LibraryRoot ?? string.Empty, loaded.LibraryIndexAnchor ?? string.Empty, ignoreCase: true);
         }
         finally
         {

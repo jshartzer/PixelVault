@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/PixelVault.LibraryAssets/PixelVault.LibraryAssets.csproj" />
+    <Project Path="src/PixelVault.Native/PixelVault.Native.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/PixelVault.LibraryAssets.Tests/PixelVault.LibraryAssets.Tests.csproj" />
+    <Project Path="tests/PixelVault.Native.Tests/PixelVault.Native.Tests.csproj" />
+  </Folder>
+</Solution>

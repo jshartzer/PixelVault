@@ -1,3 +1,7 @@
+## 0.853
+- **Release:** Version **0.853** — Photo index **Starred** flag (persisted in SQLite), Photo Index editor column, photography gallery hover star to toggle; cache stamp includes starred state.
+- **Photo index / Photography:** `LibraryMetadataIndexEntry.Starred` and `photo_index.starred` column with migration; gallery overlay star saves via metadata index.
+
 ## 0.852
 - **Release:** Version **0.852** — Library browse performance polish, photography gallery refresh (XAML + load path), publish for manual test.
 - **Library (`All` grouping / game-first):** Cached merged folder projection when folder model unchanged (`GetOrBuildLibraryBrowserFolderViews` + index fingerprint). Sort uses view **`NewestCaptureUtcTicks`** / **`FileCount`** instead of **`BuildLibraryBrowserDisplayFolder`** in **`OrderBy`**. Precomputed **`SearchBlob`** for search filter. Merge path trusts scanner file lists (no per-path **`File.Exists`**); preview + fallback sort ticks derived from index-ordered paths.

@@ -297,7 +297,7 @@ namespace PixelVaultNative
             {
                 if (string.IsNullOrWhiteSpace(root) || !fileSystem.DirectoryExists(root)) return;
                 var rowList = (rows ?? Enumerable.Empty<PhotoIndexEditorRow>())
-                    .Where(row => row != null && !string.IsNullOrWhiteSpace(row.FilePath) && fileSystem.FileExists(row.FilePath))
+                    .Where(row => row != null && !string.IsNullOrWhiteSpace(row.FilePath))
                     .GroupBy(row => row.FilePath, StringComparer.OrdinalIgnoreCase)
                     .Select(group => group.Last())
                     .ToList();
@@ -320,7 +320,8 @@ namespace PixelVaultNative
                         GameId = host.NormalizeGameId(row.GameId),
                         ConsoleLabel = normalizedConsole,
                         TagText = normalizedTags,
-                        CaptureUtcTicks = host.ResolveLibraryMetadataCaptureUtcTicks(row.FilePath, stamp, null, existingEntry)
+                        CaptureUtcTicks = host.ResolveLibraryMetadataCaptureUtcTicks(row.FilePath, stamp, null, existingEntry),
+                        Starred = row.Starred
                     };
                 }
 
@@ -354,7 +355,7 @@ namespace PixelVaultNative
         {
             return host.LoadLibraryMetadataIndex(root, true)
                 .Values
-                .Where(entry => entry != null && !string.IsNullOrWhiteSpace(entry.FilePath) && fileSystem.FileExists(entry.FilePath))
+                .Where(entry => entry != null && !string.IsNullOrWhiteSpace(entry.FilePath))
                 .Select(entry => new PhotoIndexEditorRow
                 {
                     FilePath = entry.FilePath ?? string.Empty,
