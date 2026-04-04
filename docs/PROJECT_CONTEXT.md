@@ -185,7 +185,8 @@ Use the docs by role:
 - `C:\Codex\docs\CURRENT_BUILD.txt`: current published build pointer
 - `C:\Codex\docs\ROADMAP.md`: long-term sequencing
 - `C:\Codex\docs\ARCHITECTURE_REFACTOR_PLAN.md`: refactor contract (tiered goals, service ports, FS/async scope) aligned with extraction and service split
-- `C:\Codex\docs\MAINWINDOW_EXTRACTION_ROADMAP.md`: concrete MainWindow extraction slices
+- `C:\Codex\docs\completed-projects\README.md`: **completed initiatives** (e.g. MainWindow extraction A–F)
+- `C:\Codex\docs\MAINWINDOW_EXTRACTION_ROADMAP.md`: full historical record for MainWindow extraction (complete)
 - `C:\Codex\docs\PERFORMANCE_TODO.md`: active responsiveness and scalability backlog
 - `C:\Codex\docs\MANUAL_GOLDEN_PATH_CHECKLIST.md`: short manual verification path for risky changes
 - `C:\Codex\docs\SERVICE_OWNERSHIP_AND_PARALLEL_WORK_MAP.md`: service boundaries and safe parallel-work lanes

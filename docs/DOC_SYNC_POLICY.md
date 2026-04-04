@@ -20,6 +20,7 @@ Use the repo as the source of truth for:
 - scripts
 - durable behavior rules
 - handoff state for active technical work
+- **`C:\Codex\docs\completed-projects\`** — index of **finished initiatives** (paths, summaries); Notion [Completed projects](https://www.notion.so/33873adc59b681c6a7ffe22e8bcab2a5) should mirror the index table and status
 
 Use Notion as the source of truth for:
 
@@ -56,6 +57,7 @@ After roadmap or milestone changes:
 - update `C:\Codex\docs\ROADMAP.md` if phase order, phase scope, or definitions of done changed
 - update `C:\Codex\PixelVaultData\TODO.md` if current focus or rolling follow-ups changed
 - update the related Notion roadmap and backlog entries
+- when an initiative **finishes**, add it to `C:\Codex\docs\completed-projects\README.md` (and optional `completed-projects\*.md` summary), and update Notion **Completed projects** to match
 
 After workflow, architecture, or behavior-rule changes:
 

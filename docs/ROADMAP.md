@@ -135,7 +135,7 @@ Why this is the core maintainability phase:
 
 **Execution roadmap (phased slices, line-count map, ordering):**
 
-- `C:\Codex\docs\MAINWINDOW_EXTRACTION_ROADMAP.md` — **Phases A–D complete**; **E1–E3** (library browser partial, `LibraryWorkspaceContext`, virtualization seam); **F1–F2** (settings shell + path dialog partial, photography / Steam picker partial); **E1 orchestration depth** — Library open/show wiring in **`MainWindow.LibraryBrowserShowOrchestration`** (Apr 2026). **`PixelVault.Native.cs`** line count shrinks incrementally with each slice; treat **~2.5k** orchestration target as stretch only. **Next:** new plan post Phase 3 exit (see roadmap maintenance).
+- **MainWindow extraction (Phases A–F): complete (Apr 2026).** Index: `C:\Codex\docs\completed-projects\README.md` · summary: `C:\Codex\docs\completed-projects\MAINWINDOW_EXTRACTION_PHASES_A-F.md` · full technical record: `C:\Codex\docs\MAINWINDOW_EXTRACTION_ROADMAP.md`. **Remaining Phase 3 work** (broader goal: thinner WPF shell, smaller `PixelVault.Native.cs`, clearer services) continues under this phase and other docs—not under the finished A–F extraction checklist.
 
 Primary outcomes:
 

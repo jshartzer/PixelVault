@@ -1,14 +1,16 @@
 # MainWindow extraction roadmap
 
+**Status: COMPLETE (Apr 2026)** — Phases **A–F** execution bars are done. This file remains the **canonical technical record** (file map, phase notes, principles). For a short completion summary and doc index, see **`C:\Codex\docs\completed-projects\README.md`** and **`C:\Codex\docs\completed-projects\MAINWINDOW_EXTRACTION_PHASES_A-F.md`**.
+
 This document is the **execution roadmap** for slicing responsibilities off `MainWindow`. It extends **Phase 3: Shrink MainWindow** in `C:\Codex\docs\ROADMAP.md` and aligns with `C:\Codex\docs\pixelvault_service_split_plan.txt` and `C:\Codex\docs\CODE_QUALITY_IMPROVEMENT_PLAN.md`.
 
 **Principles and scope (tiered MainWindow bar, `ILibraryScanHost` as application port, `IFileSystemService` / async expectations):** `C:\Codex\docs\ARCHITECTURE_REFACTOR_PLAN.md`. This roadmap stays the **how/where** checklist; that file is the **why/what counts as done** contract.
 
 **Not a duplicate of `PERFORMANCE_FIX_PLAN.txt`:** that file tracks **Library performance** (virtualization, sort cost, batch reads, threading). This file tracks **where UI and orchestration code lives** (partials, hosts). The **service split** (`ILibraryScanner`, `IImportService`, …) is in `pixelvault_service_split_plan.txt` — see **Service split alignment** below.
 
-**Notion (Project Wiki):** [MainWindow extraction roadmap](https://www.notion.so/33573adc59b681d88b7dcd88cad53cb6)
+**Notion (Project Wiki):** [Completed projects](https://www.notion.so/33873adc59b681c6a7ffe22e8bcab2a5) · [MainWindow extraction roadmap](https://www.notion.so/33573adc59b681d88b7dcd88cad53cb6)
 
-**Not a scratchpad:** concrete slices and order of operations. Update this file when a slice ships or the plan changes; sync Notion if you track milestones there (`DOC_SYNC_POLICY.md`).
+**Not a scratchpad:** concrete slices and order of operations. For **new** work, prefer `ROADMAP.md`, `HANDOFF.md`, and `completed-projects\README.md`; update this file only if you revise historical detail or discover a doc bug.
 
 ---
 
@@ -39,7 +41,10 @@ This document is the **execution roadmap** for slicing responsibilities off `Mai
 | `UI/Library/MainWindow.LibraryBrowserShowOrchestration.cs` | ~290 | Nested **`LibraryBrowserShowOrchestration`**: nav, panes, delegate wiring; depends on **`ILibraryBrowserShell`** only (Phase E capstone, Apr 2026) |
 | `UI/Library/MainWindow.LibraryBrowserOrchestrator.Selection.cs` | ~150 | Detail multi-select helpers + shared sort/group pill chrome; wired from **`LibraryBrowserShowOrchestration.Run`** (E2 follow-on, Apr 2026) |
 | `UI/Library/MainWindow.LibraryMetadataScan.cs` | ~195 | **`ShowLibraryMetadataScanWindow`** — metadata index scan progress UI (`MainWindow` partial; Apr 2026) |
-| `UI/Settings/MainWindow.SettingsShell.cs` | ~360 | Same + path grid helpers `SettingsTextBox`, `SettingsBrowseButton`, `PreferredSettingsWindowHeight` (Phase F1); library-aligned dark theme; no import/maintenance panel |
+| `UI/Settings/MainWindow.SettingsShell.cs` | ~95 | **`MainWindow`** bridge: **`BuildSettingsShellDependencies`**, lazy **`SettingsShellHost`**, **`ShowSettingsWindow`**, **`ShowPathSettingsWindow`** |
+| `UI/Settings/SettingsShellDependencies.cs` | — | Callbacks/context for **`SettingsShellHost`** |
+| `UI/Settings/SettingsShellHost.cs` | ~390 | Settings + Path Settings modal UI (Phase F optional host) |
+| `UI/Settings/MainWindow.SettingsPersistence.cs` | ~75 | **`CaptureAppSettings`**, **`ApplyAppSettings`**, **`LoadSettings`**, **`SaveSettings`** (Phase F3 incremental) |
 | `UI/Photography/MainWindow.PhotographyAndSteam.cs` | ~340 | Gallery + Steam picker + **`GetTaggedImagesCached`** / inventory stamp / tag scan / cache IO (Phase F2) |
 | `UI/LibraryVirtualization.cs` | ~570 | Virtualized rows / scroll hosts |
 | `Services/Library/LibraryScanner.cs` | — | **`ILibraryScanner`**: metadata index scan, folder grouping, folder cache rebuild/cached load; uses **`IMetadataService`** + **`ILibraryScanHost`**. |
@@ -191,15 +196,17 @@ Review feedback matches the plan: **`LibraryBrowserHost`** is the **typed entry*
 
 | Slice | Move to | Notes |
 |-------|---------|--------|
-| F1 | `UI/Settings/MainWindow.SettingsShell.cs` (or `SettingsShellBuilder`) | Main settings page, path modal, summaries, **`SettingsTextBox` / `SettingsBrowseButton` / `PreferredSettingsWindowHeight`** — **F1 bar complete**; **F3** optional host/persistence |
-| F2 | `UI/Photography/MainWindow.PhotographyAndSteam.cs` (roadmap name: `PhotographyWindowHost`) | Gallery, Steam picker (**`ShowSteamAppMatchWindow(Window owner, …)`**), photography index/cache helpers — **F2 bar complete** |
-| F3 | `UI/Settings/` + `Services/Config/` (optional) | Persistence already in **`ISettingsService`**; F3 is **optional** presentation/host extraction — see **F3 (optional recommendation)** below. |
+| F1 | `UI/Settings/MainWindow.SettingsShell.cs` (or `SettingsShellBuilder`) | Main settings page, path modal, summaries, path grid helpers — **F1 bar complete** |
+| F2 | `UI/Photography/MainWindow.PhotographyAndSteam.cs` (roadmap name: `PhotographyWindowHost`) | Gallery, Steam picker, photography index/cache — **F2 bar complete** |
+| F3 | `UI/Settings/` + `Services/Config/` | **Done:** persistence partial + **`SettingsShellHost`** / **`SettingsShellDependencies`** for modal UI; **`ISettingsService`** unchanged. |
 
 **Exit:** `PixelVault.Native.cs` is mostly **constructor wiring**, `MainWindow` lifecycle, and delegation to hosts.
 
-**Progress (F1):** **`UI/Settings/MainWindow.SettingsShell.cs`** — **`BuildUi`**, **`BuildSettingsSummary`**, **`BuildDiagnosticsSummary`**, **`ShowPathSettingsWindow`**, and **`ShowSettingsWindow`** (modal wrapper + field restore on close). **Apr 2026:** Library-first settings chrome (dark theme aligned with Library); import actions and intake preview pane removed from Settings (import lives on Library toolbar).
+**Progress (F1):** **`SettingsShellHost`** implements settings + path modals; **`MainWindow.SettingsShell.cs`** supplies **`SettingsShellDependencies`** and **`ShowSettingsWindow`** / **`ShowPathSettingsWindow`**. Library-first dark chrome; import on Library toolbar only.
 
 **Progress (F2):** **`UI/Photography/MainWindow.PhotographyAndSteam.cs`** — **`ShowPhotographyGallery`** (**`LogException`** on failure), **`GetTaggedImagesCached`** + cache/inventory/tag-scan helpers, and **`ShowSteamAppMatchWindow(Window owner, …)`** (manual metadata passes **`manualWindow`**). **Apr 2026:** colocated off **`PixelVault.Native.cs`**.
+
+**Progress (F3 — incremental):** **`UI/Settings/MainWindow.SettingsPersistence.cs`** — **`CaptureAppSettings`**, **`ApplyAppSettings`**, **`LoadSettings`**, **`SaveSettings`** (still **`MainWindow`** partial; **`ISettingsService`** unchanged).
 
 ---
 
@@ -207,8 +214,8 @@ Review feedback matches the plan: **`LibraryBrowserHost`** is the **typed entry*
 
 These items are **about file placement and dependency edges**, not user-visible feature work.
 
-1. ~~**Colocate path-settings controls**~~ — **Done (Apr 2026):** **`SettingsTextBox`**, **`SettingsBrowseButton`**, and **`PreferredSettingsWindowHeight`** live in **`UI/Settings/MainWindow.SettingsShell.cs`** with **`ShowPathSettingsWindow`** / **`ShowSettingsWindow`**.
-2. **Acceptable on `MainWindow` until F3** — **`CaptureAppSettings`**, **`ApplyAppSettings`**, **`LoadSettings`**, and **`SaveSettings`** remain on **`MainWindow`**: they map **flat fields** ↔ **`AppSettings`** and **`ISettingsService`**. Optional **F3** can move presentation or persistence partials when desired.
+1. ~~**Colocate path-settings controls**~~ — **Done (Apr 2026):** Path grid helpers and modal chrome live in **`SettingsShellHost`**; **`MainWindow.SettingsShell.cs`** is the dependency bridge.
+2. ~~**Settings round-trip partial**~~ — **Done (Apr 2026):** **`CaptureAppSettings`**, **`ApplyAppSettings`**, **`LoadSettings`**, **`SaveSettings`** in **`UI/Settings/MainWindow.SettingsPersistence.cs`** (still instance methods on **`MainWindow`**). Optional **`SettingsShellHost`** remains a future structural step.
 
 ---
 
@@ -219,20 +226,12 @@ These items are **about file placement and dependency edges**, not user-visible 
 
 ---
 
-### F3 — Optional recommendation (settings UI / host)
+### F3 — Complete (incremental + host)
 
-**`ISettingsService`** / **`SettingsService`** already own **INI read/write** (`Services/Config/`). F3 is **not** duplicate persistence; it is optional **structure** when you want settings out of the **`Window` partial** entirely:
+**Disk I/O:** **`ISettingsService`** / **`SettingsService`** own **INI read/write** (`Services/Config/`).
 
-1. **Preferred (clean host):** Add a **`SettingsShellHost`** (plain class under **`UI/Settings/`**) that owns **`ShowSettingsWindow`** / **`ShowPathSettingsWindow`** modal lifecycle and **`BuildUi`**, taking a **`SettingsShellDependencies`**-style record: path fields (or getters), **`ISettingsService`**, load/save/apply callbacks, **`RefreshMainUi`**, **`PickFolder`/`PickFile`**, log/troubleshooting hooks. **`MainWindow`** constructs the host once and calls **`host.ShowMainSettings()`** / **`host.ShowPathSettings()`**.
-2. **Smaller incremental:** Add **`MainWindow.SettingsPersistence.cs`** next to **`MainWindow.SettingsShell.cs`** and move only **`LoadSettings`**, **`SaveSettings`**, **`CaptureAppSettings`**, **`ApplyAppSettings`** there — drops a chunk of lines from **`PixelVault.Native.cs`** without a full host type.
-
-Pick (1) when settings UX keeps growing; pick (2) when the goal is a quick line-count win.
-
----
-
-### Legacy progress note (F3 scope)
-
-**Progress (F3):** **`ISettingsService`** / **`SettingsService`** already own settings load/save to disk. Further work is **optional** and tracked in **F3 — Optional recommendation** above.
+1. ~~**Persistence partial**~~ — **Done:** **`MainWindow.SettingsPersistence.cs`** (**`Capture`/`Apply`/`Load`/`Save`**).
+2. ~~**`SettingsShellHost`**~~ — **Done (Apr 2026):** **`SettingsShellHost`** + **`SettingsShellDependencies`**; **`MainWindow.SettingsShell.cs`** wires callbacks and lazy-initializes the host (**`OpenPathSettingsDialog`** set after construction to avoid circular init).
 
 ---
 

@@ -60,6 +60,8 @@
     <Compile Include="UI\FilenameConventionEditor.cs" />
     <Compile Include="UI\Photography\MainWindow.PhotographyAndSteam.cs" />
     <Compile Include="UI\Settings\MainWindow.SettingsShell.cs" />
+    <Compile Include="UI\Settings\SettingsShellDependencies.cs" />
+    <Compile Include="UI\Settings\SettingsShellHost.cs" />
     <Compile Include="UI\Settings\MainWindow.SettingsPersistence.cs" />
     <Compile Include="UI\Library\LibraryWorkspaceContext.cs" />
     <Compile Include="UI\Library\ILibraryBrowserShell.cs" />
