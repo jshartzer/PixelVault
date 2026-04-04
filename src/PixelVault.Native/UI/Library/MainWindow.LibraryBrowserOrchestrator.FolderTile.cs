@@ -12,26 +12,80 @@ namespace PixelVaultNative
 {
     public sealed partial class MainWindow
     {
-        FrameworkElement BuildLibraryBrowserPreviewPlatformBadge(string platformLabel)
+        FrameworkElement BuildLibraryBrowserDetailTitlePlatformBadge(string platformLabel)
         {
             var resolvedLabel = NormalizeConsoleLabel(platformLabel);
-            return string.IsNullOrWhiteSpace(resolvedLabel) ? null : BuildLibraryTilePlatformBadge(resolvedLabel);
+            if (string.IsNullOrWhiteSpace(resolvedLabel)) return null;
+            var iconPath = ResolveLibrarySectionIconPath(resolvedLabel);
+            var accent = LibrarySectionAccentBrush(resolvedLabel);
+            var badge = new Border
+            {
+                Width = 30,
+                Height = 30,
+                CornerRadius = new CornerRadius(10),
+                Background = Brush("#F6FAFC"),
+                BorderBrush = accent,
+                BorderThickness = new Thickness(1.1),
+                Padding = new Thickness(4),
+                Margin = new Thickness(0, 0, 6, 6),
+                HorizontalAlignment = HorizontalAlignment.Left,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            if (!string.IsNullOrWhiteSpace(iconPath))
+            {
+                badge.Child = new Image
+                {
+                    Source = LoadImageSource(iconPath, 60),
+                    Stretch = Stretch.Uniform,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+            }
+            else
+            {
+                badge.Child = new TextBlock
+                {
+                    Text = resolvedLabel == "Multiple Tags" ? "+" : "•",
+                    FontSize = 12,
+                    FontWeight = FontWeights.Bold,
+                    Foreground = Brush("#1D2931"),
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    TextAlignment = TextAlignment.Center
+                };
+            }
+            return badge;
         }
 
-        void UpdateLibraryBrowserPreviewPlatformBadge(LibraryBrowserPaneRefs panes, LibraryBrowserFolderView view, bool shouldShow)
+        void UpdateLibraryBrowserDetailTitleBadges(LibraryBrowserPaneRefs panes, LibraryBrowserFolderView view)
         {
-            if (panes == null || panes.PreviewPlatformBadgeHost == null) return;
-            panes.PreviewPlatformBadgeHost.Content = null;
-            panes.PreviewPlatformBadgeHost.Visibility = Visibility.Collapsed;
-            if (!shouldShow || view == null)
+            if (panes == null || panes.DetailTitleBadgePanel == null) return;
+            panes.DetailTitleBadgePanel.Children.Clear();
+            panes.DetailTitleBadgePanel.Visibility = Visibility.Collapsed;
+            if (view == null)
             {
                 return;
             }
 
-            var badge = BuildLibraryBrowserPreviewPlatformBadge(view.PrimaryPlatformLabel);
-            if (badge == null) return;
-            panes.PreviewPlatformBadgeHost.Content = badge;
-            panes.PreviewPlatformBadgeHost.Visibility = Visibility.Visible;
+            var labels = (view.PlatformLabels ?? new string[0])
+                .Where(label => !string.IsNullOrWhiteSpace(label))
+                .Select(NormalizeConsoleLabel)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(label => PlatformGroupOrder(label))
+                .ThenBy(label => label, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (labels.Count == 0 && !string.IsNullOrWhiteSpace(view.PrimaryPlatformLabel))
+            {
+                labels.Add(NormalizeConsoleLabel(view.PrimaryPlatformLabel));
+            }
+
+            foreach (var label in labels)
+            {
+                var badge = BuildLibraryBrowserDetailTitlePlatformBadge(label);
+                if (badge != null) panes.DetailTitleBadgePanel.Children.Add(badge);
+            }
+
+            panes.DetailTitleBadgePanel.Visibility = panes.DetailTitleBadgePanel.Children.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         }
 
         Button LibraryBrowserBuildFolderTile(
@@ -187,12 +241,14 @@ namespace PixelVaultNative
             LibraryBrowserFolderView info,
             Action renderSelectedFolder)
         {
-            if (!SameLibraryBrowserSelection(ws.Current, info))
+            var selectionChanged = !SameLibraryBrowserSelection(ws.Current, info);
+            if (selectionChanged)
             {
                 ws.SelectedDetailFiles.Clear();
                 ws.DetailSelectionAnchorIndex = -1;
                 ws.DetailFilesDisplayOrder.Clear();
             }
+            ws.ResetDetailRowsToLoadingOnNextRender = selectionChanged;
             ws.PreserveDetailScrollOnNextRender = false;
             ws.PreservedDetailScrollOffset = 0;
             panes.ThumbScroll.ScrollToVerticalOffset(0);
@@ -201,6 +257,7 @@ namespace PixelVaultNative
             var actionFolder = GetLibraryBrowserPrimaryFolder(info) ?? displayFolder;
             activeSelectedLibraryFolder = CloneLibraryFolderInfo(actionFolder);
             panes.DetailTitle.Text = info.Name;
+            UpdateLibraryBrowserDetailTitleBadges(panes, info);
             panes.DetailMeta.Text = BuildLibraryBrowserDetailMetaText(info, actionFolder);
             panes.OpenFolderButton.Content = BuildToolbarButtonContent("\uE8B7", BuildLibraryBrowserOpenFoldersLabel(info));
             var infoCapture = info;
@@ -217,7 +274,6 @@ namespace PixelVaultNative
                         {
                             panes.PreviewImage.Source = null;
                             panes.PreviewImage.Visibility = Visibility.Collapsed;
-                            UpdateLibraryBrowserPreviewPlatformBadge(panes, infoCapture, false);
                         }
                         else
                         {
@@ -225,7 +281,6 @@ namespace PixelVaultNative
                             {
                                 panes.PreviewImage.Source = loaded;
                                 panes.PreviewImage.Visibility = Visibility.Visible;
-                                UpdateLibraryBrowserPreviewPlatformBadge(panes, infoCapture, true);
                             }, true, delegate { return SameLibraryBrowserSelection(ws.Current, infoCapture); });
                         }
                     }));

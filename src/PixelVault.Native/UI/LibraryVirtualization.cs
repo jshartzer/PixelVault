@@ -220,11 +220,10 @@ namespace PixelVaultNative
             return Math.Max(1, columns);
         }
 
-        Border CreateLibraryDetailTile(string file, int size, string platformLabel, Func<bool> shouldLoad, Action<string> openSingleFileMetadataEditor, Action<string, ModifierKeys> updateDetailSelection, HashSet<string> selectedDetailFiles, Action refreshDetailSelectionUi)
+        Border CreateLibraryDetailTile(string file, int size, Func<bool> shouldLoad, Action<string> openSingleFileMetadataEditor, Action<string, ModifierKeys> updateDetailSelection, HashSet<string> selectedDetailFiles, Action refreshDetailSelectionUi)
         {
             var isVideoFile = IsVideo(file);
             var tileIsActive = true;
-            var badgePlatformLabel = NormalizeConsoleLabel(platformLabel);
             Func<bool> shouldKeepLoading = delegate
             {
                 return tileIsActive && (shouldLoad == null || shouldLoad());
@@ -348,10 +347,6 @@ namespace PixelVaultNative
                 image.Visibility = Visibility.Visible;
                 placeholder.Visibility = Visibility.Collapsed;
             }, true, shouldKeepLoading);
-            if (!ShouldShowLibraryBrowserPlatformContext() && !string.IsNullOrWhiteSpace(badgePlatformLabel))
-            {
-                presenter.Children.Add(BuildLibraryTilePlatformBadge(badgePlatformLabel));
-            }
             tile.MouseLeftButtonDown += delegate(object sender, System.Windows.Input.MouseButtonEventArgs e)
             {
                 var clicked = sender as Border;
