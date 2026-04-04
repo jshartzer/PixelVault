@@ -242,16 +242,36 @@ namespace PixelVaultNative
             Action renderSelectedFolder)
         {
             var selectionChanged = !SameLibraryBrowserSelection(ws.Current, info);
+            if (!selectionChanged && ws.Current != null && info != null)
+            {
+                if (!string.Equals(ws.Current.Name ?? string.Empty, info.Name ?? string.Empty, StringComparison.Ordinal)
+                    || !string.Equals(ws.Current.PrimaryFolderPath ?? string.Empty, info.PrimaryFolderPath ?? string.Empty, StringComparison.OrdinalIgnoreCase))
+                {
+                    selectionChanged = true;
+                }
+            }
             if (selectionChanged)
             {
                 ws.SelectedDetailFiles.Clear();
                 ws.DetailSelectionAnchorIndex = -1;
                 ws.DetailFilesDisplayOrder.Clear();
+                panes.PreviewImage.Source = null;
+                panes.PreviewImage.Visibility = Visibility.Collapsed;
+                panes.PreviewImage.Uid = Guid.NewGuid().ToString("N");
             }
             ws.ResetDetailRowsToLoadingOnNextRender = selectionChanged;
             ws.PreserveDetailScrollOnNextRender = false;
             ws.PreservedDetailScrollOffset = 0;
-            panes.ThumbScroll.ScrollToVerticalOffset(0);
+            if (ws.PendingRestoreDetailScrollAfterShow > 0.1d)
+            {
+                ws.PreserveDetailScrollOnNextRender = true;
+                ws.PreservedDetailScrollOffset = ws.PendingRestoreDetailScrollAfterShow;
+                ws.PendingRestoreDetailScrollAfterShow = 0;
+            }
+            else
+            {
+                panes.ThumbScroll.ScrollToVerticalOffset(0);
+            }
             ws.Current = info;
             var displayFolder = BuildLibraryBrowserDisplayFolder(info);
             var actionFolder = GetLibraryBrowserPrimaryFolder(info) ?? displayFolder;
@@ -296,6 +316,7 @@ namespace PixelVaultNative
                     }));
                 }
             });
+            PersistLibraryBrowserLastSelection(info);
             renderSelectedFolder();
         }
     }

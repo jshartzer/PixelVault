@@ -320,6 +320,12 @@ namespace PixelVaultNative
             return null;
         }
 
+        LibraryBrowserFolderView FindLibraryBrowserViewByViewKey(IEnumerable<LibraryBrowserFolderView> candidates, string viewKey)
+        {
+            if (string.IsNullOrWhiteSpace(viewKey) || candidates == null) return null;
+            return candidates.FirstOrDefault(c => c != null && string.Equals(c.ViewKey ?? string.Empty, viewKey, StringComparison.OrdinalIgnoreCase));
+        }
+
         List<LibraryBrowserFolderView> BuildLibraryBrowserFolderViews(IEnumerable<LibraryFolderInfo> folders, string groupingMode)
         {
             var rawFolders = (folders ?? Enumerable.Empty<LibraryFolderInfo>())

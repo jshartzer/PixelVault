@@ -52,6 +52,20 @@ namespace PixelVaultNative
                 libraryWindow.Content = root;
 
                 var ws = new LibraryBrowserWorkingSet { Panes = panes };
+                ws.AppliedLibrarySearchText = _libraryBrowserPersistedSearch ?? string.Empty;
+                ws.PendingLibrarySearchText = ws.AppliedLibrarySearchText;
+                panes.SearchBox.Text = ws.AppliedLibrarySearchText;
+                if (_libraryBrowserPersistedFolderScroll > 0.1d)
+                {
+                    ws.PreserveFolderScrollOnNextRender = true;
+                    ws.PreservedFolderScrollOffset = _libraryBrowserPersistedFolderScroll;
+                }
+                if (!string.IsNullOrWhiteSpace(_libraryBrowserPersistedLastViewKey))
+                {
+                    ws.PendingSessionRestore = true;
+                    ws.PendingRestoreViewKey = _libraryBrowserPersistedLastViewKey;
+                    ws.PendingRestoreDetailScrollAfterShow = Math.Max(0, _libraryBrowserPersistedDetailScroll);
+                }
 
                 Action<string, bool> runLibraryScan = null;
                 Action<bool> setLibraryBusyState = null;
@@ -180,42 +194,7 @@ namespace PixelVaultNative
                     if (refreshDetailSelectionUi != null) refreshDetailSelectionUi();
                 };
 
-                refreshIntakeReviewBadge = delegate
-                {
-                    if (navChrome.IntakeReviewButton == null || navChrome.IntakeReviewBadge == null || navChrome.IntakeReviewBadgeText == null) return;
-                    var refreshVersion = ++ws.IntakeBadgeRefreshVersion;
-                    System.Threading.Tasks.Task.Factory.StartNew(delegate
-                    {
-                        try
-                        {
-                            EnsureSourceFolders();
-                            return importService.BuildSourceInventory(false).TopLevelMediaFiles.Count;
-                        }
-                        catch
-                        {
-                            return -1;
-                        }
-                    }).ContinueWith(delegate(System.Threading.Tasks.Task<int> badgeTask)
-                    {
-                        libraryWindow.Dispatcher.BeginInvoke(new Action(delegate
-                        {
-                            if (refreshVersion != ws.IntakeBadgeRefreshVersion) return;
-                            var count = badgeTask.Status == TaskStatus.RanToCompletion ? badgeTask.Result : -1;
-                            if (count > 0)
-                            {
-                                navChrome.IntakeReviewBadgeText.Text = IntakeBadgeCountText(count);
-                                navChrome.IntakeReviewBadge.Visibility = Visibility.Visible;
-                                navChrome.IntakeReviewButton.ToolTip = count + " intake item(s) waiting";
-                            }
-                            else
-                            {
-                                navChrome.IntakeReviewBadgeText.Text = string.Empty;
-                                navChrome.IntakeReviewBadge.Visibility = Visibility.Collapsed;
-                                navChrome.IntakeReviewButton.ToolTip = count == 0 ? "No intake items waiting" : "Preview upload queue";
-                            }
-                        }));
-                    }, TaskScheduler.Default);
-                };
+                refreshIntakeReviewBadge = delegate { LibraryBrowserScheduleIntakeReviewBadgeRefresh(libraryWindow, ws, navChrome); };
 
                 refreshSortButtons = delegate
                 {
@@ -271,147 +250,17 @@ namespace PixelVaultNative
 
                 openSingleFileMetadataEditor = delegate(string filePath)
                 {
-                    if (ws.Current == null)
-                    {
-                        MessageBox.Show("Choose a capture first.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
-                        return;
-                    }
-                    EnsureExifTool();
-                    var visibleFiles = getVisibleDetailFilesOrdered();
-                    var visibleSet = new HashSet<string>(visibleFiles, StringComparer.OrdinalIgnoreCase);
-                    var selectedFiles = getSelectedDetailFiles();
-                    HashSet<string> wantedFiles;
-                    if (selectedFiles.Count > 0 && (string.IsNullOrWhiteSpace(filePath) || ws.SelectedDetailFiles.Contains(filePath)))
-                        wantedFiles = new HashSet<string>(selectedFiles, StringComparer.OrdinalIgnoreCase);
-                    else if (selectedFiles.Count == 0 && string.IsNullOrWhiteSpace(filePath))
-                        wantedFiles = new HashSet<string>(visibleFiles, StringComparer.OrdinalIgnoreCase);
-                    else if (!string.IsNullOrWhiteSpace(filePath) && visibleSet.Contains(filePath))
-                        wantedFiles = new HashSet<string>(new[] { filePath }, StringComparer.OrdinalIgnoreCase);
-                    else
-                    {
-                        MessageBox.Show("Choose a capture first.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
-                        return;
-                    }
-                    if (wantedFiles.Count == 0)
-                    {
-                        MessageBox.Show("Choose a capture first.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
-                        return;
-                    }
-                    var displayFolder = getDisplayFolder(ws.Current);
-                    var actionFolder = getActionFolder(ws.Current) ?? displayFolder;
-                    var selectedItems = BuildLibraryMetadataItems(displayFolder)
-                        .Where(item => wantedFiles.Contains(item.FilePath))
-                        .ToList();
-                    if (selectedItems.Count == 0)
-                    {
-                        MessageBox.Show("That capture could not be loaded for metadata editing.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
-                        return;
-                    }
-                    var selectedTitle = selectedItems.Count == 1
-                        ? Path.GetFileName(selectedItems[0].FilePath)
-                        : (visibleFiles.Count > 0 && selectedItems.Count == visibleFiles.Count
-                            ? (ws.Current.Name + " (all " + selectedItems.Count + " captures)")
-                            : (ws.Current.Name + " (" + selectedItems.Count + " selected)"));
-                    status.Text = selectedItems.Count == 1 ? "Editing selected capture metadata" : "Editing selected capture metadata";
-                    Log("Opening library metadata editor for " + selectedItems.Count + " selected capture(s) in " + ws.Current.Name + ".");
-                    if (!ShowManualMetadataWindow(selectedItems, true, selectedTitle))
-                    {
-                        status.Text = "Library metadata unchanged";
-                        return;
-                    }
-                    var currentSelection = CloneLibraryBrowserFolderView(ws.Current);
-                    RunLibraryMetadataWorkflowWithProgress(actionFolder, selectedItems, delegate
-                    {
-                        ws.SelectedDetailFiles.Clear();
-                        ws.DetailSelectionAnchorIndex = -1;
-                        ws.Current = currentSelection == null || string.IsNullOrWhiteSpace(currentSelection.PrimaryFolderPath)
-                            ? currentSelection
-                            : CloneLibraryBrowserFolderView(currentSelection);
-                        if (refreshLibraryFoldersAsync != null) refreshLibraryFoldersAsync(false);
-                    });
+                    LibraryBrowserOpenSingleFileMetadataEditor(ws, filePath, getVisibleDetailFilesOrdered, getSelectedDetailFiles, getDisplayFolder, getActionFolder, refreshLibraryFoldersAsync);
                 };
 
-                openSelectedLibraryMetadataEditor = delegate { openSingleFileMetadataEditor(null); };
+                openSelectedLibraryMetadataEditor = delegate
+                {
+                    LibraryBrowserOpenSingleFileMetadataEditor(ws, null, getVisibleDetailFilesOrdered, getSelectedDetailFiles, getDisplayFolder, getActionFolder, refreshLibraryFoldersAsync);
+                };
 
                 deleteSelectedLibraryFiles = delegate
                 {
-                    if (ws.Current == null)
-                    {
-                        MessageBox.Show("Choose a capture first.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
-                        return;
-                    }
-                    var selectedFiles = getSelectedDetailFiles()
-                        .Where(file => !string.IsNullOrWhiteSpace(file))
-                        .Distinct(StringComparer.OrdinalIgnoreCase)
-                        .ToList();
-                    if (selectedFiles.Count == 0)
-                    {
-                        MessageBox.Show("Select one or more captures to delete.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
-                        return;
-                    }
-                    var confirm = MessageBox.Show(
-                        "Delete " + selectedFiles.Count + " selected capture(s) from the library?\n\nThis removes the file" + (selectedFiles.Count == 1 ? string.Empty : "s") + " from disk and removes the photo index record" + (selectedFiles.Count == 1 ? string.Empty : "s") + ".",
-                        "Delete Capture",
-                        MessageBoxButton.OKCancel,
-                        MessageBoxImage.Warning);
-                    if (confirm != MessageBoxResult.OK) return;
-
-                    var removedFiles = new List<string>();
-                    var touchedDirectories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                    var failures = new List<string>();
-                    foreach (var file in selectedFiles)
-                    {
-                        try
-                        {
-                            var directory = Path.GetDirectoryName(file) ?? string.Empty;
-                            if (!string.IsNullOrWhiteSpace(directory)) touchedDirectories.Add(directory);
-                            DeleteMetadataSidecarIfPresent(file);
-                            if (File.Exists(file))
-                            {
-                                File.Delete(file);
-                                removedFiles.Add(file);
-                                Log("Library delete: " + file);
-                            }
-                            else
-                            {
-                                removedFiles.Add(file);
-                            }
-                        }
-                        catch (Exception deleteEx)
-                        {
-                            failures.Add(Path.GetFileName(file) + ": " + deleteEx.Message);
-                            Log("Library delete failed for " + file + ". " + deleteEx.Message);
-                        }
-                    }
-
-                    if (removedFiles.Count > 0)
-                    {
-                        librarySession.RemoveLibraryMetadataIndexEntries(removedFiles);
-                    }
-                    foreach (var directory in touchedDirectories) TryDeleteEmptyDirectory(directory);
-                    ApplyRemovedFilesToLibraryBrowserState(ws, removedFiles);
-                    ws.SelectedDetailFiles.Clear();
-                    ws.DetailSelectionAnchorIndex = -1;
-                    var currentSelection = CloneLibraryBrowserFolderView(ws.Current);
-                    ws.Current = currentSelection == null || string.IsNullOrWhiteSpace(currentSelection.PrimaryFolderPath)
-                        ? currentSelection
-                        : CloneLibraryBrowserFolderView(currentSelection);
-                    if (renderTiles != null) renderTiles();
-                    if (ws.Current != null) renderSelectedFolder();
-                    if (refreshLibraryFoldersAsync != null) refreshLibraryFoldersAsync(true);
-                    status.Text = removedFiles.Count == 0
-                        ? "No captures deleted"
-                        : (failures.Count == 0
-                            ? "Deleted " + removedFiles.Count + " capture(s)"
-                            : "Deleted " + removedFiles.Count + " capture(s) with " + failures.Count + " failure(s)");
-                    if (failures.Count > 0)
-                    {
-                        MessageBox.Show(
-                            "Some files could not be deleted." + Environment.NewLine + Environment.NewLine + string.Join(Environment.NewLine, failures.Take(8).ToArray()),
-                            "PixelVault",
-                            MessageBoxButton.OK,
-                            MessageBoxImage.Warning);
-                    }
+                    LibraryBrowserDeleteSelectedCaptures(ws, getSelectedDetailFiles, renderTiles, renderSelectedFolder, refreshLibraryFoldersAsync);
                 };
 
                 renderSelectedFolder = delegate
@@ -448,40 +297,7 @@ namespace PixelVaultNative
 
                 refreshLibraryFoldersAsync = delegate(bool forceRefresh)
                 {
-                    var refreshVersion = ++ws.LibraryFolderRefreshVersion;
-                    var loadingStatusText = forceRefresh || ws.Folders.Count > 0
-                        ? "Refreshing library folders..."
-                        : "Loading library folders...";
-                    ws.LibraryFoldersLoading = true;
-                    if (status != null) status.Text = loadingStatusText;
-                    if (renderTiles != null) renderTiles();
-                    System.Threading.Tasks.Task.Factory.StartNew(delegate
-                    {
-                        return librarySession.LoadLibraryFoldersCached(forceRefresh);
-                    }).ContinueWith(delegate(System.Threading.Tasks.Task<List<LibraryFolderInfo>> loadTask)
-                    {
-                        libraryWindow.Dispatcher.BeginInvoke(new Action(delegate
-                        {
-                            if (refreshVersion != ws.LibraryFolderRefreshVersion) return;
-                            ws.LibraryFoldersLoading = false;
-                            if (loadTask.IsFaulted)
-                            {
-                                var flattened = loadTask.Exception == null ? null : loadTask.Exception.Flatten();
-                                var loadError = flattened == null ? new Exception("Library load failed.") : flattened.InnerExceptions.First();
-                                if (status != null && string.Equals(status.Text, loadingStatusText, StringComparison.Ordinal)) status.Text = "Library load failed";
-                                Log(loadError.ToString());
-                                if (renderTiles != null) renderTiles();
-                                MessageBox.Show(loadError.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
-                                return;
-                            }
-
-                            ws.Folders.Clear();
-                            if (loadTask.Status == TaskStatus.RanToCompletion && loadTask.Result != null)
-                                ws.Folders.AddRange(loadTask.Result);
-                            if (status != null && string.Equals(status.Text, loadingStatusText, StringComparison.Ordinal)) status.Text = "Library ready";
-                            if (renderTiles != null) renderTiles();
-                        }));
-                    }, TaskScheduler.Default);
+                    LibraryBrowserRefreshFoldersAsync(libraryWindow, ws, forceRefresh, renderTiles);
                 };
                 activeLibraryFolderRefresh = refreshLibraryFoldersAsync;
                 if (!reuseMainWindow)
@@ -495,24 +311,7 @@ namespace PixelVaultNative
 
                 prefillLibraryFoldersFromSnapshotAsync = delegate
                 {
-                    System.Threading.Tasks.Task.Factory.StartNew(delegate
-                    {
-                        return librarySession.LoadLibraryFolderCacheSnapshot();
-                    }).ContinueWith(delegate(System.Threading.Tasks.Task<List<LibraryFolderInfo>> snapshotTask)
-                    {
-                        libraryWindow.Dispatcher.BeginInvoke(new Action(delegate
-                        {
-                            if (snapshotTask.IsFaulted || ws.Folders.Count > 0) return;
-                            var snapshotFolders = snapshotTask.Status == TaskStatus.RanToCompletion && snapshotTask.Result != null
-                                ? snapshotTask.Result
-                                : null;
-                            if (snapshotFolders == null || snapshotFolders.Count == 0) return;
-                            ws.Folders.Clear();
-                            ws.Folders.AddRange(snapshotFolders);
-                            if (status != null) status.Text = "Library ready";
-                            if (renderTiles != null) renderTiles();
-                        }));
-                    }, TaskScheduler.Default);
+                    LibraryBrowserPrefillFoldersFromSnapshot(libraryWindow, ws, renderTiles);
                 };
                 setLibraryBusyState = delegate(bool isBusy)
                 {
@@ -527,25 +326,7 @@ namespace PixelVaultNative
 
                 runLibraryScan = delegate(string folderPath, bool forceRescan)
                 {
-                    librarySession.RunLibraryMetadataScan(libraryWindow, folderPath, forceRescan, setLibraryBusyState, delegate
-                    {
-                        if (string.IsNullOrWhiteSpace(folderPath)) ws.Current = null;
-                        else
-                        {
-                            var prev = CloneLibraryBrowserFolderView(ws.Current);
-                            ws.Current = new LibraryBrowserFolderView
-                            {
-                                ViewKey = prev == null ? string.Empty : prev.ViewKey,
-                                GameId = prev == null ? string.Empty : prev.GameId,
-                                Name = prev == null ? string.Empty : prev.Name ?? string.Empty,
-                                PrimaryFolderPath = folderPath,
-                                PrimaryPlatformLabel = prev == null ? string.Empty : prev.PrimaryPlatformLabel ?? string.Empty,
-                                PlatformLabels = prev == null || prev.PlatformLabels == null ? new string[0] : prev.PlatformLabels.ToArray(),
-                                PlatformSummaryText = prev == null ? string.Empty : prev.PlatformSummaryText ?? string.Empty
-                            };
-                        }
-                        if (refreshLibraryFoldersAsync != null) refreshLibraryFoldersAsync(false);
-                    });
+                    LibraryBrowserRunFolderMetadataScan(libraryWindow, ws, folderPath, forceRescan, setLibraryBusyState, refreshLibraryFoldersAsync);
                 };
 
                 runScopedCoverRefresh = delegate(List<LibraryFolderInfo> requestedFolders, string scopeLabel, bool forceRefreshExistingCovers, bool rebuildFullCacheAfterRefresh)
@@ -570,6 +351,7 @@ namespace PixelVaultNative
                     panes.SearchDebounceTimer.Stop();
                     if (string.Equals(ws.AppliedLibrarySearchText, ws.PendingLibrarySearchText, StringComparison.OrdinalIgnoreCase)) return;
                     ws.AppliedLibrarySearchText = ws.PendingLibrarySearchText;
+                    PersistLibraryBrowserCommittedSearch(ws.AppliedLibrarySearchText);
                     if (renderTiles != null) renderTiles();
                 };
                 panes.SearchDebounceTimer.Tick += delegate
@@ -611,16 +393,10 @@ namespace PixelVaultNative
                 };
                 openLibraryMetadataEditor = delegate(LibraryBrowserFolderView focusFolder)
                 {
-                    if (focusFolder == null)
+                    LibraryBrowserOpenLibraryMetadataForFolder(ws, focusFolder, showFolder, refreshDetailSelectionUi, delegate
                     {
-                        MessageBox.Show("Choose a library folder first.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
-                        return;
-                    }
-                    showFolder(focusFolder);
-                    ws.SelectedDetailFiles.Clear();
-                    ws.DetailSelectionAnchorIndex = -1;
-                    if (refreshDetailSelectionUi != null) refreshDetailSelectionUi();
-                    openSingleFileMetadataEditor(null);
+                        LibraryBrowserOpenSingleFileMetadataEditor(ws, null, getVisibleDetailFilesOrdered, getSelectedDetailFiles, getDisplayFolder, getActionFolder, refreshLibraryFoldersAsync);
+                    });
                 };
                 panes.EditMetadataButton.Click += delegate { openSelectedLibraryMetadataEditor(); };
                 panes.DeleteSelectedButton.Click += delegate { deleteSelectedLibraryFiles(); };
@@ -666,6 +442,31 @@ namespace PixelVaultNative
                         panes.FolderResizeDebounceTimer.Stop();
                         panes.FolderResizeDebounceTimer.Start();
                     }
+                };
+                if (panes.ScrollPersistDebounceTimer != null)
+                {
+                    panes.ScrollPersistDebounceTimer.Tick += delegate
+                    {
+                        panes.ScrollPersistDebounceTimer.Stop();
+                        PersistLibraryBrowserScrollFromWorkingSet(ws);
+                    };
+                    Action scheduleScrollPersist = delegate
+                    {
+                        panes.ScrollPersistDebounceTimer.Stop();
+                        panes.ScrollPersistDebounceTimer.Start();
+                    };
+                    panes.TileScroll.ScrollChanged += delegate(object sender, ScrollChangedEventArgs e)
+                    {
+                        if (Math.Abs(e.VerticalChange) > 0.5) scheduleScrollPersist();
+                    };
+                    panes.ThumbScroll.ScrollChanged += delegate(object sender, ScrollChangedEventArgs e)
+                    {
+                        if (Math.Abs(e.VerticalChange) > 0.5) scheduleScrollPersist();
+                    };
+                }
+                libraryWindow.Closing += delegate
+                {
+                    PersistLibraryBrowserScrollFromWorkingSet(ws);
                 };
                 panes.SearchBox.TextChanged += delegate
                 {

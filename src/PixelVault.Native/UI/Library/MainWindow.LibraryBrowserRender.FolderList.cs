@@ -63,7 +63,7 @@ namespace PixelVaultNative
                 if (!SameLibraryBrowserSelection(ws.Current, selectedFolder)) showFolder(selectedFolder);
                 else ws.Current = selectedFolder;
             }
-            else
+            else if (!ws.PendingSessionRestore)
             {
                 ws.Current = null;
                 activeSelectedLibraryFolder = null;
@@ -81,6 +81,7 @@ namespace PixelVaultNative
                 panes.PreviewImage.Source = null;
                 panes.PreviewImage.Visibility = Visibility.Collapsed;
                 renderSelectedFolder();
+                PersistLibraryBrowserLastSelection(null);
             }
 
             var folderCardHeight = tileHeight + 82;
@@ -89,6 +90,12 @@ namespace PixelVaultNative
             var virtualRows = new List<VirtualizedRowDefinition>();
             if (orderedVisibleFolders.Count == 0)
             {
+                if (ws.PendingSessionRestore)
+                {
+                    ws.PendingSessionRestore = false;
+                    ws.PendingRestoreViewKey = null;
+                    ws.PendingRestoreDetailScrollAfterShow = 0;
+                }
                 virtualRows.Add(new VirtualizedRowDefinition
                 {
                     Height = 44,
@@ -126,6 +133,7 @@ namespace PixelVaultNative
                     });
                 }
                 SetVirtualizedRows(panes.TileRows, virtualRows, !shouldRestoreFolderScroll, shouldRestoreFolderScroll ? (double?)restoreFolderScrollOffset : null);
+                LibraryBrowserTryRestoreSessionSelection(ws, browserFolders, orderedVisibleFolders, showFolder);
                 renderStopwatch.Stop();
                 LogPerformanceSample("LibraryFolderRender", renderStopwatch, "mode=flat; foldersLoaded=" + folders.Count + "; views=" + browserFolders.Count + "; visible=" + orderedVisibleFolders.Count + "; rows=" + virtualRows.Count + "; columns=" + folderColumns + "; grouping=" + groupingMode + "; search=" + (string.IsNullOrWhiteSpace(searchText) ? "(none)" : searchText) + "; sort=" + sortMode + "; projectMs=" + projectionStopwatch.ElapsedMilliseconds + "; filterMs=" + filterSortStopwatch.ElapsedMilliseconds, 40);
                 return;
@@ -183,8 +191,28 @@ namespace PixelVaultNative
                 }
             }
             SetVirtualizedRows(panes.TileRows, virtualRows, !shouldRestoreFolderScroll, shouldRestoreFolderScroll ? (double?)restoreFolderScrollOffset : null);
+            LibraryBrowserTryRestoreSessionSelection(ws, browserFolders, orderedVisibleFolders, showFolder);
             renderStopwatch.Stop();
             LogPerformanceSample("LibraryFolderRender", renderStopwatch, "mode=grouped; foldersLoaded=" + folders.Count + "; views=" + browserFolders.Count + "; visible=" + orderedVisibleFolders.Count + "; rows=" + virtualRows.Count + "; columns=" + folderColumns + "; grouping=" + groupingMode + "; search=" + (string.IsNullOrWhiteSpace(searchText) ? "(none)" : searchText) + "; sort=" + sortMode + "; projectMs=" + projectionStopwatch.ElapsedMilliseconds + "; filterMs=" + filterSortStopwatch.ElapsedMilliseconds, 40);
+        }
+
+        void LibraryBrowserTryRestoreSessionSelection(
+            LibraryBrowserWorkingSet ws,
+            List<LibraryBrowserFolderView> browserFolders,
+            List<LibraryBrowserFolderView> orderedVisibleFolders,
+            Action<LibraryBrowserFolderView> showFolder)
+        {
+            if (ws == null || !ws.PendingSessionRestore || string.IsNullOrWhiteSpace(ws.PendingRestoreViewKey) || showFolder == null) return;
+            var match = FindLibraryBrowserViewByViewKey(orderedVisibleFolders, ws.PendingRestoreViewKey)
+                ?? FindLibraryBrowserViewByViewKey(browserFolders, ws.PendingRestoreViewKey);
+            ws.PendingSessionRestore = false;
+            ws.PendingRestoreViewKey = null;
+            if (match == null)
+            {
+                ws.PendingRestoreDetailScrollAfterShow = 0;
+                return;
+            }
+            showFolder(match);
         }
     }
 }

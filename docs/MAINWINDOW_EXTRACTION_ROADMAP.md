@@ -167,6 +167,10 @@ Review feedback matches the plan: **`LibraryBrowserHost`** is intentionally a **
 
 **Coordination:** Prefer **not** pairing a large facade pass with heavy **`IImportService`** / **`ImportWorkflow`** edits in the same window; see **`docs/SERVICE_OWNERSHIP_AND_PARALLEL_WORK_MAP.md`**.
 
+**Progress (E2 slice, Apr 2026):** Scoped library cover refresh (progress window, cancel, folder reload) moved from an inline delegate in **`ShowLibraryBrowserCore`** to **`RunLibraryBrowserScopedCoverRefresh`** in **`UI/Library/MainWindow.LibraryBrowserOrchestrator.CoverRefresh.cs`** (**`MainWindow`** partial); orchestrator assigns **`runScopedCoverRefresh`** to call it (no intended behavior change).
+
+**Progress (E2 slice, continued):** Additional **`ShowLibraryBrowserCore`** blocks moved to **`MainWindow`** partials — detail delete + metadata editor + “edit metadata for folder” in **`MainWindow.LibraryBrowserOrchestrator.DetailCommands.cs`**; folder list refresh, snapshot prefill, and metadata scan callback in **`MainWindow.LibraryBrowserOrchestrator.FolderData.cs`**; intake review badge refresh in **`MainWindow.LibraryBrowserOrchestrator.IntakeBadge.cs`**. Orchestrator keeps thin delegates (no intended behavior change).
+
 **Progress (E3):** Library virtualization stays in **`UI/LibraryVirtualization.cs`**; **`ShowLibraryBrowser`** already consumes it via **`MainWindow`** partial methods — **no further structural change** for this slice.
 
 ---

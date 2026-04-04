@@ -50,6 +50,7 @@
     <Compile Include="UI\ChangelogWindow.cs" />
     <Compile Include="UI\Intake\IntakePreviewWindow.cs" />
     <Compile Include="UI\Intake\MetadataReviewWindow.cs" />
+    <Compile Include="UI\Intake\MainWindow.ManualMetadata.cs" />
     <Compile Include="UI\UiBrushHelper.cs" />
     <Compile Include="UI\Progress\WorkflowProgressWindow.cs" />
     <Compile Include="UI\Editors\FilenameConventionEditorWindow.cs" />
@@ -67,9 +68,13 @@
     <Compile Include="UI\Library\MainWindow.LibraryBrowserLayout.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserViewModel.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserRender.FolderList.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryBrowserSessionPersistence.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserRender.DetailPane.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserOrchestrator.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserOrchestrator.CoverRefresh.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryBrowserOrchestrator.DetailCommands.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryBrowserOrchestrator.FolderData.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryBrowserOrchestrator.IntakeBadge.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserOrchestrator.FolderTile.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryScannerBridge.cs" />
     <Compile Include="UI\LibraryVirtualization.cs" />

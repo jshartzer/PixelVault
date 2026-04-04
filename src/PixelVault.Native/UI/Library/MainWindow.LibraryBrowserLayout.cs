@@ -15,6 +15,7 @@ namespace PixelVaultNative
             internal DispatcherTimer SearchDebounceTimer;
             internal DispatcherTimer DetailResizeDebounceTimer;
             internal DispatcherTimer FolderResizeDebounceTimer;
+            internal DispatcherTimer ScrollPersistDebounceTimer;
             internal Button GroupAllButton;
             internal Button GroupConsoleButton;
             internal Button SortPlatformButton;
@@ -86,6 +87,7 @@ namespace PixelVaultNative
             panes.SearchDebounceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(220) };
             panes.DetailResizeDebounceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(140) };
             panes.FolderResizeDebounceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(140) };
+            panes.ScrollPersistDebounceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(450) };
             searchPanel.Children.Add(searchBoxShell);
             Grid.SetRow(searchPanel, 0);
             filterGrid.Children.Add(searchPanel);

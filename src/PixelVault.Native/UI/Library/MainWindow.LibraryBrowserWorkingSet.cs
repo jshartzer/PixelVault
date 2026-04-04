@@ -34,6 +34,9 @@ namespace PixelVaultNative
             internal int EstimatedDetailRowHeight = 420;
             internal int DetailSelectionAnchorIndex = -1;
             internal int IntakeBadgeRefreshVersion;
+            internal bool PendingSessionRestore;
+            internal string PendingRestoreViewKey;
+            internal double PendingRestoreDetailScrollAfterShow;
         }
     }
 }
