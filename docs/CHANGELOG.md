@@ -1,3 +1,11 @@
+## 0.864
+- **Release:** Version **0.864** — Library Tier A polish + library metadata scan throughput fix.
+- **Library (`LIB-004` / `LIB-007`):** **Refresh this folder** (scoped cover/ID refresh without full folder-list reload; optional **Reload library folder list**); footer **Tiles −** / **Tiles +** for folder tile size (persisted).
+- **Covers (`COV-002` / `COV-003`):** **Use as folder cover** from capture context menu and detail **Use as cover** when one image is selected; **Cover: Custom / Downloaded / Preview** on folder subtitles and detail badges.
+- **UX (`UX-003` / `UX-004`):** Library toast host (saved metadata, covers, tile size, etc.); **F1** / **?** keyboard shortcuts sheet.
+- **Photography (`PHT-001`):** Photography gallery force-reloads when Library deletes files and the gallery window is open.
+- **Performance:** Library metadata index scan batches use **`Parallel.ForEach`** with **`MaxDegreeOfParallelism`** instead of one **`Task.Run` per batch** blocked on a semaphore (fewer thread-pool threads tied up on large scans).
+
 ## 0.854
 - **Release:** Version **0.854** — publish refresh; documentation consolidation (code quality plan slim + `docs/archive/CODE_QUALITY_IMPROVEMENT_PLAN_HISTORICAL.md`, archive index and cross-links in `PROJECT_CONTEXT` / `MAINWINDOW_EXTRACTION_ROADMAP` / `PixelVaultData/TODO.md`). No intentional app behavior change.
 
