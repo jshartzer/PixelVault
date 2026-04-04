@@ -188,7 +188,10 @@ namespace PixelVaultNative
                 var index = LoadLibraryMetadataIndex(root, true);
                 LibraryMetadataIndexEntry row;
                 if (!index.TryGetValue(entry.FullPath, out row) || row == null) return;
-                row.Starred = !row.Starred;
+                var nextStarred = !row.Starred;
+                ApplyEmbeddedXmpStarRating(entry.FullPath, nextStarred);
+                row.Starred = nextStarred;
+                row.Stamp = BuildLibraryMetadataStamp(entry.FullPath);
                 SaveLibraryMetadataIndex(root, index);
                 entry.Starred = row.Starred;
             }

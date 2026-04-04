@@ -23,6 +23,8 @@ namespace PixelVaultNative
         Dictionary<string, EmbeddedMetadataSnapshot> ReadEmbeddedMetadataBatch(IEnumerable<string> files, CancellationToken cancellationToken = default(CancellationToken));
         Task<Dictionary<string, string[]>> ReadEmbeddedKeywordTagsBatchAsync(IEnumerable<string> files, CancellationToken cancellationToken = default(CancellationToken));
         Task<Dictionary<string, EmbeddedMetadataSnapshot>> ReadEmbeddedMetadataBatchAsync(IEnumerable<string> files, CancellationToken cancellationToken = default(CancellationToken));
+        int? ReadEmbeddedRatingDirect(string file, CancellationToken cancellationToken = default(CancellationToken));
+        string[] BuildStarRatingExifArgs(string file, bool starred);
         void EnsureExifTool();
         void RunExifToolBatch(IReadOnlyList<ExifWriteRequest> requests);
         int RunExifWriteRequests(List<ExifWriteRequest> requests, int totalCount, int alreadyCompleted, Action<int, int, string> progress = null, CancellationToken cancellationToken = default(CancellationToken));
@@ -295,6 +297,48 @@ namespace PixelVaultNative
                 .FirstOrDefault(parsed => parsed.HasValue);
         }
 
+        static int? ParseEmbeddedRatingField(string raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw)) return null;
+            raw = raw.Trim();
+            if (raw == "-" || raw.Equals("unknown", StringComparison.OrdinalIgnoreCase)) return null;
+            if (int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var n))
+            {
+                if (n < 0 || n > 5) return null;
+                return n;
+            }
+            if (double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var d))
+            {
+                var r = (int)Math.Round(d, MidpointRounding.AwayFromZero);
+                if (r < 0 || r > 5) return null;
+                return r;
+            }
+            return null;
+        }
+
+        public int? ReadEmbeddedRatingDirect(string file, CancellationToken cancellationToken = default(CancellationToken))
+        {
+            if (string.IsNullOrWhiteSpace(file) || !File.Exists(file)) return null;
+            if (string.IsNullOrWhiteSpace(ExifToolPath) || !File.Exists(ExifToolPath)) return null;
+            var readTarget = MetadataReadPath(file);
+            if (string.IsNullOrWhiteSpace(readTarget) || !File.Exists(readTarget)) return null;
+            cancellationToken.ThrowIfCancellationRequested();
+            var output = RunExeCapture(ExifToolPath, new[] { "-s3", "-XMP:Rating", readTarget }, Path.GetDirectoryName(ExifToolPath), false, cancellationToken);
+            var line = (output ?? string.Empty).Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+            return ParseEmbeddedRatingField(line);
+        }
+
+        public string[] BuildStarRatingExifArgs(string file, bool starred)
+        {
+            if (string.IsNullOrWhiteSpace(file) || !File.Exists(file)) return Array.Empty<string>();
+            if (string.IsNullOrWhiteSpace(ExifToolPath) || !File.Exists(ExifToolPath)) return Array.Empty<string>();
+            var rating = starred ? "5" : "0";
+            var targetPath = IsVideo(file) ? MetadataSidecarPath(file) : file;
+            if (string.IsNullOrWhiteSpace(targetPath)) return Array.Empty<string>();
+            if (!IsVideo(file) && !File.Exists(targetPath)) return Array.Empty<string>();
+            return new[] { "-XMP:Rating=" + rating, "-overwrite_original", targetPath };
+        }
+
         public Dictionary<string, string[]> ReadEmbeddedKeywordTagsBatch(IEnumerable<string> files, CancellationToken cancellationToken = default(CancellationToken))
         {
             var result = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
@@ -435,7 +479,8 @@ namespace PixelVaultNative
                     "-EXIF:CreateDate",
                     "-EXIF:ModifyDate",
                     "-QuickTime:CreateDate",
-                    "-QuickTime:ModifyDate"
+                    "-QuickTime:ModifyDate",
+                    "-XMP:Rating"
                 };
                 argLines.AddRange(orderedReadTargets.Select(pair => pair.Value));
                 File.WriteAllLines(argFile, argLines.ToArray(), Encoding.UTF8);
@@ -486,6 +531,8 @@ namespace PixelVaultNative
                         break;
                     }
 
+                    if (parts.Length > 22) snapshot.Rating = ParseEmbeddedRatingField(parts[22]);
+
                     result[sourceFile] = snapshot;
                     matchedFiles.Add(sourceFile);
                 }
@@ -497,7 +544,8 @@ namespace PixelVaultNative
                     {
                         Tags = ReadEmbeddedKeywordTagsDirect(pair.Key, cancellationToken),
                         Comment = ReadEmbeddedCommentDirect(pair.Key, cancellationToken),
-                        CaptureTime = ReadEmbeddedCaptureDateDirect(pair.Key, cancellationToken)
+                        CaptureTime = ReadEmbeddedCaptureDateDirect(pair.Key, cancellationToken),
+                        Rating = ReadEmbeddedRatingDirect(pair.Key, cancellationToken)
                     };
                 }
             }

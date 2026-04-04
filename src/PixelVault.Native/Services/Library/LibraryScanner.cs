@@ -306,6 +306,7 @@ namespace PixelVaultNative
 
                 var existingIndex = host.LoadLibraryMetadataIndex(root, true);
                 var index = new Dictionary<string, LibraryMetadataIndexEntry>(StringComparer.OrdinalIgnoreCase);
+                var ratingWrites = new List<ExifWriteRequest>();
                 foreach (var row in rowList)
                 {
                     var normalizedTags = string.Join(", ", host.ParseTagText(row.TagText));
@@ -313,6 +314,24 @@ namespace PixelVaultNative
                     var stamp = host.BuildLibraryMetadataStamp(row.FilePath);
                     LibraryMetadataIndexEntry existingEntry;
                     if (!existingIndex.TryGetValue(row.FilePath, out existingEntry)) existingEntry = null;
+                    var hadStarred = existingEntry != null && existingEntry.Starred;
+                    if (row.Starred != hadStarred && fileSystem.FileExists(row.FilePath))
+                    {
+                        var args = metadataService.BuildStarRatingExifArgs(row.FilePath, row.Starred);
+                        if (args != null && args.Length > 0)
+                        {
+                            ratingWrites.Add(new ExifWriteRequest
+                            {
+                                FilePath = row.FilePath,
+                                FileName = Path.GetFileName(row.FilePath),
+                                Arguments = args,
+                                RestoreFileTimes = false,
+                                OriginalCreateTime = DateTime.MinValue,
+                                OriginalWriteTime = DateTime.MinValue,
+                                SuccessDetail = "XMP star rating"
+                            });
+                        }
+                    }
                     index[row.FilePath] = new LibraryMetadataIndexEntry
                     {
                         FilePath = row.FilePath,
@@ -323,6 +342,19 @@ namespace PixelVaultNative
                         CaptureUtcTicks = host.ResolveLibraryMetadataCaptureUtcTicks(row.FilePath, stamp, null, existingEntry),
                         Starred = row.Starred
                     };
+                }
+
+                if (ratingWrites.Count > 0)
+                {
+                    host.EnsureExifTool();
+                    metadataService.RunExifToolBatch(ratingWrites);
+                    foreach (var write in ratingWrites)
+                    {
+                        LibraryMetadataIndexEntry entry;
+                        if (!index.TryGetValue(write.FilePath, out entry) || entry == null) continue;
+                        if (!fileSystem.FileExists(entry.FilePath)) continue;
+                        entry.Stamp = host.BuildLibraryMetadataStamp(entry.FilePath);
+                    }
                 }
 
                 var gameRows = host.LoadSavedGameIndexRows(root);

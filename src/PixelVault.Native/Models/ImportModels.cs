@@ -137,5 +137,7 @@ namespace PixelVaultNative
         public string[] Tags = new string[0];
         public string Comment = string.Empty;
         public DateTime? CaptureTime;
+        /// <summary>Adobe-style XMP star rating 0–5 when present in the file; null if not set or unreadable.</summary>
+        public int? Rating;
     }
 }

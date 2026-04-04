@@ -55,6 +55,7 @@
     <Compile Include="UI\Intake\IntakePreviewWindow.cs" />
     <Compile Include="UI\Intake\MainWindow.IntakePreview.cs" />
     <Compile Include="UI\Intake\MetadataReviewWindow.cs" />
+    <Compile Include="UI\Intake\MainWindow.MetadataReview.cs" />
     <Compile Include="UI\Intake\MainWindow.ManualMetadata.cs" />
     <Compile Include="UI\UiBrushHelper.cs" />
     <Compile Include="UI\Progress\WorkflowProgressWindow.cs" />

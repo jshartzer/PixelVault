@@ -22,6 +22,27 @@ namespace PixelVaultNative
             return true;
         }
 
+        void ApplyEmbeddedXmpStarRating(string filePath, bool starred)
+        {
+            if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath)) return;
+            EnsureExifTool();
+            var args = metadataService.BuildStarRatingExifArgs(filePath, starred);
+            if (args == null || args.Length == 0) return;
+            RunExifToolBatch(new List<ExifWriteRequest>
+            {
+                new ExifWriteRequest
+                {
+                    FilePath = filePath,
+                    FileName = Path.GetFileName(filePath),
+                    Arguments = args,
+                    RestoreFileTimes = false,
+                    OriginalCreateTime = DateTime.MinValue,
+                    OriginalWriteTime = DateTime.MinValue,
+                    SuccessDetail = "XMP star rating"
+                }
+            });
+        }
+
         void ToggleLibraryFileStarredByPath(string filePath)
         {
             if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath)) return;
@@ -32,7 +53,10 @@ namespace PixelVaultNative
                 var index = LoadLibraryMetadataIndex(root, true);
                 LibraryMetadataIndexEntry row;
                 if (!index.TryGetValue(filePath, out row) || row == null) return;
-                row.Starred = !row.Starred;
+                var nextStarred = !row.Starred;
+                ApplyEmbeddedXmpStarRating(filePath, nextStarred);
+                row.Starred = nextStarred;
+                row.Stamp = BuildLibraryMetadataStamp(filePath);
                 SaveLibraryMetadataIndex(root, index);
             }
             catch (Exception ex)

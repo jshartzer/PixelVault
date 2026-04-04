@@ -106,6 +106,13 @@ namespace PixelVaultNative
             return fallback <= DateTime.MinValue ? 0L : fallback.ToUniversalTime().Ticks;
         }
 
+        /// <summary>When <see cref="EmbeddedMetadataSnapshot.Rating"/> is present (XMP 0–5), sync index star from embedded: 5 stars ⇒ starred. Otherwise keep the existing index flag.</summary>
+        bool ResolveLibraryMetadataStarred(EmbeddedMetadataSnapshot snapshot, LibraryMetadataIndexEntry existingEntry)
+        {
+            if (snapshot != null && snapshot.Rating.HasValue) return snapshot.Rating.Value >= 5;
+            return existingEntry != null && existingEntry.Starred;
+        }
+
         LibraryMetadataIndexEntry BuildResolvedLibraryMetadataIndexEntry(string root, string file, string stamp, EmbeddedMetadataSnapshot snapshot, LibraryMetadataIndexEntry existingEntry, Dictionary<string, LibraryMetadataIndexEntry> index, List<GameIndexEditorRow> gameRows)
         {
             var tags = ResolveLibraryMetadataTags(snapshot, existingEntry);
@@ -123,7 +130,7 @@ namespace PixelVaultNative
                 ConsoleLabel = platformLabel,
                 TagText = string.Join(", ", tags),
                 CaptureUtcTicks = ResolveLibraryMetadataCaptureUtcTicks(file, stamp, snapshot, existingEntry),
-                Starred = existingEntry != null && existingEntry.Starred
+                Starred = ResolveLibraryMetadataStarred(snapshot, existingEntry)
             };
         }
 

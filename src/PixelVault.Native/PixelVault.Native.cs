@@ -1074,32 +1074,6 @@ namespace PixelVaultNative
             foreach (var root in GetSourceRoots()) OpenFolder(root);
         }
 
-        int CalculateLibraryFolderArtDecodeWidth(int tileWidth)
-        {
-            return Math.Min(640, Math.Max(320, tileWidth + 96));
-        }
-
-        int CalculateLibraryBannerArtDecodeWidth()
-        {
-            return 384;
-        }
-
-        int CalculateLibraryDetailTileDecodeWidth(int tileWidth)
-        {
-            return Math.Min(640, Math.Max(384, tileWidth + 96));
-        }
-
-        bool ShowMetadataReviewWindow(List<ReviewItem> items)
-        {
-            return MetadataReviewWindow.Show(this, AppVersion, items, new MetadataReviewServices
-            {
-                CreateButton = Btn,
-                PreviewBadge = PreviewBadgeBrush,
-                LoadImageSource = LoadImageSource,
-                GamePhotographyTag = GamePhotographyTag
-            });
-        }
-
         void ClearLibraryImageCaches()
         {
             libraryWorkspace.ClearFolderImageListings();

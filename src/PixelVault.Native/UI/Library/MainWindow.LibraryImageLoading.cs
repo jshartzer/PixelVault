@@ -181,5 +181,20 @@ namespace PixelVaultNative
         {
             return libraryThumbnailPipeline.LoadFrozenBitmap(path, decodePixelWidth);
         }
+
+        int CalculateLibraryFolderArtDecodeWidth(int tileWidth)
+        {
+            return Math.Min(640, Math.Max(320, tileWidth + 96));
+        }
+
+        int CalculateLibraryBannerArtDecodeWidth()
+        {
+            return 384;
+        }
+
+        int CalculateLibraryDetailTileDecodeWidth(int tileWidth)
+        {
+            return Math.Min(640, Math.Max(384, tileWidth + 96));
+        }
     }
 }

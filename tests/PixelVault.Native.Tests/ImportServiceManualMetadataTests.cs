@@ -34,6 +34,10 @@ sealed class StubMetadataService : IMetadataService
 
     public void EnsureExifTool() { }
 
+    public int? ReadEmbeddedRatingDirect(string file, CancellationToken cancellationToken = default) => null;
+
+    public string[] BuildStarRatingExifArgs(string file, bool starred) => Array.Empty<string>();
+
     public void RunExifToolBatch(IReadOnlyList<ExifWriteRequest> requests) { }
 
     public int RunExifWriteRequests(List<ExifWriteRequest> requests, int totalCount, int alreadyCompleted, Action<int, int, string> progress = null, CancellationToken cancellationToken = default(CancellationToken)) => 0;

@@ -145,7 +145,7 @@ public sealed class IndexPersistenceServiceTests
     }
 
     [Fact]
-    public void SaveLibraryMetadataIndexEntries_IgnoresMissingFilesOnLoad()
+    public void SaveLibraryMetadataIndexEntries_RetainsMissingFilePathsOnLoad()
     {
         using var harness = new IndexPersistenceHarness();
         var existingFile = harness.CreateFile("metadata\\keep.png");
@@ -177,9 +177,11 @@ public sealed class IndexPersistenceServiceTests
 
         var loaded = harness.Service.LoadLibraryMetadataIndexEntries(harness.LibraryRoot);
 
-        Assert.Single(loaded);
+        Assert.Equal(2, loaded.Count);
         Assert.True(loaded.ContainsKey(existingFile));
-        Assert.False(loaded.ContainsKey(missingFile));
+        Assert.True(loaded.ContainsKey(missingFile));
+        Assert.Equal("G00010", loaded[existingFile].GameId);
+        Assert.Equal("G99999", loaded[missingFile].GameId);
     }
 
     [Fact]
