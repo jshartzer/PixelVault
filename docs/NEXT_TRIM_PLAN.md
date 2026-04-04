@@ -12,9 +12,9 @@
 
 | Priority | Item | Rationale |
 |----------|------|-----------|
-| **1a** | **`MainWindow.ManualMetadata.cs` (~994 lines)** | Largest UI partial after the primary file; splitting by concern (e.g. dialog builders vs grid commands vs Steam UI) reduces merge pain and clarifies thread boundaries. **Started (2026-04-04):** helpers in **`MainWindow.ManualMetadata.Helpers.cs`** (badges, shared field getters, multi-preview stack, console apply). **Next:** Steam search click/async block and/or finish-button flow in separate partials. |
-| **1b** | **`ImportWorkflow.cs` (~710 lines)** | Natural home for more steps under **`IImportService`** or small workflow types; lowers conflict risk with `PixelVault.Native.cs` per `SERVICE_OWNERSHIP_AND_PARALLEL_WORK_MAP.md`. |
-| **1c** | **`PixelVault.Native.cs` ctor / composition** | Filename-convention **`FilenameParserService`** deps still wire many **`indexPersistenceService`** lambdas in one block; consider a **`MainWindow.IndexServicesWiring.cs`** partial or a tiny bootstrap helper so the primary file’s top half is thinner (no behavior change). |
+| **1a** | **`MainWindow.ManualMetadata` (split across ~5 partials)** | **Done (2026-04-04):** Orchestration in **`MainWindow.ManualMetadata.cs`** (~550 lines); **`MainWindow.ManualMetadata.Helpers.cs`**, **`Layout.cs`**, **`SteamSearch.cs`**, **`Finish.cs`** hold dialog layout, Steam match flow, finish/confirm, and shared helpers. |
+| **1b** | **`ImportWorkflow` (split partials)** | **Done (2026-04-04):** Core intake/progress orchestration in **`Import/ImportWorkflow.cs`**; **`MainWindow.ImportWorkflow.Progress.cs`** (`RunBackgroundWorkflowWithProgress`); **`MainWindow.ImportWorkflow.Steps.cs`** (rename/move/metadata/delete/sort/undo). Further steps can move into **`IImportService`** when touching behavior. |
+| **1c** | **`PixelVault.Native.cs` ctor / composition** | **Done (2026-04-04):** **`MainWindow.IndexServicesWiring.cs`** — static **`CreateIndexFilenameRulesServices`** builds index persistence, filename parser, game-index assignment, and filename rules from one place; ctor assigns via deconstruction (no behavior change). |
 
 ## Tier 2 — Performance / polish (profile or user reports)
 
