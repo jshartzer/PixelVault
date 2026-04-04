@@ -24,6 +24,8 @@
     <Compile Include="Indexing\LibraryFolderIndexing.cs" />
     <Compile Include="Indexing\LibraryMetadataIndexing.cs" />
     <Compile Include="Import\ImportWorkflow.cs" />
+    <Compile Include="Import\MainWindow.ImportWorkflow.Progress.cs" />
+    <Compile Include="Import\MainWindow.ImportWorkflow.Steps.cs" />
     <Compile Include="Import\MainWindow.ImportSummaryDialogs.cs" />
     <Compile Include="MediaTools\MediaToolHelpers.cs" />
     <Compile Include="Metadata\LibraryMetadataEditing.cs" />
@@ -105,9 +107,12 @@
     <Compile Include="UI\Library\MainWindow.LibraryBrowserOrchestrator.IntakeBadge.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserOrchestrator.FolderTile.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryScannerBridge.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryFolderCacheIo.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryFolderIdEditor.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryCaptureQuickActions.cs" />
     <Compile Include="UI\LibraryVirtualization.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="MainWindow.IndexServicesWiring.cs" />
     <Compile Include="PixelVault.Native.cs" />
   </ItemGroup>
 
