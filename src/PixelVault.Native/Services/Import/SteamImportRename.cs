@@ -48,11 +48,18 @@ namespace PixelVaultNative
             return list;
         }
 
+        /// <summary>
+        /// True when <paramref name="baseName"/> starts with the full Steam AppID token: same digit run as <paramref name="appId"/>,
+        /// then either ends or continues with a non-digit (e.g. <c>_</c>). Avoids <c>108710</c> matching <c>1087100_...</c>.
+        /// </summary>
         internal static bool SteamAppIdLooksLikeFilenamePrefix(string appId, string baseName)
         {
             if (string.IsNullOrWhiteSpace(appId) || string.IsNullOrWhiteSpace(baseName)) return false;
             if (!appId.All(char.IsDigit)) return false;
-            return baseName.StartsWith(appId, StringComparison.OrdinalIgnoreCase);
+            if (baseName.Length < appId.Length) return false;
+            if (!baseName.StartsWith(appId, StringComparison.Ordinal)) return false;
+            if (baseName.Length == appId.Length) return true;
+            return !char.IsDigit(baseName[appId.Length]);
         }
 
         internal static bool TryBuildSteamRenameBase(string baseName, string appId, string canonicalGameTitle, string gameTitleHint, out string newBase)

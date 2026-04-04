@@ -109,4 +109,21 @@ public sealed class SteamRenamePathMappingTests
         Assert.True(SteamImportRename.TryBuildSteamRenameBase("My Game_screenshot_1", "1", "My Game", null, out var nb));
         Assert.Equal("My Game_screenshot_1", nb);
     }
+
+    [Fact]
+    public void SteamAppIdLooksLikeFilenamePrefix_RequiresBoundary_AfterDigitRun()
+    {
+        Assert.True(SteamImportRename.SteamAppIdLooksLikeFilenamePrefix("108710", "108710_screenshot"));
+        Assert.True(SteamImportRename.SteamAppIdLooksLikeFilenamePrefix("2561580", "2561580_20240101120000"));
+        Assert.True(SteamImportRename.SteamAppIdLooksLikeFilenamePrefix("730", "730"));
+        Assert.False(SteamImportRename.SteamAppIdLooksLikeFilenamePrefix("108710", "1087100_screenshot"));
+        Assert.False(SteamImportRename.SteamAppIdLooksLikeFilenamePrefix("108710", "10871000_timestamp"));
+        Assert.False(SteamImportRename.SteamAppIdLooksLikeFilenamePrefix("12", "123_something"));
+    }
+
+    [Fact]
+    public void TryBuildSteamRenameBase_DoesNotTreatLongerNumericStem_AsShorterAppId()
+    {
+        Assert.False(SteamImportRename.TryBuildSteamRenameBase("1087100_screenshot", "108710", "My Game", null, out _));
+    }
 }
