@@ -435,45 +435,58 @@ namespace PixelVaultNative
             }
         }
 
+        static bool ThumbnailCacheWriteMayRetry(Exception ex)
+        {
+            if (ex == null) return false;
+            if (ex is UnauthorizedAccessException) return true;
+            var msg = ex.Message ?? string.Empty;
+            if (msg.IndexOf("being used by another process", StringComparison.OrdinalIgnoreCase) >= 0) return true;
+            if (msg.IndexOf("cannot access the file", StringComparison.OrdinalIgnoreCase) >= 0
+                && msg.IndexOf(".tmp", StringComparison.OrdinalIgnoreCase) >= 0) return true;
+            if (msg.IndexOf("Access to the path is denied", StringComparison.OrdinalIgnoreCase) >= 0) return true;
+            return false;
+        }
+
         void SaveThumbnailCache(BitmapSource source, string destinationPath)
         {
             if (source == null || string.IsNullOrWhiteSpace(destinationPath)) return;
-            string tempPath = null;
-            try
+            var directory = Path.GetDirectoryName(destinationPath);
+            if (!string.IsNullOrWhiteSpace(directory)) Directory.CreateDirectory(directory);
+            if (File.Exists(destinationPath)) return;
+
+            const int maxAttempts = 4;
+            for (var attempt = 0; attempt < maxAttempts; attempt++)
             {
-                var directory = Path.GetDirectoryName(destinationPath);
-                if (!string.IsNullOrWhiteSpace(directory)) Directory.CreateDirectory(directory);
-                if (File.Exists(destinationPath)) return;
-                tempPath = Path.Combine(
-                    directory ?? string.Empty,
-                    Path.GetFileName(destinationPath) + "." + Guid.NewGuid().ToString("N") + ".tmp");
-                using (var stream = new FileStream(tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                if (attempt > 0) Thread.Sleep(35 * attempt);
+                string tempPath = null;
+                try
                 {
-                    var encoder = new PngBitmapEncoder();
-                    encoder.Frames.Add(BitmapFrame.Create(source));
-                    encoder.Save(stream);
+                    tempPath = Path.Combine(
+                        directory ?? string.Empty,
+                        Path.GetFileName(destinationPath) + "." + Guid.NewGuid().ToString("N") + ".tmp");
+                    using (var stream = new FileStream(tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                    {
+                        var encoder = new PngBitmapEncoder();
+                        encoder.Frames.Add(BitmapFrame.Create(source));
+                        encoder.Save(stream);
+                    }
+                    if (File.Exists(destinationPath)) return;
+                    File.Move(tempPath, destinationPath);
+                    tempPath = null;
+                    return;
                 }
-                if (File.Exists(destinationPath)) return;
-                File.Move(tempPath, destinationPath);
-                tempPath = null;
-            }
-            catch (Exception ex)
-            {
-                if (File.Exists(destinationPath)) return;
-                Log("SaveThumbnailCache failed for " + destinationPath + ". " + ex.Message);
-            }
-            finally
-            {
-                if (!string.IsNullOrWhiteSpace(tempPath) && File.Exists(tempPath))
+                catch (Exception ex)
                 {
-                    try
+                    if (File.Exists(destinationPath)) return;
+                    if (!string.IsNullOrWhiteSpace(tempPath) && File.Exists(tempPath))
                     {
-                        File.Delete(tempPath);
+                        try { File.Delete(tempPath); }
+                        catch { /* best-effort */ }
+                        tempPath = null;
                     }
-                    catch (Exception inner)
-                    {
-                        Log("SaveThumbnailCache: could not remove temp file. " + inner.Message);
-                    }
+                    if (attempt < maxAttempts - 1 && ThumbnailCacheWriteMayRetry(ex)) continue;
+                    Log("SaveThumbnailCache failed for " + destinationPath + ". " + ex.Message);
+                    return;
                 }
             }
         }

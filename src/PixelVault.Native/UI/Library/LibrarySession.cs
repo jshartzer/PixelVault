@@ -132,6 +132,30 @@ namespace PixelVaultNative
             _scanner.RemoveLibraryMetadataIndexEntries(removedFiles, LibraryRoot);
         }
 
+        public void UpsertLibraryMetadataIndexEntries(IEnumerable<string> files)
+        {
+            if (string.IsNullOrWhiteSpace(LibraryRoot) || files == null) return;
+            _scanner.UpsertLibraryMetadataIndexEntries(files, LibraryRoot);
+        }
+
+        public void UpsertLibraryMetadataIndexEntries(IEnumerable<ManualMetadataItem> items)
+        {
+            if (string.IsNullOrWhiteSpace(LibraryRoot) || items == null) return;
+            _scanner.UpsertLibraryMetadataIndexEntries(items, LibraryRoot);
+        }
+
+        public void RefreshFolderCacheAfterGameIndexChange()
+        {
+            if (string.IsNullOrWhiteSpace(LibraryRoot)) return;
+            _scanner.RefreshFolderCacheAfterGameIndexChange(LibraryRoot);
+        }
+
+        public List<LibraryFolderInfo> EnsureGameIndexFolderContext(Action<string> setUiStatus)
+        {
+            if (string.IsNullOrWhiteSpace(LibraryRoot)) return new List<LibraryFolderInfo>();
+            return _scanner.EnsureGameIndexFolderContext(LibraryRoot, setUiStatus);
+        }
+
         public List<LibraryFolderInfo> LoadLibraryFoldersCached(bool forceRefresh)
         {
             if (string.IsNullOrWhiteSpace(LibraryRoot)) return new List<LibraryFolderInfo>();

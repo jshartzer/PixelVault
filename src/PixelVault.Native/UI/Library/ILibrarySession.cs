@@ -73,6 +73,18 @@ namespace PixelVaultNative
         /// <summary>Remove index rows for deleted files under <see cref="LibraryRoot"/> (no-op when root unset).</summary>
         void RemoveLibraryMetadataIndexEntries(IEnumerable<string> removedFiles);
 
+        /// <summary>Merge updated paths into the library metadata index for <see cref="LibraryRoot"/> (no-op when root unset).</summary>
+        void UpsertLibraryMetadataIndexEntries(IEnumerable<string> files);
+
+        /// <summary>Merge manual-metadata targets into the library metadata index for <see cref="LibraryRoot"/> (no-op when root unset).</summary>
+        void UpsertLibraryMetadataIndexEntries(IEnumerable<ManualMetadataItem> items);
+
+        /// <summary>Rebuild folder cache / stamps after game-index edits for <see cref="LibraryRoot"/> (no-op when root unset).</summary>
+        void RefreshFolderCacheAfterGameIndexChange();
+
+        /// <summary>Ensure non-empty folder cache for game-index editor flows (empty list when root unset).</summary>
+        List<LibraryFolderInfo> EnsureGameIndexFolderContext(Action<string> setUiStatus);
+
         /// <summary>Load folder list from cache / scan for <see cref="LibraryRoot"/> (empty list when root unset).</summary>
         List<LibraryFolderInfo> LoadLibraryFoldersCached(bool forceRefresh);
 

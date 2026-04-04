@@ -40,7 +40,7 @@ namespace PixelVaultNative
 
     public sealed partial class MainWindow : Window
     {
-        const string AppVersion = "0.849";
+        const string AppVersion = "0.850";
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
         const string ClearedExternalIdSentinel = "__PV_CLEARED__";
@@ -1477,7 +1477,7 @@ namespace PixelVaultNative
                     reportStage(totalPerStage * 2, current, total, detail);
                 });
                 if (librarySession != null && string.Equals(libraryRoot, librarySession.LibraryRoot, StringComparison.OrdinalIgnoreCase))
-                    librarySession.Scanner.UpsertLibraryMetadataIndexEntries(items, librarySession.LibraryRoot);
+                    librarySession.UpsertLibraryMetadataIndexEntries(items);
                 else
                     libraryScanner.UpsertLibraryMetadataIndexEntries(items, libraryRoot);
                 PreserveLibraryMetadataEditGameIndex(libraryRoot, folder, originalSavedGameIndexRow, items);
@@ -1613,11 +1613,6 @@ namespace PixelVaultNative
             return files
                 .Where(file => tagMap.ContainsKey(file) && tagMap[file].Any(tag => tags.Any(candidate => string.Equals(tag, candidate, StringComparison.OrdinalIgnoreCase))))
                 .ToList();
-        }
-
-        List<LibraryFolderInfo> LoadLibraryFoldersCached(string root, bool forceRefresh)
-        {
-            return libraryScanner.LoadLibraryFoldersCached(root, forceRefresh);
         }
 
         void OpenLibraryFolderIdEditor(LibraryFolderInfo folder, Action refreshLibrary)
@@ -3120,17 +3115,64 @@ namespace PixelVaultNative
             try
             {
                 var s = text;
+                // Quoted Win32 extended paths (common in IO exception text): '\\?\C:\…' or '\\?\UNC\…'
+                s = Regex.Replace(
+                    s,
+                    @"'(?:\\{2}\?\\)([^']*)'",
+                    m => "'" + RedactBareWindowsPathForTroubleshooting(m.Groups[1].Value) + "'",
+                    RegexOptions.CultureInvariant);
+                // Quoted drive-letter paths — regex above stops at spaces; IO messages quote full paths.
+                s = Regex.Replace(
+                    s,
+                    @"'([A-Za-z]:\\[^']*)'",
+                    m => "'" + RedactBareWindowsPathForTroubleshooting(m.Groups[1].Value) + "'",
+                    RegexOptions.CultureInvariant);
+                // Double-quoted drive paths
+                s = Regex.Replace(
+                    s,
+                    @"""([A-Za-z]:\\[^""]*)""",
+                    m => "\"" + RedactBareWindowsPathForTroubleshooting(m.Groups[1].Value) + "\"",
+                    RegexOptions.CultureInvariant);
+                // DIAG-style key=value segments often hold spaced paths; stop at ';' or line end (not at first space).
+                s = Regex.Replace(
+                    s,
+                    @"([A-Za-z_][\w]*=)(\\\\[^;|\r\n]+)",
+                    m => m.Groups[1].Value + RedactBareWindowsPathForTroubleshooting(m.Groups[2].Value),
+                    RegexOptions.CultureInvariant);
+                s = Regex.Replace(
+                    s,
+                    @"([A-Za-z_][\w]*=)([A-Za-z]:\\[^;|\r\n]+)",
+                    m => m.Groups[1].Value + RedactBareWindowsPathForTroubleshooting(m.Groups[2].Value),
+                    RegexOptions.CultureInvariant);
                 // Long/Win32 extended: \\?\C:\... or \\?\UNC\...
                 s = Regex.Replace(s, @"\\{2}\?\\[^\s|""]+", RedactPathMatchForTroubleshooting, RegexOptions.CultureInvariant);
                 // Standard UNC \\server\share\...
                 s = Regex.Replace(s, @"\\{2}(?!\?\\)[^\s|""]+", RedactPathMatchForTroubleshooting, RegexOptions.CultureInvariant);
-                // Drive-letter paths (UTF-16 style); optional forward-slash form
+                // Drive-letter paths (UTF-16 style); optional forward-slash form — tokens without spaces only
                 s = Regex.Replace(s, @"(?<![\w/:])(?:[A-Za-z]:\\[^\s|""]+|[A-Za-z]:/[^\s|""]+)", RedactPathMatchForTroubleshooting, RegexOptions.CultureInvariant);
                 return s;
             }
             catch
             {
                 return text;
+            }
+        }
+
+        /// <summary>
+        /// Turns a Windows file path into <see cref="FormatPathForTroubleshooting"/> form (e.g. <c>.../LastSegment</c>) when redaction is on.
+        /// </summary>
+        string RedactBareWindowsPathForTroubleshooting(string raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw)) return raw ?? string.Empty;
+            try
+            {
+                var t = raw.Trim().Trim('"', '\'');
+                t = t.Replace('/', Path.DirectorySeparatorChar);
+                return FormatPathForTroubleshooting(t);
+            }
+            catch
+            {
+                return "(redacted)";
             }
         }
 

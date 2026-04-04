@@ -1,10 +1,11 @@
-## Unreleased (engineering / structure)
-
-- **Library session seam:** Active-library saved game-index reads and metadata upserts from `MainWindow` now prefer `ILibrarySession` / `ILibrarySession.Scanner` when the root matches (`GetSavedGameIndexRowsForRoot`, startup preload, folder ID editor, library metadata workflow, Steam ID resolution helpers).
-- **Import:** `RunSteamRenameAsync` + `IImportService` / `ImportService`; import and game-index progress hosts now run `Func<..., Task<TResult>>` backgrounds (`Task.Run` + `await`) so Steam rename uses `ICoverService.SteamNameAsync` without nested sync-over-async in that loop. Sync `RunSteamRename` delegates to the async implementation.
-- **Manual metadata:** Game-title combo row loading goes through `IImportService.LoadManualMetadataGameTitleRowsAsync` (host-wired thread-pool load); finish path uses `librarySession.LoadSavedGameIndexRows()`.
-- **Library UI:** `MainWindow.LibraryBrowserOrchestrator.NavChromeAndToolbar.cs` — nav chrome + pane toolbar click wiring extracted from `ShowLibraryBrowserCore`.
-- **Game index:** Resolve-IDs progress uses the same async progress host (no `GetAwaiter().GetResult()` inside the background lambda).
+## 0.850
+- **Release:** Version **0.850** — publish refresh for library/import orchestration refactors and troubleshooting privacy hardening.
+- **Library session:** Active-library saved game-index reads and metadata upserts from `MainWindow` prefer `ILibrarySession` / `ILibrarySession.Scanner` when the root matches (`GetSavedGameIndexRowsForRoot`, startup preload, folder ID editor, library metadata workflow, Steam ID resolution helpers).
+- **Import:** `RunSteamRenameAsync` on `IImportService` / `ImportService`; import and game-index progress hosts use `Func<..., Task<TResult>>` backgrounds (`Task.Run` + `await`) so Steam rename uses `ICoverService.SteamNameAsync` on the async path. Sync `RunSteamRename` wraps the async implementation. Game index Resolve-IDs progress no longer uses `GetAwaiter().GetResult()` inside the background lambda.
+- **Manual metadata:** Game-title combo row loading uses `IImportService.LoadManualMetadataGameTitleRowsAsync` (host-wired thread-pool load); finish path uses `librarySession.LoadSavedGameIndexRows()`.
+- **Library UI:** `MainWindow.LibraryBrowserOrchestrator.NavChromeAndToolbar.cs` — nav chrome + pane toolbar click wiring extracted from `ShowLibraryBrowserCore` (with existing `PaneEvents` partial).
+- **Diagnostics / privacy:** With **Redact folder paths** enabled, troubleshooting logs redact path-like segments inside `ViewKey` (e.g. console grouping) and scrub embedded absolute paths from exception text and stack fragments before writing `PixelVault-troubleshooting.log`, so IO errors cannot bypass path redaction via `ex.Message` alone.
+- **Logging (prior slices in this train):** UTC timestamps on log lines, `S=` session id on DIAG lines, optional path redaction setting, troubleshooting log rotation, and `LogException` for richer main-log errors.
 
 ## 0.849
 - **Release:** Version **0.849** — publish refresh for the thumbnail cache contention cleanup.
