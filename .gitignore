@@ -20,6 +20,8 @@ PixelVaultData/cache/thumbs/
 PixelVaultData/cache/*.sqlite
 PixelVaultData/cache/*.sqlite-shm
 PixelVaultData/cache/*.sqlite-wal
+PixelVaultData/cache/index-sqlite-backups/
+PixelVaultData/cache/manual-index-backups/
 PixelVaultData/cache/*.args
 PixelVaultData/cache/*.pre-*
 PixelVaultData/cache/*.bak-*
