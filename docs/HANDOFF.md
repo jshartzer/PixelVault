@@ -47,6 +47,7 @@ Then use these based on the task:
 - `C:\Codex\docs\ROADMAP.md` for sequencing and larger direction
 - `C:\Codex\docs\MAINWINDOW_EXTRACTION_ROADMAP.md` for **complete** MainWindow extraction record (technical detail; see completed-projects index first)
 - `C:\Codex\docs\PERFORMANCE_TODO.md` for responsiveness/scalability follow-up
+- `C:\Codex\docs\CODE_QUALITY_IMPROVEMENT_PLAN.md` for hardening / edge-case backlog
 - `C:\Codex\docs\MANUAL_GOLDEN_PATH_CHECKLIST.md` for risky manual verification
 - `C:\Codex\docs\SERVICE_OWNERSHIP_AND_PARALLEL_WORK_MAP.md` for service boundaries and parallel lanes
 
@@ -54,11 +55,11 @@ Then use these based on the task:
 
 Current live build:
 
-- `0.853`
+- `0.854`
 
 Current executable:
 
-- `C:\Codex\dist\PixelVault-0.853\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.854\PixelVault.exe`
 
 Current build pointer:
 
@@ -92,7 +93,7 @@ Practical current focus:
 
 ## Current Stop Point
 
-The app is currently published at `0.853`.
+The app is currently published at `0.854`.
 
 **Notion:** [MainWindow extraction roadmap](https://www.notion.so/33573adc59b681d88b7dcd88cad53cb6) updated for Phase **E** capstone (**`ILibraryBrowserShell`**). If release rows in Notion lag `docs/CURRENT_BUILD.txt`, re-sync per `docs/DOC_SYNC_POLICY.md`.
 

@@ -1,3 +1,6 @@
+## 0.854
+- **Release:** Version **0.854** — publish refresh; documentation consolidation (code quality plan slim + `docs/archive/CODE_QUALITY_IMPROVEMENT_PLAN_HISTORICAL.md`, archive index and cross-links in `PROJECT_CONTEXT` / `MAINWINDOW_EXTRACTION_ROADMAP` / `PixelVaultData/TODO.md`). No intentional app behavior change.
+
 ## 0.853
 - **Release:** Version **0.853** — Photo index **Starred** flag (persisted in SQLite), Photo Index editor column, photography gallery hover star to toggle; cache stamp includes starred state.
 - **Photo index / Photography:** `LibraryMetadataIndexEntry.Starred` and `photo_index.starred` column with migration; gallery overlay star saves via metadata index.
