@@ -26,6 +26,7 @@ namespace PixelVaultNative
             internal Image PreviewImage;
             internal TextBlock DetailTitle;
             internal TextBlock DetailMeta;
+            internal WrapPanel DetailPlatformChipsPanel;
             internal Button OpenFolderButton;
             internal Button EditMetadataButton;
             internal Button DeleteSelectedButton;
@@ -193,6 +194,7 @@ namespace PixelVaultNative
             var textStack = new StackPanel();
             panes.DetailTitle = new TextBlock { Text = "Select a folder", FontSize = 28, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White };
             panes.DetailMeta = new TextBlock { Text = "Browse the library you chose in Settings.", Foreground = Brush("#9CB1BC"), Margin = new Thickness(0, 8, 0, 14), TextWrapping = TextWrapping.Wrap, FontSize = 13.5 };
+            panes.DetailPlatformChipsPanel = new WrapPanel { Margin = new Thickness(0, 0, 0, 12), Visibility = Visibility.Collapsed };
             panes.OpenFolderButton = Btn("Open Folder", null, "#275D47", Brushes.White);
             panes.EditMetadataButton = Btn("Edit Metadata", null, "#20343A", Brushes.White);
             panes.OpenFolderButton.Content = BuildToolbarButtonContent("\uE8B7", "Open Folder");
@@ -210,6 +212,7 @@ namespace PixelVaultNative
             bannerButtonRow.Children.Add(panes.EditMetadataButton);
             textStack.Children.Add(panes.DetailTitle);
             textStack.Children.Add(panes.DetailMeta);
+            textStack.Children.Add(panes.DetailPlatformChipsPanel);
             textStack.Children.Add(bannerButtonRow);
             Grid.SetColumn(textStack, 1);
             bannerGrid.Children.Add(textStack);

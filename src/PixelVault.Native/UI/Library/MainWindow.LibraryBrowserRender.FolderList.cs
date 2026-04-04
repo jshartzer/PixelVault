@@ -72,6 +72,11 @@ namespace PixelVaultNative
                 ws.DetailFilesDisplayOrder.Clear();
                 panes.DetailTitle.Text = "Select a folder";
                 panes.DetailMeta.Text = "Browse the library you chose in Settings.";
+                if (panes.DetailPlatformChipsPanel != null)
+                {
+                    panes.DetailPlatformChipsPanel.Children.Clear();
+                    panes.DetailPlatformChipsPanel.Visibility = Visibility.Collapsed;
+                }
                 panes.OpenFolderButton.Content = BuildToolbarButtonContent("\uE8B7", "Open Folder");
                 panes.PreviewImage.Source = null;
                 panes.PreviewImage.Visibility = Visibility.Collapsed;

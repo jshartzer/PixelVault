@@ -744,8 +744,7 @@ namespace PixelVaultNative
                 };
                 panes.OpenFolderButton.Click += delegate
                 {
-                    var actionFolder = getActionFolder(ws.Current);
-                    if (actionFolder != null) OpenFolder(actionFolder.FolderPath);
+                    foreach (var folderPath in GetLibraryBrowserSourceFolderPaths(ws.Current)) OpenFolder(folderPath);
                 };
                 openLibraryMetadataEditor = delegate(LibraryBrowserFolderView focusFolder)
                 {

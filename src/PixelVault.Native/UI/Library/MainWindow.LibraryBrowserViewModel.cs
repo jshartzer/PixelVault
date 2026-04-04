@@ -149,9 +149,36 @@ namespace PixelVaultNative
                 .Count();
         }
 
+        List<string> GetLibraryBrowserSourceFolderPaths(LibraryBrowserFolderView view)
+        {
+            return (view == null ? Enumerable.Empty<LibraryFolderInfo>() : view.SourceFolders)
+                .Select(folder => folder == null ? string.Empty : folder.FolderPath ?? string.Empty)
+                .Where(path => !string.IsNullOrWhiteSpace(path))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        List<LibraryFolderInfo> GetLibraryBrowserActionFolders(LibraryBrowserFolderView view)
+        {
+            return (view == null ? Enumerable.Empty<LibraryFolderInfo>() : view.SourceFolders)
+                .Where(folder => folder != null && !string.IsNullOrWhiteSpace(folder.FolderPath))
+                .GroupBy(folder => folder.FolderPath ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.First())
+                .OrderBy(folder => folder.FolderPath ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
         bool ShouldShowLibraryBrowserPlatformContext()
         {
             return string.Equals(NormalizeLibraryGroupingMode(libraryGroupingMode), "console", StringComparison.OrdinalIgnoreCase);
+        }
+
+        bool ShouldShowLibraryBrowserDetailPlatformChips(LibraryBrowserFolderView view)
+        {
+            return view != null
+                && !ShouldShowLibraryBrowserPlatformContext()
+                && (view.PlatformLabels ?? new string[0]).Any(label => !string.IsNullOrWhiteSpace(label));
         }
 
         string BuildLibraryBrowserFolderTileSubtitle(LibraryBrowserFolderView view)
@@ -196,6 +223,22 @@ namespace PixelVaultNative
             return string.IsNullOrWhiteSpace(platformText)
                 ? (view.Name ?? string.Empty)
                 : ((view.Name ?? string.Empty) + " | " + platformText);
+        }
+
+        string BuildLibraryBrowserActionScopeLabel(LibraryBrowserFolderView view)
+        {
+            if (view == null) return string.Empty;
+            var sourceFolderCount = CountLibraryBrowserSourceFolders(view);
+            if (!ShouldShowLibraryBrowserPlatformContext() && sourceFolderCount > 1)
+            {
+                return (view.Name ?? string.Empty) + " (" + sourceFolderCount + " folders)";
+            }
+            return BuildLibraryBrowserScopeLabel(view);
+        }
+
+        string BuildLibraryBrowserOpenFoldersLabel(LibraryBrowserFolderView view)
+        {
+            return CountLibraryBrowserSourceFolders(view) > 1 ? "Open Folders" : "Open Folder";
         }
 
         void ApplyRemovedFilesToLibraryBrowserState(LibraryBrowserWorkingSet ws, IEnumerable<string> removedFiles)
