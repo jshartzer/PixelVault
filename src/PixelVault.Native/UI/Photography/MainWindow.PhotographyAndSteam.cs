@@ -250,6 +250,11 @@ namespace PixelVaultNative
                     GetFileHasGamePhotographyTag = LibraryFileIndexHasGamePhotographyTag
                 };
                 var win = new PhotographyGalleryWindow(host, owner ?? this);
+                _activePhotographyGalleryWindow = win;
+                win.Closed += delegate
+                {
+                    if (ReferenceEquals(_activePhotographyGalleryWindow, win)) _activePhotographyGalleryWindow = null;
+                };
                 host.RefreshTaggedGallery = delegate
                 {
                     win.Dispatcher.BeginInvoke(new Action(win.RequestGalleryReload));
@@ -262,6 +267,13 @@ namespace PixelVaultNative
                 LogException("ShowPhotographyGallery", ex);
                 MessageBox.Show(ex.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
             }
+        }
+
+        void NotifyPhotographyGalleryAfterLibraryFilesRemoved()
+        {
+            var w = _activePhotographyGalleryWindow;
+            if (w == null) return;
+            _ = w.Dispatcher.BeginInvoke(new Action(() => w.RequestGalleryForceReload()));
         }
 
         Tuple<string, string> ShowSteamAppMatchWindow(Window owner, string query, List<Tuple<string, string>> matches)

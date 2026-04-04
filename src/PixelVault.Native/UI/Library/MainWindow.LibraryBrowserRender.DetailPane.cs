@@ -20,7 +20,8 @@ namespace PixelVaultNative
             Action<string> openSingleFileMetadataEditor,
             Action<string, ModifierKeys> updateDetailSelection,
             Action refreshDetailSelectionUi,
-            Action redrawSelectedFolderDetail)
+            Action redrawSelectedFolderDetail,
+            Action renderFolderTiles)
         {
             var panes = ws.Panes;
             var renderStopwatch = Stopwatch.StartNew();
@@ -190,7 +191,16 @@ namespace PixelVaultNative
                                             updateDetailSelection,
                                             ws.SelectedDetailFiles,
                                             refreshDetailSelectionUi,
-                                            redrawSelectedFolderDetail);
+                                            redrawSelectedFolderDetail,
+                                            delegate(string imagePath)
+                                            {
+                                                var folder = activeSelectedLibraryFolder;
+                                                if (folder == null || string.IsNullOrWhiteSpace(imagePath) || !File.Exists(imagePath) || !IsImage(imagePath)) return;
+                                                SaveCustomCover(folder, imagePath);
+                                                if (renderFolderTiles != null) renderFolderTiles();
+                                                redrawSelectedFolderDetail?.Invoke();
+                                                ShowLibraryBrowserToast(ws, "Cover saved");
+                                            });
                                         tile.Margin = new Thickness(0, 0, fileIndex < rowFiles.Count - 1 ? detailTileGap : 0, 0);
                                         ws.DetailTiles.Add(tile);
                                         rowPanel.Children.Add(tile);

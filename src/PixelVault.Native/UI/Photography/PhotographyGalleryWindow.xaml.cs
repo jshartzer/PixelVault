@@ -99,6 +99,8 @@ namespace PixelVaultNative
 
         internal void RequestGalleryReload() => RunLoad(false);
 
+        internal void RequestGalleryForceReload() => RunLoad(true);
+
         void RunLoad(bool forceRefresh)
         {
             LoadingPanel.Visibility = Visibility.Visible;

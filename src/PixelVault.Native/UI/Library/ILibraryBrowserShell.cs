@@ -21,6 +21,7 @@ namespace PixelVaultNative
 
         string LibraryFolderSortMode { get; set; }
         string LibraryGroupingMode { get; set; }
+        int LibraryFolderTileSize { get; set; }
 
         Action<bool> ActiveLibraryFolderRefresh { get; set; }
         LibraryFolderInfo ActiveSelectedLibraryFolder { get; set; }
@@ -65,6 +66,14 @@ namespace PixelVaultNative
 
         void LibraryBrowserApplySortGroupPillState(Button button, bool active);
         void SaveSettings();
+        int NormalizeLibraryFolderTileSizeValue(int value);
+        List<LibraryFolderInfo> GetLibraryBrowserActionFolders(MainWindow.LibraryBrowserFolderView view);
+        string BuildLibraryBrowserActionScopeLabel(MainWindow.LibraryBrowserFolderView view);
+        void LibrarySaveCustomCover(LibraryFolderInfo folder, string sourcePath);
+        bool IsLibraryRasterImageFilePath(string path);
+        void LibraryBrowserMountToastHost(Grid rootGrid, MainWindow.LibraryBrowserWorkingSet ws);
+        void LibraryBrowserShowToast(MainWindow.LibraryBrowserWorkingSet ws, string message);
+        void ShowLibraryBrowserKeyboardShortcutsHelp(Window owner);
 
         void LibraryBrowserOpenSingleFileMetadataEditor(
             MainWindow.LibraryBrowserWorkingSet ws,
@@ -88,7 +97,8 @@ namespace PixelVaultNative
             Action<string> openSingleFileMetadataEditor,
             Action<string, ModifierKeys> updateDetailSelection,
             Action refreshDetailSelectionUi,
-            Action redrawSelectedFolderDetail);
+            Action redrawSelectedFolderDetail,
+            Action renderFolderTiles);
 
         Button LibraryBrowserBuildFolderTile(
             MainWindow.LibraryBrowserFolderView folder,
@@ -98,8 +108,9 @@ namespace PixelVaultNative
             Action<MainWindow.LibraryBrowserFolderView> showFolder,
             Action renderTiles,
             Action<bool> refreshLibraryFoldersAsync,
-            Action<List<LibraryFolderInfo>, string, bool, bool> runScopedCoverRefresh,
-            Action<MainWindow.LibraryBrowserFolderView> openLibraryMetadataEditor);
+            Action<List<LibraryFolderInfo>, string, bool, bool, bool> runScopedCoverRefresh,
+            Action<MainWindow.LibraryBrowserFolderView> openLibraryMetadataEditor,
+            Action<string> libraryToast);
 
         void LibraryBrowserShowSelectedFolder(
             MainWindow.LibraryBrowserWorkingSet ws,
@@ -133,6 +144,8 @@ namespace PixelVaultNative
             string scopeLabel,
             bool forceRefreshExistingCovers,
             bool rebuildFullCacheAfterRefresh,
+            bool reloadLibraryFolderListAfter,
+            Action repaintLibraryBrowserChrome,
             Action<bool> refreshLibraryFoldersAsync,
             Action<bool> setLibraryBusyState);
 

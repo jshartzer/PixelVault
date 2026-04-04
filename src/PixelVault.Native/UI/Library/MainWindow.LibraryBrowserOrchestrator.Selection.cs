@@ -142,6 +142,18 @@ namespace PixelVaultNative
                 }
                 panes.DeleteSelectedButton.IsEnabled = ws.Current != null && selectedFiles.Count > 0;
                 panes.ThumbLabel.Text = selectedFiles.Count > 0 ? selectedFiles.Count + " selected" : "Screenshots";
+                if (panes.RefreshThisFolderButton != null)
+                {
+                    panes.RefreshThisFolderButton.IsEnabled = ws.Current != null && !ws.LibraryFoldersLoading;
+                }
+                if (panes.UseSelectionAsCoverButton != null)
+                {
+                    var coverPath = selectedFiles.Count == 1 ? selectedFiles[0] : null;
+                    panes.UseSelectionAsCoverButton.IsEnabled = ws.Current != null
+                        && !string.IsNullOrWhiteSpace(coverPath)
+                        && File.Exists(coverPath)
+                        && IsImage(coverPath);
+                }
             };
         }
     }

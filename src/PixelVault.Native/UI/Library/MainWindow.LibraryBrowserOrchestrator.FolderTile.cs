@@ -85,6 +85,29 @@ namespace PixelVaultNative
                 if (badge != null) panes.DetailTitleBadgePanel.Children.Add(badge);
             }
 
+            var coverKind = BuildLibraryBrowserCoverKindShortLabel(BuildLibraryBrowserDisplayFolder(view));
+            if (!string.IsNullOrWhiteSpace(coverKind))
+            {
+                var coverBadge = new Border
+                {
+                    Padding = new Thickness(10, 4, 10, 4),
+                    CornerRadius = new CornerRadius(8),
+                    Background = Brush("#1A2830"),
+                    BorderBrush = Brush("#3D5362"),
+                    BorderThickness = new Thickness(1),
+                    Margin = new Thickness(0, 0, 6, 6),
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                coverBadge.Child = new TextBlock
+                {
+                    Text = "Cover: " + coverKind,
+                    FontSize = 11,
+                    Foreground = Brush("#C5D6E0"),
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                panes.DetailTitleBadgePanel.Children.Add(coverBadge);
+            }
+
             panes.DetailTitleBadgePanel.Visibility = panes.DetailTitleBadgePanel.Children.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         }
 
@@ -96,8 +119,9 @@ namespace PixelVaultNative
             Action<LibraryBrowserFolderView> showFolder,
             Action renderTiles,
             Action<bool> refreshLibraryFoldersAsync,
-            Action<List<LibraryFolderInfo>, string, bool, bool> runScopedCoverRefresh,
-            Action<LibraryBrowserFolderView> openLibraryMetadataEditor)
+            Action<List<LibraryFolderInfo>, string, bool, bool, bool> runScopedCoverRefresh,
+            Action<LibraryBrowserFolderView> openLibraryMetadataEditor,
+            Action<string> libraryToast)
         {
             var displayFolder = BuildLibraryBrowserDisplayFolder(folder);
             var actionFolder = GetLibraryBrowserPrimaryFolder(folder) ?? displayFolder;
@@ -163,7 +187,7 @@ namespace PixelVaultNative
             }
             tileStack.Children.Add(imageBorder);
             tileStack.Children.Add(new TextBlock { Text = folder.Name, TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.CharacterEllipsis, Foreground = Brushes.White, Margin = new Thickness(10, 12, 10, 3), FontWeight = FontWeights.SemiBold, FontSize = 13.5, Height = 34 });
-            tileStack.Children.Add(new TextBlock { Text = BuildLibraryBrowserFolderTileSubtitle(folder), Foreground = Brush("#8FA4B0"), Margin = new Thickness(10, 0, 10, 10), FontSize = 10.5, Height = 16 });
+            tileStack.Children.Add(new TextBlock { Text = BuildLibraryBrowserFolderTileSubtitle(folder), Foreground = Brush("#8FA4B0"), Margin = new Thickness(10, 0, 10, 10), FontSize = 10.5, TextWrapping = TextWrapping.Wrap, MaxHeight = 36 });
             tile.Content = tileStack;
             tile.Click += delegate { showFolder(folder); };
             var contextMenu = new ContextMenu();
@@ -178,6 +202,7 @@ namespace PixelVaultNative
                 foreach (var targetFolder in actionFolders) SaveCustomCover(targetFolder, pickedCover);
                 showFolder(folder);
                 if (renderTiles != null) renderTiles();
+                libraryToast?.Invoke("Cover saved");
                 Log("Custom cover set for " + BuildLibraryBrowserActionScopeLabel(folder) + ".");
             };
             var clearCoverItem = new MenuItem
@@ -190,6 +215,7 @@ namespace PixelVaultNative
                 foreach (var targetFolder in actionFolders.Where(targetFolder => !string.IsNullOrWhiteSpace(CustomCoverPath(targetFolder)))) ClearCustomCover(targetFolder);
                 showFolder(folder);
                 if (renderTiles != null) renderTiles();
+                libraryToast?.Invoke("Cover cleared");
                 Log("Custom cover cleared for " + BuildLibraryBrowserActionScopeLabel(folder) + ".");
             };
             var openFolderItem = new MenuItem { Header = BuildLibraryBrowserOpenFoldersLabel(folder) };
@@ -222,24 +248,30 @@ namespace PixelVaultNative
                     if (renderTiles != null) renderTiles();
                 });
             };
-            var refreshFolderItem = new MenuItem { Header = "Refresh Folder" };
-            refreshFolderItem.Click += delegate
+            var refreshThisFolderItem = new MenuItem { Header = "Refresh this folder", IsEnabled = actionFolders.Count > 0 };
+            refreshThisFolderItem.Click += delegate
             {
                 showFolder(folder);
+                runScopedCoverRefresh(actionFolders, BuildLibraryBrowserActionScopeLabel(folder), true, false, false);
+            };
+            var reloadLibraryListItem = new MenuItem { Header = "Reload library folder list" };
+            reloadLibraryListItem.Click += delegate
+            {
                 if (refreshLibraryFoldersAsync != null) refreshLibraryFoldersAsync(false);
             };
             var fetchFolderCoverItem = new MenuItem { Header = "Fetch Cover Art", IsEnabled = actionFolders.Count > 0 };
             fetchFolderCoverItem.Click += delegate
             {
                 showFolder(folder);
-                runScopedCoverRefresh(actionFolders, BuildLibraryBrowserActionScopeLabel(folder), true, false);
+                runScopedCoverRefresh(actionFolders, BuildLibraryBrowserActionScopeLabel(folder), true, false, true);
             };
             contextMenu.Items.Add(openFolderItem);
             contextMenu.Items.Add(copyFolderPathItem);
             contextMenu.Items.Add(editMetadataItem);
             contextMenu.Items.Add(editIdsItem);
             contextMenu.Items.Add(new Separator());
-            contextMenu.Items.Add(refreshFolderItem);
+            contextMenu.Items.Add(refreshThisFolderItem);
+            contextMenu.Items.Add(reloadLibraryListItem);
             contextMenu.Items.Add(fetchFolderCoverItem);
             contextMenu.Items.Add(new Separator());
             contextMenu.Items.Add(openMyCoversItem);

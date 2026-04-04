@@ -106,6 +106,7 @@
     <Compile Include="UI\Library\MainWindow.LibraryBrowserOrchestrator.FolderData.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserOrchestrator.IntakeBadge.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserOrchestrator.FolderTile.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryBrowserToastAndShortcuts.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryScannerBridge.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryFolderCacheIo.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryFolderIdEditor.cs" />

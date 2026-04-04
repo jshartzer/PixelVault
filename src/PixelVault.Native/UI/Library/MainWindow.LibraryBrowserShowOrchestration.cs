@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -42,9 +43,9 @@ namespace PixelVaultNative
                 root.Children.Add(contentGrid);
 
                 var panes = _shell.BuildLibraryBrowserContentPanes(contentGrid);
-                libraryWindow.Content = root;
-
                 var ws = new LibraryBrowserWorkingSet { Panes = panes };
+                _shell.LibraryBrowserMountToastHost(root, ws);
+                libraryWindow.Content = root;
                 ws.AppliedLibrarySearchText = _shell.LibraryBrowserPersistedSearch;
                 ws.PendingLibrarySearchText = ws.AppliedLibrarySearchText;
                 panes.SearchBox.Text = ws.AppliedLibrarySearchText;
@@ -74,7 +75,7 @@ namespace PixelVaultNative
                 Action<string> setLibrarySortMode = null;
                 Action<string> setLibraryGroupingMode = null;
                 Action<LibraryBrowserFolderView> showFolder = null;
-                Action<List<LibraryFolderInfo>, string, bool, bool> runScopedCoverRefresh = null;
+                Action<List<LibraryFolderInfo>, string, bool, bool, bool> runScopedCoverRefresh = null;
                 Action refreshDetailSelectionUi = null;
                 Action deleteSelectedLibraryFiles = null;
                 Action openSelectedLibraryMetadataEditor = null;
@@ -167,7 +168,7 @@ namespace PixelVaultNative
 
                 renderSelectedFolder = delegate
                 {
-                    _shell.LibraryBrowserRenderSelectedFolderDetail(ws, libraryWindow, openSingleFileMetadataEditor, updateDetailSelection, refreshDetailSelectionUi, renderSelectedFolder);
+                    _shell.LibraryBrowserRenderSelectedFolderDetail(ws, libraryWindow, openSingleFileMetadataEditor, updateDetailSelection, refreshDetailSelectionUi, renderSelectedFolder, renderTiles);
                     if (ws.Current == null) ws.DetailSelectionAnchorIndex = -1;
                 };
 
@@ -182,7 +183,8 @@ namespace PixelVaultNative
                         renderTiles,
                         refreshLibraryFoldersAsync,
                         runScopedCoverRefresh,
-                        openLibraryMetadataEditor);
+                        openLibraryMetadataEditor,
+                        msg => _shell.LibraryBrowserShowToast(ws, msg));
                 };
 
                 showFolder = delegate(LibraryBrowserFolderView info)
@@ -219,11 +221,17 @@ namespace PixelVaultNative
                 {
                     navChrome.RefreshButton.IsEnabled = !isBusy;
                     panes.EditMetadataButton.IsEnabled = !isBusy;
+                    panes.RefreshThisFolderButton.IsEnabled = !isBusy && ws.Current != null;
+                    panes.FolderTileSmallerButton.IsEnabled = !isBusy;
+                    panes.FolderTileLargerButton.IsEnabled = !isBusy;
+                    panes.ShortcutsHelpButton.IsEnabled = !isBusy;
+                    if (isBusy) panes.UseSelectionAsCoverButton.IsEnabled = false;
                     navChrome.FetchButton.IsEnabled = !isBusy;
                     navChrome.ImportButton.IsEnabled = !isBusy;
                     navChrome.ImportCommentsButton.IsEnabled = !isBusy;
                     navChrome.ManualImportButton.IsEnabled = !isBusy;
                     if (navChrome.IntakeReviewButton != null) navChrome.IntakeReviewButton.IsEnabled = !isBusy;
+                    if (!isBusy && refreshDetailSelectionUi != null) refreshDetailSelectionUi();
                 };
 
                 runLibraryScan = delegate(string folderPath, bool forceRescan)
@@ -231,7 +239,12 @@ namespace PixelVaultNative
                     _shell.LibraryBrowserRunFolderMetadataScan(libraryWindow, ws, folderPath, forceRescan, setLibraryBusyState, refreshLibraryFoldersAsync);
                 };
 
-                runScopedCoverRefresh = delegate(List<LibraryFolderInfo> requestedFolders, string scopeLabel, bool forceRefreshExistingCovers, bool rebuildFullCacheAfterRefresh)
+                Action repaintLibraryChromeAfterScopedCover = delegate
+                {
+                    if (renderTiles != null) renderTiles();
+                    if (renderSelectedFolder != null) renderSelectedFolder();
+                };
+                runScopedCoverRefresh = delegate(List<LibraryFolderInfo> requestedFolders, string scopeLabel, bool forceRefreshExistingCovers, bool rebuildFullCacheAfterRefresh, bool reloadLibraryFolderListAfter)
                 {
                     _shell.RunLibraryBrowserScopedCoverRefresh(
                         libraryWindow,
@@ -240,13 +253,15 @@ namespace PixelVaultNative
                         scopeLabel,
                         forceRefreshExistingCovers,
                         rebuildFullCacheAfterRefresh,
+                        reloadLibraryFolderListAfter,
+                        repaintLibraryChromeAfterScopedCover,
                         refreshLibraryFoldersAsync,
                         setLibraryBusyState);
                 };
 
                 Action runCoverRefresh = delegate
                 {
-                    runScopedCoverRefresh(ws.Folders, "library", false, false);
+                    runScopedCoverRefresh(ws.Folders, "library", false, false, true);
                 };
                 applySearchFilter = delegate
                 {
@@ -277,6 +292,48 @@ namespace PixelVaultNative
                     deleteSelectedLibraryFiles,
                     setLibraryGroupingMode,
                     setLibrarySortMode);
+                panes.ShortcutsHelpButton.Click += delegate { _shell.ShowLibraryBrowserKeyboardShortcutsHelp(libraryWindow); };
+                libraryWindow.PreviewKeyDown += delegate(object _, KeyEventArgs e)
+                {
+                    if (e.Key != Key.F1) return;
+                    e.Handled = true;
+                    _shell.ShowLibraryBrowserKeyboardShortcutsHelp(libraryWindow);
+                };
+                panes.FolderTileSmallerButton.Click += delegate
+                {
+                    _shell.LibraryFolderTileSize = _shell.NormalizeLibraryFolderTileSizeValue(_shell.LibraryFolderTileSize - 20);
+                    _shell.SaveSettings();
+                    if (renderTiles != null) renderTiles();
+                    _shell.LibraryBrowserShowToast(ws, "Folder tiles: " + _shell.LibraryFolderTileSize);
+                };
+                panes.FolderTileLargerButton.Click += delegate
+                {
+                    _shell.LibraryFolderTileSize = _shell.NormalizeLibraryFolderTileSizeValue(_shell.LibraryFolderTileSize + 20);
+                    _shell.SaveSettings();
+                    if (renderTiles != null) renderTiles();
+                    _shell.LibraryBrowserShowToast(ws, "Folder tiles: " + _shell.LibraryFolderTileSize);
+                };
+                panes.RefreshThisFolderButton.Click += delegate
+                {
+                    if (ws.Current == null) return;
+                    var scopeFolders = _shell.GetLibraryBrowserActionFolders(ws.Current);
+                    if (scopeFolders.Count == 0) return;
+                    showFolder(ws.Current);
+                    runScopedCoverRefresh(scopeFolders, _shell.BuildLibraryBrowserActionScopeLabel(ws.Current), true, false, false);
+                };
+                panes.UseSelectionAsCoverButton.Click += delegate
+                {
+                    var paths = getSelectedDetailFiles();
+                    if (paths.Count != 1) return;
+                    var path = paths[0];
+                    if (!_shell.IsLibraryRasterImageFilePath(path) || !File.Exists(path)) return;
+                    var coverFolder = _shell.ActiveSelectedLibraryFolder;
+                    if (coverFolder == null) return;
+                    _shell.LibrarySaveCustomCover(coverFolder, path);
+                    if (renderTiles != null) renderTiles();
+                    if (ws.Current != null) showFolder(ws.Current);
+                    _shell.LibraryBrowserShowToast(ws, "Cover saved");
+                };
                 libraryWindow.Activated += delegate
                 {
                     if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge();

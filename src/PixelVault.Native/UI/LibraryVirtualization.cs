@@ -242,7 +242,7 @@ namespace PixelVaultNative
             return Math.Max(1, columns);
         }
 
-        Border CreateLibraryDetailTile(string file, int size, Func<bool> shouldLoad, Action<string> openSingleFileMetadataEditor, Action<string, ModifierKeys> updateDetailSelection, HashSet<string> selectedDetailFiles, Action refreshDetailSelectionUi, Action redrawDetailPane)
+        Border CreateLibraryDetailTile(string file, int size, Func<bool> shouldLoad, Action<string> openSingleFileMetadataEditor, Action<string, ModifierKeys> updateDetailSelection, HashSet<string> selectedDetailFiles, Action refreshDetailSelectionUi, Action redrawDetailPane, Action<string> useFileAsFolderCover)
         {
             var isVideoFile = IsVideo(file);
             var tileIsActive = true;
@@ -707,6 +707,12 @@ namespace PixelVaultNative
             }
             contextMenu.Items.Add(openFolderItem);
             contextMenu.Items.Add(editItem);
+            if (useFileAsFolderCover != null && !isVideoFile && IsImage(file))
+            {
+                var useCoverItem = new MenuItem { Header = "Use as folder cover" };
+                useCoverItem.Click += delegate { useFileAsFolderCover(file); };
+                contextMenu.Items.Add(useCoverItem);
+            }
             contextMenu.Items.Add(starMenuItem);
             contextMenu.Items.Add(photoTagMenuItem);
             contextMenu.Items.Add(new Separator());

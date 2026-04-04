@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Windows.Controls;
+using System.Windows.Threading;
 
 namespace PixelVaultNative
 {
@@ -37,6 +38,9 @@ namespace PixelVaultNative
             internal bool PendingSessionRestore;
             internal string PendingRestoreViewKey;
             internal double PendingRestoreDetailScrollAfterShow;
+            internal Border LibraryToastBorder;
+            internal TextBlock LibraryToastLabel;
+            internal DispatcherTimer LibraryToastTimer;
         }
     }
 }

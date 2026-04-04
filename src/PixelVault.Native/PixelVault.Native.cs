@@ -107,6 +107,7 @@ namespace PixelVaultNative
         Window gameIndexEditorWindow;
         bool gameIndexEditorLoadPending;
         Window filenameConventionEditorWindow;
+        PhotographyGalleryWindow _activePhotographyGalleryWindow;
         readonly ICoverService coverService;
         readonly IFilenameParserService filenameParserService;
         readonly IFilenameRulesService filenameRulesService;

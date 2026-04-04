@@ -199,20 +199,35 @@ namespace PixelVaultNative
             return string.Equals(NormalizeLibraryGroupingMode(libraryGroupingMode), "console", StringComparison.OrdinalIgnoreCase);
         }
 
+        string BuildLibraryBrowserCoverKindShortLabel(LibraryFolderInfo folder)
+        {
+            if (folder == null) return string.Empty;
+            var art = GetLibraryArtPathForDisplayOnly(folder);
+            if (string.IsNullOrWhiteSpace(art) || !File.Exists(art)) return string.Empty;
+            if (!string.IsNullOrWhiteSpace(CustomCoverPath(folder))) return "Custom";
+            if (CachedCoverPath(folder.Name) != null) return "Downloaded";
+            return "Preview";
+        }
+
         string BuildLibraryBrowserFolderTileSubtitle(LibraryBrowserFolderView view)
         {
             var captureCount = view == null ? 0 : Math.Max(view.FileCount, 0);
             var captureText = captureCount + " capture" + (captureCount == 1 ? string.Empty : "s");
+            string core;
             if (ShouldShowLibraryBrowserPlatformContext())
             {
                 var platformText = view == null ? string.Empty : CleanTag(view.PlatformSummaryText);
-                return string.IsNullOrWhiteSpace(platformText) ? captureText : platformText + " | " + captureText;
+                core = string.IsNullOrWhiteSpace(platformText) ? captureText : platformText + " | " + captureText;
             }
-
-            var sourceFolderCount = CountLibraryBrowserSourceFolders(view);
-            return sourceFolderCount > 1
-                ? captureText + " | " + sourceFolderCount + " folders"
-                : captureText;
+            else
+            {
+                var sourceFolderCount = CountLibraryBrowserSourceFolders(view);
+                core = sourceFolderCount > 1
+                    ? captureText + " | " + sourceFolderCount + " folders"
+                    : captureText;
+            }
+            var coverKind = BuildLibraryBrowserCoverKindShortLabel(BuildLibraryBrowserDisplayFolder(view));
+            return string.IsNullOrWhiteSpace(coverKind) ? core : core + " · Cover: " + coverKind;
         }
 
         string BuildLibraryBrowserDetailMetaText(LibraryBrowserFolderView view, LibraryFolderInfo actionFolder)

@@ -92,6 +92,7 @@ namespace PixelVaultNative
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
             }
+            if (removedFiles.Count > 0) NotifyPhotographyGalleryAfterLibraryFilesRemoved();
         }
 
         void LibraryBrowserOpenSingleFileMetadataEditor(
@@ -160,6 +161,7 @@ namespace PixelVaultNative
                     ? currentSelection
                     : CloneLibraryBrowserFolderView(currentSelection);
                 if (refreshLibraryFoldersAsync != null) refreshLibraryFoldersAsync(false);
+                ShowLibraryBrowserToast(ws, "Saved");
             });
         }
 

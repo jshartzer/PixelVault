@@ -19,6 +19,8 @@ namespace PixelVaultNative
             string scopeLabel,
             bool forceRefreshExistingCovers,
             bool rebuildFullCacheAfterRefresh,
+            bool reloadLibraryFolderListAfter,
+            Action repaintLibraryBrowserChrome,
             Action<bool> refreshLibraryFoldersAsync,
             Action<bool> setLibraryBusyState)
         {
@@ -137,7 +139,12 @@ namespace PixelVaultNative
                             status.Text = targetFolders.Count == 1 ? "Folder cover refresh complete" : "Cover refresh complete";
                             if (progressMeta != null) progressMeta.Text += " | complete";
                             appendProgress("Cover refresh finished successfully.");
-                            if (refreshLibraryFoldersAsync != null) refreshLibraryFoldersAsync(false);
+                            if (reloadLibraryFolderListAfter)
+                            {
+                                if (refreshLibraryFoldersAsync != null) refreshLibraryFoldersAsync(false);
+                            }
+                            else if (repaintLibraryBrowserChrome != null) repaintLibraryBrowserChrome();
+                            ShowLibraryBrowserToast(ws, targetFolders.Count == 1 ? "Cover refreshed" : "Covers refreshed");
                             Log((targetFolders.Count == 1 ? "Folder" : "Library") + " cover art refresh complete for " + resolvedScopeLabel + ". Resolved " + resolved + " external ID entr" + (resolved == 1 ? "y" : "ies") + "; " + coversReady + " title" + (coversReady == 1 ? " has" : "s have") + " cover art ready.");
                         }
                         if (actionButton != null)
