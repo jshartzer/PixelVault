@@ -20,7 +20,7 @@ namespace PixelVaultNative
         string startLogLine,
         string failureStatusText,
         int totalWork,
-        Func<Action<int, string>, CancellationToken, int[]> backgroundWork,
+        Func<Action<int, string>, CancellationToken, Task<int[]>> backgroundWork,
         Action<int[]> onSuccess,
         Action onCanceled = null);
 
@@ -365,27 +365,23 @@ namespace PixelVaultNative
                         "Starting external game ID resolution for " + rowsToResolve.Count + " row(s).",
                         "Game index resolve failed",
                         totalWork,
-                        delegate(Action<int, string> reportProgress, CancellationToken cancellationToken)
+                        async (reportProgress, cancellationToken) =>
                         {
-                            async Task<int[]> runAsync()
+                            var appIdOffset = 0;
+                            var steamGridDbOffset = appIdTargets;
+                            services.ThrowIfWorkflowCancellationRequested(cancellationToken, "Game index resolve");
+                            var resolvedAppIds = await services.ResolveMissingSteamAppIdsAsync(libraryRoot, rowsToResolve, delegate(int current, int total, string detail)
                             {
-                                var appIdOffset = 0;
-                                var steamGridDbOffset = appIdTargets;
-                                services.ThrowIfWorkflowCancellationRequested(cancellationToken, "Game index resolve");
-                                var resolvedAppIds = await services.ResolveMissingSteamAppIdsAsync(libraryRoot, rowsToResolve, delegate(int current, int total, string detail)
-                                {
-                                    reportProgress(appIdOffset + current, detail);
-                                }, cancellationToken).ConfigureAwait(false);
-                                services.ThrowIfWorkflowCancellationRequested(cancellationToken, "Game index resolve");
-                                var resolvedSteamGridDbIds = await services.ResolveMissingSteamGridDbIdsAsync(libraryRoot, rowsToResolve, delegate(int current, int total, string detail)
-                                {
-                                    reportProgress(steamGridDbOffset + current, detail);
-                                }, cancellationToken).ConfigureAwait(false);
-                                services.ThrowIfWorkflowCancellationRequested(cancellationToken, "Game index resolve");
-                                reportProgress(totalWork, "Game index ID resolution complete.");
-                                return new[] { resolvedAppIds, resolvedSteamGridDbIds };
-                            }
-                            return runAsync().GetAwaiter().GetResult();
+                                reportProgress(appIdOffset + current, detail);
+                            }, cancellationToken).ConfigureAwait(false);
+                            services.ThrowIfWorkflowCancellationRequested(cancellationToken, "Game index resolve");
+                            var resolvedSteamGridDbIds = await services.ResolveMissingSteamGridDbIdsAsync(libraryRoot, rowsToResolve, delegate(int current, int total, string detail)
+                            {
+                                reportProgress(steamGridDbOffset + current, detail);
+                            }, cancellationToken).ConfigureAwait(false);
+                            services.ThrowIfWorkflowCancellationRequested(cancellationToken, "Game index resolve");
+                            reportProgress(totalWork, "Game index ID resolution complete.");
+                            return new[] { resolvedAppIds, resolvedSteamGridDbIds };
                         },
                         delegate(int[] result)
                         {

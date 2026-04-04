@@ -225,12 +225,7 @@ namespace PixelVaultNative
             {
                 var version = ++gameTitleChoicesRefreshVersion;
                 var root = libraryRoot;
-                System.Threading.Tasks.Task.Factory.StartNew(delegate
-                {
-                    var rows = LoadSavedGameIndexRows(root);
-                    if (rows == null || rows.Count == 0) rows = LoadGameIndexEditorRowsCore(root, null);
-                    return rows ?? new List<GameIndexEditorRow>();
-                }).ContinueWith(delegate(System.Threading.Tasks.Task<List<GameIndexEditorRow>> loadTask)
+                importService.LoadManualMetadataGameTitleRowsAsync(root, System.Threading.CancellationToken.None).ContinueWith(delegate(System.Threading.Tasks.Task<List<GameIndexEditorRow>> loadTask)
                 {
                     Dispatcher.BeginInvoke(new Action(delegate
                     {
@@ -928,7 +923,7 @@ namespace PixelVaultNative
                 {
                     await importService.ApplyImportAndEditSteamStoreTitlesWhenGameNameUnchangedAsync(pendingItems.Where(i => i != null && !i.DeleteBeforeProcessing), CancellationToken.None).ConfigureAwait(true);
                 }
-                var gameRows = LoadSavedGameIndexRows(libraryRoot);
+                var gameRows = librarySession.LoadSavedGameIndexRows();
                 var unresolvedMasterRecords = importService.BuildUnresolvedManualMetadataMasterRecordLabels(gameRows, pendingItems);
                 if (unresolvedMasterRecords.Count > 0)
                 {

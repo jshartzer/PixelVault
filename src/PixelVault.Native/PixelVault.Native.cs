@@ -314,7 +314,14 @@ namespace PixelVaultNative
                 GameIndexEditorAssignment = gameIndexEditorAssignmentService,
                 BuildManualMetadataGameTitleChoiceLabel = (name, platform) => BuildGameTitleChoiceLabel(name, platform),
                 ParseManualMetadataTagText = ParseTagText,
-                CleanTag = CleanTag
+                CleanTag = CleanTag,
+                LoadManualMetadataGameTitleRowsAsync = (root, ct) => Task.Factory.StartNew(() =>
+                {
+                    ct.ThrowIfCancellationRequested();
+                    var rows = GetSavedGameIndexRowsForRoot(root);
+                    if (rows == null || rows.Count == 0) rows = LoadGameIndexEditorRowsCore(root, null);
+                    return rows ?? new List<GameIndexEditorRow>();
+                }, ct, TaskCreationOptions.None, TaskScheduler.Default)
             });
             libraryWorkspace = new LibraryWorkspaceContext(this);
             librarySession = new LibrarySession(
@@ -349,7 +356,7 @@ namespace PixelVaultNative
             LoadSettings();
             try
             {
-                if (!string.IsNullOrWhiteSpace(libraryRoot) && Directory.Exists(libraryRoot)) LoadSavedGameIndexRows(libraryRoot);
+                if (!string.IsNullOrWhiteSpace(libraryRoot) && Directory.Exists(libraryRoot)) librarySession.LoadSavedGameIndexRows();
             }
             catch (Exception ex)
             {
@@ -1408,7 +1415,7 @@ namespace PixelVaultNative
         }
         void RunLibraryMetadataWorkflowWithProgress(LibraryFolderInfo folder, List<ManualMetadataItem> items, Action refreshLibrary)
         {
-            var originalSavedGameIndexRow = folder == null ? null : FindSavedGameIndexRow(LoadSavedGameIndexRows(libraryRoot), folder);
+            var originalSavedGameIndexRow = folder == null ? null : FindSavedGameIndexRow(GetSavedGameIndexRowsForRoot(libraryRoot), folder);
             var totalPerStage = Math.Max(items.Count, 1);
             var totalWork = totalPerStage * 3;
             var closeButton = Btn("Close", null, "#334249", Brushes.White);
@@ -1469,7 +1476,10 @@ namespace PixelVaultNative
                 {
                     reportStage(totalPerStage * 2, current, total, detail);
                 });
-                libraryScanner.UpsertLibraryMetadataIndexEntries(items, libraryRoot);
+                if (librarySession != null && string.Equals(libraryRoot, librarySession.LibraryRoot, StringComparison.OrdinalIgnoreCase))
+                    librarySession.Scanner.UpsertLibraryMetadataIndexEntries(items, librarySession.LibraryRoot);
+                else
+                    libraryScanner.UpsertLibraryMetadataIndexEntries(items, libraryRoot);
                 PreserveLibraryMetadataEditGameIndex(libraryRoot, folder, originalSavedGameIndexRow, items);
                 progressWindow.Dispatcher.BeginInvoke(new Action(delegate
                 {
@@ -1623,7 +1633,7 @@ namespace PixelVaultNative
                 return;
             }
 
-            var savedRows = LoadSavedGameIndexRows(libraryRoot);
+            var savedRows = librarySession.LoadSavedGameIndexRows();
             var savedRow = FindSavedGameIndexRow(savedRows, folder);
             var appIdBox = new TextBox
             {
@@ -1723,7 +1733,7 @@ namespace PixelVaultNative
                 {
                     var steamAppId = CleanTag(appIdBox.Text);
                     var steamGridDbId = CleanTag(steamGridDbIdBox.Text);
-                    var rows = LoadSavedGameIndexRows(libraryRoot);
+                    var rows = librarySession.LoadSavedGameIndexRows();
                     var row = FindSavedGameIndexRow(rows, folder);
                     if (row == null)
                     {
@@ -2033,7 +2043,7 @@ namespace PixelVaultNative
             if (folder.SuppressSteamAppIdAutoResolve) return string.Empty;
             if (!string.IsNullOrWhiteSpace(folder.SteamAppId)) return folder.SteamAppId;
             cancellationToken.ThrowIfCancellationRequested();
-            var saved = FindSavedGameIndexRow(LoadSavedGameIndexRows(root), folder);
+            var saved = FindSavedGameIndexRow(GetSavedGameIndexRowsForRoot(root), folder);
             if (saved != null && saved.SuppressSteamAppIdAutoResolve)
             {
                 folder.SteamAppId = string.Empty;
@@ -2064,7 +2074,7 @@ namespace PixelVaultNative
             if (folder.SuppressSteamGridDbIdAutoResolve) return string.Empty;
             if (!string.IsNullOrWhiteSpace(folder.SteamGridDbId)) return folder.SteamGridDbId;
             cancellationToken.ThrowIfCancellationRequested();
-            var saved = FindSavedGameIndexRow(LoadSavedGameIndexRows(root), folder);
+            var saved = FindSavedGameIndexRow(GetSavedGameIndexRowsForRoot(root), folder);
             if (saved != null && saved.SuppressSteamGridDbIdAutoResolve)
             {
                 folder.SteamGridDbId = string.Empty;
@@ -3132,6 +3142,30 @@ namespace PixelVaultNative
             {
                 return "(redacted)";
             }
+        }
+
+        /// <summary>
+        /// <see cref="LibraryBrowserFolderView.ViewKey"/> can embed a full folder path (e.g. console grouping). When path redaction is on, only path-like pipe segments are shortened.
+        /// </summary>
+        string FormatViewKeyForTroubleshooting(string viewKey)
+        {
+            if (string.IsNullOrWhiteSpace(viewKey) || !troubleshootingLogRedactPaths) return viewKey ?? string.Empty;
+            var parts = viewKey.Split('|');
+            for (var i = 0; i < parts.Length; i++)
+            {
+                if (TroubleshootingSegmentLooksLikePath(parts[i]))
+                    parts[i] = FormatPathForTroubleshooting(parts[i]);
+            }
+            return string.Join("|", parts);
+        }
+
+        static bool TroubleshootingSegmentLooksLikePath(string segment)
+        {
+            if (string.IsNullOrWhiteSpace(segment)) return false;
+            if (segment.IndexOf(Path.DirectorySeparatorChar) >= 0) return true;
+            if (segment.IndexOf(Path.AltDirectorySeparatorChar) >= 0) return true;
+            if (segment.StartsWith("\\\\", StringComparison.Ordinal)) return true;
+            return segment.Length >= 2 && char.IsLetter(segment[0]) && segment[1] == ':';
         }
     }
 }

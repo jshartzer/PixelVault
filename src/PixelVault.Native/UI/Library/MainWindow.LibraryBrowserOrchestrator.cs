@@ -263,38 +263,6 @@ namespace PixelVaultNative
                 };
                 LibraryBrowserWirePaneEvents(libraryWindow, ws, panes, renderTiles, renderSelectedFolder, applySearchFilter);
 
-                navChrome.RefreshButton.Click += delegate
-                {
-                    if (refreshLibraryFoldersAsync != null) refreshLibraryFoldersAsync(false);
-                };
-                navChrome.SettingsButton.Click += delegate { ShowSettingsWindow(); if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge(); };
-                navChrome.GameIndexButton.Click += delegate { OpenGameIndexEditor(); };
-                navChrome.PhotoIndexButton.Click += delegate { OpenPhotoIndexEditor(); };
-                navChrome.PhotographyGalleryButton.Click += delegate { ShowPhotographyGallery(libraryWindow); };
-                navChrome.FilenameRulesButton.Click += delegate { OpenFilenameConventionEditor(); };
-                navChrome.MyCoversButton.Click += delegate { OpenSavedCoversFolder(); };
-                navChrome.ImportButton.Click += delegate { RunWorkflow(false); if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge(); };
-                navChrome.ImportCommentsButton.Click += delegate { RunWorkflow(true); if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge(); };
-                navChrome.ManualImportButton.Click += delegate { OpenManualIntakeWindow(); if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge(); };
-                navChrome.FetchButton.Click += delegate
-                {
-                    var choice = MessageBox.Show(
-                        "Refresh cover art for the entire library?",
-                        "PixelVault",
-                        MessageBoxButton.OKCancel,
-                        MessageBoxImage.Question);
-                    if (choice != MessageBoxResult.OK) return;
-                    runCoverRefresh();
-                };
-                navChrome.IntakeReviewButton.Click += delegate
-                {
-                    ShowIntakePreviewWindow(false);
-                    if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge();
-                };
-                panes.OpenFolderButton.Click += delegate
-                {
-                    foreach (var folderPath in GetLibraryBrowserSourceFolderPaths(ws.Current)) OpenFolder(folderPath);
-                };
                 openLibraryMetadataEditor = delegate(LibraryBrowserFolderView focusFolder)
                 {
                     LibraryBrowserOpenLibraryMetadataForFolder(ws, focusFolder, showFolder, refreshDetailSelectionUi, delegate
@@ -302,13 +270,18 @@ namespace PixelVaultNative
                         LibraryBrowserOpenSingleFileMetadataEditor(ws, null, getVisibleDetailFilesOrdered, getSelectedDetailFiles, getDisplayFolder, getActionFolder, refreshLibraryFoldersAsync);
                     });
                 };
-                panes.EditMetadataButton.Click += delegate { openSelectedLibraryMetadataEditor(); };
-                panes.DeleteSelectedButton.Click += delegate { deleteSelectedLibraryFiles(); };
-                panes.GroupAllButton.Click += delegate { setLibraryGroupingMode("all"); };
-                panes.GroupConsoleButton.Click += delegate { setLibraryGroupingMode("console"); };
-                panes.SortPlatformButton.Click += delegate { setLibrarySortMode("platform"); };
-                panes.SortRecentButton.Click += delegate { setLibrarySortMode("recent"); };
-                panes.SortPhotosButton.Click += delegate { setLibrarySortMode("photos"); };
+                LibraryBrowserWireNavChromeAndToolbar(
+                    libraryWindow,
+                    ws,
+                    panes,
+                    navChrome,
+                    refreshIntakeReviewBadge,
+                    refreshLibraryFoldersAsync,
+                    runCoverRefresh,
+                    openSelectedLibraryMetadataEditor,
+                    deleteSelectedLibraryFiles,
+                    setLibraryGroupingMode,
+                    setLibrarySortMode);
                 libraryWindow.Activated += delegate
                 {
                     if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge();
@@ -326,7 +299,7 @@ namespace PixelVaultNative
             }
             catch (Exception ex)
             {
-                Log(ex.Message);
+                LogException("ShowLibraryBrowserCore", ex);
                 MessageBox.Show(ex.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }

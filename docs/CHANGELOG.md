@@ -1,3 +1,11 @@
+## Unreleased (engineering / structure)
+
+- **Library session seam:** Active-library saved game-index reads and metadata upserts from `MainWindow` now prefer `ILibrarySession` / `ILibrarySession.Scanner` when the root matches (`GetSavedGameIndexRowsForRoot`, startup preload, folder ID editor, library metadata workflow, Steam ID resolution helpers).
+- **Import:** `RunSteamRenameAsync` + `IImportService` / `ImportService`; import and game-index progress hosts now run `Func<..., Task<TResult>>` backgrounds (`Task.Run` + `await`) so Steam rename uses `ICoverService.SteamNameAsync` without nested sync-over-async in that loop. Sync `RunSteamRename` delegates to the async implementation.
+- **Manual metadata:** Game-title combo row loading goes through `IImportService.LoadManualMetadataGameTitleRowsAsync` (host-wired thread-pool load); finish path uses `librarySession.LoadSavedGameIndexRows()`.
+- **Library UI:** `MainWindow.LibraryBrowserOrchestrator.NavChromeAndToolbar.cs` — nav chrome + pane toolbar click wiring extracted from `ShowLibraryBrowserCore`.
+- **Game index:** Resolve-IDs progress uses the same async progress host (no `GetAwaiter().GetResult()` inside the background lambda).
+
 ## 0.849
 - **Release:** Version **0.849** — publish refresh for the thumbnail cache contention cleanup.
 - **Thumbnail cache:** Fixed `SaveThumbnailCache` so concurrent thumbnail writes no longer share a single `.tmp` path per cache key. Each writer now uses its own temp file and treats an already-created destination thumbnail as a benign race instead of an error.

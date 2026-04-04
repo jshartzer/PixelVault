@@ -143,7 +143,7 @@ namespace PixelVaultNative
             }
         }
 
-        void RunBackgroundWorkflowWithProgress<TResult>(string windowTitle, string progressTitleText, string initialMetaText, string startStatusText, string canceledStatusText, string startLogLine, string failureStatusText, int totalWork, Func<Action<int, string>, CancellationToken, TResult> backgroundWork, Action<TResult> onSuccess, Action onCanceled = null)
+        void RunBackgroundWorkflowWithProgress<TResult>(string windowTitle, string progressTitleText, string initialMetaText, string startStatusText, string canceledStatusText, string startLogLine, string failureStatusText, int totalWork, Func<Action<int, string>, CancellationToken, Task<TResult>> backgroundWork, Action<TResult> onSuccess, Action onCanceled = null)
         {
             var effectiveTotalWork = Math.Max(totalWork, 1);
             var closeButton = Btn("Cancel", null, "#334249", Brushes.White);
@@ -204,9 +204,9 @@ namespace PixelVaultNative
                 }));
             };
 
-            Task.Factory.StartNew(delegate
+            Task.Run(async () =>
             {
-                return backgroundWork(reportProgress, workflowCancellation.Token);
+                return await backgroundWork(reportProgress, workflowCancellation.Token).ConfigureAwait(false);
             }, workflowCancellation.Token).ContinueWith(delegate(Task<TResult> workflowTask)
             {
                 progressWindow.Dispatcher.BeginInvoke(new Action(delegate
@@ -297,7 +297,7 @@ namespace PixelVaultNative
                 "Starting " + workflowLabel + " workflow.",
                 withReview ? "Import and comment failed" : "Import failed",
                 totalWork,
-                delegate(Action<int, string> reportProgress, CancellationToken cancellationToken)
+                async (reportProgress, cancellationToken) =>
                 {
                     if (useUnifiedManualImportBatch)
                     {
@@ -314,10 +314,10 @@ namespace PixelVaultNative
                         var sortOff = moveOff + mvTotal;
 
                         ThrowIfWorkflowCancellationRequested(cancellationToken, "Import workflow");
-                        var steamRenameResult = RunRename(batch.Select(item => item.FilePath), delegate(int current, int total, string detail)
+                        var steamRenameResult = await importService.RunSteamRenameAsync(batch.Select(item => item.FilePath), delegate(int current, int total, string detail)
                         {
                             reportProgress(steamOff + current, detail);
-                        }, cancellationToken);
+                        }, cancellationToken).ConfigureAwait(false);
                         var steamMap = steamRenameResult == null ? null : steamRenameResult.OldPathToNewPath;
                         if (steamMap != null && steamMap.Count > 0) SteamImportRename.ApplySteamRenameMapToManualMetadataItems(batch, steamMap);
                         ThrowIfWorkflowCancellationRequested(cancellationToken, "Import workflow");
@@ -374,10 +374,10 @@ namespace PixelVaultNative
                     var sortOffset = moveOffset + moveTotal;
 
                     ThrowIfWorkflowCancellationRequested(cancellationToken, "Import workflow");
-                    var renameResult = RunRename(renameInventory == null ? new List<string>() : renameInventory.RenameScopeFiles, delegate(int current, int total, string detail)
+                    var renameResult = await importService.RunSteamRenameAsync(renameInventory == null ? new List<string>() : renameInventory.RenameScopeFiles, delegate(int current, int total, string detail)
                     {
                         reportProgress(renameOffset + current, detail);
-                    }, cancellationToken);
+                    }, cancellationToken).ConfigureAwait(false);
                     var steamRenameMap = renameResult == null ? null : renameResult.OldPathToNewPath;
                     if (steamRenameMap != null && steamRenameMap.Count > 0) SteamImportRename.ApplySteamRenameMapToReviewItems(reviewItems, steamRenameMap);
                     var moveSourcePathsAfterRename = SteamImportRename.ResolveTopLevelPathsAfterSteamRename(inventory == null ? null : inventory.TopLevelMediaFiles, steamRenameMap);
@@ -460,7 +460,7 @@ namespace PixelVaultNative
                 "Starting manual intake workflow.",
                 "Manual intake failed",
                 totalWork,
-                delegate(Action<int, string> reportProgress, CancellationToken cancellationToken)
+                async (reportProgress, cancellationToken) =>
                 {
                     var renameOffset = 0;
                     var metadataOffset = renameOffset + renameTotal;

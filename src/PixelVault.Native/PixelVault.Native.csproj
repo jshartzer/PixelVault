@@ -76,6 +76,7 @@
     <Compile Include="UI\Library\MainWindow.LibraryMetadataScan.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryImageLoading.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserOrchestrator.PaneEvents.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryBrowserOrchestrator.NavChromeAndToolbar.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserInstrumentation.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserOrchestrator.CoverRefresh.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserOrchestrator.DetailCommands.cs" />

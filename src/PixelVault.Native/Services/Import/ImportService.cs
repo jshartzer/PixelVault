@@ -33,6 +33,12 @@ namespace PixelVaultNative
         /// <summary>Steam AppID-based renames in the upload folder (canonical store title + timestamp suffix rules).</summary>
         RenameStepResult RunSteamRename(IEnumerable<string> sourceFiles, Action<int, int, string> progress = null, CancellationToken cancellationToken = default);
 
+        /// <summary>Async Steam rename (uses <see cref="ICoverService.SteamNameAsync"/>; prefer in background workflows).</summary>
+        Task<RenameStepResult> RunSteamRenameAsync(IEnumerable<string> sourceFiles, Action<int, int, string> progress = null, CancellationToken cancellationToken = default);
+
+        /// <summary>Loads saved + optional editor fallback game rows for manual-metadata title combo (thread-pool; host-supplied).</summary>
+        Task<List<GameIndexEditorRow>> LoadManualMetadataGameTitleRowsAsync(string libraryRoot, CancellationToken cancellationToken = default);
+
         /// <summary>Lets import use <see cref="ILibrarySession.EnsureSteamAppIdInActiveLibrary"/> when the active library root matches the rename target root.</summary>
         void AttachLibrarySessionAccessor(Func<ILibrarySession> getSession);
 
@@ -141,6 +147,9 @@ namespace PixelVaultNative
 
         /// <summary>Steam / store lookups (async store title for import-and-edit).</summary>
         public ICoverService CoverService;
+
+        /// <summary>Optional; loads game-index rows for manual-metadata title dropdown off the UI thread.</summary>
+        public Func<string, CancellationToken, Task<List<GameIndexEditorRow>>> LoadManualMetadataGameTitleRowsAsync;
 
         /// <summary>Same normalization as game-index manual metadata (single-argument form: title only).</summary>
         public Func<string, string> NormalizeGameIndexName;
@@ -390,6 +399,11 @@ namespace PixelVaultNative
 
         public RenameStepResult RunSteamRename(IEnumerable<string> sourceFiles, Action<int, int, string> progress = null, CancellationToken cancellationToken = default)
         {
+            return RunSteamRenameAsync(sourceFiles, progress, cancellationToken).GetAwaiter().GetResult();
+        }
+
+        public async Task<RenameStepResult> RunSteamRenameAsync(IEnumerable<string> sourceFiles, Action<int, int, string> progress = null, CancellationToken cancellationToken = default)
+        {
             int renamed = 0, skipped = 0;
             var pathMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             var recordedSteamAppIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -424,7 +438,7 @@ namespace PixelVaultNative
                 }
                 string game = null;
                 if (d.ResolveSteamStoreTitle != null) game = d.ResolveSteamStoreTitle(appId);
-                else game = d.CoverService.SteamName(appId, cancellationToken);
+                else game = await d.CoverService.SteamNameAsync(appId, cancellationToken).ConfigureAwait(false);
                 if (string.IsNullOrWhiteSpace(game))
                 {
                     skipped++;
@@ -467,6 +481,13 @@ namespace PixelVaultNative
             if (progress != null) progress(total, total, "Rename step complete: renamed " + renamed + ", skipped " + skipped + ".");
             d.Log?.Invoke("Rename summary: renamed " + renamed + ", skipped " + skipped + ".");
             return new RenameStepResult { Renamed = renamed, Skipped = skipped, OldPathToNewPath = pathMap };
+        }
+
+        public Task<List<GameIndexEditorRow>> LoadManualMetadataGameTitleRowsAsync(string libraryRoot, CancellationToken cancellationToken = default)
+        {
+            if (d.LoadManualMetadataGameTitleRowsAsync == null)
+                return Task.FromResult(new List<GameIndexEditorRow>());
+            return d.LoadManualMetadataGameTitleRowsAsync(libraryRoot ?? string.Empty, cancellationToken);
         }
 
         public RenameStepResult RunManualRename(List<ManualMetadataItem> items, Action<int, int, string> progress = null, CancellationToken cancellationToken = default)

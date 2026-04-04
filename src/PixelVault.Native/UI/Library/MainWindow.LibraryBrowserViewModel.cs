@@ -257,7 +257,7 @@ namespace PixelVaultNative
                 platformText = "(none)";
             }
 
-            return "viewKey=" + (view.ViewKey ?? string.Empty)
+            return "viewKey=" + FormatViewKeyForTroubleshooting(view.ViewKey ?? string.Empty)
                 + "; name=" + (view.Name ?? string.Empty)
                 + "; files=" + Math.Max(view.FileCount, 0)
                 + "; sourceFolders=" + CountLibraryBrowserSourceFolders(view)

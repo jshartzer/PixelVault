@@ -258,7 +258,7 @@ Fill this in during **Phase A** (region name, primary file lines if known, Dispa
 
 | Region | Dispatcher / UI thread | Shared `MainWindow` state | Services |
 |--------|-------------------------|---------------------------|----------|
-| *(example)* Library browser | Yes | `libraryWorkspace`, bitmap decode cache | cover, metadata, **`libraryScanner`**, index persistence |
+| Library browser | Yes | `libraryWorkspace`, bitmap decode cache; orchestration split across **`LibraryBrowserOrchestrator`** (+ **`PaneEvents`**, **`NavChromeAndToolbar`**) | **`ILibrarySession`**, cover, metadata, **`libraryScanner`**, index persistence |
 | Import workflow | Progress on UI; work on pool | `sourceRoot`, `destinationRoot`, `conflictBox` | **`importService`**, **`metadataService`**, **`libraryScanner`** |
 | | | | |
 

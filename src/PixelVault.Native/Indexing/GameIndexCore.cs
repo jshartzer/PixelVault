@@ -352,6 +352,15 @@ namespace PixelVaultNative
             return indexPersistenceService.LoadSavedGameIndexRows(root);
         }
 
+        /// <summary>Uses <see cref="ILibrarySession.LoadSavedGameIndexRows"/> when <paramref name="root"/> is the active library root.</summary>
+        List<GameIndexEditorRow> GetSavedGameIndexRowsForRoot(string root)
+        {
+            if (string.IsNullOrWhiteSpace(root)) return new List<GameIndexEditorRow>();
+            if (librarySession != null && string.Equals(root, libraryRoot, StringComparison.OrdinalIgnoreCase))
+                return librarySession.LoadSavedGameIndexRows();
+            return LoadSavedGameIndexRows(root) ?? new List<GameIndexEditorRow>();
+        }
+
         void SaveSavedGameIndexRows(string root, IEnumerable<GameIndexEditorRow> rows)
         {
             gameIndexEditorAssignmentService.SaveSavedGameIndexRows(root, rows);
