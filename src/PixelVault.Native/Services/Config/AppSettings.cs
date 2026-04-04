@@ -11,6 +11,7 @@ namespace PixelVaultNative
         public string SteamGridDbApiToken = string.Empty;
         public int LibraryFolderTileSize = 240;
         public string LibraryFolderSortMode = "platform";
+        public string LibraryGroupingMode = "all";
 
         public static AppSettings Clone(AppSettings s)
         {
@@ -24,7 +25,8 @@ namespace PixelVaultNative
                 FfmpegPath = s.FfmpegPath ?? string.Empty,
                 SteamGridDbApiToken = s.SteamGridDbApiToken ?? string.Empty,
                 LibraryFolderTileSize = s.LibraryFolderTileSize,
-                LibraryFolderSortMode = s.LibraryFolderSortMode ?? "platform"
+                LibraryFolderSortMode = s.LibraryFolderSortMode ?? "platform",
+                LibraryGroupingMode = s.LibraryGroupingMode ?? "all"
             };
         }
     }

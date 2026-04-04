@@ -11,7 +11,8 @@ namespace PixelVaultNative
         {
             internal LibraryBrowserPaneRefs Panes;
             internal readonly List<LibraryFolderInfo> Folders = new List<LibraryFolderInfo>();
-            internal LibraryFolderInfo Current;
+            internal readonly List<LibraryBrowserFolderView> ViewFolders = new List<LibraryBrowserFolderView>();
+            internal LibraryBrowserFolderView Current;
             internal readonly HashSet<string> CollapsedPlatformSections = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             internal readonly HashSet<string> SelectedDetailFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             internal readonly List<Border> DetailTiles = new List<Border>();

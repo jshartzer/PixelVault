@@ -29,7 +29,8 @@ public sealed class SettingsServiceTests
                 "ffmpeg=",
                 "steamgriddb_token=secret",
                 "library_folder_tile_size=200",
-                "library_folder_sort_mode=recent"
+                "library_folder_sort_mode=recent",
+                "library_grouping_mode=console"
             });
 
             var initial = new AppSettings
@@ -41,7 +42,8 @@ public sealed class SettingsServiceTests
                 FfmpegPath = string.Empty,
                 SteamGridDbApiToken = string.Empty,
                 LibraryFolderTileSize = 240,
-                LibraryFolderSortMode = "platform"
+                LibraryFolderSortMode = "platform",
+                LibraryGroupingMode = "all"
             };
 
             var svc = new SettingsService();
@@ -55,6 +57,7 @@ public sealed class SettingsServiceTests
             Assert.Equal("secret", loaded.SteamGridDbApiToken);
             Assert.Equal(200, loaded.LibraryFolderTileSize);
             Assert.Equal("recent", loaded.LibraryFolderSortMode);
+            Assert.Equal("console", loaded.LibraryGroupingMode);
         }
         finally
         {
@@ -82,7 +85,8 @@ public sealed class SettingsServiceTests
                 FfmpegPath = ffmpegStub,
                 SteamGridDbApiToken = "tok",
                 LibraryFolderTileSize = 180,
-                LibraryFolderSortMode = "photos"
+                LibraryFolderSortMode = "photos",
+                LibraryGroupingMode = "console"
             };
 
             var svc = new SettingsService();
@@ -99,6 +103,7 @@ public sealed class SettingsServiceTests
             Assert.Equal(original.SteamGridDbApiToken, loaded.SteamGridDbApiToken);
             Assert.Equal(SettingsService.NormalizeLibraryFolderTileSize(original.LibraryFolderTileSize), loaded.LibraryFolderTileSize);
             Assert.Equal("photos", loaded.LibraryFolderSortMode);
+            Assert.Equal("console", loaded.LibraryGroupingMode);
         }
         finally
         {

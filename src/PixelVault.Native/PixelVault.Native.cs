@@ -84,6 +84,7 @@ namespace PixelVaultNative
         string steamGridDbApiToken;
         int libraryFolderTileSize = 240;
         string libraryFolderSortMode = "platform";
+        string libraryGroupingMode = "all";
         Action<bool> activeLibraryFolderRefresh;
         LibraryFolderInfo activeSelectedLibraryFolder;
 
@@ -4700,7 +4701,8 @@ namespace PixelVaultNative
                 FfmpegPath = ffmpegPath ?? string.Empty,
                 SteamGridDbApiToken = steamGridDbApiToken ?? string.Empty,
                 LibraryFolderTileSize = libraryFolderTileSize,
-                LibraryFolderSortMode = libraryFolderSortMode ?? "platform"
+                LibraryFolderSortMode = libraryFolderSortMode ?? "platform",
+                LibraryGroupingMode = libraryGroupingMode ?? "all"
             };
         }
 
@@ -4715,6 +4717,7 @@ namespace PixelVaultNative
             steamGridDbApiToken = s.SteamGridDbApiToken ?? string.Empty;
             libraryFolderTileSize = s.LibraryFolderTileSize;
             libraryFolderSortMode = s.LibraryFolderSortMode ?? "platform";
+            libraryGroupingMode = s.LibraryGroupingMode ?? "all";
         }
 
         void LoadSettings()

@@ -47,6 +47,7 @@ namespace PixelVaultNative
             var restoreDetailScrollPending = shouldRestoreDetailScroll;
             ws.PreserveDetailScrollOnNextRender = false;
             var renderFolder = ws.Current;
+            var displayFolder = BuildLibraryBrowserDisplayFolder(renderFolder);
             SetVirtualizedRows(panes.DetailRows, new[]
             {
                 new VirtualizedRowDefinition
@@ -65,11 +66,11 @@ namespace PixelVaultNative
                 applyDetailSnapshot = delegate(LibraryDetailRenderSnapshot snapshot, bool logCompletion)
                 {
                     if (renderVersion != ws.DetailRenderSequence) return;
-                    if (!SameLibraryFolderSelection(ws.Current, renderFolder)) return;
+                    if (!SameLibraryBrowserSelection(ws.Current, renderFolder)) return;
                     var visibleFiles = snapshot == null ? new List<string>() : (snapshot.VisibleFiles ?? new List<string>());
                     var visibleSet = new HashSet<string>(visibleFiles, StringComparer.OrdinalIgnoreCase);
                     foreach (var stale in ws.SelectedDetailFiles.Where(path => !visibleSet.Contains(path)).ToList()) ws.SelectedDetailFiles.Remove(stale);
-                    if (SameLibraryFolderSelection(ws.Current, renderFolder))
+                    if (SameLibraryBrowserSelection(ws.Current, renderFolder))
                     {
                         ws.DetailFilesDisplayOrder.Clear();
                         ws.DetailFilesDisplayOrder.AddRange(visibleFiles);
@@ -94,7 +95,7 @@ namespace PixelVaultNative
                         if (logCompletion)
                         {
                             renderStopwatch.Stop();
-                            LogPerformanceSample("LibraryDetailRender", renderStopwatch, "folder=" + (renderFolder.Name ?? renderFolder.FolderPath ?? "(unknown)") + "; rows=1; files=0; size=" + size, 40);
+                            LogPerformanceSample("LibraryDetailRender", renderStopwatch, "folder=" + (renderFolder.Name ?? renderFolder.PrimaryFolderPath ?? "(unknown)") + "; rows=1; files=0; size=" + size, 40);
                         }
                         return;
                     }
@@ -136,7 +137,7 @@ namespace PixelVaultNative
                                         var tile = CreateLibraryDetailTile(
                                             file,
                                             size,
-                                            delegate { return SameLibraryFolderSelection(ws.Current, renderFolder); },
+                                            delegate { return SameLibraryBrowserSelection(ws.Current, renderFolder); },
                                             openSingleFileMetadataEditor,
                                             updateDetailSelection,
                                             ws.SelectedDetailFiles,
@@ -156,14 +157,14 @@ namespace PixelVaultNative
                     if (logCompletion)
                     {
                         renderStopwatch.Stop();
-                        LogPerformanceSample("LibraryDetailRender", renderStopwatch, "folder=" + (renderFolder.Name ?? renderFolder.FolderPath ?? "(unknown)") + "; groups=" + snapshot.Groups.Count + "; files=" + visibleFiles.Count + "; rows=" + virtualRows.Count + "; columns=" + detailColumns + "; size=" + size, 40);
+                        LogPerformanceSample("LibraryDetailRender", renderStopwatch, "folder=" + (renderFolder.Name ?? renderFolder.PrimaryFolderPath ?? "(unknown)") + "; groups=" + snapshot.Groups.Count + "; files=" + visibleFiles.Count + "; rows=" + virtualRows.Count + "; columns=" + detailColumns + "; size=" + size, 40);
                     }
                 };
 
                 try
                 {
                     var metadataIndex = librarySession.LoadLibraryMetadataIndex(false);
-                    var detailFiles = GetFilesForLibraryFolderEntry(renderFolder, false)
+                    var detailFiles = GetFilesForLibraryFolderEntry(displayFolder, false)
                         .Where(file => !string.IsNullOrWhiteSpace(file) && File.Exists(file))
                         .Distinct(StringComparer.OrdinalIgnoreCase)
                         .ToList();
@@ -239,7 +240,7 @@ namespace PixelVaultNative
                         }
                         catch (Exception repairEx)
                         {
-                            Log("Library detail metadata repair failed for " + (renderFolder.Name ?? renderFolder.FolderPath ?? "(unknown)") + ". " + repairEx.Message);
+                            Log("Library detail metadata repair failed for " + (renderFolder.Name ?? renderFolder.PrimaryFolderPath ?? "(unknown)") + ". " + repairEx.Message);
                         }
 
                         var refinedSnapshot = buildSnapshot();
@@ -277,7 +278,7 @@ namespace PixelVaultNative
                     await libraryWindow.Dispatcher.InvokeAsync((Action)(delegate
                     {
                         if (renderVersion != ws.DetailRenderSequence) return;
-                        if (!SameLibraryFolderSelection(ws.Current, renderFolder)) return;
+                        if (!SameLibraryBrowserSelection(ws.Current, renderFolder)) return;
                         ws.DetailFilesDisplayOrder.Clear();
                         SetVirtualizedRows(panes.DetailRows, new[]
                         {
@@ -291,7 +292,7 @@ namespace PixelVaultNative
                             }
                         }, true, null);
                         if (refreshDetailSelectionUi != null) refreshDetailSelectionUi();
-                        Log("Library detail render failed for " + (renderFolder.Name ?? renderFolder.FolderPath ?? "(unknown)") + ". " + ex.Message);
+                        Log("Library detail render failed for " + (renderFolder.Name ?? renderFolder.PrimaryFolderPath ?? "(unknown)") + ". " + ex.Message);
                         renderStopwatch.Stop();
                     }));
                 }

@@ -31,6 +31,13 @@ namespace PixelVaultNative
             return "platform";
         }
 
+        public static string NormalizeLibraryGroupingMode(string value)
+        {
+            var normalized = (value ?? string.Empty).Trim().ToLowerInvariant();
+            if (normalized == "console" || normalized == "by console" || normalized == "platform" || normalized == "by platform") return "console";
+            return "all";
+        }
+
         public static string FindSteamGridDbApiTokenInEnvironment()
         {
             foreach (var key in new[] { "PIXELVAULT_STEAMGRIDDB_TOKEN", "STEAMGRIDDB_API_KEY", "STEAMGRIDDB_TOKEN" })
@@ -68,6 +75,7 @@ namespace PixelVaultNative
                     if (int.TryParse(value, out var parsedSize)) s.LibraryFolderTileSize = NormalizeLibraryFolderTileSize(parsedSize);
                 }
                 else if (key == "library_folder_sort_mode") s.LibraryFolderSortMode = NormalizeLibraryFolderSortMode(value);
+                else if (key == "library_grouping_mode") s.LibraryGroupingMode = NormalizeLibraryGroupingMode(value);
             }
 
             var bundledExifTool = Path.Combine(appRoot ?? string.Empty, "tools", "exiftool.exe");
@@ -99,7 +107,8 @@ namespace PixelVaultNative
                 "ffmpeg=" + (state.FfmpegPath ?? string.Empty),
                 "steamgriddb_token=" + (state.SteamGridDbApiToken ?? string.Empty),
                 "library_folder_tile_size=" + NormalizeLibraryFolderTileSize(state.LibraryFolderTileSize),
-                "library_folder_sort_mode=" + NormalizeLibraryFolderSortMode(state.LibraryFolderSortMode)
+                "library_folder_sort_mode=" + NormalizeLibraryFolderSortMode(state.LibraryFolderSortMode),
+                "library_grouping_mode=" + NormalizeLibraryGroupingMode(state.LibraryGroupingMode)
             });
         }
     }

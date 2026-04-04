@@ -15,6 +15,8 @@ namespace PixelVaultNative
             internal DispatcherTimer SearchDebounceTimer;
             internal DispatcherTimer DetailResizeDebounceTimer;
             internal DispatcherTimer FolderResizeDebounceTimer;
+            internal Button GroupAllButton;
+            internal Button GroupConsoleButton;
             internal Button SortPlatformButton;
             internal Button SortRecentButton;
             internal Button SortPhotosButton;
@@ -172,6 +174,21 @@ namespace PixelVaultNative
             previewFrame.Child = panes.PreviewImage;
             bannerGrid.Children.Add(previewFrame);
             var textStack = new StackPanel();
+            var groupingRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 12), HorizontalAlignment = HorizontalAlignment.Left };
+            panes.GroupAllButton = Btn("All", null, "#20343A", Brushes.White);
+            panes.GroupAllButton.Width = 58;
+            panes.GroupAllButton.Height = 32;
+            panes.GroupAllButton.FontSize = 11.5;
+            panes.GroupAllButton.Margin = new Thickness(0, 0, 8, 0);
+            ApplyLibraryPillChrome(panes.GroupAllButton, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
+            panes.GroupConsoleButton = Btn("By Console", null, "#20343A", Brushes.White);
+            panes.GroupConsoleButton.Width = 94;
+            panes.GroupConsoleButton.Height = 32;
+            panes.GroupConsoleButton.FontSize = 11.5;
+            panes.GroupConsoleButton.Margin = new Thickness(0);
+            ApplyLibraryPillChrome(panes.GroupConsoleButton, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
+            groupingRow.Children.Add(panes.GroupAllButton);
+            groupingRow.Children.Add(panes.GroupConsoleButton);
             panes.DetailEyebrow = new TextBlock { Text = "Selected game", FontSize = 11, FontWeight = FontWeights.SemiBold, Foreground = Brush("#728996"), Margin = new Thickness(0, 0, 0, 8) };
             panes.DetailTitle = new TextBlock { Text = "Select a folder", FontSize = 28, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White };
             panes.DetailMeta = new TextBlock { Text = "Browse the library you chose in Settings.", Foreground = Brush("#9CB1BC"), Margin = new Thickness(0, 8, 0, 14), TextWrapping = TextWrapping.Wrap, FontSize = 13.5 };
@@ -190,6 +207,7 @@ namespace PixelVaultNative
             bannerButtonRow.Children.Add(panes.OpenFolderButton);
             Grid.SetColumn(panes.EditMetadataButton, 1);
             bannerButtonRow.Children.Add(panes.EditMetadataButton);
+            textStack.Children.Add(groupingRow);
             textStack.Children.Add(panes.DetailEyebrow);
             textStack.Children.Add(panes.DetailTitle);
             textStack.Children.Add(panes.DetailMeta);
