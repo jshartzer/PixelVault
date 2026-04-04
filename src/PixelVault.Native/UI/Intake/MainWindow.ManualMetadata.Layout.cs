@@ -34,6 +34,7 @@ namespace PixelVaultNative
             public Button SteamSearchButton;
             public TextBox SteamAppIdBox;
             public TextBlock SteamLookupStatus;
+            public Button SameAsPreviousButton;
             public ComboBox GameNameBox;
             public TextBox TagsBox;
             public CheckBox PhotographyBox;
@@ -160,19 +161,6 @@ namespace PixelVaultNative
             Grid.SetColumn(h.SteamAppIdBox, 2);
             steamLookupGrid.Children.Add(h.SteamAppIdBox);
             h.SteamLookupStatus = new TextBlock { Text = "Search by game title or numeric Steam AppID (Search looks up the store name), or paste an AppID in the box on the right.", Foreground = Brush("#5F6970"), Margin = new Thickness(0, 0, 0, 16), TextWrapping = TextWrapping.Wrap };
-            h.GameNameBox = new ComboBox
-            {
-                Margin = new Thickness(0, 8, 0, 14),
-                Background = Brushes.White,
-                BorderBrush = Brush("#D7E1E8"),
-                BorderThickness = new Thickness(1),
-                Padding = new Thickness(8, 4, 8, 4),
-                FontSize = 14,
-                FontFamily = new FontFamily("Cascadia Mono"),
-                IsEditable = true,
-                IsTextSearchEnabled = true,
-                StaysOpenOnEdit = true
-            };
             h.TagsBox = new TextBox { Margin = new Thickness(0, 8, 0, 14), Background = Brushes.White, BorderBrush = Brush("#D7E1E8"), BorderThickness = new Thickness(1), Padding = new Thickness(12), FontSize = 14 };
             h.PhotographyBox = new CheckBox { Content = "Add Game Photography tag", Foreground = Brush("#1F2A30"), Margin = new Thickness(0, 0, 14, 10), IsThreeState = true };
             var tagSeparator = new Border { Width = 1, Height = 20, Background = Brush("#D7E1E8"), Margin = new Thickness(2, 2, 16, 10), VerticalAlignment = VerticalAlignment.Center };
@@ -216,7 +204,30 @@ namespace PixelVaultNative
             detailStack.Children.Add(steamLookupGrid);
             detailStack.Children.Add(h.SteamLookupStatus);
             detailStack.Children.Add(new TextBlock { Text = "Game title to prepend", FontSize = 16, FontWeight = FontWeights.SemiBold, Foreground = Brush("#1F2A30") });
-            detailStack.Children.Add(h.GameNameBox);
+            var gameTitleRow = new Grid { Margin = new Thickness(0, 8, 0, 14) };
+            gameTitleRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            gameTitleRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            h.SameAsPreviousButton = Btn("Same as previous", null, "#334249", Brushes.White);
+            h.SameAsPreviousButton.ToolTip = "Copy game title, Steam AppID, tags, platform, date, and comment from the previous file in the list to the current selection.";
+            h.SameAsPreviousButton.Margin = new Thickness(0, 0, 10, 0);
+            h.SameAsPreviousButton.VerticalAlignment = VerticalAlignment.Center;
+            Grid.SetColumn(h.SameAsPreviousButton, 0);
+            h.GameNameBox = new ComboBox
+            {
+                Background = Brushes.White,
+                BorderBrush = Brush("#D7E1E8"),
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(8, 4, 8, 4),
+                FontSize = 14,
+                FontFamily = new FontFamily("Cascadia Mono"),
+                IsEditable = true,
+                IsTextSearchEnabled = true,
+                StaysOpenOnEdit = true
+            };
+            Grid.SetColumn(h.GameNameBox, 1);
+            gameTitleRow.Children.Add(h.SameAsPreviousButton);
+            gameTitleRow.Children.Add(h.GameNameBox);
+            detailStack.Children.Add(gameTitleRow);
             detailStack.Children.Add(new TextBlock { Text = "Additional tags", FontSize = 16, FontWeight = FontWeights.SemiBold, Foreground = Brush("#1F2A30") });
             detailStack.Children.Add(h.TagsBox);
             detailStack.Children.Add(tagToggleRow);

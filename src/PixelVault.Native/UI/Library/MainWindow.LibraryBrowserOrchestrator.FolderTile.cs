@@ -197,6 +197,20 @@ namespace PixelVaultNative
             {
                 foreach (var folderPath in GetLibraryBrowserSourceFolderPaths(folder)) OpenFolder(folderPath);
             };
+            var copyFolderPathItem = new MenuItem { Header = "Copy folder path" };
+            copyFolderPathItem.Click += delegate
+            {
+                try
+                {
+                    var paths = GetLibraryBrowserSourceFolderPaths(folder).Where(p => !string.IsNullOrWhiteSpace(p)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+                    if (paths.Count == 0) return;
+                    Clipboard.SetText(paths.Count == 1 ? paths[0] : string.Join(Environment.NewLine, paths));
+                }
+                catch (Exception ex)
+                {
+                    Log("Copy folder path failed. " + ex.Message);
+                }
+            };
             var editMetadataItem = new MenuItem { Header = "Edit Metadata" };
             editMetadataItem.Click += delegate { openLibraryMetadataEditor(folder); };
             var editIdsItem = new MenuItem { Header = "Edit IDs...", IsEnabled = folder != null && !folder.IsMergedAcrossPlatforms };
@@ -221,6 +235,7 @@ namespace PixelVaultNative
                 runScopedCoverRefresh(actionFolders, BuildLibraryBrowserActionScopeLabel(folder), true, false);
             };
             contextMenu.Items.Add(openFolderItem);
+            contextMenu.Items.Add(copyFolderPathItem);
             contextMenu.Items.Add(editMetadataItem);
             contextMenu.Items.Add(editIdsItem);
             contextMenu.Items.Add(new Separator());

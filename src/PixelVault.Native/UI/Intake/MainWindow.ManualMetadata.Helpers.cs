@@ -65,6 +65,54 @@ namespace PixelVaultNative
             }
         }
 
+        List<string> GetManualMetadataRecentTitleLabelsList()
+        {
+            if (string.IsNullOrWhiteSpace(_manualMetadataRecentTitleLabelsSerialized)) return new List<string>();
+            return _manualMetadataRecentTitleLabelsSerialized
+                .Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(s => s.Trim())
+                .Where(s => !string.IsNullOrWhiteSpace(s))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        void PushManualMetadataRecentTitleLabels(IEnumerable<string> labels)
+        {
+            var next = new List<string>();
+            foreach (var segment in GetManualMetadataRecentTitleLabelsList())
+            {
+                if (!next.Contains(segment, StringComparer.OrdinalIgnoreCase)) next.Add(segment);
+            }
+            foreach (var raw in labels ?? Enumerable.Empty<string>())
+            {
+                var label = (raw ?? string.Empty).Trim().Replace("|", " ");
+                if (string.IsNullOrWhiteSpace(label)) continue;
+                next.RemoveAll(x => string.Equals(x, label, StringComparison.OrdinalIgnoreCase));
+                next.Insert(0, label);
+            }
+            _manualMetadataRecentTitleLabelsSerialized = string.Join("|", next.Take(15));
+            SaveSettings();
+        }
+
+        static void CopyManualMetadataItemFromAnother(ManualMetadataItem from, ManualMetadataItem to)
+        {
+            if (from == null || to == null) return;
+            to.GameName = from.GameName ?? string.Empty;
+            to.SteamAppId = from.SteamAppId ?? string.Empty;
+            to.TagText = from.TagText ?? string.Empty;
+            to.Comment = from.Comment ?? string.Empty;
+            to.AddPhotographyTag = from.AddPhotographyTag;
+            to.TagSteam = from.TagSteam;
+            to.TagPc = from.TagPc;
+            to.TagPs5 = from.TagPs5;
+            to.TagXbox = from.TagXbox;
+            to.TagOther = from.TagOther;
+            to.CustomPlatformTag = from.CustomPlatformTag ?? string.Empty;
+            to.CaptureTime = from.CaptureTime;
+            to.UseCustomCaptureTime = from.UseCustomCaptureTime;
+            to.ForceTagMetadataWrite = true;
+        }
+
         UIElement BuildManualMetadataMultiPreviewStack(int count, bool useFlexiblePreview, double previewImageMaxHeight)
         {
             var multiH = useFlexiblePreview ? Math.Min(400, Math.Max(240, previewImageMaxHeight)) : 320;

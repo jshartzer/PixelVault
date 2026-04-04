@@ -4,6 +4,33 @@ namespace PixelVaultNative
 {
     public sealed partial class MainWindow
     {
+        void FlushLibraryBrowserWorkingSetToSettings(LibraryBrowserWorkingSet ws)
+        {
+            if (ws?.Panes == null) return;
+            ws.PendingLibrarySearchText = string.IsNullOrWhiteSpace(ws.Panes.SearchBox.Text) ? string.Empty : ws.Panes.SearchBox.Text.Trim();
+            if (!string.Equals(ws.AppliedLibrarySearchText, ws.PendingLibrarySearchText, StringComparison.OrdinalIgnoreCase))
+            {
+                ws.AppliedLibrarySearchText = ws.PendingLibrarySearchText;
+                PersistLibraryBrowserCommittedSearch(ws.AppliedLibrarySearchText);
+            }
+            PersistLibraryBrowserScrollFromWorkingSet(ws);
+            PersistLibraryBrowserLastSelection(ws.Current);
+        }
+
+        void PrepareLibraryBrowserSessionForRebuild()
+        {
+            if (_libraryBrowserLiveWorkingSet != null)
+            {
+                FlushLibraryBrowserWorkingSetToSettings(_libraryBrowserLiveWorkingSet);
+                _libraryBrowserLiveWorkingSet = null;
+            }
+        }
+
+        void RegisterLibraryBrowserLiveWorkingSet(LibraryBrowserWorkingSet ws)
+        {
+            _libraryBrowserLiveWorkingSet = ws;
+        }
+
         void PersistLibraryBrowserScrollFromWorkingSet(LibraryBrowserWorkingSet ws)
         {
             if (ws?.Panes?.TileScroll == null) return;

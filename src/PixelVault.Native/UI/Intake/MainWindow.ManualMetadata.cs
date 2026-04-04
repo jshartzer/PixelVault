@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Windows;
@@ -12,6 +13,56 @@ namespace PixelVaultNative
 {
     public sealed partial class MainWindow
     {
+        ListBoxItem BuildManualMetadataListTile(ManualMetadataDialogHost h, ManualMetadataItem item)
+        {
+            var tile = new ListBoxItem { Tag = item, Padding = new Thickness(0), Margin = new Thickness(0, 0, 0, 10), BorderThickness = new Thickness(0), Background = Brushes.Transparent };
+            var tileBorder = new Border { Background = Brush("#1A2329"), BorderBrush = Brush("#1A2329"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(12), Padding = new Thickness(10) };
+            h.TileBorders[item] = tileBorder;
+            var tileStack = new StackPanel();
+            var badge = new TextBlock { Text = "[Manual]", Foreground = Brush("#D0A15F"), FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 4) };
+            h.BadgeBlocks[item] = badge;
+            tileStack.Children.Add(badge);
+            tileStack.Children.Add(new TextBlock { Text = item.FileName, Foreground = Brushes.White, TextWrapping = TextWrapping.Wrap, FontWeight = FontWeights.SemiBold });
+            tileStack.Children.Add(new TextBlock { Text = FormatFriendlyTimestamp(item.CaptureTime), Foreground = Brush("#B7C6C0"), Margin = new Thickness(0, 6, 0, 0) });
+            tileBorder.Child = tileStack;
+            tile.Content = tileBorder;
+            return tile;
+        }
+
+        void RebuildManualMetadataFileList(ManualMetadataDialogHost h)
+        {
+            h.FileList.Items.Clear();
+            h.BadgeBlocks.Clear();
+            h.TileBorders.Clear();
+            foreach (var item in h.Items)
+                h.FileList.Items.Add(BuildManualMetadataListTile(h, item));
+        }
+
+        /// <summary>After applying library metadata to a batch: remove those files from the dialog list and keep editing. Returns false if the list is empty (caller should close).</summary>
+        bool ContinueManualMetadataAfterLibraryApply(ManualMetadataDialogHost h, List<ManualMetadataItem> pendingItems, Action refreshGameTitleChoices, Action refreshSelectionUi, Action refreshTileBadges)
+        {
+            var paths = new HashSet<string>(pendingItems.Select(p => p.FilePath), StringComparer.OrdinalIgnoreCase);
+            for (int i = h.Items.Count - 1; i >= 0; i--)
+            {
+                if (paths.Contains(h.Items[i].FilePath)) h.Items.RemoveAt(i);
+            }
+            var distinctLabels = pendingItems
+                .Select(it => BuildGameTitleChoiceLabel(it.GameName, DetermineManualMetadataPlatformLabel(it)))
+                .Where(l => !string.IsNullOrWhiteSpace(l))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (distinctLabels.Count > 0) PushManualMetadataRecentTitleLabels(distinctLabels);
+            RebuildManualMetadataFileList(h);
+            refreshGameTitleChoices();
+            refreshTileBadges();
+            if (h.Items.Count == 0) return false;
+            foreach (ListBoxItem entry in h.FileList.Items) entry.IsSelected = false;
+            var first = h.FileList.Items.Cast<ListBoxItem>().FirstOrDefault();
+            if (first != null) first.IsSelected = true;
+            refreshSelectionUi();
+            return true;
+        }
+
         bool ShowManualMetadataWindow(List<ManualMetadataItem> items, bool libraryMode, string contextName, bool importAndEditMode = false)
         {
             if (items == null || items.Count == 0) return true;
@@ -75,6 +126,11 @@ namespace PixelVaultNative
                             .Where(label => !string.IsNullOrWhiteSpace(label))
                             .Distinct(StringComparer.OrdinalIgnoreCase)
                             .ToList();
+                        foreach (var recent in GetManualMetadataRecentTitleLabelsList())
+                        {
+                            if (loadedChoices.Contains(recent, StringComparer.OrdinalIgnoreCase)) continue;
+                            loadedChoices.Insert(0, recent);
+                        }
                         foreach (var extraChoice in h.KnownGameChoices.Where(label => !string.IsNullOrWhiteSpace(label)))
                         {
                             if (!loadedChoices.Contains(extraChoice, StringComparer.OrdinalIgnoreCase)) loadedChoices.Add(extraChoice);
@@ -321,21 +377,36 @@ namespace PixelVaultNative
             };
 
             foreach (var item in items)
-            {
-                var tile = new ListBoxItem { Tag = item, Padding = new Thickness(0), Margin = new Thickness(0, 0, 0, 10), BorderThickness = new Thickness(0), Background = Brushes.Transparent };
-                var tileBorder = new Border { Background = Brush("#1A2329"), BorderBrush = Brush("#1A2329"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(12), Padding = new Thickness(10) };
-                h.TileBorders[item] = tileBorder;
-                var tileStack = new StackPanel();
-                var badge = new TextBlock { Text = "[Manual]", Foreground = Brush("#D0A15F"), FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 4) };
-                h.BadgeBlocks[item] = badge;
-                tileStack.Children.Add(badge);
-                tileStack.Children.Add(new TextBlock { Text = item.FileName, Foreground = Brushes.White, TextWrapping = TextWrapping.Wrap, FontWeight = FontWeights.SemiBold });
-                tileStack.Children.Add(new TextBlock { Text = FormatFriendlyTimestamp(item.CaptureTime), Foreground = Brush("#B7C6C0"), Margin = new Thickness(0, 6, 0, 0) });
-                tileBorder.Child = tileStack;
-                tile.Content = tileBorder;
-                h.FileList.Items.Add(tile);
-            }
+                h.FileList.Items.Add(BuildManualMetadataListTile(h, item));
             refreshTileBadges();
+
+            var fileListMenu = new ContextMenu();
+            var copyPathItem = new MenuItem { Header = "Copy file path" };
+            copyPathItem.Click += delegate
+            {
+                try
+                {
+                    var paths = h.FileList.SelectedItems.Cast<ListBoxItem>().Select(i => i.Tag as ManualMetadataItem).Where(m => m != null).Select(m => m.FilePath).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+                    if (paths.Count == 0) return;
+                    Clipboard.SetText(paths.Count == 1 ? paths[0] : string.Join(Environment.NewLine, paths));
+                }
+                catch (Exception ex)
+                {
+                    Log("Copy file path failed. " + ex.Message);
+                }
+            };
+            var openFolderItem = new MenuItem { Header = "Open containing folder" };
+            openFolderItem.Click += delegate
+            {
+                foreach (var path in h.FileList.SelectedItems.Cast<ListBoxItem>().Select(i => i.Tag as ManualMetadataItem).Where(m => m != null).Select(m => m.FilePath).Distinct(StringComparer.OrdinalIgnoreCase))
+                {
+                    var dir = Path.GetDirectoryName(path);
+                    if (!string.IsNullOrWhiteSpace(dir)) OpenFolder(dir);
+                }
+            };
+            fileListMenu.Items.Add(copyPathItem);
+            fileListMenu.Items.Add(openFolderItem);
+            h.FileList.ContextMenu = fileListMenu;
 
             h.FileList.SelectionChanged += delegate
             {
@@ -348,6 +419,27 @@ namespace PixelVaultNative
             h.GameNameBox.AddHandler(TextBox.TextChangedEvent, new TextChangedEventHandler(delegate { syncSelectedGameNames(); }));
             h.SteamAppIdBox.TextChanged += delegate { syncSelectedSteamAppIds(); };
             h.SteamAppIdBox.LostKeyboardFocus += delegate { syncSelectedSteamAppIds(); };
+
+            h.SameAsPreviousButton.Click += delegate
+            {
+                if (h.SelectedItems == null || h.SelectedItems.Count == 0 || h.Items == null || h.Items.Count < 2)
+                {
+                    MessageBox.Show("Select one or more files. There must be a previous file in the list to copy from.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+                var indices = h.SelectedItems.Select(it => h.Items.IndexOf(it)).Where(ix => ix >= 0).ToList();
+                if (indices.Count == 0) return;
+                var minIx = indices.Min();
+                if (minIx < 1)
+                {
+                    MessageBox.Show("There is no previous file above the current selection in the list.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+                var source = h.Items[minIx - 1];
+                foreach (var item in h.SelectedItems) CopyManualMetadataItemFromAnother(source, item);
+                refreshTileBadges();
+                refreshSelectionUi();
+            };
 
             AttachManualMetadataSteamSearchHandler(h, refreshGameTitleChoices, syncSelectedGameNames, refreshTileBadges, refreshSelectionStatus, refreshSelectionUi);
 
@@ -534,7 +626,7 @@ namespace PixelVaultNative
                 refreshSelectionStatus();
             };
 
-            AttachManualMetadataFinishHandler(h, saveSelectedDateTime, refreshGameTitleChoices);
+            AttachManualMetadataFinishHandler(h, saveSelectedDateTime, refreshGameTitleChoices, refreshSelectionUi, refreshTileBadges);
 
             h.LeaveButton.Click += delegate
             {

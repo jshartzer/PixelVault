@@ -80,7 +80,7 @@ namespace PixelVaultNative
             }
             libraryWindow.Closing += delegate
             {
-                PersistLibraryBrowserScrollFromWorkingSet(ws);
+                FlushLibraryBrowserWorkingSetToSettings(ws);
             };
             panes.SearchBox.TextChanged += delegate
             {

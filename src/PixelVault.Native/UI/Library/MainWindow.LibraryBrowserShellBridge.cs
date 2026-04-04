@@ -187,6 +187,10 @@ namespace PixelVaultNative
 
             public void PersistLibraryBrowserCommittedSearch(string text) => _m.PersistLibraryBrowserCommittedSearch(text);
 
+            public void PrepareLibraryBrowserSessionForRebuild() => _m.PrepareLibraryBrowserSessionForRebuild();
+
+            public void RegisterLibraryBrowserLiveWorkingSet(LibraryBrowserWorkingSet ws) => _m.RegisterLibraryBrowserLiveWorkingSet(ws);
+
             public void LibraryBrowserWirePaneEvents(
                 Window libraryWindow,
                 LibraryBrowserWorkingSet ws,

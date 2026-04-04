@@ -23,6 +23,7 @@ namespace PixelVaultNative
                 LibraryBrowserLastViewKey = _libraryBrowserPersistedLastViewKey ?? string.Empty,
                 LibraryBrowserFolderScroll = Math.Max(0, _libraryBrowserPersistedFolderScroll),
                 LibraryBrowserDetailScroll = Math.Max(0, _libraryBrowserPersistedDetailScroll),
+                ManualMetadataRecentTitleLabels = _manualMetadataRecentTitleLabelsSerialized ?? string.Empty,
                 TroubleshootingLoggingEnabled = troubleshootingLoggingEnabled,
                 TroubleshootingLogRedactPaths = troubleshootingLogRedactPaths
             };
@@ -45,6 +46,7 @@ namespace PixelVaultNative
             _libraryBrowserPersistedLastViewKey = s.LibraryBrowserLastViewKey ?? string.Empty;
             _libraryBrowserPersistedFolderScroll = Math.Max(0, s.LibraryBrowserFolderScroll);
             _libraryBrowserPersistedDetailScroll = Math.Max(0, s.LibraryBrowserDetailScroll);
+            _manualMetadataRecentTitleLabelsSerialized = s.ManualMetadataRecentTitleLabels ?? string.Empty;
             troubleshootingLoggingEnabled = s.TroubleshootingLoggingEnabled;
             troubleshootingLogRedactPaths = s.TroubleshootingLogRedactPaths;
         }

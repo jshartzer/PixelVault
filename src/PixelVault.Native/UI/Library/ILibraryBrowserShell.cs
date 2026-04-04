@@ -137,6 +137,8 @@ namespace PixelVaultNative
             Action<bool> setLibraryBusyState);
 
         void PersistLibraryBrowserCommittedSearch(string text);
+        void PrepareLibraryBrowserSessionForRebuild();
+        void RegisterLibraryBrowserLiveWorkingSet(MainWindow.LibraryBrowserWorkingSet ws);
 
         void LibraryBrowserWirePaneEvents(
             Window libraryWindow,

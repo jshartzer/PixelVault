@@ -7,7 +7,7 @@ namespace PixelVaultNative
 {
     public sealed partial class MainWindow
     {
-        void AttachManualMetadataFinishHandler(ManualMetadataDialogHost h, Action saveSelectedDateTime, Action refreshGameTitleChoices)
+        void AttachManualMetadataFinishHandler(ManualMetadataDialogHost h, Action saveSelectedDateTime, Action refreshGameTitleChoices, Action refreshSelectionUi, Action refreshTileBadges)
         {
             h.FinishButton.Click += async delegate
             {
@@ -53,6 +53,20 @@ namespace PixelVaultNative
                     MessageBoxImage.Question);
                 if (confirm != MessageBoxResult.OK) return;
                 importService.FinalizeManualMetadataItemsAgainstGameIndex(libraryRoot, gameRows, pendingItems);
+                if (h.LibraryMode && !h.ImportAndEditMode)
+                {
+                    if (ContinueManualMetadataAfterLibraryApply(h, pendingItems, refreshGameTitleChoices, refreshSelectionUi, refreshTileBadges))
+                        return;
+                }
+                else
+                {
+                    var distinctLabels = pendingItems
+                        .Select(it => BuildGameTitleChoiceLabel(it.GameName, DetermineManualMetadataPlatformLabel(it)))
+                        .Where(l => !string.IsNullOrWhiteSpace(l))
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .ToList();
+                    if (distinctLabels.Count > 0) PushManualMetadataRecentTitleLabels(distinctLabels);
+                }
                 h.Items.Clear();
                 h.Items.AddRange(pendingItems);
                 h.ManualWindow.DialogResult = true;

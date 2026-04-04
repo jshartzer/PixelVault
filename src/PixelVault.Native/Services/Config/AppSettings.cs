@@ -21,6 +21,8 @@ namespace PixelVaultNative
         public string LibraryBrowserLastViewKey = string.Empty;
         public double LibraryBrowserFolderScroll;
         public double LibraryBrowserDetailScroll;
+        /// <summary>Pipe-separated recent game title choice labels for manual metadata ComboBox (most recent first).</summary>
+        public string ManualMetadataRecentTitleLabels = string.Empty;
         public bool TroubleshootingLoggingEnabled;
         /// <summary>When true, troubleshooting log encodes folder paths as <c>.../LastSegment</c> to limit disclosure.</summary>
         public bool TroubleshootingLogRedactPaths;
@@ -44,6 +46,7 @@ namespace PixelVaultNative
                 LibraryBrowserLastViewKey = s.LibraryBrowserLastViewKey ?? string.Empty,
                 LibraryBrowserFolderScroll = s.LibraryBrowserFolderScroll,
                 LibraryBrowserDetailScroll = s.LibraryBrowserDetailScroll,
+                ManualMetadataRecentTitleLabels = s.ManualMetadataRecentTitleLabels ?? string.Empty,
                 TroubleshootingLoggingEnabled = s.TroubleshootingLoggingEnabled,
                 TroubleshootingLogRedactPaths = s.TroubleshootingLogRedactPaths
             };

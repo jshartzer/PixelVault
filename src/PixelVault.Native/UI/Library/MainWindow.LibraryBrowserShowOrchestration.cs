@@ -22,6 +22,7 @@ namespace PixelVaultNative
 
             internal void Run(bool reuseMainWindow)
             {
+                if (reuseMainWindow) _shell.PrepareLibraryBrowserSessionForRebuild();
                 _shell.MarkLibraryBrowserSessionFirstPaintTracking();
                 _shell.LibrarySession.EnsureLibraryRootAccessible("Library folder");
                 Action refreshIntakeReviewBadge = null;
@@ -283,6 +284,7 @@ namespace PixelVaultNative
 
                 refreshSortButtons();
                 refreshGroupingButtons();
+                if (reuseMainWindow) _shell.RegisterLibraryBrowserLiveWorkingSet(ws);
                 if (!reuseMainWindow) libraryWindow.Show();
                 if (renderTiles != null) renderTiles();
                 if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge();

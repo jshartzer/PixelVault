@@ -92,6 +92,8 @@ namespace PixelVaultNative
         string _libraryBrowserPersistedLastViewKey = string.Empty;
         double _libraryBrowserPersistedFolderScroll;
         double _libraryBrowserPersistedDetailScroll;
+        LibraryBrowserWorkingSet _libraryBrowserLiveWorkingSet;
+        string _manualMetadataRecentTitleLabelsSerialized = string.Empty;
         Action<bool> activeLibraryFolderRefresh;
         LibraryFolderInfo activeSelectedLibraryFolder;
 

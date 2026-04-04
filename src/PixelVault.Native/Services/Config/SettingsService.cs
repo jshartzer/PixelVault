@@ -88,6 +88,7 @@ namespace PixelVaultNative
                 {
                     if (double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var dy)) s.LibraryBrowserDetailScroll = Math.Max(0, dy);
                 }
+                else if (key == "manual_metadata_recent_titles") s.ManualMetadataRecentTitleLabels = value ?? string.Empty;
                 else if (key == "troubleshooting_logging_enabled")
                 {
                     var normalizedValue = (value ?? string.Empty).Trim();
@@ -169,6 +170,7 @@ namespace PixelVaultNative
                 "library_browser_last_view_key=" + (state.LibraryBrowserLastViewKey ?? string.Empty).Replace("\r", " ").Replace("\n", " "),
                 "library_browser_folder_scroll=" + Math.Max(0, state.LibraryBrowserFolderScroll).ToString(CultureInfo.InvariantCulture),
                 "library_browser_detail_scroll=" + Math.Max(0, state.LibraryBrowserDetailScroll).ToString(CultureInfo.InvariantCulture),
+                "manual_metadata_recent_titles=" + (state.ManualMetadataRecentTitleLabels ?? string.Empty).Replace("\r", " ").Replace("\n", " "),
                 "troubleshooting_logging_enabled=" + (state.TroubleshootingLoggingEnabled ? "1" : "0"),
                 "troubleshooting_log_redact_paths=" + (state.TroubleshootingLogRedactPaths ? "1" : "0")
             });
