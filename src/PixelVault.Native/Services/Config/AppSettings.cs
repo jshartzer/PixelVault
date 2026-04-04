@@ -19,6 +19,8 @@ namespace PixelVaultNative
         public double LibraryBrowserFolderScroll;
         public double LibraryBrowserDetailScroll;
         public bool TroubleshootingLoggingEnabled;
+        /// <summary>When true, troubleshooting log encodes folder paths as <c>.../LastSegment</c> to limit disclosure.</summary>
+        public bool TroubleshootingLogRedactPaths;
 
         public static AppSettings Clone(AppSettings s)
         {
@@ -38,7 +40,8 @@ namespace PixelVaultNative
                 LibraryBrowserLastViewKey = s.LibraryBrowserLastViewKey ?? string.Empty,
                 LibraryBrowserFolderScroll = s.LibraryBrowserFolderScroll,
                 LibraryBrowserDetailScroll = s.LibraryBrowserDetailScroll,
-                TroubleshootingLoggingEnabled = s.TroubleshootingLoggingEnabled
+                TroubleshootingLoggingEnabled = s.TroubleshootingLoggingEnabled,
+                TroubleshootingLogRedactPaths = s.TroubleshootingLogRedactPaths
             };
         }
     }

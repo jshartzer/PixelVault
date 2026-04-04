@@ -193,6 +193,7 @@ namespace PixelVaultNative
             var stack = new StackPanel();
             stack.Children.Add(new TextBlock { Text = "Diagnostics", FontWeight = FontWeights.SemiBold, Foreground = textPrimary, Margin = new Thickness(0, 0, 0, 8) });
             stack.Children.Add(new TextBlock { Text = "Optional extra logging for library and UI timing. Separate from the run history on the right.", Foreground = textMuted, Margin = new Thickness(0, 0, 0, 10), TextWrapping = TextWrapping.Wrap });
+            stack.Children.Add(new TextBlock { Text = "Troubleshooting lines: [UTC] DIAG | S<session> | T<thread> | <Area> | <message>. Session id is fixed for one window instance; use it to grep a single run. Logs are UTC. Large troubleshooting files rotate automatically.", Foreground = textSoft, Margin = new Thickness(0, 0, 0, 10), TextWrapping = TextWrapping.Wrap });
             var enableTroubleshootingBox = new CheckBox { Content = "Enable troubleshooting logging", IsChecked = troubleshootingLoggingEnabled, Margin = new Thickness(0, 0, 0, 8), Foreground = textPrimary };
             enableTroubleshootingBox.Checked += delegate
             {
@@ -209,6 +210,20 @@ namespace PixelVaultNative
                 Log("Troubleshooting logging disabled.");
             };
             stack.Children.Add(enableTroubleshootingBox);
+            var redactPathsBox = new CheckBox { Content = "Redact folder paths in troubleshooting log (only the last path segment is kept)", IsChecked = troubleshootingLogRedactPaths, Margin = new Thickness(0, 0, 0, 8), Foreground = textPrimary };
+            redactPathsBox.Checked += delegate
+            {
+                troubleshootingLogRedactPaths = true;
+                SaveSettings();
+                Log("Troubleshooting path redaction enabled.");
+            };
+            redactPathsBox.Unchecked += delegate
+            {
+                troubleshootingLogRedactPaths = false;
+                SaveSettings();
+                Log("Troubleshooting path redaction disabled.");
+            };
+            stack.Children.Add(redactPathsBox);
             stack.Children.Add(new TextBlock { Text = "Normal log: " + LogFilePath(), Foreground = textSoft, Margin = new Thickness(0, 0, 0, 4), TextWrapping = TextWrapping.Wrap });
             stack.Children.Add(new TextBlock { Text = "Troubleshooting log: " + TroubleshootingLogFilePath(), Foreground = textSoft, TextWrapping = TextWrapping.Wrap });
             border.Child = stack;

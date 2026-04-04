@@ -320,10 +320,12 @@ namespace PixelVaultNative
                         }
                         catch (Exception repairEx)
                         {
-                            Log("Library detail metadata repair failed for " + (renderFolder.Name ?? renderFolder.PrimaryFolderPath ?? "(unknown)") + ". " + repairEx.Message);
+                            LogException("Library detail metadata repair | " + (renderFolder.Name ?? renderFolder.PrimaryFolderPath ?? "(unknown)"), repairEx);
                             LogTroubleshooting("LibraryDetailMetadataRepairFail",
                                 "renderVersion=" + renderVersion
+                                + "; type=" + repairEx.GetType().FullName
                                 + "; message=" + repairEx.Message
+                                + "; exception=" + FormatExceptionForTroubleshooting(repairEx)
                                 + "; " + BuildLibraryBrowserTroubleshootingLabel(renderFolder));
                         }
 
@@ -388,10 +390,12 @@ namespace PixelVaultNative
                             }
                         }, true, null);
                         if (refreshDetailSelectionUi != null) refreshDetailSelectionUi();
-                        Log("Library detail render failed for " + (renderFolder.Name ?? renderFolder.PrimaryFolderPath ?? "(unknown)") + ". " + ex.Message);
+                        LogException("Library detail render | " + (renderFolder.Name ?? renderFolder.PrimaryFolderPath ?? "(unknown)"), ex);
                         LogTroubleshooting("LibraryDetailRenderFail",
                             "renderVersion=" + renderVersion
+                            + "; type=" + ex.GetType().FullName
                             + "; message=" + ex.Message
+                            + "; exception=" + FormatExceptionForTroubleshooting(ex)
                             + "; " + BuildLibraryBrowserTroubleshootingLabel(renderFolder));
                         renderStopwatch.Stop();
                     }));

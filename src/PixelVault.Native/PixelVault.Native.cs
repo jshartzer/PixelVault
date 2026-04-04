@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -85,6 +86,9 @@ namespace PixelVaultNative
         string libraryFolderSortMode = "platform";
         string libraryGroupingMode = "all";
         bool troubleshootingLoggingEnabled;
+        bool troubleshootingLogRedactPaths;
+        readonly string _diagnosticsSessionId;
+        const long TroubleshootingLogMaxBytes = 5_000_000L;
         string _libraryBrowserPersistedSearch = string.Empty;
         string _libraryBrowserPersistedLastViewKey = string.Empty;
         double _libraryBrowserPersistedFolderScroll;
@@ -183,6 +187,7 @@ namespace PixelVaultNative
 
         public MainWindow()
         {
+            _diagnosticsSessionId = Guid.NewGuid().ToString("N").Substring(0, 8);
             dataRoot = ResolvePersistentDataRoot(appRoot);
             logsRoot = Path.Combine(dataRoot, "logs");
             cacheRoot = Path.Combine(dataRoot, "cache");
@@ -555,11 +560,14 @@ namespace PixelVaultNative
             }
             return changed;
         }
+        /// <summary>Emits one PERF line when <paramref name="stopwatch"/> elapsed ms is ≥ <paramref name="thresholdMilliseconds"/> (0 = always log).</summary>
         void LogPerformanceSample(string area, Stopwatch stopwatch, string detail, long thresholdMilliseconds = 80)
         {
             if (stopwatch == null) return;
             if (stopwatch.ElapsedMilliseconds < thresholdMilliseconds) return;
-            Log("PERF | " + area + " | " + stopwatch.ElapsedMilliseconds + " ms" + (string.IsNullOrWhiteSpace(detail) ? string.Empty : " | " + detail));
+            var sessionSegment = troubleshootingLoggingEnabled ? " | S=" + _diagnosticsSessionId : string.Empty;
+            var detailSegment = string.IsNullOrWhiteSpace(detail) ? string.Empty : " | " + detail;
+            Log("PERF | " + area + " | " + stopwatch.ElapsedMilliseconds + " ms | T=" + Environment.CurrentManagedThreadId + sessionSegment + detailSegment);
         }
         FrameworkElement BuildLibraryTilePlatformBadge(string platformLabel)
         {
@@ -1485,7 +1493,7 @@ namespace PixelVaultNative
                     appendProgress("ERROR: " + error.Message);
                     closeButton.IsEnabled = true;
                     status.Text = "Library metadata failed";
-                    Log(error.ToString());
+                    LogException("Library metadata apply", error);
                     MessageBox.Show(error.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
                 }));
             });
@@ -1752,7 +1760,7 @@ namespace PixelVaultNative
                 }
                 catch (Exception ex)
                 {
-                    Log(ex.ToString());
+                    LogException("Save folder IDs", ex);
                     MessageBox.Show("Could not save the folder IDs." + Environment.NewLine + Environment.NewLine + ex.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             };
@@ -2869,7 +2877,7 @@ namespace PixelVaultNative
                         if (status != null) status.Text = "Game index unavailable";
                         var flattened = loadTask.Exception == null ? null : loadTask.Exception.Flatten();
                         var err = flattened == null ? new Exception("Game index load failed.") : flattened.InnerExceptions.First();
-                        Log(err.ToString());
+                        LogException("Game index load", err);
                         MessageBox.Show("Could not load the game index." + Environment.NewLine + Environment.NewLine + err.Message, "PixelVault");
                         return;
                     }
@@ -2910,7 +2918,7 @@ namespace PixelVaultNative
                     catch (Exception ex)
                     {
                         if (status != null) status.Text = "Game index unavailable";
-                        Log("Failed to open game index. " + ex.Message);
+                        LogException("Open game index", ex);
                         MessageBox.Show("Could not open the game index." + Environment.NewLine + Environment.NewLine + ex.Message, "PixelVault");
                     }
                 }));
@@ -2935,7 +2943,8 @@ namespace PixelVaultNative
                 LibraryBrowserLastViewKey = _libraryBrowserPersistedLastViewKey ?? string.Empty,
                 LibraryBrowserFolderScroll = Math.Max(0, _libraryBrowserPersistedFolderScroll),
                 LibraryBrowserDetailScroll = Math.Max(0, _libraryBrowserPersistedDetailScroll),
-                TroubleshootingLoggingEnabled = troubleshootingLoggingEnabled
+                TroubleshootingLoggingEnabled = troubleshootingLoggingEnabled,
+                TroubleshootingLogRedactPaths = troubleshootingLogRedactPaths
             };
         }
 
@@ -2956,6 +2965,7 @@ namespace PixelVaultNative
             _libraryBrowserPersistedFolderScroll = Math.Max(0, s.LibraryBrowserFolderScroll);
             _libraryBrowserPersistedDetailScroll = Math.Max(0, s.LibraryBrowserDetailScroll);
             troubleshootingLoggingEnabled = s.TroubleshootingLoggingEnabled;
+            troubleshootingLogRedactPaths = s.TroubleshootingLogRedactPaths;
         }
 
         void LoadSettings()
@@ -2997,12 +3007,36 @@ namespace PixelVaultNative
             }
             return string.Empty;
         }
+        static string FormatLogUtcTimestamp()
+        {
+            return DateTimeOffset.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ", CultureInfo.InvariantCulture);
+        }
+
+        void RotateTroubleshootingLogIfNeeded(string troubleshootingPath)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(troubleshootingPath) || !File.Exists(troubleshootingPath)) return;
+                var length = new FileInfo(troubleshootingPath).Length;
+                if (length < TroubleshootingLogMaxBytes) return;
+                var rotated = Path.Combine(
+                    logsRoot,
+                    "PixelVault-troubleshooting-" + DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture) + ".log");
+                File.Move(troubleshootingPath, rotated);
+            }
+            catch
+            {
+            }
+        }
+
         void AppendLogFileLine(string path, string line)
         {
             if (string.IsNullOrWhiteSpace(path)) return;
             Directory.CreateDirectory(logsRoot);
             lock (logFileSync)
             {
+                if (string.Equals(path, TroubleshootingLogFilePath(), StringComparison.OrdinalIgnoreCase))
+                    RotateTroubleshootingLogIfNeeded(path);
                 for (int attempt = 0; attempt < 4; attempt++)
                 {
                     try
@@ -3036,7 +3070,7 @@ namespace PixelVaultNative
         }
         void Log(string message)
         {
-            var line = "[" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "] " + message;
+            var line = "[" + FormatLogUtcTimestamp() + "] " + message;
             if (logBox != null)
             {
                 Action append = delegate
@@ -3049,15 +3083,55 @@ namespace PixelVaultNative
             }
             AppendLogFileLine(line);
         }
+
+        /// <summary>Writes a full exception (including stack trace) to the main log with ERROR prefix and managed thread id.</summary>
+        void LogException(string context, Exception ex)
+        {
+            if (ex == null) return;
+            var prefix = string.IsNullOrWhiteSpace(context) ? string.Empty : context + " | ";
+            Log("ERROR | T" + Environment.CurrentManagedThreadId + " | " + prefix + ex);
+        }
+
+        string FormatExceptionForTroubleshooting(Exception ex)
+        {
+            if (ex == null) return string.Empty;
+            var s = ex.ToString();
+            const int max = 32768;
+            if (s.Length <= max) return s;
+            return s.Substring(0, max) + "... (truncated)";
+        }
+
+        /// <summary>
+        /// Troubleshooting-only log file line shape:
+        /// <c>[UTC] DIAG | S&lt;session&gt; | T&lt;managedThreadId&gt; | &lt;Area&gt; | &lt;message&gt;</c>.
+        /// The session id is fixed for one <see cref="MainWindow"/> instance so you can grep a single run across the normal and troubleshooting logs.
+        /// </summary>
         void LogTroubleshooting(string area, string message)
         {
             if (!troubleshootingLoggingEnabled) return;
-            var line = "[" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "] "
+            var line = "[" + FormatLogUtcTimestamp() + "] "
                 + "DIAG"
-                + " | T" + Environment.CurrentManagedThreadId
+                + " | S=" + _diagnosticsSessionId
+                + " | T=" + Environment.CurrentManagedThreadId
                 + " | " + (string.IsNullOrWhiteSpace(area) ? "General" : area.Trim())
                 + " | " + (message ?? string.Empty);
             AppendLogFileLine(TroubleshootingLogFilePath(), line);
+        }
+
+        string FormatPathForTroubleshooting(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path)) return string.Empty;
+            if (!troubleshootingLogRedactPaths) return path;
+            try
+            {
+                var trimmed = path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                var name = Path.GetFileName(trimmed);
+                return string.IsNullOrWhiteSpace(name) ? "(redacted)" : ".../" + name;
+            }
+            catch
+            {
+                return "(redacted)";
+            }
         }
     }
 }

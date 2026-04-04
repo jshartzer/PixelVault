@@ -88,7 +88,7 @@ namespace PixelVaultNative
             catch (Exception ex)
             {
                 status.Text = "Workflow failed";
-                Log(ex.ToString());
+                LogException("Import workflow", ex);
                 MessageBox.Show(ex.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
@@ -130,7 +130,7 @@ namespace PixelVaultNative
             catch (Exception ex)
             {
                 status.Text = "Manual intake failed";
-                Log(ex.ToString());
+                LogException("Import workflow", ex);
                 MessageBox.Show(ex.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
@@ -229,7 +229,7 @@ namespace PixelVaultNative
                         status.Text = failureStatusText;
                         progressMeta.Text = error.Message;
                         appendProgress("ERROR: " + error.Message);
-                        Log(error.ToString());
+                        LogException("Import workflow", error);
                         MessageBox.Show(error.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
                         return;
                     }
@@ -250,7 +250,7 @@ namespace PixelVaultNative
                         status.Text = failureStatusText;
                         progressMeta.Text = ex.Message;
                         appendProgress("ERROR: " + ex.Message);
-                        Log(ex.ToString());
+                        LogException("Import workflow", ex);
                         MessageBox.Show(ex.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
                     }
                 }));

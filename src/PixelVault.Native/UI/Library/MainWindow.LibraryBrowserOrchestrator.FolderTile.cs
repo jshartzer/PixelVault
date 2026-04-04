@@ -318,9 +318,12 @@ namespace PixelVaultNative
                 {
                     _ = libraryWindow.Dispatcher.BeginInvoke(new Action(delegate
                     {
-                        Log("Library detail banner art resolve failed for " + (infoCapture.Name ?? "?") + ". " + ex.Message);
+                        LogException("Library banner art | " + (infoCapture.Name ?? "?"), ex);
                         LogTroubleshooting("LibraryBannerArtFail",
-                            "message=" + ex.Message + "; " + BuildLibraryBrowserTroubleshootingLabel(infoCapture));
+                            "type=" + ex.GetType().FullName
+                            + "; message=" + ex.Message
+                            + "; exception=" + FormatExceptionForTroubleshooting(ex)
+                            + "; " + BuildLibraryBrowserTroubleshootingLabel(infoCapture));
                     }));
                 }
             });

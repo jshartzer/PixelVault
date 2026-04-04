@@ -131,7 +131,7 @@ namespace PixelVaultNative
                             var scanError = flattened == null ? new Exception("Library scan failed.") : flattened.InnerExceptions.First();
                             if (progressMeta != null) progressMeta.Text = scanError.Message;
                             appendProgress("ERROR: " + scanError.Message);
-                            Log(scanError.ToString());
+                            LogException("Library metadata scan", scanError);
                             MessageBox.Show(scanError.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
                         }
                         else
@@ -164,7 +164,7 @@ namespace PixelVaultNative
                 }
                 finishButtons();
                 if (status != null) status.Text = "Library scan failed";
-                Log(ex.ToString());
+                LogException("Library metadata scan", ex);
                 if (progressMeta != null) progressMeta.Text = ex.Message;
                 if (appendProgress != null) appendProgress("ERROR: " + ex.Message);
                 if (actionButton != null)

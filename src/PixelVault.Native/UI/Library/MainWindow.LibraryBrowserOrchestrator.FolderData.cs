@@ -41,11 +41,13 @@ namespace PixelVaultNative
                         var flattened = loadTask.Exception == null ? null : loadTask.Exception.Flatten();
                         var loadError = flattened == null ? new Exception("Library load failed.") : flattened.InnerExceptions.First();
                         if (status != null && string.Equals(status.Text, loadingStatusText, StringComparison.Ordinal)) status.Text = "Library load failed";
-                        Log(loadError.ToString());
+                        LogException("Library folder refresh", loadError);
                         LogTroubleshooting("LibraryFolderRefreshFail",
                             "version=" + refreshVersion
                             + "; forceRefresh=" + forceRefresh
-                            + "; message=" + loadError.Message);
+                            + "; type=" + loadError.GetType().FullName
+                            + "; message=" + loadError.Message
+                            + "; exception=" + FormatExceptionForTroubleshooting(loadError));
                         if (renderTiles != null) renderTiles();
                         MessageBox.Show(loadError.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
                         return;

@@ -262,7 +262,7 @@ namespace PixelVaultNative
                 + "; files=" + Math.Max(view.FileCount, 0)
                 + "; sourceFolders=" + CountLibraryBrowserSourceFolders(view)
                 + "; platforms=" + platformText
-                + "; primaryFolder=" + (view.PrimaryFolderPath ?? string.Empty)
+                + "; primaryFolder=" + FormatPathForTroubleshooting(view.PrimaryFolderPath ?? string.Empty)
                 + "; grouping=" + NormalizeLibraryGroupingMode(libraryGroupingMode);
         }
 

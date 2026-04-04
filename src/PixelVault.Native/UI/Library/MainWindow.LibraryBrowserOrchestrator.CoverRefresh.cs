@@ -127,7 +127,7 @@ namespace PixelVaultNative
                             var refreshError = flattened == null ? new Exception("Cover refresh failed.") : flattened.InnerExceptions.First();
                             if (progressMeta != null) progressMeta.Text = refreshError.Message;
                             appendProgress("ERROR: " + refreshError.Message);
-                            Log(refreshError.ToString());
+                            LogException("Library cover refresh", refreshError);
                             MessageBox.Show(refreshError.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
                         }
                         else
@@ -158,7 +158,7 @@ namespace PixelVaultNative
                 }
                 finishButtons();
                 status.Text = "Cover refresh failed";
-                Log(ex.ToString());
+                LogException("Library cover refresh", ex);
                 if (progressMeta != null) progressMeta.Text = ex.Message;
                 if (appendProgress != null) appendProgress("ERROR: " + ex.Message);
                 if (actionButton != null)

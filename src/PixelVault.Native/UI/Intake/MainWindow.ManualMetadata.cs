@@ -239,7 +239,8 @@ namespace PixelVaultNative
                         {
                             var flattened = loadTask.Exception == null ? null : loadTask.Exception.Flatten();
                             var err = flattened == null ? null : flattened.InnerExceptions.FirstOrDefault();
-                            Log(err == null ? "Game title list load failed." : err.ToString());
+                            if (err == null) Log("Game title list load failed.");
+                            else LogException("Game title list load", err);
                             return;
                         }
                         var rows = loadTask.Status == System.Threading.Tasks.TaskStatus.RanToCompletion && loadTask.Result != null
