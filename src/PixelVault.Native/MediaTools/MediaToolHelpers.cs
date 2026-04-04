@@ -137,7 +137,7 @@ namespace PixelVaultNative
             {
                 if (string.IsNullOrWhiteSpace(videoPath) || !File.Exists(videoPath)) return null;
                 var info = new FileInfo(videoPath);
-                var normalizedDecodePixelWidth = NormalizeThumbnailDecodeWidth(decodePixelWidth);
+                var normalizedDecodePixelWidth = LibraryThumbnailPipeline.NormalizeDecodePixelWidth(decodePixelWidth);
                 var width = Math.Max(320, normalizedDecodePixelWidth > 0 ? normalizedDecodePixelWidth : 720);
                 var keySource = videoPath + "|" + info.LastWriteTimeUtc.Ticks + "|" + info.Length + "|" + width;
                 string hash;
@@ -639,7 +639,7 @@ namespace PixelVaultNative
             try
             {
                 var info = new FileInfo(videoPath);
-                var normalizedDecodePixelWidth = NormalizeThumbnailDecodeWidth(decodePixelWidth);
+                var normalizedDecodePixelWidth = LibraryThumbnailPipeline.NormalizeDecodePixelWidth(decodePixelWidth);
                 var width = Math.Max(320, normalizedDecodePixelWidth > 0 ? normalizedDecodePixelWidth : 720);
                 var keySource = "preview|" + videoPath + "|" + info.LastWriteTimeUtc.Ticks + "|" + info.Length + "|" + width;
                 using (var md5 = MD5.Create())
@@ -666,7 +666,7 @@ namespace PixelVaultNative
                 try
                 {
                     if (File.Exists(previewPath)) File.Delete(previewPath);
-                    RunExeCapture(ffmpeg, BuildFfmpegPreviewArgs(videoPath, previewPath, Math.Max(320, NormalizeThumbnailDecodeWidth(decodePixelWidth)), hwaccel), Path.GetDirectoryName(ffmpeg), false);
+                    RunExeCapture(ffmpeg, BuildFfmpegPreviewArgs(videoPath, previewPath, Math.Max(320, LibraryThumbnailPipeline.NormalizeDecodePixelWidth(decodePixelWidth)), hwaccel), Path.GetDirectoryName(ffmpeg), false);
                     if (File.Exists(previewPath)) return previewPath;
                 }
                 catch

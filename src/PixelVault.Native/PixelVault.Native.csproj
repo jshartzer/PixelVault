@@ -45,11 +45,15 @@
     <Compile Include="Services\Import\ImportService.cs" />
     <Compile Include="Services\Import\SteamImportRename.cs" />
     <Compile Include="Services\Indexing\GameIndexEditorAssignmentService.cs" />
+    <Compile Include="Services\Indexing\GameIndexService.cs" />
+    <Compile Include="Services\Indexing\GameIndexServiceDependencies.cs" />
+    <Compile Include="Services\Indexing\IGameIndexService.cs" />
     <Compile Include="Services\Indexing\IndexPersistenceService.cs" />
     <Compile Include="Services\Metadata\MetadataService.cs" />
     <Compile Include="Storage\IndexDatabaseStorage.cs" />
     <Compile Include="UI\ChangelogWindow.cs" />
     <Compile Include="UI\Intake\IntakePreviewWindow.cs" />
+    <Compile Include="UI\Intake\MainWindow.IntakePreview.cs" />
     <Compile Include="UI\Intake\MetadataReviewWindow.cs" />
     <Compile Include="UI\Intake\MainWindow.ManualMetadata.cs" />
     <Compile Include="UI\UiBrushHelper.cs" />
@@ -79,6 +83,9 @@
     <Compile Include="UI\Library\MainWindow.LibraryBrowserShellBridge.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserOrchestrator.Selection.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryMetadataScan.cs" />
+    <Compile Include="UI\Library\LibraryBitmapLruCache.cs" />
+    <Compile Include="UI\Library\LibraryThumbnailPipeline.cs" />
+    <Compile Include="UI\Library\LibraryImageLoadCoordinator.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryImageLoading.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserOrchestrator.PaneEvents.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserOrchestrator.NavChromeAndToolbar.cs" />

@@ -8,21 +8,9 @@ namespace PixelVaultNative
 {
     public sealed partial class MainWindow
     {
-        /// <summary>Load merged game index rows (uses <see cref="ILibraryScanner.EnsureGameIndexFolderContext"/>). Safe from thread pool when <paramref name="setUiStatus"/> is null.</summary>
         List<GameIndexEditorRow> LoadGameIndexEditorRowsCore(string root, Action<string> setUiStatus)
         {
-            var folders = librarySession != null && string.Equals(root, librarySession.LibraryRoot, StringComparison.OrdinalIgnoreCase)
-                ? librarySession.EnsureGameIndexFolderContext(setUiStatus)
-                : libraryScanner.EnsureGameIndexFolderContext(root, setUiStatus);
-            var liveRows = BuildGameIndexRowsFromFolders(folders);
-            var savedRows = LoadSavedGameIndexRows(root);
-            var rows = MergeGameIndexRows(savedRows.Concat(liveRows));
-            if (savedRows.Count == 0 || rows.Count != savedRows.Count)
-            {
-                SaveSavedGameIndexRows(root, rows);
-                RefreshCachedLibraryFoldersFromGameIndex(root);
-            }
-            return rows;
+            return gameIndexService.LoadEditorRowsCore(root, setUiStatus);
         }
 
         List<GameIndexEditorRow> LoadGameIndexEditorRows(string root)
@@ -32,38 +20,7 @@ namespace PixelVaultNative
 
         void SaveGameIndexEditorRows(string root, IEnumerable<GameIndexEditorRow> rows)
         {
-            var previousSavedRows = LoadSavedGameIndexRows(root);
-            foreach (var row in (rows ?? Enumerable.Empty<GameIndexEditorRow>()).Where(entry => entry != null))
-            {
-                var previous = FindSavedGameIndexRowById(previousSavedRows, row.GameId)
-                    ?? FindSavedGameIndexRowByIdentity(previousSavedRows, row.Name, row.PlatformLabel);
-                var cleanedSteamAppId = CleanTag(row.SteamAppId);
-                var cleanedSteamGridDbId = CleanTag(row.SteamGridDbId);
-                row.SuppressSteamAppIdAutoResolve = ShouldSuppressExternalIdAutoResolve(
-                    cleanedSteamAppId,
-                    previous == null ? string.Empty : previous.SteamAppId,
-                    (previous != null && previous.SuppressSteamAppIdAutoResolve) || row.SuppressSteamAppIdAutoResolve);
-                row.SuppressSteamGridDbIdAutoResolve = ShouldSuppressExternalIdAutoResolve(
-                    cleanedSteamGridDbId,
-                    previous == null ? string.Empty : previous.SteamGridDbId,
-                    (previous != null && previous.SuppressSteamGridDbIdAutoResolve) || row.SuppressSteamGridDbIdAutoResolve);
-                row.SteamAppId = cleanedSteamAppId;
-                row.SteamGridDbId = cleanedSteamGridDbId;
-            }
-            var normalizedRows = MergeGameIndexRows(rows);
-            var cachedFoldersForAlias = string.Equals(root, librarySession.LibraryRoot, StringComparison.OrdinalIgnoreCase)
-                ? librarySession.LoadLibraryFoldersCached(false)
-                : (libraryScanner.LoadLibraryFoldersCached(root, false) ?? new List<LibraryFolderInfo>());
-            var previousRows = MergeGameIndexRows(LoadSavedGameIndexRows(root).Concat(BuildGameIndexRowsFromFolders(cachedFoldersForAlias)));
-            var aliasMap = BuildGameIndexSaveAliasMap(previousRows, normalizedRows);
-            AlignLibraryFoldersToGameIndex(root, normalizedRows);
-            SaveSavedGameIndexRows(root, normalizedRows);
-            if (aliasMap.Count > 0)
-            {
-                indexPersistenceService.ApplyGameIdAliases(root, aliasMap);
-                RewriteGameIdAliasesInLibraryFolderCacheFile(root, aliasMap);
-            }
-            RefreshCachedLibraryFoldersFromGameIndex(root);
+            gameIndexService.SaveEditorRows(root, rows);
         }
 
         async Task<int> ResolveMissingGameIndexSteamAppIdsAsync(string root, List<GameIndexEditorRow> rows, Action<int, int, string> progress, CancellationToken cancellationToken = default(CancellationToken))

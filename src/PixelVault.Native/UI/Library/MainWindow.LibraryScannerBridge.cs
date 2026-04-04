@@ -27,7 +27,7 @@ namespace PixelVaultNative
 
             public void SaveLibraryMetadataIndex(string root, Dictionary<string, LibraryMetadataIndexEntry> index) => window.SaveLibraryMetadataIndex(root, index);
 
-            public List<GameIndexEditorRow> LoadSavedGameIndexRows(string root) => window.LoadSavedGameIndexRows(root);
+            public List<GameIndexEditorRow> LoadSavedGameIndexRows(string root) => window.GetSavedGameIndexRowsForRoot(root);
 
             public bool IsLibraryMediaFile(string path) => IsMedia(path);
 

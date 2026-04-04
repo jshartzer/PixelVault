@@ -210,7 +210,7 @@ namespace PixelVaultNative
 
         bool ApplySavedGameIndexRows(string root, List<LibraryFolderInfo> folders)
         {
-            var savedRows = LoadSavedGameIndexRows(root);
+            var savedRows = GetSavedGameIndexRowsForRoot(root);
             if (savedRows.Count == 0 || folders == null || folders.Count == 0) return false;
             bool changed = false;
             foreach (var folder in folders)
@@ -274,7 +274,7 @@ namespace PixelVaultNative
         void UpsertSavedGameIndexRow(string root, LibraryFolderInfo folder)
         {
             if (folder == null || string.IsNullOrWhiteSpace(root)) return;
-            var rows = LoadSavedGameIndexRows(root);
+            var rows = GetSavedGameIndexRowsForRoot(root);
             var saved = FindSavedGameIndexRow(rows, folder);
             var gameId = NormalizeGameId(folder.GameId);
             if (string.IsNullOrWhiteSpace(gameId))

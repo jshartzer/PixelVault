@@ -303,6 +303,29 @@ namespace PixelVaultNative
                 row != null && string.Equals(BuildGameIndexIdentity(row.Name, row.PlatformLabel), wantedIdentity, StringComparison.OrdinalIgnoreCase));
         }
 
+        /// <summary>Editor save path: normalize external IDs and suppress flags from prior disk rows (used by <see cref="IGameIndexService"/>).</summary>
+        void ApplyGameIndexEditorSaveRowPolicies(List<GameIndexEditorRow> rows, List<GameIndexEditorRow> previousSaved)
+        {
+            foreach (var row in rows ?? new List<GameIndexEditorRow>())
+            {
+                if (row == null) continue;
+                var previous = FindSavedGameIndexRowById(previousSaved, row.GameId)
+                    ?? FindSavedGameIndexRowByIdentity(previousSaved, row.Name, row.PlatformLabel);
+                var cleanedSteamAppId = CleanTag(row.SteamAppId);
+                var cleanedSteamGridDbId = CleanTag(row.SteamGridDbId);
+                row.SuppressSteamAppIdAutoResolve = ShouldSuppressExternalIdAutoResolve(
+                    cleanedSteamAppId,
+                    previous == null ? string.Empty : previous.SteamAppId,
+                    (previous != null && previous.SuppressSteamAppIdAutoResolve) || row.SuppressSteamAppIdAutoResolve);
+                row.SuppressSteamGridDbIdAutoResolve = ShouldSuppressExternalIdAutoResolve(
+                    cleanedSteamGridDbId,
+                    previous == null ? string.Empty : previous.SteamGridDbId,
+                    (previous != null && previous.SuppressSteamGridDbIdAutoResolve) || row.SuppressSteamGridDbIdAutoResolve);
+                row.SteamAppId = cleanedSteamAppId;
+                row.SteamGridDbId = cleanedSteamGridDbId;
+            }
+        }
+
         Dictionary<string, string> BuildSavedGameIdAliasMapFromFile(string root)
         {
             return indexPersistenceService.BuildSavedGameIdAliasMap(root);
@@ -356,9 +379,11 @@ namespace PixelVaultNative
             return indexPersistenceService.LoadSavedGameIndexRows(root);
         }
 
-        /// <summary>Uses <see cref="ILibrarySession.LoadSavedGameIndexRows"/> when <paramref name="root"/> is the active library root.</summary>
+        /// <summary>Uses <see cref="IGameIndexService.GetSavedRowsForRoot"/> when constructed; falls back during early <see cref="MainWindow"/> ctor.</summary>
         List<GameIndexEditorRow> GetSavedGameIndexRowsForRoot(string root)
         {
+            if (gameIndexService != null)
+                return gameIndexService.GetSavedRowsForRoot(root);
             if (string.IsNullOrWhiteSpace(root)) return new List<GameIndexEditorRow>();
             if (librarySession != null && string.Equals(root, libraryRoot, StringComparison.OrdinalIgnoreCase))
                 return librarySession.LoadSavedGameIndexRows();

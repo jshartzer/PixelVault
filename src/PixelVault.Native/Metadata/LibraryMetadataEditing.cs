@@ -158,7 +158,7 @@ namespace PixelVaultNative
                 ? originalSavedRow.SteamGridDbId
                 : (originalFolder == null ? string.Empty : (originalFolder.SteamGridDbId ?? string.Empty));
             if (string.IsNullOrWhiteSpace(preservedAppId) && string.IsNullOrWhiteSpace(preservedSteamGridDbId)) return;
-            var rows = LoadSavedGameIndexRows(root);
+            var rows = GetSavedGameIndexRowsForRoot(root);
             var sourceGameId = NormalizeGameId(originalSavedRow == null ? (originalFolder == null ? string.Empty : originalFolder.GameId) : originalSavedRow.GameId);
             var sourceName = NormalizeGameIndexName(originalSavedRow == null ? (originalFolder == null ? string.Empty : originalFolder.Name) : originalSavedRow.Name);
             var sourcePlatform = NormalizeConsoleLabel(originalSavedRow == null ? (originalFolder == null ? string.Empty : originalFolder.PlatformLabel) : originalSavedRow.PlatformLabel);

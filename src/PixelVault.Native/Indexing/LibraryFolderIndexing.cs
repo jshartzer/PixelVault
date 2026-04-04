@@ -23,7 +23,7 @@ namespace PixelVaultNative
         void EnsureSteamAppIdInGameIndex(string root, string name, string steamAppId)
         {
             if (string.IsNullOrWhiteSpace(root) || string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(steamAppId)) return;
-            var rows = LoadSavedGameIndexRows(root);
+            var rows = GetSavedGameIndexRowsForRoot(root);
             var row = EnsureGameIndexRowForAssignment(rows, name, "Steam");
             if (string.Equals(row.SteamAppId ?? string.Empty, steamAppId, StringComparison.Ordinal)) return;
             row.SteamAppId = steamAppId;

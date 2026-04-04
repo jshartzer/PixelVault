@@ -63,6 +63,8 @@
 
 **Acceptance:** Library browse and detail pane behave as today; troubleshooting logs still useful if issues arise.
 
+**Status (landed):** **`LibraryBitmapLruCache`** (`UI/Library/LibraryBitmapLruCache.cs`) owns the thread-safe LRU; **`LibraryImageLoadCoordinator`** owns normal/priority **`SemaphoreSlim`** limits; **`LibraryThumbnailPipeline`** (`UI/Library/LibraryThumbnailPipeline.cs`) owns decode-width normalization, frozen bitmap / **`BitmapImage`** load, disk thumbnail cache read/write, and video poster path resolution. **`MainWindow.LibraryImageLoading.cs`** keeps **`QueueImageLoad`** and dispatcher marshaling; **`LoadImageSource`** and related helpers forward to the pipeline.
+
 ---
 
 ### Phase 3 — Intake / import-adjacent glue still in `PixelVault.Native.cs`
@@ -70,6 +72,8 @@
 **Intent:** Move remaining intake orchestration into `Import/` or `IImportService` dependencies **only when a file is already being edited**—same pattern as `ImportWorkflow` and prior import slices.
 
 **Why:** **Monolith** line reduction without a big-bang import rewrite; **stability** by extending existing service boundaries.
+
+**Status (landed):** Intake preview orchestration is in **`UI/Intake/MainWindow.IntakePreview.cs`** (preview summary async/build, review/manual/import-edit metadata item builders, **`IntakePreviewFileAnalysis`**). **`PixelVault.Native.cs`** still holds **`ShowMetadataReviewWindow`** and library folder/banner/detail decode-width helpers adjacent to Library metadata UI.
 
 ---
 
@@ -94,4 +98,7 @@
 
 ## Next step
 
-Implement **Phase 1 — milestone 1a** (`IGameIndexService` + editor load/save / active-root paths), then **1b**; update `PERFORMANCE_TODO.md` item 7 and `HANDOFF.md` when those land.
+- **1a (landed in source):** `IGameIndexService`, `GameIndexService`, `GameIndexServiceDependencies` — editor **`LoadEditorRowsCore`** / **`SaveEditorRows`** orchestration (active root → `ILibrarySession`, else `ILibraryScanner`); alignment / alias / cache callbacks remain on `MainWindow` until a later slice.
+- **1b (landed in source):** **`GetSavedRowsForRoot`** on **`IGameIndexService`** (host **`HostLibraryRoot`** + session vs **`IIndexPersistenceService`**); startup preload calls **`gameIndexService.GetSavedRowsForRoot(libraryRoot)`**; **`GetSavedGameIndexRowsForRoot`** forwards to the service.
+- **1c (landed in source):** **`ILibraryScanHost.LoadSavedGameIndexRows`** → **`GetSavedGameIndexRowsForRoot`**; **`FilenameParserService`** load delegate → same; folder alignment, Steam AppID ensure, metadata edit preserve use **`GetSavedGameIndexRowsForRoot`**. **`LibrarySession`** ctor still receives persistence-only **`LoadSavedGameIndexRows`** (avoids **`GetSavedRowsForRoot` → session → …** recursion). **`GetSavedGameIndexRowsForRoot`** keeps a short fallback when **`gameIndexService`** is not yet assigned.
+- **Phase 2 (landed, core):** **`LibraryBitmapLruCache`** + **`LibraryImageLoadCoordinator`** — see Phase 2 **Status** above. **Next:** Phase 3 (intake/import glue when touching those files) or optional Phase 2 follow-up (decode/thumbnail helper extraction).
