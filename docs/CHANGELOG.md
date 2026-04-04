@@ -1,3 +1,10 @@
+## 0.844
+- **Release:** Version **0.844** — publish refresh for the next game-first Library polish slice.
+- **Library (selected cover context):** Replaced the selected-game platform chip row with the existing console badge overlay on the displayed cover art, so game-first browse stays clean while the current cover still shows its console at a glance.
+- **Library (timeline platform context):** In default **`All`** mode, screenshot tiles now carry per-capture console badges using the same icon language, so mixed-platform timelines keep platform context without forcing console-first grouping.
+- **Library (detail responsiveness):** Rapid folder switching now keeps the current screenshot rows in place until the next detail snapshot is ready, reducing the blank/unresponsive feel when clicking through folders quickly.
+- **Library (merged custom covers):** Merged game rows can now set and clear custom covers across all source folders instead of being blocked in `All` mode.
+
 ## 0.843
 - **Release:** Version **0.843** — publish refresh for the first game-first Library action-hardening slice.
 - **Library (platform context):** In default **`All`** mode, the selected-game pane now shows subtle platform chips so merged game rows still surface console context without reverting to console-first card chrome.

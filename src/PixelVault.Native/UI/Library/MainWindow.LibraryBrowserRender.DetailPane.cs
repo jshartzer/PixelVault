@@ -65,6 +65,7 @@ namespace PixelVaultNative
             if (refreshDetailSelectionUi != null) refreshDetailSelectionUi();
             Task.Run(async delegate
             {
+                Func<string, string> resolveDetailPlatformLabel = delegate(string file) { return string.Empty; };
                 Action<LibraryDetailRenderSnapshot, bool> applyDetailSnapshot = null;
                 applyDetailSnapshot = delegate(LibraryDetailRenderSnapshot snapshot, bool logCompletion)
                 {
@@ -140,6 +141,7 @@ namespace PixelVaultNative
                                         var tile = CreateLibraryDetailTile(
                                             file,
                                             size,
+                                            resolveDetailPlatformLabel(file),
                                             delegate { return SameLibraryBrowserSelection(ws.Current, renderFolder); },
                                             openSingleFileMetadataEditor,
                                             updateDetailSelection,
@@ -167,6 +169,19 @@ namespace PixelVaultNative
                 try
                 {
                     var metadataIndex = librarySession.LoadLibraryMetadataIndex(false);
+                    resolveDetailPlatformLabel = delegate(string file)
+                    {
+                        if (string.IsNullOrWhiteSpace(file)) return string.Empty;
+                        LibraryMetadataIndexEntry entry;
+                        if (metadataIndex != null && metadataIndex.TryGetValue(file, out entry) && entry != null)
+                        {
+                            var indexedLabel = NormalizeConsoleLabel(string.IsNullOrWhiteSpace(entry.ConsoleLabel)
+                                ? DetermineConsoleLabelFromTags(ParseTagText(entry.TagText))
+                                : entry.ConsoleLabel);
+                            if (!string.IsNullOrWhiteSpace(indexedLabel)) return indexedLabel;
+                        }
+                        return NormalizeConsoleLabel(ParseFilename(file, libraryRoot).PlatformLabel);
+                    };
                     var detailFiles = GetFilesForLibraryFolderEntry(displayFolder, false)
                         .Where(file => !string.IsNullOrWhiteSpace(file) && File.Exists(file))
                         .Distinct(StringComparer.OrdinalIgnoreCase)
