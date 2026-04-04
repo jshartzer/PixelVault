@@ -3,10 +3,10 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:PixelVaultNative"
         Title="Photography"
-        Width="1240"
-        Height="940"
-        MinWidth="520"
-        MinHeight="480"
+        Width="1680"
+        Height="1000"
+        MinWidth="720"
+        MinHeight="520"
         WindowStartupLocation="CenterOwner"
         Background="#080A0D"
         ShowInTaskbar="False">
@@ -54,7 +54,7 @@
     </DataTemplate>
   </Window.Resources>
 
-  <DockPanel Margin="20">
+  <DockPanel Margin="14">
     <Border DockPanel.Dock="Top"
             Background="#11161B"
             BorderBrush="#243139"

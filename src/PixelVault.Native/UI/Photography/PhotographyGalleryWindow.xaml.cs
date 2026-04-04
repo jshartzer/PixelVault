@@ -44,7 +44,7 @@ namespace PixelVaultNative
 
         void ApplyPhotographyGalleryImageMaxHeights()
         {
-            var maxH = Math.Max(320d, ActualHeight - 220d);
+            var maxH = Math.Max(360d, ActualHeight - 200d);
             if (GalleryList.ItemContainerGenerator.Status != GeneratorStatus.ContainersGenerated) return;
             for (var i = 0; i < GalleryList.Items.Count; i++)
             {
@@ -190,7 +190,7 @@ namespace PixelVaultNative
             if (image == null) return;
             if (starButton != null) starGlyph = FindVisualChild<TextBlock>(starButton);
             image.Source = null;
-            var maxH = Math.Max(320d, ActualHeight > 120 ? ActualHeight - 220d : 700d);
+            var maxH = Math.Max(360d, ActualHeight > 120 ? ActualHeight - 200d : 700d);
             image.MaxHeight = maxH;
             var winW = ActualWidth > 80 ? ActualWidth : 1200d;
             var decode = (int)Math.Max(960, Math.Min(4800, winW * 3.5));

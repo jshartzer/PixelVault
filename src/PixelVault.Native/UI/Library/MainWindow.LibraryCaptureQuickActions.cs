@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 
 namespace PixelVaultNative
@@ -43,27 +44,41 @@ namespace PixelVaultNative
             });
         }
 
-        void ToggleLibraryFileStarredByPath(string filePath)
+        /// <summary>Runs Exif write + index save on a worker thread; invokes <paramref name="uiAfter"/> on the UI dispatcher when finished (success or failure).</summary>
+        void ToggleLibraryFileStarredByPath(string filePath, Action uiAfter = null)
         {
             if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath)) return;
-            try
+            var root = libraryWorkspace.LibraryRoot;
+            if (string.IsNullOrWhiteSpace(root)) return;
+            var dispatcher = Dispatcher;
+            Task.Run(delegate
             {
-                var root = libraryWorkspace.LibraryRoot;
-                if (string.IsNullOrWhiteSpace(root)) return;
-                var index = LoadLibraryMetadataIndex(root, true);
-                LibraryMetadataIndexEntry row;
-                if (!index.TryGetValue(filePath, out row) || row == null) return;
-                var nextStarred = !row.Starred;
-                ApplyEmbeddedXmpStarRating(filePath, nextStarred);
-                row.Starred = nextStarred;
-                row.Stamp = BuildLibraryMetadataStamp(filePath);
-                SaveLibraryMetadataIndex(root, index);
-            }
-            catch (Exception ex)
-            {
-                LogException("ToggleLibraryFileStarredByPath", ex);
-                MessageBox.Show(ex.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Warning);
-            }
+                Exception caught = null;
+                try
+                {
+                    var index = LoadLibraryMetadataIndex(root, true);
+                    LibraryMetadataIndexEntry row;
+                    if (!index.TryGetValue(filePath, out row) || row == null) return;
+                    var nextStarred = !row.Starred;
+                    ApplyEmbeddedXmpStarRating(filePath, nextStarred);
+                    row.Starred = nextStarred;
+                    row.Stamp = BuildLibraryMetadataStamp(filePath);
+                    SaveLibraryMetadataIndex(root, index);
+                }
+                catch (Exception ex)
+                {
+                    caught = ex;
+                }
+                dispatcher.BeginInvoke(new Action(delegate
+                {
+                    if (caught != null)
+                    {
+                        LogException("ToggleLibraryFileStarredByPath", caught);
+                        MessageBox.Show(caught.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    }
+                    uiAfter?.Invoke();
+                }));
+            });
         }
 
         bool LibraryFileIndexHasGamePhotographyTag(string filePath)

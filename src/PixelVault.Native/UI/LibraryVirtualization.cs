@@ -330,9 +330,11 @@ namespace PixelVaultNative
                 showDetailStarChrome(false);
                 detailStarButton.Click += delegate
                 {
-                    ToggleLibraryFileStarredByPath(file);
-                    applyDetailStarVisual();
-                    if (redrawDetailPane != null) redrawDetailPane();
+                    ToggleLibraryFileStarredByPath(file, delegate
+                    {
+                        applyDetailStarVisual();
+                        if (redrawDetailPane != null) redrawDetailPane();
+                    });
                 };
                 presenter.Children.Add(detailStarButton);
             }
@@ -628,8 +630,10 @@ namespace PixelVaultNative
             };
             starMenuItem.Click += delegate
             {
-                ToggleLibraryFileStarredByPath(file);
-                if (redrawDetailPane != null) redrawDetailPane();
+                ToggleLibraryFileStarredByPath(file, delegate
+                {
+                    if (redrawDetailPane != null) redrawDetailPane();
+                });
             };
             photoTagMenuItem.Click += delegate
             {

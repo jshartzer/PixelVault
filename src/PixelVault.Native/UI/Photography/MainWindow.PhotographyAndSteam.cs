@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -181,24 +182,37 @@ namespace PixelVaultNative
         void TogglePhotographyGalleryEntryStarred(PhotographyGalleryEntry entry)
         {
             if (entry == null || string.IsNullOrWhiteSpace(entry.FullPath) || !File.Exists(entry.FullPath)) return;
-            try
+            var root = libraryWorkspace.LibraryRoot;
+            if (string.IsNullOrWhiteSpace(root)) return;
+            var fullPath = entry.FullPath;
+            var dispatcher = Dispatcher;
+            Task.Run(delegate
             {
-                var root = libraryWorkspace.LibraryRoot;
-                if (string.IsNullOrWhiteSpace(root)) return;
-                var index = LoadLibraryMetadataIndex(root, true);
-                LibraryMetadataIndexEntry row;
-                if (!index.TryGetValue(entry.FullPath, out row) || row == null) return;
-                var nextStarred = !row.Starred;
-                ApplyEmbeddedXmpStarRating(entry.FullPath, nextStarred);
-                row.Starred = nextStarred;
-                row.Stamp = BuildLibraryMetadataStamp(entry.FullPath);
-                SaveLibraryMetadataIndex(root, index);
-                entry.Starred = row.Starred;
-            }
-            catch (Exception ex)
-            {
-                LogException("TogglePhotographyGalleryEntryStarred", ex);
-            }
+                bool ok = false;
+                bool newStarred = false;
+                Exception caught = null;
+                try
+                {
+                    var index = LoadLibraryMetadataIndex(root, true);
+                    LibraryMetadataIndexEntry row;
+                    if (!index.TryGetValue(fullPath, out row) || row == null) return;
+                    newStarred = !row.Starred;
+                    ApplyEmbeddedXmpStarRating(fullPath, newStarred);
+                    row.Starred = newStarred;
+                    row.Stamp = BuildLibraryMetadataStamp(fullPath);
+                    SaveLibraryMetadataIndex(root, index);
+                    ok = true;
+                }
+                catch (Exception ex)
+                {
+                    caught = ex;
+                }
+                dispatcher.BeginInvoke(new Action(delegate
+                {
+                    if (caught != null) LogException("TogglePhotographyGalleryEntryStarred", caught);
+                    else if (ok) entry.Starred = newStarred;
+                }));
+            });
         }
 
         void ShowPhotographyGallery(Window owner)
