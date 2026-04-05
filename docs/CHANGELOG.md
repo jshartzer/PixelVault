@@ -1,3 +1,6 @@
+## 0.939
+- **Release:** Version **0.939** — **Rollback:** detail pane is again the **0.936 masonry** grid (reverts **0.937** / **0.938** `VirtualizingWrapPanel` + `ItemsControl`, which caused load failures and crashes).
+
 ## 0.936
 - **Release:** Version **0.936** — Library masonry view reads as a **tight photo mosaic**.
 - **Library / masonry tiles:** Images and video previews use **cover-style** scaling (`UniformToFill`) so each cell is **filled** with minimal empty area inside the frame; media is **clipped** to the rounded tile shape. Masonry uses a **narrower gutter** (3px) than the rest of the library grid, and **frameless** masonry cells (no inner border band) so neighboring shots sit closer together.
