@@ -1,3 +1,8 @@
+## 0.926
+- **Release:** Version **0.926** — Library timeline now uses **packed day cards**.
+- **Library / timeline:** Sparse timeline days no longer each consume a full-width date band. Timeline now renders each day as a compact card, so low-volume days can sit side-by-side while still keeping the existing game, platform, time, and inline comment footer under each photo.
+- **Timeline polish:** Added a repo reference note for the Immich-inspired layout model and shared sizing/packing helpers so the next pass can move toward more justified intra-day layouts without reworking metadata or actions again.
+
 ## 0.921
 - **Release:** Version **0.921** — Import metadata failures **quarantined** to an **`Errors`** folder.
 - **Intake / ExifTool:** When ExifTool cannot update a staged upload file (wrong extension vs bytes, corrupt media, etc.), PixelVault **moves that file** (and its `.meta.json` sidecar if present) into an **`Errors`** subfolder next to the staged copies, with a unique name if needed, then continues the rest of the batch. The import summary reports how many items were relocated instead of failing the whole metadata step.
