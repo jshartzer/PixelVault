@@ -61,7 +61,7 @@ namespace PixelVaultNative
                 else
                 {
                     var distinctLabels = pendingItems
-                        .Select(it => BuildGameTitleChoiceLabel(it.GameName, DetermineManualMetadataPlatformLabel(it)))
+                        .Select(it => NormalizeGameIndexName(it.GameName, null))
                         .Where(l => !string.IsNullOrWhiteSpace(l))
                         .Distinct(StringComparer.OrdinalIgnoreCase)
                         .ToList();

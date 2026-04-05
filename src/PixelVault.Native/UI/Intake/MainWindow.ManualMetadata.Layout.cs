@@ -208,7 +208,7 @@ namespace PixelVaultNative
             gameTitleRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             gameTitleRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             h.SameAsPreviousButton = Btn("Same as previous", null, "#334249", Brushes.White);
-            h.SameAsPreviousButton.ToolTip = "Copy game title, Steam AppID, tags, platform, date, and comment from the previous file in the list to the current selection.";
+            h.SameAsPreviousButton.ToolTip = "Copy game title, Steam AppID, tags, platform, date, and comment from the file immediately above each selected row in the list.";
             h.SameAsPreviousButton.Margin = new Thickness(0, 0, 10, 0);
             h.SameAsPreviousButton.VerticalAlignment = VerticalAlignment.Center;
             Grid.SetColumn(h.SameAsPreviousButton, 0);

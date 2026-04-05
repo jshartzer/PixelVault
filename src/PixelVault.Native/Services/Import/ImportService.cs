@@ -61,7 +61,7 @@ namespace PixelVaultNative
         void FinalizeManualMetadataItemsAgainstGameIndex(string libraryRoot, List<GameIndexEditorRow> gameRows, IEnumerable<ManualMetadataItem> pendingItems);
 
         /// <summary>
-        /// Before final confirm: distinct sorted UI labels for pending rows whose name/platform/id are not yet in <paramref name="gameRows"/> (drives “Add New Game” prompt).
+        /// Before final confirm: distinct sorted normalized game names for pending rows whose name/platform/id are not yet in <paramref name="gameRows"/> (drives “Add New Game” prompt).
         /// </summary>
         List<string> BuildUnresolvedManualMetadataMasterRecordLabels(List<GameIndexEditorRow> gameRows, IEnumerable<ManualMetadataItem> pendingItems);
 
@@ -163,7 +163,7 @@ namespace PixelVaultNative
         /// <summary>Resolve and persist game index rows for manual metadata finish.</summary>
         public IGameIndexEditorAssignmentService GameIndexEditorAssignment;
 
-        /// <summary>“Game Name | Console” label for manual metadata game-title combo (same as library edit UI).</summary>
+        /// <summary>Legacy “Game Name | Console” formatter; kept for host wiring. Dropdown uses normalized game names only.</summary>
         public Func<string, string, string> BuildManualMetadataGameTitleChoiceLabel;
 
         /// <summary>Split manual metadata “extra tags” text into distinct tokens (same rules as the editor).</summary>
@@ -682,10 +682,9 @@ namespace PixelVaultNative
             var nameFromFile = d.GetGameNameFromFileName;
             var platformFn = d.DetermineManualMetadataPlatformLabel;
             var groupingFn = d.ManualMetadataChangesGroupingIdentity;
-            var choiceLabel = d.BuildManualMetadataGameTitleChoiceLabel;
-            if (assignment == null || normalize == null || nameFromFile == null || platformFn == null || groupingFn == null || choiceLabel == null)
+            if (assignment == null || normalize == null || nameFromFile == null || platformFn == null || groupingFn == null)
             {
-                throw new InvalidOperationException("ImportServiceDependencies must set GameIndexEditorAssignment, NormalizeGameIndexName, GetGameNameFromFileName, DetermineManualMetadataPlatformLabel, ManualMetadataChangesGroupingIdentity, and BuildManualMetadataGameTitleChoiceLabel.");
+                throw new InvalidOperationException("ImportServiceDependencies must set GameIndexEditorAssignment, NormalizeGameIndexName, GetGameNameFromFileName, DetermineManualMetadataPlatformLabel, and ManualMetadataChangesGroupingIdentity.");
             }
 
             return (pendingItems ?? Enumerable.Empty<ManualMetadataItem>())
@@ -705,7 +704,7 @@ namespace PixelVaultNative
                 })
                 .Where(e => !string.IsNullOrWhiteSpace(e.Name))
                 .Where(e => assignment.ManualMetadataMasterRecordNeedsNewPlaceholder(gameRows, e.Name, e.PlatformLabel, e.PreferredGameId))
-                .Select(e => choiceLabel(e.Name, e.PlatformLabel))
+                .Select(e => e.Name)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(s => s, StringComparer.OrdinalIgnoreCase)
                 .ToList();

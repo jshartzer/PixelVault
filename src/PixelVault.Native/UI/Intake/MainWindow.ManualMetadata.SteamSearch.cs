@@ -107,7 +107,8 @@ namespace PixelVaultNative
                         refreshTileBadges();
                         if (!string.IsNullOrWhiteSpace(resolvedTitle))
                         {
-                            if (h.KnownGameChoiceSet.Add(BuildGameTitleChoiceLabel(resolvedTitle, "Steam"))) h.KnownGameChoices.Add(BuildGameTitleChoiceLabel(resolvedTitle, "Steam"));
+                            var choiceName = NormalizeGameIndexName(resolvedTitle, null);
+                            if (!string.IsNullOrWhiteSpace(choiceName) && h.KnownGameChoiceSet.Add(choiceName)) h.KnownGameChoices.Add(choiceName);
                             refreshGameTitleChoices();
                             h.SuppressSync = true;
                             h.GameNameBox.Text = resolvedTitle;

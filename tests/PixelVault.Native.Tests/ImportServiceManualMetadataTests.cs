@@ -245,8 +245,8 @@ public sealed class ImportServiceManualMetadataTests
         };
         var labels = svc.BuildUnresolvedManualMetadataMasterRecordLabels(rows, items);
         Assert.Equal(2, labels.Count);
-        Assert.Equal("Alpha | Steam", labels[0]);
-        Assert.Equal("NewGame | Steam", labels[1]);
+        Assert.Equal("Alpha", labels[0]);
+        Assert.Equal("NewGame", labels[1]);
     }
 
     [Fact]

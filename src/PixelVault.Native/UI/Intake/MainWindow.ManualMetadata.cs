@@ -47,7 +47,7 @@ namespace PixelVaultNative
                 if (paths.Contains(h.Items[i].FilePath)) h.Items.RemoveAt(i);
             }
             var distinctLabels = pendingItems
-                .Select(it => BuildGameTitleChoiceLabel(it.GameName, DetermineManualMetadataPlatformLabel(it)))
+                .Select(it => NormalizeGameIndexName(it.GameName, null))
                 .Where(l => !string.IsNullOrWhiteSpace(l))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
@@ -120,16 +120,17 @@ namespace PixelVaultNative
                             : new List<GameIndexEditorRow>();
                         var loadedChoices = rows
                             .Where(row => row != null && !string.IsNullOrWhiteSpace(row.Name))
-                            .OrderBy(row => row.Name ?? string.Empty, StringComparer.OrdinalIgnoreCase)
-                            .ThenBy(row => row.PlatformLabel ?? string.Empty, StringComparer.OrdinalIgnoreCase)
-                            .Select(row => BuildGameTitleChoiceLabel(row.Name, row.PlatformLabel))
-                            .Where(label => !string.IsNullOrWhiteSpace(label))
+                            .Select(row => NormalizeGameIndexName(row.Name, row.FolderPath))
+                            .Where(name => !string.IsNullOrWhiteSpace(name))
                             .Distinct(StringComparer.OrdinalIgnoreCase)
+                            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
                             .ToList();
                         foreach (var recent in GetManualMetadataRecentTitleLabelsList())
                         {
-                            if (loadedChoices.Contains(recent, StringComparer.OrdinalIgnoreCase)) continue;
-                            loadedChoices.Insert(0, recent);
+                            var recentName = NormalizeGameIndexName(ExtractGameNameFromChoiceLabel(recent), null);
+                            if (string.IsNullOrWhiteSpace(recentName)) continue;
+                            if (loadedChoices.Contains(recentName, StringComparer.OrdinalIgnoreCase)) continue;
+                            loadedChoices.Insert(0, recentName);
                         }
                         foreach (var extraChoice in h.KnownGameChoices.Where(label => !string.IsNullOrWhiteSpace(label)))
                         {
@@ -139,10 +140,10 @@ namespace PixelVaultNative
                         h.KnownGameChoiceSet = new HashSet<string>(h.KnownGameChoices, StringComparer.OrdinalIgnoreCase);
                         h.KnownGameChoiceNameMap = rows
                             .Where(row => row != null && !string.IsNullOrWhiteSpace(row.Name))
-                            .Select(row => new { Label = BuildGameTitleChoiceLabel(row.Name, row.PlatformLabel), Name = NormalizeGameIndexName(row.Name, row.FolderPath) })
-                            .Where(entry => !string.IsNullOrWhiteSpace(entry.Label) && !string.IsNullOrWhiteSpace(entry.Name))
-                            .GroupBy(entry => entry.Label, StringComparer.OrdinalIgnoreCase)
-                            .ToDictionary(group => CleanTag(group.Key), group => group.First().Name, StringComparer.OrdinalIgnoreCase);
+                            .Select(row => NormalizeGameIndexName(row.Name, row.FolderPath))
+                            .Where(name => !string.IsNullOrWhiteSpace(name))
+                            .Distinct(StringComparer.OrdinalIgnoreCase)
+                            .ToDictionary(name => CleanTag(name), name => name, StringComparer.OrdinalIgnoreCase);
                         foreach (var extraChoice in h.KnownGameChoices)
                         {
                             var normalizedChoice = CleanTag(extraChoice);
@@ -347,8 +348,8 @@ namespace PixelVaultNative
                 h.SteamAppIdBox.Text = GetSharedManualMetadataFieldText(h.SelectedItems, delegate(ManualMetadataItem item) { return item.SteamAppId; });
                 h.GameNameBox.Text = GetSharedManualMetadataFieldText(h.SelectedItems, delegate(ManualMetadataItem item)
                 {
-                    var displayLabel = BuildGameTitleChoiceLabel(item.GameName, DetermineManualMetadataPlatformLabel(item));
-                    return h.KnownGameChoiceSet.Contains(displayLabel) ? displayLabel : item.GameName;
+                    var n = NormalizeGameIndexName(item.GameName, null);
+                    return !string.IsNullOrWhiteSpace(n) && h.KnownGameChoiceSet.Contains(n) ? n : (item.GameName ?? string.Empty);
                 });
                 h.TagsBox.Text = GetSharedManualMetadataFieldText(h.SelectedItems, delegate(ManualMetadataItem item) { return item.TagText; });
                 h.CommentBox.Text = GetSharedManualMetadataFieldText(h.SelectedItems, delegate(ManualMetadataItem item) { return item.Comment; });
@@ -427,16 +428,19 @@ namespace PixelVaultNative
                     MessageBox.Show("Select one or more files. There must be a previous file in the list to copy from.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
                     return;
                 }
-                var indices = h.SelectedItems.Select(it => h.Items.IndexOf(it)).Where(ix => ix >= 0).ToList();
-                if (indices.Count == 0) return;
-                var minIx = indices.Min();
-                if (minIx < 1)
+                var ordered = h.SelectedItems
+                    .Select(it => new { Item = it, Index = h.Items.IndexOf(it) })
+                    .Where(x => x.Index >= 0)
+                    .OrderBy(x => x.Index)
+                    .ToList();
+                if (ordered.Count == 0) return;
+                if (ordered[0].Index < 1)
                 {
                     MessageBox.Show("There is no previous file above the current selection in the list.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
                     return;
                 }
-                var source = h.Items[minIx - 1];
-                foreach (var item in h.SelectedItems) CopyManualMetadataItemFromAnother(source, item);
+                foreach (var x in ordered)
+                    CopyManualMetadataItemFromAnother(h.Items[x.Index - 1], x.Item);
                 refreshTileBadges();
                 refreshSelectionUi();
             };
