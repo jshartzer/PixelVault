@@ -153,6 +153,13 @@ namespace PixelVaultNative
             var cleanedBaseName = baseName ?? string.Empty;
             if (string.IsNullOrWhiteSpace(cleanedBaseName)) return string.Empty;
 
+            string xboxPcTitle;
+            DateTime _;
+            if (TryParseXboxPcCaptureFromTrailingTimestamp(cleanedBaseName, out xboxPcTitle, out _))
+            {
+                return xboxPcTitle;
+            }
+
             var match = Regex.Match(cleanedBaseName, "^(?<game>.+?)_(?<ts>\\d{14})(?:[_-]\\d+)?$");
             if (match.Success) return match.Groups["game"].Value;
 
@@ -591,13 +598,17 @@ namespace PixelVaultNative
             title = string.Empty;
             captureTime = default;
 
-            var extension = Path.GetExtension(fileName ?? string.Empty);
-            if (!Regex.IsMatch(extension ?? string.Empty, @"^\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$", RegexOptions.IgnoreCase))
+            var candidate = fileName ?? string.Empty;
+            var extension = Path.GetExtension(candidate);
+            if (!string.IsNullOrWhiteSpace(extension)
+                && !Regex.IsMatch(extension, @"^\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$", RegexOptions.IgnoreCase))
             {
                 return false;
             }
 
-            var baseName = Path.GetFileNameWithoutExtension(fileName ?? string.Empty);
+            var baseName = string.IsNullOrWhiteSpace(extension)
+                ? Path.GetFileName(candidate)
+                : Path.GetFileNameWithoutExtension(candidate);
             var stampMatch = Regex.Match(
                 baseName ?? string.Empty,
                 @"(?<stamp>\d{1,2}_\d{1,2}_\d{4}\s+\d{1,2}_\d{2}_\d{2}\s+[AP]M)$",

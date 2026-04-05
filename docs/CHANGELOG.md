@@ -1,3 +1,7 @@
+## 0.876
+- **Release:** Version **0.876** — finish the `Xbox PC` title fix in the shared folder-sorting path.
+- **Filename parsing:** `GetGameTitleHint(...)` now honors the trailing `M_D_YYYY h_mm_ss AM/PM` timestamp before any underscore fallback, so library folders no longer become **`PowerWash Simulator 4`** or **`Screenshot 4`** when sorting Windows/Xbox captures.
+
 ## 0.875
 - **Release:** Version **0.875** — Xbox PC title parsing fix for Windows/Xbox screenshot names that were still leaking the first date digit into the game title.
 - **Filename parsing:** `Xbox PC` capture detection now parses the trailing timestamp first and treats everything to its left as the game name, so titles like **`Forza Horizon 5 4_4_2026 7_23_36 PM.png`** keep the sequel digit in the title while the date stays fully in the timestamp.

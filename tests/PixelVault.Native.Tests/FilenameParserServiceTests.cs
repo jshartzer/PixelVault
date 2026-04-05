@@ -103,6 +103,26 @@ public sealed class FilenameParserServiceTests
     }
 
     [Fact]
+    public void GetGameTitleHint_XboxPcCaptureBaseName_UsesTrailingTimestampInsteadOfFirstUnderscore()
+    {
+        var parser = CreateParser();
+
+        var title = parser.GetGameTitleHint("PowerWash Simulator 4_4_2026 7_16_35 PM", string.Empty);
+
+        Assert.Equal("PowerWash Simulator", title);
+    }
+
+    [Fact]
+    public void GetGameTitleHint_XboxPcCaptureScreenshotBaseName_DoesNotKeepDateDigitInTitle()
+    {
+        var parser = CreateParser();
+
+        var title = parser.GetGameTitleHint("Screenshot 4_4_2026 7_21_47 PM", string.Empty);
+
+        Assert.Equal("Screenshot", title);
+    }
+
+    [Fact]
     public void Parse_GenericDate_IsoAtStartOfFileName_ParsesDate()
     {
         var parser = CreateParser();
