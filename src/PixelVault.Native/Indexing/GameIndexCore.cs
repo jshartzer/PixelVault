@@ -50,7 +50,7 @@ namespace PixelVaultNative
             if (string.IsNullOrWhiteSpace(cleaned)) return string.Empty;
             while (true)
             {
-                var updated = Regex.Replace(cleaned, @"\s*-\s*(Steam|PS5|PlayStation|Xbox|PC)\s*$", string.Empty, RegexOptions.IgnoreCase);
+                var updated = Regex.Replace(cleaned, @"\s*-\s*(Steam|PS5|PlayStation|Xbox PC|Xbox\/Windows|Xbox Windows|Xbox|PC)\s*$", string.Empty, RegexOptions.IgnoreCase);
                 updated = CleanTag(updated);
                 if (string.Equals(updated, cleaned, StringComparison.Ordinal)) return cleaned;
                 cleaned = updated;

@@ -36,62 +36,6 @@ namespace PixelVaultNative
             return Math.Max(1, Math.Min(Math.Min(Environment.ProcessorCount, 4), workItems));
         }
 
-        string BuildImportDestinationPreviewBody(List<string> sampleFiles, int totalFileHint)
-        {
-            var lines = new List<string>
-            {
-                "Destination root:",
-                destinationRoot,
-                string.Empty,
-                "Files move here first (same file name), then sort into per-game subfolders from the filename game prefix.",
-                string.Empty
-            };
-            foreach (var file in sampleFiles)
-            {
-                var name = Path.GetFileName(file);
-                var afterMove = Path.Combine(destinationRoot, name);
-                var gameName = GetGameNameFromFileName(Path.GetFileNameWithoutExtension(file));
-                var folder = GetSafeGameFolderName(gameName);
-                var afterSort = Path.Combine(destinationRoot, folder, name);
-                lines.Add(name);
-                lines.Add("  After move: " + afterMove);
-                lines.Add("  After sort: " + afterSort);
-                lines.Add(string.Empty);
-            }
-            if (totalFileHint > sampleFiles.Count) lines.Add("... and " + (totalFileHint - sampleFiles.Count) + " more file(s).");
-            lines.Add(string.Empty);
-            lines.Add("Start this import?");
-            return string.Join(Environment.NewLine, lines);
-        }
-
-        bool TryConfirmImportDestinationPreview(bool useUnifiedImportBatch, SourceInventory inventory, List<ManualMetadataItem> batchOrManual, HashSet<string> manualPaths)
-        {
-            List<string> sampleFiles;
-            int totalHint;
-            if (useUnifiedImportBatch && batchOrManual != null)
-            {
-                var paths = batchOrManual
-                    .Where(i => i != null && !i.DeleteBeforeProcessing && !string.IsNullOrWhiteSpace(i.FilePath) && File.Exists(i.FilePath))
-                    .Select(i => i.FilePath)
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .ToList();
-                totalHint = paths.Count;
-                sampleFiles = paths.Take(10).ToList();
-            }
-            else
-            {
-                var paths = (inventory?.TopLevelMediaFiles ?? Enumerable.Empty<string>())
-                    .Where(f => !string.IsNullOrWhiteSpace(f) && File.Exists(f) && (manualPaths == null || !manualPaths.Contains(f)))
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .ToList();
-                totalHint = paths.Count;
-                sampleFiles = paths.Take(10).ToList();
-            }
-            if (sampleFiles.Count == 0) return true;
-            var body = BuildImportDestinationPreviewBody(sampleFiles, totalHint);
-            return MessageBox.Show(body, "Import destination preview", MessageBoxButton.OKCancel, MessageBoxImage.Information) == MessageBoxResult.OK;
-        }
-
         void RunWorkflow(bool withReview)
         {
             try
@@ -136,13 +80,6 @@ namespace PixelVaultNative
                     ? (int?)Math.Max(0, topAtStart.Count - unifiedImportBatch.Count)
                     : null;
                 LogPerformanceSample("ImportPreparation", prepStopwatch, "workflow=" + (withReview ? "import+comment" : "import") + "; renameScope=" + renameInventory.RenameScopeFiles.Count + "; topLevel=" + inventory.TopLevelMediaFiles.Count + "; reviewItems=" + reviewItems.Count + "; manualItems=" + manualItems.Count + "; unifiedImport=" + useUnifiedImportBatch, 40);
-                if (!TryConfirmImportDestinationPreview(useUnifiedImportBatch, inventory, useUnifiedImportBatch ? unifiedImportBatch : manualItems, manualPaths))
-                {
-                    status.Text = "Import canceled";
-                    Log("Import canceled from destination preview.");
-                    RefreshPreview();
-                    return;
-                }
                 RunImportWorkflowWithProgress(withReview, useUnifiedImportBatch, renameInventory, inventory, reviewItems, useUnifiedImportBatch ? unifiedImportBatch : manualItems, manualPaths, manualLeftOverride);
             }
             catch (Exception ex)

@@ -64,6 +64,8 @@ namespace PixelVaultNative
                 break;
             }
 
+            ApplyXboxPcTrailingTimestampParse(result, fileName);
+
             if (result.CaptureTime == null)
             {
                 result.CaptureTime = ParseGenericCaptureDate(fileName);
@@ -89,6 +91,26 @@ namespace PixelVaultNative
             }
 
             return result;
+        }
+
+        void ApplyXboxPcTrailingTimestampParse(FilenameParseResult result, string fileName)
+        {
+            if (result == null) return;
+            if (result.MatchedConvention && !string.Equals(result.ConventionId, "xbox_pc_capture_ampm", StringComparison.OrdinalIgnoreCase)) return;
+
+            string title;
+            DateTime captureTime;
+            if (!TryParseXboxPcCaptureFromTrailingTimestamp(fileName, out title, out captureTime)) return;
+
+            result.MatchedConvention = true;
+            result.ConventionId = "xbox_pc_capture_ampm";
+            result.ConventionName = "Xbox PC Capture (Windows)";
+            result.ConfidenceLabel = "ExplicitPattern";
+            result.PlatformTags = ParseTagText("Platform:Xbox PC");
+            result.PlatformLabel = ResolvePrimaryPlatformLabel("Xbox PC", result.PlatformTags);
+            result.GameTitleHint = title;
+            result.CaptureTime = captureTime;
+            result.PreserveFileTimes = true;
         }
 
         public List<FilenameConventionRule> GetConventionRules(string root)
@@ -344,6 +366,22 @@ namespace PixelVaultNative
                 },
                 new FilenameConventionRule
                 {
+                    ConventionId = "xbox_pc_capture_ampm",
+                    Name = "Xbox PC Capture (Windows)",
+                    Priority = 836,
+                    Pattern = @"^(?<title>.+?)\s+(?<stamp>\d{1,2}_\d{1,2}_\d{4}\s+\d{1,2}_\d{2}_\d{2}\s+[AP]M)\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$",
+                    PatternText = @"^(?<title>.+?)\s+(?<stamp>\d{1,2}_\d{1,2}_\d{4}\s+\d{1,2}_\d{2}_\d{2}\s+[AP]M)\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$",
+                    PlatformLabel = "Xbox PC",
+                    PlatformTagsText = "Platform:Xbox PC",
+                    TitleGroup = "title",
+                    TimestampGroup = "stamp",
+                    TimestampFormat = "M_d_yyyy h_mm_ss tt",
+                    PreserveFileTimes = true,
+                    ConfidenceLabel = "ExplicitPattern",
+                    IsBuiltIn = true
+                },
+                new FilenameConventionRule
+                {
                     ConventionId = "ps5_literal_token",
                     Name = "PS5 Token",
                     Priority = 120,
@@ -388,7 +426,8 @@ namespace PixelVaultNative
             foreach (var tag in tags ?? new string[0])
             {
                 var normalized = NormalizeConsoleLabel(tag);
-                if (string.Equals(normalized, "Xbox", StringComparison.OrdinalIgnoreCase)
+                if (string.Equals(normalized, "Xbox PC", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(normalized, "Xbox", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(normalized, "Steam", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(normalized, "PS5", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(normalized, "PlayStation", StringComparison.OrdinalIgnoreCase)
@@ -545,6 +584,35 @@ namespace PixelVaultNative
             return DateTime.TryParseExact(rawValue, format, CultureInfo.InvariantCulture, DateTimeStyles.None, out parsed)
                 ? DateTime.SpecifyKind(parsed, DateTimeKind.Local)
                 : (DateTime?)null;
+        }
+
+        static bool TryParseXboxPcCaptureFromTrailingTimestamp(string fileName, out string title, out DateTime captureTime)
+        {
+            title = string.Empty;
+            captureTime = default;
+
+            var extension = Path.GetExtension(fileName ?? string.Empty);
+            if (!Regex.IsMatch(extension ?? string.Empty, @"^\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$", RegexOptions.IgnoreCase))
+            {
+                return false;
+            }
+
+            var baseName = Path.GetFileNameWithoutExtension(fileName ?? string.Empty);
+            var stampMatch = Regex.Match(
+                baseName ?? string.Empty,
+                @"(?<stamp>\d{1,2}_\d{1,2}_\d{4}\s+\d{1,2}_\d{2}_\d{2}\s+[AP]M)$",
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+            if (!stampMatch.Success) return false;
+
+            var parsed = ParseTimestamp(stampMatch.Groups["stamp"].Value, "M_d_yyyy h_mm_ss tt");
+            if (!parsed.HasValue) return false;
+
+            var derivedTitle = (baseName ?? string.Empty).Substring(0, stampMatch.Index).TrimEnd();
+            if (string.IsNullOrWhiteSpace(derivedTitle)) return false;
+
+            title = derivedTitle;
+            captureTime = parsed.Value;
+            return true;
         }
 
         static DateTime? ParseGenericCaptureDate(string fileName)

@@ -40,7 +40,7 @@ namespace PixelVaultNative
 
     public sealed partial class MainWindow : Window
     {
-        const string AppVersion = "0.864";
+        const string AppVersion = "0.875";
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
         const string ClearedExternalIdSentinel = "__PV_CLEARED__";
@@ -469,6 +469,8 @@ namespace PixelVaultNative
                     return ResolveWorkspaceAssetPath("PS5 Library Logo.png");
                 case "Xbox":
                     return ResolveWorkspaceAssetPath("Xbox Library Logo.png");
+                case "Xbox PC":
+                    return ResolveWorkspaceAssetPath("PC Library Icon.jpg");
                 case "PC":
                     return ResolveWorkspaceAssetPath("PC Library Icon.jpg");
                 case "Multiple Tags":
@@ -489,6 +491,8 @@ namespace PixelVaultNative
                     return Brush("#4E7CFF");
                 case "Xbox":
                     return Brush("#69B157");
+                case "Xbox PC":
+                    return Brush("#5FA77A");
                 case "PC":
                     return Brush("#8DA0AF");
                 case "Multiple Tags":
@@ -1813,9 +1817,11 @@ namespace PixelVaultNative
                 case "Steam": return 0;
                 case "PS5": return 1;
                 case "Xbox": return 2;
-                case "Multiple Tags": return 3;
-                case "Other": return 4;
-                default: return 5;
+                case "Xbox PC": return 3;
+                case "PC": return 4;
+                case "Multiple Tags": return 5;
+                case "Other": return 6;
+                default: return 7;
             }
         }
 
@@ -1824,6 +1830,7 @@ namespace PixelVaultNative
             switch (label)
             {
                 case "Xbox": return Brush("#2E8B57");
+                case "Xbox PC": return Brush("#4D8F68");
                 case "Steam": return Brush("#2F6FDB");
                 case "PC": return Brush("#4F6D7A");
                 case "PS5": return Brush("#2563EB");
@@ -2438,10 +2445,6 @@ namespace PixelVaultNative
         }
     }
 }
-
-
-
-
 
 
 

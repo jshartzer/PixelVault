@@ -1,3 +1,16 @@
+## 0.875
+- **Release:** Version **0.875** — Xbox PC title parsing fix for Windows/Xbox screenshot names that were still leaking the first date digit into the game title.
+- **Filename parsing:** `Xbox PC` capture detection now parses the trailing timestamp first and treats everything to its left as the game name, so titles like **`Forza Horizon 5 4_4_2026 7_23_36 PM.png`** keep the sequel digit in the title while the date stays fully in the timestamp.
+
+## 0.870
+- **Release:** Version **0.870** — restore and publish the missing `Xbox PC` capture detection that did not make it into `0.865`.
+- **Filename parsing:** Added a distinct **`Xbox PC`** platform for Windows/Xbox app captures named like **`Human Fall Flat 4_4_2026 7_23_36 PM.png`**, while keeping native console captures like **`Human Fall Flat-2026_04_04-23-47-43.png`** on the existing **`Xbox`** rule.
+- **Library / indexing:** `Xbox PC` now normalizes consistently for folder grouping, badges, filename-convention editing, and game-index title cleanup.
+
+## 0.865
+- **Release:** Version **0.865** — publish refresh from current `main` after branch cleanup; no intentional app behavior change.
+- **Build / release hygiene:** New published build generated from the current live source, with `dist\PixelVault-current`, `docs/CURRENT_BUILD.txt`, and handoff pointers advanced to **0.865**.
+
 ## 0.864
 - **Release:** Version **0.864** — Library Tier A polish + library metadata scan throughput fix.
 - **Library (`LIB-004` / `LIB-007`):** **Refresh this folder** (scoped cover/ID refresh without full folder-list reload; optional **Reload library folder list**); footer **Tiles −** / **Tiles +** for folder tile size (persisted).
