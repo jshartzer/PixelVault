@@ -20,7 +20,7 @@ namespace PixelVaultNative
         public static int NormalizeLibraryFolderTileSize(int value)
         {
             if (value < 140) return 140;
-            if (value > 440) return 440;
+            if (value > 1000) return 1000;
             return value;
         }
 

@@ -783,11 +783,11 @@ namespace PixelVaultNative
             if (viewportWidth <= 0 && scrollViewer != null) viewportWidth = scrollViewer.ActualWidth;
             viewportWidth = Math.Max(120, viewportWidth - 18);
             // Default is three columns in the ~1/3-wide folder pane; fourth column only on very wide panes.
-            var columns = viewportWidth >= 1000 ? 4 : (viewportWidth >= 520 ? 3 : (viewportWidth >= 360 ? 2 : 1));
+            var columns = viewportWidth >= 1200 ? 5 : (viewportWidth >= 900 ? 4 : (viewportWidth >= 360 ? 2 : 1));
             var rawTile = (int)Math.Floor((viewportWidth - ((columns - 1) * 14)) / (double)Math.Max(1, columns));
             var minTile = viewportWidth < 260 ? 112 : 140;
             var userCap = NormalizeLibraryFolderTileSize(libraryFolderTileSize);
-            const int layoutMaxTile = 700;
+            const int layoutMaxTile = 1000;
             var tileWidth = Math.Max(minTile, Math.Min(Math.Min(layoutMaxTile, userCap), rawTile));
             tileWidth = (int)(Math.Round(tileWidth / 16d) * 16);
             tileWidth = Math.Max(minTile, Math.Min(Math.Min(layoutMaxTile, userCap), Math.Min(rawTile, tileWidth)));
