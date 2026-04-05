@@ -226,7 +226,8 @@ namespace PixelVaultNative
                 BorderThickness = new Thickness(1, 0, 1, 0),
                 ResizeBehavior = GridResizeBehavior.PreviousAndNext,
                 ResizeDirection = GridResizeDirection.Columns,
-                ShowsPreview = false
+                // Live resize remeasures the whole library panes on every mouse move; preview defers real layout until release.
+                ShowsPreview = true
             };
             panes.Splitter = splitter;
             Grid.SetColumn(splitter, 1);

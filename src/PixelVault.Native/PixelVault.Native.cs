@@ -40,7 +40,7 @@ namespace PixelVaultNative
 
     public sealed partial class MainWindow : Window
     {
-        const string AppVersion = "0.911";
+        const string AppVersion = "0.913";
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
         const string ClearedExternalIdSentinel = "__PV_CLEARED__";
@@ -780,31 +780,38 @@ namespace PixelVaultNative
         (int Columns, int TileSize) CalculateResponsiveLibraryFolderLayout(ScrollViewer scrollViewer)
         {
             const int gapPx = 14;
-            // When the folder pane is very wide, allow up to this many columns (still reduced below if tiles would be narrower than minTile).
-            const int libraryFolderMaxColumnsWideBand = 5;
+            // Upper bound on columns for very wide folder panes; slack-minimization below may use fewer.
+            const int libraryFolderMaxColumnsWideBand = 8;
             var viewportWidth = scrollViewer == null ? 0 : scrollViewer.ViewportWidth;
             if (viewportWidth <= 0 && scrollViewer != null) viewportWidth = scrollViewer.ActualWidth;
             viewportWidth = Math.Max(120, viewportWidth - 18);
-            // Per-band ceiling so mid-width panes are not as dense as a starved ~⅓ pane; edit the matching branch if your typical split lands in that width range.
+            // Per-band ceiling so mid-width panes stay readable; widen the matching branch if your splitter default lands wider.
             var maxColumnsCeiling = viewportWidth >= 1200 ? libraryFolderMaxColumnsWideBand : (viewportWidth >= 900 ? 4 : (viewportWidth >= 360 ? 2 : 1));
             var minTile = viewportWidth < 260 ? 112 : 140;
             var userCap = NormalizeLibraryFolderTileSize(libraryFolderTileSize);
             const int layoutMaxTile = 1000;
-            var columns = 1;
-            for (var candidate = maxColumnsCeiling; candidate >= 1; candidate--)
+            // max columns × min(user cap, equal split) often leaves dead space on the row (e.g. five 300px tiles in a ~1750px viewport). Choose column count ≤ ceiling that minimizes horizontal slack after the cap; tie-break toward larger tiles.
+            var bestColumns = 1;
+            var bestTileW = minTile;
+            var bestSlack = double.MaxValue;
+            for (var c = 1; c <= maxColumnsCeiling; c++)
             {
-                var spacePerTile = (viewportWidth - ((candidate - 1) * gapPx)) / (double)Math.Max(1, candidate);
-                if (spacePerTile + 1e-6 >= minTile)
+                var rawTile = (int)Math.Floor((viewportWidth - ((c - 1) * gapPx)) / (double)c);
+                if (rawTile < minTile) continue;
+                var tileWidth = Math.Max(minTile, Math.Min(Math.Min(layoutMaxTile, userCap), rawTile));
+                tileWidth = (int)(Math.Round(tileWidth / 16d) * 16);
+                tileWidth = Math.Max(minTile, Math.Min(Math.Min(layoutMaxTile, userCap), Math.Min(rawTile, tileWidth)));
+                var used = c * tileWidth + (c - 1) * gapPx;
+                var slack = viewportWidth - used;
+                if (!(slack > -0.5)) continue;
+                if (slack < bestSlack - 0.5 || (Math.Abs(slack - bestSlack) < 0.5 && tileWidth > bestTileW))
                 {
-                    columns = candidate;
-                    break;
+                    bestSlack = slack;
+                    bestColumns = c;
+                    bestTileW = tileWidth;
                 }
             }
-            var rawTile = (int)Math.Floor((viewportWidth - ((columns - 1) * gapPx)) / (double)Math.Max(1, columns));
-            var tileWidth = Math.Max(minTile, Math.Min(Math.Min(layoutMaxTile, userCap), rawTile));
-            tileWidth = (int)(Math.Round(tileWidth / 16d) * 16);
-            tileWidth = Math.Max(minTile, Math.Min(Math.Min(layoutMaxTile, userCap), Math.Min(rawTile, tileWidth)));
-            return (columns, tileWidth);
+            return (bestColumns, bestTileW);
         }
         (int Columns, int TileSize) CalculateResponsiveLibraryDetailLayout(ScrollViewer scrollViewer)
         {

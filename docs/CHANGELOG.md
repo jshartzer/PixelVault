@@ -1,3 +1,14 @@
+## 0.913
+- **Release:** Version **0.913** — Library folder grid fill + **Export Starred** export path polish.
+- **Folder grid:** Column count is chosen to **minimize empty horizontal space** after the tile-size cap (Tiles ±), with a higher wide-pane column ceiling, so folder covers use the pane width instead of leaving a gap beside the last column.
+- **Export Starred:** Copies preserve each file’s path **relative to the library root** (subfolders created under the export folder). Clears **read-only** on an existing destination file when possible before overwrite (helps NAS/SMB). Skips copying when source and destination are the same path.
+
+## 0.912
+- **Release:** Version **0.912** — Library folder-pane layout and splitter polish.
+- **Folder grid:** Responsive column count now respects a minimum per-column width, so raising the wide-pane column cap actually affects layout when the folder pane is wide enough, and mid-width panes no longer request more columns than fit.
+- **Splitter:** The folder/detail **GridSplitter** uses **preview** drag (commit on mouse-up) so resizing the panes no longer remeasures the full library on every mouse move.
+- **Repo hygiene:** `.vs/` is listed in `.gitignore` so Visual Studio’s local solution cache is not tracked as project changes.
+
 ## 0.911
 - **Release:** Version **0.911** — Library **Timeline** mode phase 2, first context pass.
 - **Timeline:** Timeline photos now show lightweight game and platform context directly on each tile, plus a capture-time label, so the full-library feed is easier to read without opening metadata.

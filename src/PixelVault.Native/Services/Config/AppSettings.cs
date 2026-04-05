@@ -6,7 +6,7 @@ namespace PixelVaultNative
         public string SourceRootsSerialized = string.Empty;
         public string DestinationRoot = string.Empty;
         public string LibraryRoot = string.Empty;
-        /// <summary>Optional folder for on-demand “Export Starred” copies (library metadata index). Same base file names overwrite existing files.</summary>
+        /// <summary>Optional folder for on-demand “Export Starred” copies (library metadata index). Mirrors paths relative to the library root; overwrites existing files.</summary>
         public string StarredExportFolder = string.Empty;
 
         /// <summary>Snapshot path used to detect library-folder changes: each folder gets its own index SQLite under the app cache.</summary>

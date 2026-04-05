@@ -9,6 +9,42 @@ namespace PixelVaultNative
 {
     public sealed partial class MainWindow
     {
+        /// <summary>
+        /// When the capture path lies under the library root, returns relative path (subfolders + file name) for mirroring under the export folder; otherwise file name only.
+        /// </summary>
+        static string BuildStarredExportRelativePath(string libraryRoot, string sourceFilePath)
+        {
+            try
+            {
+                var rootNorm = Path.GetFullPath(libraryRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+                var srcNorm = Path.GetFullPath(sourceFilePath);
+                var rel = Path.GetRelativePath(rootNorm, srcNorm);
+                if (string.IsNullOrWhiteSpace(rel)) return Path.GetFileName(sourceFilePath) ?? string.Empty;
+                var parts = rel.Split(new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar }, StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length > 0 && string.Equals(parts[0], "..", StringComparison.Ordinal))
+                    return Path.GetFileName(sourceFilePath) ?? string.Empty;
+                return rel;
+            }
+            catch
+            {
+                return Path.GetFileName(sourceFilePath) ?? string.Empty;
+            }
+        }
+
+        static void ClearReadOnlyForOverwrite(string destPath)
+        {
+            if (string.IsNullOrWhiteSpace(destPath) || !File.Exists(destPath)) return;
+            try
+            {
+                var attrs = File.GetAttributes(destPath);
+                if ((attrs & FileAttributes.ReadOnly) != 0)
+                    File.SetAttributes(destPath, attrs & ~FileAttributes.ReadOnly);
+            }
+            catch
+            {
+            }
+        }
+
         internal void ExportStarredLibraryCapturesToFolder(Window owner)
         {
             var dest = (starredExportFolder ?? string.Empty).Trim();
@@ -79,6 +115,7 @@ namespace PixelVaultNative
 
             var dispatcher = Dispatcher;
             var destNorm = Path.GetFullPath(dest);
+            var rootNorm = Path.GetFullPath(root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
             _ = Task.Run(delegate
             {
                 var ok = 0;
@@ -88,9 +125,18 @@ namespace PixelVaultNative
                 {
                     try
                     {
-                        var name = Path.GetFileName(src);
-                        if (string.IsNullOrWhiteSpace(name)) continue;
-                        var dst = Path.Combine(destNorm, name);
+                        var rel = BuildStarredExportRelativePath(rootNorm, src);
+                        if (string.IsNullOrWhiteSpace(rel)) continue;
+                        var dst = Path.Combine(destNorm, rel);
+                        if (string.Equals(Path.GetFullPath(src), Path.GetFullPath(dst), StringComparison.OrdinalIgnoreCase))
+                        {
+                            ok++;
+                            continue;
+                        }
+                        var dstDir = Path.GetDirectoryName(dst);
+                        if (!string.IsNullOrEmpty(dstDir))
+                            Directory.CreateDirectory(dstDir);
+                        ClearReadOnlyForOverwrite(dst);
                         fileSystemService.CopyFile(src, dst, true);
                         ok++;
                     }

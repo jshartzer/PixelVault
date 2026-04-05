@@ -68,17 +68,34 @@ namespace PixelVaultNative
             var tagPs5 = consoleTags.Contains("PS5");
             var tagXbox = consoleTags.Contains("Xbox");
             var customPlatformValue = useCustomPlatform ? customPlatformName : string.Empty;
-            string gameName;
-            if (folder != null) gameName = folder.Name ?? string.Empty;
+            // Timeline (and similar) passes a synthetic LibraryFolderInfo whose Name is browse chrome ("Timeline") with no real folder path — do not use that as the game title.
+            var folderPathUsable = folder != null
+                && !string.IsNullOrWhiteSpace(folder.FolderPath)
+                && Directory.Exists(folder.FolderPath);
+            GameIndexEditorRow savedGameRow = null;
+            var indexGameIdNorm = indexEntry == null ? string.Empty : NormalizeGameId(indexEntry.GameId);
+            if (!string.IsNullOrWhiteSpace(indexGameIdNorm) && !string.IsNullOrWhiteSpace(libraryRoot))
+            {
+                var rows = GetSavedGameIndexRowsForRoot(libraryRoot);
+                savedGameRow = FindSavedGameIndexRowById(rows, indexGameIdNorm);
+            }
+            string gameName = string.Empty;
+            if (savedGameRow != null && !string.IsNullOrWhiteSpace(NormalizeGameIndexName(savedGameRow.Name, savedGameRow.FolderPath)))
+                gameName = NormalizeGameIndexName(savedGameRow.Name, savedGameRow.FolderPath);
+            else if (folderPathUsable)
+                gameName = folder.Name ?? string.Empty;
             else
             {
                 gameName = Path.GetFileName(Path.GetDirectoryName(file)) ?? string.Empty;
                 if (string.IsNullOrWhiteSpace(gameName)) gameName = GetGameNameFromFileName(Path.GetFileNameWithoutExtension(file));
             }
+            var steamAppId = folderPathUsable ? (folder.SteamAppId ?? string.Empty) : string.Empty;
+            if (savedGameRow != null && !string.IsNullOrWhiteSpace(savedGameRow.SteamAppId))
+                steamAppId = savedGameRow.SteamAppId;
             return new ManualMetadataItem
             {
-                GameId = indexEntry == null ? (folder == null ? string.Empty : folder.GameId) : indexEntry.GameId,
-                SteamAppId = folder == null ? string.Empty : (folder.SteamAppId ?? string.Empty),
+                GameId = indexEntry == null ? (folder == null || !folderPathUsable ? string.Empty : folder.GameId) : indexEntry.GameId,
+                SteamAppId = steamAppId,
                 FilePath = file,
                 FileName = fileName,
                 OriginalFileName = fileName,
@@ -94,8 +111,8 @@ namespace PixelVaultNative
                 TagXbox = tagXbox,
                 TagOther = useCustomPlatform,
                 CustomPlatformTag = customPlatformValue,
-                OriginalGameId = indexEntry == null ? (folder == null ? string.Empty : folder.GameId) : indexEntry.GameId,
-                OriginalSteamAppId = folder == null ? string.Empty : (folder.SteamAppId ?? string.Empty),
+                OriginalGameId = indexEntry == null ? (folder == null || !folderPathUsable ? string.Empty : folder.GameId) : indexEntry.GameId,
+                OriginalSteamAppId = steamAppId,
                 OriginalCaptureTime = captureTime,
                 OriginalUseCustomCaptureTime = false,
                 OriginalGameName = gameName,
