@@ -155,6 +155,7 @@ namespace PixelVaultNative
                 VerticalAlignment = VerticalAlignment.Center,
                 Visibility = Visibility.Collapsed
             };
+            RenderOptions.SetBitmapScalingMode(image, BitmapScalingMode.HighQuality);
             presenter.Children.Add(placeholder);
             presenter.Children.Add(image);
             tile.Child = presenter;
@@ -182,19 +183,39 @@ namespace PixelVaultNative
             return libraryThumbnailPipeline.LoadFrozenBitmap(path, decodePixelWidth);
         }
 
-        int CalculateLibraryFolderArtDecodeWidth(int tileWidth)
+        /// <summary>Decode width for folder-cover art; scales with tile size and display DPI (capped at pipeline max).</summary>
+        int CalculateLibraryFolderArtDecodeWidth(int tileWidthLogical, double dpiScaleX = 1.0)
         {
-            return Math.Min(640, Math.Max(320, tileWidth + 96));
+            var target = (int)Math.Ceiling((tileWidthLogical + 160) * Math.Max(1.0, dpiScaleX));
+            target = Math.Max(384, Math.Min(1600, target));
+            return LibraryThumbnailPipeline.NormalizeDecodePixelWidth(target);
         }
 
-        int CalculateLibraryBannerArtDecodeWidth()
+        int CalculateLibraryBannerArtDecodeWidth(double dpiScaleX = 1.0)
         {
-            return 384;
+            var target = (int)Math.Ceiling(720 * Math.Max(1.0, dpiScaleX));
+            target = Math.Max(512, Math.Min(1280, target));
+            return LibraryThumbnailPipeline.NormalizeDecodePixelWidth(target);
         }
 
-        int CalculateLibraryDetailTileDecodeWidth(int tileWidth)
+        int CalculateLibraryDetailTileDecodeWidth(int tileWidthLogical, double dpiScaleX = 1.0)
         {
-            return Math.Min(640, Math.Max(384, tileWidth + 96));
+            var target = (int)Math.Ceiling((tileWidthLogical + 128) * Math.Max(1.0, dpiScaleX));
+            target = Math.Max(384, Math.Min(1600, target));
+            return LibraryThumbnailPipeline.NormalizeDecodePixelWidth(target);
+        }
+
+        double ResolveLibraryDpiScale(DependencyObject visualHint = null)
+        {
+            try
+            {
+                if (visualHint is Visual v) return VisualTreeHelper.GetDpi(v).DpiScaleX;
+                return VisualTreeHelper.GetDpi(this).DpiScaleX;
+            }
+            catch
+            {
+                return 1.0;
+            }
         }
     }
 }

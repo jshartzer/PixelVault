@@ -1,3 +1,8 @@
+## 0.933
+- **Release:** Version **0.933** — Detail and timeline photo views now share the same adaptive tile style with a lower max size cap.
+- **Library / screenshots:** The regular screenshot pane keeps the variable row sizing you liked, but tiles now stop growing past a saner ceiling so a single photo no longer dominates the pane.
+- **Library / timeline:** Timeline no longer uses the oversized packed day-card container layout. It now renders date-grouped rows of individual capture tiles with the same adaptive sizing behavior as the regular screenshot pane.
+
 ## 0.932
 - **Release:** Version **0.932** — Regular screenshot view now follows the denser timeline-style grid behavior.
 - **Library / detail pane:** The non-timeline screenshot pane no longer relies on the older coarse one/two/three column thresholds. Detail photos now choose columns from actual pane width and fill each row more aggressively, so regular view and timeline view behave much more consistently.

@@ -55,11 +55,11 @@ Then use these based on the task:
 
 Current live build:
 
-- `0.932`
+- `0.933`
 
 Current executable:
 
-- `C:\Codex\dist\PixelVault-0.932\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.933\PixelVault.exe`
 
 Current build pointer:
 
@@ -93,12 +93,13 @@ Practical current focus:
 
 ## Current Stop Point
 
-The app is currently published at `0.932`.
+The app is currently published at `0.933`.
 
 **Notion:** [MainWindow extraction roadmap](https://www.notion.so/33573adc59b681d88b7dcd88cad53cb6) updated for Phase **E** capstone (**`ILibraryBrowserShell`**). If release rows in Notion lag `docs/CURRENT_BUILD.txt`, re-sync per `docs/DOC_SYNC_POLICY.md`.
 
 Recent extraction progress (repo):
 
+- **Detail/timeline tile alignment (0.933):** The regular screenshot pane keeps adaptive variable tile sizing but now caps singleton growth so one image does not dominate the view, and timeline has been brought back to date-grouped rows of individual capture tiles using that same capped adaptive sizing.
 - **Detail grid alignment (0.932):** The regular screenshot/detail pane now uses pane-width-driven columns and row fill much more like timeline mode, instead of the old coarse column thresholds that could leave it stuck in an oversized single-column layout.
 - **Timeline packed-card regression fix (0.931):** Timeline day cards now keep the same internal photo-column count they were sized for, so the packed layout no longer falls back to a single skinny photo column inside oversized cards.
 - **Library layout follow-up (0.930):** Folder-cover rows now respond to pane width more reliably and expand sparse rows instead of leaving a large dead gutter, and timeline/detail width-sensitive layout now rerenders when splitter/window changes matter even if the coarse column count does not.

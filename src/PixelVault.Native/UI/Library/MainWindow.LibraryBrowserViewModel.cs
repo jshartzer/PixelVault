@@ -310,6 +310,73 @@ namespace PixelVaultNative
             return rows;
         }
 
+        internal static int LibraryDetailFileLayoutHash(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return 0;
+            unchecked
+            {
+                return Math.Abs(StringComparer.OrdinalIgnoreCase.GetHashCode(path));
+            }
+        }
+
+        internal static int ResolveLibraryVariableDetailTileWidth(string file, int baseWidth, int minWidth, int maxWidth)
+        {
+            var scales = new[] { 0.76, 0.88, 0.96, 1.06, 1.18, 1.32 };
+            var h = LibraryDetailFileLayoutHash(file);
+            var s = scales[h % scales.Length];
+            var w = (int)Math.Round(baseWidth * s / 12.0) * 12;
+            return Math.Max(minWidth, Math.Min(maxWidth, w));
+        }
+
+        internal static List<List<(string File, int Width)>> PackLibraryDetailFilesIntoVariableRows(
+            IReadOnlyList<string> files,
+            double availableWidth,
+            int gapPx,
+            int baseWidth,
+            int minWidth,
+            int maxWidth)
+        {
+            var rows = new List<List<(string, int)>>();
+            if (files == null || files.Count == 0) return rows;
+            var avail = Math.Max(120d, availableWidth);
+            var row = new List<(string, int)>();
+            var rowUsed = 0d;
+            foreach (var file in files)
+            {
+                if (string.IsNullOrWhiteSpace(file)) continue;
+                var w = ResolveLibraryVariableDetailTileWidth(file, baseWidth, minWidth, maxWidth);
+                w = Math.Min(w, (int)Math.Floor(avail));
+                var extra = row.Count > 0 ? gapPx : 0;
+                if (row.Count > 0 && rowUsed + extra + w > avail + 1.0)
+                {
+                    rows.Add(row);
+                    row = new List<(string, int)>();
+                    rowUsed = 0;
+                    extra = 0;
+                }
+                if (extra > 0) rowUsed += extra;
+                row.Add((file, w));
+                rowUsed += w;
+            }
+            if (row.Count > 0) rows.Add(row);
+            return rows;
+        }
+
+        internal static int EstimateLibraryVariableDetailRowHeight(IReadOnlyList<(string File, int Width)> row, bool includeTimelineFooter)
+        {
+            if (row == null || row.Count == 0) return 260;
+            var footer = includeTimelineFooter ? 196 : 182;
+            var ratios = new[] { 0.58, 0.62, 0.66, 0.72, 0.78 };
+            var maxInner = 0;
+            foreach (var pair in row)
+            {
+                var r = ratios[LibraryDetailFileLayoutHash(pair.File) % ratios.Length];
+                var inner = (int)Math.Ceiling(pair.Width * r);
+                if (inner > maxInner) maxInner = inner;
+            }
+            return Math.Max(220, maxInner + footer);
+        }
+
         Dictionary<string, LibraryTimelineCaptureContext> BuildLibraryTimelineCaptureContextMap(
             IEnumerable<string> files,
             Dictionary<string, LibraryMetadataIndexEntry> metadataIndex,

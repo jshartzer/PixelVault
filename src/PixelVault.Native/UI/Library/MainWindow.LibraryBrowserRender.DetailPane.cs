@@ -50,13 +50,10 @@ namespace PixelVaultNative
                 LogPerformanceSample("LibraryDetailRender", renderStopwatch, "folder=(none); rows=0; files=0", 40);
                 return;
             }
+            const int detailTileGap = 8;
             var detailLayout = CalculateResponsiveLibraryDetailLayout(panes.ThumbScroll);
-            var targetDetailColumns = detailLayout.Columns;
             var size = detailLayout.TileSize;
-            ws.LastDetailColumns = targetDetailColumns;
-            ws.LastDetailTileSize = size;
             ws.LastDetailViewportWidth = ResolveScrollViewerLayoutWidth(panes == null ? null : panes.ThumbScroll);
-            ws.EstimatedDetailRowHeight = Math.Max(220, size + (IsLibraryBrowserTimelineView(ws.Current) ? 176 : 96));
             var shouldRestoreDetailScroll = ws.PreserveDetailScrollOnNextRender && ws.PreservedDetailScrollOffset > 0.1d;
             var restoreDetailScrollOffset = shouldRestoreDetailScroll ? (double?)ws.PreservedDetailScrollOffset : null;
             var restoreDetailScrollPending = shouldRestoreDetailScroll;
@@ -66,8 +63,23 @@ namespace PixelVaultNative
             var renderFolder = ws.Current;
             var timelineView = IsLibraryBrowserTimelineView(renderFolder);
             var detailViewportWidth = ws.LastDetailViewportWidth;
-            var timelinePackedTileSize = timelineView ? CalculateLibraryTimelinePackedTileSize(size, detailViewportWidth) : size;
-            if (timelineView) ws.EstimatedDetailRowHeight = Math.Max(240, timelinePackedTileSize + 184);
+            int ResolveAdaptiveDetailMaxTileSize(double viewportWidth)
+            {
+                var width = viewportWidth <= 0d ? 1280d : viewportWidth;
+                if (width >= 1900d) return 336;
+                if (width >= 1500d) return 312;
+                if (width >= 1100d) return 288;
+                if (width >= 840d) return 264;
+                return 232;
+            }
+            var adaptiveMaxTileSize = ResolveAdaptiveDetailMaxTileSize(detailViewportWidth);
+            var effectiveTileSize = Math.Min(size, adaptiveMaxTileSize);
+            var targetDetailColumns = Math.Max(1, CalculateVirtualizedTileColumns(panes == null ? null : panes.ThumbScroll, effectiveTileSize, detailTileGap, 6));
+            ws.LastDetailColumns = targetDetailColumns;
+            ws.LastDetailTileSize = effectiveTileSize;
+            ws.EstimatedDetailRowHeight = EstimateLibraryVariableDetailRowHeight(
+                new List<(string File, int Width)> { (string.Empty, effectiveTileSize) },
+                timelineView);
             var timelineRangeStart = ws.TimelineStartDate;
             var timelineRangeEnd = ws.TimelineEndDate;
             NormalizeLibraryTimelineDateRange(ref timelineRangeStart, ref timelineRangeEnd);
@@ -76,7 +88,7 @@ namespace PixelVaultNative
                 + "; resetToLoading=" + resetRowsToLoading
                 + "; restoreScroll=" + shouldRestoreDetailScroll
                 + "; detailColumns=" + targetDetailColumns
-                + "; detailSize=" + size
+                + "; detailSize=" + effectiveTileSize
                 + (timelineView ? "; timelineRange=" + timelineRangeStart.ToString("yyyy-MM-dd") + ".." + timelineRangeEnd.ToString("yyyy-MM-dd") : string.Empty)
                 + "; " + BuildLibraryBrowserTroubleshootingLabel(renderFolder));
             var displayFolder = BuildLibraryBrowserDisplayFolder(renderFolder);
@@ -187,40 +199,99 @@ namespace PixelVaultNative
                         if (logCompletion)
                         {
                             renderStopwatch.Stop();
-                            LogPerformanceSample("LibraryDetailRender", renderStopwatch, "folder=" + (renderFolder.Name ?? renderFolder.PrimaryFolderPath ?? "(unknown)") + "; rows=1; files=0; size=" + size, 40);
+                            LogPerformanceSample("LibraryDetailRender", renderStopwatch, "folder=" + (renderFolder.Name ?? renderFolder.PrimaryFolderPath ?? "(unknown)") + "; rows=1; files=0; size=" + effectiveTileSize, 40);
                             LogLibraryBrowserFirstDetailPaintOnce("folder=" + (renderFolder.Name ?? renderFolder.PrimaryFolderPath ?? "(unknown)") + "; files=0");
                         }
                         return;
                     }
 
-                    const int detailTileGap = 8;
                     var detailColumns = targetDetailColumns;
-                    var virtualRows = timelineView
-                        ? BuildLibraryTimelinePackedRowDefinitions(
-                            ws,
-                            renderFolder,
-                            snapshot.Groups,
-                            timelineContexts,
-                            detailViewportWidth,
-                            timelinePackedTileSize,
-                            openSingleFileMetadataEditor,
-                            updateDetailSelection,
-                            refreshDetailSelectionUi,
-                            redrawSelectedFolderDetail)
-                        : new List<VirtualizedRowDefinition>();
-                    if (!timelineView)
-                    {
-                        int ResolveDetailRowTileWidth(int rowCount)
-                        {
-                            if (rowCount <= 0) return size;
-                            var availableWidth = Math.Max(size, detailViewportWidth - 6d);
-                            var rawFill = (int)Math.Floor((availableWidth - ((rowCount - 1) * detailTileGap)) / Math.Max(1d, rowCount));
-                            if (rawFill <= size) return size;
-                            var roundedDown = (int)(Math.Floor(rawFill / 12d) * 12);
-                            if (roundedDown < size) roundedDown = rawFill;
-                            return Math.Max(size, roundedDown);
-                        }
+                    var dpiScale = ResolveLibraryDpiScale(panes?.ThumbScroll);
+                    var packAvailableW = Math.Max((double)effectiveTileSize, detailViewportWidth - 6d);
+                    var packMinW = Math.Max(140, (int)Math.Floor(effectiveTileSize * 0.62));
+                    var virtualRows = new List<VirtualizedRowDefinition>();
 
+                    if (timelineView)
+                    {
+                        foreach (var group in snapshot.Groups)
+                        {
+                            var groupDate = group.CaptureDate;
+                            var groupFiles = group.Files ?? new List<string>();
+                            var relativeTitle = BuildLibraryTimelineDayCardTitle(groupDate, DateTime.Today);
+                            var absoluteTitle = groupDate <= DateTime.MinValue ? string.Empty : groupDate.ToString("MMMM d, yyyy");
+                            virtualRows.Add(new VirtualizedRowDefinition
+                            {
+                                Height = string.IsNullOrWhiteSpace(absoluteTitle) || string.Equals(relativeTitle, absoluteTitle, StringComparison.Ordinal) ? 34 : 52,
+                                Build = delegate
+                                {
+                                    var headerStack = new StackPanel { Margin = new Thickness(0, 0, 0, 10) };
+                                    headerStack.Children.Add(new TextBlock
+                                    {
+                                        Text = string.IsNullOrWhiteSpace(relativeTitle) ? absoluteTitle : relativeTitle,
+                                        FontSize = 16,
+                                        FontWeight = FontWeights.SemiBold,
+                                        Foreground = Brush("#F1E9DA")
+                                    });
+                                    if (!string.IsNullOrWhiteSpace(absoluteTitle) && !string.Equals(relativeTitle, absoluteTitle, StringComparison.Ordinal))
+                                    {
+                                        headerStack.Children.Add(new TextBlock
+                                        {
+                                            Text = absoluteTitle,
+                                            FontSize = 12,
+                                            Foreground = Brush("#8FA1AD"),
+                                            Margin = new Thickness(0, 2, 0, 0)
+                                        });
+                                    }
+                                    return headerStack;
+                                }
+                            });
+                            var timelinePackedRows = PackLibraryDetailFilesIntoVariableRows(
+                                groupFiles,
+                                packAvailableW,
+                                detailTileGap,
+                                effectiveTileSize,
+                                packMinW,
+                                adaptiveMaxTileSize);
+                            foreach (var rowEntries in timelinePackedRows)
+                            {
+                                var rowHeight = EstimateLibraryVariableDetailRowHeight(rowEntries, true);
+                                virtualRows.Add(new VirtualizedRowDefinition
+                                {
+                                    Height = rowHeight,
+                                    Build = delegate
+                                    {
+                                        var rowPanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, detailTileGap) };
+                                        for (int fileIndex = 0; fileIndex < rowEntries.Count; fileIndex++)
+                                        {
+                                            var file = rowEntries[fileIndex].File;
+                                            var rowTileWidth = rowEntries[fileIndex].Width;
+                                            var decodeW = CalculateLibraryDetailTileDecodeWidth(rowTileWidth, dpiScale);
+                                            LibraryTimelineCaptureContext timelineContext;
+                                            if (!timelineContexts.TryGetValue(file, out timelineContext)) timelineContext = null;
+                                            var tile = CreateLibraryDetailTile(
+                                                file,
+                                                rowTileWidth,
+                                                decodeW,
+                                                delegate { return SameLibraryBrowserSelection(ws.Current, renderFolder); },
+                                                openSingleFileMetadataEditor,
+                                                updateDetailSelection,
+                                                ws.SelectedDetailFiles,
+                                                refreshDetailSelectionUi,
+                                                redrawSelectedFolderDetail,
+                                                null,
+                                                timelineContext);
+                                            tile.Margin = new Thickness(0, 0, fileIndex < rowEntries.Count - 1 ? detailTileGap : 0, 0);
+                                            ws.DetailTiles.Add(tile);
+                                            rowPanel.Children.Add(tile);
+                                        }
+                                        return rowPanel;
+                                    }
+                                });
+                            }
+                        }
+                    }
+                    else
+                    {
                         foreach (var group in snapshot.Groups)
                         {
                             var groupDate = group.CaptureDate;
@@ -240,19 +311,27 @@ namespace PixelVaultNative
                                     };
                                 }
                             });
-                            for (int rowStart = 0; rowStart < groupFiles.Count; rowStart += detailColumns)
+                            var normalPackedRows = PackLibraryDetailFilesIntoVariableRows(
+                                groupFiles,
+                                packAvailableW,
+                                detailTileGap,
+                                effectiveTileSize,
+                                packMinW,
+                                adaptiveMaxTileSize);
+                            foreach (var rowEntries in normalPackedRows)
                             {
-                                var rowFiles = groupFiles.Skip(rowStart).Take(detailColumns).ToList();
-                                var rowTileWidth = ResolveDetailRowTileWidth(rowFiles.Count);
+                                var rowHeight = EstimateLibraryVariableDetailRowHeight(rowEntries, false);
                                 virtualRows.Add(new VirtualizedRowDefinition
                                 {
-                                    Height = ws.EstimatedDetailRowHeight,
+                                    Height = rowHeight,
                                     Build = delegate
                                     {
                                         var rowPanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, detailTileGap) };
-                                        for (int fileIndex = 0; fileIndex < rowFiles.Count; fileIndex++)
+                                        for (int fileIndex = 0; fileIndex < rowEntries.Count; fileIndex++)
                                         {
-                                            var file = rowFiles[fileIndex];
+                                            var file = rowEntries[fileIndex].File;
+                                            var rowTileWidth = rowEntries[fileIndex].Width;
+                                            var decodeW = CalculateLibraryDetailTileDecodeWidth(rowTileWidth, dpiScale);
                                             Action<string> useFileAsFolderCover = delegate(string imagePath)
                                             {
                                                 var folder = activeSelectedLibraryFolder;
@@ -265,6 +344,7 @@ namespace PixelVaultNative
                                             var tile = CreateLibraryDetailTile(
                                                 file,
                                                 rowTileWidth,
+                                                decodeW,
                                                 delegate { return SameLibraryBrowserSelection(ws.Current, renderFolder); },
                                                 openSingleFileMetadataEditor,
                                                 updateDetailSelection,
@@ -273,7 +353,7 @@ namespace PixelVaultNative
                                                 redrawSelectedFolderDetail,
                                                 useFileAsFolderCover,
                                                 null);
-                                            tile.Margin = new Thickness(0, 0, fileIndex < rowFiles.Count - 1 ? detailTileGap : 0, 0);
+                                            tile.Margin = new Thickness(0, 0, fileIndex < rowEntries.Count - 1 ? detailTileGap : 0, 0);
                                             ws.DetailTiles.Add(tile);
                                             rowPanel.Children.Add(tile);
                                         }
@@ -297,7 +377,7 @@ namespace PixelVaultNative
                     if (logCompletion)
                     {
                         renderStopwatch.Stop();
-                        LogPerformanceSample("LibraryDetailRender", renderStopwatch, "folder=" + (renderFolder.Name ?? renderFolder.PrimaryFolderPath ?? "(unknown)") + "; groups=" + snapshot.Groups.Count + "; files=" + visibleFiles.Count + "; rows=" + virtualRows.Count + "; columns=" + detailColumns + "; size=" + size, 40);
+                        LogPerformanceSample("LibraryDetailRender", renderStopwatch, "folder=" + (renderFolder.Name ?? renderFolder.PrimaryFolderPath ?? "(unknown)") + "; groups=" + snapshot.Groups.Count + "; files=" + visibleFiles.Count + "; rows=" + virtualRows.Count + "; columns=" + detailColumns + "; size=" + effectiveTileSize, 40);
                         LogLibraryBrowserFirstDetailPaintOnce("folder=" + (renderFolder.Name ?? renderFolder.PrimaryFolderPath ?? "(unknown)") + "; files=" + visibleFiles.Count + "; groups=" + snapshot.Groups.Count);
                     }
                 };
@@ -554,6 +634,7 @@ namespace PixelVaultNative
             IDictionary<string, LibraryTimelineCaptureContext> timelineContexts,
             double viewportWidth,
             int timelineTileSize,
+            double dpiScale,
             Action<string> openSingleFileMetadataEditor,
             Action<string, ModifierKeys> updateDetailSelection,
             Action refreshDetailSelectionUi,
@@ -606,6 +687,7 @@ namespace PixelVaultNative
                                 cardWidths[rowIndexes[i]],
                                 timelineTileSize,
                                 cardColumnCounts[rowIndexes[i]],
+                                dpiScale,
                                 openSingleFileMetadataEditor,
                                 updateDetailSelection,
                                 refreshDetailSelectionUi,
@@ -631,6 +713,7 @@ namespace PixelVaultNative
             double cardWidth,
             int timelineTileSize,
             int preferredCardColumns,
+            double dpiScale,
             Action<string> openSingleFileMetadataEditor,
             Action<string, ModifierKeys> updateDetailSelection,
             Action refreshDetailSelectionUi,

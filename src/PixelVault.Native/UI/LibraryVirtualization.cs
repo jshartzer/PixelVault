@@ -419,7 +419,7 @@ namespace PixelVaultNative
             return footer;
         }
 
-        Border CreateLibraryDetailTile(string file, int size, Func<bool> shouldLoad, Action<string> openSingleFileMetadataEditor, Action<string, ModifierKeys> updateDetailSelection, HashSet<string> selectedDetailFiles, Action refreshDetailSelectionUi, Action redrawDetailPane, Action<string> useFileAsFolderCover, LibraryTimelineCaptureContext timelineContext = null)
+        Border CreateLibraryDetailTile(string file, int size, int decodePixelWidth, Func<bool> shouldLoad, Action<string> openSingleFileMetadataEditor, Action<string, ModifierKeys> updateDetailSelection, HashSet<string> selectedDetailFiles, Action refreshDetailSelectionUi, Action redrawDetailPane, Action<string> useFileAsFolderCover, LibraryTimelineCaptureContext timelineContext = null)
         {
             var isVideoFile = IsVideo(file);
             var tileIsActive = true;
@@ -442,6 +442,7 @@ namespace PixelVaultNative
             var presenter = new Grid();
             var placeholder = new TextBlock { Text = System.IO.Path.GetFileName(file), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(8), Foreground = Brush("#F1E9DA"), TextAlignment = TextAlignment.Center };
             var image = new Image { Width = size, Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Center, Visibility = Visibility.Collapsed };
+            RenderOptions.SetBitmapScalingMode(image, BitmapScalingMode.HighQuality);
             MediaElement videoPreviewMedia = null;
             TextBlock videoPreviewStatus = null;
             Border videoDurationBadge = null;
@@ -519,6 +520,7 @@ namespace PixelVaultNative
             {
                 videoPreviewMedia = new MediaElement
                 {
+                    Width = size,
                     LoadedBehavior = MediaState.Manual,
                     UnloadedBehavior = MediaState.Manual,
                     Stretch = Stretch.Uniform,
@@ -608,7 +610,7 @@ namespace PixelVaultNative
                 tileContent.Children.Add(tileFooter);
                 tile.Child = tileContent;
             }
-            QueueImageLoad(image, file, CalculateLibraryDetailTileDecodeWidth(size), delegate(BitmapImage loaded)
+            QueueImageLoad(image, file, decodePixelWidth, delegate(BitmapImage loaded)
             {
                 image.Source = loaded;
                 image.Visibility = Visibility.Visible;
