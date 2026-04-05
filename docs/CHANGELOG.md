@@ -1,3 +1,9 @@
+## 0.974
+- **Release:** Version **0.974** — Library and timeline tiles follow **each image’s aspect ratio** instead of forced wide cells.
+- **Library / masonry height:** Tile height is **`ceil(width ÷ (width÷height))`** from real dimensions when known, with a varied hash fallback when metadata is missing—**no** shared min/max height clamps or footer slack that flattened portrait and landscape into similar rectangles.
+- **Library / rendering:** Detail **`Image`** and hover **`MediaElement`** use **`Stretch.Uniform`** only (uniform scale, no `UniformToFill` / `Fill`). Bottom timeline overlays unchanged; they layer on top of the media, not in the height math.
+- **Timeline / virtual rows:** Packed-card height estimates allow for **tall portrait** rows so scrolling reserves enough space.
+
 ## 0.969
 - **Release:** Version **0.969** — Library detail and timeline images keep their **correct aspect ratio** (no non-uniform stretch).
 - **Library / framing:** Masonry tile heights now use each file’s **natural width÷height** from real pixel dimensions when available, so cells track the shot’s shape (especially portrait) instead of an artificial minimum aspect clamp.

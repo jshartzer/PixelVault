@@ -131,26 +131,8 @@ namespace PixelVaultNative
             return map;
         }
 
+        /// <summary>Source width ÷ height (pixel dimensions when known, else stable hash mix across portrait and landscape). Used for tile height = width ÷ aspect.</summary>
         internal static double ResolveLibraryDetailAspectRatio(string file, IReadOnlyDictionary<string, LibraryDetailMediaLayoutInfo> mediaLayoutByFile = null)
-        {
-            LibraryDetailMediaLayoutInfo info;
-            if (mediaLayoutByFile != null
-                && !string.IsNullOrWhiteSpace(file)
-                && mediaLayoutByFile.TryGetValue(file, out info)
-                && info != null
-                && info.PixelWidth > 0
-                && info.PixelHeight > 0)
-            {
-                return Math.Max(0.72d, Math.Min(2.35d, (double)info.PixelWidth / Math.Max(1d, info.PixelHeight)));
-            }
-
-            var ratios = new[] { 1.24d, 1.5d, 1.68d, 1.78d, 1.92d };
-            var r = ratios[LibraryDetailFileLayoutHash(file) % ratios.Length];
-            return Math.Max(0.72d, Math.Min(2.35d, r));
-        }
-
-        /// <summary>Width ÷ height from real pixels when known; loose clamp only for pathological inputs. Otherwise same as <see cref="ResolveLibraryDetailAspectRatio"/>.</summary>
-        internal static double ResolveLibraryDetailNaturalAspectRatio(string file, IReadOnlyDictionary<string, LibraryDetailMediaLayoutInfo> mediaLayoutByFile = null)
         {
             LibraryDetailMediaLayoutInfo info;
             if (mediaLayoutByFile != null
@@ -164,6 +146,14 @@ namespace PixelVaultNative
                 return Math.Max(0.25d, Math.Min(4.0d, r));
             }
 
+            var ratios = new[] { 0.56d, 0.65d, 0.78d, 1.0d, 1.25d, 1.55d, 1.78d, 2.0d };
+            var rHash = ratios[LibraryDetailFileLayoutHash(file) % ratios.Length];
+            return Math.Max(0.25d, Math.Min(4.0d, rHash));
+        }
+
+        /// <inheritdoc cref="ResolveLibraryDetailAspectRatio"/>
+        internal static double ResolveLibraryDetailNaturalAspectRatio(string file, IReadOnlyDictionary<string, LibraryDetailMediaLayoutInfo> mediaLayoutByFile = null)
+        {
             return ResolveLibraryDetailAspectRatio(file, mediaLayoutByFile);
         }
 
@@ -174,13 +164,9 @@ namespace PixelVaultNative
             IReadOnlyDictionary<string, LibraryDetailMediaLayoutInfo> mediaLayoutByFile = null)
         {
             if (string.IsNullOrWhiteSpace(file) || tileWidth <= 0) return 260;
-            var footer = 14;
-            var aspectRatio = ResolveLibraryDetailNaturalAspectRatio(file, mediaLayoutByFile);
-            var inner = (int)Math.Ceiling(tileWidth / aspectRatio);
-            var minInner = 118;
-            var maxInner = 380;
-            inner = Math.Max(minInner, Math.Min(maxInner, inner));
-            return Math.Max(includeTimelineFooter ? 220 : 180, inner + footer);
+            var aspectRatio = ResolveLibraryDetailAspectRatio(file, mediaLayoutByFile);
+            var h = (int)Math.Ceiling(tileWidth / aspectRatio);
+            return Math.Max(1, h);
         }
 
         /// <summary>Column-based masonry with occasional 2-column &quot;hero&quot; spans when there are at least two columns.</summary>

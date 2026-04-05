@@ -278,11 +278,10 @@ namespace PixelVaultNative
             const double headerHeight = 40d;
             const double verticalPadding = 24d;
             const double innerGap = 8d;
-            const double footerReserve = 18d;
             var safeCaptureCount = Math.Max(1, captureCount);
             var normalizedColumns = Math.Max(1, Math.Min(safeCaptureCount, cardColumns));
             var rowCount = Math.Max(1, (int)Math.Ceiling(safeCaptureCount / (double)normalizedColumns));
-            var estimatedTileHeight = Math.Max(240d, tileSize + footerReserve);
+            var estimatedTileHeight = Math.Max(260d, tileSize / 0.28d);
             return headerHeight + verticalPadding + (rowCount * estimatedTileHeight) + ((rowCount - 1) * innerGap);
         }
 
@@ -402,18 +401,14 @@ namespace PixelVaultNative
         internal static int EstimateLibraryVariableDetailRowHeight(IReadOnlyList<(string File, int Width)> row, bool includeTimelineFooter)
         {
             if (row == null || row.Count == 0) return 260;
-            var footer = 14;
-            var maxInner = 0;
+            var maxH = 0;
             foreach (var pair in row)
             {
-                var aspectRatio = ResolveLibraryDetailNaturalAspectRatio(pair.File, null);
-                var inner = (int)Math.Ceiling(pair.Width / aspectRatio);
-                if (inner > maxInner) maxInner = inner;
+                var aspectRatio = ResolveLibraryDetailAspectRatio(pair.File, null);
+                var h = (int)Math.Ceiling(pair.Width / aspectRatio);
+                if (h > maxH) maxH = h;
             }
-            var minInner = 118;
-            var maxInnerCap = 380;
-            maxInner = Math.Max(minInner, Math.Min(maxInnerCap, maxInner));
-            return Math.Max(includeTimelineFooter ? 220 : 180, maxInner + footer);
+            return Math.Max(1, maxH);
         }
 
         Dictionary<string, LibraryTimelineCaptureContext> BuildLibraryTimelineCaptureContextMap(
