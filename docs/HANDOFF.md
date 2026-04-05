@@ -55,11 +55,11 @@ Then use these based on the task:
 
 Current live build:
 
-- `0.896`
+- `0.906`
 
 Current executable:
 
-- `C:\Codex\dist\PixelVault-0.896\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.906\PixelVault.exe`
 
 Current build pointer:
 
@@ -93,11 +93,13 @@ Practical current focus:
 
 ## Current Stop Point
 
-The app is currently published at `0.876`.
+The app is currently published at `0.906`.
 
 **Notion:** [MainWindow extraction roadmap](https://www.notion.so/33573adc59b681d88b7dcd88cad53cb6) updated for Phase **E** capstone (**`ILibraryBrowserShell`**). If release rows in Notion lag `docs/CURRENT_BUILD.txt`, re-sync per `docs/DOC_SYNC_POLICY.md`.
 
 Recent extraction progress (repo):
+
+- **Library timeline mode (0.906):** Phase 1 shipped. Library now has a persisted **`Timeline`** browse mode that swaps the split folder/detail layout for a full-width chronological image feed built from the current visible library scope. Timeline keeps delete + metadata editing working on selected captures and adds a **Folder Browser** button to return to the classic left/right layout.
 
 - **Library grouping (game-first browse):** Added persisted **`LibraryGroupingMode`** with **`All`** and **`By Console`** controls in the Library banner area. Browser rows now project from raw **`LibraryFolderInfo`** into **`LibraryBrowserFolderView`** so the default view can merge same-game captures across consoles without changing storage or scanner persistence. The `All` merge key now prefers normalized game name instead of platform-specific saved row IDs, so cross-platform titles actually collapse into one game row. In `All`, folder cards and the detail header now suppress console-first badge/text chrome so the browse experience reads game-first by default. Merged rows intentionally use **Open Primary Folder** and keep cover / ID actions constrained until the next hardening slice.
 - **Library polish (current publish):** The detail header now carries platform badges beside the game title instead of placing them over the cover art or screenshot tiles, keeping the game-first Library cleaner while preserving console context.

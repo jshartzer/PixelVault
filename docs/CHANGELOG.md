@@ -1,3 +1,9 @@
+## 0.906
+- **Release:** Version **0.906** — Library **Timeline** mode phase 1.
+- **Library:** Added a third Library browse mode, **Timeline**, that replaces the folder/detail split with a single chronological photo feed built from the visible library scope. The timeline is image-only for this first pass and orders captures by indexed capture time across games and consoles.
+- **Layout / actions:** Timeline mode hides folder-specific cover refresh / open-folder UI, adds a **Folder Browser** escape button, and keeps capture selection, delete, and metadata editing working against the flattened feed.
+- **Persistence:** `library_grouping_mode` now supports **`timeline`** and persists it like the existing `all` / `console` modes.
+
 ## 0.896
 - **Release:** Version **0.896** — on-demand **Export Starred** for Immich / external folders; default library split a bit wider for the detail pane.
 - **Library:** **Export Starred** toolbar button copies every **starred** file from the **photo metadata index** into **Path Settings → Starred export folder** (`starred_export_folder` in ini). Uses each file’s **base name** only; existing files in that folder are **overwritten**. Empty export path shows a pointer to Path Settings.
