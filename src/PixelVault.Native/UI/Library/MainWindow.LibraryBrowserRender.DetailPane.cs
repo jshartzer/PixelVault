@@ -43,7 +43,7 @@ namespace PixelVaultNative
             var size = detailLayout.TileSize;
             ws.LastDetailColumns = targetDetailColumns;
             ws.LastDetailTileSize = size;
-            ws.EstimatedDetailRowHeight = Math.Max(200, size + 96);
+            ws.EstimatedDetailRowHeight = Math.Max(200, size + (IsLibraryBrowserTimelineView(ws.Current) ? 132 : 96));
             var shouldRestoreDetailScroll = ws.PreserveDetailScrollOnNextRender && ws.PreservedDetailScrollOffset > 0.1d;
             var restoreDetailScrollOffset = shouldRestoreDetailScroll ? (double?)ws.PreservedDetailScrollOffset : null;
             var restoreDetailScrollPending = shouldRestoreDetailScroll;
@@ -113,12 +113,35 @@ namespace PixelVaultNative
                         return;
                     }
                     var visibleFiles = snapshot == null ? new List<string>() : (snapshot.VisibleFiles ?? new List<string>());
+                    var timelineContexts = snapshot == null
+                        ? new Dictionary<string, LibraryTimelineCaptureContext>(StringComparer.OrdinalIgnoreCase)
+                        : (snapshot.TimelineContextByFile ?? new Dictionary<string, LibraryTimelineCaptureContext>(StringComparer.OrdinalIgnoreCase));
                     var visibleSet = new HashSet<string>(visibleFiles, StringComparer.OrdinalIgnoreCase);
                     foreach (var stale in ws.SelectedDetailFiles.Where(path => !visibleSet.Contains(path)).ToList()) ws.SelectedDetailFiles.Remove(stale);
                     if (SameLibraryBrowserSelection(ws.Current, renderFolder))
                     {
                         ws.DetailFilesDisplayOrder.Clear();
                         ws.DetailFilesDisplayOrder.AddRange(visibleFiles);
+                    }
+                    if (timelineView)
+                    {
+                        var distinctGames = timelineContexts.Values
+                            .Select(context => NormalizeGameIndexName(context == null ? string.Empty : context.GameTitle))
+                            .Where(title => !string.IsNullOrWhiteSpace(title))
+                            .Distinct(StringComparer.OrdinalIgnoreCase)
+                            .Count();
+                        var distinctPlatforms = timelineContexts.Values
+                            .Select(context => NormalizeConsoleLabel(context == null ? string.Empty : context.PlatformLabel))
+                            .Where(label => !string.IsNullOrWhiteSpace(label) && !string.Equals(label, "Other", StringComparison.OrdinalIgnoreCase))
+                            .Distinct(StringComparer.OrdinalIgnoreCase)
+                            .Count();
+                        var captureDates = timelineContexts.Values
+                            .Select(context => context == null ? DateTime.MinValue : context.CaptureDate)
+                            .Where(date => date > DateTime.MinValue)
+                            .ToList();
+                        var newestCapture = captureDates.Count == 0 ? DateTime.MinValue : captureDates.Max();
+                        var oldestCapture = captureDates.Count == 0 ? DateTime.MinValue : captureDates.Min();
+                        panes.DetailMeta.Text = BuildLibraryTimelineSummaryText(visibleFiles.Count, distinctGames, distinctPlatforms, newestCapture, oldestCapture);
                     }
                     ws.DetailTiles.Clear();
                     if (snapshot == null || snapshot.Groups == null || snapshot.Groups.Count == 0)
@@ -184,6 +207,8 @@ namespace PixelVaultNative
                                     for (int fileIndex = 0; fileIndex < rowFiles.Count; fileIndex++)
                                     {
                                         var file = rowFiles[fileIndex];
+                                        LibraryTimelineCaptureContext timelineContext = null;
+                                        if (timelineView) timelineContexts.TryGetValue(file, out timelineContext);
                                         Action<string> useFileAsFolderCover = null;
                                         if (!timelineView)
                                         {
@@ -206,7 +231,8 @@ namespace PixelVaultNative
                                             ws.SelectedDetailFiles,
                                             refreshDetailSelectionUi,
                                             redrawSelectedFolderDetail,
-                                            useFileAsFolderCover);
+                                            useFileAsFolderCover,
+                                            timelineContext);
                                         tile.Margin = new Thickness(0, 0, fileIndex < rowFiles.Count - 1 ? detailTileGap : 0, 0);
                                         ws.DetailTiles.Add(tile);
                                         rowPanel.Children.Add(tile);
@@ -240,6 +266,12 @@ namespace PixelVaultNative
                     traceStep("LibraryDetailBackgroundStart", "thread=" + Environment.CurrentManagedThreadId);
                     var metadataIndex = librarySession.LoadLibraryMetadataIndex(false);
                     traceStep("LibraryDetailMetadataIndexLoaded", "entries=" + metadataIndex.Count);
+                    List<GameIndexEditorRow> savedGameRows = null;
+                    if (timelineView)
+                    {
+                        savedGameRows = librarySession.LoadSavedGameIndexRows();
+                        traceStep("LibraryDetailTimelineGameRowsLoaded", "savedGameRows=" + savedGameRows.Count);
+                    }
                     var detailFiles = GetFilesForLibraryFolderEntry(displayFolder, false)
                         .Where(file => !string.IsNullOrWhiteSpace(file) && File.Exists(file))
                         .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -273,6 +305,10 @@ namespace PixelVaultNative
                         {
                             VisibleFiles = datedFiles.Select(entry => entry.FilePath).Distinct(StringComparer.OrdinalIgnoreCase).ToList()
                         };
+                        if (timelineView)
+                        {
+                            snapshot.TimelineContextByFile = BuildLibraryTimelineCaptureContextMap(snapshot.VisibleFiles, metadataIndex, savedGameRows);
+                        }
                         foreach (var group in datedFiles
                             .GroupBy(entry => entry.CaptureDate.Date)
                             .OrderByDescending(group => group.Key))
@@ -303,7 +339,7 @@ namespace PixelVaultNative
                             + "; " + BuildLibraryBrowserTroubleshootingLabel(renderFolder));
                         try
                         {
-                            var savedGameRows = librarySession.LoadSavedGameIndexRows();
+                            if (savedGameRows == null) savedGameRows = librarySession.LoadSavedGameIndexRows();
                             traceStep("LibraryDetailMetadataRepairRowsLoaded", "savedGameRows=" + savedGameRows.Count);
                             var metadataByFile = await metadataService.ReadEmbeddedMetadataBatchAsync(filesMissingCaptureTicks, CancellationToken.None).ConfigureAwait(false);
                             traceStep("LibraryDetailMetadataRepairBatchRead", "metadataResults=" + metadataByFile.Count);

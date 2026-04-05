@@ -130,6 +130,69 @@ namespace PixelVaultNative
             return view != null && view.IsTimelineProjection;
         }
 
+        internal static string BuildLibraryTimelineSummaryText(int captureCount, int gameCount, int platformCount, DateTime newestCapture, DateTime oldestCapture)
+        {
+            var parts = new List<string>
+            {
+                captureCount + " photo" + (captureCount == 1 ? string.Empty : "s")
+            };
+            if (gameCount > 0) parts.Add(gameCount + " game" + (gameCount == 1 ? string.Empty : "s"));
+            if (platformCount > 0) parts.Add(platformCount + " platform" + (platformCount == 1 ? string.Empty : "s"));
+            if (newestCapture > DateTime.MinValue && oldestCapture > DateTime.MinValue)
+            {
+                var rangeText = newestCapture.Date == oldestCapture.Date
+                    ? newestCapture.ToString("MMMM d, yyyy")
+                    : oldestCapture.ToString("MMMM d, yyyy") + " - " + newestCapture.ToString("MMMM d, yyyy");
+                parts.Add(rangeText);
+            }
+            return string.Join(" | ", parts.Where(part => !string.IsNullOrWhiteSpace(part)));
+        }
+
+        internal static string BuildLibraryTimelineCaptureTimeLabel(DateTime captureDate)
+        {
+            return captureDate <= DateTime.MinValue ? string.Empty : captureDate.ToString("h:mm tt");
+        }
+
+        Dictionary<string, LibraryTimelineCaptureContext> BuildLibraryTimelineCaptureContextMap(
+            IEnumerable<string> files,
+            Dictionary<string, LibraryMetadataIndexEntry> metadataIndex,
+            IEnumerable<GameIndexEditorRow> savedGameRows)
+        {
+            var contexts = new Dictionary<string, LibraryTimelineCaptureContext>(StringComparer.OrdinalIgnoreCase);
+            var rowsByGameId = (savedGameRows ?? Enumerable.Empty<GameIndexEditorRow>())
+                .Where(row => row != null && !string.IsNullOrWhiteSpace(NormalizeGameId(row.GameId)))
+                .GroupBy(row => NormalizeGameId(row.GameId), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+            foreach (var file in (files ?? Enumerable.Empty<string>()).Where(path => !string.IsNullOrWhiteSpace(path)))
+            {
+                var captureDate = ResolveIndexedLibraryDate(libraryRoot, file, metadataIndex);
+                var entry = TryGetLibraryMetadataIndexEntry(libraryRoot, file, metadataIndex);
+                var normalizedGameId = NormalizeGameId(entry == null ? string.Empty : entry.GameId);
+                GameIndexEditorRow savedRow;
+                rowsByGameId.TryGetValue(normalizedGameId, out savedRow);
+                var gameTitle = NormalizeGameIndexName(savedRow == null ? string.Empty : savedRow.Name);
+                if (string.IsNullOrWhiteSpace(gameTitle)) gameTitle = NormalizeGameIndexName(Path.GetFileName(Path.GetDirectoryName(file) ?? string.Empty));
+                if (string.IsNullOrWhiteSpace(gameTitle)) gameTitle = NormalizeGameIndexName(GetGameNameFromFileName(Path.GetFileNameWithoutExtension(file)));
+                if (string.IsNullOrWhiteSpace(gameTitle)) gameTitle = "Unknown Game";
+                var platformLabel = NormalizeConsoleLabel(savedRow == null ? (entry == null ? string.Empty : entry.ConsoleLabel) : savedRow.PlatformLabel);
+                if (string.IsNullOrWhiteSpace(platformLabel) || string.Equals(platformLabel, "Other", StringComparison.OrdinalIgnoreCase))
+                {
+                    platformLabel = NormalizeConsoleLabel(entry == null ? string.Empty : entry.ConsoleLabel);
+                }
+                if (string.IsNullOrWhiteSpace(platformLabel) || string.Equals(platformLabel, "Other", StringComparison.OrdinalIgnoreCase))
+                {
+                    platformLabel = NormalizeConsoleLabel(PrimaryPlatformLabel(file));
+                }
+                contexts[file] = new LibraryTimelineCaptureContext
+                {
+                    GameTitle = gameTitle,
+                    PlatformLabel = platformLabel,
+                    CaptureDate = captureDate
+                };
+            }
+            return contexts;
+        }
+
         string BuildLibraryBrowserViewKey(string groupingMode, string gameId, string name, string folderPath, string platformLabel)
         {
             var normalizedGrouping = NormalizeLibraryGroupingMode(groupingMode);

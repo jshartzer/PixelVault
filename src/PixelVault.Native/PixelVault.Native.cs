@@ -128,12 +128,20 @@ namespace PixelVaultNative
         {
             public List<LibraryDetailRenderGroup> Groups = new List<LibraryDetailRenderGroup>();
             public List<string> VisibleFiles = new List<string>();
+            public Dictionary<string, LibraryTimelineCaptureContext> TimelineContextByFile = new Dictionary<string, LibraryTimelineCaptureContext>(StringComparer.OrdinalIgnoreCase);
         }
 
         sealed class LibraryDetailRenderGroup
         {
             public DateTime CaptureDate;
             public List<string> Files = new List<string>();
+        }
+
+        internal sealed class LibraryTimelineCaptureContext
+        {
+            internal string GameTitle;
+            internal string PlatformLabel;
+            internal DateTime CaptureDate;
         }
 
         LibraryMetadataIndexEntry CloneLibraryMetadataIndexEntry(LibraryMetadataIndexEntry entry)
@@ -779,7 +787,7 @@ namespace PixelVaultNative
             var rawTile = (int)Math.Floor((viewportWidth - ((columns - 1) * 14)) / (double)Math.Max(1, columns));
             var minTile = viewportWidth < 260 ? 112 : 140;
             var userCap = NormalizeLibraryFolderTileSize(libraryFolderTileSize);
-            const int layoutMaxTile = 440;
+            const int layoutMaxTile = 700;
             var tileWidth = Math.Max(minTile, Math.Min(Math.Min(layoutMaxTile, userCap), rawTile));
             tileWidth = (int)(Math.Round(tileWidth / 16d) * 16);
             tileWidth = Math.Max(minTile, Math.Min(Math.Min(layoutMaxTile, userCap), Math.Min(rawTile, tileWidth)));
@@ -2452,7 +2460,6 @@ namespace PixelVaultNative
         }
     }
 }
-
 
 
 

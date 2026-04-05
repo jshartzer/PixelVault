@@ -242,7 +242,71 @@ namespace PixelVaultNative
             return Math.Max(1, columns);
         }
 
-        Border CreateLibraryDetailTile(string file, int size, Func<bool> shouldLoad, Action<string> openSingleFileMetadataEditor, Action<string, ModifierKeys> updateDetailSelection, HashSet<string> selectedDetailFiles, Action refreshDetailSelectionUi, Action redrawDetailPane, Action<string> useFileAsFolderCover)
+        FrameworkElement BuildLibraryTimelinePlatformChip(string platformLabel)
+        {
+            var normalized = NormalizeConsoleLabel(platformLabel);
+            if (string.IsNullOrWhiteSpace(normalized) || string.Equals(normalized, "Other", StringComparison.OrdinalIgnoreCase)) return null;
+            return new Border
+            {
+                Background = Brush("#162028"),
+                BorderBrush = LibrarySectionAccentBrush(normalized),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(9),
+                Padding = new Thickness(8, 3, 8, 3),
+                Child = new TextBlock
+                {
+                    Text = normalized,
+                    Foreground = Brush("#DCE6EC"),
+                    FontSize = 10.5,
+                    FontWeight = FontWeights.SemiBold,
+                    TextAlignment = TextAlignment.Center
+                }
+            };
+        }
+
+        FrameworkElement BuildLibraryTimelineCaptureFooter(int size, LibraryTimelineCaptureContext timelineContext)
+        {
+            if (timelineContext == null) return null;
+            var footer = new StackPanel
+            {
+                Margin = new Thickness(10, 10, 10, 10),
+                MaxWidth = Math.Max(80, size - 20)
+            };
+            footer.Children.Add(new TextBlock
+            {
+                Text = string.IsNullOrWhiteSpace(timelineContext.GameTitle) ? "Unknown Game" : timelineContext.GameTitle,
+                Foreground = Brushes.White,
+                FontSize = 12.5,
+                FontWeight = FontWeights.SemiBold,
+                TextWrapping = TextWrapping.Wrap,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                MaxHeight = 36
+            });
+            var footerMetaRow = new DockPanel { Margin = new Thickness(0, 6, 0, 0), LastChildFill = false };
+            var timeText = BuildLibraryTimelineCaptureTimeLabel(timelineContext.CaptureDate);
+            if (!string.IsNullOrWhiteSpace(timeText))
+            {
+                var captureTimeBlock = new TextBlock
+                {
+                    Text = timeText,
+                    Foreground = Brush("#9FB0BA"),
+                    FontSize = 10.5,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                DockPanel.SetDock(captureTimeBlock, Dock.Right);
+                footerMetaRow.Children.Add(captureTimeBlock);
+            }
+            var platformChip = BuildLibraryTimelinePlatformChip(timelineContext.PlatformLabel);
+            if (platformChip != null)
+            {
+                DockPanel.SetDock(platformChip, Dock.Left);
+                footerMetaRow.Children.Add(platformChip);
+            }
+            if (footerMetaRow.Children.Count > 0) footer.Children.Add(footerMetaRow);
+            return footer;
+        }
+
+        Border CreateLibraryDetailTile(string file, int size, Func<bool> shouldLoad, Action<string> openSingleFileMetadataEditor, Action<string, ModifierKeys> updateDetailSelection, HashSet<string> selectedDetailFiles, Action refreshDetailSelectionUi, Action redrawDetailPane, Action<string> useFileAsFolderCover, LibraryTimelineCaptureContext timelineContext = null)
         {
             var isVideoFile = IsVideo(file);
             var tileIsActive = true;
@@ -416,7 +480,21 @@ namespace PixelVaultNative
                 }, shouldKeepLoading);
             }
             else applyVideoInfo(null);
-            tile.Child = presenter;
+            var tileFooter = BuildLibraryTimelineCaptureFooter(size, timelineContext);
+            if (tileFooter == null)
+            {
+                tile.Child = presenter;
+            }
+            else
+            {
+                var tileContent = new Grid();
+                tileContent.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                tileContent.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                tileContent.Children.Add(presenter);
+                Grid.SetRow(tileFooter, 1);
+                tileContent.Children.Add(tileFooter);
+                tile.Child = tileContent;
+            }
             QueueImageLoad(image, file, CalculateLibraryDetailTileDecodeWidth(size), delegate(BitmapImage loaded)
             {
                 image.Source = loaded;
