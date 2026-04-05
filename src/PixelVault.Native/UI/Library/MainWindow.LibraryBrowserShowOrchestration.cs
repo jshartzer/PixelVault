@@ -220,6 +220,7 @@ namespace PixelVaultNative
                         _shell.SaveSettings();
                         if (renderTiles != null) renderTiles();
                     }
+                    refreshSortButtons?.Invoke();
                     refreshGroupingButtons();
                 };
 
