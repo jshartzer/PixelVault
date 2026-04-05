@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 
@@ -51,7 +52,6 @@ namespace PixelVaultNative
                 return;
             }
             const int detailTileGap = 8;
-            const int masonryTileGap = 3;
             var detailLayout = CalculateResponsiveLibraryDetailLayout(panes.ThumbScroll);
             var size = detailLayout.TileSize;
             ws.LastDetailViewportWidth = ResolveScrollViewerLayoutWidth(panes == null ? null : panes.ThumbScroll);
@@ -246,56 +246,63 @@ namespace PixelVaultNative
                                     return headerStack;
                                 }
                             });
-                            var timelineMasonryChunks = BuildLibraryDetailMasonryChunks(
+                            var timelinePackedRows = PackLibraryDetailFilesIntoVariableRows(
                                 groupFiles,
                                 packAvailableW,
-                                masonryTileGap,
+                                detailTileGap,
                                 effectiveTileSize,
                                 packMinW,
-                                adaptiveMaxTileSize,
-                                true);
-                            foreach (var chunk in timelineMasonryChunks)
+                                adaptiveMaxTileSize);
+                            double timelineItemsRowH = 44d;
+                            if (timelinePackedRows.Count > 0)
                             {
-                                var chunkHeight = chunk.CanvasHeight + masonryTileGap;
-                                var chunkCopy = chunk;
-                                virtualRows.Add(new VirtualizedRowDefinition
+                                timelineItemsRowH = 0;
+                                for (var pri = 0; pri < timelinePackedRows.Count; pri++)
                                 {
-                                    Height = chunkHeight,
-                                    Build = delegate
-                                    {
-                                        var canvas = new Canvas
-                                        {
-                                            Width = chunkCopy.CanvasWidth,
-                                            Height = chunkCopy.CanvasHeight,
-                                            Margin = new Thickness(0, 0, 0, masonryTileGap)
-                                        };
-                                        foreach (var pl in chunkCopy.Placements)
-                                        {
-                                            var decodeW = CalculateLibraryDetailTileDecodeWidth(pl.Width, dpiScale);
-                                            LibraryTimelineCaptureContext timelineContext;
-                                            if (!timelineContexts.TryGetValue(pl.File, out timelineContext)) timelineContext = null;
-                                            var tile = CreateLibraryDetailTile(
-                                                pl.File,
-                                                pl.Width,
-                                                decodeW,
-                                                delegate { return SameLibraryBrowserSelection(ws.Current, renderFolder); },
-                                                openSingleFileMetadataEditor,
-                                                updateDetailSelection,
-                                                ws.SelectedDetailFiles,
-                                                refreshDetailSelectionUi,
-                                                redrawSelectedFolderDetail,
-                                                null,
-                                                pl.Height,
-                                                timelineContext);
-                                            Canvas.SetLeft(tile, pl.X);
-                                            Canvas.SetTop(tile, pl.Y);
-                                            ws.DetailTiles.Add(tile);
-                                            canvas.Children.Add(tile);
-                                        }
-                                        return canvas;
-                                    }
-                                });
+                                    timelineItemsRowH += EstimateLibraryVariableDetailRowHeight(timelinePackedRows[pri], true);
+                                    if (pri < timelinePackedRows.Count - 1) timelineItemsRowH += detailTileGap;
+                                }
                             }
+                            virtualRows.Add(new VirtualizedRowDefinition
+                            {
+                                Height = timelineItemsRowH + detailTileGap,
+                                Build = delegate
+                                {
+                                    var itemsControl = new ItemsControl
+                                    {
+                                        ItemsPanel = CreateLibraryDetailVirtualizingWrapPanelItemsPanelTemplate(),
+                                        Width = packAvailableW,
+                                        Margin = new Thickness(0, 0, 0, detailTileGap)
+                                    };
+                                    VirtualizingPanel.SetIsVirtualizing(itemsControl, true);
+                                    VirtualizingPanel.SetVirtualizationMode(itemsControl, VirtualizationMode.Recycling);
+                                    foreach (var file in groupFiles)
+                                    {
+                                        if (string.IsNullOrWhiteSpace(file)) continue;
+                                        var w = ResolveLibraryVariableDetailTileWidth(file, effectiveTileSize, packMinW, adaptiveMaxTileSize);
+                                        w = Math.Min(w, (int)Math.Floor(packAvailableW));
+                                        var decodeW = CalculateLibraryDetailTileDecodeWidth(w, dpiScale);
+                                        LibraryTimelineCaptureContext timelineContext;
+                                        if (!timelineContexts.TryGetValue(file, out timelineContext)) timelineContext = null;
+                                        var tile = CreateLibraryDetailTile(
+                                            file,
+                                            w,
+                                            decodeW,
+                                            delegate { return SameLibraryBrowserSelection(ws.Current, renderFolder); },
+                                            openSingleFileMetadataEditor,
+                                            updateDetailSelection,
+                                            ws.SelectedDetailFiles,
+                                            refreshDetailSelectionUi,
+                                            redrawSelectedFolderDetail,
+                                            null,
+                                            timelineContext);
+                                        tile.Margin = new Thickness(0, 0, detailTileGap, detailTileGap);
+                                        ws.DetailTiles.Add(tile);
+                                        itemsControl.Items.Add(tile);
+                                    }
+                                    return itemsControl;
+                                }
+                            });
                         }
                     }
                     else
@@ -319,63 +326,70 @@ namespace PixelVaultNative
                                     };
                                 }
                             });
-                            var normalMasonryChunks = BuildLibraryDetailMasonryChunks(
+                            var normalPackedRows = PackLibraryDetailFilesIntoVariableRows(
                                 groupFiles,
                                 packAvailableW,
-                                masonryTileGap,
+                                detailTileGap,
                                 effectiveTileSize,
                                 packMinW,
-                                adaptiveMaxTileSize,
-                                false);
-                            foreach (var chunk in normalMasonryChunks)
+                                adaptiveMaxTileSize);
+                            double normalItemsRowH = 44d;
+                            if (normalPackedRows.Count > 0)
                             {
-                                var chunkHeight = chunk.CanvasHeight + masonryTileGap;
-                                var chunkCopy = chunk;
-                                virtualRows.Add(new VirtualizedRowDefinition
+                                normalItemsRowH = 0;
+                                for (var pri = 0; pri < normalPackedRows.Count; pri++)
                                 {
-                                    Height = chunkHeight,
-                                    Build = delegate
-                                    {
-                                        var canvas = new Canvas
-                                        {
-                                            Width = chunkCopy.CanvasWidth,
-                                            Height = chunkCopy.CanvasHeight,
-                                            Margin = new Thickness(0, 0, 0, masonryTileGap)
-                                        };
-                                        foreach (var pl in chunkCopy.Placements)
-                                        {
-                                            var decodeW = CalculateLibraryDetailTileDecodeWidth(pl.Width, dpiScale);
-                                            Action<string> useFileAsFolderCover = delegate(string imagePath)
-                                            {
-                                                var folder = activeSelectedLibraryFolder;
-                                                if (folder == null || string.IsNullOrWhiteSpace(imagePath) || !File.Exists(imagePath) || !IsImage(imagePath)) return;
-                                                SaveCustomCover(folder, imagePath);
-                                                if (renderFolderTiles != null) renderFolderTiles();
-                                                redrawSelectedFolderDetail?.Invoke();
-                                                ShowLibraryBrowserToast(ws, "Cover saved");
-                                            };
-                                            var tile = CreateLibraryDetailTile(
-                                                pl.File,
-                                                pl.Width,
-                                                decodeW,
-                                                delegate { return SameLibraryBrowserSelection(ws.Current, renderFolder); },
-                                                openSingleFileMetadataEditor,
-                                                updateDetailSelection,
-                                                ws.SelectedDetailFiles,
-                                                refreshDetailSelectionUi,
-                                                redrawSelectedFolderDetail,
-                                                useFileAsFolderCover,
-                                                pl.Height,
-                                                null);
-                                            Canvas.SetLeft(tile, pl.X);
-                                            Canvas.SetTop(tile, pl.Y);
-                                            ws.DetailTiles.Add(tile);
-                                            canvas.Children.Add(tile);
-                                        }
-                                        return canvas;
-                                    }
-                                });
+                                    normalItemsRowH += EstimateLibraryVariableDetailRowHeight(normalPackedRows[pri], false);
+                                    if (pri < normalPackedRows.Count - 1) normalItemsRowH += detailTileGap;
+                                }
                             }
+                            virtualRows.Add(new VirtualizedRowDefinition
+                            {
+                                Height = normalItemsRowH + detailTileGap,
+                                Build = delegate
+                                {
+                                    var itemsControl = new ItemsControl
+                                    {
+                                        ItemsPanel = CreateLibraryDetailVirtualizingWrapPanelItemsPanelTemplate(),
+                                        Width = packAvailableW,
+                                        Margin = new Thickness(0, 0, 0, detailTileGap)
+                                    };
+                                    VirtualizingPanel.SetIsVirtualizing(itemsControl, true);
+                                    VirtualizingPanel.SetVirtualizationMode(itemsControl, VirtualizationMode.Recycling);
+                                    Action<string> useFileAsFolderCover = delegate(string imagePath)
+                                    {
+                                        var folder = activeSelectedLibraryFolder;
+                                        if (folder == null || string.IsNullOrWhiteSpace(imagePath) || !File.Exists(imagePath) || !IsImage(imagePath)) return;
+                                        SaveCustomCover(folder, imagePath);
+                                        if (renderFolderTiles != null) renderFolderTiles();
+                                        redrawSelectedFolderDetail?.Invoke();
+                                        ShowLibraryBrowserToast(ws, "Cover saved");
+                                    };
+                                    foreach (var file in groupFiles)
+                                    {
+                                        if (string.IsNullOrWhiteSpace(file)) continue;
+                                        var w = ResolveLibraryVariableDetailTileWidth(file, effectiveTileSize, packMinW, adaptiveMaxTileSize);
+                                        w = Math.Min(w, (int)Math.Floor(packAvailableW));
+                                        var decodeW = CalculateLibraryDetailTileDecodeWidth(w, dpiScale);
+                                        var tile = CreateLibraryDetailTile(
+                                            file,
+                                            w,
+                                            decodeW,
+                                            delegate { return SameLibraryBrowserSelection(ws.Current, renderFolder); },
+                                            openSingleFileMetadataEditor,
+                                            updateDetailSelection,
+                                            ws.SelectedDetailFiles,
+                                            refreshDetailSelectionUi,
+                                            redrawSelectedFolderDetail,
+                                            useFileAsFolderCover,
+                                            null);
+                                        tile.Margin = new Thickness(0, 0, detailTileGap, detailTileGap);
+                                        ws.DetailTiles.Add(tile);
+                                        itemsControl.Items.Add(tile);
+                                    }
+                                    return itemsControl;
+                                }
+                            });
                         }
                     }
                     SetVirtualizedRows(panes.DetailRows, virtualRows, !restoreDetailScrollPending, restoreDetailScrollPending ? restoreDetailScrollOffset : null);
@@ -835,7 +849,6 @@ namespace PixelVaultNative
                         ws == null ? new HashSet<string>(StringComparer.OrdinalIgnoreCase) : ws.SelectedDetailFiles,
                         refreshDetailSelectionUi,
                         redrawSelectedFolderDetail,
-                        null,
                         null,
                         timelineContext);
                     tile.Margin = new Thickness(0, 0, fileIndex < rowEntries.Count - 1 ? detailTileGap : 0, 0);
