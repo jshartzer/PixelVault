@@ -28,6 +28,8 @@ namespace PixelVaultNative
 
             public double LibraryBrowserPersistedDetailScroll => _m._libraryBrowserPersistedDetailScroll;
 
+            public bool HasLiveLibraryBrowserWorkingSet => _m._libraryBrowserLiveWorkingSet != null;
+
             public string LibraryFolderSortMode
             {
                 get => _m.libraryFolderSortMode;

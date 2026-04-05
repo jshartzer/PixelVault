@@ -89,6 +89,7 @@ namespace PixelVaultNative
             var normalized = NormalizeConsoleLabel(platformLabel);
             if (string.Equals(normalized, "Steam", StringComparison.OrdinalIgnoreCase)) return "Steam";
             if (string.Equals(normalized, "Xbox", StringComparison.OrdinalIgnoreCase)) return "Xbox";
+            if (string.Equals(normalized, "Xbox PC", StringComparison.OrdinalIgnoreCase)) return "Platform:Xbox PC";
             if (string.Equals(normalized, "PS5", StringComparison.OrdinalIgnoreCase)) return "PS5;PlayStation";
             if (string.Equals(normalized, "PlayStation", StringComparison.OrdinalIgnoreCase)) return "PlayStation";
             if (string.Equals(normalized, "PC", StringComparison.OrdinalIgnoreCase)) return "PC";
@@ -172,6 +173,20 @@ namespace PixelVaultNative
                 rule.TitleGroup = "title";
                 rule.TimestampGroup = "stamp";
                 rule.TimestampFormat = "yyyy-MM-dd hh-mm-ss tt";
+                rule.PreserveFileTimes = true;
+                return rule;
+            }
+
+            if (Regex.IsMatch(fileName, @"^.+?\s+\d{1,2}_\d{1,2}_\d{4}\s+\d{1,2}_\d{2}_\d{2}\s+[AP]M\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$", RegexOptions.IgnoreCase))
+            {
+                rule.Name = "Custom: Xbox PC Capture";
+                rule.PlatformLabel = "Xbox PC";
+                rule.PlatformTagsText = "Platform:Xbox PC";
+                rule.PatternText = @"^(?<title>.+?)\s+(?<stamp>\d{1,2}_\d{1,2}_\d{4}\s+\d{1,2}_\d{2}_\d{2}\s+[AP]M)\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$";
+                rule.Pattern = rule.PatternText;
+                rule.TitleGroup = "title";
+                rule.TimestampGroup = "stamp";
+                rule.TimestampFormat = "M_d_yyyy h_mm_ss tt";
                 rule.PreserveFileTimes = true;
                 return rule;
             }

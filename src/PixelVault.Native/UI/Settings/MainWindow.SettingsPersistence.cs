@@ -60,6 +60,7 @@ namespace PixelVaultNative
                 () => FindExecutableOnPath("ffmpeg.exe") ?? string.Empty,
                 SettingsService.FindSteamGridDbApiTokenInEnvironment);
             ApplyAppSettings(merged);
+            settingsService.PersistResolvedToolPaths(settingsPath, exifToolPath, ffmpegPath);
             NotifyIfLibraryIndexScopeChanged();
         }
 

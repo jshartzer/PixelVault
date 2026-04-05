@@ -108,6 +108,21 @@ public sealed class ConsoleIdentificationTests
     }
 
     [Fact]
+    public void MergePlatformTagsWithFilenamePlatformHint_XboxPcParse_AddsCustomPlatformTag()
+    {
+        var parsed = new FilenameParseResult
+        {
+            PlatformLabel = "Xbox/Windows",
+            PlatformTags = Array.Empty<string>()
+        };
+
+        var merged = MainWindow.MergePlatformTagsWithFilenamePlatformHint(Array.Empty<string>(), parsed);
+
+        Assert.Contains("Platform:Xbox PC", merged);
+        Assert.Equal("Xbox PC", MainWindow.DetermineConsoleLabelFromTags(merged));
+    }
+
+    [Fact]
     public void ApplyFilenameParseResultToManualPlatformFlags_OtherLeavesAllFlagsOff()
     {
         MainWindow.ApplyFilenameParseResultToManualPlatformFlags(

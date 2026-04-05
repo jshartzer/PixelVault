@@ -13,5 +13,6 @@ namespace PixelVaultNative
             Func<string> readSteamGridDbTokenFromEnvironment);
 
         void SaveToIni(string path, AppSettings state);
+        bool PersistResolvedToolPaths(string path, string exifToolPath, string ffmpegPath);
     }
 }

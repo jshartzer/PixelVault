@@ -18,6 +18,7 @@ namespace PixelVaultNative
         double LibraryBrowserPersistedFolderScroll { get; }
         string LibraryBrowserPersistedLastViewKey { get; }
         double LibraryBrowserPersistedDetailScroll { get; }
+        bool HasLiveLibraryBrowserWorkingSet { get; }
 
         string LibraryFolderSortMode { get; set; }
         string LibraryGroupingMode { get; set; }

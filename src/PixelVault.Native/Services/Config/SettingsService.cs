@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -45,6 +46,25 @@ namespace PixelVaultNative
             {
                 var value = Environment.GetEnvironmentVariable(key);
                 if (!string.IsNullOrWhiteSpace(value)) return value.Trim();
+            }
+            return string.Empty;
+        }
+
+        internal static string FindBundledToolPath(string appRoot, string executableName)
+        {
+            if (string.IsNullOrWhiteSpace(appRoot) || string.IsNullOrWhiteSpace(executableName)) return string.Empty;
+            try
+            {
+                var current = new DirectoryInfo(Path.GetFullPath(appRoot));
+                while (current != null)
+                {
+                    var candidate = Path.Combine(current.FullName, "tools", executableName);
+                    if (File.Exists(candidate)) return candidate;
+                    current = current.Parent;
+                }
+            }
+            catch
+            {
             }
             return string.Empty;
         }
@@ -109,13 +129,17 @@ namespace PixelVaultNative
                 }
             }
 
-            var bundledExifTool = Path.Combine(appRoot ?? string.Empty, "tools", "exiftool.exe");
-            if (!File.Exists(s.ExifToolPath) && File.Exists(bundledExifTool)) s.ExifToolPath = bundledExifTool;
+            var bundledExifTool = FindBundledToolPath(appRoot, "exiftool.exe");
+            if ((string.IsNullOrWhiteSpace(s.ExifToolPath) || !File.Exists(s.ExifToolPath))
+                && !string.IsNullOrWhiteSpace(bundledExifTool))
+            {
+                s.ExifToolPath = bundledExifTool;
+            }
 
-            var bundledFfmpeg = Path.Combine(appRoot ?? string.Empty, "tools", "ffmpeg.exe");
+            var bundledFfmpeg = FindBundledToolPath(appRoot, "ffmpeg.exe");
             if (string.IsNullOrWhiteSpace(s.FfmpegPath) || !File.Exists(s.FfmpegPath))
             {
-                s.FfmpegPath = File.Exists(bundledFfmpeg)
+                s.FfmpegPath = !string.IsNullOrWhiteSpace(bundledFfmpeg)
                     ? bundledFfmpeg
                     : (findFfmpegOnPath != null ? findFfmpegOnPath() : string.Empty) ?? string.Empty;
             }
@@ -176,6 +200,17 @@ namespace PixelVaultNative
             });
         }
 
+        public bool PersistResolvedToolPaths(string path, string exifToolPath, string ffmpegPath)
+        {
+            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path)) return false;
+            var lines = File.ReadAllLines(path).ToList();
+            var changed = false;
+            changed |= PersistResolvedToolPath(lines, "exiftool", exifToolPath);
+            changed |= PersistResolvedToolPath(lines, "ffmpeg", ffmpegPath);
+            if (changed) File.WriteAllLines(path, lines);
+            return changed;
+        }
+
         static string TryReadIniValue(string path, string wantedKey)
         {
             if (string.IsNullOrWhiteSpace(path) || string.IsNullOrWhiteSpace(wantedKey) || !File.Exists(path)) return string.Empty;
@@ -194,6 +229,62 @@ namespace PixelVaultNative
             {
             }
             return string.Empty;
+        }
+
+        static bool PersistResolvedToolPath(List<string> lines, string key, string resolvedPath)
+        {
+            if (lines == null || string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(resolvedPath) || !File.Exists(resolvedPath)) return false;
+            var current = TryReadIniValue(lines, key);
+            if (PathValuesEqual(current, resolvedPath)) return false;
+            if (!string.IsNullOrWhiteSpace(current) && File.Exists(current)) return false;
+            return UpsertIniValue(lines, key, resolvedPath);
+        }
+
+        static bool UpsertIniValue(List<string> lines, string wantedKey, string value)
+        {
+            if (lines == null || string.IsNullOrWhiteSpace(wantedKey)) return false;
+            var newLine = wantedKey + "=" + (value ?? string.Empty);
+            for (var i = 0; i < lines.Count; i++)
+            {
+                var line = lines[i];
+                if (string.IsNullOrWhiteSpace(line) || !line.Contains('=')) continue;
+                var index = line.IndexOf('=');
+                var key = line.Substring(0, index);
+                if (!string.Equals(key, wantedKey, StringComparison.OrdinalIgnoreCase)) continue;
+                if (string.Equals(line, newLine, StringComparison.Ordinal)) return false;
+                lines[i] = newLine;
+                return true;
+            }
+
+            lines.Add(newLine);
+            return true;
+        }
+
+        static string TryReadIniValue(IEnumerable<string> lines, string wantedKey)
+        {
+            if (lines == null || string.IsNullOrWhiteSpace(wantedKey)) return string.Empty;
+            foreach (var line in lines)
+            {
+                if (string.IsNullOrWhiteSpace(line) || !line.Contains('=')) continue;
+                var index = line.IndexOf('=');
+                var key = line.Substring(0, index);
+                if (!string.Equals(key, wantedKey, StringComparison.OrdinalIgnoreCase)) continue;
+                return line.Substring(index + 1) ?? string.Empty;
+            }
+            return string.Empty;
+        }
+
+        static bool PathValuesEqual(string a, string b)
+        {
+            if (string.IsNullOrWhiteSpace(a) || string.IsNullOrWhiteSpace(b)) return false;
+            try
+            {
+                return string.Equals(Path.GetFullPath(a.Trim()), Path.GetFullPath(b.Trim()), StringComparison.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                return string.Equals(a.Trim(), b.Trim(), StringComparison.OrdinalIgnoreCase);
+            }
         }
     }
 }

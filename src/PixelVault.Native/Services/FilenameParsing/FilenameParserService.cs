@@ -344,6 +344,22 @@ namespace PixelVaultNative
                 },
                 new FilenameConventionRule
                 {
+                    ConventionId = "xbox_pc_capture_ampm",
+                    Name = "Xbox PC Capture (Windows)",
+                    Priority = 836,
+                    Pattern = @"^(?<title>.+?)\s+(?<stamp>\d{1,2}_\d{1,2}_\d{4}\s+\d{1,2}_\d{2}_\d{2}\s+[AP]M)\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$",
+                    PatternText = @"^(?<title>.+?)\s+(?<stamp>\d{1,2}_\d{1,2}_\d{4}\s+\d{1,2}_\d{2}_\d{2}\s+[AP]M)\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$",
+                    PlatformLabel = "Xbox PC",
+                    PlatformTagsText = "Platform:Xbox PC",
+                    TitleGroup = "title",
+                    TimestampGroup = "stamp",
+                    TimestampFormat = "M_d_yyyy h_mm_ss tt",
+                    PreserveFileTimes = true,
+                    ConfidenceLabel = "ExplicitPattern",
+                    IsBuiltIn = true
+                },
+                new FilenameConventionRule
+                {
                     ConventionId = "ps5_literal_token",
                     Name = "PS5 Token",
                     Priority = 120,
@@ -388,7 +404,8 @@ namespace PixelVaultNative
             foreach (var tag in tags ?? new string[0])
             {
                 var normalized = NormalizeConsoleLabel(tag);
-                if (string.Equals(normalized, "Xbox", StringComparison.OrdinalIgnoreCase)
+                if (string.Equals(normalized, "Xbox PC", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(normalized, "Xbox", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(normalized, "Steam", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(normalized, "PS5", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(normalized, "PlayStation", StringComparison.OrdinalIgnoreCase)

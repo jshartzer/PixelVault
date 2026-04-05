@@ -74,6 +74,22 @@ public sealed class FilenameParserServiceTests
     }
 
     [Fact]
+    public void Parse_XboxPcCapture_WithAmPmTimestamp_UsesXboxPcRule()
+    {
+        var parser = CreateParser();
+
+        var parsed = parser.Parse("Human Fall Flat 4_4_2026 7_23_36 PM.png", string.Empty);
+
+        Assert.Equal("Xbox PC", parsed.PlatformLabel);
+        Assert.Contains("Platform:Xbox PC", parsed.PlatformTags);
+        Assert.True(parsed.PreserveFileTimes);
+        Assert.Equal("Human Fall Flat", parsed.GameTitleHint);
+        Assert.Equal(new DateTime(2026, 4, 4, 19, 23, 36), parsed.CaptureTime);
+        Assert.Equal(DateTimeKind.Local, parsed.CaptureTime!.Value.Kind);
+        Assert.Equal("xbox_pc_capture_ampm", parsed.ConventionId);
+    }
+
+    [Fact]
     public void Parse_GenericDate_IsoAtStartOfFileName_ParsesDate()
     {
         var parser = CreateParser();
@@ -293,6 +309,10 @@ public sealed class FilenameParserServiceTests
                 if (string.Equals(normalized, "PS5", StringComparison.OrdinalIgnoreCase)) return "PS5";
                 if (string.Equals(normalized, "PlayStation", StringComparison.OrdinalIgnoreCase)) return "PlayStation";
                 if (string.Equals(normalized, "Steam", StringComparison.OrdinalIgnoreCase)) return "Steam";
+                if (string.Equals(normalized, "Xbox PC", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(normalized, "Xbox/Windows", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(normalized, "Xbox Windows", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(normalized, "Xbox on Windows", StringComparison.OrdinalIgnoreCase)) return "Xbox PC";
                 if (string.Equals(normalized, "Xbox", StringComparison.OrdinalIgnoreCase)) return "Xbox";
                 if (string.Equals(normalized, "PC", StringComparison.OrdinalIgnoreCase)) return "PC";
                 if (string.IsNullOrWhiteSpace(normalized)) return "Other";

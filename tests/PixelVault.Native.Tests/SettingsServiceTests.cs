@@ -143,4 +143,75 @@ public sealed class SettingsServiceTests
             try { if (File.Exists(ffmpegStub)) File.Delete(ffmpegStub); } catch { /* ignore */ }
         }
     }
+
+    [Fact]
+    public void LoadFromIni_FallsBackToAncestorToolsFolder_WhenSavedPathsAreInvalid()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), "pv-tools-" + Guid.NewGuid().ToString("N"));
+        var appRoot = Path.Combine(tempRoot, "src", "PixelVault.Native", "bin", "Release", "net8.0-windows", "win-x64");
+        var toolsRoot = Path.Combine(tempRoot, "tools");
+        var settingsPath = Path.Combine(tempRoot, "PixelVault.settings.ini");
+        var exifStub = Path.Combine(toolsRoot, "exiftool.exe");
+        var ffmpegStub = Path.Combine(toolsRoot, "ffmpeg.exe");
+
+        try
+        {
+            Directory.CreateDirectory(appRoot);
+            Directory.CreateDirectory(toolsRoot);
+            File.WriteAllText(exifStub, string.Empty);
+            File.WriteAllText(ffmpegStub, string.Empty);
+            File.WriteAllLines(settingsPath, new[]
+            {
+                @"exiftool=C:\missing\exiftool.exe",
+                @"ffmpeg=C:\missing\ffmpeg.exe"
+            });
+
+            var svc = new SettingsService();
+            var loaded = svc.LoadFromIni(settingsPath, new AppSettings(), appRoot, () => string.Empty, () => string.Empty);
+
+            Assert.Equal(exifStub, loaded.ExifToolPath, ignoreCase: true);
+            Assert.Equal(ffmpegStub, loaded.FfmpegPath, ignoreCase: true);
+        }
+        finally
+        {
+            try { if (Directory.Exists(tempRoot)) Directory.Delete(tempRoot, true); } catch { /* ignore */ }
+        }
+    }
+
+    [Fact]
+    public void PersistResolvedToolPaths_RewritesOnlyInvalidSavedToolEntries()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), "pv-settings-heal-" + Guid.NewGuid().ToString("N"));
+        var settingsPath = Path.Combine(tempRoot, "PixelVault.settings.ini");
+        var toolsRoot = Path.Combine(tempRoot, "tools");
+        var exifStub = Path.Combine(toolsRoot, "exiftool.exe");
+        var ffmpegStub = Path.Combine(toolsRoot, "ffmpeg.exe");
+
+        try
+        {
+            Directory.CreateDirectory(toolsRoot);
+            File.WriteAllText(exifStub, string.Empty);
+            File.WriteAllText(ffmpegStub, string.Empty);
+            File.WriteAllLines(settingsPath, new[]
+            {
+                "source=C:\\upload",
+                @"exiftool=C:\missing\exiftool.exe",
+                @"ffmpeg=C:\missing\ffmpeg.exe",
+                "steamgriddb_token=keep-me"
+            });
+
+            var svc = new SettingsService();
+            var changed = svc.PersistResolvedToolPaths(settingsPath, exifStub, ffmpegStub);
+            var lines = File.ReadAllLines(settingsPath);
+
+            Assert.True(changed);
+            Assert.Contains("exiftool=" + exifStub, lines, StringComparer.OrdinalIgnoreCase);
+            Assert.Contains("ffmpeg=" + ffmpegStub, lines, StringComparer.OrdinalIgnoreCase);
+            Assert.Contains("steamgriddb_token=keep-me", lines);
+        }
+        finally
+        {
+            try { if (Directory.Exists(tempRoot)) Directory.Delete(tempRoot, true); } catch { /* ignore */ }
+        }
+    }
 }

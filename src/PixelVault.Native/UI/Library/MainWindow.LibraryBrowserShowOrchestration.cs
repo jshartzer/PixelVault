@@ -21,10 +21,16 @@ namespace PixelVaultNative
                 _shell = shell ?? throw new ArgumentNullException(nameof(shell));
             }
 
+            internal static bool ShouldStartFirstPaintTracking(bool reuseMainWindow, bool hasLiveWorkingSet)
+            {
+                return !reuseMainWindow || !hasLiveWorkingSet;
+            }
+
             internal void Run(bool reuseMainWindow)
             {
+                var shouldTrackFirstPaint = ShouldStartFirstPaintTracking(reuseMainWindow, _shell.HasLiveLibraryBrowserWorkingSet);
                 if (reuseMainWindow) _shell.PrepareLibraryBrowserSessionForRebuild();
-                _shell.MarkLibraryBrowserSessionFirstPaintTracking();
+                if (shouldTrackFirstPaint) _shell.MarkLibraryBrowserSessionFirstPaintTracking();
                 _shell.LibrarySession.EnsureLibraryRootAccessible("Library folder");
                 Action refreshIntakeReviewBadge = null;
                 var libraryWindow = _shell.GetOrCreateLibraryBrowserWindow(reuseMainWindow);
