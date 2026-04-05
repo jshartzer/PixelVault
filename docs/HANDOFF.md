@@ -55,11 +55,11 @@ Then use these based on the task:
 
 Current live build:
 
-- `0.944`
+- `0.949`
 
 Current executable:
 
-- `C:\Codex\dist\PixelVault-0.944\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.949\PixelVault.exe`
 
 Current build pointer:
 
@@ -93,12 +93,13 @@ Practical current focus:
 
 ## Current Stop Point
 
-The app is currently published at `0.944`.
+The app is currently published at `0.949`.
 
 **Notion:** [MainWindow extraction roadmap](https://www.notion.so/33573adc59b681d88b7dcd88cad53cb6) updated for Phase **E** capstone (**`ILibraryBrowserShell`**). If release rows in Notion lag `docs/CURRENT_BUILD.txt`, re-sync per `docs/DOC_SYNC_POLICY.md`.
 
 Recent extraction progress (repo):
 
+- **Packed day-card gallery scale-up (0.949):** Library detail and timeline now pack days beside each other instead of forcing a full-width date break every time, and the minimum card/tile sizing is larger overall with timeline intentionally much roomier.
 - **Media-aware masonry layout (0.944):** Library detail and timeline masonry tiles now size from real media dimensions when available, sparse groups use fewer columns so they breathe on wide panes, and hero tiles are bounded by image shape instead of hash-only randomness.
 - **Detail/timeline tile alignment (0.933):** The regular screenshot pane keeps adaptive variable tile sizing but now caps singleton growth so one image does not dominate the view, and timeline has been brought back to date-grouped rows of individual capture tiles using that same capped adaptive sizing.
 - **Detail grid alignment (0.932):** The regular screenshot/detail pane now uses pane-width-driven columns and row fill much more like timeline mode, instead of the old coarse column thresholds that could leave it stuck in an oversized single-column layout.

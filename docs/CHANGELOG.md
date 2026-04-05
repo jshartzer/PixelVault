@@ -1,3 +1,8 @@
+## 0.949
+- **Release:** Version **0.949** — Larger packed day-card gallery for Library detail and timeline.
+- **Library / day packing:** Days no longer force their own full-width line in either detail or timeline view. Instead, each day renders as a packed card so adjacent days can sit side by side and use the row width more efficiently, closer to the Immich-style layout direction.
+- **Library / tile scale:** The minimum card and tile sizes were raised, with timeline biased substantially larger than the regular detail pane so captures have more room to breathe while still keeping empty space under control.
+
 ## 0.944
 - **Release:** Version **0.944** — Media-aware masonry sizing for the Library detail pane and timeline.
 - **Library / masonry layout:** Detail and timeline grids now size tiles from real media dimensions when available instead of the old hash-based fake ratios, so portrait, landscape, and video captures land in more intentional shapes.
