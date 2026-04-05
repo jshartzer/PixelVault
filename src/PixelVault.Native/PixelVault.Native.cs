@@ -790,11 +790,11 @@ namespace PixelVaultNative
             var viewportWidth = scrollViewer == null ? 0 : scrollViewer.ViewportWidth;
             if (viewportWidth <= 0 && scrollViewer != null) viewportWidth = scrollViewer.ActualWidth;
             viewportWidth = Math.Max(120, viewportWidth - 64);
-            var columns = viewportWidth >= 1450 ? 3 : (viewportWidth >= 780 ? 2 : 1);
+            var columns = viewportWidth >= 1800 ? 3 : (viewportWidth >= 900 ? 2 : 1);
             var tileWidth = (int)Math.Floor((viewportWidth - ((columns - 1) * 8)) / columns);
             var minTile = viewportWidth < 340 ? 120 : 180;
-            tileWidth = Math.Max(minTile, Math.Min(680, tileWidth));
-            tileWidth = Math.Max(minTile, Math.Min(680, (int)(Math.Round(tileWidth / 24d) * 24)));
+            tileWidth = Math.Max(minTile, Math.Min(900, tileWidth));
+            tileWidth = Math.Max(minTile, Math.Min(900, (int)(Math.Round(tileWidth / 24d) * 24)));
             return (columns, tileWidth);
         }
         string NormalizeLibraryFolderSortMode(string value) => SettingsService.NormalizeLibraryFolderSortMode(value);
