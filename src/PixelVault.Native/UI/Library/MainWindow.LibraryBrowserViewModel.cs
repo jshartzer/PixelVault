@@ -315,11 +315,11 @@ namespace PixelVaultNative
             var safeCaptureCount = Math.Max(1, captureCount);
             var width = availableWidth <= 0d ? 1280d : availableWidth;
             var minCardWidth = timelineView
-                ? (width >= 1850d ? 680d : (width >= 1450d ? 600d : 520d))
-                : (width >= 1450d ? 480d : (width >= 1080d ? 420d : 360d));
+                ? (width >= 1850d ? 760d : (width >= 1450d ? 660d : 560d))
+                : (width >= 1450d ? 540d : (width >= 1080d ? 460d : 390d));
             var targetTileWidth = timelineView
-                ? (width >= 1850d ? 440d : (width >= 1450d ? 380d : 330d))
-                : (width >= 1450d ? 330d : (width >= 1080d ? 290d : 250d));
+                ? (width >= 1850d ? 520d : (width >= 1450d ? 440d : 360d))
+                : (width >= 1450d ? 400d : (width >= 1080d ? 330d : 280d));
             var preferredColumns = 1;
             if (safeCaptureCount >= (timelineView ? 4 : 3) && width >= (timelineView ? 1250d : 920d))
                 preferredColumns = 2;

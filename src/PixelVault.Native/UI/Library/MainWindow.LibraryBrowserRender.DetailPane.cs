@@ -597,18 +597,17 @@ namespace PixelVaultNative
                 .ToList();
             if (groupFiles.Count == 0) return null;
 
-            const int cardPadding = 12;
             const int masonryTileGap = 4;
-            var innerPackWidth = Math.Max(240d, cardWidth - (2 * cardPadding));
+            var innerPackWidth = Math.Max(240d, cardWidth);
             var targetTileWidth = timelineView
-                ? (innerPackWidth >= 1200d ? 520 : (innerPackWidth >= 900d ? 440 : (innerPackWidth >= 680d ? 360 : 300)))
-                : (innerPackWidth >= 900d ? 420 : (innerPackWidth >= 680d ? 340 : 280));
+                ? (innerPackWidth >= 1280d ? 620 : (innerPackWidth >= 980d ? 520 : (innerPackWidth >= 760d ? 440 : 360)))
+                : (innerPackWidth >= 980d ? 500 : (innerPackWidth >= 760d ? 420 : 330));
             var minTileWidth = timelineView
-                ? Math.Max(320, Math.Min(targetTileWidth, (int)Math.Floor(innerPackWidth * 0.46d)))
-                : Math.Max(240, Math.Min(targetTileWidth, (int)Math.Floor(innerPackWidth * 0.38d)));
+                ? Math.Max(360, Math.Min(targetTileWidth, (int)Math.Floor(innerPackWidth * 0.5d)))
+                : Math.Max(280, Math.Min(targetTileWidth, (int)Math.Floor(innerPackWidth * 0.44d)));
             var maxTileWidth = groupFiles.Count == 1
                 ? (int)Math.Floor(innerPackWidth)
-                : Math.Min((int)Math.Floor(innerPackWidth), targetTileWidth + (timelineView ? 140 : 100));
+                : Math.Min((int)Math.Floor(innerPackWidth), targetTileWidth + (timelineView ? 180 : 120));
             maxTileWidth = Math.Max(minTileWidth, maxTileWidth);
             var chunks = BuildLibraryDetailMasonryChunks(
                 groupFiles,
@@ -619,16 +618,14 @@ namespace PixelVaultNative
                 maxTileWidth,
                 timelineView,
                 mediaLayoutByFile);
-            var title = BuildLibraryTimelineDayCardTitle(group.CaptureDate, DateTime.Today);
-            var absoluteTitle = group.CaptureDate <= DateTime.MinValue ? string.Empty : group.CaptureDate.ToString("MMMM d, yyyy");
-            var headerHeight = string.IsNullOrWhiteSpace(absoluteTitle) || string.Equals(title, absoluteTitle, StringComparison.Ordinal) ? 56d : 76d;
+            var headerHeight = group.CaptureDate <= DateTime.MinValue ? 0d : 24d;
             var chunkHeights = chunks.Sum(chunk => chunk == null ? 0d : chunk.CanvasHeight);
             var chunkGaps = Math.Max(0, chunks.Count - 1) * masonryTileGap;
             return new LibraryPackedDayCardLayout
             {
                 Group = group,
                 Width = Math.Max(timelineView ? 520d : 360d, Math.Ceiling(cardWidth)),
-                Height = headerHeight + chunkHeights + chunkGaps + (2 * cardPadding),
+                Height = headerHeight + chunkHeights + chunkGaps,
                 TimelineView = timelineView,
                 Chunks = chunks
             };
@@ -649,62 +646,26 @@ namespace PixelVaultNative
             if (cardLayout == null || cardLayout.Group == null) return null;
             var group = cardLayout.Group;
             var timelineView = cardLayout.TimelineView;
-            const int cardPadding = 12;
             const int masonryTileGap = 4;
             var groupFiles = (group.Files ?? new List<string>())
                 .Where(file => !string.IsNullOrWhiteSpace(file))
                 .ToList();
             if (groupFiles.Count == 0) return null;
-            var title = BuildLibraryTimelineDayCardTitle(group.CaptureDate, DateTime.Today);
-            var absoluteTitle = group.CaptureDate <= DateTime.MinValue ? string.Empty : group.CaptureDate.ToString("MMMM d, yyyy");
-
-            var card = new Border
-            {
-                Width = cardLayout.Width,
-                Padding = new Thickness(cardPadding),
-                Background = Brush("#121A20"),
-                BorderBrush = Brush("#24323B"),
-                BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(16)
-            };
+            var labelText = group.CaptureDate <= DateTime.MinValue
+                ? string.Empty
+                : (group.CaptureDate.Year == DateTime.Today.Year
+                    ? group.CaptureDate.ToString("ddd, MMM d")
+                    : group.CaptureDate.ToString("ddd, MMM d, yyyy"));
             var stack = new StackPanel();
-
-            var header = new DockPanel { Margin = new Thickness(0, 0, 0, 10), LastChildFill = true };
-            var countBadge = new Border
-            {
-                Background = Brush("#162028"),
-                BorderBrush = Brush("#2E4551"),
-                BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(10),
-                Padding = new Thickness(8, 3, 8, 3),
-                Child = new TextBlock
-                {
-                    Text = groupFiles.Count + " photo" + (groupFiles.Count == 1 ? string.Empty : "s"),
-                    Foreground = Brush("#CFE0E8"),
-                    FontSize = 10.5,
-                    FontWeight = FontWeights.SemiBold
-                }
-            };
-            DockPanel.SetDock(countBadge, Dock.Right);
-            header.Children.Add(countBadge);
-            header.Children.Add(new TextBlock
-            {
-                Text = string.IsNullOrWhiteSpace(title) ? absoluteTitle : title,
-                Foreground = Brush("#F1E9DA"),
-                FontSize = 14,
-                FontWeight = FontWeights.SemiBold,
-                TextWrapping = TextWrapping.Wrap,
-                Margin = new Thickness(0, 1, 12, 0)
-            });
-            stack.Children.Add(header);
-            if (!string.IsNullOrWhiteSpace(absoluteTitle) && !string.Equals(title, absoluteTitle, StringComparison.Ordinal))
+            if (!string.IsNullOrWhiteSpace(labelText))
             {
                 stack.Children.Add(new TextBlock
                 {
-                    Text = absoluteTitle,
+                    Text = labelText,
                     Foreground = Brush("#8FA1AD"),
-                    FontSize = 11.5,
-                    Margin = new Thickness(0, -4, 0, 12)
+                    FontSize = timelineView ? 12.5 : 11.5,
+                    FontWeight = FontWeights.Medium,
+                    Margin = new Thickness(2, 0, 0, 6)
                 });
             }
 
@@ -756,8 +717,14 @@ namespace PixelVaultNative
                 stack.Children.Add(canvas);
             }
 
-            card.Child = stack;
-            return card;
+            return new Border
+            {
+                Width = cardLayout.Width,
+                Background = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                Padding = new Thickness(0),
+                Child = stack
+            };
         }
     }
 }

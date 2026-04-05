@@ -944,14 +944,14 @@ namespace PixelVaultNative
                 presenter.VerticalAlignment = VerticalAlignment.Stretch;
                 image.ClearValue(WidthProperty);
                 image.ClearValue(MaxWidthProperty);
-                image.Stretch = Stretch.UniformToFill;
+                image.Stretch = Stretch.Uniform;
                 image.HorizontalAlignment = HorizontalAlignment.Stretch;
                 image.VerticalAlignment = VerticalAlignment.Stretch;
                 if (videoPreviewMedia != null)
                 {
                     videoPreviewMedia.ClearValue(WidthProperty);
                     videoPreviewMedia.ClearValue(MaxWidthProperty);
-                    videoPreviewMedia.Stretch = Stretch.UniformToFill;
+                    videoPreviewMedia.Stretch = Stretch.Uniform;
                     videoPreviewMedia.HorizontalAlignment = HorizontalAlignment.Stretch;
                     videoPreviewMedia.VerticalAlignment = VerticalAlignment.Stretch;
                 }
