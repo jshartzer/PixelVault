@@ -1,3 +1,17 @@
+## 0.916
+- **Release:** Version **0.916** — timeline sort-pill state fix.
+- **Library / timeline:** The three left-side sort pills no longer stay accidentally greyed out after switching into and back out of **Timeline** mode. Grouping changes now always refresh the sort-pill enabled state, so the folder browser returns in a consistent interactive state.
+
+## 0.915
+- **Release:** Version **0.915** — Xbox intake **capture time** from filename (Steam-style).
+- **Intake / metadata:** Xbox console captures no longer use **filesystem modified time** as the capture instant when the filename encodes the real shot time. **`CaptureTime`** now follows **`ParseFilename`** (e.g. `Title-YYYY_MM_DD-HH_mm_ss`) like Steam.
+- **Built-in rules:** **Xbox Capture** and **Xbox Capture (Hyphen Time)** default to **`PreserveFileTimes = false`** (same idea as Steam screenshots) so ExifTool can align **on-disk** timestamps with the filename date after import.
+
+## 0.914
+- **Release:** Version **0.914** — **Export Starred** incremental sync + library metadata editor context fixes.
+- **Export Starred:** Copies only **new** starred files or those whose **file/date/sidecar stamp** or **photo-index metadata** (tags, game id, console, capture time) changed since the last export to the same destination. State is stored in the per-library **`starred_export_state`** SQLite table inside the existing index database; unstarred files drop off tracking. Missing export files are always recopied.
+- **Edit library metadata:** Opening the editor from **Timeline** (or any synthetic folder row) no longer prefills **Steam lookup** / **Game title to prepend** with **“Timeline”**; titles resolve from the **game index** and path when the folder row is not a real on-disk game folder.
+
 ## 0.913
 - **Release:** Version **0.913** — Library folder grid fill + **Export Starred** export path polish.
 - **Folder grid:** Column count is chosen to **minimize empty horizontal space** after the tile-size cap (Tiles ±), with a higher wide-pane column ceiling, so folder covers use the pane width instead of leaving a gap beside the last column.
