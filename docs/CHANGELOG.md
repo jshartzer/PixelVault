@@ -1,3 +1,9 @@
+## 0.954
+- **Release:** Version **0.954** — Seamless gallery-grid follow-up for Library detail and timeline.
+- **Library / gallery chrome:** Packed day cards no longer draw their own visible frame chrome. The gallery now reads as one continuous grid, with only a small muted date label above each day’s first cluster.
+- **Library / media fit:** Masonry tiles now fit media to the available frame shape instead of cover-cropping it, so screenshots and clips keep their aspect ratio inside the grid while still using the available cell space cleanly.
+- **Library / scale:** Packed widths were loosened further so both normal detail and timeline render larger cells, with timeline still intentionally roomier than the regular detail pane.
+
 ## 0.949
 - **Release:** Version **0.949** — Larger packed day-card gallery for Library detail and timeline.
 - **Library / day packing:** Days no longer force their own full-width line in either detail or timeline view. Instead, each day renders as a packed card so adjacent days can sit side by side and use the row width more efficiently, closer to the Immich-style layout direction.
