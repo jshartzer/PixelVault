@@ -149,6 +149,9 @@ namespace PixelVaultNative
                     var timelineContexts = snapshot == null
                         ? new Dictionary<string, LibraryTimelineCaptureContext>(StringComparer.OrdinalIgnoreCase)
                         : (snapshot.TimelineContextByFile ?? new Dictionary<string, LibraryTimelineCaptureContext>(StringComparer.OrdinalIgnoreCase));
+                    var mediaLayoutByFile = snapshot == null
+                        ? new Dictionary<string, LibraryDetailMediaLayoutInfo>(StringComparer.OrdinalIgnoreCase)
+                        : (snapshot.MediaLayoutByFile ?? new Dictionary<string, LibraryDetailMediaLayoutInfo>(StringComparer.OrdinalIgnoreCase));
                     var visibleSet = new HashSet<string>(visibleFiles, StringComparer.OrdinalIgnoreCase);
                     foreach (var stale in ws.SelectedDetailFiles.Where(path => !visibleSet.Contains(path)).ToList()) ws.SelectedDetailFiles.Remove(stale);
                     if (SameLibraryBrowserSelection(ws.Current, renderFolder))
@@ -253,7 +256,8 @@ namespace PixelVaultNative
                                 effectiveTileSize,
                                 packMinW,
                                 adaptiveMaxTileSize,
-                                true);
+                                true,
+                                mediaLayoutByFile);
                             foreach (var chunk in timelineMasonryChunks)
                             {
                                 var chunkHeight = chunk.CanvasHeight + masonryTileGap;
@@ -326,7 +330,8 @@ namespace PixelVaultNative
                                 effectiveTileSize,
                                 packMinW,
                                 adaptiveMaxTileSize,
-                                false);
+                                false,
+                                mediaLayoutByFile);
                             foreach (var chunk in normalMasonryChunks)
                             {
                                 var chunkHeight = chunk.CanvasHeight + masonryTileGap;
@@ -442,6 +447,7 @@ namespace PixelVaultNative
                         {
                             VisibleFiles = datedFiles.Select(entry => entry.FilePath).Distinct(StringComparer.OrdinalIgnoreCase).ToList()
                         };
+                        snapshot.MediaLayoutByFile = BuildLibraryDetailMediaLayoutInfoMap(snapshot.VisibleFiles);
                         if (timelineView)
                         {
                             snapshot.TimelineContextByFile = BuildLibraryTimelineCaptureContextMap(snapshot.VisibleFiles, metadataIndex, savedGameRows, timelineMetadataSnapshots);

@@ -365,16 +365,18 @@ namespace PixelVaultNative
         internal static int EstimateLibraryVariableDetailRowHeight(IReadOnlyList<(string File, int Width)> row, bool includeTimelineFooter)
         {
             if (row == null || row.Count == 0) return 260;
-            var footer = includeTimelineFooter ? 196 : 182;
-            var ratios = new[] { 0.58, 0.62, 0.66, 0.72, 0.78 };
+            var footer = includeTimelineFooter ? 112 : 14;
             var maxInner = 0;
             foreach (var pair in row)
             {
-                var r = ratios[LibraryDetailFileLayoutHash(pair.File) % ratios.Length];
-                var inner = (int)Math.Ceiling(pair.Width * r);
+                var aspectRatio = ResolveLibraryDetailAspectRatio(pair.File);
+                var inner = (int)Math.Ceiling(pair.Width / Math.Max(0.72d, aspectRatio));
                 if (inner > maxInner) maxInner = inner;
             }
-            return Math.Max(220, maxInner + footer);
+            var minInner = includeTimelineFooter ? 132 : 118;
+            var maxInnerCap = includeTimelineFooter ? 440 : 380;
+            maxInner = Math.Max(minInner, Math.Min(maxInnerCap, maxInner));
+            return Math.Max(includeTimelineFooter ? 248 : 180, maxInner + footer);
         }
 
         Dictionary<string, LibraryTimelineCaptureContext> BuildLibraryTimelineCaptureContextMap(

@@ -129,6 +129,7 @@ namespace PixelVaultNative
             public List<LibraryDetailRenderGroup> Groups = new List<LibraryDetailRenderGroup>();
             public List<string> VisibleFiles = new List<string>();
             public Dictionary<string, LibraryTimelineCaptureContext> TimelineContextByFile = new Dictionary<string, LibraryTimelineCaptureContext>(StringComparer.OrdinalIgnoreCase);
+            public Dictionary<string, LibraryDetailMediaLayoutInfo> MediaLayoutByFile = new Dictionary<string, LibraryDetailMediaLayoutInfo>(StringComparer.OrdinalIgnoreCase);
         }
 
         sealed class LibraryDetailRenderGroup
@@ -2592,7 +2593,6 @@ namespace PixelVaultNative
         }
     }
 }
-
 
 
 
