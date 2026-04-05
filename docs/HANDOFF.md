@@ -55,11 +55,11 @@ Then use these based on the task:
 
 Current live build:
 
-- `0.974`
+- `0.975`
 
 Current executable:
 
-- `C:\Codex\dist\PixelVault-0.974\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.975\PixelVault.exe`
 
 Current build pointer:
 
@@ -93,12 +93,13 @@ Practical current focus:
 
 ## Current Stop Point
 
-The app is currently published at `0.974`.
+The app is currently published at `0.975`.
 
 **Notion:** [MainWindow extraction roadmap](https://www.notion.so/33573adc59b681d88b7dcd88cad53cb6) updated for Phase **E** capstone (**`ILibraryBrowserShell`**). If release rows in Notion lag `docs/CURRENT_BUILD.txt`, re-sync per `docs/DOC_SYNC_POLICY.md`.
 
 Recent extraction progress (repo):
 
+- **Packed card tile scale (0.975):** Packed day-card masonry uses a **1.25×** tile-width multiplier instead of **1.75×** for in-card targets and min/max column bounds (detail/timeline packed layout only).
 - **Library aspect-native tiles (0.974):** Masonry heights are **width ÷ aspect** per file with no shared height clamps; images and video previews use **Uniform** stretch only; timeline packed-card estimates reserve space for tall portraits.
 - **Library aspect accuracy (0.969):** Introduced natural pixel aspect for masonry height estimates (prior to 0.974 removing shared height clamps and Uniform-only rendering).
 - **Library gallery refresh (0.964):** Detail scroll position is preserved across refined snapshot passes with debounced virtual refresh for smoother panning. Tile min/max bounds are ~1.75× larger for screenshot and timeline views; media uses cover-fill through rounded clips; timeline titles, meta, and comments sit on a bottom gradient over the image.

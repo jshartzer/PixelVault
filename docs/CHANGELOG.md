@@ -1,3 +1,7 @@
+## 0.975
+- **Release:** Version **0.975** — Slightly smaller packed day-card tiles in Library detail and timeline.
+- **Library / packed cards:** The multiplier applied to masonry **target**, **minimum**, and **max-bump** tile widths inside each packed day card is reduced from **1.75×** to **1.25×** (`BuildLibraryPackedDayCardLayout`), so thumbnails in those cards render a bit smaller while keeping the same column logic and breakpoints. Responsive detail grid scaling (`CalculateResponsiveLibraryDetailLayout`) and other **1.75×** library heuristics are unchanged.
+
 ## 0.974
 - **Release:** Version **0.974** — Library and timeline tiles follow **each image’s aspect ratio** instead of forced wide cells.
 - **Library / masonry height:** Tile height is **`ceil(width ÷ (width÷height))`** from real dimensions when known, with a varied hash fallback when metadata is missing—**no** shared min/max height clamps or footer slack that flattened portrait and landscape into similar rectangles.
