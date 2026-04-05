@@ -249,21 +249,38 @@ namespace PixelVaultNative
 
         internal static double EstimateLibraryTimelinePackedCardWidth(int captureCount, int tileSize, double availableWidth)
         {
+            return EstimateLibraryTimelinePackedCardWidth(
+                captureCount,
+                tileSize,
+                availableWidth,
+                CalculateLibraryTimelinePackedCardColumns(captureCount, availableWidth));
+        }
+
+        internal static double EstimateLibraryTimelinePackedCardWidth(int captureCount, int tileSize, double availableWidth, int cardColumns)
+        {
             const double innerGap = 8d;
             const double horizontalPadding = 24d;
-            var cardColumns = CalculateLibraryTimelinePackedCardColumns(captureCount, availableWidth);
-            return Math.Max(220d, (cardColumns * tileSize) + ((cardColumns - 1) * innerGap) + horizontalPadding);
+            var normalizedColumns = Math.Max(1, Math.Min(Math.Max(1, captureCount), cardColumns));
+            return Math.Max(220d, (normalizedColumns * tileSize) + ((normalizedColumns - 1) * innerGap) + horizontalPadding);
         }
 
         internal static double EstimateLibraryTimelinePackedCardHeight(int captureCount, int tileSize, double availableWidth)
+        {
+            return EstimateLibraryTimelinePackedCardHeight(
+                captureCount,
+                tileSize,
+                CalculateLibraryTimelinePackedCardColumns(Math.Max(1, captureCount), availableWidth));
+        }
+
+        internal static double EstimateLibraryTimelinePackedCardHeight(int captureCount, int tileSize, int cardColumns)
         {
             const double headerHeight = 40d;
             const double verticalPadding = 24d;
             const double innerGap = 8d;
             const double footerReserve = 176d;
             var safeCaptureCount = Math.Max(1, captureCount);
-            var cardColumns = CalculateLibraryTimelinePackedCardColumns(safeCaptureCount, availableWidth);
-            var rowCount = Math.Max(1, (int)Math.Ceiling(safeCaptureCount / (double)cardColumns));
+            var normalizedColumns = Math.Max(1, Math.Min(safeCaptureCount, cardColumns));
+            var rowCount = Math.Max(1, (int)Math.Ceiling(safeCaptureCount / (double)normalizedColumns));
             var estimatedTileHeight = Math.Max(240d, tileSize + footerReserve);
             return headerHeight + verticalPadding + (rowCount * estimatedTileHeight) + ((rowCount - 1) * innerGap);
         }

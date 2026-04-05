@@ -1,3 +1,11 @@
+## 0.932
+- **Release:** Version **0.932** — Regular screenshot view now follows the denser timeline-style grid behavior.
+- **Library / detail pane:** The non-timeline screenshot pane no longer relies on the older coarse one/two/three column thresholds. Detail photos now choose columns from actual pane width and fill each row more aggressively, so regular view and timeline view behave much more consistently.
+
+## 0.931
+- **Release:** Version **0.931** — Timeline packed-card grid regression fix.
+- **Library / timeline:** Packed day cards now keep the same internal photo-column count they were sized for, so the timeline no longer renders giant day cards with only a single narrow image column inside. Width, estimated height, and per-day photo grid now stay in sync.
+
 ## 0.930
 - **Release:** Version **0.930** — Library pane-width layout follow-up for covers and timeline.
 - **Library / covers:** Folder rows now use the real pane width more reliably and expand sparse rows, so cover tiles spread out instead of leaving a wide dead gutter when the folder pane has room.

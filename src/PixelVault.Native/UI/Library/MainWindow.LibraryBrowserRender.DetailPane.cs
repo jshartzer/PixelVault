@@ -210,6 +210,17 @@ namespace PixelVaultNative
                         : new List<VirtualizedRowDefinition>();
                     if (!timelineView)
                     {
+                        int ResolveDetailRowTileWidth(int rowCount)
+                        {
+                            if (rowCount <= 0) return size;
+                            var availableWidth = Math.Max(size, detailViewportWidth - 6d);
+                            var rawFill = (int)Math.Floor((availableWidth - ((rowCount - 1) * detailTileGap)) / Math.Max(1d, rowCount));
+                            if (rawFill <= size) return size;
+                            var roundedDown = (int)(Math.Floor(rawFill / 12d) * 12);
+                            if (roundedDown < size) roundedDown = rawFill;
+                            return Math.Max(size, roundedDown);
+                        }
+
                         foreach (var group in snapshot.Groups)
                         {
                             var groupDate = group.CaptureDate;
@@ -232,6 +243,7 @@ namespace PixelVaultNative
                             for (int rowStart = 0; rowStart < groupFiles.Count; rowStart += detailColumns)
                             {
                                 var rowFiles = groupFiles.Skip(rowStart).Take(detailColumns).ToList();
+                                var rowTileWidth = ResolveDetailRowTileWidth(rowFiles.Count);
                                 virtualRows.Add(new VirtualizedRowDefinition
                                 {
                                     Height = ws.EstimatedDetailRowHeight,
@@ -252,7 +264,7 @@ namespace PixelVaultNative
                                             };
                                             var tile = CreateLibraryDetailTile(
                                                 file,
-                                                size,
+                                                rowTileWidth,
                                                 delegate { return SameLibraryBrowserSelection(ws.Current, renderFolder); },
                                                 openSingleFileMetadataEditor,
                                                 updateDetailSelection,
@@ -554,8 +566,15 @@ namespace PixelVaultNative
             if (safeGroups.Count == 0) return new List<VirtualizedRowDefinition>();
 
             var availableWidth = viewportWidth <= 0d ? 1100d : Math.Max(320d, viewportWidth - 6d);
+            var cardColumnCounts = safeGroups
+                .Select(group => CalculateLibraryTimelinePackedCardColumns((group.Files ?? new List<string>()).Count, availableWidth))
+                .ToList();
             var cardWidths = safeGroups
-                .Select(group => EstimateLibraryTimelinePackedCardWidth((group.Files ?? new List<string>()).Count, timelineTileSize, availableWidth))
+                .Select((group, index) => EstimateLibraryTimelinePackedCardWidth(
+                    (group.Files ?? new List<string>()).Count,
+                    timelineTileSize,
+                    availableWidth,
+                    cardColumnCounts[index]))
                 .ToList();
             var packedRows = BuildLibraryTimelinePackedRows(cardWidths, availableWidth, cardGap);
             var rowDefinitions = new List<VirtualizedRowDefinition>();
@@ -564,7 +583,10 @@ namespace PixelVaultNative
                 var rowIndexes = row == null ? new List<int>() : row.ToList();
                 if (rowIndexes.Count == 0) continue;
                 var estimatedHeight = rowIndexes
-                    .Select(index => EstimateLibraryTimelinePackedCardHeight((safeGroups[index].Files ?? new List<string>()).Count, timelineTileSize, availableWidth))
+                    .Select(index => EstimateLibraryTimelinePackedCardHeight(
+                        (safeGroups[index].Files ?? new List<string>()).Count,
+                        timelineTileSize,
+                        cardColumnCounts[index]))
                     .DefaultIfEmpty(ws == null ? 360d : ws.EstimatedDetailRowHeight)
                     .Max();
                 rowDefinitions.Add(new VirtualizedRowDefinition
@@ -583,6 +605,7 @@ namespace PixelVaultNative
                                 timelineContexts,
                                 cardWidths[rowIndexes[i]],
                                 timelineTileSize,
+                                cardColumnCounts[rowIndexes[i]],
                                 openSingleFileMetadataEditor,
                                 updateDetailSelection,
                                 refreshDetailSelectionUi,
@@ -607,6 +630,7 @@ namespace PixelVaultNative
             IDictionary<string, LibraryTimelineCaptureContext> timelineContexts,
             double cardWidth,
             int timelineTileSize,
+            int preferredCardColumns,
             Action<string> openSingleFileMetadataEditor,
             Action<string, ModifierKeys> updateDetailSelection,
             Action refreshDetailSelectionUi,
@@ -620,7 +644,7 @@ namespace PixelVaultNative
 
             const int detailTileGap = 8;
             const int cardPadding = 12;
-            var cardColumns = CalculateLibraryTimelinePackedCardColumns(groupFiles.Count, Math.Max(220d, cardWidth));
+            var cardColumns = Math.Max(1, Math.Min(groupFiles.Count, preferredCardColumns));
             var title = BuildLibraryTimelineDayCardTitle(group.CaptureDate, DateTime.Today);
             var absoluteTitle = group.CaptureDate <= DateTime.MinValue ? string.Empty : group.CaptureDate.ToString("MMMM d, yyyy");
 

@@ -87,4 +87,21 @@ public sealed class LibraryTimelineModeTests
         Assert.Equal(new[] { 0, 1 }, rows[0]);
         Assert.Equal(new[] { 2 }, rows[1]);
     }
+
+    [Fact]
+    public void EstimateLibraryTimelinePackedCardWidth_UsesProvidedCardColumns()
+    {
+        var width = MainWindow.EstimateLibraryTimelinePackedCardWidth(13, 180, 1800, 3);
+
+        Assert.Equal(580d, width);
+    }
+
+    [Fact]
+    public void EstimateLibraryTimelinePackedCardHeight_UsesProvidedCardColumns()
+    {
+        var singleColumn = MainWindow.EstimateLibraryTimelinePackedCardHeight(13, 180, 1);
+        var threeColumns = MainWindow.EstimateLibraryTimelinePackedCardHeight(13, 180, 3);
+
+        Assert.True(threeColumns < singleColumn);
+    }
 }

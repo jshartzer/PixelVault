@@ -40,7 +40,7 @@ namespace PixelVaultNative
 
     public sealed partial class MainWindow : Window
     {
-        const string AppVersion = "0.930";
+        const string AppVersion = "0.932";
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
         const string ClearedExternalIdSentinel = "__PV_CLEARED__";
@@ -881,14 +881,49 @@ namespace PixelVaultNative
         }
         (int Columns, int TileSize) CalculateResponsiveLibraryDetailLayout(ScrollViewer scrollViewer)
         {
+            const int gapPx = 8;
+            const double moreColumnsSlackBudgetPx = 16d;
             var viewportWidth = ResolveScrollViewerLayoutWidth(scrollViewer);
-            viewportWidth = Math.Max(120, viewportWidth - 64);
-            var columns = viewportWidth >= 1800 ? 3 : (viewportWidth >= 900 ? 2 : 1);
-            var tileWidth = (int)Math.Floor((viewportWidth - ((columns - 1) * 8)) / columns);
-            var minTile = viewportWidth < 340 ? 120 : 180;
-            tileWidth = Math.Max(minTile, Math.Min(900, tileWidth));
-            tileWidth = Math.Max(minTile, Math.Min(900, (int)(Math.Round(tileWidth / 24d) * 24)));
-            return (columns, tileWidth);
+            viewportWidth = Math.Max(160, viewportWidth - 24);
+            var maxColumnsCeiling = viewportWidth >= 1100d ? 4 : (viewportWidth >= 560d ? 3 : (viewportWidth >= 360d ? 2 : 1));
+            var minTile = viewportWidth < 420d ? 156 : (viewportWidth < 900d ? 176 : 208);
+
+            int ClampRoundedTile(int rawEqualSplit)
+            {
+                var clamped = Math.Max(minTile, Math.Min(900, rawEqualSplit));
+                var roundedDown = (int)(Math.Floor(clamped / 12d) * 12);
+                if (roundedDown < minTile) roundedDown = clamped;
+                return Math.Max(minTile, Math.Min(rawEqualSplit, roundedDown));
+            }
+
+            var bestColumns = 1;
+            var bestTileWidth = ClampRoundedTile((int)Math.Floor(viewportWidth));
+            var bestSlack = Math.Max(0d, viewportWidth - bestTileWidth);
+
+            for (var columns = 1; columns <= maxColumnsCeiling; columns++)
+            {
+                var rawEqualSplit = (int)Math.Floor((viewportWidth - ((columns - 1) * gapPx)) / columns);
+                if (rawEqualSplit < minTile) continue;
+                var tileWidth = ClampRoundedTile(rawEqualSplit);
+                var usedWidth = (columns * tileWidth) + ((columns - 1) * gapPx);
+                var slack = Math.Max(0d, viewportWidth - usedWidth);
+                if (slack + moreColumnsSlackBudgetPx < bestSlack)
+                {
+                    bestColumns = columns;
+                    bestTileWidth = tileWidth;
+                    bestSlack = slack;
+                    continue;
+                }
+
+                if (slack <= bestSlack + moreColumnsSlackBudgetPx && columns > bestColumns)
+                {
+                    bestColumns = columns;
+                    bestTileWidth = tileWidth;
+                    bestSlack = slack;
+                }
+            }
+
+            return (bestColumns, bestTileWidth);
         }
         string NormalizeLibraryFolderSortMode(string value) => SettingsService.NormalizeLibraryFolderSortMode(value);
         string LibraryFolderSortModeLabel(string value)
@@ -2557,9 +2592,6 @@ namespace PixelVaultNative
         }
     }
 }
-
-
-
 
 
 
