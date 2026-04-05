@@ -419,6 +419,21 @@ namespace PixelVaultNative
             return footer;
         }
 
+        static void SyncLibraryMasonryTileRoundedClip(Border tile)
+        {
+            if (tile == null) return;
+            var w = tile.ActualWidth;
+            var h = tile.ActualHeight;
+            if (w <= 1d || h <= 1d) return;
+            var r = tile.CornerRadius.TopLeft;
+            if (r <= 0d)
+            {
+                tile.Clip = new RectangleGeometry(new Rect(0, 0, w, h));
+                return;
+            }
+            tile.Clip = new RectangleGeometry(new Rect(0, 0, w, h), r, r);
+        }
+
         Border CreateLibraryDetailTile(string file, int size, int decodePixelWidth, Func<bool> shouldLoad, Action<string> openSingleFileMetadataEditor, Action<string, ModifierKeys> updateDetailSelection, HashSet<string> selectedDetailFiles, Action refreshDetailSelectionUi, Action redrawDetailPane, Action<string> useFileAsFolderCover, int? masonryLayoutHeight = null, LibraryTimelineCaptureContext timelineContext = null)
         {
             var isVideoFile = IsVideo(file);
@@ -924,16 +939,21 @@ namespace PixelVaultNative
             {
                 var totalH = Math.Max(1, masonryLayoutHeight.Value);
                 tile.Height = totalH;
+                tile.BorderThickness = new Thickness(0);
+                presenter.HorizontalAlignment = HorizontalAlignment.Stretch;
+                presenter.VerticalAlignment = VerticalAlignment.Stretch;
                 image.ClearValue(WidthProperty);
-                image.MaxWidth = size;
+                image.ClearValue(MaxWidthProperty);
+                image.Stretch = Stretch.UniformToFill;
                 image.HorizontalAlignment = HorizontalAlignment.Stretch;
-                image.VerticalAlignment = VerticalAlignment.Center;
+                image.VerticalAlignment = VerticalAlignment.Stretch;
                 if (videoPreviewMedia != null)
                 {
                     videoPreviewMedia.ClearValue(WidthProperty);
-                    videoPreviewMedia.MaxWidth = size;
+                    videoPreviewMedia.ClearValue(MaxWidthProperty);
+                    videoPreviewMedia.Stretch = Stretch.UniformToFill;
                     videoPreviewMedia.HorizontalAlignment = HorizontalAlignment.Stretch;
-                    videoPreviewMedia.VerticalAlignment = VerticalAlignment.Center;
+                    videoPreviewMedia.VerticalAlignment = VerticalAlignment.Stretch;
                 }
                 if (tile.Child is Grid tileGrid && tileGrid.RowDefinitions.Count == 2)
                 {
@@ -943,6 +963,15 @@ namespace PixelVaultNative
                 {
                     presenter.VerticalAlignment = VerticalAlignment.Stretch;
                 }
+                presenter.ClipToBounds = true;
+                tile.SizeChanged += delegate
+                {
+                    SyncLibraryMasonryTileRoundedClip(tile);
+                };
+                tile.Loaded += delegate(object s, RoutedEventArgs e)
+                {
+                    SyncLibraryMasonryTileRoundedClip(tile);
+                };
             }
             return tile;
         }

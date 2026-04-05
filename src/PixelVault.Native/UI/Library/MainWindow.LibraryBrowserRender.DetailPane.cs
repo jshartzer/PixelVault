@@ -51,6 +51,7 @@ namespace PixelVaultNative
                 return;
             }
             const int detailTileGap = 8;
+            const int masonryTileGap = 3;
             var detailLayout = CalculateResponsiveLibraryDetailLayout(panes.ThumbScroll);
             var size = detailLayout.TileSize;
             ws.LastDetailViewportWidth = ResolveScrollViewerLayoutWidth(panes == null ? null : panes.ThumbScroll);
@@ -248,14 +249,14 @@ namespace PixelVaultNative
                             var timelineMasonryChunks = BuildLibraryDetailMasonryChunks(
                                 groupFiles,
                                 packAvailableW,
-                                detailTileGap,
+                                masonryTileGap,
                                 effectiveTileSize,
                                 packMinW,
                                 adaptiveMaxTileSize,
                                 true);
                             foreach (var chunk in timelineMasonryChunks)
                             {
-                                var chunkHeight = chunk.CanvasHeight + detailTileGap;
+                                var chunkHeight = chunk.CanvasHeight + masonryTileGap;
                                 var chunkCopy = chunk;
                                 virtualRows.Add(new VirtualizedRowDefinition
                                 {
@@ -266,7 +267,7 @@ namespace PixelVaultNative
                                         {
                                             Width = chunkCopy.CanvasWidth,
                                             Height = chunkCopy.CanvasHeight,
-                                            Margin = new Thickness(0, 0, 0, detailTileGap)
+                                            Margin = new Thickness(0, 0, 0, masonryTileGap)
                                         };
                                         foreach (var pl in chunkCopy.Placements)
                                         {
@@ -321,14 +322,14 @@ namespace PixelVaultNative
                             var normalMasonryChunks = BuildLibraryDetailMasonryChunks(
                                 groupFiles,
                                 packAvailableW,
-                                detailTileGap,
+                                masonryTileGap,
                                 effectiveTileSize,
                                 packMinW,
                                 adaptiveMaxTileSize,
                                 false);
                             foreach (var chunk in normalMasonryChunks)
                             {
-                                var chunkHeight = chunk.CanvasHeight + detailTileGap;
+                                var chunkHeight = chunk.CanvasHeight + masonryTileGap;
                                 var chunkCopy = chunk;
                                 virtualRows.Add(new VirtualizedRowDefinition
                                 {
@@ -339,7 +340,7 @@ namespace PixelVaultNative
                                         {
                                             Width = chunkCopy.CanvasWidth,
                                             Height = chunkCopy.CanvasHeight,
-                                            Margin = new Thickness(0, 0, 0, detailTileGap)
+                                            Margin = new Thickness(0, 0, 0, masonryTileGap)
                                         };
                                         foreach (var pl in chunkCopy.Placements)
                                         {

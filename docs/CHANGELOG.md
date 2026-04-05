@@ -1,3 +1,7 @@
+## 0.936
+- **Release:** Version **0.936** — Library masonry view reads as a **tight photo mosaic**.
+- **Library / masonry tiles:** Images and video previews use **cover-style** scaling (`UniformToFill`) so each cell is **filled** with minimal empty area inside the frame; media is **clipped** to the rounded tile shape. Masonry uses a **narrower gutter** (3px) than the rest of the library grid, and **frameless** masonry cells (no inner border band) so neighboring shots sit closer together.
+
 ## 0.935
 - **Release:** Version **0.935** — Library detail and timeline photo grids use **masonry-style** layout with **hero** tiles.
 - **Library / detail pane:** Captures in the screenshot and timeline feeds are placed in a **column masonry** flow (not strict horizontal rows). The first item and occasional highlights render as **wider two-column “hero”** tiles; other images use variable heights and pack around them. Layout is **chunked** for scrolling performance, with a **comfortable minimum column width** so thumbnails stay legible.
