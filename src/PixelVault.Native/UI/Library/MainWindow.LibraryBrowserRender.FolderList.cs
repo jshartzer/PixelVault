@@ -114,7 +114,7 @@ namespace PixelVaultNative
             {
                 if (rowCount <= 0) return tileWidth;
                 var availableWidth = Math.Max(tileWidth, folderPaneWidth - 4);
-                var rawFill = (int)Math.Floor((availableWidth - ((rowCount - 1) * 14d)) / Math.Max(1d, rowCount));
+                var rawFill = (int)Math.Floor((availableWidth - ((rowCount - 1) * 12d)) / Math.Max(1d, rowCount));
                 var roundedFill = Math.Max(tileWidth, (int)(Math.Round(rawFill / 16d) * 16));
                 var maxExpandedTile = Math.Max(tileWidth, Math.Min(1000, NormalizeLibraryFolderTileSize(libraryFolderTileSize) + 176));
                 return Math.Max(tileWidth, Math.Min(maxExpandedTile, roundedFill));
@@ -215,8 +215,8 @@ namespace PixelVaultNative
                         var rowFolders = groupFolders.Skip(rowStart).Take(folderColumns).ToList();
                         var rowTileWidth = ResolveFolderRowTileWidth(rowFolders.Count);
                         var rowTileHeight = (int)Math.Round(rowTileWidth * 1.5d);
-                        var rowCardHeight = rowTileHeight + 16;
-                        var rowHeight = rowCardHeight + 14;
+                        var rowCardHeight = rowTileHeight + 14;
+                        var rowHeight = rowCardHeight + 12;
                         virtualRows.Add(new VirtualizedRowDefinition
                         {
                             Height = rowHeight,

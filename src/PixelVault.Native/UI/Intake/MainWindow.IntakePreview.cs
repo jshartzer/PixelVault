@@ -99,7 +99,8 @@ namespace PixelVaultNative
                 PreviewBadge = PreviewBadgeBrush,
                 PlatformOrder = PlatformGroupOrder,
                 FormatTimestamp = FormatFriendlyTimestamp,
-                FilenameGuess = FilenameGuessLabel
+                FilenameGuess = FilenameGuessLabel,
+                IntakeReviewQueueBitmap = LoadIntakeReviewQueueBitmap()
             });
         }
 

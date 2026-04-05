@@ -113,7 +113,7 @@ namespace PixelVaultNative
             {
                 Width = tileWidth,
                 Height = tileHeight,
-                Margin = new Thickness(0, 0, 14, 16),
+                Margin = new Thickness(0, 0, 12, 14),
                 Padding = new Thickness(0),
                 Background = Brush("#151E24"),
                 BorderBrush = Brush("#25333D"),
@@ -184,6 +184,10 @@ namespace PixelVaultNative
                 ClipToBounds = true,
                 Child = coverRoot
             };
+            var coverRadius = coverCorner.TopLeft;
+            var roundedCoverClip = new RectangleGeometry(new Rect(0, 0, tileWidth, tileHeight), coverRadius, coverRadius);
+            if (roundedCoverClip.CanFreeze) roundedCoverClip.Freeze();
+            imageBorder.Clip = roundedCoverClip;
             tile.Content = imageBorder;
             tile.Click += delegate { showFolder(folder); };
             var contextMenu = new ContextMenu();

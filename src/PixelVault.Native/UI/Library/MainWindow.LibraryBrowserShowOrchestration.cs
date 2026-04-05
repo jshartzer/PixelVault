@@ -128,10 +128,8 @@ namespace PixelVaultNative
                     var normalized = _shell.NormalizeLibraryFolderSortMode(_shell.LibraryFolderSortMode);
                     _shell.LibraryBrowserApplySortGroupPillState(panes.SortPlatformButton, !timelineMode && string.Equals(normalized, "platform", StringComparison.OrdinalIgnoreCase));
                     _shell.LibraryBrowserApplySortGroupPillState(panes.SortRecentButton, !timelineMode && string.Equals(normalized, "recent", StringComparison.OrdinalIgnoreCase));
-                    _shell.LibraryBrowserApplySortGroupPillState(panes.SortPhotosButton, !timelineMode && string.Equals(normalized, "photos", StringComparison.OrdinalIgnoreCase));
                     panes.SortPlatformButton.IsEnabled = !timelineMode;
                     panes.SortRecentButton.IsEnabled = !timelineMode;
-                    panes.SortPhotosButton.IsEnabled = !timelineMode;
                 };
 
                 refreshGroupingButtons = delegate

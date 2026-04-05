@@ -23,7 +23,6 @@ namespace PixelVaultNative
             internal Button GroupTimelineButton;
             internal Button SortPlatformButton;
             internal Button SortRecentButton;
-            internal Button SortPhotosButton;
             internal VirtualizedRowHost TileRows;
             internal ScrollViewer TileScroll;
             internal TextBlock ThumbLabel;
@@ -113,7 +112,6 @@ namespace PixelVaultNative
             var browserToolbar = new Grid();
             browserToolbar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             browserToolbar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            browserToolbar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             browserToolbar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             browserToolbar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             browserToolbar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -130,17 +128,9 @@ namespace PixelVaultNative
             panes.SortRecentButton.FontSize = 11.5;
             panes.SortRecentButton.Margin = new Thickness(0, 0, 10, 0);
             ApplyLibraryPillChrome(panes.SortRecentButton, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
-            panes.SortPhotosButton = Btn("Most Photos", null, "#20343A", Brushes.White);
-            panes.SortPhotosButton.Width = 108;
-            panes.SortPhotosButton.Height = 34;
-            panes.SortPhotosButton.FontSize = 11.5;
-            panes.SortPhotosButton.Margin = new Thickness(0, 0, 0, 0);
-            ApplyLibraryPillChrome(panes.SortPhotosButton, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
             browserToolbar.Children.Add(panes.SortPlatformButton);
             Grid.SetColumn(panes.SortRecentButton, 1);
             browserToolbar.Children.Add(panes.SortRecentButton);
-            Grid.SetColumn(panes.SortPhotosButton, 2);
-            browserToolbar.Children.Add(panes.SortPhotosButton);
             panes.GroupAllButton = Btn("All", null, "#20343A", Brushes.White);
             panes.GroupAllButton.Width = 58;
             panes.GroupAllButton.Height = 32;
@@ -159,11 +149,11 @@ namespace PixelVaultNative
             panes.GroupTimelineButton.FontSize = 11.5;
             panes.GroupTimelineButton.Margin = new Thickness(0);
             ApplyLibraryPillChrome(panes.GroupTimelineButton, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
-            Grid.SetColumn(panes.GroupAllButton, 4);
+            Grid.SetColumn(panes.GroupAllButton, 3);
             browserToolbar.Children.Add(panes.GroupAllButton);
-            Grid.SetColumn(panes.GroupConsoleButton, 5);
+            Grid.SetColumn(panes.GroupConsoleButton, 4);
             browserToolbar.Children.Add(panes.GroupConsoleButton);
-            Grid.SetColumn(panes.GroupTimelineButton, 6);
+            Grid.SetColumn(panes.GroupTimelineButton, 5);
             browserToolbar.Children.Add(panes.GroupTimelineButton);
             var toolbarScroll = new ScrollViewer
             {

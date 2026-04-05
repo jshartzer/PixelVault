@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Effects;
+using System.Windows.Media.Imaging;
 
 namespace PixelVaultNative
 {
@@ -25,6 +26,7 @@ namespace PixelVaultNative
         public Func<string, int> PlatformOrder { get; set; }
         public Func<DateTime, string> FormatTimestamp { get; set; }
         public Func<string, string> FilenameGuess { get; set; }
+        public BitmapSource IntakeReviewQueueBitmap { get; set; }
     }
 
     /// <summary>Modal upload-queue preview (extracted from MainWindow, Phase C1).</summary>
@@ -140,6 +142,16 @@ namespace PixelVaultNative
                 headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
                 headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                 headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                FrameworkElement headerGlyph = services.IntakeReviewQueueBitmap != null
+                    ? new Image
+                    {
+                        Source = services.IntakeReviewQueueBitmap,
+                        Stretch = Stretch.Uniform,
+                        HorizontalAlignment = HorizontalAlignment.Center,
+                        VerticalAlignment = VerticalAlignment.Center
+                    }
+                    : BuildGamepadGlyph(B("#F5F7FA"), 2.2, 42, 28);
+                if (headerGlyph is Image hi) RenderOptions.SetBitmapScalingMode(hi, BitmapScalingMode.HighQuality);
                 var iconShell = new Border
                 {
                     Width = 74,
@@ -150,7 +162,7 @@ namespace PixelVaultNative
                     CornerRadius = new CornerRadius(22),
                     Padding = new Thickness(14),
                     Margin = new Thickness(0, 0, 18, 0),
-                    Child = BuildGamepadGlyph(B("#F5F7FA"), 2.2, 42, 28)
+                    Child = headerGlyph
                 };
                 headerGrid.Children.Add(iconShell);
                 var headerStack = new StackPanel { VerticalAlignment = VerticalAlignment.Center };

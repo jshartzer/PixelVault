@@ -160,15 +160,33 @@ namespace PixelVaultNative
             chrome.IntakeReviewButton.ToolTip = "Preview upload queue";
             ApplyLibraryToolbarChrome(chrome.IntakeReviewButton, "#152028", "#253745", "#1E2D37", "#121C23");
             var intakeReviewContent = new Grid();
-            intakeReviewContent.Children.Add(new Viewbox
+            var intakeQueueIcon = LoadIntakeReviewQueueBitmap();
+            if (intakeQueueIcon != null)
             {
-                Width = 42,
-                Height = 28,
-                Stretch = Stretch.Uniform,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center,
-                Child = BuildGamepadGlyph(Brush("#F5F7FA"), 2.15, 42, 28)
-            });
+                var intakeImage = new Image
+                {
+                    Width = 42,
+                    Height = 28,
+                    Stretch = Stretch.Uniform,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Source = intakeQueueIcon
+                };
+                RenderOptions.SetBitmapScalingMode(intakeImage, BitmapScalingMode.HighQuality);
+                intakeReviewContent.Children.Add(intakeImage);
+            }
+            else
+            {
+                intakeReviewContent.Children.Add(new Viewbox
+                {
+                    Width = 42,
+                    Height = 28,
+                    Stretch = Stretch.Uniform,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Child = BuildGamepadGlyph(Brush("#F5F7FA"), 2.15, 42, 28)
+                });
+            }
             chrome.IntakeReviewBadgeText = new TextBlock
             {
                 Foreground = Brushes.White,

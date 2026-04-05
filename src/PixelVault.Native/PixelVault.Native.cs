@@ -51,7 +51,7 @@ namespace PixelVaultNative
 
     public sealed partial class MainWindow : Window
     {
-        const string AppVersion = "0.981";
+        const string AppVersion = "0.982";
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
         const string ClearedExternalIdSentinel = "__PV_CLEARED__";
@@ -483,6 +483,44 @@ namespace PixelVaultNative
             }
             return string.Empty;
         }
+        /// <summary>Toolbar / intake header bitmap; knocks out near-white backing so the glyph reads on dark chrome.</summary>
+        BitmapSource LoadIntakeReviewQueueBitmap()
+        {
+            var path = ResolveWorkspaceAssetPath("IntakeReviewQueue.png");
+            if (string.IsNullOrWhiteSpace(path)) return null;
+            try
+            {
+                var bmp = new BitmapImage();
+                bmp.BeginInit();
+                bmp.UriSource = new Uri(path, UriKind.Absolute);
+                bmp.DecodePixelWidth = 128;
+                bmp.CacheOption = BitmapCacheOption.OnLoad;
+                bmp.EndInit();
+                bmp.Freeze();
+                var converted = new FormatConvertedBitmap(bmp, PixelFormats.Pbgra32, null, 0);
+                converted.Freeze();
+                var w = converted.PixelWidth;
+                var h = converted.PixelHeight;
+                var stride = w * 4;
+                var pixels = new byte[stride * h];
+                converted.CopyPixels(pixels, stride, 0);
+                for (var i = 0; i < pixels.Length; i += 4)
+                {
+                    var blue = pixels[i];
+                    var green = pixels[i + 1];
+                    var red = pixels[i + 2];
+                    if (red >= 245 && green >= 245 && blue >= 245) pixels[i + 3] = 0;
+                }
+                var trimmed = new WriteableBitmap(w, h, 96, 96, PixelFormats.Pbgra32, null);
+                trimmed.WritePixels(new Int32Rect(0, 0, w, h), pixels, stride, 0);
+                trimmed.Freeze();
+                return trimmed;
+            }
+            catch
+            {
+                return null;
+            }
+        }
         string ResolveLibrarySectionIconPath(string platformLabel)
         {
             var normalized = NormalizeConsoleLabel(platformLabel);
@@ -833,16 +871,16 @@ namespace PixelVaultNative
         int NormalizeLibraryFolderTileSize(int value) => SettingsService.NormalizeLibraryFolderTileSize(value);
         (int Columns, int TileSize) CalculateResponsiveLibraryFolderLayout(ScrollViewer scrollViewer)
         {
-            const int gapPx = 14;
-            // Upper bound on columns for very wide folder panes; slack-minimization below may use fewer.
-            const int libraryFolderMaxColumnsWideBand = 8;
-            // When slack is nearly tied, allow a few extra pixels of slack to prefer a denser grid (e.g. 3 columns in the folder pane instead of 2).
-            const double moreColumnsSlackBudgetPx = 12;
+            // Match folder cover tile Margin right (horizontal rhythm between columns).
+            const int gapPx = 12;
+            // Hard cap: at most four covers per row so tiles stay larger and column count does not jump 5–8 on wide layouts.
+            const int libraryFolderMaxColumns = 4;
+            // When slack is nearly tied on a narrow folder pane, prefer one more column only within this budget (stable wide layouts avoid this).
+            const double moreColumnsSlackBudgetPx = 8;
             var viewportWidth = ResolveScrollViewerLayoutWidth(scrollViewer);
             viewportWidth = Math.Max(120, viewportWidth - 18);
-            // Per-band ceiling; 360–899 is typical library splitter width — allow up to 3 columns so covers use width instead of leaving a gutter beside a capped 2-column row.
-            var maxColumnsCeiling = viewportWidth >= 1200 ? libraryFolderMaxColumnsWideBand : (viewportWidth >= 900 ? 4 : (viewportWidth >= 360 ? 3 : 1));
-            var preferDenseGridInSplitPane = maxColumnsCeiling <= 3;
+            var maxColumnsCeiling = viewportWidth >= 360 ? libraryFolderMaxColumns : 1;
+            var preferDenseGridInSplitPane = viewportWidth < 900;
             var minTile = viewportWidth < 260 ? 112 : 140;
             var userCap = NormalizeLibraryFolderTileSize(libraryFolderTileSize);
             const int layoutMaxTile = 1000;

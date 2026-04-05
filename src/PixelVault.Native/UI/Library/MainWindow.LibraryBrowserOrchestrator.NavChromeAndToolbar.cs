@@ -60,7 +60,6 @@ namespace PixelVaultNative
             panes.ExitTimelineButton.Click += delegate { setLibraryGroupingMode("folders"); };
             panes.SortPlatformButton.Click += delegate { setLibrarySortMode("platform"); };
             panes.SortRecentButton.Click += delegate { setLibrarySortMode("recent"); };
-            panes.SortPhotosButton.Click += delegate { setLibrarySortMode("photos"); };
         }
     }
 }
