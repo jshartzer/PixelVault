@@ -74,6 +74,7 @@ dist/PixelVault-0.712/
 dist/PixelVault-0.713/
 
 # OS/editor noise
+.vs/
 Thumbs.db
 .DS_Store
 *.user
