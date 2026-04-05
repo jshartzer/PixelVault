@@ -406,8 +406,8 @@ namespace PixelVaultNative
             var maxInner = 0;
             foreach (var pair in row)
             {
-                var aspectRatio = ResolveLibraryDetailAspectRatio(pair.File);
-                var inner = (int)Math.Ceiling(pair.Width / Math.Max(0.72d, aspectRatio));
+                var aspectRatio = ResolveLibraryDetailNaturalAspectRatio(pair.File, null);
+                var inner = (int)Math.Ceiling(pair.Width / aspectRatio);
                 if (inner > maxInner) maxInner = inner;
             }
             var minInner = 118;

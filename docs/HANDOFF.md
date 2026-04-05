@@ -55,11 +55,11 @@ Then use these based on the task:
 
 Current live build:
 
-- `0.964`
+- `0.969`
 
 Current executable:
 
-- `C:\Codex\dist\PixelVault-0.964\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.969\PixelVault.exe`
 
 Current build pointer:
 
@@ -93,12 +93,13 @@ Practical current focus:
 
 ## Current Stop Point
 
-The app is currently published at `0.964`.
+The app is currently published at `0.969`.
 
 **Notion:** [MainWindow extraction roadmap](https://www.notion.so/33573adc59b681d88b7dcd88cad53cb6) updated for Phase **E** capstone (**`ILibraryBrowserShell`**). If release rows in Notion lag `docs/CURRENT_BUILD.txt`, re-sync per `docs/DOC_SYNC_POLICY.md`.
 
 Recent extraction progress (repo):
 
+- **Library aspect accuracy (0.969):** Masonry cell heights follow real image width÷height when known; loaded tiles pick **Uniform** vs **UniformToFill** so bitmaps are never non-uniformly stretched—crop only when the fixed cell still mismatches after layout caps.
 - **Library gallery refresh (0.964):** Detail scroll position is preserved across refined snapshot passes with debounced virtual refresh for smoother panning. Tile min/max bounds are ~1.75× larger for screenshot and timeline views; media uses cover-fill through rounded clips; timeline titles, meta, and comments sit on a bottom gradient over the image.
 - **Seamless gallery grid (0.954):** Packed day cards no longer show visible frame chrome, dates are reduced to a small label above each day’s first cluster, media fits the frame shape without cover-cropping, and packed gallery widths were loosened again so the grid reads larger overall.
 - **Packed day-card gallery scale-up (0.949):** Library detail and timeline now pack days beside each other instead of forcing a full-width date break every time, and the minimum card/tile sizing is larger overall with timeline intentionally much roomier.

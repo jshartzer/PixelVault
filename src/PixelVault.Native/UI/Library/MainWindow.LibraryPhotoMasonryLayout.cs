@@ -149,6 +149,24 @@ namespace PixelVaultNative
             return Math.Max(0.72d, Math.Min(2.35d, r));
         }
 
+        /// <summary>Width ÷ height from real pixels when known; loose clamp only for pathological inputs. Otherwise same as <see cref="ResolveLibraryDetailAspectRatio"/>.</summary>
+        internal static double ResolveLibraryDetailNaturalAspectRatio(string file, IReadOnlyDictionary<string, LibraryDetailMediaLayoutInfo> mediaLayoutByFile = null)
+        {
+            LibraryDetailMediaLayoutInfo info;
+            if (mediaLayoutByFile != null
+                && !string.IsNullOrWhiteSpace(file)
+                && mediaLayoutByFile.TryGetValue(file, out info)
+                && info != null
+                && info.PixelWidth > 0
+                && info.PixelHeight > 0)
+            {
+                var r = (double)info.PixelWidth / Math.Max(1d, info.PixelHeight);
+                return Math.Max(0.25d, Math.Min(4.0d, r));
+            }
+
+            return ResolveLibraryDetailAspectRatio(file, mediaLayoutByFile);
+        }
+
         internal static int EstimateLibraryDetailSingleTileHeight(
             string file,
             int tileWidth,
@@ -157,8 +175,8 @@ namespace PixelVaultNative
         {
             if (string.IsNullOrWhiteSpace(file) || tileWidth <= 0) return 260;
             var footer = 14;
-            var aspectRatio = ResolveLibraryDetailAspectRatio(file, mediaLayoutByFile);
-            var inner = (int)Math.Ceiling(tileWidth / Math.Max(0.72d, aspectRatio));
+            var aspectRatio = ResolveLibraryDetailNaturalAspectRatio(file, mediaLayoutByFile);
+            var inner = (int)Math.Ceiling(tileWidth / aspectRatio);
             var minInner = 118;
             var maxInner = 380;
             inner = Math.Max(minInner, Math.Min(maxInner, inner));

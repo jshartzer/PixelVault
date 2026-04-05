@@ -1,3 +1,8 @@
+## 0.969
+- **Release:** Version **0.969** — Library detail and timeline images keep their **correct aspect ratio** (no non-uniform stretch).
+- **Library / framing:** Masonry tile heights now use each file’s **natural width÷height** from real pixel dimensions when available, so cells track the shot’s shape (especially portrait) instead of an artificial minimum aspect clamp.
+- **Library / rendering:** After decode, when the cell’s aspect already matches the bitmap within a small tolerance, thumbnails use **`Uniform`** so the image fills the frame without cropping; when the allotted cell still disagrees (rounding or layout caps), **`UniformToFill`** crops only—never **`Stretch.Fill`**. Video previews remain uniform scaled.
+
 ## 0.964
 - **Release:** Version **0.964** — Library detail scrolling stability, larger gallery tiles, cover-fill media, timeline overlays.
 - **Library / scroll:** Timeline and detail virtualized rows no longer snap back to the top when a second (refined) snapshot applies after the quick pass. Scroll-driven virtual passes are debounced so wheel and trackpad panning feel less jittery.

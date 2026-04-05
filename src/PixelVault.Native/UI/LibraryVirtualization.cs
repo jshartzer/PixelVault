@@ -680,6 +680,17 @@ namespace PixelVaultNative
                 image.Source = loaded;
                 image.Visibility = Visibility.Visible;
                 placeholder.Visibility = Visibility.Collapsed;
+                if (masonryLayoutHeight.HasValue && loaded.PixelWidth > 0 && loaded.PixelHeight > 0)
+                {
+                    var cw = (double)Math.Max(1, size);
+                    var ch = (double)Math.Max(1, masonryLayoutHeight.Value);
+                    var cellAr = cw / ch;
+                    var bmpAr = loaded.PixelWidth / (double)loaded.PixelHeight;
+                    var rel = Math.Abs(cellAr - bmpAr) / (0.5d * (cellAr + bmpAr));
+                    image.Stretch = rel < 0.02d ? Stretch.Uniform : Stretch.UniformToFill;
+                }
+                else
+                    image.Stretch = Stretch.UniformToFill;
             }, true, shouldKeepLoading);
             tile.MouseLeftButtonDown += delegate(object sender, System.Windows.Input.MouseButtonEventArgs e)
             {
