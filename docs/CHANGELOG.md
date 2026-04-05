@@ -1,7 +1,3 @@
-## 0.938
-- **Release:** Version **0.938** — Library detail **VirtualizingWrapPanel** crash fix.
-- **Library / detail pane:** `ItemsControl` hosts for photo grids no longer enable **UI virtualization** (`VirtualizingPanel.IsVirtualizing`) while nested under the outer row `StackPanel`. Full virtualization + recycling on `VirtualizingWrapPanel` expected a **ScrollViewer** scroll owner and could **crash** when opening a folder; wrapping layout is unchanged with virtualization off for those nested controls.
-
 ## 0.937
 - **Release:** Version **0.937** — Library detail/timeline photos use **VirtualizingWrapPanel** instead of custom masonry.
 - **Library / detail pane:** Each date group’s captures are shown in an **`ItemsControl`** whose **`ItemsPanel`** is the **VirtualizingWrapPanel** NuGet control (`SpacingMode.None`, variable-width items). **Tile creation, widths, margins, and grouping** match the prior **`PackLibraryDetailFilesIntoVariableRows`**-based behavior; only the layout container changed. The old masonry chunk layout file and its tests were removed.
