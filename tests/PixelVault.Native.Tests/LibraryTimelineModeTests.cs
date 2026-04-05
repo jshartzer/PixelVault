@@ -104,4 +104,24 @@ public sealed class LibraryTimelineModeTests
 
         Assert.True(threeColumns < singleColumn);
     }
+
+    [Fact]
+    public void EstimateLibraryPackedDayCardDesiredWidth_MakesTimelineCardsLargerThanDetailCards()
+    {
+        var normalWidth = MainWindow.EstimateLibraryPackedDayCardDesiredWidth(4, 1600, false);
+        var timelineWidth = MainWindow.EstimateLibraryPackedDayCardDesiredWidth(4, 1600, true);
+
+        Assert.True(timelineWidth > normalWidth);
+    }
+
+    [Fact]
+    public void ExpandLibraryPackedRowWidths_FillsAvailableSlackAcrossCards()
+    {
+        var expanded = MainWindow.ExpandLibraryPackedRowWidths(new[] { 420d, 420d }, 1000d, 14d);
+
+        Assert.Equal(2, expanded.Count);
+        Assert.True(expanded[0] > 420d);
+        Assert.True(expanded[1] > 420d);
+        Assert.Equal(1000d - 14d, expanded[0] + expanded[1], 3);
+    }
 }

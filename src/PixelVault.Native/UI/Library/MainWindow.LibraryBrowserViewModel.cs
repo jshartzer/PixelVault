@@ -310,6 +310,41 @@ namespace PixelVaultNative
             return rows;
         }
 
+        internal static double EstimateLibraryPackedDayCardDesiredWidth(int captureCount, double availableWidth, bool timelineView)
+        {
+            var safeCaptureCount = Math.Max(1, captureCount);
+            var width = availableWidth <= 0d ? 1280d : availableWidth;
+            var minCardWidth = timelineView
+                ? (width >= 1850d ? 680d : (width >= 1450d ? 600d : 520d))
+                : (width >= 1450d ? 480d : (width >= 1080d ? 420d : 360d));
+            var targetTileWidth = timelineView
+                ? (width >= 1850d ? 440d : (width >= 1450d ? 380d : 330d))
+                : (width >= 1450d ? 330d : (width >= 1080d ? 290d : 250d));
+            var preferredColumns = 1;
+            if (safeCaptureCount >= (timelineView ? 4 : 3) && width >= (timelineView ? 1250d : 920d))
+                preferredColumns = 2;
+            if (timelineView && safeCaptureCount >= 10 && width >= 2200d)
+                preferredColumns = 3;
+            const double innerGap = 8d;
+            const double horizontalPadding = 24d;
+            var desiredWidth = horizontalPadding + (preferredColumns * targetTileWidth) + ((preferredColumns - 1) * innerGap);
+            if (safeCaptureCount >= 8) desiredWidth += targetTileWidth * (timelineView ? 0.22d : 0.16d);
+            return Math.Max(minCardWidth, Math.Min(width, desiredWidth));
+        }
+
+        internal static List<double> ExpandLibraryPackedRowWidths(IReadOnlyList<double> desiredWidths, double availableWidth, double interCardGap)
+        {
+            var expanded = new List<double>();
+            if (desiredWidths == null || desiredWidths.Count == 0) return expanded;
+            var widths = desiredWidths.Select(width => Math.Max(180d, width)).ToList();
+            var totalGap = Math.Max(0, widths.Count - 1) * Math.Max(0d, interCardGap);
+            var slack = Math.Max(0d, Math.Max(220d, availableWidth) - totalGap - widths.Sum());
+            var extraPerCard = slack <= 0d ? 0d : slack / widths.Count;
+            for (var i = 0; i < widths.Count; i++)
+                expanded.Add(widths[i] + extraPerCard);
+            return expanded;
+        }
+
         internal static int LibraryDetailFileLayoutHash(string path)
         {
             if (string.IsNullOrEmpty(path)) return 0;
