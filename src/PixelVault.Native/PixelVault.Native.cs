@@ -40,7 +40,7 @@ namespace PixelVaultNative
 
     public sealed partial class MainWindow : Window
     {
-        const string AppVersion = "0.876";
+        const string AppVersion = "0.886";
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
         const string ClearedExternalIdSentinel = "__PV_CLEARED__";
@@ -86,6 +86,7 @@ namespace PixelVaultNative
         string libraryGroupingMode = "all";
         bool troubleshootingLoggingEnabled;
         bool troubleshootingLogRedactPaths;
+        bool libraryDoubleClickSetsFolderCover;
         readonly string _diagnosticsSessionId;
         const long TroubleshootingLogMaxBytes = 5_000_000L;
         string _libraryBrowserPersistedSearch = string.Empty;
@@ -470,7 +471,7 @@ namespace PixelVaultNative
                 case "Xbox":
                     return ResolveWorkspaceAssetPath("Xbox Library Logo.png");
                 case "Xbox PC":
-                    return ResolveWorkspaceAssetPath("PC Library Icon.jpg");
+                    return ResolveWorkspaceAssetPath("Xbox PC Library Icon.png");
                 case "PC":
                     return ResolveWorkspaceAssetPath("PC Library Icon.jpg");
                 case "Multiple Tags":

@@ -1,3 +1,13 @@
+## 0.886
+- **Release:** Version **0.886** — Library **Edit IDs** lookup uses the same Steam search + match picker as manual metadata, then fills SteamGridDB when possible.
+- **Library (`Edit IDs`):** **Look up IDs** runs a Steam store search for the folder name; when several titles match, **Steam Matches** opens so you pick the correct App ID. Empty **SteamGridDB ID** is still resolved from the App ID (or game name) when a SteamGridDB token is configured. Only blank fields are overwritten; canceling the picker leaves IDs unchanged.
+
+## 0.881
+- **Release:** Version **0.881** — library cover UX cleanup, folder-cover preference in Settings, and Xbox PC header icon refresh.
+- **Library / covers:** Removed **Cover: Custom / Downloaded / Preview** badges from the folder detail header and dropped **`· Cover:`** hints from folder subtitles; removed the **Use as cover** toolbar control.
+- **Settings:** New Library option **Double-click or right-click → “Use as folder cover” on a still image** (`library_double_click_set_folder_cover`). When enabled, double-click a still in the detail grid sets the folder custom cover and the capture context menu includes **Use as folder cover**; when disabled, double-click opens the file and that menu item is hidden.
+- **Assets:** Regenerated **`Xbox PC Library Icon.png`** using the same solid Xbox sphere as the console tile, bold **PC** lettering, transparent background, and tighter framing so it reads at a similar weight in section headers (regenerate via **`scripts/build_xbox_pc_library_icon.py`** if the source Xbox logo changes).
+
 ## 0.876
 - **Release:** Version **0.876** — finish the `Xbox PC` title fix in the shared folder-sorting path.
 - **Filename parsing:** `GetGameTitleHint(...)` now honors the trailing `M_D_YYYY h_mm_ss AM/PM` timestamp before any underscore fallback, so library folders no longer become **`PowerWash Simulator 4`** or **`Screenshot 4`** when sorting Windows/Xbox captures.

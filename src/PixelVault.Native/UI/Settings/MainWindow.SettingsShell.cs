@@ -47,6 +47,8 @@ namespace PixelVaultNative
                 SetTroubleshootingLoggingEnabled = v => troubleshootingLoggingEnabled = v,
                 GetTroubleshootingLogRedactPaths = () => troubleshootingLogRedactPaths,
                 SetTroubleshootingLogRedactPaths = v => troubleshootingLogRedactPaths = v,
+                GetLibraryDoubleClickSetsFolderCover = () => libraryDoubleClickSetsFolderCover,
+                SetLibraryDoubleClickSetsFolderCover = v => libraryDoubleClickSetsFolderCover = v,
                 SaveSettings = SaveSettings,
                 Log = Log,
                 LogTroubleshooting = LogTroubleshooting,

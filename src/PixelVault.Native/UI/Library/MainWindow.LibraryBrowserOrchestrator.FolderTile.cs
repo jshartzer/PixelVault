@@ -85,29 +85,6 @@ namespace PixelVaultNative
                 if (badge != null) panes.DetailTitleBadgePanel.Children.Add(badge);
             }
 
-            var coverKind = BuildLibraryBrowserCoverKindShortLabel(BuildLibraryBrowserDisplayFolder(view));
-            if (!string.IsNullOrWhiteSpace(coverKind))
-            {
-                var coverBadge = new Border
-                {
-                    Padding = new Thickness(10, 4, 10, 4),
-                    CornerRadius = new CornerRadius(8),
-                    Background = Brush("#1A2830"),
-                    BorderBrush = Brush("#3D5362"),
-                    BorderThickness = new Thickness(1),
-                    Margin = new Thickness(0, 0, 6, 6),
-                    VerticalAlignment = VerticalAlignment.Center
-                };
-                coverBadge.Child = new TextBlock
-                {
-                    Text = "Cover: " + coverKind,
-                    FontSize = 11,
-                    Foreground = Brush("#C5D6E0"),
-                    VerticalAlignment = VerticalAlignment.Center
-                };
-                panes.DetailTitleBadgePanel.Children.Add(coverBadge);
-            }
-
             panes.DetailTitleBadgePanel.Visibility = panes.DetailTitleBadgePanel.Children.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         }
 

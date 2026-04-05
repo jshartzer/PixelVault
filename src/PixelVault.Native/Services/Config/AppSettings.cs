@@ -26,6 +26,8 @@ namespace PixelVaultNative
         public bool TroubleshootingLoggingEnabled;
         /// <summary>When true, troubleshooting log encodes folder paths as <c>.../LastSegment</c> to limit disclosure.</summary>
         public bool TroubleshootingLogRedactPaths;
+        /// <summary>When true, double-click a still image in the library detail grid (or use its context menu) to set that file as the folder custom cover.</summary>
+        public bool LibraryDoubleClickSetsFolderCover;
 
         public static AppSettings Clone(AppSettings s)
         {
@@ -48,7 +50,8 @@ namespace PixelVaultNative
                 LibraryBrowserDetailScroll = s.LibraryBrowserDetailScroll,
                 ManualMetadataRecentTitleLabels = s.ManualMetadataRecentTitleLabels ?? string.Empty,
                 TroubleshootingLoggingEnabled = s.TroubleshootingLoggingEnabled,
-                TroubleshootingLogRedactPaths = s.TroubleshootingLogRedactPaths
+                TroubleshootingLogRedactPaths = s.TroubleshootingLogRedactPaths,
+                LibraryDoubleClickSetsFolderCover = s.LibraryDoubleClickSetsFolderCover
             };
         }
     }

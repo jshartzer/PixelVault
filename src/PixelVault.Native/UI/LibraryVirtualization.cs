@@ -428,7 +428,12 @@ namespace PixelVaultNative
                 var clicked = sender as Border;
                 var clickedFile = clicked == null ? string.Empty : clicked.Tag as string;
                 updateDetailSelection(clickedFile, Keyboard.Modifiers);
-                if (e.ClickCount >= 2 && !string.IsNullOrWhiteSpace(clickedFile)) OpenWithShell(clickedFile);
+                if (e.ClickCount >= 2 && !string.IsNullOrWhiteSpace(clickedFile))
+                {
+                    if (libraryDoubleClickSetsFolderCover && !isVideoFile && IsImage(clickedFile) && useFileAsFolderCover != null)
+                        useFileAsFolderCover(clickedFile);
+                    else OpenWithShell(clickedFile);
+                }
             };
             tile.MouseRightButtonDown += delegate(object sender, System.Windows.Input.MouseButtonEventArgs e)
             {
@@ -711,7 +716,7 @@ namespace PixelVaultNative
             }
             contextMenu.Items.Add(openFolderItem);
             contextMenu.Items.Add(editItem);
-            if (useFileAsFolderCover != null && !isVideoFile && IsImage(file))
+            if (libraryDoubleClickSetsFolderCover && useFileAsFolderCover != null && !isVideoFile && IsImage(file))
             {
                 var useCoverItem = new MenuItem { Header = "Use as folder cover" };
                 useCoverItem.Click += delegate { useFileAsFolderCover(file); };

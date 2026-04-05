@@ -199,16 +199,6 @@ namespace PixelVaultNative
             return string.Equals(NormalizeLibraryGroupingMode(libraryGroupingMode), "console", StringComparison.OrdinalIgnoreCase);
         }
 
-        string BuildLibraryBrowserCoverKindShortLabel(LibraryFolderInfo folder)
-        {
-            if (folder == null) return string.Empty;
-            var art = GetLibraryArtPathForDisplayOnly(folder);
-            if (string.IsNullOrWhiteSpace(art) || !File.Exists(art)) return string.Empty;
-            if (!string.IsNullOrWhiteSpace(CustomCoverPath(folder))) return "Custom";
-            if (CachedCoverPath(folder.Name) != null) return "Downloaded";
-            return "Preview";
-        }
-
         string BuildLibraryBrowserFolderTileSubtitle(LibraryBrowserFolderView view)
         {
             var captureCount = view == null ? 0 : Math.Max(view.FileCount, 0);
@@ -226,8 +216,7 @@ namespace PixelVaultNative
                     ? captureText + " | " + sourceFolderCount + " folders"
                     : captureText;
             }
-            var coverKind = BuildLibraryBrowserCoverKindShortLabel(BuildLibraryBrowserDisplayFolder(view));
-            return string.IsNullOrWhiteSpace(coverKind) ? core : core + " · Cover: " + coverKind;
+            return core;
         }
 
         string BuildLibraryBrowserDetailMetaText(LibraryBrowserFolderView view, LibraryFolderInfo actionFolder)

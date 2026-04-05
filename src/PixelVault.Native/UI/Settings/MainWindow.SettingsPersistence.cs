@@ -25,7 +25,8 @@ namespace PixelVaultNative
                 LibraryBrowserDetailScroll = Math.Max(0, _libraryBrowserPersistedDetailScroll),
                 ManualMetadataRecentTitleLabels = _manualMetadataRecentTitleLabelsSerialized ?? string.Empty,
                 TroubleshootingLoggingEnabled = troubleshootingLoggingEnabled,
-                TroubleshootingLogRedactPaths = troubleshootingLogRedactPaths
+                TroubleshootingLogRedactPaths = troubleshootingLogRedactPaths,
+                LibraryDoubleClickSetsFolderCover = libraryDoubleClickSetsFolderCover
             };
         }
 
@@ -49,6 +50,7 @@ namespace PixelVaultNative
             _manualMetadataRecentTitleLabelsSerialized = s.ManualMetadataRecentTitleLabels ?? string.Empty;
             troubleshootingLoggingEnabled = s.TroubleshootingLoggingEnabled;
             troubleshootingLogRedactPaths = s.TroubleshootingLogRedactPaths;
+            libraryDoubleClickSetsFolderCover = s.LibraryDoubleClickSetsFolderCover;
         }
 
         void LoadSettings()

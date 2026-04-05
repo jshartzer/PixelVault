@@ -55,11 +55,11 @@ Then use these based on the task:
 
 Current live build:
 
-- `0.876`
+- `0.886`
 
 Current executable:
 
-- `C:\Codex\dist\PixelVault-0.876\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.886\PixelVault.exe`
 
 Current build pointer:
 

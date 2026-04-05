@@ -146,14 +146,6 @@ namespace PixelVaultNative
                 {
                     panes.RefreshThisFolderButton.IsEnabled = ws.Current != null && !ws.LibraryFoldersLoading;
                 }
-                if (panes.UseSelectionAsCoverButton != null)
-                {
-                    var coverPath = selectedFiles.Count == 1 ? selectedFiles[0] : null;
-                    panes.UseSelectionAsCoverButton.IsEnabled = ws.Current != null
-                        && !string.IsNullOrWhiteSpace(coverPath)
-                        && File.Exists(coverPath)
-                        && IsImage(coverPath);
-                }
             };
         }
     }

@@ -31,7 +31,8 @@ public sealed class SettingsServiceTests
                 "library_folder_tile_size=200",
                 "library_folder_sort_mode=recent",
                 "library_grouping_mode=console",
-                "troubleshooting_logging_enabled=1"
+                "troubleshooting_logging_enabled=1",
+                "library_double_click_set_folder_cover=1"
             });
 
             var initial = new AppSettings
@@ -61,6 +62,7 @@ public sealed class SettingsServiceTests
             Assert.Equal("recent", loaded.LibraryFolderSortMode);
             Assert.Equal("console", loaded.LibraryGroupingMode);
             Assert.True(loaded.TroubleshootingLoggingEnabled);
+            Assert.True(loaded.LibraryDoubleClickSetsFolderCover);
             Assert.Empty(loaded.LibraryIndexAnchor ?? string.Empty);
         }
         finally
@@ -115,7 +117,8 @@ public sealed class SettingsServiceTests
                 LibraryFolderTileSize = 180,
                 LibraryFolderSortMode = "photos",
                 LibraryGroupingMode = "console",
-                TroubleshootingLoggingEnabled = true
+                TroubleshootingLoggingEnabled = true,
+                LibraryDoubleClickSetsFolderCover = true
             };
 
             var svc = new SettingsService();
@@ -134,6 +137,7 @@ public sealed class SettingsServiceTests
             Assert.Equal("photos", loaded.LibraryFolderSortMode);
             Assert.Equal("console", loaded.LibraryGroupingMode);
             Assert.True(loaded.TroubleshootingLoggingEnabled);
+            Assert.True(loaded.LibraryDoubleClickSetsFolderCover);
             Assert.Equal(loaded.LibraryRoot ?? string.Empty, loaded.LibraryIndexAnchor ?? string.Empty, ignoreCase: true);
         }
         finally

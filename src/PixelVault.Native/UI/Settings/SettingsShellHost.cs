@@ -233,6 +233,7 @@ namespace PixelVaultNative
                 TextWrapping = TextWrapping.Wrap
             });
             leftStack.Children.Add(BuildSettingsSummary(cardBg, cardBorder, textPrimary, textMuted));
+            leftStack.Children.Add(BuildLibraryBehaviorSummary(cardBg, cardBorder, textPrimary, textMuted));
             leftStack.Children.Add(BuildDiagnosticsSummary(cardBg, cardBorder, textPrimary, textMuted, textSoft));
             leftScroll.Content = leftStack;
             left.Child = leftScroll;
@@ -309,6 +310,42 @@ namespace PixelVaultNative
             stack.Children.Add(new TextBlock { Text = "ExifTool: " + d.GetExifToolPath(), TextWrapping = TextWrapping.Wrap, Foreground = textMuted, Margin = new Thickness(0, 0, 0, 4) });
             stack.Children.Add(new TextBlock { Text = "FFmpeg: " + (string.IsNullOrWhiteSpace(d.GetFfmpegPath()) ? "(not configured)" : d.GetFfmpegPath()), TextWrapping = TextWrapping.Wrap, Foreground = textMuted, Margin = new Thickness(0, 0, 0, 4) });
             stack.Children.Add(new TextBlock { Text = "SteamGridDB: " + (d.HasSteamGridDbApiToken() ? "token configured" : "(token not configured)"), TextWrapping = TextWrapping.Wrap, Foreground = textMuted });
+            border.Child = stack;
+            return border;
+        }
+
+        Border BuildLibraryBehaviorSummary(Brush cardBg, Brush cardBorder, Brush textPrimary, Brush textMuted)
+        {
+            var border = new Border { Background = cardBg, CornerRadius = new CornerRadius(14), Padding = new Thickness(14), BorderBrush = cardBorder, BorderThickness = new Thickness(1), Margin = new Thickness(0, 14, 0, 0) };
+            var stack = new StackPanel();
+            stack.Children.Add(new TextBlock { Text = "Library", FontWeight = FontWeights.SemiBold, Foreground = textPrimary, Margin = new Thickness(0, 0, 0, 8) });
+            stack.Children.Add(new TextBlock
+            {
+                Text = "Optional gestures on captures in the folder detail view (right pane). Folder tiles still use the right-click menu for custom covers.",
+                Foreground = textMuted,
+                Margin = new Thickness(0, 0, 0, 10),
+                TextWrapping = TextWrapping.Wrap
+            });
+            var doubleClickCoverBox = new CheckBox
+            {
+                Content = "Double-click or right-click → “Use as folder cover” on a still image",
+                IsChecked = d.GetLibraryDoubleClickSetsFolderCover(),
+                Margin = new Thickness(0, 0, 0, 0),
+                Foreground = textPrimary
+            };
+            doubleClickCoverBox.Checked += delegate
+            {
+                d.SetLibraryDoubleClickSetsFolderCover(true);
+                d.SaveSettings();
+                d.Log("Library: double-click / context menu can set folder cover.");
+            };
+            doubleClickCoverBox.Unchecked += delegate
+            {
+                d.SetLibraryDoubleClickSetsFolderCover(false);
+                d.SaveSettings();
+                d.Log("Library: double-click opens files (folder cover gesture off).");
+            };
+            stack.Children.Add(doubleClickCoverBox);
             border.Child = stack;
             return border;
         }

@@ -37,6 +37,8 @@ namespace PixelVaultNative
         public Action<bool> SetTroubleshootingLoggingEnabled { get; set; }
         public Func<bool> GetTroubleshootingLogRedactPaths { get; set; }
         public Action<bool> SetTroubleshootingLogRedactPaths { get; set; }
+        public Func<bool> GetLibraryDoubleClickSetsFolderCover { get; set; }
+        public Action<bool> SetLibraryDoubleClickSetsFolderCover { get; set; }
 
         public Action SaveSettings { get; set; }
         public Action<string> Log { get; set; }

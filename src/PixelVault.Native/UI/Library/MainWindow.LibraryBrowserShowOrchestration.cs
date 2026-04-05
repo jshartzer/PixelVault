@@ -225,7 +225,6 @@ namespace PixelVaultNative
                     panes.FolderTileSmallerButton.IsEnabled = !isBusy;
                     panes.FolderTileLargerButton.IsEnabled = !isBusy;
                     panes.ShortcutsHelpButton.IsEnabled = !isBusy;
-                    if (isBusy) panes.UseSelectionAsCoverButton.IsEnabled = false;
                     navChrome.FetchButton.IsEnabled = !isBusy;
                     navChrome.ImportButton.IsEnabled = !isBusy;
                     navChrome.ImportCommentsButton.IsEnabled = !isBusy;
@@ -320,19 +319,6 @@ namespace PixelVaultNative
                     if (scopeFolders.Count == 0) return;
                     showFolder(ws.Current);
                     runScopedCoverRefresh(scopeFolders, _shell.BuildLibraryBrowserActionScopeLabel(ws.Current), true, false, false);
-                };
-                panes.UseSelectionAsCoverButton.Click += delegate
-                {
-                    var paths = getSelectedDetailFiles();
-                    if (paths.Count != 1) return;
-                    var path = paths[0];
-                    if (!_shell.IsLibraryRasterImageFilePath(path) || !File.Exists(path)) return;
-                    var coverFolder = _shell.ActiveSelectedLibraryFolder;
-                    if (coverFolder == null) return;
-                    _shell.LibrarySaveCustomCover(coverFolder, path);
-                    if (renderTiles != null) renderTiles();
-                    if (ws.Current != null) showFolder(ws.Current);
-                    _shell.LibraryBrowserShowToast(ws, "Cover saved");
                 };
                 libraryWindow.Activated += delegate
                 {

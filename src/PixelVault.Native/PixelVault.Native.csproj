@@ -121,4 +121,11 @@
     <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.8" />
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.6" />
   </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\assets\Xbox PC Library Icon.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>assets\Xbox PC Library Icon.png</Link>
+    </None>
+  </ItemGroup>
 </Project>

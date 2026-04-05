@@ -1,5 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -98,23 +101,122 @@ namespace PixelVaultNative
             var actions = new Grid { HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 8, 0, 0) };
             actions.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             actions.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            actions.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             var cancelButton = Btn("Cancel", null, "#EEF2F5", Brush("#33424D"));
-            cancelButton.Width = 138;
+            cancelButton.Width = 122;
             cancelButton.Height = 44;
             cancelButton.Margin = new Thickness(0, 0, 10, 0);
             cancelButton.VerticalAlignment = VerticalAlignment.Top;
+            var lookupButton = Btn("Look up IDs", null, "#20343A", Brushes.White);
+            lookupButton.Width = 158;
+            lookupButton.Height = 44;
+            lookupButton.Margin = new Thickness(0, 0, 10, 0);
+            lookupButton.VerticalAlignment = VerticalAlignment.Top;
+            lookupButton.ToolTip = "Search Steam (pick from the match list when several games match) and SteamGridDB using the folder name above, then fill any empty ID fields (won’t replace text you already typed).";
             var saveButton = Btn("Save", null, "#275D47", Brushes.White);
-            saveButton.Width = 138;
+            saveButton.Width = 122;
             saveButton.Height = 44;
             saveButton.Margin = new Thickness(0);
             saveButton.VerticalAlignment = VerticalAlignment.Top;
             actions.Children.Add(cancelButton);
-            Grid.SetColumn(saveButton, 1);
+            Grid.SetColumn(lookupButton, 1);
+            actions.Children.Add(lookupButton);
+            Grid.SetColumn(saveButton, 2);
             actions.Children.Add(saveButton);
             Grid.SetRow(actions, 2);
             root.Children.Add(actions);
 
             cancelButton.Click += delegate { editorWindow.Close(); };
+            lookupButton.Click += async delegate
+            {
+                var queryTitle = CleanTag(folder.Name ?? string.Empty);
+                if (string.IsNullOrWhiteSpace(queryTitle))
+                {
+                    MessageBox.Show("This folder has no name to search with.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+                cancelButton.IsEnabled = false;
+                lookupButton.IsEnabled = false;
+                saveButton.IsEnabled = false;
+                appIdBox.IsEnabled = false;
+                steamGridDbIdBox.IsEnabled = false;
+                try
+                {
+                    var existingApp = CleanTag(appIdBox.Text);
+                    var existingGrid = CleanTag(steamGridDbIdBox.Text);
+                    string resolvedApp = null;
+                    string resolvedGrid = null;
+                    var steamReturnedMatches = false;
+                    var steamUserSelected = false;
+                    if (string.IsNullOrWhiteSpace(existingApp))
+                    {
+                        var matches = await coverService.SearchSteamAppMatchesAsync(queryTitle, CancellationToken.None).ConfigureAwait(true);
+                        if (matches != null && matches.Count > 0)
+                        {
+                            steamReturnedMatches = true;
+                            var chosen = matches.Count == 1 ? matches[0] : ShowSteamAppMatchWindow(editorWindow, queryTitle, matches);
+                            if (chosen != null)
+                            {
+                                resolvedApp = chosen.Item1;
+                                steamUserSelected = true;
+                            }
+                        }
+                    }
+                    var appForGrid = !string.IsNullOrWhiteSpace(existingApp) ? existingApp : resolvedApp;
+                    if (string.IsNullOrWhiteSpace(existingGrid) && HasSteamGridDbApiToken())
+                    {
+                        if (!string.IsNullOrWhiteSpace(appForGrid))
+                            resolvedGrid = await coverService.TryResolveSteamGridDbIdBySteamAppIdAsync(appForGrid, CancellationToken.None).ConfigureAwait(true);
+                        if (string.IsNullOrWhiteSpace(resolvedGrid))
+                            resolvedGrid = await coverService.TryResolveSteamGridDbIdByNameAsync(queryTitle, CancellationToken.None).ConfigureAwait(true);
+                    }
+                    if (!string.IsNullOrWhiteSpace(resolvedApp)) appIdBox.Text = resolvedApp;
+                    if (!string.IsNullOrWhiteSpace(resolvedGrid)) steamGridDbIdBox.Text = resolvedGrid;
+                    var filledApp = !string.IsNullOrWhiteSpace(resolvedApp);
+                    var filledGrid = !string.IsNullOrWhiteSpace(resolvedGrid);
+                    if (!filledApp && !filledGrid)
+                    {
+                        string hint;
+                        if (steamReturnedMatches && !steamUserSelected)
+                            hint = "Steam lookup canceled. ID fields were not changed.";
+                        else if (string.IsNullOrWhiteSpace(existingApp) && !steamReturnedMatches)
+                            hint = "No Steam store results for \"" + queryTitle + "\".";
+                        else
+                            hint = "No new IDs were filled.";
+                        if (string.IsNullOrWhiteSpace(existingGrid) && !HasSteamGridDbApiToken())
+                            hint += Environment.NewLine + Environment.NewLine + "Add a SteamGridDB API token in Settings to enable SteamGridDB ID lookup.";
+                        else if (string.IsNullOrWhiteSpace(existingGrid) && HasSteamGridDbApiToken() && !string.IsNullOrWhiteSpace(appForGrid))
+                            hint += Environment.NewLine + Environment.NewLine + "SteamGridDB did not return a single confident match for that title.";
+                        MessageBox.Show(hint, "Look up IDs", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                    else
+                    {
+                        var lines = new List<string>();
+                        if (filledApp) lines.Add("Filled Steam App ID: " + resolvedApp);
+                        else if (string.IsNullOrWhiteSpace(existingApp) && !steamReturnedMatches) lines.Add("Steam App ID: no store results for \"" + queryTitle + "\".");
+                        if (HasSteamGridDbApiToken())
+                        {
+                            if (filledGrid) lines.Add("Filled SteamGridDB ID: " + resolvedGrid);
+                            else if (string.IsNullOrWhiteSpace(existingGrid)) lines.Add("SteamGridDB ID: no confident match (you can search the site manually).");
+                        }
+                        else if (string.IsNullOrWhiteSpace(existingGrid)) lines.Add("SteamGridDB ID: skipped (no API token in Settings).");
+                        MessageBox.Show(string.Join(Environment.NewLine, lines), "Look up IDs", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    LogException("Look up folder IDs", ex);
+                    MessageBox.Show("Lookup failed." + Environment.NewLine + Environment.NewLine + ex.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+                finally
+                {
+                    cancelButton.IsEnabled = true;
+                    lookupButton.IsEnabled = true;
+                    saveButton.IsEnabled = true;
+                    appIdBox.IsEnabled = true;
+                    steamGridDbIdBox.IsEnabled = true;
+                }
+            };
             saveButton.Click += delegate
             {
                 try
