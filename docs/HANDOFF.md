@@ -55,11 +55,11 @@ Then use these based on the task:
 
 Current live build:
 
-- `0.926`
+- `0.930`
 
 Current executable:
 
-- `C:\Codex\dist\PixelVault-0.926\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.930\PixelVault.exe`
 
 Current build pointer:
 
@@ -93,12 +93,13 @@ Practical current focus:
 
 ## Current Stop Point
 
-The app is currently published at `0.926`.
+The app is currently published at `0.930`.
 
 **Notion:** [MainWindow extraction roadmap](https://www.notion.so/33573adc59b681d88b7dcd88cad53cb6) updated for Phase **E** capstone (**`ILibraryBrowserShell`**). If release rows in Notion lag `docs/CURRENT_BUILD.txt`, re-sync per `docs/DOC_SYNC_POLICY.md`.
 
 Recent extraction progress (repo):
 
+- **Library layout follow-up (0.930):** Folder-cover rows now respond to pane width more reliably and expand sparse rows instead of leaving a large dead gutter, and timeline/detail width-sensitive layout now rerenders when splitter/window changes matter even if the coarse column count does not.
 - **Library timeline layout (0.926):** Timeline now uses **packed day cards** instead of full-width date bands, so sparse capture days can sit beside each other while keeping the existing game/platform/time/comment footer. Reference note: `docs/LIBRARY_TIMELINE_LAYOUT_REFERENCE.md`.
 
 - **Library timeline mode (0.911):** Phase 2 first slice shipped. Timeline tiles now show lightweight **game title + platform chip + capture time** context, and the timeline header summarizes the visible feed by photo count, game count, platform count, and date range.
