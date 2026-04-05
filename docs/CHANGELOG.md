@@ -1,3 +1,10 @@
+## 0.964
+- **Release:** Version **0.964** — Library detail scrolling stability, larger gallery tiles, cover-fill media, timeline overlays.
+- **Library / scroll:** Timeline and detail virtualized rows no longer snap back to the top when a second (refined) snapshot applies after the quick pass. Scroll-driven virtual passes are debounced so wheel and trackpad panning feel less jittery.
+- **Library / scale:** Responsive detail columns and packed day-card tile **min/max** bounds are scaled by **1.75×** for both the regular screenshot pane and timeline so cells read larger while keeping the same breakpoint behavior.
+- **Library / media fit:** Masonry tiles again use **cover-style** scaling (`UniformToFill`) with rounding clips so frames stay **fully filled** without letterboxing.
+- **Library / timeline chrome:** Per-capture title, platform chip, capture time, and comment editor sit on a **bottom gradient scrim** over the image instead of reserving a separate block below it; packed-card height estimates match the shorter tile footprint.
+
 ## 0.954
 - **Release:** Version **0.954** — Seamless gallery-grid follow-up for Library detail and timeline.
 - **Library / gallery chrome:** Packed day cards no longer draw their own visible frame chrome. The gallery now reads as one continuous grid, with only a small muted date label above each day’s first cluster.
