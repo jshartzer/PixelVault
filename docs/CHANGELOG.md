@@ -1,3 +1,9 @@
+## 0.911
+- **Release:** Version **0.911** — Library **Timeline** mode phase 2, first context pass.
+- **Timeline:** Timeline photos now show lightweight game and platform context directly on each tile, plus a capture-time label, so the full-library feed is easier to read without opening metadata.
+- **Timeline header:** The timeline summary now reports the visible photo count, distinct games, distinct platforms, and the visible capture date range.
+- **Implementation:** Timeline context is built from the saved game index plus the photo metadata index, keeping the new captions cheap enough to render across the full feed.
+
 ## 0.906
 - **Release:** Version **0.906** — Library **Timeline** mode phase 1.
 - **Library:** Added a third Library browse mode, **Timeline**, that replaces the folder/detail split with a single chronological photo feed built from the visible library scope. The timeline is image-only for this first pass and orders captures by indexed capture time across games and consoles.

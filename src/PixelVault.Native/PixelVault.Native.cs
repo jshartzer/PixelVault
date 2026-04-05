@@ -40,7 +40,7 @@ namespace PixelVaultNative
 
     public sealed partial class MainWindow : Window
     {
-        const string AppVersion = "0.906";
+        const string AppVersion = "0.911";
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
         const string ClearedExternalIdSentinel = "__PV_CLEARED__";
@@ -779,15 +779,28 @@ namespace PixelVaultNative
         int NormalizeLibraryFolderTileSize(int value) => SettingsService.NormalizeLibraryFolderTileSize(value);
         (int Columns, int TileSize) CalculateResponsiveLibraryFolderLayout(ScrollViewer scrollViewer)
         {
+            const int gapPx = 14;
+            // When the folder pane is very wide, allow up to this many columns (still reduced below if tiles would be narrower than minTile).
+            const int libraryFolderMaxColumnsWideBand = 5;
             var viewportWidth = scrollViewer == null ? 0 : scrollViewer.ViewportWidth;
             if (viewportWidth <= 0 && scrollViewer != null) viewportWidth = scrollViewer.ActualWidth;
             viewportWidth = Math.Max(120, viewportWidth - 18);
-            // Default is three columns in the ~1/3-wide folder pane; fourth column only on very wide panes.
-            var columns = viewportWidth >= 1200 ? 5 : (viewportWidth >= 900 ? 4 : (viewportWidth >= 360 ? 2 : 1));
-            var rawTile = (int)Math.Floor((viewportWidth - ((columns - 1) * 14)) / (double)Math.Max(1, columns));
+            // Per-band ceiling so mid-width panes are not as dense as a starved ~⅓ pane; edit the matching branch if your typical split lands in that width range.
+            var maxColumnsCeiling = viewportWidth >= 1200 ? libraryFolderMaxColumnsWideBand : (viewportWidth >= 900 ? 4 : (viewportWidth >= 360 ? 2 : 1));
             var minTile = viewportWidth < 260 ? 112 : 140;
             var userCap = NormalizeLibraryFolderTileSize(libraryFolderTileSize);
             const int layoutMaxTile = 1000;
+            var columns = 1;
+            for (var candidate = maxColumnsCeiling; candidate >= 1; candidate--)
+            {
+                var spacePerTile = (viewportWidth - ((candidate - 1) * gapPx)) / (double)Math.Max(1, candidate);
+                if (spacePerTile + 1e-6 >= minTile)
+                {
+                    columns = candidate;
+                    break;
+                }
+            }
+            var rawTile = (int)Math.Floor((viewportWidth - ((columns - 1) * gapPx)) / (double)Math.Max(1, columns));
             var tileWidth = Math.Max(minTile, Math.Min(Math.Min(layoutMaxTile, userCap), rawTile));
             tileWidth = (int)(Math.Round(tileWidth / 16d) * 16);
             tileWidth = Math.Max(minTile, Math.Min(Math.Min(layoutMaxTile, userCap), Math.Min(rawTile, tileWidth)));
@@ -2460,7 +2473,6 @@ namespace PixelVaultNative
         }
     }
 }
-
 
 
 
