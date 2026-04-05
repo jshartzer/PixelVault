@@ -274,8 +274,9 @@ namespace PixelVaultNative
                                         Width = packAvailableW,
                                         Margin = new Thickness(0, 0, 0, detailTileGap)
                                     };
-                                    VirtualizingPanel.SetIsVirtualizing(itemsControl, true);
-                                    VirtualizingPanel.SetVirtualizationMode(itemsControl, VirtualizationMode.Recycling);
+                                    // Detail rows sit in a outer StackPanel with unbounded height; virtualizing wrap
+                                    // + recycling expects a ScrollViewer scroll owner — can hard-fault without it.
+                                    VirtualizingPanel.SetIsVirtualizing(itemsControl, false);
                                     foreach (var file in groupFiles)
                                     {
                                         if (string.IsNullOrWhiteSpace(file)) continue;
@@ -354,8 +355,7 @@ namespace PixelVaultNative
                                         Width = packAvailableW,
                                         Margin = new Thickness(0, 0, 0, detailTileGap)
                                     };
-                                    VirtualizingPanel.SetIsVirtualizing(itemsControl, true);
-                                    VirtualizingPanel.SetVirtualizationMode(itemsControl, VirtualizationMode.Recycling);
+                                    VirtualizingPanel.SetIsVirtualizing(itemsControl, false);
                                     Action<string> useFileAsFolderCover = delegate(string imagePath)
                                     {
                                         var folder = activeSelectedLibraryFolder;
