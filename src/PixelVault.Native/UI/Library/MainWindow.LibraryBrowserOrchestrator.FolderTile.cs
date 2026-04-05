@@ -112,7 +112,7 @@ namespace PixelVaultNative
             var tile = new Button
             {
                 Width = tileWidth,
-                Height = tileHeight + 76,
+                Height = tileHeight,
                 Margin = new Thickness(0, 0, 14, 16),
                 Padding = new Thickness(0),
                 Background = Brush("#151E24"),
@@ -123,49 +123,68 @@ namespace PixelVaultNative
                 VerticalContentAlignment = VerticalAlignment.Stretch
             };
             tile.Template = BuildRoundedTileButtonTemplate();
-            var tileStack = new StackPanel();
-            var imageBorder = new Border { Width = tileWidth, Height = tileHeight, Background = Brush("#0E1418"), CornerRadius = new CornerRadius(18), ClipToBounds = true };
-            if (showPlatformBadgeOnTile)
+            var coverCorner = new CornerRadius(12);
+            var coverRoot = new Grid { Width = tileWidth, Height = tileHeight };
+            coverRoot.Children.Add(CreateAsyncImageTile(
+                GetLibraryArtPathForDisplayOnly(displayFolder),
+                CalculateLibraryFolderArtDecodeWidth(tileWidth, ResolveLibraryDpiScale()),
+                tileWidth,
+                tileHeight,
+                Stretch.UniformToFill,
+                tileFallbackText,
+                Brushes.White,
+                new Thickness(0),
+                new Thickness(0),
+                Brushes.Transparent,
+                new CornerRadius(0),
+                Brushes.Transparent,
+                new Thickness(0)));
+            var overlayPadRight = showPlatformBadgeOnTile ? 48d : 10d;
+            var titleBlock = new TextBlock
             {
-                var imageGrid = new Grid();
-                imageGrid.Children.Add(CreateAsyncImageTile(
-                    GetLibraryArtPathForDisplayOnly(displayFolder),
-                    CalculateLibraryFolderArtDecodeWidth(tileWidth, ResolveLibraryDpiScale()),
-                    tileWidth,
-                    tileHeight,
-                    Stretch.UniformToFill,
-                    tileFallbackText,
-                    Brushes.White,
-                    new Thickness(0),
-                    new Thickness(0),
-                    Brushes.Transparent,
-                    new CornerRadius(0),
-                    Brushes.Transparent,
-                    new Thickness(0)));
-                imageGrid.Children.Add(BuildLibraryTilePlatformBadge(badgePlatformLabel));
-                imageBorder.Child = imageGrid;
-            }
-            else
+                Text = folder.Name,
+                TextWrapping = TextWrapping.Wrap,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                Foreground = Brushes.White,
+                FontWeight = FontWeights.SemiBold,
+                FontSize = 12,
+                MaxHeight = 30,
+                LineHeight = 15
+            };
+            var subtitleBlock = new TextBlock
             {
-                imageBorder.Child = CreateAsyncImageTile(
-                    GetLibraryArtPathForDisplayOnly(displayFolder),
-                    CalculateLibraryFolderArtDecodeWidth(tileWidth, ResolveLibraryDpiScale()),
-                    tileWidth,
-                    tileHeight,
-                    Stretch.UniformToFill,
-                    tileFallbackText,
-                    Brushes.White,
-                    new Thickness(0),
-                    new Thickness(0),
-                    Brushes.Transparent,
-                    new CornerRadius(0),
-                    Brushes.Transparent,
-                    new Thickness(0));
-            }
-            tileStack.Children.Add(imageBorder);
-            tileStack.Children.Add(new TextBlock { Text = folder.Name, TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.CharacterEllipsis, Foreground = Brushes.White, Margin = new Thickness(10, 12, 10, 3), FontWeight = FontWeights.SemiBold, FontSize = 13.5, Height = 34 });
-            tileStack.Children.Add(new TextBlock { Text = BuildLibraryBrowserFolderTileSubtitle(folder), Foreground = Brush("#8FA4B0"), Margin = new Thickness(10, 0, 10, 10), FontSize = 10.5, TextWrapping = TextWrapping.Wrap, MaxHeight = 36 });
-            tile.Content = tileStack;
+                Text = BuildLibraryBrowserFolderTileSubtitle(folder),
+                Foreground = Brush("#8FA4B0"),
+                FontSize = 9.5,
+                TextWrapping = TextWrapping.Wrap,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                MaxHeight = 28,
+                Margin = new Thickness(0, 2, 0, 0),
+                LineHeight = 13
+            };
+            var overlayStack = new StackPanel();
+            overlayStack.Children.Add(titleBlock);
+            overlayStack.Children.Add(subtitleBlock);
+            var footerScrim = new Border
+            {
+                VerticalAlignment = VerticalAlignment.Bottom,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                Background = LibraryTimelineTileFooterScrimBrush,
+                Padding = new Thickness(10, 18, overlayPadRight, 8),
+                Child = overlayStack
+            };
+            coverRoot.Children.Add(footerScrim);
+            if (showPlatformBadgeOnTile) coverRoot.Children.Add(BuildLibraryTilePlatformBadge(badgePlatformLabel));
+            var imageBorder = new Border
+            {
+                Width = tileWidth,
+                Height = tileHeight,
+                Background = Brush("#0E1418"),
+                CornerRadius = coverCorner,
+                ClipToBounds = true,
+                Child = coverRoot
+            };
+            tile.Content = imageBorder;
             tile.Click += delegate { showFolder(folder); };
             var contextMenu = new ContextMenu();
             var openMyCoversItem = new MenuItem { Header = "Open My Covers Folder" };

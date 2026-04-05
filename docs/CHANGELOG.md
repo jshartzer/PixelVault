@@ -1,3 +1,8 @@
+## 0.981
+- **Release:** Version **0.981** — Library folder cover tiles: full-bleed art with bottom title strip.
+- **Library / folder tiles:** Game (folder) cover thumbnails fill the tile; name and file-count subtitle sit on the same **bottom gradient scrim** as timeline tiles (reuses `LibraryTimelineTileFooterScrimBrush`). Typography is slightly smaller; platform badge stays above the scrim when shown.
+- **Chrome:** Folder tile and chrome **corner radius** is **12** (was 18) for a subtler rounded frame. Virtualized folder row heights match the shorter tile (no separate text band under the image).
+
 ## 0.980
 - **Release:** Version **0.980** — Library detail speedups, perf diagnostics, global scrollbar chrome.
 - **Library / detail:** Parallel probe of image/video dimensions for large visible sets (≥16 files); reuse the media layout map across quick, comment, and refined snapshot passes when the visible file set is unchanged; slightly higher concurrent bitmap decode limits for the thumbnail pipeline.

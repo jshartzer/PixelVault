@@ -51,7 +51,7 @@ namespace PixelVaultNative
 
     public sealed partial class MainWindow : Window
     {
-        const string AppVersion = "0.980";
+        const string AppVersion = "0.981";
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
         const string ClearedExternalIdSentinel = "__PV_CLEARED__";
@@ -1030,7 +1030,7 @@ namespace PixelVaultNative
             borderFactory.SetValue(Border.BackgroundProperty, Brush("#151E24"));
             borderFactory.SetValue(Border.BorderBrushProperty, Brush("#25333D"));
             borderFactory.SetValue(Border.BorderThicknessProperty, new Thickness(1));
-            borderFactory.SetValue(Border.CornerRadiusProperty, new CornerRadius(18));
+            borderFactory.SetValue(Border.CornerRadiusProperty, new CornerRadius(12));
 
             var contentFactory = new FrameworkElementFactory(typeof(ContentPresenter));
             contentFactory.SetValue(ContentPresenter.HorizontalAlignmentProperty, HorizontalAlignment.Stretch);

@@ -154,7 +154,7 @@ namespace PixelVaultNative
                     var rowFolders = orderedVisibleFolders.Skip(rowStart).Take(folderColumns).ToList();
                     var rowTileWidth = ResolveFolderRowTileWidth(rowFolders.Count);
                     var rowTileHeight = (int)Math.Round(rowTileWidth * 1.5d);
-                    var rowCardHeight = rowTileHeight + 82;
+                    var rowCardHeight = rowTileHeight + 16;
                     var rowHeight = rowCardHeight + 14;
                     virtualRows.Add(new VirtualizedRowDefinition
                     {
@@ -215,7 +215,7 @@ namespace PixelVaultNative
                         var rowFolders = groupFolders.Skip(rowStart).Take(folderColumns).ToList();
                         var rowTileWidth = ResolveFolderRowTileWidth(rowFolders.Count);
                         var rowTileHeight = (int)Math.Round(rowTileWidth * 1.5d);
-                        var rowCardHeight = rowTileHeight + 82;
+                        var rowCardHeight = rowTileHeight + 16;
                         var rowHeight = rowCardHeight + 14;
                         virtualRows.Add(new VirtualizedRowDefinition
                         {
