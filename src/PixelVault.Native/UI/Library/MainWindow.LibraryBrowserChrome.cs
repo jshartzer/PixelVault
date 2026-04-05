@@ -140,7 +140,7 @@ namespace PixelVaultNative
             chrome.ExportStarredButton.Height = 42;
             chrome.ExportStarredButton.FontSize = 13;
             chrome.ExportStarredButton.Margin = new Thickness(0, 0, 12, 0);
-            chrome.ExportStarredButton.ToolTip = "Copy starred captures to the folder set in Path Settings, mirroring subfolders under the library root. Existing files are replaced; read-only targets are cleared when possible.";
+            chrome.ExportStarredButton.ToolTip = "Copy starred captures to the folder set in Path Settings, mirroring subfolders under the library root. Only new files or those with changed metadata are copied again; state is tracked per library in the index database. Existing files are replaced; read-only targets are cleared when possible.";
             ApplyLibraryToolbarChrome(chrome.ExportStarredButton, "#18242B", "#24353F", "#22323C", "#131D23");
             chrome.ExportStarredButton.Content = BuildToolbarButtonContent("\uE81E", "Export Starred");
             chrome.RefreshButton = Btn("Refresh", null, "#20343A", Brushes.White);

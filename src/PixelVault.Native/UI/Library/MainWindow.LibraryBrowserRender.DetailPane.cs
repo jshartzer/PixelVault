@@ -26,7 +26,19 @@ namespace PixelVaultNative
             var panes = ws.Panes;
             var renderStopwatch = Stopwatch.StartNew();
             var renderVersion = ++ws.DetailRenderSequence;
-            if (!ws.PreserveDetailScrollOnNextRender) ws.PreservedDetailScrollOffset = 0;
+            if (ws.Current != null && panes?.ThumbScroll != null && !ws.PreserveDetailScrollOnNextRender)
+            {
+                var liveDetailScroll = panes.ThumbScroll.VerticalOffset;
+                if (liveDetailScroll > 0.1d)
+                {
+                    ws.PreservedDetailScrollOffset = Math.Max(0d, liveDetailScroll);
+                    ws.PreserveDetailScrollOnNextRender = true;
+                }
+            }
+            else if (!ws.PreserveDetailScrollOnNextRender)
+            {
+                ws.PreservedDetailScrollOffset = 0;
+            }
             ws.DetailTiles.Clear();
             if (ws.Current == null)
             {
@@ -52,6 +64,10 @@ namespace PixelVaultNative
             ws.ResetDetailRowsToLoadingOnNextRender = false;
             var renderFolder = ws.Current;
             var timelineView = IsLibraryBrowserTimelineView(renderFolder);
+            var detailViewportWidth = panes?.ThumbScroll == null ? 0d : panes.ThumbScroll.ViewportWidth;
+            if (detailViewportWidth <= 0d && panes?.ThumbScroll != null) detailViewportWidth = panes.ThumbScroll.ActualWidth;
+            var timelinePackedTileSize = timelineView ? CalculateLibraryTimelinePackedTileSize(size, detailViewportWidth) : size;
+            if (timelineView) ws.EstimatedDetailRowHeight = Math.Max(240, timelinePackedTileSize + 184);
             var timelineRangeStart = ws.TimelineStartDate;
             var timelineRangeEnd = ws.TimelineEndDate;
             NormalizeLibraryTimelineDateRange(ref timelineRangeStart, ref timelineRangeEnd);
@@ -179,44 +195,53 @@ namespace PixelVaultNative
 
                     const int detailTileGap = 8;
                     var detailColumns = targetDetailColumns;
-                    var virtualRows = new List<VirtualizedRowDefinition>();
-                    foreach (var group in snapshot.Groups)
+                    var virtualRows = timelineView
+                        ? BuildLibraryTimelinePackedRowDefinitions(
+                            ws,
+                            renderFolder,
+                            snapshot.Groups,
+                            timelineContexts,
+                            detailViewportWidth,
+                            timelinePackedTileSize,
+                            openSingleFileMetadataEditor,
+                            updateDetailSelection,
+                            refreshDetailSelectionUi,
+                            redrawSelectedFolderDetail)
+                        : new List<VirtualizedRowDefinition>();
+                    if (!timelineView)
                     {
-                        var groupDate = group.CaptureDate;
-                        var groupFiles = group.Files ?? new List<string>();
-                        virtualRows.Add(new VirtualizedRowDefinition
+                        foreach (var group in snapshot.Groups)
                         {
-                            Height = 34,
-                            Build = delegate
-                            {
-                                return new TextBlock
-                                {
-                                    Text = groupDate.ToString("MMMM d, yyyy"),
-                                    FontSize = 16,
-                                    FontWeight = FontWeights.SemiBold,
-                                    Foreground = Brush("#F1E9DA"),
-                                    Margin = new Thickness(0, 0, 0, 10)
-                                };
-                            }
-                        });
-                        for (int rowStart = 0; rowStart < groupFiles.Count; rowStart += detailColumns)
-                        {
-                            var rowFiles = groupFiles.Skip(rowStart).Take(detailColumns).ToList();
+                            var groupDate = group.CaptureDate;
+                            var groupFiles = group.Files ?? new List<string>();
                             virtualRows.Add(new VirtualizedRowDefinition
                             {
-                                Height = ws.EstimatedDetailRowHeight,
+                                Height = 34,
                                 Build = delegate
                                 {
-                                    var rowPanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, detailTileGap) };
-                                    for (int fileIndex = 0; fileIndex < rowFiles.Count; fileIndex++)
+                                    return new TextBlock
                                     {
-                                        var file = rowFiles[fileIndex];
-                                        LibraryTimelineCaptureContext timelineContext = null;
-                                        if (timelineView) timelineContexts.TryGetValue(file, out timelineContext);
-                                        Action<string> useFileAsFolderCover = null;
-                                        if (!timelineView)
+                                        Text = groupDate.ToString("MMMM d, yyyy"),
+                                        FontSize = 16,
+                                        FontWeight = FontWeights.SemiBold,
+                                        Foreground = Brush("#F1E9DA"),
+                                        Margin = new Thickness(0, 0, 0, 10)
+                                    };
+                                }
+                            });
+                            for (int rowStart = 0; rowStart < groupFiles.Count; rowStart += detailColumns)
+                            {
+                                var rowFiles = groupFiles.Skip(rowStart).Take(detailColumns).ToList();
+                                virtualRows.Add(new VirtualizedRowDefinition
+                                {
+                                    Height = ws.EstimatedDetailRowHeight,
+                                    Build = delegate
+                                    {
+                                        var rowPanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, detailTileGap) };
+                                        for (int fileIndex = 0; fileIndex < rowFiles.Count; fileIndex++)
                                         {
-                                            useFileAsFolderCover = delegate(string imagePath)
+                                            var file = rowFiles[fileIndex];
+                                            Action<string> useFileAsFolderCover = delegate(string imagePath)
                                             {
                                                 var folder = activeSelectedLibraryFolder;
                                                 if (folder == null || string.IsNullOrWhiteSpace(imagePath) || !File.Exists(imagePath) || !IsImage(imagePath)) return;
@@ -225,25 +250,25 @@ namespace PixelVaultNative
                                                 redrawSelectedFolderDetail?.Invoke();
                                                 ShowLibraryBrowserToast(ws, "Cover saved");
                                             };
+                                            var tile = CreateLibraryDetailTile(
+                                                file,
+                                                size,
+                                                delegate { return SameLibraryBrowserSelection(ws.Current, renderFolder); },
+                                                openSingleFileMetadataEditor,
+                                                updateDetailSelection,
+                                                ws.SelectedDetailFiles,
+                                                refreshDetailSelectionUi,
+                                                redrawSelectedFolderDetail,
+                                                useFileAsFolderCover,
+                                                null);
+                                            tile.Margin = new Thickness(0, 0, fileIndex < rowFiles.Count - 1 ? detailTileGap : 0, 0);
+                                            ws.DetailTiles.Add(tile);
+                                            rowPanel.Children.Add(tile);
                                         }
-                                        var tile = CreateLibraryDetailTile(
-                                            file,
-                                            size,
-                                            delegate { return SameLibraryBrowserSelection(ws.Current, renderFolder); },
-                                            openSingleFileMetadataEditor,
-                                            updateDetailSelection,
-                                            ws.SelectedDetailFiles,
-                                            refreshDetailSelectionUi,
-                                            redrawSelectedFolderDetail,
-                                            useFileAsFolderCover,
-                                            timelineContext);
-                                        tile.Margin = new Thickness(0, 0, fileIndex < rowFiles.Count - 1 ? detailTileGap : 0, 0);
-                                        ws.DetailTiles.Add(tile);
-                                        rowPanel.Children.Add(tile);
+                                        return rowPanel;
                                     }
-                                    return rowPanel;
-                                }
-                            });
+                                });
+                            }
                         }
                     }
                     SetVirtualizedRows(panes.DetailRows, virtualRows, !restoreDetailScrollPending, restoreDetailScrollPending ? restoreDetailScrollOffset : null);
@@ -508,6 +533,180 @@ namespace PixelVaultNative
                     }));
                 }
             });
+        }
+
+        List<VirtualizedRowDefinition> BuildLibraryTimelinePackedRowDefinitions(
+            LibraryBrowserWorkingSet ws,
+            LibraryBrowserFolderView renderFolder,
+            IList<LibraryDetailRenderGroup> groups,
+            IDictionary<string, LibraryTimelineCaptureContext> timelineContexts,
+            double viewportWidth,
+            int timelineTileSize,
+            Action<string> openSingleFileMetadataEditor,
+            Action<string, ModifierKeys> updateDetailSelection,
+            Action refreshDetailSelectionUi,
+            Action redrawSelectedFolderDetail)
+        {
+            const double cardGap = 12d;
+            var safeGroups = (groups ?? new List<LibraryDetailRenderGroup>())
+                .Where(group => group != null && (group.Files ?? new List<string>()).Count > 0)
+                .ToList();
+            if (safeGroups.Count == 0) return new List<VirtualizedRowDefinition>();
+
+            var availableWidth = viewportWidth <= 0d ? 1100d : Math.Max(320d, viewportWidth - 6d);
+            var cardWidths = safeGroups
+                .Select(group => EstimateLibraryTimelinePackedCardWidth((group.Files ?? new List<string>()).Count, timelineTileSize, availableWidth))
+                .ToList();
+            var packedRows = BuildLibraryTimelinePackedRows(cardWidths, availableWidth, cardGap);
+            var rowDefinitions = new List<VirtualizedRowDefinition>();
+            foreach (var row in packedRows)
+            {
+                var rowIndexes = row == null ? new List<int>() : row.ToList();
+                if (rowIndexes.Count == 0) continue;
+                var estimatedHeight = rowIndexes
+                    .Select(index => EstimateLibraryTimelinePackedCardHeight((safeGroups[index].Files ?? new List<string>()).Count, timelineTileSize, availableWidth))
+                    .DefaultIfEmpty(ws == null ? 360d : ws.EstimatedDetailRowHeight)
+                    .Max();
+                rowDefinitions.Add(new VirtualizedRowDefinition
+                {
+                    Height = Math.Max(ws == null ? 360 : ws.EstimatedDetailRowHeight, (int)Math.Ceiling(estimatedHeight + cardGap)),
+                    Build = delegate
+                    {
+                        var rowPanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, cardGap) };
+                        for (var i = 0; i < rowIndexes.Count; i++)
+                        {
+                            var group = safeGroups[rowIndexes[i]];
+                            var card = BuildLibraryTimelinePackedDayCard(
+                                ws,
+                                renderFolder,
+                                group,
+                                timelineContexts,
+                                cardWidths[rowIndexes[i]],
+                                timelineTileSize,
+                                openSingleFileMetadataEditor,
+                                updateDetailSelection,
+                                refreshDetailSelectionUi,
+                                redrawSelectedFolderDetail);
+                            if (card != null)
+                            {
+                                card.Margin = new Thickness(0, 0, i < rowIndexes.Count - 1 ? cardGap : 0, 0);
+                                rowPanel.Children.Add(card);
+                            }
+                        }
+                        return rowPanel;
+                    }
+                });
+            }
+            return rowDefinitions;
+        }
+
+        FrameworkElement BuildLibraryTimelinePackedDayCard(
+            LibraryBrowserWorkingSet ws,
+            LibraryBrowserFolderView renderFolder,
+            LibraryDetailRenderGroup group,
+            IDictionary<string, LibraryTimelineCaptureContext> timelineContexts,
+            double cardWidth,
+            int timelineTileSize,
+            Action<string> openSingleFileMetadataEditor,
+            Action<string, ModifierKeys> updateDetailSelection,
+            Action refreshDetailSelectionUi,
+            Action redrawSelectedFolderDetail)
+        {
+            if (group == null) return null;
+            var groupFiles = (group.Files ?? new List<string>())
+                .Where(file => !string.IsNullOrWhiteSpace(file))
+                .ToList();
+            if (groupFiles.Count == 0) return null;
+
+            const int detailTileGap = 8;
+            const int cardPadding = 12;
+            var cardColumns = CalculateLibraryTimelinePackedCardColumns(groupFiles.Count, Math.Max(220d, cardWidth));
+            var title = BuildLibraryTimelineDayCardTitle(group.CaptureDate, DateTime.Today);
+            var absoluteTitle = group.CaptureDate <= DateTime.MinValue ? string.Empty : group.CaptureDate.ToString("MMMM d, yyyy");
+
+            var card = new Border
+            {
+                Width = Math.Max(220d, Math.Ceiling(cardWidth)),
+                Padding = new Thickness(cardPadding),
+                Background = Brush("#121A20"),
+                BorderBrush = Brush("#24323B"),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(16)
+            };
+            var stack = new StackPanel();
+
+            var header = new DockPanel { Margin = new Thickness(0, 0, 0, 10), LastChildFill = true };
+            var countBadge = new Border
+            {
+                Background = Brush("#162028"),
+                BorderBrush = Brush("#2E4551"),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(10),
+                Padding = new Thickness(8, 3, 8, 3),
+                Child = new TextBlock
+                {
+                    Text = groupFiles.Count + " photo" + (groupFiles.Count == 1 ? string.Empty : "s"),
+                    Foreground = Brush("#CFE0E8"),
+                    FontSize = 10.5,
+                    FontWeight = FontWeights.SemiBold
+                }
+            };
+            DockPanel.SetDock(countBadge, Dock.Right);
+            header.Children.Add(countBadge);
+            header.Children.Add(new TextBlock
+            {
+                Text = string.IsNullOrWhiteSpace(title) ? absoluteTitle : title,
+                Foreground = Brush("#F1E9DA"),
+                FontSize = 14,
+                FontWeight = FontWeights.SemiBold,
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 1, 12, 0)
+            });
+            stack.Children.Add(header);
+            if (!string.IsNullOrWhiteSpace(absoluteTitle) && !string.Equals(title, absoluteTitle, StringComparison.Ordinal))
+            {
+                stack.Children.Add(new TextBlock
+                {
+                    Text = absoluteTitle,
+                    Foreground = Brush("#8FA1AD"),
+                    FontSize = 11.5,
+                    Margin = new Thickness(0, -4, 0, 12)
+                });
+            }
+
+            for (var rowStart = 0; rowStart < groupFiles.Count; rowStart += cardColumns)
+            {
+                var rowFiles = groupFiles.Skip(rowStart).Take(cardColumns).ToList();
+                var rowPanel = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    Margin = new Thickness(0, 0, 0, rowStart + cardColumns < groupFiles.Count ? detailTileGap : 0)
+                };
+                for (var fileIndex = 0; fileIndex < rowFiles.Count; fileIndex++)
+                {
+                    var file = rowFiles[fileIndex];
+                    LibraryTimelineCaptureContext timelineContext;
+                    if (timelineContexts == null || !timelineContexts.TryGetValue(file, out timelineContext)) timelineContext = null;
+                    var tile = CreateLibraryDetailTile(
+                        file,
+                        timelineTileSize,
+                        delegate { return ws != null && SameLibraryBrowserSelection(ws.Current, renderFolder); },
+                        openSingleFileMetadataEditor,
+                        updateDetailSelection,
+                        ws == null ? new HashSet<string>(StringComparer.OrdinalIgnoreCase) : ws.SelectedDetailFiles,
+                        refreshDetailSelectionUi,
+                        redrawSelectedFolderDetail,
+                        null,
+                        timelineContext);
+                    tile.Margin = new Thickness(0, 0, fileIndex < rowFiles.Count - 1 ? detailTileGap : 0, 0);
+                    if (ws != null) ws.DetailTiles.Add(tile);
+                    rowPanel.Children.Add(tile);
+                }
+                stack.Children.Add(rowPanel);
+            }
+
+            card.Child = stack;
+            return card;
         }
     }
 }

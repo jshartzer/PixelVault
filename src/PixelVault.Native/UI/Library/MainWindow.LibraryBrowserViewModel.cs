@@ -25,6 +25,7 @@ namespace PixelVaultNative
             internal string PreviewImagePath;
             internal string[] FilePaths = new string[0];
             internal long NewestCaptureUtcTicks;
+            internal long NewestRecentSortUtcTicks;
             internal string SteamAppId;
             internal string SteamGridDbId;
             internal bool SuppressSteamAppIdAutoResolve;
@@ -52,6 +53,7 @@ namespace PixelVaultNative
                 PreviewImagePath = view.PreviewImagePath,
                 FilePaths = view.FilePaths == null ? new string[0] : view.FilePaths.ToArray(),
                 NewestCaptureUtcTicks = view.NewestCaptureUtcTicks,
+                NewestRecentSortUtcTicks = view.NewestRecentSortUtcTicks,
                 SteamAppId = view.SteamAppId,
                 SteamGridDbId = view.SteamGridDbId,
                 SuppressSteamAppIdAutoResolve = view.SuppressSteamAppIdAutoResolve,
@@ -103,6 +105,7 @@ namespace PixelVaultNative
             folder.PreviewImagePath = string.IsNullOrWhiteSpace(view.PreviewImagePath) ? (primary == null ? string.Empty : primary.PreviewImagePath ?? string.Empty) : view.PreviewImagePath;
             folder.FilePaths = view.FilePaths == null ? new string[0] : view.FilePaths.ToArray();
             folder.NewestCaptureUtcTicks = view.NewestCaptureUtcTicks;
+            folder.NewestRecentSortUtcTicks = view.NewestRecentSortUtcTicks;
             folder.SteamAppId = view.SteamAppId ?? string.Empty;
             folder.SteamGridDbId = view.SteamGridDbId ?? string.Empty;
             folder.SuppressSteamAppIdAutoResolve = view.SuppressSteamAppIdAutoResolve;
@@ -213,6 +216,81 @@ namespace PixelVaultNative
         internal static string BuildLibraryTimelineCaptureTimeLabel(DateTime captureDate)
         {
             return captureDate <= DateTime.MinValue ? string.Empty : captureDate.ToString("h:mm tt");
+        }
+
+        internal static string BuildLibraryTimelineDayCardTitle(DateTime captureDate, DateTime referenceDate)
+        {
+            if (captureDate <= DateTime.MinValue) return string.Empty;
+            var today = referenceDate <= DateTime.MinValue ? DateTime.Today : referenceDate.Date;
+            var captureDay = captureDate.Date;
+            if (captureDay == today) return "Today";
+            if (captureDay == today.AddDays(-1)) return "Yesterday";
+            if (captureDay.Year == today.Year) return captureDay.ToString("ddd, MMM d");
+            return captureDay.ToString("ddd, MMM d, yyyy");
+        }
+
+        internal static int CalculateLibraryTimelinePackedTileSize(int detailTileSize, double availableWidth)
+        {
+            var width = availableWidth <= 0 ? 1280d : availableWidth;
+            var minTile = width < 540d ? 144 : (width < 860d ? 160 : 180);
+            var maxTile = width >= 1800d ? 280 : (width >= 1300d ? 256 : (width >= 960d ? 228 : 196));
+            var proposed = detailTileSize <= 0 ? maxTile : Math.Min(detailTileSize, maxTile);
+            return Math.Max(minTile, Math.Min(maxTile, proposed));
+        }
+
+        internal static int CalculateLibraryTimelinePackedCardColumns(int captureCount, double availableWidth)
+        {
+            if (captureCount <= 1) return 1;
+            var widthBasedMax = availableWidth >= 1680d ? 3 : (availableWidth >= 980d ? 2 : 1);
+            if (captureCount >= 6 && widthBasedMax >= 3) return 3;
+            if (captureCount >= 3 && widthBasedMax >= 2) return 2;
+            return Math.Max(1, Math.Min(captureCount, widthBasedMax));
+        }
+
+        internal static double EstimateLibraryTimelinePackedCardWidth(int captureCount, int tileSize, double availableWidth)
+        {
+            const double innerGap = 8d;
+            const double horizontalPadding = 24d;
+            var cardColumns = CalculateLibraryTimelinePackedCardColumns(captureCount, availableWidth);
+            return Math.Max(220d, (cardColumns * tileSize) + ((cardColumns - 1) * innerGap) + horizontalPadding);
+        }
+
+        internal static double EstimateLibraryTimelinePackedCardHeight(int captureCount, int tileSize, double availableWidth)
+        {
+            const double headerHeight = 40d;
+            const double verticalPadding = 24d;
+            const double innerGap = 8d;
+            const double footerReserve = 176d;
+            var safeCaptureCount = Math.Max(1, captureCount);
+            var cardColumns = CalculateLibraryTimelinePackedCardColumns(safeCaptureCount, availableWidth);
+            var rowCount = Math.Max(1, (int)Math.Ceiling(safeCaptureCount / (double)cardColumns));
+            var estimatedTileHeight = Math.Max(240d, tileSize + footerReserve);
+            return headerHeight + verticalPadding + (rowCount * estimatedTileHeight) + ((rowCount - 1) * innerGap);
+        }
+
+        internal static List<List<int>> BuildLibraryTimelinePackedRows(IReadOnlyList<double> cardWidths, double availableWidth, double interCardGap)
+        {
+            var rows = new List<List<int>>();
+            if (cardWidths == null || cardWidths.Count == 0) return rows;
+            var rowLimit = Math.Max(220d, availableWidth);
+            var currentRow = new List<int>();
+            var currentWidth = 0d;
+            for (var i = 0; i < cardWidths.Count; i++)
+            {
+                var width = Math.Max(180d, cardWidths[i]);
+                var neededWidth = currentRow.Count == 0 ? width : width + Math.Max(0d, interCardGap);
+                if (currentRow.Count > 0 && currentWidth + neededWidth > rowLimit)
+                {
+                    rows.Add(currentRow);
+                    currentRow = new List<int>();
+                    currentWidth = 0d;
+                    neededWidth = width;
+                }
+                currentRow.Add(i);
+                currentWidth += neededWidth;
+            }
+            if (currentRow.Count > 0) rows.Add(currentRow);
+            return rows;
         }
 
         Dictionary<string, LibraryTimelineCaptureContext> BuildLibraryTimelineCaptureContextMap(
@@ -469,6 +547,7 @@ namespace PixelVaultNative
                 PreviewImagePath = orderedImagePaths.FirstOrDefault() ?? string.Empty,
                 FilePaths = orderedImagePaths,
                 NewestCaptureUtcTicks = newest <= DateTime.MinValue ? 0 : newest.ToUniversalTime().Ticks,
+                NewestRecentSortUtcTicks = newest <= DateTime.MinValue ? 0 : newest.ToUniversalTime().Ticks,
                 SteamAppId = string.Empty,
                 SteamGridDbId = string.Empty,
                 SuppressSteamAppIdAutoResolve = true,
@@ -522,6 +601,9 @@ namespace PixelVaultNative
                     .DefaultIfEmpty(DateTime.MinValue)
                     .Max();
                 folder.NewestCaptureUtcTicks = newest > DateTime.MinValue ? newest.ToUniversalTime().Ticks : 0;
+                folder.NewestRecentSortUtcTicks = remainingPaths.Length == 0
+                    ? 0
+                    : remainingPaths.Max(path => ResolveLibraryFileRecentSortUtcTicks(libraryRoot, path, null));
 
                 var previewPath = folder.PreviewImagePath ?? string.Empty;
                 if (removedSet.Contains(previewPath) || string.IsNullOrWhiteSpace(previewPath) || !File.Exists(previewPath))
@@ -600,6 +682,7 @@ namespace PixelVaultNative
                     h = h * 397 ^ (folder.PlatformLabel ?? string.Empty).GetHashCode(StringComparison.OrdinalIgnoreCase);
                     h = h * 397 ^ folder.FileCount;
                     h = h * 397 ^ folder.NewestCaptureUtcTicks;
+                    h = h * 397 ^ folder.NewestRecentSortUtcTicks;
                     h = h * 397 ^ (folder.PreviewImagePath ?? string.Empty).GetHashCode(StringComparison.OrdinalIgnoreCase);
                     h = h * 397 ^ (folder.SteamAppId ?? string.Empty).GetHashCode(StringComparison.OrdinalIgnoreCase);
                     h = h * 397 ^ (folder.SteamGridDbId ?? string.Empty).GetHashCode(StringComparison.OrdinalIgnoreCase);
@@ -658,6 +741,23 @@ namespace PixelVaultNative
             return GetLibraryFolderNewestDate(BuildLibraryBrowserDisplayFolder(view));
         }
 
+        /// <summary>Sort key for Recently Added: index date-added when known, else capture/file date (see <see cref="ResolveLibraryFileRecentSortUtcTicks"/>).</summary>
+        DateTime GetLibraryBrowserFolderViewSortRecentlyAdded(LibraryBrowserFolderView view)
+        {
+            if (view == null) return DateTime.MinValue;
+            if (view.NewestRecentSortUtcTicks > 0)
+            {
+                try
+                {
+                    return new DateTime(view.NewestRecentSortUtcTicks, DateTimeKind.Utc).ToLocalTime();
+                }
+                catch
+                {
+                }
+            }
+            return GetLibraryBrowserFolderViewSortNewest(view);
+        }
+
         List<LibraryBrowserFolderView> BuildLibraryBrowserFolderViews(IEnumerable<LibraryFolderInfo> folders, string groupingMode)
         {
             var rawFolders = (folders ?? Enumerable.Empty<LibraryFolderInfo>())
@@ -682,6 +782,7 @@ namespace PixelVaultNative
                         PreviewImagePath = folder.PreviewImagePath ?? string.Empty,
                         FilePaths = folder.FilePaths == null ? new string[0] : folder.FilePaths.ToArray(),
                         NewestCaptureUtcTicks = folder.NewestCaptureUtcTicks,
+                        NewestRecentSortUtcTicks = folder.NewestRecentSortUtcTicks,
                         SteamAppId = folder.SteamAppId ?? string.Empty,
                         SteamGridDbId = folder.SteamGridDbId ?? string.Empty,
                         SuppressSteamAppIdAutoResolve = folder.SuppressSteamAppIdAutoResolve,
@@ -752,6 +853,11 @@ namespace PixelVaultNative
                             }
                         }
                     }
+                    var tickMaxRecent = sourceFolders.Max(folder => folder == null ? 0L : folder.NewestRecentSortUtcTicks);
+                    if (tickMaxRecent == 0 && orderedPaths.Length > 0)
+                    {
+                        tickMaxRecent = orderedPaths.Max(path => ResolveLibraryFileRecentSortUtcTicks(libraryRoot, path, null));
+                    }
                     var previewImagePath = primary != null && !string.IsNullOrWhiteSpace(primary.PreviewImagePath)
                         ? primary.PreviewImagePath
                         : (orderedPaths.FirstOrDefault(IsImage) ?? orderedPaths.FirstOrDefault() ?? string.Empty);
@@ -769,6 +875,7 @@ namespace PixelVaultNative
                         PreviewImagePath = previewImagePath ?? string.Empty,
                         FilePaths = orderedPaths,
                         NewestCaptureUtcTicks = tickMax,
+                        NewestRecentSortUtcTicks = tickMaxRecent,
                         SteamAppId = distinctSteamAppIds.Count == 1 ? distinctSteamAppIds[0] : string.Empty,
                         SteamGridDbId = distinctSteamGridDbIds.Count == 1 ? distinctSteamGridDbIds[0] : string.Empty,
                         SuppressSteamAppIdAutoResolve = sourceFolders.All(folder => folder != null && folder.SuppressSteamAppIdAutoResolve),

@@ -229,6 +229,12 @@ The cleanest first pass is:
 - move timeline-specific row building into a dedicated renderer instead of overloading folder-detail code forever
 - make the layout container decide between split mode and full-width timeline mode
 
+The next layout refinement after the initial full-width feed should follow the packed day-card model documented in `C:\Codex\docs\LIBRARY_TIMELINE_LAYOUT_REFERENCE.md`:
+
+- each day becomes a compact card with its own label
+- sparse days can sit beside each other in the same row
+- the layout stays photo-first while still preserving subtle metadata context
+
 ### Search strategy
 
 For phase 1, reuse the current Library search text and visible-folder scope.

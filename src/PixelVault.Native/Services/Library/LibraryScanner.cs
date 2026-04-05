@@ -246,7 +246,10 @@ namespace PixelVaultNative
                         ConsoleLabel = platformLabel,
                         TagText = string.Join(", ", tags),
                         CaptureUtcTicks = host.ToCaptureUtcTicks(item.CaptureTime),
-                        Starred = priorEntry != null && priorEntry.Starred
+                        Starred = priorEntry != null && priorEntry.Starred,
+                        IndexAddedUtcTicks = priorEntry != null && priorEntry.IndexAddedUtcTicks > 0
+                            ? priorEntry.IndexAddedUtcTicks
+                            : DateTime.UtcNow.Ticks
                     };
                     host.SetCachedFileTagsForLibraryScan(item.FilePath, tags, host.MetadataCacheStamp(item.FilePath));
                 }
@@ -390,7 +393,8 @@ namespace PixelVaultNative
                     GameId = host.NormalizeGameId(entry.GameId),
                     ConsoleLabel = host.NormalizeConsoleLabel(entry.ConsoleLabel),
                     TagText = entry.TagText ?? string.Empty,
-                    Starred = entry.Starred
+                    Starred = entry.Starred,
+                    IndexAddedUtcTicks = entry.IndexAddedUtcTicks
                 })
                 .OrderBy(row => row.FilePath ?? string.Empty, StringComparer.OrdinalIgnoreCase)
                 .ToList();
@@ -473,6 +477,7 @@ namespace PixelVaultNative
                     ? host.DetermineFolderPlatformForFiles(groupFiles.ToList(), index)
                     : host.NormalizeConsoleLabel(saved.PlatformLabel);
                 long newestCaptureUtcTicks = 0;
+                long newestRecentSortUtcTicks = 0;
                 if (groupFiles.Length > 0)
                 {
                     LibraryMetadataIndexEntry newestEntry;
@@ -484,6 +489,12 @@ namespace PixelVaultNative
                     if (newestCaptureUtcTicks <= 0)
                     {
                         newestCaptureUtcTicks = host.ToCaptureUtcTicks(host.ResolveIndexedLibraryDate(root, groupFiles[0], index));
+                    }
+
+                    foreach (var file in groupFiles)
+                    {
+                        var r = host.ResolveLibraryFileRecentSortUtcTicks(root, file, index);
+                        if (r > newestRecentSortUtcTicks) newestRecentSortUtcTicks = r;
                     }
                 }
 
@@ -497,6 +508,7 @@ namespace PixelVaultNative
                     PlatformLabel = platformLabel,
                     FilePaths = groupFiles,
                     NewestCaptureUtcTicks = newestCaptureUtcTicks,
+                    NewestRecentSortUtcTicks = newestRecentSortUtcTicks,
                     SteamAppId = saved != null && (saved.SuppressSteamAppIdAutoResolve || !string.IsNullOrWhiteSpace(saved.SteamAppId))
                         ? (saved.SteamAppId ?? string.Empty)
                         : host.ResolveLibraryFolderSteamAppId(platformLabel, groupFiles),

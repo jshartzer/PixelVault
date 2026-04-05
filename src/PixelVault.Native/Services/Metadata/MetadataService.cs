@@ -27,7 +27,7 @@ namespace PixelVaultNative
         string[] BuildStarRatingExifArgs(string file, bool starred);
         void EnsureExifTool();
         void RunExifToolBatch(IReadOnlyList<ExifWriteRequest> requests);
-        int RunExifWriteRequests(List<ExifWriteRequest> requests, int totalCount, int alreadyCompleted, Action<int, int, string> progress = null, CancellationToken cancellationToken = default(CancellationToken));
+        ExifWriteBatchResult RunExifWriteRequests(List<ExifWriteRequest> requests, int totalCount, int alreadyCompleted, Action<int, int, string> progress = null, CancellationToken cancellationToken = default(CancellationToken));
     }
 
     sealed class MetadataServiceDependencies
@@ -127,8 +127,8 @@ namespace PixelVaultNative
 
         public string[] BuildExifArgs(string file, DateTime dt, string[] platformTags, IEnumerable<string> extraTags, bool preserveFileTimes, string comment, bool addPhotographyTag, bool writeDateMetadata, bool writeCommentMetadata, bool writeTagMetadata)
         {
-            var ext = Path.GetExtension(file).ToLowerInvariant();
             var targetPath = IsVideo(file) ? MetadataSidecarPath(file) : file;
+            var contentIsPng = !IsVideo(file) && FileContentHasPngSignature(file);
             var args = new List<string>();
             var png = dt.ToString("yyyy:MM:dd HH:mm:ss");
             var std = dt.ToString("yyyyMMdd HH:mm:ss");
@@ -141,7 +141,7 @@ namespace PixelVaultNative
                     args.Add("-XMP:ModifyDate=" + std);
                     args.Add("-XMP:MetadataDate=" + std);
                 }
-                else if (ext == ".png")
+                else if (contentIsPng)
                 {
                     args.Add("-PNG:CreationTime=" + png);
                     args.Add("-PNG:ModifyDate=" + png);
@@ -179,7 +179,7 @@ namespace PixelVaultNative
                         args.Add("-EXIF:ImageDescription=" + cleanedComment);
                         args.Add("-EXIF:UserComment=" + cleanedComment);
                         args.Add("-IPTC:Caption-Abstract=" + cleanedComment);
-                        if (ext == ".png") args.Add("-PNG:Comment=" + cleanedComment);
+                        if (contentIsPng) args.Add("-PNG:Comment=" + cleanedComment);
                     }
                 }
                 else
@@ -192,7 +192,7 @@ namespace PixelVaultNative
                         args.Add("-EXIF:ImageDescription=");
                         args.Add("-EXIF:UserComment=");
                         args.Add("-IPTC:Caption-Abstract=");
-                        if (ext == ".png") args.Add("-PNG:Comment=");
+                        if (contentIsPng) args.Add("-PNG:Comment=");
                     }
                 }
             }
@@ -218,6 +218,25 @@ namespace PixelVaultNative
             args.Add("-overwrite_original");
             args.Add(targetPath);
             return args.ToArray();
+        }
+
+        static bool FileContentHasPngSignature(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path)) return false;
+            try
+            {
+                using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                {
+                    var sig = new byte[8];
+                    if (fs.Read(sig, 0, 8) != 8) return false;
+                    return sig[0] == 0x89 && sig[1] == 0x50 && sig[2] == 0x4E && sig[3] == 0x47
+                        && sig[4] == 0x0D && sig[5] == 0x0A && sig[6] == 0x1A && sig[7] == 0x0A;
+                }
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         public string[] ReadEmbeddedKeywordTagsDirect(string file, CancellationToken cancellationToken = default(CancellationToken))
@@ -611,14 +630,14 @@ namespace PixelVaultNative
             }
         }
 
-        public int RunExifWriteRequests(List<ExifWriteRequest> requests, int totalCount, int alreadyCompleted, Action<int, int, string> progress = null, CancellationToken cancellationToken = default(CancellationToken))
+        public ExifWriteBatchResult RunExifWriteRequests(List<ExifWriteRequest> requests, int totalCount, int alreadyCompleted, Action<int, int, string> progress = null, CancellationToken cancellationToken = default(CancellationToken))
         {
             var workItems = requests ?? new List<ExifWriteRequest>();
-            if (workItems.Count == 0) return 0;
+            if (workItems.Count == 0) return new ExifWriteBatchResult();
             cancellationToken.ThrowIfCancellationRequested();
 
             var completed = alreadyCompleted;
-            var failures = new ConcurrentQueue<Exception>();
+            var failures = new ConcurrentQueue<ExifWriteFailure>();
             var workerCount = dependencies.GetMetadataWorkerCount == null ? 1 : dependencies.GetMetadataWorkerCount(workItems.Count);
             var batchSize = Math.Max(1, Math.Min(24, (int)Math.Ceiling((double)workItems.Count / workerCount)));
             var batches = workItems.Chunk(batchSize).ToList();
@@ -668,14 +687,23 @@ namespace PixelVaultNative
                         }
                         catch (Exception itemEx)
                         {
-                            failures.Enqueue(new InvalidOperationException("Metadata update failed for " + request.FileName + ". " + itemEx.Message, itemEx));
+                            failures.Enqueue(new ExifWriteFailure
+                            {
+                                FilePath = request.FilePath,
+                                FileName = request.FileName,
+                                ErrorMessage = itemEx.Message
+                            });
                         }
                     }
                 }
             });
 
-            if (!failures.IsEmpty) throw new AggregateException(failures);
-            return workItems.Count;
+            var failureList = failures.ToList();
+            return new ExifWriteBatchResult
+            {
+                SuccessCount = workItems.Count - failureList.Count,
+                Failures = failureList
+            };
         }
 
         IEnumerable<string> ParseTagText(string raw)

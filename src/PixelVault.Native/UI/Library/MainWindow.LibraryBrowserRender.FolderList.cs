@@ -20,11 +20,20 @@ namespace PixelVaultNative
             var panes = ws.Panes;
             var folders = ws.Folders;
             var renderStopwatch = Stopwatch.StartNew();
-            var restoreFolderScrollOffset = ws.PreserveFolderScrollOnNextRender ? Math.Max(0, ws.PreservedFolderScrollOffset) : 0;
-            var shouldRestoreFolderScroll = ws.PreserveFolderScrollOnNextRender && restoreFolderScrollOffset > 0.1d;
-            ws.PreserveFolderScrollOnNextRender = false;
             var groupingMode = NormalizeLibraryGroupingMode(libraryGroupingMode);
             var timelineMode = string.Equals(groupingMode, "timeline", StringComparison.OrdinalIgnoreCase);
+            if (!timelineMode && panes?.TileScroll != null && !ws.PreserveFolderScrollOnNextRender)
+            {
+                var liveFolderScroll = panes.TileScroll.VerticalOffset;
+                if (liveFolderScroll > 0.1d)
+                {
+                    ws.PreservedFolderScrollOffset = Math.Max(0d, liveFolderScroll);
+                    ws.PreserveFolderScrollOnNextRender = true;
+                }
+            }
+            var restoreFolderScrollOffset = ws.PreserveFolderScrollOnNextRender ? Math.Max(0d, ws.PreservedFolderScrollOffset) : 0d;
+            var shouldRestoreFolderScroll = ws.PreserveFolderScrollOnNextRender && restoreFolderScrollOffset > 0.1d;
+            ws.PreserveFolderScrollOnNextRender = false;
             var sortMode = NormalizeLibraryFolderSortMode(libraryFolderSortMode);
             var flattenGroups = !string.Equals(groupingMode, "console", StringComparison.OrdinalIgnoreCase);
             var searchText = ws.AppliedLibrarySearchText;
@@ -57,7 +66,7 @@ namespace PixelVaultNative
                 return;
             }
             var orderedVisibleFolders = visibleFolders
-                .OrderByDescending(folder => string.Equals(sortMode, "recent", StringComparison.OrdinalIgnoreCase) ? GetLibraryBrowserFolderViewSortNewest(folder) : DateTime.MinValue)
+                .OrderByDescending(folder => string.Equals(sortMode, "recent", StringComparison.OrdinalIgnoreCase) ? GetLibraryBrowserFolderViewSortRecentlyAdded(folder) : DateTime.MinValue)
                 .ThenByDescending(folder => string.Equals(sortMode, "photos", StringComparison.OrdinalIgnoreCase) ? folder.FileCount : 0)
                 .ThenByDescending(folder => string.Equals(sortMode, "photos", StringComparison.OrdinalIgnoreCase) ? GetLibraryBrowserFolderViewSortNewest(folder) : DateTime.MinValue)
                 .ThenBy(folder => string.Equals(sortMode, "platform", StringComparison.OrdinalIgnoreCase) ? PlatformGroupOrder(DetermineLibraryBrowserGroup(folder)) : 0)

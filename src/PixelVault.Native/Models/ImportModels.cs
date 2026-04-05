@@ -84,6 +84,21 @@ namespace PixelVaultNative
     {
         public int Updated;
         public int Skipped;
+        /// <summary>Files ExifTool could not update; moved under an <c>Errors</c> subfolder in the upload directory.</summary>
+        public int FailedRelocatedToErrors;
+    }
+
+    sealed class ExifWriteFailure
+    {
+        public string FilePath;
+        public string FileName;
+        public string ErrorMessage;
+    }
+
+    sealed class ExifWriteBatchResult
+    {
+        public int SuccessCount;
+        public List<ExifWriteFailure> Failures = new List<ExifWriteFailure>();
     }
 
     sealed class MoveStepResult

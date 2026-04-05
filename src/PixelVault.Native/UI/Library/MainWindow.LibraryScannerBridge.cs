@@ -109,6 +109,9 @@ namespace PixelVaultNative
             public DateTime ResolveIndexedLibraryDate(string root, string file, Dictionary<string, LibraryMetadataIndexEntry> index) =>
                 window.ResolveIndexedLibraryDate(root, file, index);
 
+            public long ResolveLibraryFileRecentSortUtcTicks(string root, string file, Dictionary<string, LibraryMetadataIndexEntry> index) =>
+                window.ResolveLibraryFileRecentSortUtcTicks(root, file, index);
+
             public string DetermineFolderPlatformForFiles(List<string> files, Dictionary<string, LibraryMetadataIndexEntry> index) =>
                 window.DetermineFolderPlatform(files, index, null);
 

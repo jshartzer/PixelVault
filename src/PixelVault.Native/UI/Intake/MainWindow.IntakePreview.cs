@@ -123,7 +123,8 @@ namespace PixelVaultNative
                 var parsed = ParseFilename(fileName);
                 var platformTags = parsed.PlatformTags ?? new string[0];
                 var isVideo = IsVideo(file);
-                var preserveFileTimes = parsed.PreserveFileTimes || platformTags.Contains("Xbox") || isVideo;
+                // Respect the convention’s PreserveFileTimes (Steam-style: console captures update embedded + file dates from the filename). Do not force Xbox to use filesystem mtime as the capture instant.
+                var preserveFileTimes = parsed.PreserveFileTimes || isVideo;
                 var canUpdateMetadata = !(parsed.RoutesToManualWhenMissingSteamAppId && string.IsNullOrWhiteSpace(parsed.SteamAppId))
                     && (isVideo || platformTags.Contains("Xbox") || parsed.CaptureTime.HasValue);
                 analysis[file] = new IntakePreviewFileAnalysis
@@ -133,7 +134,7 @@ namespace PixelVaultNative
                     Parsed = parsed,
                     CanUpdateMetadata = canUpdateMetadata,
                     PreserveFileTimes = preserveFileTimes,
-                    CaptureTime = preserveFileTimes ? GetLibraryDate(file) : (parsed.CaptureTime ?? GetLibraryDate(file))
+                    CaptureTime = parsed.CaptureTime ?? GetLibraryDate(file)
                 };
             }
             return analysis;

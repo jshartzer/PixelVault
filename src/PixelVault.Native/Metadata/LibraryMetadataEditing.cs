@@ -222,7 +222,8 @@ namespace PixelVaultNative
                     FileCount = 0,
                     FolderPath = originalSavedRow == null ? (originalFolder == null ? string.Empty : originalFolder.FolderPath ?? string.Empty) : originalSavedRow.FolderPath ?? string.Empty,
                     PreviewImagePath = string.Empty,
-                    FilePaths = new string[0]
+                    FilePaths = new string[0],
+                    IndexAddedUtcTicks = DateTime.UtcNow.Ticks
                 };
                 rows.Add(existing);
             }

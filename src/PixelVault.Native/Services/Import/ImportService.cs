@@ -48,6 +48,9 @@ namespace PixelVaultNative
         /// <summary>Write Exif/metadata for intake review items (standard import / import-and-comment workflow).</summary>
         MetadataStepResult WriteMetadataForReviewItems(IEnumerable<ReviewItem> reviewItems, Action<int, int, string> progress = null, CancellationToken cancellationToken = default);
 
+        /// <summary>Moves files that failed ExifTool metadata writes into an <c>Errors</c> subfolder under the file’s current directory (upload folder).</summary>
+        void RelocateExifFailuresToUploadErrors(IEnumerable<ExifWriteFailure> failures);
+
         /// <summary>
         /// Import-and-edit: for rows still tagged Steam, when the user did not change the loaded game title from the original,
         /// replace numeric/placeholder titles with the Steam store name for that AppID (same idea as automatic import).
@@ -608,10 +611,44 @@ namespace PixelVaultNative
                     SuccessDetail = item.FileName
                 });
             }
-            updated = d.MetadataService.RunExifWriteRequests(requests, requests.Count + skipped, skipped, progress, cancellationToken);
-            if (progress != null) progress(total, total, "Metadata step complete: updated " + updated + ", skipped " + skipped + ".");
-            d.Log?.Invoke("Metadata summary: updated " + updated + ", skipped " + skipped + ".");
-            return new MetadataStepResult { Updated = updated, Skipped = skipped };
+            var batch = d.MetadataService.RunExifWriteRequests(requests, requests.Count + skipped, skipped, progress, cancellationToken);
+            updated = batch.SuccessCount;
+            var relocated = 0;
+            if (batch.Failures != null && batch.Failures.Count > 0)
+            {
+                RelocateExifFailuresToUploadErrors(batch.Failures);
+                relocated = batch.Failures.Count;
+            }
+            if (progress != null) progress(total, total, "Metadata step complete: updated " + updated + ", skipped " + skipped + (relocated > 0 ? ", " + relocated + " moved to Errors" : string.Empty) + ".");
+            d.Log?.Invoke("Metadata summary: updated " + updated + ", skipped " + skipped + (relocated > 0 ? ", " + relocated + " moved to Errors folder" : string.Empty) + ".");
+            return new MetadataStepResult { Updated = updated, Skipped = skipped, FailedRelocatedToErrors = relocated };
+        }
+
+        public void RelocateExifFailuresToUploadErrors(IEnumerable<ExifWriteFailure> failures)
+        {
+            foreach (var failure in failures ?? Enumerable.Empty<ExifWriteFailure>())
+            {
+                if (failure == null || string.IsNullOrWhiteSpace(failure.FilePath)) continue;
+                if (!fs.FileExists(failure.FilePath)) continue;
+                var parent = Path.GetDirectoryName(failure.FilePath);
+                if (string.IsNullOrWhiteSpace(parent)) continue;
+                var errorsDir = Path.Combine(parent, "Errors");
+                try
+                {
+                    d.EnsureDirectoryExists?.Invoke(errorsDir, "Upload errors folder");
+                    var name = Path.GetFileName(failure.FilePath);
+                    if (string.IsNullOrWhiteSpace(name)) continue;
+                    var combined = Path.Combine(errorsDir, name);
+                    var dest = d.UniquePath == null ? combined : d.UniquePath(combined);
+                    fs.MoveFile(failure.FilePath, dest);
+                    d.MoveMetadataSidecarIfPresent?.Invoke(failure.FilePath, dest);
+                    d.Log?.Invoke("Metadata update failed; moved to Errors: " + (failure.FileName ?? name) + " -> " + dest);
+                }
+                catch (Exception ex)
+                {
+                    d.Log?.Invoke("Could not move failed metadata file to Errors: " + failure.FilePath + ". " + ex.Message);
+                }
+            }
         }
 
         public async Task ApplyImportAndEditSteamStoreTitlesWhenGameNameUnchangedAsync(IEnumerable<ManualMetadataItem> items, CancellationToken cancellationToken = default)

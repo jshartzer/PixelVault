@@ -86,6 +86,7 @@ namespace PixelVaultNative
                             ? parts[6].Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries).Distinct(StringComparer.OrdinalIgnoreCase).ToArray()
                             : new string[0],
                         NewestCaptureUtcTicks = parts.Length > 9 ? ParseLong(parts[9]) : 0,
+                        NewestRecentSortUtcTicks = parts.Length > 10 ? ParseLong(parts[10]) : 0,
                         SteamAppId = parts.Length > 7 ? parts[7] : string.Empty,
                         SteamGridDbId = parts.Length > 8 ? parts[8] : string.Empty
                     });
@@ -149,7 +150,8 @@ namespace PixelVaultNative
                     string.Join("|", (folder.FilePaths ?? new string[0]).Where(File.Exists)),
                     folder.SteamAppId ?? string.Empty,
                     folder.SteamGridDbId ?? string.Empty,
-                    folder.NewestCaptureUtcTicks > 0 ? folder.NewestCaptureUtcTicks.ToString() : string.Empty
+                    folder.NewestCaptureUtcTicks > 0 ? folder.NewestCaptureUtcTicks.ToString() : string.Empty,
+                    folder.NewestRecentSortUtcTicks > 0 ? folder.NewestRecentSortUtcTicks.ToString() : string.Empty
                 }));
             }
             File.WriteAllLines(path, lines.ToArray());

@@ -1,7 +1,24 @@
 using System;
+using System.Globalization;
 
 namespace PixelVaultNative
 {
+    internal static class LibraryIndexRecordDisplay
+    {
+        internal static string FormatIndexAddedUtcLocal(long ticks)
+        {
+            if (ticks <= 0) return string.Empty;
+            try
+            {
+                return new DateTime(ticks, DateTimeKind.Utc).ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.CurrentCulture);
+            }
+            catch
+            {
+                return string.Empty;
+            }
+        }
+    }
+
     sealed class LibraryFolderInfo
     {
         public string GameId;
@@ -12,6 +29,8 @@ namespace PixelVaultNative
         public string PlatformLabel;
         public string[] FilePaths;
         public long NewestCaptureUtcTicks;
+        /// <summary>Max over files of (index date added if set, else capture/reindexed date ticks); used for Recently Added folder sort.</summary>
+        public long NewestRecentSortUtcTicks;
         public string SteamAppId;
         public string SteamGridDbId;
         public bool SuppressSteamAppIdAutoResolve;
@@ -31,6 +50,9 @@ namespace PixelVaultNative
         public string FolderPath { get; set; }
         public string PreviewImagePath { get; set; }
         public string[] FilePaths { get; set; }
+        /// <summary>UTC ticks when this game row was first added to the index (0 = unknown / predates field).</summary>
+        public long IndexAddedUtcTicks { get; set; }
+        public string IndexAddedAtLocal => LibraryIndexRecordDisplay.FormatIndexAddedUtcLocal(IndexAddedUtcTicks);
     }
 
     sealed class PhotoIndexEditorRow
@@ -41,6 +63,9 @@ namespace PixelVaultNative
         public string ConsoleLabel { get; set; }
         public string TagText { get; set; }
         public bool Starred { get; set; }
+        /// <summary>UTC ticks when this file row was first added to the photo index (0 = unknown / predates field).</summary>
+        public long IndexAddedUtcTicks { get; set; }
+        public string IndexAddedAtLocal => LibraryIndexRecordDisplay.FormatIndexAddedUtcLocal(IndexAddedUtcTicks);
     }
 
     sealed class LibraryMetadataIndexEntry
@@ -52,6 +77,8 @@ namespace PixelVaultNative
         public string TagText;
         public long CaptureUtcTicks;
         public bool Starred;
+        /// <summary>UTC ticks when this file was first recorded in the photo index.</summary>
+        public long IndexAddedUtcTicks;
     }
 
     sealed class VideoClipInfo

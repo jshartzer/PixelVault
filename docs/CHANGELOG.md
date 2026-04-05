@@ -1,3 +1,23 @@
+## 0.921
+- **Release:** Version **0.921** — Import metadata failures **quarantined** to an **`Errors`** folder.
+- **Intake / ExifTool:** When ExifTool cannot update a staged upload file (wrong extension vs bytes, corrupt media, etc.), PixelVault **moves that file** (and its `.meta.json` sidecar if present) into an **`Errors`** subfolder next to the staged copies, with a unique name if needed, then continues the rest of the batch. The import summary reports how many items were relocated instead of failing the whole metadata step.
+
+## 0.920
+- **Release:** Version **0.920** — Import metadata fix for **`.png` files that are actually JPEG**.
+- **Intake / ExifTool:** Metadata writes used PNG-specific tags whenever the **extension** was `.png`. If the file bytes are JPEG (wrong extension), ExifTool failed with *Not a valid PNG (looks more like a JPEG)*. PixelVault now picks PNG vs EXIF/XMP tagging from the **PNG file signature**, so mislabeled captures still update.
+
+## 0.919
+- **Release:** Version **0.919** — Library scroll position kept through refresh/import-style reloads.
+- **Library:** Rebuilding the **folder** or **detail** virtualized lists (refresh, cover fetch, import completion, etc.) now re-applies the previous **vertical scroll** when you had scrolled down, instead of jumping to the top. Session restore and resize behavior unchanged.
+
+## 0.918
+- **Release:** Version **0.918** — Library **Recently Added** sort uses **Date added** from the photo index.
+- **Library:** The **Recently Added** folder sort orders games by each folder’s newest relevant instant: per-file **`IndexAddedUtcTicks`** when present, otherwise **capture time** (same fallback as before). **Most Photos** unchanged. Folder cache gains an extra persisted field so order stays stable across sessions after scan.
+
+## 0.917
+- **Release:** Version **0.917** — index SQLite schema fix for **Date added** (`index_added_utc_ticks`).
+- **Indexes:** Loading the game index could crash with **`no such column: index_added_utc_ticks`** when PixelVault scanned **other** cached `pixelvault-index-*.sqlite` files (Steam ID backfill). Donor databases now get the same column migrations as the active library DB before any read.
+
 ## 0.916
 - **Release:** Version **0.916** — timeline sort-pill state fix.
 - **Library / timeline:** The three left-side sort pills no longer stay accidentally greyed out after switching into and back out of **Timeline** mode. Grouping changes now always refresh the sort-pill enabled state, so the folder browser returns in a consistent interactive state.

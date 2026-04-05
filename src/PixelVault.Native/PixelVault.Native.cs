@@ -40,7 +40,7 @@ namespace PixelVaultNative
 
     public sealed partial class MainWindow : Window
     {
-        const string AppVersion = "0.916";
+        const string AppVersion = "0.921";
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
         const string ClearedExternalIdSentinel = "__PV_CLEARED__";
@@ -156,7 +156,8 @@ namespace PixelVaultNative
                 ConsoleLabel = entry.ConsoleLabel,
                 TagText = entry.TagText,
                 CaptureUtcTicks = entry.CaptureUtcTicks,
-                Starred = entry.Starred
+                Starred = entry.Starred,
+                IndexAddedUtcTicks = entry.IndexAddedUtcTicks
             };
         }
 
@@ -184,6 +185,7 @@ namespace PixelVaultNative
                 PlatformLabel = folder.PlatformLabel,
                 FilePaths = folder.FilePaths == null ? null : folder.FilePaths.ToArray(),
                 NewestCaptureUtcTicks = folder.NewestCaptureUtcTicks,
+                NewestRecentSortUtcTicks = folder.NewestRecentSortUtcTicks,
                 SteamAppId = folder.SteamAppId,
                 SteamGridDbId = folder.SteamGridDbId,
                 SuppressSteamAppIdAutoResolve = folder.SuppressSteamAppIdAutoResolve,
@@ -546,12 +548,34 @@ namespace PixelVaultNative
             bool changed = false;
             foreach (var folder in (folders ?? Enumerable.Empty<LibraryFolderInfo>()).Where(entry => entry != null))
             {
-                if (folder.NewestCaptureUtcTicks > 0) continue;
-                var newest = GetLibraryFolderNewestDate(folder);
-                if (newest > DateTime.MinValue)
+                if (folder.NewestCaptureUtcTicks <= 0)
                 {
-                    folder.NewestCaptureUtcTicks = newest.ToUniversalTime().Ticks;
-                    changed = true;
+                    var newest = GetLibraryFolderNewestDate(folder);
+                    if (newest > DateTime.MinValue)
+                    {
+                        folder.NewestCaptureUtcTicks = newest.ToUniversalTime().Ticks;
+                        changed = true;
+                    }
+                }
+
+                if (folder.NewestRecentSortUtcTicks <= 0)
+                {
+                    var paths = folder.FilePaths;
+                    if (paths != null && paths.Length > 0)
+                    {
+                        long maxR = 0;
+                        foreach (var path in paths)
+                        {
+                            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path)) continue;
+                            var t = ResolveLibraryFileRecentSortUtcTicks(libraryRoot, path, null);
+                            if (t > maxR) maxR = t;
+                        }
+                        if (maxR > 0)
+                        {
+                            folder.NewestRecentSortUtcTicks = maxR;
+                            changed = true;
+                        }
+                    }
                 }
             }
             return changed;
@@ -783,15 +807,38 @@ namespace PixelVaultNative
             const int gapPx = 14;
             // Upper bound on columns for very wide folder panes; slack-minimization below may use fewer.
             const int libraryFolderMaxColumnsWideBand = 8;
+            // When slack is nearly tied, allow a few extra pixels of slack to prefer a denser grid (e.g. 3 columns in the folder pane instead of 2).
+            const double moreColumnsSlackBudgetPx = 12;
             var viewportWidth = scrollViewer == null ? 0 : scrollViewer.ViewportWidth;
             if (viewportWidth <= 0 && scrollViewer != null) viewportWidth = scrollViewer.ActualWidth;
             viewportWidth = Math.Max(120, viewportWidth - 18);
-            // Per-band ceiling so mid-width panes stay readable; widen the matching branch if your splitter default lands wider.
-            var maxColumnsCeiling = viewportWidth >= 1200 ? libraryFolderMaxColumnsWideBand : (viewportWidth >= 900 ? 4 : (viewportWidth >= 360 ? 2 : 1));
+            // Per-band ceiling; 360–899 is typical library splitter width — allow up to 3 columns so covers use width instead of leaving a gutter beside a capped 2-column row.
+            var maxColumnsCeiling = viewportWidth >= 1200 ? libraryFolderMaxColumnsWideBand : (viewportWidth >= 900 ? 4 : (viewportWidth >= 360 ? 3 : 1));
+            var preferDenseGridInSplitPane = maxColumnsCeiling <= 3;
             var minTile = viewportWidth < 260 ? 112 : 140;
             var userCap = NormalizeLibraryFolderTileSize(libraryFolderTileSize);
             const int layoutMaxTile = 1000;
-            // max columns × min(user cap, equal split) often leaves dead space on the row (e.g. five 300px tiles in a ~1750px viewport). Choose column count ≤ ceiling that minimizes horizontal slack after the cap; tie-break toward larger tiles.
+            int TileWidthForColumns(int c, int rawEqualSplit)
+            {
+                var tileWidth = Math.Max(minTile, Math.Min(layoutMaxTile, rawEqualSplit));
+                tileWidth = (int)(Math.Round(tileWidth / 16d) * 16);
+                tileWidth = Math.Max(minTile, Math.Min(layoutMaxTile, Math.Min(rawEqualSplit, tileWidth)));
+                while (tileWidth > minTile && c * tileWidth + (c - 1) * gapPx > viewportWidth)
+                    tileWidth = Math.Max(minTile, tileWidth - 16);
+                return tileWidth;
+            }
+            bool ShouldPreferLayout(double slack, int c, int tileW, double prevSlack, int prevC, int prevTileW)
+            {
+                if (slack < prevSlack - 0.5) return true;
+                if (preferDenseGridInSplitPane && slack <= prevSlack + moreColumnsSlackBudgetPx && c > prevC) return true;
+                if (Math.Abs(slack - prevSlack) < 0.5)
+                {
+                    if (c > prevC) return true;
+                    if (c == prevC && tileW > prevTileW) return true;
+                    if (c == prevC && tileW != prevTileW && Math.Abs(tileW - userCap) < Math.Abs(prevTileW - userCap)) return true;
+                }
+                return false;
+            }
             var bestColumns = 1;
             var bestTileW = minTile;
             var bestSlack = double.MaxValue;
@@ -799,18 +846,20 @@ namespace PixelVaultNative
             {
                 var rawTile = (int)Math.Floor((viewportWidth - ((c - 1) * gapPx)) / (double)c);
                 if (rawTile < minTile) continue;
-                var tileWidth = Math.Max(minTile, Math.Min(Math.Min(layoutMaxTile, userCap), rawTile));
-                tileWidth = (int)(Math.Round(tileWidth / 16d) * 16);
-                tileWidth = Math.Max(minTile, Math.Min(Math.Min(layoutMaxTile, userCap), Math.Min(rawTile, tileWidth)));
+                var tileWidth = TileWidthForColumns(c, rawTile);
                 var used = c * tileWidth + (c - 1) * gapPx;
                 var slack = viewportWidth - used;
                 if (!(slack > -0.5)) continue;
-                if (slack < bestSlack - 0.5 || (Math.Abs(slack - bestSlack) < 0.5 && tileWidth > bestTileW))
-                {
-                    bestSlack = slack;
-                    bestColumns = c;
-                    bestTileW = tileWidth;
-                }
+                if (!ShouldPreferLayout(slack, c, tileWidth, bestSlack, bestColumns, bestTileW)) continue;
+                bestSlack = slack;
+                bestColumns = c;
+                bestTileW = tileWidth;
+            }
+            {
+                var span = viewportWidth - (bestColumns - 1) * gapPx;
+                var rawFill = (int)Math.Floor(span / (double)bestColumns);
+                var capped = Math.Max(minTile, Math.Min(userCap, rawFill));
+                bestTileW = TileWidthForColumns(bestColumns, capped);
             }
             return (bestColumns, bestTileW);
         }
@@ -1808,6 +1857,7 @@ namespace PixelVaultNative
             if (match == null) return;
             match.GameId = !string.IsNullOrWhiteSpace(normalizedGameId) ? normalizedGameId : match.GameId;
             match.NewestCaptureUtcTicks = folder.NewestCaptureUtcTicks;
+            match.NewestRecentSortUtcTicks = folder.NewestRecentSortUtcTicks;
             match.SteamAppId = folder.SteamAppId ?? string.Empty;
             match.SteamGridDbId = folder.SteamGridDbId ?? string.Empty;
             match.SuppressSteamAppIdAutoResolve = folder.SuppressSteamAppIdAutoResolve;

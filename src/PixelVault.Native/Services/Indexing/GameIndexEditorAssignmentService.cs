@@ -105,7 +105,8 @@ namespace PixelVaultNative
                 FileCount = 0,
                 FolderPath = string.Empty,
                 PreviewImagePath = string.Empty,
-                FilePaths = new string[0]
+                FilePaths = new string[0],
+                IndexAddedUtcTicks = DateTime.UtcNow.Ticks
             };
             rows.Add(created);
             return created;
@@ -146,7 +147,8 @@ namespace PixelVaultNative
                 FileCount = Math.Max(0, row.FileCount),
                 FolderPath = (row.FolderPath ?? string.Empty).Trim(),
                 PreviewImagePath = (row.PreviewImagePath ?? string.Empty).Trim(),
-                FilePaths = (row.FilePaths ?? new string[0]).Where(path => !string.IsNullOrWhiteSpace(path)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray()
+                FilePaths = (row.FilePaths ?? new string[0]).Where(path => !string.IsNullOrWhiteSpace(path)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
+                IndexAddedUtcTicks = row.IndexAddedUtcTicks
             };
         }
     }

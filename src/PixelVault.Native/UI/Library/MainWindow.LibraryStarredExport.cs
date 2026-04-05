@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
 
@@ -28,6 +31,45 @@ namespace PixelVaultNative
             catch
             {
                 return Path.GetFileName(sourceFilePath) ?? string.Empty;
+            }
+        }
+
+        /// <summary>Stable hash of on-disk metadata stamp plus photo-index fields; when it changes, export copies again.</summary>
+        string ComputeStarredExportFingerprint(string sourceFile, LibraryMetadataIndexEntry entry)
+        {
+            long fileStamp = 0;
+            if (!string.IsNullOrWhiteSpace(sourceFile) && File.Exists(sourceFile))
+                fileStamp = MetadataCacheStamp(sourceFile);
+            var st = entry?.Stamp ?? string.Empty;
+            var gid = NormalizeGameId(entry?.GameId ?? string.Empty);
+            var con = entry?.ConsoleLabel ?? string.Empty;
+            var tag = entry?.TagText ?? string.Empty;
+            var cap = entry != null ? entry.CaptureUtcTicks : 0L;
+            var payload = string.Join("\u241e", new[]
+            {
+                fileStamp.ToString(CultureInfo.InvariantCulture),
+                st,
+                gid,
+                con,
+                tag,
+                cap.ToString(CultureInfo.InvariantCulture)
+            });
+            using (var sha = SHA256.Create())
+            {
+                return Convert.ToHexString(sha.ComputeHash(Encoding.UTF8.GetBytes(payload)));
+            }
+        }
+
+        static string NormalizePathForStarredExportTracking(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path)) return string.Empty;
+            try
+            {
+                return Path.GetFullPath(path);
+            }
+            catch
+            {
+                return path.Trim();
             }
         }
 
@@ -73,10 +115,11 @@ namespace PixelVaultNative
             }
 
             var paths = new List<string>();
+            Dictionary<string, LibraryMetadataIndexEntry> metadataIndex = null;
             try
             {
-                var index = LoadLibraryMetadataIndex(root, false);
-                foreach (var kv in index)
+                metadataIndex = LoadLibraryMetadataIndex(root, false);
+                foreach (var kv in metadataIndex)
                 {
                     if (kv.Value == null || !kv.Value.Starred) continue;
                     var path = kv.Key;
@@ -116,12 +159,22 @@ namespace PixelVaultNative
             var dispatcher = Dispatcher;
             var destNorm = Path.GetFullPath(dest);
             var rootNorm = Path.GetFullPath(root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+            var pathsOrdered = paths.OrderBy(p => p, StringComparer.OrdinalIgnoreCase).ToList();
+            var entryByPath = new Dictionary<string, LibraryMetadataIndexEntry>(StringComparer.OrdinalIgnoreCase);
+            foreach (var p in pathsOrdered)
+            {
+                LibraryMetadataIndexEntry e;
+                entryByPath[p] = metadataIndex != null && metadataIndex.TryGetValue(p, out e) ? e : null;
+            }
+            var rootForDb = root;
             _ = Task.Run(delegate
             {
-                var ok = 0;
+                var tracking = indexPersistenceService.LoadStarredExportFingerprints(rootForDb, destNorm);
+                var copied = 0;
+                var skipped = 0;
                 var failed = 0;
                 string lastError = null;
-                foreach (var src in paths.OrderBy(p => p, StringComparer.OrdinalIgnoreCase))
+                foreach (var src in pathsOrdered)
                 {
                     try
                     {
@@ -130,7 +183,18 @@ namespace PixelVaultNative
                         var dst = Path.Combine(destNorm, rel);
                         if (string.Equals(Path.GetFullPath(src), Path.GetFullPath(dst), StringComparison.OrdinalIgnoreCase))
                         {
-                            ok++;
+                            skipped++;
+                            continue;
+                        }
+                        var srcNorm = NormalizePathForStarredExportTracking(src);
+                        LibraryMetadataIndexEntry entry;
+                        entryByPath.TryGetValue(src, out entry);
+                        var fingerprint = ComputeStarredExportFingerprint(src, entry);
+                        if (tracking.TryGetValue(srcNorm, out var prevPrint)
+                            && string.Equals(prevPrint, fingerprint, StringComparison.Ordinal)
+                            && File.Exists(dst))
+                        {
+                            skipped++;
                             continue;
                         }
                         var dstDir = Path.GetDirectoryName(dst);
@@ -138,7 +202,9 @@ namespace PixelVaultNative
                             Directory.CreateDirectory(dstDir);
                         ClearReadOnlyForOverwrite(dst);
                         fileSystemService.CopyFile(src, dst, true);
-                        ok++;
+                        indexPersistenceService.UpsertStarredExportFingerprint(rootForDb, destNorm, srcNorm, fingerprint);
+                        tracking[srcNorm] = fingerprint;
+                        copied++;
                     }
                     catch (Exception ex)
                     {
@@ -146,15 +212,21 @@ namespace PixelVaultNative
                         lastError = ex.Message;
                     }
                 }
+                var activeNorm = pathsOrdered.Select(NormalizePathForStarredExportTracking).Where(s => !string.IsNullOrWhiteSpace(s)).ToList();
+                indexPersistenceService.PruneStarredExportFingerprints(rootForDb, destNorm, activeNorm);
                 dispatcher.BeginInvoke(new Action(delegate
                 {
-                    Log("Export Starred: " + ok + " copied" + (failed > 0 ? "; " + failed + " failed" : string.Empty) + " → " + destNorm);
-                    if (status != null) status.Text = "Export Starred: " + ok + " file" + (ok == 1 ? string.Empty : "s");
+                    var summary = "Export Starred: " + copied + " copied, " + skipped + " up to date" + (failed > 0 ? ", " + failed + " failed" : string.Empty) + " → " + destNorm;
+                    Log(summary);
+                    if (status != null) status.Text = failed == 0
+                        ? "Export Starred: " + copied + " updated, " + skipped + " skipped"
+                        : "Export Starred: " + failed + " failed";
                     if (failed == 0)
                     {
                         MessageBox.Show(
                             owner,
-                            ok + " file" + (ok == 1 ? string.Empty : "s") + " copied to:" + Environment.NewLine + destNorm,
+                            copied + " file" + (copied == 1 ? string.Empty : "s") + " copied (new or changed)." + Environment.NewLine
+                            + skipped + " already up to date." + Environment.NewLine + Environment.NewLine + destNorm,
                             "Export Starred",
                             MessageBoxButton.OK,
                             MessageBoxImage.Information);
@@ -163,7 +235,7 @@ namespace PixelVaultNative
                     {
                         MessageBox.Show(
                             owner,
-                            ok + " copied, " + failed + " failed."
+                            copied + " copied, " + skipped + " skipped, " + failed + " failed."
                             + (string.IsNullOrWhiteSpace(lastError) ? string.Empty : Environment.NewLine + Environment.NewLine + lastError),
                             "Export Starred",
                             MessageBoxButton.OK,

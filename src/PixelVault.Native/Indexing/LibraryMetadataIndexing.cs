@@ -130,7 +130,10 @@ namespace PixelVaultNative
                 ConsoleLabel = platformLabel,
                 TagText = string.Join(", ", tags),
                 CaptureUtcTicks = ResolveLibraryMetadataCaptureUtcTicks(file, stamp, snapshot, existingEntry),
-                Starred = ResolveLibraryMetadataStarred(snapshot, existingEntry)
+                Starred = ResolveLibraryMetadataStarred(snapshot, existingEntry),
+                IndexAddedUtcTicks = existingEntry != null && existingEntry.IndexAddedUtcTicks > 0
+                    ? existingEntry.IndexAddedUtcTicks
+                    : DateTime.UtcNow.Ticks
             };
         }
 
@@ -152,6 +155,30 @@ namespace PixelVaultNative
                 }
             }
             return GetLibraryDate(file);
+        }
+
+        /// <summary>UTC ticks for "recently added" ordering: <see cref="LibraryMetadataIndexEntry.IndexAddedUtcTicks"/> when set, otherwise capture ticks or resolved file date.</summary>
+        long ResolveLibraryFileRecentSortUtcTicks(string root, string file, Dictionary<string, LibraryMetadataIndexEntry> index = null)
+        {
+            if (string.IsNullOrWhiteSpace(file) || !File.Exists(file)) return 0;
+            LibraryMetadataIndexEntry entry = null;
+            if (index != null) index.TryGetValue(file, out entry);
+            if (entry == null) entry = TryGetLibraryMetadataIndexEntry(root, file, index);
+            if (entry != null)
+            {
+                if (entry.IndexAddedUtcTicks > 0) return entry.IndexAddedUtcTicks;
+                if (entry.CaptureUtcTicks > 0) return entry.CaptureUtcTicks;
+            }
+            var d = ResolveIndexedLibraryDate(root, file, index);
+            if (d <= DateTime.MinValue) return 0;
+            try
+            {
+                return d.ToUniversalTime().Ticks;
+            }
+            catch
+            {
+                return 0;
+            }
         }
 
         Dictionary<string, LibraryMetadataIndexEntry> LoadLibraryMetadataIndex(string root, bool forceDiskReload = false)

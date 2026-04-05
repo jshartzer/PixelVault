@@ -96,7 +96,8 @@ namespace PixelVaultNative
                             GameId = NormalizeGameId(row.GameId),
                             ConsoleLabel = NormalizeConsoleLabel(row.PlatformLabel),
                             TagText = string.Join(", ", fallbackTags),
-                            CaptureUtcTicks = ResolveLibraryMetadataCaptureUtcTicks(targetPath, targetStamp, null, null)
+                            CaptureUtcTicks = ResolveLibraryMetadataCaptureUtcTicks(targetPath, targetStamp, null, null),
+                            IndexAddedUtcTicks = DateTime.UtcNow.Ticks
                         };
                     }
 

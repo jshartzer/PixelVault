@@ -43,7 +43,7 @@ public sealed class FilenameParserServiceTests
     }
 
     [Fact]
-    public void Parse_XboxCapture_PreservesFileTimesAndCapturesTitleHint()
+    public void Parse_XboxCapture_WritesFileTimesLikeSteamAndCapturesTitleHint()
     {
         var parser = CreateParser();
 
@@ -51,14 +51,27 @@ public sealed class FilenameParserServiceTests
 
         Assert.Equal("Xbox", parsed.PlatformLabel);
         Assert.Contains("Xbox", parsed.PlatformTags);
-        Assert.True(parsed.PreserveFileTimes);
+        Assert.False(parsed.PreserveFileTimes);
         Assert.Equal("Halo Infinite", parsed.GameTitleHint);
         Assert.Equal(new DateTime(2024, 3, 12, 13, 4, 5), parsed.CaptureTime);
         Assert.Equal(DateTimeKind.Local, parsed.CaptureTime!.Value.Kind);
     }
 
     [Fact]
-    public void Parse_XboxCapture_WithHyphenSeparatedTime_PreservesFileTimesAndCapturesTitleHint()
+    public void Parse_XboxCapture_UnderscoreInTitle_ParsesFilenameDate()
+    {
+        var parser = CreateParser();
+
+        var parsed = parser.Parse("The Witcher 3_ Wild Hunt-2018_01_03-04_05_23.png", string.Empty);
+
+        Assert.Equal("Xbox", parsed.PlatformLabel);
+        Assert.Equal("The Witcher 3: Wild Hunt", parsed.GameTitleHint);
+        Assert.Equal(new DateTime(2018, 1, 3, 4, 5, 23), parsed.CaptureTime);
+        Assert.Equal("xbox_capture", parsed.ConventionId);
+    }
+
+    [Fact]
+    public void Parse_XboxCapture_WithHyphenSeparatedTime_WritesFileTimesLikeSteam()
     {
         var parser = CreateParser();
 
@@ -66,7 +79,7 @@ public sealed class FilenameParserServiceTests
 
         Assert.Equal("Xbox", parsed.PlatformLabel);
         Assert.Contains("Xbox", parsed.PlatformTags);
-        Assert.True(parsed.PreserveFileTimes);
+        Assert.False(parsed.PreserveFileTimes);
         Assert.Equal("Human Fall Flat", parsed.GameTitleHint);
         Assert.Equal(new DateTime(2026, 3, 31, 0, 9, 35), parsed.CaptureTime);
         Assert.Equal(DateTimeKind.Local, parsed.CaptureTime!.Value.Kind);
@@ -399,5 +412,19 @@ public sealed class FilenameParserServiceTests
             {
             }
         }
+    }
+
+    [Fact]
+    public void NormalizeColonStandin_UnderscoreSpace_BecomesColonSpace()
+    {
+        Assert.Equal("The Witcher 3: Wild Hunt", FilenameParserService.NormalizeColonStandinUnderscoresForGameTitle("The Witcher 3_ Wild Hunt"));
+        Assert.Equal("A: B: C", FilenameParserService.NormalizeColonStandinUnderscoresForGameTitle("A_ B_ C"));
+    }
+
+    [Fact]
+    public void NormalizeColonStandin_SnakeCaseOrNoSpace_Unchanged()
+    {
+        Assert.Equal("My_Favorite_Game", FilenameParserService.NormalizeColonStandinUnderscoresForGameTitle("My_Favorite_Game"));
+        Assert.Equal("Halo Infinite", FilenameParserService.NormalizeColonStandinUnderscoresForGameTitle("Halo Infinite"));
     }
 }

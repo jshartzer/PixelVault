@@ -19,6 +19,10 @@ namespace PixelVaultNative
                 lines.Add("Delete summary: deleted " + deleteResult.Deleted + ", skipped " + deleteResult.Skipped + ".");
             }
             lines.Add("Metadata summary: updated " + (metadataResult == null ? 0 : metadataResult.Updated) + ", skipped " + (metadataResult == null ? 0 : metadataResult.Skipped) + ".");
+            if (metadataResult != null && metadataResult.FailedRelocatedToErrors > 0)
+            {
+                lines.Add("Metadata errors: " + metadataResult.FailedRelocatedToErrors + " file(s) could not be updated with ExifTool and were moved into the Errors subfolder under the same upload directory.");
+            }
             lines.Add("Move summary: moved " + (moveResult == null ? 0 : moveResult.Moved) + ", skipped " + (moveResult == null ? 0 : moveResult.Skipped) + ", renamed-on-conflict " + (moveResult == null ? 0 : moveResult.RenamedOnConflict) + ".");
             if (sortResult == null)
             {

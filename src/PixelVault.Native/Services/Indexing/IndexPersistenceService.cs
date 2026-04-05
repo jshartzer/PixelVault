@@ -20,6 +20,10 @@ namespace PixelVaultNative
         void SaveSavedGameIndexRows(string root, IEnumerable<GameIndexEditorRow> rows);
         Dictionary<string, LibraryMetadataIndexEntry> LoadLibraryMetadataIndexEntries(string root);
         void SaveLibraryMetadataIndexEntries(string root, Dictionary<string, LibraryMetadataIndexEntry> index);
+        /// <summary>Fingerprint by normalized source path for incremental Export Starred (per library root + export destination).</summary>
+        Dictionary<string, string> LoadStarredExportFingerprints(string root, string exportDestinationNormalized);
+        void UpsertStarredExportFingerprint(string root, string exportDestinationNormalized, string sourcePathNormalized, string fingerprint);
+        void PruneStarredExportFingerprints(string root, string exportDestinationNormalized, IReadOnlyCollection<string> activeSourcePathsNormalized);
     }
 
     sealed class IndexPersistenceServiceDependencies
@@ -263,6 +267,7 @@ CREATE TABLE IF NOT EXISTS game_index (
     file_count INTEGER NOT NULL DEFAULT 0,
     preview_image_path TEXT NOT NULL DEFAULT '',
     file_paths TEXT NOT NULL DEFAULT '',
+    index_added_utc_ticks INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (root, game_id)
 );
 CREATE INDEX IF NOT EXISTS idx_game_index_root_identity ON game_index(root, name, platform_label);
@@ -275,6 +280,7 @@ CREATE TABLE IF NOT EXISTS photo_index (
     tag_text TEXT NOT NULL DEFAULT '',
     capture_utc_ticks INTEGER NOT NULL DEFAULT 0,
     starred INTEGER NOT NULL DEFAULT 0,
+    index_added_utc_ticks INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (root, file_path)
 );
 CREATE INDEX IF NOT EXISTS idx_photo_index_root_game ON photo_index(root, game_id);
@@ -308,12 +314,44 @@ CREATE TABLE IF NOT EXISTS filename_convention_sample (
     occurrence_count INTEGER NOT NULL DEFAULT 0
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_filename_convention_sample_root_file ON filename_convention_sample(root, file_name);
+CREATE TABLE IF NOT EXISTS starred_export_state (
+    root TEXT NOT NULL,
+    export_dest TEXT NOT NULL,
+    source_path TEXT NOT NULL,
+    fingerprint TEXT NOT NULL,
+    PRIMARY KEY (root, export_dest, source_path)
+);
+CREATE INDEX IF NOT EXISTS idx_starred_export_root_dest ON starred_export_state(root, export_dest);
 ";
                 command.ExecuteNonQuery();
             }
 
             EnsurePhotoIndexCaptureTicksColumn(connection);
             EnsurePhotoIndexStarredColumn(connection);
+            EnsureGameIndexIndexAddedUtcTicksColumn(connection);
+            EnsurePhotoIndexIndexAddedUtcTicksColumn(connection);
+        }
+
+        void EnsureGameIndexIndexAddedUtcTicksColumn(SqliteConnection connection)
+        {
+            if (connection == null) return;
+            if (DatabaseTableHasColumn(connection, "game_index", "index_added_utc_ticks")) return;
+            using (var command = connection.CreateCommand())
+            {
+                command.CommandText = "ALTER TABLE game_index ADD COLUMN index_added_utc_ticks INTEGER NOT NULL DEFAULT 0;";
+                command.ExecuteNonQuery();
+            }
+        }
+
+        void EnsurePhotoIndexIndexAddedUtcTicksColumn(SqliteConnection connection)
+        {
+            if (connection == null) return;
+            if (DatabaseTableHasColumn(connection, "photo_index", "index_added_utc_ticks")) return;
+            using (var command = connection.CreateCommand())
+            {
+                command.CommandText = "ALTER TABLE photo_index ADD COLUMN index_added_utc_ticks INTEGER NOT NULL DEFAULT 0;";
+                command.ExecuteNonQuery();
+            }
         }
 
         void EnsurePhotoIndexCaptureTicksColumn(SqliteConnection connection)
@@ -373,7 +411,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_filename_convention_sample_root_file ON fi
             using (var command = connection.CreateCommand())
             {
                 command.CommandText = @"
-SELECT game_id, folder_path, name, platform_label, steam_app_id, steam_grid_db_id, file_count, preview_image_path, file_paths
+SELECT game_id, folder_path, name, platform_label, steam_app_id, steam_grid_db_id, file_count, preview_image_path, file_paths, index_added_utc_ticks
 FROM game_index
 WHERE root = $root
 ORDER BY name COLLATE NOCASE, platform_label COLLATE NOCASE, game_id COLLATE NOCASE;";
@@ -397,7 +435,8 @@ ORDER BY name COLLATE NOCASE, platform_label COLLATE NOCASE, game_id COLLATE NOC
                             PreviewImagePath = reader.IsDBNull(7) ? string.Empty : reader.GetString(7),
                             FilePaths = string.IsNullOrWhiteSpace(filePathsText)
                                 ? new string[0]
-                                : filePathsText.Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries).Where(File.Exists).ToArray()
+                                : filePathsText.Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries).Where(File.Exists).ToArray(),
+                            IndexAddedUtcTicks = reader.IsDBNull(9) ? 0L : reader.GetInt64(9)
                         });
                     }
                 }
@@ -412,7 +451,7 @@ ORDER BY name COLLATE NOCASE, platform_label COLLATE NOCASE, game_id COLLATE NOC
             using (var command = connection.CreateCommand())
             {
                 command.CommandText = @"
-SELECT game_id, folder_path, name, platform_label, steam_app_id, steam_grid_db_id, file_count, preview_image_path, file_paths
+SELECT game_id, folder_path, name, platform_label, steam_app_id, steam_grid_db_id, file_count, preview_image_path, file_paths, index_added_utc_ticks
 FROM game_index
 ORDER BY name COLLATE NOCASE, platform_label COLLATE NOCASE, game_id COLLATE NOCASE;";
                 using (var reader = command.ExecuteReader())
@@ -434,7 +473,8 @@ ORDER BY name COLLATE NOCASE, platform_label COLLATE NOCASE, game_id COLLATE NOC
                             PreviewImagePath = reader.IsDBNull(7) ? string.Empty : reader.GetString(7),
                             FilePaths = string.IsNullOrWhiteSpace(filePathsText)
                                 ? new string[0]
-                                : filePathsText.Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries).Where(File.Exists).ToArray()
+                                : filePathsText.Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries).Where(File.Exists).ToArray(),
+                            IndexAddedUtcTicks = reader.IsDBNull(9) ? 0L : reader.GetInt64(9)
                         });
                     }
                 }
@@ -461,8 +501,8 @@ ORDER BY name COLLATE NOCASE, platform_label COLLATE NOCASE, game_id COLLATE NOC
                     {
                         insert.Transaction = transaction;
                         insert.CommandText = @"
-INSERT INTO game_index (root, game_id, folder_path, name, platform_label, steam_app_id, steam_grid_db_id, file_count, preview_image_path, file_paths)
-VALUES ($root, $gameId, $folderPath, $name, $platformLabel, $steamAppId, $steamGridDbId, $fileCount, $previewImagePath, $filePaths);";
+INSERT INTO game_index (root, game_id, folder_path, name, platform_label, steam_app_id, steam_grid_db_id, file_count, preview_image_path, file_paths, index_added_utc_ticks)
+VALUES ($root, $gameId, $folderPath, $name, $platformLabel, $steamAppId, $steamGridDbId, $fileCount, $previewImagePath, $filePaths, $indexAddedUtcTicks);";
                         insert.Parameters.AddWithValue("$root", root ?? string.Empty);
                         insert.Parameters.AddWithValue("$gameId", NormalizeGameId(row.GameId));
                         insert.Parameters.AddWithValue("$folderPath", row.FolderPath ?? string.Empty);
@@ -473,6 +513,7 @@ VALUES ($root, $gameId, $folderPath, $name, $platformLabel, $steamAppId, $steamG
                         insert.Parameters.AddWithValue("$fileCount", Math.Max(0, row.FileCount));
                         insert.Parameters.AddWithValue("$previewImagePath", row.PreviewImagePath ?? string.Empty);
                         insert.Parameters.AddWithValue("$filePaths", string.Join("|", (row.FilePaths ?? new string[0]).Where(File.Exists)));
+                        insert.Parameters.AddWithValue("$indexAddedUtcTicks", row.IndexAddedUtcTicks > 0 ? row.IndexAddedUtcTicks : 0);
                         insert.ExecuteNonQuery();
                     }
                 }
@@ -487,7 +528,7 @@ VALUES ($root, $gameId, $folderPath, $name, $platformLabel, $steamAppId, $steamG
             using (var command = connection.CreateCommand())
             {
                 command.CommandText = @"
-SELECT file_path, stamp, game_id, console_label, tag_text, capture_utc_ticks, starred
+SELECT file_path, stamp, game_id, console_label, tag_text, capture_utc_ticks, starred, index_added_utc_ticks
 FROM photo_index
 WHERE root = $root
 ORDER BY file_path COLLATE NOCASE;";
@@ -515,7 +556,8 @@ ORDER BY file_path COLLATE NOCASE;";
                                 : storedConsoleLabel,
                             TagText = tagText,
                             CaptureUtcTicks = reader.IsDBNull(5) ? 0L : reader.GetInt64(5),
-                            Starred = ReadSqliteBoolLoose(reader, 6)
+                            Starred = ReadSqliteBoolLoose(reader, 6),
+                            IndexAddedUtcTicks = reader.IsDBNull(7) ? 0L : reader.GetInt64(7)
                         };
                     }
                 }
@@ -561,8 +603,8 @@ ORDER BY file_path COLLATE NOCASE;";
                     {
                         insert.Transaction = transaction;
                         insert.CommandText = @"
-INSERT INTO photo_index (root, file_path, stamp, game_id, console_label, tag_text, capture_utc_ticks, starred)
-VALUES ($root, $filePath, $stamp, $gameId, $consoleLabel, $tagText, $captureUtcTicks, $starred);";
+INSERT INTO photo_index (root, file_path, stamp, game_id, console_label, tag_text, capture_utc_ticks, starred, index_added_utc_ticks)
+VALUES ($root, $filePath, $stamp, $gameId, $consoleLabel, $tagText, $captureUtcTicks, $starred, $indexAddedUtcTicks);";
                         insert.Parameters.AddWithValue("$root", root ?? string.Empty);
                         insert.Parameters.AddWithValue("$filePath", entry.FilePath ?? string.Empty);
                         insert.Parameters.AddWithValue("$stamp", entry.Stamp ?? string.Empty);
@@ -571,6 +613,7 @@ VALUES ($root, $filePath, $stamp, $gameId, $consoleLabel, $tagText, $captureUtcT
                         insert.Parameters.AddWithValue("$tagText", entry.TagText ?? string.Empty);
                         insert.Parameters.AddWithValue("$captureUtcTicks", entry.CaptureUtcTicks > 0 ? entry.CaptureUtcTicks : 0L);
                         insert.Parameters.AddWithValue("$starred", entry.Starred ? 1L : 0L);
+                        insert.Parameters.AddWithValue("$indexAddedUtcTicks", entry.IndexAddedUtcTicks > 0 ? entry.IndexAddedUtcTicks : 0L);
                         insert.ExecuteNonQuery();
                     }
                 }
@@ -822,7 +865,8 @@ VALUES ($root, $fileName, $platformLabel, $conventionId, $firstSeenUtcTicks, $la
                         ConsoleLabel = DetermineConsoleLabelFromTags(ParseTagText(tagText)),
                         TagText = tagText,
                         CaptureUtcTicks = 0,
-                        Starred = false
+                        Starred = false,
+                        IndexAddedUtcTicks = 0
                     };
                 }
                 else if (parts.Length >= 4)
@@ -838,7 +882,8 @@ VALUES ($root, $fileName, $platformLabel, $conventionId, $firstSeenUtcTicks, $la
                         ConsoleLabel = DetermineConsoleLabelFromTags(ParseTagText(tagText)),
                         TagText = tagText,
                         CaptureUtcTicks = 0,
-                        Starred = false
+                        Starred = false,
+                        IndexAddedUtcTicks = 0
                     };
                 }
             }
@@ -989,6 +1034,8 @@ WHERE root = $root AND game_id = $oldGameId;";
                 using (var donorConnection = new SqliteConnection(builder.ToString()))
                 {
                     donorConnection.Open();
+                    // Donor files are opened outside OpenIndexDatabase; align schema so reads match current column set.
+                    InitializeIndexDatabase(donorConnection);
                     if (CountIndexDatabaseRows(donorConnection, "game_index", string.Empty) == 0 && !DatabaseHasAnyRows(donorConnection, "game_index")) continue;
                     foreach (var donorRow in ReadAllSavedGameIndexRowsFromDatabase(donorConnection).Where(row => row != null && CountResolvedExternalIds(row) > 0))
                     {
@@ -1266,6 +1313,117 @@ WHERE root = $root AND sample_id = $sampleId;";
             using (var connection = OpenIndexDatabase(root))
             {
                 WriteLibraryMetadataIndexToDatabase(root, index, connection);
+            }
+        }
+
+        static string NormalizeStarredExportPathKey(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path)) return string.Empty;
+            try
+            {
+                return Path.GetFullPath(path);
+            }
+            catch
+            {
+                return path.Trim();
+            }
+        }
+
+        public Dictionary<string, string> LoadStarredExportFingerprints(string root, string exportDestinationNormalized)
+        {
+            var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (string.IsNullOrWhiteSpace(root) || string.IsNullOrWhiteSpace(exportDestinationNormalized)) return map;
+            var exportKey = NormalizeStarredExportPathKey(exportDestinationNormalized);
+            using (var connection = OpenIndexDatabase(root))
+            {
+                using (var command = connection.CreateCommand())
+                {
+                    command.CommandText = @"
+SELECT source_path, fingerprint
+FROM starred_export_state
+WHERE root = $root AND export_dest = $exportDest;";
+                    command.Parameters.AddWithValue("$root", root);
+                    command.Parameters.AddWithValue("$exportDest", exportKey);
+                    using (var reader = command.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            var src = reader.IsDBNull(0) ? string.Empty : reader.GetString(0);
+                            var fp = reader.IsDBNull(1) ? string.Empty : reader.GetString(1);
+                            if (string.IsNullOrWhiteSpace(src)) continue;
+                            map[NormalizeStarredExportPathKey(src)] = fp ?? string.Empty;
+                        }
+                    }
+                }
+            }
+            return map;
+        }
+
+        public void UpsertStarredExportFingerprint(string root, string exportDestinationNormalized, string sourcePathNormalized, string fingerprint)
+        {
+            if (string.IsNullOrWhiteSpace(root) || string.IsNullOrWhiteSpace(exportDestinationNormalized)
+                || string.IsNullOrWhiteSpace(sourcePathNormalized)) return;
+            var exportKey = NormalizeStarredExportPathKey(exportDestinationNormalized);
+            var srcKey = NormalizeStarredExportPathKey(sourcePathNormalized);
+            var fp = fingerprint ?? string.Empty;
+            using (var connection = OpenIndexDatabase(root))
+            {
+                using (var command = connection.CreateCommand())
+                {
+                    command.CommandText = @"
+INSERT INTO starred_export_state (root, export_dest, source_path, fingerprint)
+VALUES ($root, $exportDest, $sourcePath, $fingerprint)
+ON CONFLICT(root, export_dest, source_path) DO UPDATE SET fingerprint = excluded.fingerprint;";
+                    command.Parameters.AddWithValue("$root", root);
+                    command.Parameters.AddWithValue("$exportDest", exportKey);
+                    command.Parameters.AddWithValue("$sourcePath", srcKey);
+                    command.Parameters.AddWithValue("$fingerprint", fp);
+                    command.ExecuteNonQuery();
+                }
+            }
+        }
+
+        public void PruneStarredExportFingerprints(string root, string exportDestinationNormalized, IReadOnlyCollection<string> activeSourcePathsNormalized)
+        {
+            if (string.IsNullOrWhiteSpace(root) || string.IsNullOrWhiteSpace(exportDestinationNormalized)) return;
+            var exportKey = NormalizeStarredExportPathKey(exportDestinationNormalized);
+            var keep = new HashSet<string>(
+                (activeSourcePathsNormalized ?? Array.Empty<string>()).Select(NormalizeStarredExportPathKey).Where(p => !string.IsNullOrWhiteSpace(p)),
+                StringComparer.OrdinalIgnoreCase);
+            using (var connection = OpenIndexDatabase(root))
+            {
+                var toRemove = new List<string>();
+                using (var command = connection.CreateCommand())
+                {
+                    command.CommandText = @"
+SELECT source_path FROM starred_export_state WHERE root = $root AND export_dest = $exportDest;";
+                    command.Parameters.AddWithValue("$root", root);
+                    command.Parameters.AddWithValue("$exportDest", exportKey);
+                    using (var reader = command.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            var src = reader.IsDBNull(0) ? string.Empty : reader.GetString(0);
+                            if (!string.IsNullOrWhiteSpace(src))
+                            {
+                                var n = NormalizeStarredExportPathKey(src);
+                                if (!keep.Contains(n)) toRemove.Add(n);
+                            }
+                        }
+                    }
+                }
+                foreach (var src in toRemove)
+                {
+                    using (var del = connection.CreateCommand())
+                    {
+                        del.CommandText = @"
+DELETE FROM starred_export_state WHERE root = $root AND export_dest = $exportDest AND source_path = $sourcePath;";
+                        del.Parameters.AddWithValue("$root", root);
+                        del.Parameters.AddWithValue("$exportDest", exportKey);
+                        del.Parameters.AddWithValue("$sourcePath", src);
+                        del.ExecuteNonQuery();
+                    }
+                }
             }
         }
     }

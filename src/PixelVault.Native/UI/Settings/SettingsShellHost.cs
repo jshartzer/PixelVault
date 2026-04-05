@@ -84,7 +84,7 @@ namespace PixelVaultNative
             var steamGridDbTokenBox = SettingsTextBox(panel, 5, "SteamGridDB token", d.GetSteamGridDbApiToken(), labelFg, boxBg, boxFg, borderBrush, boxFg);
             steamGridDbTokenBox.ToolTip = "Stored locally in PixelVault.settings.ini. Environment variables can also override it.";
             var starredExportBox = SettingsTextBox(panel, 6, "Starred export folder (optional)", d.GetStarredExportFolder(), labelFg, boxBg, boxFg, borderBrush, boxFg);
-            starredExportBox.ToolTip = "Library → Export Starred copies starred files here, preserving each file’s path relative to the library root. Creates subfolders as needed; replaces existing files and clears read-only when needed.";
+            starredExportBox.ToolTip = "Library → Export Starred copies starred files here (mirrored paths under the library root). Only files that are new to the export or whose metadata/file stamp changed are copied again; tracking lives in that library’s SQLite index. Replaces existing files when needed.";
 
             SettingsBrowseButton(panel, 0, delegate { var picked = d.PickFolder(d.PrimarySourceRoot()); if (!string.IsNullOrWhiteSpace(picked)) sourceBox.Text = d.AppendSourceRoot(sourceBox.Text, picked); }, "Add Folder");
             SettingsBrowseButton(panel, 1, delegate { var picked = d.PickFolder(destinationBox.Text); if (!string.IsNullOrWhiteSpace(picked)) destinationBox.Text = picked; });

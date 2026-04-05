@@ -40,7 +40,8 @@ sealed class StubMetadataService : IMetadataService
 
     public void RunExifToolBatch(IReadOnlyList<ExifWriteRequest> requests) { }
 
-    public int RunExifWriteRequests(List<ExifWriteRequest> requests, int totalCount, int alreadyCompleted, Action<int, int, string> progress = null, CancellationToken cancellationToken = default(CancellationToken)) => 0;
+    public ExifWriteBatchResult RunExifWriteRequests(List<ExifWriteRequest> requests, int totalCount, int alreadyCompleted, Action<int, int, string> progress = null, CancellationToken cancellationToken = default(CancellationToken)) =>
+        new ExifWriteBatchResult { SuccessCount = requests?.Count ?? 0 };
 }
 
 /// <summary><see cref="ICoverService.SteamNameAsync"/> returns a fixed title for app id <c>123</c>; other members are inert.</summary>

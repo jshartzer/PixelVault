@@ -54,6 +54,37 @@ public sealed class IndexPersistenceServiceTests
     }
 
     [Fact]
+    public void SaveAndLoadSavedGameIndexRows_RoundTripsIndexAddedUtcTicks()
+    {
+        using var harness = new IndexPersistenceHarness();
+        var existingFile = harness.CreateFile("library\\cover.png");
+        var addedTicks = new DateTime(2024, 6, 15, 14, 30, 0, DateTimeKind.Utc).Ticks;
+
+        harness.Service.SaveSavedGameIndexRows(
+            harness.LibraryRoot,
+            new[]
+            {
+                new GameIndexEditorRow
+                {
+                    GameId = "G00099",
+                    Name = "Test Game",
+                    PlatformLabel = "Steam",
+                    SteamAppId = string.Empty,
+                    SteamGridDbId = string.Empty,
+                    FileCount = 1,
+                    FolderPath = Path.Combine(harness.RootPath, "library"),
+                    PreviewImagePath = existingFile,
+                    FilePaths = new[] { existingFile },
+                    IndexAddedUtcTicks = addedTicks
+                }
+            });
+
+        var rows = harness.Service.LoadSavedGameIndexRows(harness.LibraryRoot);
+        var row = Assert.Single(rows);
+        Assert.Equal(addedTicks, row.IndexAddedUtcTicks);
+    }
+
+    [Fact]
     public void LoadSavedGameIndexRows_BackfillsExternalIdsFromPriorRootDatabase()
     {
         using var harness = new IndexPersistenceHarness();
@@ -105,6 +136,68 @@ public sealed class IndexPersistenceServiceTests
     }
 
     [Fact]
+    public void LoadSavedGameIndexRows_BackfillSucceedsWhenDonorIndexLacksIndexAddedUtcTicksColumn()
+    {
+        using var harness = new IndexPersistenceHarness();
+        var priorRoot = Path.Combine(harness.RootPath, "prior-lib");
+        Directory.CreateDirectory(priorRoot);
+        var donorPath = Path.Combine(
+            harness.CacheRoot,
+            "pixelvault-index-" + Regex.Replace(priorRoot.ToLowerInvariant(), @"[^a-z0-9]+", "_").Trim('_') + ".sqlite");
+
+        var builder = new SqliteConnectionStringBuilder { DataSource = donorPath, Mode = SqliteOpenMode.ReadWriteCreate };
+        using (var conn = new SqliteConnection(builder.ToString()))
+        {
+            conn.Open();
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = @"
+CREATE TABLE game_index (
+    root TEXT NOT NULL,
+    game_id TEXT NOT NULL,
+    folder_path TEXT NOT NULL DEFAULT '',
+    name TEXT NOT NULL DEFAULT '',
+    platform_label TEXT NOT NULL DEFAULT '',
+    steam_app_id TEXT NOT NULL DEFAULT '',
+    steam_grid_db_id TEXT NOT NULL DEFAULT '',
+    file_count INTEGER NOT NULL DEFAULT 0,
+    preview_image_path TEXT NOT NULL DEFAULT '',
+    file_paths TEXT NOT NULL DEFAULT '',
+    PRIMARY KEY (root, game_id)
+);
+INSERT INTO game_index (root, game_id, folder_path, name, platform_label, steam_app_id, steam_grid_db_id, file_count, preview_image_path, file_paths)
+VALUES ($root, 'G00999', 'E:/Game Captures/Alan Wake', 'Alan Wake', 'Steam', '108710', '9991', 12, '', '');";
+                cmd.Parameters.AddWithValue("$root", priorRoot);
+                cmd.ExecuteNonQuery();
+            }
+        }
+
+        harness.Service.SaveSavedGameIndexRows(
+            harness.LibraryRoot,
+            new[]
+            {
+                new GameIndexEditorRow
+                {
+                    GameId = "G00001",
+                    Name = "Alan Wake",
+                    PlatformLabel = "Steam",
+                    SteamAppId = string.Empty,
+                    SteamGridDbId = string.Empty,
+                    FileCount = 12,
+                    FolderPath = "E:/Game Captures/Alan Wake",
+                    FilePaths = Array.Empty<string>()
+                }
+            });
+
+        var rows = harness.Service.LoadSavedGameIndexRows(harness.LibraryRoot);
+
+        var row = Assert.Single(rows);
+        Assert.Equal("G00001", row.GameId);
+        Assert.Equal("108710", row.SteamAppId);
+        Assert.Equal("9991", row.SteamGridDbId);
+    }
+
+    [Fact]
     public void ApplyGameIdAliases_RewritesPhotoIndexRowsAndNotifiesCachedMetadataLayer()
     {
         using var harness = new IndexPersistenceHarness();
@@ -139,6 +232,7 @@ public sealed class IndexPersistenceServiceTests
         Assert.Equal("Steam", entry.ConsoleLabel);
         Assert.Equal("Steam;Action", entry.TagText);
         Assert.Equal(new DateTime(2026, 3, 30, 12, 34, 56, DateTimeKind.Utc).Ticks, entry.CaptureUtcTicks);
+        Assert.Equal(0L, entry.IndexAddedUtcTicks);
         Assert.Equal(harness.LibraryRoot, harness.LastAliasApplyRoot);
         Assert.NotNull(harness.LastAliasApplyMap);
         Assert.Equal("G00077", harness.LastAliasApplyMap!["G00001"]);
@@ -182,6 +276,35 @@ public sealed class IndexPersistenceServiceTests
         Assert.True(loaded.ContainsKey(missingFile));
         Assert.Equal("G00010", loaded[existingFile].GameId);
         Assert.Equal("G99999", loaded[missingFile].GameId);
+    }
+
+    [Fact]
+    public void SaveLibraryMetadataIndexEntries_RoundTripsIndexAddedUtcTicks()
+    {
+        using var harness = new IndexPersistenceHarness();
+        var file = harness.CreateFile("metadata\\indexed.png");
+        var addedTicks = new DateTime(2025, 1, 20, 8, 15, 0, DateTimeKind.Utc).Ticks;
+
+        harness.Service.SaveLibraryMetadataIndexEntries(
+            harness.LibraryRoot,
+            new Dictionary<string, LibraryMetadataIndexEntry>(StringComparer.OrdinalIgnoreCase)
+            {
+                [file] = new LibraryMetadataIndexEntry
+                {
+                    FilePath = file,
+                    Stamp = "s1",
+                    GameId = "G00001",
+                    ConsoleLabel = "Steam",
+                    TagText = "Steam",
+                    CaptureUtcTicks = 100,
+                    Starred = false,
+                    IndexAddedUtcTicks = addedTicks
+                }
+            });
+
+        var loaded = harness.Service.LoadLibraryMetadataIndexEntries(harness.LibraryRoot);
+        var entry = Assert.Single(loaded.Values);
+        Assert.Equal(addedTicks, entry.IndexAddedUtcTicks);
     }
 
     [Fact]
@@ -285,6 +408,8 @@ VALUES ($root, $filePath, $stamp, $gameId, $consoleLabel, $tagText);";
         verifyCommand.CommandText = "SELECT COUNT(1) FROM pragma_table_info('photo_index') WHERE name = 'capture_utc_ticks';";
         var columnCount = Convert.ToInt32(verifyCommand.ExecuteScalar());
         Assert.Equal(1, columnCount);
+        verifyCommand.CommandText = "SELECT COUNT(1) FROM pragma_table_info('photo_index') WHERE name = 'index_added_utc_ticks';";
+        Assert.Equal(1, Convert.ToInt32(verifyCommand.ExecuteScalar()));
     }
 
     [Fact]

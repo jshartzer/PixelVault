@@ -62,4 +62,29 @@ public sealed class LibraryTimelineModeTests
 
         Assert.Equal("1 photo | 1 game | 1 platform | April 4, 2026", summary);
     }
+
+    [Fact]
+    public void BuildLibraryTimelineDayCardTitle_UsesRelativeLabelsForRecentDays()
+    {
+        Assert.Equal("Today", MainWindow.BuildLibraryTimelineDayCardTitle(new DateTime(2026, 4, 5, 21, 15, 0), new DateTime(2026, 4, 5)));
+        Assert.Equal("Yesterday", MainWindow.BuildLibraryTimelineDayCardTitle(new DateTime(2026, 4, 4, 9, 30, 0), new DateTime(2026, 4, 5)));
+    }
+
+    [Fact]
+    public void CalculateLibraryTimelinePackedTileSize_CapsLargeDetailTilesForPackedTimeline()
+    {
+        var packed = MainWindow.CalculateLibraryTimelinePackedTileSize(540, 1280);
+
+        Assert.Equal(228, packed);
+    }
+
+    [Fact]
+    public void BuildLibraryTimelinePackedRows_PacksMultipleSparseDaysIntoOneRow()
+    {
+        var rows = MainWindow.BuildLibraryTimelinePackedRows(new[] { 244d, 244d, 244d }, 740d, 12d);
+
+        Assert.Equal(2, rows.Count);
+        Assert.Equal(new[] { 0, 1 }, rows[0]);
+        Assert.Equal(new[] { 2 }, rows[1]);
+    }
 }

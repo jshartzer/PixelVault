@@ -81,11 +81,14 @@ namespace PixelVaultNative
                 });
                 itemsToReset.Add(item);
             }
-            updated = RunExifWriteRequests(requests, total, skipped, progress, cancellationToken);
+            var batch = metadataService.RunExifWriteRequests(requests, total, skipped, progress, cancellationToken);
+            importService.RelocateExifFailuresToUploadErrors(batch.Failures);
+            updated = batch.SuccessCount;
+            var relocated = batch.Failures == null ? 0 : batch.Failures.Count;
             foreach (var item in itemsToReset) item.ForceTagMetadataWrite = false;
-            if (progress != null) progress(total, total, "Metadata step complete: updated " + updated + ", skipped " + skipped + ".");
-            Log("Manual metadata summary: updated " + updated + ", skipped " + skipped + ".");
-            return new MetadataStepResult { Updated = updated, Skipped = skipped };
+            if (progress != null) progress(total, total, "Metadata step complete: updated " + updated + ", skipped " + skipped + (relocated > 0 ? ", " + relocated + " moved to Errors" : string.Empty) + ".");
+            Log("Manual metadata summary: updated " + updated + ", skipped " + skipped + (relocated > 0 ? ", " + relocated + " moved to Errors folder" : string.Empty) + ".");
+            return new MetadataStepResult { Updated = updated, Skipped = skipped, FailedRelocatedToErrors = relocated };
         }
 
         DeleteStepResult RunDelete(List<ReviewItem> reviewItems, Action<int, int, string> progress = null, CancellationToken cancellationToken = default(CancellationToken))
@@ -98,11 +101,6 @@ namespace PixelVaultNative
         {
             var paths = (items ?? new List<ManualMetadataItem>()).Where(i => i != null && i.DeleteBeforeProcessing).Select(i => i.FilePath);
             return importService.DeleteSourceFiles(paths, progress, cancellationToken);
-        }
-
-        int RunExifWriteRequests(List<ExifWriteRequest> requests, int totalCount, int alreadyCompleted, Action<int, int, string> progress = null, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            return metadataService.RunExifWriteRequests(requests, totalCount, alreadyCompleted, progress, cancellationToken);
         }
 
         MetadataStepResult RunMetadata(List<ReviewItem> reviewItems, Action<int, int, string> progress = null, CancellationToken cancellationToken = default(CancellationToken))

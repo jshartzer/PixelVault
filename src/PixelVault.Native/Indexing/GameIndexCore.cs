@@ -41,6 +41,7 @@ namespace PixelVaultNative
             {
                 normalized = CleanTag(Path.GetFileName(folderPath.TrimEnd(Path.DirectorySeparatorChar)));
             }
+            normalized = FilenameParserService.NormalizeColonStandinUnderscoresForGameTitle(normalized);
             return StripKnownPlatformSuffixes(normalized);
         }
 
@@ -112,7 +113,8 @@ namespace PixelVaultNative
                 FileCount = Math.Max(0, row.FileCount),
                 FolderPath = (row.FolderPath ?? string.Empty).Trim(),
                 PreviewImagePath = (row.PreviewImagePath ?? string.Empty).Trim(),
-                FilePaths = (row.FilePaths ?? new string[0]).Where(path => !string.IsNullOrWhiteSpace(path)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray()
+                FilePaths = (row.FilePaths ?? new string[0]).Where(path => !string.IsNullOrWhiteSpace(path)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
+                IndexAddedUtcTicks = row.IndexAddedUtcTicks
             };
         }
 
@@ -221,6 +223,11 @@ namespace PixelVaultNative
                     .Select(row => row.PreviewImagePath ?? string.Empty)
                     .FirstOrDefault(path => !string.IsNullOrWhiteSpace(path) && File.Exists(path));
                 if (string.IsNullOrWhiteSpace(previewPath)) previewPath = mergedFilePaths.FirstOrDefault(IsImage) ?? mergedFilePaths.FirstOrDefault() ?? string.Empty;
+                var mergedIndexAddedTicks = groupRows
+                    .Select(row => row.IndexAddedUtcTicks)
+                    .Where(t => t > 0)
+                    .DefaultIfEmpty(0L)
+                    .Min();
                 mergedRows.Add(new GameIndexEditorRow
                 {
                     GameId = NormalizeGameId(representative.GameId),
@@ -233,7 +240,8 @@ namespace PixelVaultNative
                     FileCount = mergedFilePaths.Length > 0 ? mergedFilePaths.Length : groupRows.Max(row => row.FileCount),
                     FolderPath = folderPath ?? string.Empty,
                     PreviewImagePath = previewPath,
-                    FilePaths = mergedFilePaths
+                    FilePaths = mergedFilePaths,
+                    IndexAddedUtcTicks = mergedIndexAddedTicks
                 });
             }
             var activeRowsByName = mergedRows
@@ -306,11 +314,17 @@ namespace PixelVaultNative
         /// <summary>Editor save path: normalize external IDs and suppress flags from prior disk rows (used by <see cref="IGameIndexService"/>).</summary>
         void ApplyGameIndexEditorSaveRowPolicies(List<GameIndexEditorRow> rows, List<GameIndexEditorRow> previousSaved)
         {
+            var nowTicks = DateTime.UtcNow.Ticks;
             foreach (var row in rows ?? new List<GameIndexEditorRow>())
             {
                 if (row == null) continue;
                 var previous = FindSavedGameIndexRowById(previousSaved, row.GameId)
                     ?? FindSavedGameIndexRowByIdentity(previousSaved, row.Name, row.PlatformLabel);
+                if (row.IndexAddedUtcTicks <= 0)
+                {
+                    if (previous != null && previous.IndexAddedUtcTicks > 0) row.IndexAddedUtcTicks = previous.IndexAddedUtcTicks;
+                    else if (previous == null) row.IndexAddedUtcTicks = nowTicks;
+                }
                 var cleanedSteamAppId = CleanTag(row.SteamAppId);
                 var cleanedSteamGridDbId = CleanTag(row.SteamGridDbId);
                 row.SuppressSteamAppIdAutoResolve = ShouldSuppressExternalIdAutoResolve(

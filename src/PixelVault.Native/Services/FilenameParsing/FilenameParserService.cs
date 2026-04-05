@@ -90,7 +90,20 @@ namespace PixelVaultNative
                 result.ConfidenceLabel = result.CaptureTime.HasValue ? "Heuristic" : string.Empty;
             }
 
+            if (!string.IsNullOrWhiteSpace(result.GameTitleHint))
+                result.GameTitleHint = NormalizeColonStandinUnderscoresForGameTitle(result.GameTitleHint);
+
             return result;
+        }
+
+        /// <summary>
+        /// Windows paths cannot contain ':'; Xbox (and similar) exports often use "_ " in place of ": " in titles.
+        /// Normalize so the same game merges under one index/browser identity (e.g. "The Witcher 3_ Wild Hunt" → "The Witcher 3: Wild Hunt").
+        /// </summary>
+        public static string NormalizeColonStandinUnderscoresForGameTitle(string title)
+        {
+            if (string.IsNullOrWhiteSpace(title)) return title ?? string.Empty;
+            return Regex.Replace(title.Trim(), @"([\p{L}\p{N}])_ ", "$1: ", RegexOptions.CultureInvariant);
         }
 
         void ApplyXboxPcTrailingTimestampParse(FilenameParseResult result, string fileName)
@@ -157,24 +170,24 @@ namespace PixelVaultNative
             DateTime _;
             if (TryParseXboxPcCaptureFromTrailingTimestamp(cleanedBaseName, out xboxPcTitle, out _))
             {
-                return xboxPcTitle;
+                return NormalizeColonStandinUnderscoresForGameTitle(xboxPcTitle);
             }
 
             var match = Regex.Match(cleanedBaseName, "^(?<game>.+?)_(?<ts>\\d{14})(?:[_-]\\d+)?$");
-            if (match.Success) return match.Groups["game"].Value;
+            if (match.Success) return NormalizeColonStandinUnderscoresForGameTitle(match.Groups["game"].Value);
 
             match = Regex.Match(cleanedBaseName, "^(?<game>.+?)_(?<ts>\\d{8,})(?:[_-]\\d+)?$");
-            if (match.Success) return match.Groups["game"].Value;
+            if (match.Success) return NormalizeColonStandinUnderscoresForGameTitle(match.Groups["game"].Value);
 
             match = Regex.Match(cleanedBaseName, "^(?<game>.+?)-(?<year>20\\d{2})[_-](?<mon>\\d{2})[_-](?<day>\\d{2}).*$");
-            if (match.Success) return match.Groups["game"].Value;
+            if (match.Success) return NormalizeColonStandinUnderscoresForGameTitle(match.Groups["game"].Value);
 
-            if (cleanedBaseName.Contains("_")) return cleanedBaseName.Split('_')[0];
+            if (cleanedBaseName.Contains("_")) return NormalizeColonStandinUnderscoresForGameTitle(cleanedBaseName.Split('_')[0]);
 
             match = Regex.Match(cleanedBaseName, "^(?<game>.+?)-20\\d{2}.*$");
-            if (match.Success) return match.Groups["game"].Value;
+            if (match.Success) return NormalizeColonStandinUnderscoresForGameTitle(match.Groups["game"].Value);
 
-            return cleanedBaseName;
+            return NormalizeColonStandinUnderscoresForGameTitle(cleanedBaseName);
         }
 
         List<FilenameConventionRule> GetRules(string root)
@@ -351,7 +364,7 @@ namespace PixelVaultNative
                     TitleGroup = "title",
                     TimestampGroup = "stamp",
                     TimestampFormat = "yyyy_MM_dd-HH_mm_ss",
-                    PreserveFileTimes = true,
+                    PreserveFileTimes = false,
                     ConfidenceLabel = "ExplicitPattern",
                     IsBuiltIn = true
                 },
@@ -367,7 +380,7 @@ namespace PixelVaultNative
                     TitleGroup = "title",
                     TimestampGroup = "stamp",
                     TimestampFormat = "yyyy_MM_dd-HH-mm-ss",
-                    PreserveFileTimes = true,
+                    PreserveFileTimes = false,
                     ConfidenceLabel = "ExplicitPattern",
                     IsBuiltIn = true
                 },

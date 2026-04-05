@@ -182,6 +182,7 @@ namespace PixelVaultNative
                 Margin = new Thickness(0, 0, 0, 16)
             };
             grid.Columns.Add(new DataGridTextColumn { Header = "Game ID", Binding = new System.Windows.Data.Binding("GameId"), IsReadOnly = true, Width = 180 });
+            grid.Columns.Add(new DataGridTextColumn { Header = "Added", Binding = new System.Windows.Data.Binding("IndexAddedAtLocal"), IsReadOnly = true, Width = 130 });
             grid.Columns.Add(new DataGridTextColumn { Header = "Game", Binding = new System.Windows.Data.Binding("Name") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus }, Width = new DataGridLength(1.15, DataGridLengthUnitType.Star) });
             grid.Columns.Add(new DataGridTextColumn { Header = "Platform", Binding = new System.Windows.Data.Binding("PlatformLabel") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus }, Width = 130 });
             grid.Columns.Add(new DataGridTextColumn { Header = "Steam AppID", Binding = new System.Windows.Data.Binding("SteamAppId") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus }, Width = 130 });
