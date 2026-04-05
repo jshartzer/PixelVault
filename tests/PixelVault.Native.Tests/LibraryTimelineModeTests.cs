@@ -75,7 +75,7 @@ public sealed class LibraryTimelineModeTests
     {
         var packed = MainWindow.CalculateLibraryTimelinePackedTileSize(540, 1280);
 
-        Assert.Equal(228, packed);
+        Assert.Equal(399, packed);
     }
 
     [Fact]

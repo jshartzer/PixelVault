@@ -156,13 +156,13 @@ namespace PixelVaultNative
             IReadOnlyDictionary<string, LibraryDetailMediaLayoutInfo> mediaLayoutByFile = null)
         {
             if (string.IsNullOrWhiteSpace(file) || tileWidth <= 0) return 260;
-            var footer = includeTimelineFooter ? 112 : 14;
+            var footer = 14;
             var aspectRatio = ResolveLibraryDetailAspectRatio(file, mediaLayoutByFile);
             var inner = (int)Math.Ceiling(tileWidth / Math.Max(0.72d, aspectRatio));
-            var minInner = includeTimelineFooter ? 132 : 118;
-            var maxInner = includeTimelineFooter ? 440 : 380;
+            var minInner = 118;
+            var maxInner = 380;
             inner = Math.Max(minInner, Math.Min(maxInner, inner));
-            return Math.Max(includeTimelineFooter ? 248 : 180, inner + footer);
+            return Math.Max(includeTimelineFooter ? 220 : 180, inner + footer);
         }
 
         /// <summary>Column-based masonry with occasional 2-column &quot;hero&quot; spans when there are at least two columns.</summary>

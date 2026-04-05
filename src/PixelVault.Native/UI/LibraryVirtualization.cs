@@ -13,6 +13,22 @@ namespace PixelVaultNative
 {
     public sealed partial class MainWindow
     {
+        static readonly Brush LibraryTimelineTileFooterScrimBrush = CreateLibraryTimelineTileFooterScrimBrush();
+
+        static Brush CreateLibraryTimelineTileFooterScrimBrush()
+        {
+            var brush = new LinearGradientBrush
+            {
+                StartPoint = new Point(0.5, 0),
+                EndPoint = new Point(0.5, 1)
+            };
+            brush.GradientStops.Add(new GradientStop(Color.FromArgb(0, 20, 28, 36), 0));
+            brush.GradientStops.Add(new GradientStop(Color.FromArgb(120, 10, 18, 24), 0.4));
+            brush.GradientStops.Add(new GradientStop(Color.FromArgb(244, 7, 12, 17), 1));
+            brush.Freeze();
+            return brush;
+        }
+
         internal sealed class VirtualizedRowDefinition
         {
             public double Height;
@@ -298,11 +314,7 @@ namespace PixelVaultNative
             var savedComment = CleanComment(timelineContext.Comment ?? string.Empty);
             var editMode = false;
             var saveInFlight = false;
-            var footer = new StackPanel
-            {
-                Margin = new Thickness(10, 10, 10, 10),
-                MaxWidth = Math.Max(80, size - 20)
-            };
+            var footer = new StackPanel();
             footer.Children.Add(new TextBlock
             {
                 Text = string.IsNullOrWhiteSpace(timelineContext.GameTitle) ? "Unknown Game" : timelineContext.GameTitle,
@@ -311,9 +323,9 @@ namespace PixelVaultNative
                 FontWeight = FontWeights.SemiBold,
                 TextWrapping = TextWrapping.Wrap,
                 TextTrimming = TextTrimming.CharacterEllipsis,
-                MaxHeight = 36
+                MaxHeight = 40
             });
-            var footerMetaRow = new DockPanel { Margin = new Thickness(0, 6, 0, 0), LastChildFill = false };
+            var footerMetaRow = new DockPanel { Margin = new Thickness(0, 5, 0, 0), LastChildFill = false };
             var timeText = BuildLibraryTimelineCaptureTimeLabel(timelineContext.CaptureDate);
             if (!string.IsNullOrWhiteSpace(timeText))
             {
@@ -335,7 +347,7 @@ namespace PixelVaultNative
             }
             if (footerMetaRow.Children.Count > 0) footer.Children.Add(footerMetaRow);
 
-            var commentShell = new Grid { Margin = new Thickness(0, 10, 0, 0), Cursor = Cursors.IBeam };
+            var commentShell = new Grid { Margin = new Thickness(0, 6, 0, 0), Cursor = Cursors.IBeam };
             var commentDisplay = new TextBlock
             {
                 TextWrapping = TextWrapping.Wrap,
@@ -444,7 +456,15 @@ namespace PixelVaultNative
             commentShell.Children.Add(commentEditorBorder);
             refreshCommentChrome();
             footer.Children.Add(commentShell);
-            return footer;
+            return new Border
+            {
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                VerticalAlignment = VerticalAlignment.Bottom,
+                Background = LibraryTimelineTileFooterScrimBrush,
+                Padding = new Thickness(10, 20, 10, 8),
+                MaxWidth = Math.Max(64, size),
+                Child = footer
+            };
         }
 
         static void SyncLibraryMasonryTileRoundedClip(Border tile)
@@ -482,9 +502,24 @@ namespace PixelVaultNative
                 Cursor = System.Windows.Input.Cursors.Hand,
                 Tag = file
             };
-            var presenter = new Grid();
-            var placeholder = new TextBlock { Text = System.IO.Path.GetFileName(file), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(8), Foreground = Brush("#F1E9DA"), TextAlignment = TextAlignment.Center };
-            var image = new Image { Width = size, Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Center, Visibility = Visibility.Collapsed };
+            var contentRoot = new Grid { ClipToBounds = true };
+            var placeholder = new TextBlock
+            {
+                Text = System.IO.Path.GetFileName(file),
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(8),
+                Foreground = Brush("#F1E9DA"),
+                TextAlignment = TextAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            var image = new Image
+            {
+                Stretch = Stretch.UniformToFill,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                VerticalAlignment = VerticalAlignment.Stretch,
+                Visibility = Visibility.Collapsed
+            };
             RenderOptions.SetBitmapScalingMode(image, BitmapScalingMode.HighQuality);
             MediaElement videoPreviewMedia = null;
             TextBlock videoPreviewStatus = null;
@@ -503,8 +538,8 @@ namespace PixelVaultNative
                     videoDurationBadge.Visibility = string.IsNullOrWhiteSpace(durationLabel) ? Visibility.Collapsed : Visibility.Visible;
                 }
             };
-            presenter.Children.Add(placeholder);
-            presenter.Children.Add(image);
+            contentRoot.Children.Add(placeholder);
+            contentRoot.Children.Add(image);
             Button detailStarButton = null;
             TextBlock detailStarGlyph = null;
             Action applyDetailStarVisual = null;
@@ -557,18 +592,16 @@ namespace PixelVaultNative
                         if (redrawDetailPane != null) redrawDetailPane();
                     });
                 };
-                presenter.Children.Add(detailStarButton);
             }
             if (isVideoFile)
             {
                 videoPreviewMedia = new MediaElement
                 {
-                    Width = size,
                     LoadedBehavior = MediaState.Manual,
                     UnloadedBehavior = MediaState.Manual,
-                    Stretch = Stretch.Uniform,
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Center,
+                    Stretch = Stretch.UniformToFill,
+                    HorizontalAlignment = HorizontalAlignment.Stretch,
+                    VerticalAlignment = VerticalAlignment.Stretch,
                     IsMuted = true,
                     Volume = 0,
                     Visibility = Visibility.Hidden,
@@ -584,9 +617,9 @@ namespace PixelVaultNative
                     VerticalAlignment = VerticalAlignment.Center,
                     Visibility = Visibility.Collapsed
                 };
-                presenter.Children.Add(videoPreviewMedia);
-                presenter.Children.Add(videoPreviewStatus);
-                presenter.Children.Add(new Border
+                contentRoot.Children.Add(videoPreviewMedia);
+                contentRoot.Children.Add(videoPreviewStatus);
+                contentRoot.Children.Add(new Border
                 {
                     Background = Brush("#AA234A63"),
                     BorderBrush = Brush("#7AB4E3"),
@@ -617,14 +650,14 @@ namespace PixelVaultNative
                 {
                     HorizontalAlignment = HorizontalAlignment.Left,
                     VerticalAlignment = VerticalAlignment.Bottom,
-                    Margin = new Thickness(8, 0, 0, 8),
+                    Margin = new Thickness(8, 0, 0, timelineContext != null ? 76d : 8d),
                     Background = Brush("#A6141C21"),
                     CornerRadius = new CornerRadius(8),
                     Padding = new Thickness(8, 4, 8, 4),
                     Visibility = Visibility.Collapsed,
                     Child = videoDurationText
                 };
-                presenter.Children.Add(videoDurationBadge);
+                contentRoot.Children.Add(videoDurationBadge);
                 videoPreviewStopTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(10) };
                 applyVideoInfo(TryLoadCachedVideoClipInfo(file));
                 WarmVideoClipInfo(file, delegate(VideoClipInfo info)
@@ -638,21 +671,10 @@ namespace PixelVaultNative
                 }, shouldKeepLoading);
             }
             else applyVideoInfo(null);
-            var tileFooter = BuildLibraryTimelineCaptureFooter(size, file, timelineContext);
-            if (tileFooter == null)
-            {
-                tile.Child = presenter;
-            }
-            else
-            {
-                var tileContent = new Grid();
-                tileContent.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-                tileContent.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-                tileContent.Children.Add(presenter);
-                Grid.SetRow(tileFooter, 1);
-                tileContent.Children.Add(tileFooter);
-                tile.Child = tileContent;
-            }
+            var timelineFooterHost = BuildLibraryTimelineCaptureFooter(size, file, timelineContext);
+            if (timelineFooterHost != null) contentRoot.Children.Add(timelineFooterHost);
+            if (!isVideoFile && detailStarButton != null) contentRoot.Children.Add(detailStarButton);
+            tile.Child = contentRoot;
             QueueImageLoad(image, file, decodePixelWidth, delegate(BitmapImage loaded)
             {
                 image.Source = loaded;
@@ -968,30 +990,17 @@ namespace PixelVaultNative
                 var totalH = Math.Max(1, masonryLayoutHeight.Value);
                 tile.Height = totalH;
                 tile.BorderThickness = new Thickness(0);
-                presenter.HorizontalAlignment = HorizontalAlignment.Stretch;
-                presenter.VerticalAlignment = VerticalAlignment.Stretch;
-                image.ClearValue(WidthProperty);
-                image.ClearValue(MaxWidthProperty);
-                image.Stretch = Stretch.Uniform;
+                contentRoot.HorizontalAlignment = HorizontalAlignment.Stretch;
+                contentRoot.VerticalAlignment = VerticalAlignment.Stretch;
+                image.Stretch = Stretch.UniformToFill;
                 image.HorizontalAlignment = HorizontalAlignment.Stretch;
                 image.VerticalAlignment = VerticalAlignment.Stretch;
                 if (videoPreviewMedia != null)
                 {
-                    videoPreviewMedia.ClearValue(WidthProperty);
-                    videoPreviewMedia.ClearValue(MaxWidthProperty);
-                    videoPreviewMedia.Stretch = Stretch.Uniform;
+                    videoPreviewMedia.Stretch = Stretch.UniformToFill;
                     videoPreviewMedia.HorizontalAlignment = HorizontalAlignment.Stretch;
                     videoPreviewMedia.VerticalAlignment = VerticalAlignment.Stretch;
                 }
-                if (tile.Child is Grid tileGrid && tileGrid.RowDefinitions.Count == 2)
-                {
-                    tileGrid.RowDefinitions[0] = new RowDefinition { Height = new GridLength(1, GridUnitType.Star) };
-                }
-                else if (tile.Child == presenter)
-                {
-                    presenter.VerticalAlignment = VerticalAlignment.Stretch;
-                }
-                presenter.ClipToBounds = true;
                 tile.SizeChanged += delegate
                 {
                     SyncLibraryMasonryTileRoundedClip(tile);

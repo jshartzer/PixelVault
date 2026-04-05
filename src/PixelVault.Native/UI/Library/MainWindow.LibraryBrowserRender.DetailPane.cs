@@ -608,16 +608,17 @@ namespace PixelVaultNative
             if (groupFiles.Count == 0) return null;
 
             const int masonryTileGap = 4;
+            const double packedTileSizeScale = 1.75d;
             var innerPackWidth = Math.Max(240d, cardWidth);
             var targetTileWidth = timelineView
-                ? (innerPackWidth >= 1280d ? 620 : (innerPackWidth >= 980d ? 520 : (innerPackWidth >= 760d ? 440 : 360)))
-                : (innerPackWidth >= 980d ? 500 : (innerPackWidth >= 760d ? 420 : 330));
+                ? (int)Math.Round((innerPackWidth >= 1280d ? 620 : (innerPackWidth >= 980d ? 520 : (innerPackWidth >= 760d ? 440 : 360))) * packedTileSizeScale)
+                : (int)Math.Round((innerPackWidth >= 980d ? 500 : (innerPackWidth >= 760d ? 420 : 330)) * packedTileSizeScale);
             var minTileWidth = timelineView
-                ? Math.Max(360, Math.Min(targetTileWidth, (int)Math.Floor(innerPackWidth * 0.5d)))
-                : Math.Max(280, Math.Min(targetTileWidth, (int)Math.Floor(innerPackWidth * 0.44d)));
+                ? Math.Max((int)Math.Round(360 * packedTileSizeScale), Math.Min(targetTileWidth, (int)Math.Floor(innerPackWidth * 0.5d)))
+                : Math.Max((int)Math.Round(280 * packedTileSizeScale), Math.Min(targetTileWidth, (int)Math.Floor(innerPackWidth * 0.44d)));
             var maxTileWidth = groupFiles.Count == 1
                 ? (int)Math.Floor(innerPackWidth)
-                : Math.Min((int)Math.Floor(innerPackWidth), targetTileWidth + (timelineView ? 180 : 120));
+                : Math.Min((int)Math.Floor(innerPackWidth), targetTileWidth + (int)Math.Round((timelineView ? 180 : 120) * packedTileSizeScale));
             maxTileWidth = Math.Max(minTileWidth, maxTileWidth);
             var chunks = BuildLibraryDetailMasonryChunks(
                 groupFiles,
@@ -634,7 +635,7 @@ namespace PixelVaultNative
             return new LibraryPackedDayCardLayout
             {
                 Group = group,
-                Width = Math.Max(timelineView ? 520d : 360d, Math.Ceiling(cardWidth)),
+                Width = Math.Max(timelineView ? 520d * 1.75d : 360d * 1.75d, Math.Ceiling(cardWidth)),
                 Height = headerHeight + chunkHeights + chunkGaps,
                 TimelineView = timelineView,
                 Chunks = chunks

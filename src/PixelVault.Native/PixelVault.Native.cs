@@ -884,14 +884,16 @@ namespace PixelVaultNative
         {
             const int gapPx = 8;
             const double moreColumnsSlackBudgetPx = 16d;
+            const double libraryDetailPhotoTileSizeScale = 1.75d;
             var viewportWidth = ResolveScrollViewerLayoutWidth(scrollViewer);
             viewportWidth = Math.Max(160, viewportWidth - 24);
             var maxColumnsCeiling = viewportWidth >= 1100d ? 4 : (viewportWidth >= 560d ? 3 : (viewportWidth >= 360d ? 2 : 1));
-            var minTile = viewportWidth < 420d ? 156 : (viewportWidth < 900d ? 176 : 208);
+            var minTile = (int)Math.Round((viewportWidth < 420d ? 156 : (viewportWidth < 900d ? 176 : 208)) * libraryDetailPhotoTileSizeScale);
+            var layoutMaxTile = (int)Math.Round(900d * libraryDetailPhotoTileSizeScale);
 
             int ClampRoundedTile(int rawEqualSplit)
             {
-                var clamped = Math.Max(minTile, Math.Min(900, rawEqualSplit));
+                var clamped = Math.Max(minTile, Math.Min(layoutMaxTile, rawEqualSplit));
                 var roundedDown = (int)(Math.Floor(clamped / 12d) * 12);
                 if (roundedDown < minTile) roundedDown = clamped;
                 return Math.Max(minTile, Math.Min(rawEqualSplit, roundedDown));

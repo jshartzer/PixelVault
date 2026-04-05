@@ -231,9 +231,10 @@ namespace PixelVaultNative
 
         internal static int CalculateLibraryTimelinePackedTileSize(int detailTileSize, double availableWidth)
         {
+            const double scale = 1.75d;
             var width = availableWidth <= 0 ? 1280d : availableWidth;
-            var minTile = width < 540d ? 144 : (width < 860d ? 160 : 180);
-            var maxTile = width >= 1800d ? 280 : (width >= 1300d ? 256 : (width >= 960d ? 228 : 196));
+            var minTile = (int)Math.Round((width < 540d ? 144 : (width < 860d ? 160 : 180)) * scale);
+            var maxTile = (int)Math.Round((width >= 1800d ? 280 : (width >= 1300d ? 256 : (width >= 960d ? 228 : 196))) * scale);
             var proposed = detailTileSize <= 0 ? maxTile : Math.Min(detailTileSize, maxTile);
             return Math.Max(minTile, Math.Min(maxTile, proposed));
         }
@@ -277,7 +278,7 @@ namespace PixelVaultNative
             const double headerHeight = 40d;
             const double verticalPadding = 24d;
             const double innerGap = 8d;
-            const double footerReserve = 176d;
+            const double footerReserve = 18d;
             var safeCaptureCount = Math.Max(1, captureCount);
             var normalizedColumns = Math.Max(1, Math.Min(safeCaptureCount, cardColumns));
             var rowCount = Math.Max(1, (int)Math.Ceiling(safeCaptureCount / (double)normalizedColumns));
@@ -312,14 +313,15 @@ namespace PixelVaultNative
 
         internal static double EstimateLibraryPackedDayCardDesiredWidth(int captureCount, double availableWidth, bool timelineView)
         {
+            const double scale = 1.75d;
             var safeCaptureCount = Math.Max(1, captureCount);
             var width = availableWidth <= 0d ? 1280d : availableWidth;
             var minCardWidth = timelineView
-                ? (width >= 1850d ? 760d : (width >= 1450d ? 660d : 560d))
-                : (width >= 1450d ? 540d : (width >= 1080d ? 460d : 390d));
+                ? (width >= 1850d ? 760d * scale : (width >= 1450d ? 660d * scale : 560d * scale))
+                : (width >= 1450d ? 540d * scale : (width >= 1080d ? 460d * scale : 390d * scale));
             var targetTileWidth = timelineView
-                ? (width >= 1850d ? 520d : (width >= 1450d ? 440d : 360d))
-                : (width >= 1450d ? 400d : (width >= 1080d ? 330d : 280d));
+                ? (width >= 1850d ? 520d * scale : (width >= 1450d ? 440d * scale : 360d * scale))
+                : (width >= 1450d ? 400d * scale : (width >= 1080d ? 330d * scale : 280d * scale));
             var preferredColumns = 1;
             if (safeCaptureCount >= (timelineView ? 4 : 3) && width >= (timelineView ? 1250d : 920d))
                 preferredColumns = 2;
@@ -400,7 +402,7 @@ namespace PixelVaultNative
         internal static int EstimateLibraryVariableDetailRowHeight(IReadOnlyList<(string File, int Width)> row, bool includeTimelineFooter)
         {
             if (row == null || row.Count == 0) return 260;
-            var footer = includeTimelineFooter ? 112 : 14;
+            var footer = 14;
             var maxInner = 0;
             foreach (var pair in row)
             {
@@ -408,10 +410,10 @@ namespace PixelVaultNative
                 var inner = (int)Math.Ceiling(pair.Width / Math.Max(0.72d, aspectRatio));
                 if (inner > maxInner) maxInner = inner;
             }
-            var minInner = includeTimelineFooter ? 132 : 118;
-            var maxInnerCap = includeTimelineFooter ? 440 : 380;
+            var minInner = 118;
+            var maxInnerCap = 380;
             maxInner = Math.Max(minInner, Math.Min(maxInnerCap, maxInner));
-            return Math.Max(includeTimelineFooter ? 248 : 180, maxInner + footer);
+            return Math.Max(includeTimelineFooter ? 220 : 180, maxInner + footer);
         }
 
         Dictionary<string, LibraryTimelineCaptureContext> BuildLibraryTimelineCaptureContextMap(
