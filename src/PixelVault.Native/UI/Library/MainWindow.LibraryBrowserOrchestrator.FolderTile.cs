@@ -130,7 +130,7 @@ namespace PixelVaultNative
                 var imageGrid = new Grid();
                 imageGrid.Children.Add(CreateAsyncImageTile(
                     GetLibraryArtPathForDisplayOnly(displayFolder),
-                    CalculateLibraryFolderArtDecodeWidth(tileWidth),
+                    CalculateLibraryFolderArtDecodeWidth(tileWidth, ResolveLibraryDpiScale()),
                     tileWidth,
                     tileHeight,
                     Stretch.UniformToFill,
@@ -149,7 +149,7 @@ namespace PixelVaultNative
             {
                 imageBorder.Child = CreateAsyncImageTile(
                     GetLibraryArtPathForDisplayOnly(displayFolder),
-                    CalculateLibraryFolderArtDecodeWidth(tileWidth),
+                    CalculateLibraryFolderArtDecodeWidth(tileWidth, ResolveLibraryDpiScale()),
                     tileWidth,
                     tileHeight,
                     Stretch.UniformToFill,
@@ -336,7 +336,7 @@ namespace PixelVaultNative
                         }
                         else
                         {
-                            QueueImageLoad(panes.PreviewImage, artPath, CalculateLibraryBannerArtDecodeWidth(), delegate(BitmapImage loaded)
+                            QueueImageLoad(panes.PreviewImage, artPath, CalculateLibraryBannerArtDecodeWidth(ResolveLibraryDpiScale(panes.PreviewImage)), delegate(BitmapImage loaded)
                             {
                                 panes.PreviewImage.Source = loaded;
                                 panes.PreviewImage.Visibility = Visibility.Visible;

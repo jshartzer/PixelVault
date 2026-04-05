@@ -727,7 +727,14 @@ namespace PixelVaultNative
 
             const int detailTileGap = 8;
             const int cardPadding = 12;
-            var cardColumns = Math.Max(1, Math.Min(groupFiles.Count, preferredCardColumns));
+            var innerPackW = Math.Max(160d, cardWidth - (2 * cardPadding) - 8d);
+            var packMinWTimeline = Math.Max(120, (int)Math.Floor(timelineTileSize * 0.62));
+            var packMaxWTimeline = Math.Min(timelineTileSize + 72, (int)Math.Floor(innerPackW));
+            var colCap = Math.Max(1, preferredCardColumns);
+            packMaxWTimeline = Math.Min(
+                packMaxWTimeline,
+                (int)Math.Floor((innerPackW - (colCap - 1) * detailTileGap) / colCap));
+            packMaxWTimeline = Math.Max(packMinWTimeline, packMaxWTimeline);
             var title = BuildLibraryTimelineDayCardTitle(group.CaptureDate, DateTime.Today);
             var absoluteTitle = group.CaptureDate <= DateTime.MinValue ? string.Empty : group.CaptureDate.ToString("MMMM d, yyyy");
 
@@ -781,22 +788,32 @@ namespace PixelVaultNative
                 });
             }
 
-            for (var rowStart = 0; rowStart < groupFiles.Count; rowStart += cardColumns)
+            var cardPackedRows = PackLibraryDetailFilesIntoVariableRows(
+                groupFiles,
+                innerPackW,
+                detailTileGap,
+                timelineTileSize,
+                packMinWTimeline,
+                packMaxWTimeline);
+            for (var packRowIndex = 0; packRowIndex < cardPackedRows.Count; packRowIndex++)
             {
-                var rowFiles = groupFiles.Skip(rowStart).Take(cardColumns).ToList();
+                var rowEntries = cardPackedRows[packRowIndex];
                 var rowPanel = new StackPanel
                 {
                     Orientation = Orientation.Horizontal,
-                    Margin = new Thickness(0, 0, 0, rowStart + cardColumns < groupFiles.Count ? detailTileGap : 0)
+                    Margin = new Thickness(0, 0, 0, packRowIndex < cardPackedRows.Count - 1 ? detailTileGap : 0)
                 };
-                for (var fileIndex = 0; fileIndex < rowFiles.Count; fileIndex++)
+                for (var fileIndex = 0; fileIndex < rowEntries.Count; fileIndex++)
                 {
-                    var file = rowFiles[fileIndex];
+                    var file = rowEntries[fileIndex].File;
+                    var tw = rowEntries[fileIndex].Width;
+                    var decodeW = CalculateLibraryDetailTileDecodeWidth(tw, dpiScale);
                     LibraryTimelineCaptureContext timelineContext;
                     if (timelineContexts == null || !timelineContexts.TryGetValue(file, out timelineContext)) timelineContext = null;
                     var tile = CreateLibraryDetailTile(
                         file,
-                        timelineTileSize,
+                        tw,
+                        decodeW,
                         delegate { return ws != null && SameLibraryBrowserSelection(ws.Current, renderFolder); },
                         openSingleFileMetadataEditor,
                         updateDetailSelection,
@@ -805,7 +822,7 @@ namespace PixelVaultNative
                         redrawSelectedFolderDetail,
                         null,
                         timelineContext);
-                    tile.Margin = new Thickness(0, 0, fileIndex < rowFiles.Count - 1 ? detailTileGap : 0, 0);
+                    tile.Margin = new Thickness(0, 0, fileIndex < rowEntries.Count - 1 ? detailTileGap : 0, 0);
                     if (ws != null) ws.DetailTiles.Add(tile);
                     rowPanel.Children.Add(tile);
                 }

@@ -1,3 +1,8 @@
+## 0.934
+- **Release:** Version **0.934** — Library image decode DPI follow-through and timeline packed-card photo strips.
+- **Library / covers:** Folder cover tiles and the selected-folder header preview now use **DPI-scaled decode widths** (same helper family as the detail pane), so art stays sharper on high-DPI displays instead of capping like a 1× monitor.
+- **Library / timeline (packed day cards):** When the packed day-card path is used, photos inside each card use **variable-width rows** and **per-tile decode sizes** aligned with each tile width, instead of a single fixed width for every thumbnail in the card.
+
 ## 0.933
 - **Release:** Version **0.933** — Detail and timeline photo views now share the same adaptive tile style with a lower max size cap.
 - **Library / screenshots:** The regular screenshot pane keeps the variable row sizing you liked, but tiles now stop growing past a saner ceiling so a single photo no longer dominates the pane.
