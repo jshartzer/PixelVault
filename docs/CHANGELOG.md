@@ -1,3 +1,9 @@
+## 0.980
+- **Release:** Version **0.980** — Library detail speedups, perf diagnostics, global scrollbar chrome.
+- **Library / detail:** Parallel probe of image/video dimensions for large visible sets (≥16 files); reuse the media layout map across quick, comment, and refined snapshot passes when the visible file set is unchanged; slightly higher concurrent bitmap decode limits for the thumbnail pipeline.
+- **Diagnostics:** `PERF | LibraryDetailRender` lines now break out quick snapshot **prep**, **media map**, and **timeline/groups** times, **media reuse**, and **UI apply** ms; troubleshooting log records first detail **dispatcherWallMs**.
+- **Chrome:** App-wide **ScrollBar** theme — thin opaque dark track, rounded thumb (merged at startup from `Themes/PixelVaultScrollBars.xaml`).
+
 ## 0.975
 - **Release:** Version **0.975** — Slightly smaller packed day-card tiles in Library detail and timeline.
 - **Library / packed cards:** The multiplier applied to masonry **target**, **minimum**, and **max-bump** tile widths inside each packed day card is reduced from **1.75×** to **1.25×** (`BuildLibraryPackedDayCardLayout`), so thumbnails in those cards render a bit smaller while keeping the same column logic and breakpoints. Responsive detail grid scaling (`CalculateResponsiveLibraryDetailLayout`) and other **1.75×** library heuristics are unchanged.

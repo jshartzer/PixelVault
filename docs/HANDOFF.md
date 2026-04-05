@@ -55,11 +55,11 @@ Then use these based on the task:
 
 Current live build:
 
-- `0.975`
+- `0.980`
 
 Current executable:
 
-- `C:\Codex\dist\PixelVault-0.975\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.980\PixelVault.exe`
 
 Current build pointer:
 
@@ -93,12 +93,13 @@ Practical current focus:
 
 ## Current Stop Point
 
-The app is currently published at `0.975`.
+The app is currently published at `0.980`.
 
 **Notion:** [MainWindow extraction roadmap](https://www.notion.so/33573adc59b681d88b7dcd88cad53cb6) updated for Phase **E** capstone (**`ILibraryBrowserShell`**). If release rows in Notion lag `docs/CURRENT_BUILD.txt`, re-sync per `docs/DOC_SYNC_POLICY.md`.
 
 Recent extraction progress (repo):
 
+- **Library perf + chrome (0.980):** Detail snapshot builds reuse media dimension maps when possible, parallel-probe layouts for large folders, richer **PERF** / troubleshooting timings for hunts, global thin dark rounded **ScrollBar** theme, slightly higher decode concurrency.
 - **Packed card tile scale (0.975):** Packed day-card masonry uses a **1.25×** tile-width multiplier instead of **1.75×** for in-card targets and min/max column bounds (detail/timeline packed layout only).
 - **Library aspect-native tiles (0.974):** Masonry heights are **width ÷ aspect** per file with no shared height clamps; images and video previews use **Uniform** stretch only; timeline packed-card estimates reserve space for tall portraits.
 - **Library aspect accuracy (0.969):** Introduced natural pixel aspect for masonry height estimates (prior to 0.974 removing shared height clamps and Uniform-only rendering).

@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows.Media.Imaging;
 
 namespace PixelVaultNative
@@ -118,17 +120,36 @@ namespace PixelVaultNative
             return resolved;
         }
 
+        const int LibraryDetailMediaLayoutParallelThreshold = 16;
+
         Dictionary<string, LibraryDetailMediaLayoutInfo> BuildLibraryDetailMediaLayoutInfoMap(IEnumerable<string> files)
         {
-            var map = new Dictionary<string, LibraryDetailMediaLayoutInfo>(StringComparer.OrdinalIgnoreCase);
-            foreach (var file in (files ?? Enumerable.Empty<string>())
+            var list = (files ?? Enumerable.Empty<string>())
                 .Where(path => !string.IsNullOrWhiteSpace(path))
-                .Distinct(StringComparer.OrdinalIgnoreCase))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (list.Count == 0)
+                return new Dictionary<string, LibraryDetailMediaLayoutInfo>(StringComparer.OrdinalIgnoreCase);
+
+            if (list.Count < LibraryDetailMediaLayoutParallelThreshold)
+            {
+                var map = new Dictionary<string, LibraryDetailMediaLayoutInfo>(list.Count, StringComparer.OrdinalIgnoreCase);
+                foreach (var file in list)
+                {
+                    var info = ResolveLibraryDetailMediaLayoutInfo(file);
+                    if (info != null) map[file] = info;
+                }
+                return map;
+            }
+
+            var concurrent = new ConcurrentDictionary<string, LibraryDetailMediaLayoutInfo>(StringComparer.OrdinalIgnoreCase);
+            var dop = Math.Max(2, Math.Min(8, Environment.ProcessorCount));
+            Parallel.ForEach(list, new ParallelOptions { MaxDegreeOfParallelism = dop }, file =>
             {
                 var info = ResolveLibraryDetailMediaLayoutInfo(file);
-                if (info != null) map[file] = info;
-            }
-            return map;
+                if (info != null) concurrent[file] = info;
+            });
+            return new Dictionary<string, LibraryDetailMediaLayoutInfo>(concurrent, StringComparer.OrdinalIgnoreCase);
         }
 
         /// <summary>Source width ÷ height (pixel dimensions when known, else stable hash mix across portrait and landscape). Used for tile height = width ÷ aspect.</summary>

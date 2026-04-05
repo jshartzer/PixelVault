@@ -26,6 +26,15 @@ namespace PixelVaultNative
 {
     internal static class Program
     {
+        static void MergeGlobalScrollBarTheme(Application app)
+        {
+            if (app == null) return;
+            app.Resources.MergedDictionaries.Add(new ResourceDictionary
+            {
+                Source = new Uri("pack://application:,,,/PixelVault;component/Themes/PixelVaultScrollBars.xaml", UriKind.Absolute)
+            });
+        }
+
         [STAThread]
         private static void Main()
         {
@@ -34,13 +43,15 @@ namespace PixelVaultNative
                 (SecurityProtocolType)768 |
                 SecurityProtocolType.Tls;
             Batteries_V2.Init();
-            new Application().Run(new MainWindow());
+            var app = new Application();
+            MergeGlobalScrollBarTheme(app);
+            app.Run(new MainWindow());
         }
     }
 
     public sealed partial class MainWindow : Window
     {
-        const string AppVersion = "0.975";
+        const string AppVersion = "0.980";
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
         const string ClearedExternalIdSentinel = "__PV_CLEARED__";

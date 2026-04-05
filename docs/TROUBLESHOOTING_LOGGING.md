@@ -32,6 +32,9 @@ Current Library entries include:
 - stale render skips when a newer selection/render wins
 - embedded metadata repair start, completion, diff outcome, and failure
 - banner art resolve failures
+- first detail snapshot dispatch wall time (`LibraryDetailQuickSnapshotDispatchComplete` → `dispatcherWallMs`)
+
+When a folder’s first detail paint is slow enough, the main app log also emits **`PERF | LibraryDetailRender`** with a breakdown of the **background quick snapshot** (prep vs media-dimension map vs timeline/groups tail), whether the media map was **reused** from an earlier snapshot pass, and **`uiApplyMs`** (time inside the first UI-thread apply that builds virtual rows).
 
 Each line includes:
 
