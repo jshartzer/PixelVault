@@ -1,7 +1,3 @@
-## 0.937
-- **Release:** Version **0.937** — Library detail/timeline photos use **VirtualizingWrapPanel** instead of custom masonry.
-- **Library / detail pane:** Each date group’s captures are shown in an **`ItemsControl`** whose **`ItemsPanel`** is the **VirtualizingWrapPanel** NuGet control (`SpacingMode.None`, variable-width items). **Tile creation, widths, margins, and grouping** match the prior **`PackLibraryDetailFilesIntoVariableRows`**-based behavior; only the layout container changed. The old masonry chunk layout file and its tests were removed.
-
 ## 0.936
 - **Release:** Version **0.936** — Library masonry view reads as a **tight photo mosaic**.
 - **Library / masonry tiles:** Images and video previews use **cover-style** scaling (`UniformToFill`) so each cell is **filled** with minimal empty area inside the frame; media is **clipped** to the rounded tile shape. Masonry uses a **narrower gutter** (3px) than the rest of the library grid, and **frameless** masonry cells (no inner border band) so neighboring shots sit closer together.

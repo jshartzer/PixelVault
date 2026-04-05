@@ -8,8 +8,6 @@ using System.Windows.Media;
 using System.Windows.Input;
 using System.Windows.Threading;
 using System.Windows.Media.Imaging;
-using System.Windows.Controls.Primitives;
-using WpfToolkit.Controls;
 
 namespace PixelVaultNative
 {
@@ -421,17 +419,22 @@ namespace PixelVaultNative
             return footer;
         }
 
-        static ItemsPanelTemplate CreateLibraryDetailVirtualizingWrapPanelItemsPanelTemplate()
+        static void SyncLibraryMasonryTileRoundedClip(Border tile)
         {
-            var factory = new FrameworkElementFactory(typeof(VirtualizingWrapPanel));
-            factory.SetValue(VirtualizingWrapPanel.OrientationProperty, Orientation.Horizontal);
-            factory.SetValue(VirtualizingWrapPanel.AllowDifferentSizedItemsProperty, true);
-            factory.SetValue(VirtualizingWrapPanel.SpacingModeProperty, SpacingMode.None);
-            factory.SetValue(VirtualizingWrapPanel.StretchItemsProperty, false);
-            return new ItemsPanelTemplate(factory);
+            if (tile == null) return;
+            var w = tile.ActualWidth;
+            var h = tile.ActualHeight;
+            if (w <= 1d || h <= 1d) return;
+            var r = tile.CornerRadius.TopLeft;
+            if (r <= 0d)
+            {
+                tile.Clip = new RectangleGeometry(new Rect(0, 0, w, h));
+                return;
+            }
+            tile.Clip = new RectangleGeometry(new Rect(0, 0, w, h), r, r);
         }
 
-        Border CreateLibraryDetailTile(string file, int size, int decodePixelWidth, Func<bool> shouldLoad, Action<string> openSingleFileMetadataEditor, Action<string, ModifierKeys> updateDetailSelection, HashSet<string> selectedDetailFiles, Action refreshDetailSelectionUi, Action redrawDetailPane, Action<string> useFileAsFolderCover, LibraryTimelineCaptureContext timelineContext = null)
+        Border CreateLibraryDetailTile(string file, int size, int decodePixelWidth, Func<bool> shouldLoad, Action<string> openSingleFileMetadataEditor, Action<string, ModifierKeys> updateDetailSelection, HashSet<string> selectedDetailFiles, Action refreshDetailSelectionUi, Action redrawDetailPane, Action<string> useFileAsFolderCover, int? masonryLayoutHeight = null, LibraryTimelineCaptureContext timelineContext = null)
         {
             var isVideoFile = IsVideo(file);
             var tileIsActive = true;
@@ -932,6 +935,44 @@ namespace PixelVaultNative
             contextMenu.Items.Add(new Separator());
             contextMenu.Items.Add(copyPathItem);
             tile.ContextMenu = contextMenu;
+            if (masonryLayoutHeight.HasValue)
+            {
+                var totalH = Math.Max(1, masonryLayoutHeight.Value);
+                tile.Height = totalH;
+                tile.BorderThickness = new Thickness(0);
+                presenter.HorizontalAlignment = HorizontalAlignment.Stretch;
+                presenter.VerticalAlignment = VerticalAlignment.Stretch;
+                image.ClearValue(WidthProperty);
+                image.ClearValue(MaxWidthProperty);
+                image.Stretch = Stretch.UniformToFill;
+                image.HorizontalAlignment = HorizontalAlignment.Stretch;
+                image.VerticalAlignment = VerticalAlignment.Stretch;
+                if (videoPreviewMedia != null)
+                {
+                    videoPreviewMedia.ClearValue(WidthProperty);
+                    videoPreviewMedia.ClearValue(MaxWidthProperty);
+                    videoPreviewMedia.Stretch = Stretch.UniformToFill;
+                    videoPreviewMedia.HorizontalAlignment = HorizontalAlignment.Stretch;
+                    videoPreviewMedia.VerticalAlignment = VerticalAlignment.Stretch;
+                }
+                if (tile.Child is Grid tileGrid && tileGrid.RowDefinitions.Count == 2)
+                {
+                    tileGrid.RowDefinitions[0] = new RowDefinition { Height = new GridLength(1, GridUnitType.Star) };
+                }
+                else if (tile.Child == presenter)
+                {
+                    presenter.VerticalAlignment = VerticalAlignment.Stretch;
+                }
+                presenter.ClipToBounds = true;
+                tile.SizeChanged += delegate
+                {
+                    SyncLibraryMasonryTileRoundedClip(tile);
+                };
+                tile.Loaded += delegate(object s, RoutedEventArgs e)
+                {
+                    SyncLibraryMasonryTileRoundedClip(tile);
+                };
+            }
             return tile;
         }
     }
