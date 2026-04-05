@@ -608,7 +608,7 @@ namespace PixelVaultNative
             if (groupFiles.Count == 0) return null;
 
             const int masonryTileGap = 4;
-            const double packedTileSizeScale = 1.75d;
+            const double packedTileSizeScale = 1.25d;
             var innerPackWidth = Math.Max(240d, cardWidth);
             var targetTileWidth = timelineView
                 ? (int)Math.Round((innerPackWidth >= 1280d ? 620 : (innerPackWidth >= 980d ? 520 : (innerPackWidth >= 760d ? 440 : 360))) * packedTileSizeScale)
