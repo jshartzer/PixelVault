@@ -43,7 +43,7 @@ namespace PixelVaultNative
             var size = detailLayout.TileSize;
             ws.LastDetailColumns = targetDetailColumns;
             ws.LastDetailTileSize = size;
-            ws.EstimatedDetailRowHeight = Math.Max(200, size + (IsLibraryBrowserTimelineView(ws.Current) ? 132 : 96));
+            ws.EstimatedDetailRowHeight = Math.Max(220, size + (IsLibraryBrowserTimelineView(ws.Current) ? 176 : 96));
             var shouldRestoreDetailScroll = ws.PreserveDetailScrollOnNextRender && ws.PreservedDetailScrollOffset > 0.1d;
             var restoreDetailScrollOffset = shouldRestoreDetailScroll ? (double?)ws.PreservedDetailScrollOffset : null;
             var restoreDetailScrollPending = shouldRestoreDetailScroll;
@@ -52,12 +52,16 @@ namespace PixelVaultNative
             ws.ResetDetailRowsToLoadingOnNextRender = false;
             var renderFolder = ws.Current;
             var timelineView = IsLibraryBrowserTimelineView(renderFolder);
+            var timelineRangeStart = ws.TimelineStartDate;
+            var timelineRangeEnd = ws.TimelineEndDate;
+            NormalizeLibraryTimelineDateRange(ref timelineRangeStart, ref timelineRangeEnd);
             LogTroubleshooting("LibraryDetailRenderStart",
                 "renderVersion=" + renderVersion
                 + "; resetToLoading=" + resetRowsToLoading
                 + "; restoreScroll=" + shouldRestoreDetailScroll
                 + "; detailColumns=" + targetDetailColumns
                 + "; detailSize=" + size
+                + (timelineView ? "; timelineRange=" + timelineRangeStart.ToString("yyyy-MM-dd") + ".." + timelineRangeEnd.ToString("yyyy-MM-dd") : string.Empty)
                 + "; " + BuildLibraryBrowserTroubleshootingLabel(renderFolder));
             var displayFolder = BuildLibraryBrowserDisplayFolder(renderFolder);
             if (resetRowsToLoading || panes.DetailRows.Rows == null || panes.DetailRows.Rows.Count == 0)
@@ -154,7 +158,7 @@ namespace PixelVaultNative
                                 Height = 44,
                                 Build = delegate
                                 {
-                                    return new TextBlock { Text = timelineView ? "No captures found in the timeline." : "No captures found in this folder.", Foreground = Brush("#A7B5BD") };
+                                    return new TextBlock { Text = timelineView ? "No captures found in the selected timeline range." : "No captures found in this folder.", Foreground = Brush("#A7B5BD") };
                                 }
                             }
                         }, !restoreDetailScrollPending, restoreDetailScrollPending ? restoreDetailScrollOffset : null);
@@ -294,10 +298,11 @@ namespace PixelVaultNative
                         + "; missingCaptureTicks=" + filesMissingCaptureTicks.Count
                         + "; hasLibraryRoot=" + librarySession.HasLibraryRoot);
 
-                    Func<LibraryDetailRenderSnapshot> buildSnapshot = delegate
+                    Func<Dictionary<string, EmbeddedMetadataSnapshot>, LibraryDetailRenderSnapshot> buildSnapshot = delegate(Dictionary<string, EmbeddedMetadataSnapshot> timelineMetadataSnapshots)
                     {
                         var datedFiles = detailFiles
                             .Select(file => new { FilePath = file, CaptureDate = librarySession.ResolveIndexedLibraryDate(file, metadataIndex) })
+                            .Where(entry => !timelineView || LibraryTimelineRangeContainsCapture(entry.CaptureDate, timelineRangeStart, timelineRangeEnd))
                             .OrderByDescending(entry => entry.CaptureDate)
                             .ThenBy(entry => entry.FilePath, StringComparer.OrdinalIgnoreCase)
                             .ToList();
@@ -307,7 +312,7 @@ namespace PixelVaultNative
                         };
                         if (timelineView)
                         {
-                            snapshot.TimelineContextByFile = BuildLibraryTimelineCaptureContextMap(snapshot.VisibleFiles, metadataIndex, savedGameRows);
+                            snapshot.TimelineContextByFile = BuildLibraryTimelineCaptureContextMap(snapshot.VisibleFiles, metadataIndex, savedGameRows, timelineMetadataSnapshots);
                         }
                         foreach (var group in datedFiles
                             .GroupBy(entry => entry.CaptureDate.Date)
@@ -323,13 +328,61 @@ namespace PixelVaultNative
                     };
 
                     traceStep("LibraryDetailQuickSnapshotBuildStart", "files=" + detailFiles.Count);
-                    var quickSnapshot = buildSnapshot();
+                    var quickSnapshot = buildSnapshot(null);
                     traceStep("LibraryDetailQuickSnapshotBuilt",
                         "groups=" + quickSnapshot.Groups.Count
                         + "; visibleFiles=" + quickSnapshot.VisibleFiles.Count);
                     traceStep("LibraryDetailQuickSnapshotDispatchStart", "stage=initial");
                     await libraryWindow.Dispatcher.InvokeAsync((Action)(delegate { applyDetailSnapshot(quickSnapshot, true); }));
                     traceStep("LibraryDetailQuickSnapshotDispatchComplete", "stage=initial");
+                    Dictionary<string, EmbeddedMetadataSnapshot> timelineMetadataSnapshots = null;
+                    if (timelineView && quickSnapshot.VisibleFiles.Count > 0)
+                    {
+                        try
+                        {
+                            traceStep("LibraryDetailTimelineMetadataReadStart", "files=" + quickSnapshot.VisibleFiles.Count);
+                            timelineMetadataSnapshots = await metadataService.ReadEmbeddedMetadataBatchAsync(quickSnapshot.VisibleFiles, CancellationToken.None).ConfigureAwait(false);
+                            traceStep("LibraryDetailTimelineMetadataReadComplete", "metadataResults=" + timelineMetadataSnapshots.Count);
+                            var commentSnapshot = buildSnapshot(timelineMetadataSnapshots);
+                            var commentsChanged = commentSnapshot.TimelineContextByFile.Count != quickSnapshot.TimelineContextByFile.Count;
+                            if (!commentsChanged)
+                            {
+                                foreach (var pair in commentSnapshot.TimelineContextByFile)
+                                {
+                                    LibraryTimelineCaptureContext quickContext;
+                                    if (!quickSnapshot.TimelineContextByFile.TryGetValue(pair.Key, out quickContext))
+                                    {
+                                        commentsChanged = true;
+                                        break;
+                                    }
+                                    var nextComment = pair.Value == null ? string.Empty : pair.Value.Comment ?? string.Empty;
+                                    var quickComment = quickContext == null ? string.Empty : quickContext.Comment ?? string.Empty;
+                                    if (!string.Equals(nextComment, quickComment, StringComparison.Ordinal))
+                                    {
+                                        commentsChanged = true;
+                                        break;
+                                    }
+                                }
+                            }
+                            if (commentsChanged)
+                            {
+                                traceStep("LibraryDetailTimelineMetadataDispatchStart", "stage=comment-refresh");
+                                await libraryWindow.Dispatcher.InvokeAsync((Action)(delegate { applyDetailSnapshot(commentSnapshot, false); }));
+                                traceStep("LibraryDetailTimelineMetadataDispatchComplete", "stage=comment-refresh");
+                                quickSnapshot = commentSnapshot;
+                            }
+                        }
+                        catch (Exception timelineMetadataEx)
+                        {
+                            LogException("Library detail timeline metadata read | " + (renderFolder.Name ?? renderFolder.PrimaryFolderPath ?? "(unknown)"), timelineMetadataEx);
+                            LogTroubleshooting("LibraryDetailTimelineMetadataReadFail",
+                                "renderVersion=" + renderVersion
+                                + "; type=" + timelineMetadataEx.GetType().FullName
+                                + "; message=" + timelineMetadataEx.Message
+                                + "; exception=" + FormatExceptionForTroubleshooting(timelineMetadataEx)
+                                + "; " + BuildLibraryBrowserTroubleshootingLabel(renderFolder));
+                        }
+                    }
 
                     if (filesMissingCaptureTicks.Count > 0)
                     {
@@ -384,7 +437,7 @@ namespace PixelVaultNative
                         }
 
                         traceStep("LibraryDetailRefinedSnapshotBuildStart", "files=" + detailFiles.Count);
-                        var refinedSnapshot = buildSnapshot();
+                        var refinedSnapshot = buildSnapshot(timelineMetadataSnapshots);
                         traceStep("LibraryDetailRefinedSnapshotBuilt",
                             "groups=" + refinedSnapshot.Groups.Count
                             + "; visibleFiles=" + refinedSnapshot.VisibleFiles.Count);

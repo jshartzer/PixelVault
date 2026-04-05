@@ -26,6 +26,7 @@ namespace PixelVaultNative
             if (panes.OpenFolderButton != null) panes.OpenFolderButton.Visibility = timelineMode ? Visibility.Collapsed : Visibility.Visible;
             if (panes.RefreshThisFolderButton != null) panes.RefreshThisFolderButton.Visibility = timelineMode ? Visibility.Collapsed : Visibility.Visible;
             if (panes.ExitTimelineButton != null) panes.ExitTimelineButton.Visibility = timelineMode ? Visibility.Visible : Visibility.Collapsed;
+            if (panes.TimelineFilterPanel != null) panes.TimelineFilterPanel.Visibility = timelineMode ? Visibility.Visible : Visibility.Collapsed;
 
             if (timelineMode)
             {

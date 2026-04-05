@@ -38,6 +38,9 @@ namespace PixelVaultNative
             internal bool PendingSessionRestore;
             internal string PendingRestoreViewKey;
             internal double PendingRestoreDetailScrollAfterShow;
+            internal string TimelineDatePresetKey = "30d";
+            internal DateTime TimelineStartDate = DateTime.MinValue;
+            internal DateTime TimelineEndDate = DateTime.MinValue;
             internal Border LibraryToastBorder;
             internal TextBlock LibraryToastLabel;
             internal DispatcherTimer LibraryToastTimer;

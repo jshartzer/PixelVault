@@ -61,6 +61,11 @@ namespace PixelVaultNative
                     ws.PendingRestoreViewKey = _shell.LibraryBrowserPersistedLastViewKey;
                     ws.PendingRestoreDetailScrollAfterShow = Math.Max(0, _shell.LibraryBrowserPersistedDetailScroll);
                 }
+                if (ws.TimelineStartDate <= DateTime.MinValue || ws.TimelineEndDate <= DateTime.MinValue)
+                {
+                    MainWindow.BuildLibraryTimelinePresetDateRange("30d", DateTime.Today, out ws.TimelineStartDate, out ws.TimelineEndDate);
+                    ws.TimelineDatePresetKey = "30d";
+                }
 
                 Action<string, bool> runLibraryScan = null;
                 Action<bool> setLibraryBusyState = null;
@@ -80,6 +85,9 @@ namespace PixelVaultNative
                 Action refreshDetailSelectionUi = null;
                 Action deleteSelectedLibraryFiles = null;
                 Action openSelectedLibraryMetadataEditor = null;
+                Action refreshTimelineRangeUi = null;
+                Action<string> applyTimelinePreset = null;
+                Action applyTimelineDatePickerRange = null;
                 var lastFolderGroupingMode = _shell.NormalizeLibraryGroupingMode(_shell.LibraryGroupingMode);
                 if (string.Equals(lastFolderGroupingMode, "timeline", StringComparison.OrdinalIgnoreCase)) lastFolderGroupingMode = "all";
                 Func<LibraryBrowserFolderView, LibraryFolderInfo> getDisplayFolder = delegate(LibraryBrowserFolderView view)
@@ -132,6 +140,56 @@ namespace PixelVaultNative
                     _shell.LibraryBrowserApplySortGroupPillState(panes.GroupAllButton, string.Equals(normalized, "all", StringComparison.OrdinalIgnoreCase));
                     _shell.LibraryBrowserApplySortGroupPillState(panes.GroupConsoleButton, string.Equals(normalized, "console", StringComparison.OrdinalIgnoreCase));
                     _shell.LibraryBrowserApplySortGroupPillState(panes.GroupTimelineButton, string.Equals(normalized, "timeline", StringComparison.OrdinalIgnoreCase));
+                    refreshTimelineRangeUi?.Invoke();
+                };
+
+                var suppressTimelineRangeSync = false;
+                refreshTimelineRangeUi = delegate
+                {
+                    if (panes.TimelineFilterPanel == null) return;
+                    var timelineMode = string.Equals(_shell.NormalizeLibraryGroupingMode(_shell.LibraryGroupingMode), "timeline", StringComparison.OrdinalIgnoreCase);
+                    panes.TimelineFilterPanel.Visibility = timelineMode ? Visibility.Visible : Visibility.Collapsed;
+                    var rangeStart = ws.TimelineStartDate;
+                    var rangeEnd = ws.TimelineEndDate;
+                    MainWindow.NormalizeLibraryTimelineDateRange(ref rangeStart, ref rangeEnd);
+                    ws.TimelineStartDate = rangeStart;
+                    ws.TimelineEndDate = rangeEnd;
+                    ws.TimelineDatePresetKey = MainWindow.DetectLibraryTimelinePresetKey(rangeStart, rangeEnd, DateTime.Today);
+                    _shell.LibraryBrowserApplySortGroupPillState(panes.TimelinePresetTodayButton, string.Equals(ws.TimelineDatePresetKey, "today", StringComparison.OrdinalIgnoreCase));
+                    _shell.LibraryBrowserApplySortGroupPillState(panes.TimelinePresetMonthButton, string.Equals(ws.TimelineDatePresetKey, "month", StringComparison.OrdinalIgnoreCase));
+                    _shell.LibraryBrowserApplySortGroupPillState(panes.TimelinePresetThirtyDaysButton, string.Equals(ws.TimelineDatePresetKey, "30d", StringComparison.OrdinalIgnoreCase));
+                    suppressTimelineRangeSync = true;
+                    if (panes.TimelineStartDatePicker != null) panes.TimelineStartDatePicker.SelectedDate = rangeStart;
+                    if (panes.TimelineEndDatePicker != null) panes.TimelineEndDatePicker.SelectedDate = rangeEnd;
+                    suppressTimelineRangeSync = false;
+                };
+                Action<DateTime, DateTime, bool> applyTimelineDateRange = delegate(DateTime startDate, DateTime endDate, bool rerender)
+                {
+                    MainWindow.NormalizeLibraryTimelineDateRange(ref startDate, ref endDate);
+                    ws.TimelineStartDate = startDate;
+                    ws.TimelineEndDate = endDate;
+                    ws.TimelineDatePresetKey = MainWindow.DetectLibraryTimelinePresetKey(startDate, endDate, DateTime.Today);
+                    refreshTimelineRangeUi?.Invoke();
+                    if (!rerender) return;
+                    if (!string.Equals(_shell.NormalizeLibraryGroupingMode(_shell.LibraryGroupingMode), "timeline", StringComparison.OrdinalIgnoreCase)) return;
+                    if (ws.Current == null || renderSelectedFolder == null) return;
+                    ws.PreserveDetailScrollOnNextRender = false;
+                    ws.PreservedDetailScrollOffset = 0;
+                    renderSelectedFolder();
+                };
+                applyTimelinePreset = delegate(string presetKey)
+                {
+                    DateTime startDate;
+                    DateTime endDate;
+                    MainWindow.BuildLibraryTimelinePresetDateRange(presetKey, DateTime.Today, out startDate, out endDate);
+                    applyTimelineDateRange(startDate, endDate, true);
+                };
+                applyTimelineDatePickerRange = delegate
+                {
+                    if (suppressTimelineRangeSync) return;
+                    if (panes.TimelineStartDatePicker == null || panes.TimelineEndDatePicker == null) return;
+                    if (!panes.TimelineStartDatePicker.SelectedDate.HasValue || !panes.TimelineEndDatePicker.SelectedDate.HasValue) return;
+                    applyTimelineDateRange(panes.TimelineStartDatePicker.SelectedDate.Value, panes.TimelineEndDatePicker.SelectedDate.Value, true);
                 };
 
                 setLibrarySortMode = delegate(string mode)
@@ -327,6 +385,11 @@ namespace PixelVaultNative
                     if (renderTiles != null) renderTiles();
                     _shell.LibraryBrowserShowToast(ws, "Folder tiles: " + _shell.LibraryFolderTileSize);
                 };
+                panes.TimelinePresetTodayButton.Click += delegate { applyTimelinePreset("today"); };
+                panes.TimelinePresetMonthButton.Click += delegate { applyTimelinePreset("month"); };
+                panes.TimelinePresetThirtyDaysButton.Click += delegate { applyTimelinePreset("30d"); };
+                panes.TimelineStartDatePicker.SelectedDateChanged += delegate { applyTimelineDatePickerRange(); };
+                panes.TimelineEndDatePicker.SelectedDateChanged += delegate { applyTimelineDatePickerRange(); };
                 panes.RefreshThisFolderButton.Click += delegate
                 {
                     if (ws.Current == null) return;
@@ -342,6 +405,7 @@ namespace PixelVaultNative
 
                 refreshSortButtons();
                 refreshGroupingButtons();
+                refreshTimelineRangeUi();
                 if (reuseMainWindow) _shell.RegisterLibraryBrowserLiveWorkingSet(ws);
                 if (!reuseMainWindow) libraryWindow.Show();
                 if (renderTiles != null) renderTiles();

@@ -120,6 +120,67 @@ namespace PixelVaultNative
             }
         }
 
+        /// <summary>Writes an embedded comment for a single library capture without reopening the full manual metadata window.</summary>
+        void SaveLibraryFileCommentByPath(string filePath, string comment, Action<bool> uiAfter = null)
+        {
+            if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
+            {
+                uiAfter?.Invoke(false);
+                return;
+            }
+            var root = libraryWorkspace.LibraryRoot;
+            var dispatcher = Dispatcher;
+            Task.Run(delegate
+            {
+                Exception caught = null;
+                var saved = false;
+                try
+                {
+                    EnsureExifTool();
+                    var item = BuildLibraryMetadataItemForPath(filePath, null);
+                    if (item != null)
+                    {
+                        var cleanedComment = CleanComment(comment);
+                        if (!SameManualText(cleanedComment, item.OriginalComment))
+                        {
+                            item.Comment = cleanedComment;
+                            RunManualMetadata(new List<ManualMetadataItem> { item }, null, CancellationToken.None);
+                            if (!string.IsNullOrWhiteSpace(root))
+                            {
+                                var index = LoadLibraryMetadataIndex(root, true);
+                                LibraryMetadataIndexEntry row;
+                                if (index.TryGetValue(filePath, out row) && row != null)
+                                {
+                                    row.Stamp = BuildLibraryMetadataStamp(filePath);
+                                    SaveLibraryMetadataIndex(root, index);
+                                }
+                            }
+                            saved = true;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    caught = ex;
+                }
+                dispatcher.BeginInvoke(new Action(delegate
+                {
+                    if (caught != null)
+                    {
+                        LogException("SaveLibraryFileCommentByPath", caught);
+                        MessageBox.Show(caught.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        uiAfter?.Invoke(false);
+                        return;
+                    }
+                    if (status != null)
+                    {
+                        if (saved) status.Text = string.IsNullOrWhiteSpace(CleanComment(comment)) ? "Comment cleared" : "Comment saved";
+                    }
+                    uiAfter?.Invoke(true);
+                }));
+            });
+        }
+
         void OpenStandaloneLibraryMetadataEditor(string filePath)
         {
             if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath)) return;

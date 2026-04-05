@@ -130,6 +130,68 @@ namespace PixelVaultNative
             return view != null && view.IsTimelineProjection;
         }
 
+        internal static void NormalizeLibraryTimelineDateRange(ref DateTime startDate, ref DateTime endDate)
+        {
+            if (startDate <= DateTime.MinValue) startDate = DateTime.Today;
+            if (endDate <= DateTime.MinValue) endDate = startDate;
+            startDate = startDate.Date;
+            endDate = endDate.Date;
+            if (endDate < startDate)
+            {
+                var swap = startDate;
+                startDate = endDate;
+                endDate = swap;
+            }
+        }
+
+        internal static void BuildLibraryTimelinePresetDateRange(string presetKey, DateTime referenceDate, out DateTime startDate, out DateTime endDate)
+        {
+            var today = referenceDate <= DateTime.MinValue ? DateTime.Today : referenceDate.Date;
+            switch ((presetKey ?? string.Empty).Trim().ToLowerInvariant())
+            {
+                case "today":
+                    startDate = today;
+                    endDate = today;
+                    break;
+                case "month":
+                case "this-month":
+                    startDate = new DateTime(today.Year, today.Month, 1);
+                    endDate = today;
+                    break;
+                case "30d":
+                case "30-days":
+                case "last-30-days":
+                default:
+                    startDate = today.AddDays(-29);
+                    endDate = today;
+                    break;
+            }
+            NormalizeLibraryTimelineDateRange(ref startDate, ref endDate);
+        }
+
+        internal static string DetectLibraryTimelinePresetKey(DateTime startDate, DateTime endDate, DateTime referenceDate)
+        {
+            NormalizeLibraryTimelineDateRange(ref startDate, ref endDate);
+            var today = referenceDate <= DateTime.MinValue ? DateTime.Today : referenceDate.Date;
+            DateTime presetStart;
+            DateTime presetEnd;
+            BuildLibraryTimelinePresetDateRange("today", today, out presetStart, out presetEnd);
+            if (startDate == presetStart && endDate == presetEnd) return "today";
+            BuildLibraryTimelinePresetDateRange("month", today, out presetStart, out presetEnd);
+            if (startDate == presetStart && endDate == presetEnd) return "month";
+            BuildLibraryTimelinePresetDateRange("30d", today, out presetStart, out presetEnd);
+            if (startDate == presetStart && endDate == presetEnd) return "30d";
+            return "custom";
+        }
+
+        internal static bool LibraryTimelineRangeContainsCapture(DateTime captureDate, DateTime startDate, DateTime endDate)
+        {
+            if (captureDate <= DateTime.MinValue) return false;
+            NormalizeLibraryTimelineDateRange(ref startDate, ref endDate);
+            var captureDay = captureDate.Date;
+            return captureDay >= startDate && captureDay <= endDate;
+        }
+
         internal static string BuildLibraryTimelineSummaryText(int captureCount, int gameCount, int platformCount, DateTime newestCapture, DateTime oldestCapture)
         {
             var parts = new List<string>
@@ -156,7 +218,8 @@ namespace PixelVaultNative
         Dictionary<string, LibraryTimelineCaptureContext> BuildLibraryTimelineCaptureContextMap(
             IEnumerable<string> files,
             Dictionary<string, LibraryMetadataIndexEntry> metadataIndex,
-            IEnumerable<GameIndexEditorRow> savedGameRows)
+            IEnumerable<GameIndexEditorRow> savedGameRows,
+            Dictionary<string, EmbeddedMetadataSnapshot> metadataSnapshots = null)
         {
             var contexts = new Dictionary<string, LibraryTimelineCaptureContext>(StringComparer.OrdinalIgnoreCase);
             var rowsByGameId = (savedGameRows ?? Enumerable.Empty<GameIndexEditorRow>())
@@ -167,6 +230,8 @@ namespace PixelVaultNative
             {
                 var captureDate = ResolveIndexedLibraryDate(libraryRoot, file, metadataIndex);
                 var entry = TryGetLibraryMetadataIndexEntry(libraryRoot, file, metadataIndex);
+                EmbeddedMetadataSnapshot metadataSnapshot;
+                if (metadataSnapshots == null || !metadataSnapshots.TryGetValue(file, out metadataSnapshot) || metadataSnapshot == null) metadataSnapshot = null;
                 var normalizedGameId = NormalizeGameId(entry == null ? string.Empty : entry.GameId);
                 GameIndexEditorRow savedRow;
                 rowsByGameId.TryGetValue(normalizedGameId, out savedRow);
@@ -187,7 +252,8 @@ namespace PixelVaultNative
                 {
                     GameTitle = gameTitle,
                     PlatformLabel = platformLabel,
-                    CaptureDate = captureDate
+                    CaptureDate = captureDate,
+                    Comment = metadataSnapshot == null ? string.Empty : CleanComment(metadataSnapshot.Comment ?? string.Empty)
                 };
             }
             return contexts;

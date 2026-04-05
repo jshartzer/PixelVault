@@ -40,7 +40,7 @@ namespace PixelVaultNative
 
     public sealed partial class MainWindow : Window
     {
-        const string AppVersion = "0.913";
+        const string AppVersion = "0.915";
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
         const string ClearedExternalIdSentinel = "__PV_CLEARED__";
@@ -142,6 +142,7 @@ namespace PixelVaultNative
             internal string GameTitle;
             internal string PlatformLabel;
             internal DateTime CaptureDate;
+            internal string Comment;
         }
 
         LibraryMetadataIndexEntry CloneLibraryMetadataIndexEntry(LibraryMetadataIndexEntry entry)
@@ -2480,7 +2481,6 @@ namespace PixelVaultNative
         }
     }
 }
-
 
 
 

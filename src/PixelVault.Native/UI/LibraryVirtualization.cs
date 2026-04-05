@@ -264,9 +264,12 @@ namespace PixelVaultNative
             };
         }
 
-        FrameworkElement BuildLibraryTimelineCaptureFooter(int size, LibraryTimelineCaptureContext timelineContext)
+        FrameworkElement BuildLibraryTimelineCaptureFooter(int size, string filePath, LibraryTimelineCaptureContext timelineContext)
         {
             if (timelineContext == null) return null;
+            var savedComment = CleanComment(timelineContext.Comment ?? string.Empty);
+            var editMode = false;
+            var saveInFlight = false;
             var footer = new StackPanel
             {
                 Margin = new Thickness(10, 10, 10, 10),
@@ -303,6 +306,116 @@ namespace PixelVaultNative
                 footerMetaRow.Children.Add(platformChip);
             }
             if (footerMetaRow.Children.Count > 0) footer.Children.Add(footerMetaRow);
+
+            var commentShell = new Grid { Margin = new Thickness(0, 10, 0, 0), Cursor = Cursors.IBeam };
+            var commentDisplay = new TextBlock
+            {
+                TextWrapping = TextWrapping.Wrap,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                MaxHeight = 38,
+                FontSize = 11.5
+            };
+            var commentEditor = new TextBox
+            {
+                FontSize = 11.5,
+                AcceptsReturn = false,
+                TextWrapping = TextWrapping.NoWrap,
+                VerticalContentAlignment = VerticalAlignment.Center,
+                Background = Brush("#182129"),
+                Foreground = Brush("#F1E9DA"),
+                BorderBrush = Brush("#35505D"),
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(8, 6, 8, 6)
+            };
+            var commentEditorBorder = new Border
+            {
+                Visibility = Visibility.Collapsed,
+                CornerRadius = new CornerRadius(8),
+                Background = Brush("#182129"),
+                BorderBrush = Brush("#35505D"),
+                BorderThickness = new Thickness(1),
+                Child = commentEditor
+            };
+            Action refreshCommentChrome = delegate
+            {
+                var hasComment = !string.IsNullOrWhiteSpace(savedComment);
+                commentDisplay.Text = hasComment ? savedComment : "Add comment";
+                commentDisplay.Foreground = hasComment ? Brush("#C7D4DB") : Brush("#6E828E");
+                commentDisplay.FontStyle = hasComment ? FontStyles.Normal : FontStyles.Italic;
+                commentDisplay.Visibility = editMode ? Visibility.Collapsed : Visibility.Visible;
+                commentEditorBorder.Visibility = editMode ? Visibility.Visible : Visibility.Collapsed;
+                commentDisplay.ToolTip = hasComment ? "Click to edit comment" : "Click to add a comment";
+                if (!editMode) commentEditor.Text = savedComment;
+            };
+            Action beginCommentEdit = delegate
+            {
+                if (saveInFlight || editMode) return;
+                editMode = true;
+                commentEditor.Text = savedComment;
+                refreshCommentChrome();
+                commentEditor.Dispatcher.BeginInvoke(new Action(delegate
+                {
+                    commentEditor.Focus();
+                    commentEditor.SelectAll();
+                }), DispatcherPriority.Input);
+            };
+            Action<bool> finishCommentEdit = delegate(bool saveChanges)
+            {
+                if (!editMode) return;
+                var nextComment = CleanComment(commentEditor.Text ?? string.Empty);
+                editMode = false;
+                if (!saveChanges || string.Equals(nextComment, savedComment, StringComparison.Ordinal))
+                {
+                    refreshCommentChrome();
+                    return;
+                }
+                var previousComment = savedComment;
+                savedComment = nextComment;
+                timelineContext.Comment = nextComment;
+                refreshCommentChrome();
+                saveInFlight = true;
+                SaveLibraryFileCommentByPath(filePath, nextComment, delegate(bool success)
+                {
+                    saveInFlight = false;
+                    if (!success)
+                    {
+                        savedComment = previousComment;
+                        timelineContext.Comment = previousComment;
+                    }
+                    refreshCommentChrome();
+                });
+            };
+            commentShell.MouseLeftButtonDown += delegate(object sender, MouseButtonEventArgs e)
+            {
+                if (editMode) return;
+                beginCommentEdit();
+                e.Handled = true;
+            };
+            commentShell.MouseLeave += delegate
+            {
+                if (editMode) finishCommentEdit(true);
+            };
+            commentEditor.PreviewKeyDown += delegate(object sender, KeyEventArgs e)
+            {
+                if (e.Key == Key.Enter)
+                {
+                    finishCommentEdit(true);
+                    e.Handled = true;
+                    return;
+                }
+                if (e.Key != Key.Escape) return;
+                editMode = false;
+                refreshCommentChrome();
+                e.Handled = true;
+            };
+            commentEditor.LostKeyboardFocus += delegate
+            {
+                finishCommentEdit(true);
+            };
+            commentShell.Children.Add(commentDisplay);
+            commentShell.Children.Add(commentEditorBorder);
+            refreshCommentChrome();
+            footer.Children.Add(commentShell);
             return footer;
         }
 
@@ -480,7 +593,7 @@ namespace PixelVaultNative
                 }, shouldKeepLoading);
             }
             else applyVideoInfo(null);
-            var tileFooter = BuildLibraryTimelineCaptureFooter(size, timelineContext);
+            var tileFooter = BuildLibraryTimelineCaptureFooter(size, file, timelineContext);
             if (tileFooter == null)
             {
                 tile.Child = presenter;

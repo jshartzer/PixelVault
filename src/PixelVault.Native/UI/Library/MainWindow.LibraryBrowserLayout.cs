@@ -36,6 +36,12 @@ namespace PixelVaultNative
             internal Button EditMetadataButton;
             internal Button RefreshThisFolderButton;
             internal Button ExitTimelineButton;
+            internal WrapPanel TimelineFilterPanel;
+            internal Button TimelinePresetTodayButton;
+            internal Button TimelinePresetMonthButton;
+            internal Button TimelinePresetThirtyDaysButton;
+            internal DatePicker TimelineStartDatePicker;
+            internal DatePicker TimelineEndDatePicker;
             internal Button DeleteSelectedButton;
             internal Button FolderTileSmallerButton;
             internal Button FolderTileLargerButton;
@@ -338,7 +344,78 @@ namespace PixelVaultNative
             var controls = new DockPanel { Margin = new Thickness(0, 4, 0, 14) };
             panes.ThumbLabel = new TextBlock { Text = "Screenshots", FontSize = 22, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, VerticalAlignment = VerticalAlignment.Center };
             controls.Children.Add(panes.ThumbLabel);
-            var sliderPanel = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+            var sliderPanel = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
+            panes.TimelineFilterPanel = new WrapPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Margin = new Thickness(0, 0, 12, 0),
+                Visibility = Visibility.Collapsed
+            };
+            panes.TimelineFilterPanel.Children.Add(new TextBlock
+            {
+                Text = "Range",
+                Foreground = Brush("#8FA4B0"),
+                FontSize = 11.5,
+                FontWeight = FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 10, 0)
+            });
+            panes.TimelinePresetTodayButton = Btn("Today", null, "#20343A", Brushes.White);
+            panes.TimelinePresetTodayButton.Width = 62;
+            panes.TimelinePresetTodayButton.Height = 30;
+            panes.TimelinePresetTodayButton.FontSize = 11;
+            panes.TimelinePresetTodayButton.Margin = new Thickness(0, 0, 8, 0);
+            ApplyLibraryPillChrome(panes.TimelinePresetTodayButton, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
+            panes.TimelineFilterPanel.Children.Add(panes.TimelinePresetTodayButton);
+            panes.TimelinePresetMonthButton = Btn("This Month", null, "#20343A", Brushes.White);
+            panes.TimelinePresetMonthButton.Width = 92;
+            panes.TimelinePresetMonthButton.Height = 30;
+            panes.TimelinePresetMonthButton.FontSize = 11;
+            panes.TimelinePresetMonthButton.Margin = new Thickness(0, 0, 8, 0);
+            ApplyLibraryPillChrome(panes.TimelinePresetMonthButton, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
+            panes.TimelineFilterPanel.Children.Add(panes.TimelinePresetMonthButton);
+            panes.TimelinePresetThirtyDaysButton = Btn("30 Days", null, "#20343A", Brushes.White);
+            panes.TimelinePresetThirtyDaysButton.Width = 82;
+            panes.TimelinePresetThirtyDaysButton.Height = 30;
+            panes.TimelinePresetThirtyDaysButton.FontSize = 11;
+            panes.TimelinePresetThirtyDaysButton.Margin = new Thickness(0, 0, 10, 0);
+            ApplyLibraryPillChrome(panes.TimelinePresetThirtyDaysButton, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
+            panes.TimelineFilterPanel.Children.Add(panes.TimelinePresetThirtyDaysButton);
+            panes.TimelineStartDatePicker = new DatePicker
+            {
+                Width = 126,
+                Height = 30,
+                Margin = new Thickness(0, 0, 6, 0),
+                SelectedDateFormat = DatePickerFormat.Short,
+                Background = Brush("#182129"),
+                Foreground = Brush("#F1E9DA"),
+                BorderBrush = Brush("#2D3A43"),
+                BorderThickness = new Thickness(1)
+            };
+            panes.TimelineFilterPanel.Children.Add(panes.TimelineStartDatePicker);
+            panes.TimelineFilterPanel.Children.Add(new TextBlock
+            {
+                Text = "to",
+                Foreground = Brush("#8FA4B0"),
+                FontSize = 11.5,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 6, 0)
+            });
+            panes.TimelineEndDatePicker = new DatePicker
+            {
+                Width = 126,
+                Height = 30,
+                Margin = new Thickness(0),
+                SelectedDateFormat = DatePickerFormat.Short,
+                Background = Brush("#182129"),
+                Foreground = Brush("#F1E9DA"),
+                BorderBrush = Brush("#2D3A43"),
+                BorderThickness = new Thickness(1)
+            };
+            panes.TimelineFilterPanel.Children.Add(panes.TimelineEndDatePicker);
+            sliderPanel.Children.Add(panes.TimelineFilterPanel);
             panes.DeleteSelectedButton = new Button
             {
                 Width = 28,
