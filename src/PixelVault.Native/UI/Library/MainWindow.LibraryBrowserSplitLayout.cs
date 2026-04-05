@@ -10,9 +10,51 @@ namespace PixelVaultNative
         internal const double LibraryBrowserFolderPaneSplitMinRight = 260;
         internal const double LibraryBrowserFolderPaneSplitterWidth = 12;
 
+        void ApplyLibraryBrowserLayoutMode(LibraryBrowserPaneRefs panes)
+        {
+            var contentGrid = panes == null ? null : panes.LibrarySplitContentGrid;
+            if (contentGrid?.ColumnDefinitions == null || contentGrid.ColumnDefinitions.Count < 3) return;
+
+            var timelineMode = IsLibraryBrowserTimelineMode();
+            var colLeft = contentGrid.ColumnDefinitions[0];
+            var colSplitter = contentGrid.ColumnDefinitions[1];
+            var colRight = contentGrid.ColumnDefinitions[2];
+
+            if (panes.LeftPane != null) panes.LeftPane.Visibility = timelineMode ? Visibility.Collapsed : Visibility.Visible;
+            if (panes.Splitter != null) panes.Splitter.Visibility = timelineMode ? Visibility.Collapsed : Visibility.Visible;
+            if (panes.PreviewFrame != null) panes.PreviewFrame.Visibility = timelineMode ? Visibility.Collapsed : Visibility.Visible;
+            if (panes.OpenFolderButton != null) panes.OpenFolderButton.Visibility = timelineMode ? Visibility.Collapsed : Visibility.Visible;
+            if (panes.RefreshThisFolderButton != null) panes.RefreshThisFolderButton.Visibility = timelineMode ? Visibility.Collapsed : Visibility.Visible;
+            if (panes.ExitTimelineButton != null) panes.ExitTimelineButton.Visibility = timelineMode ? Visibility.Visible : Visibility.Collapsed;
+
+            if (timelineMode)
+            {
+                colLeft.MinWidth = 0;
+                colLeft.Width = new GridLength(0);
+                colSplitter.Width = new GridLength(0);
+                colRight.MinWidth = LibraryBrowserFolderPaneSplitMinRight;
+                colRight.Width = new GridLength(1, GridUnitType.Star);
+                return;
+            }
+
+            colLeft.MinWidth = LibraryBrowserFolderPaneSplitMinLeft;
+            colSplitter.Width = GridLength.Auto;
+            colRight.MinWidth = LibraryBrowserFolderPaneSplitMinRight;
+            ApplyLibraryBrowserFolderPaneSplit(contentGrid);
+        }
+
         void ApplyLibraryBrowserFolderPaneSplit(Grid contentGrid)
         {
             if (contentGrid?.ColumnDefinitions == null || contentGrid.ColumnDefinitions.Count < 3) return;
+            if (IsLibraryBrowserTimelineMode())
+            {
+                contentGrid.ColumnDefinitions[0].MinWidth = 0;
+                contentGrid.ColumnDefinitions[0].Width = new GridLength(0);
+                contentGrid.ColumnDefinitions[1].Width = new GridLength(0);
+                contentGrid.ColumnDefinitions[2].MinWidth = LibraryBrowserFolderPaneSplitMinRight;
+                contentGrid.ColumnDefinitions[2].Width = new GridLength(1, GridUnitType.Star);
+                return;
+            }
             var colLeft = contentGrid.ColumnDefinitions[0];
             var colRight = contentGrid.ColumnDefinitions[2];
             var saved = _libraryBrowserPersistedFolderPaneWidth;
@@ -46,6 +88,7 @@ namespace PixelVaultNative
         void PersistLibraryBrowserFolderPaneWidthFromGrid(Grid contentGrid)
         {
             if (contentGrid?.ColumnDefinitions == null || contentGrid.ColumnDefinitions.Count < 3) return;
+            if (IsLibraryBrowserTimelineMode()) return;
             var colLeft = contentGrid.ColumnDefinitions[0];
             double w;
             if (colLeft.Width.IsAbsolute)
@@ -70,6 +113,7 @@ namespace PixelVaultNative
         void LibraryBrowserFolderSplitClampAfterResize(Grid contentGrid)
         {
             if (contentGrid == null || _libraryBrowserPersistedFolderPaneWidth <= 0.5) return;
+            if (IsLibraryBrowserTimelineMode()) return;
             var col0 = contentGrid.ColumnDefinitions[0];
             if (!col0.Width.IsAbsolute) return;
             var clamped = ClampLibraryBrowserFolderPaneWidth(contentGrid, col0.Width.Value);

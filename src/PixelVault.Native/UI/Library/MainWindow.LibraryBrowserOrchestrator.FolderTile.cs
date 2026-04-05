@@ -305,11 +305,20 @@ namespace PixelVaultNative
                 + "; " + BuildLibraryBrowserTroubleshootingLabel(info));
             var displayFolder = BuildLibraryBrowserDisplayFolder(info);
             var actionFolder = GetLibraryBrowserPrimaryFolder(info) ?? displayFolder;
-            activeSelectedLibraryFolder = CloneLibraryFolderInfo(actionFolder);
-            panes.DetailTitle.Text = info.Name;
-            UpdateLibraryBrowserDetailTitleBadges(panes, info);
+            var timelineView = IsLibraryBrowserTimelineView(info);
+            activeSelectedLibraryFolder = timelineView ? null : CloneLibraryFolderInfo(actionFolder);
+            panes.DetailTitle.Text = timelineView ? "Timeline" : info.Name;
+            UpdateLibraryBrowserDetailTitleBadges(panes, timelineView ? null : info);
             panes.DetailMeta.Text = BuildLibraryBrowserDetailMetaText(info, actionFolder);
             panes.OpenFolderButton.Content = BuildToolbarButtonContent("\uE8B7", BuildLibraryBrowserOpenFoldersLabel(info));
+            if (timelineView)
+            {
+                panes.PreviewImage.Source = null;
+                panes.PreviewImage.Visibility = Visibility.Collapsed;
+                PersistLibraryBrowserLastSelection(info);
+                renderSelectedFolder();
+                return;
+            }
             var infoCapture = info;
             _ = Task.Run(() =>
             {

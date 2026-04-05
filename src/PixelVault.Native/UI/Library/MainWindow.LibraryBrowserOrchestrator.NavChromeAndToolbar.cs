@@ -56,6 +56,8 @@ namespace PixelVaultNative
             panes.DeleteSelectedButton.Click += delegate { deleteSelectedLibraryFiles(); };
             panes.GroupAllButton.Click += delegate { setLibraryGroupingMode("all"); };
             panes.GroupConsoleButton.Click += delegate { setLibraryGroupingMode("console"); };
+            panes.GroupTimelineButton.Click += delegate { setLibraryGroupingMode("timeline"); };
+            panes.ExitTimelineButton.Click += delegate { setLibraryGroupingMode("folders"); };
             panes.SortPlatformButton.Click += delegate { setLibrarySortMode("platform"); };
             panes.SortRecentButton.Click += delegate { setLibrarySortMode("recent"); };
             panes.SortPhotosButton.Click += delegate { setLibrarySortMode("photos"); };

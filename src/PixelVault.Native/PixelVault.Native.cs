@@ -1050,6 +1050,7 @@ namespace PixelVaultNative
             var originalSavedGameIndexRow = folder == null ? null : FindSavedGameIndexRow(GetSavedGameIndexRowsForRoot(libraryRoot), folder);
             var totalPerStage = Math.Max(items.Count, 1);
             var totalWork = totalPerStage * 3;
+            var folderDisplayName = folder == null ? "selected captures" : (folder.Name ?? "selected captures");
             var closeButton = Btn("Close", null, "#334249", Brushes.White);
             closeButton.IsEnabled = false;
             var libMetaView = WorkflowProgressWindow.Create(
@@ -1075,7 +1076,7 @@ namespace PixelVaultNative
             };
 
             status.Text = "Applying library metadata";
-            appendProgress("Starting library metadata apply for " + items.Count + " capture(s) in " + folder.Name + ".");
+            appendProgress("Starting library metadata apply for " + items.Count + " capture(s) in " + folderDisplayName + ".");
             Action<int, string> updateProgress = delegate(int completed, string detail)
             {
                 var safeCompleted = Math.Max(0, Math.Min(completed, totalWork));
@@ -1116,11 +1117,11 @@ namespace PixelVaultNative
                 progressWindow.Dispatcher.BeginInvoke(new Action(delegate
                 {
                     progressFinished = true;
-                    updateProgress(totalWork, "Library metadata apply complete for " + folder.Name + ". Edited " + items.Count + " capture(s); reorganized " + moved + ".");
+                    updateProgress(totalWork, "Library metadata apply complete for " + folderDisplayName + ". Edited " + items.Count + " capture(s); reorganized " + moved + ".");
                     status.Text = moved > 0 ? "Library metadata updated and organized" : "Library metadata updated";
 
                     if (refreshLibrary != null) refreshLibrary();
-                    Log("Library metadata apply complete for " + folder.Name + ". Edited " + items.Count + " capture(s); reorganized " + moved + ".");
+                    Log("Library metadata apply complete for " + folderDisplayName + ". Edited " + items.Count + " capture(s); reorganized " + moved + ".");
                     closeButton.IsEnabled = true;
                 }));
             }).ContinueWith(delegate(System.Threading.Tasks.Task task)
@@ -2451,7 +2452,6 @@ namespace PixelVaultNative
         }
     }
 }
-
 
 
 

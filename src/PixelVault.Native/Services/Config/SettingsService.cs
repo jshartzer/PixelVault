@@ -35,6 +35,7 @@ namespace PixelVaultNative
         public static string NormalizeLibraryGroupingMode(string value)
         {
             var normalized = (value ?? string.Empty).Trim().ToLowerInvariant();
+            if (normalized == "timeline" || normalized == "photo timeline" || normalized == "capture timeline") return "timeline";
             if (normalized == "console" || normalized == "by console" || normalized == "platform" || normalized == "by platform") return "console";
             return "all";
         }

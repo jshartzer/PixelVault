@@ -51,6 +51,7 @@ namespace PixelVaultNative
             var resetRowsToLoading = ws.ResetDetailRowsToLoadingOnNextRender;
             ws.ResetDetailRowsToLoadingOnNextRender = false;
             var renderFolder = ws.Current;
+            var timelineView = IsLibraryBrowserTimelineView(renderFolder);
             LogTroubleshooting("LibraryDetailRenderStart",
                 "renderVersion=" + renderVersion
                 + "; resetToLoading=" + resetRowsToLoading
@@ -130,7 +131,7 @@ namespace PixelVaultNative
                                 Height = 44,
                                 Build = delegate
                                 {
-                                    return new TextBlock { Text = "No captures found in this folder.", Foreground = Brush("#A7B5BD") };
+                                    return new TextBlock { Text = timelineView ? "No captures found in the timeline." : "No captures found in this folder.", Foreground = Brush("#A7B5BD") };
                                 }
                             }
                         }, !restoreDetailScrollPending, restoreDetailScrollPending ? restoreDetailScrollOffset : null);
@@ -183,6 +184,19 @@ namespace PixelVaultNative
                                     for (int fileIndex = 0; fileIndex < rowFiles.Count; fileIndex++)
                                     {
                                         var file = rowFiles[fileIndex];
+                                        Action<string> useFileAsFolderCover = null;
+                                        if (!timelineView)
+                                        {
+                                            useFileAsFolderCover = delegate(string imagePath)
+                                            {
+                                                var folder = activeSelectedLibraryFolder;
+                                                if (folder == null || string.IsNullOrWhiteSpace(imagePath) || !File.Exists(imagePath) || !IsImage(imagePath)) return;
+                                                SaveCustomCover(folder, imagePath);
+                                                if (renderFolderTiles != null) renderFolderTiles();
+                                                redrawSelectedFolderDetail?.Invoke();
+                                                ShowLibraryBrowserToast(ws, "Cover saved");
+                                            };
+                                        }
                                         var tile = CreateLibraryDetailTile(
                                             file,
                                             size,
@@ -192,15 +206,7 @@ namespace PixelVaultNative
                                             ws.SelectedDetailFiles,
                                             refreshDetailSelectionUi,
                                             redrawSelectedFolderDetail,
-                                            delegate(string imagePath)
-                                            {
-                                                var folder = activeSelectedLibraryFolder;
-                                                if (folder == null || string.IsNullOrWhiteSpace(imagePath) || !File.Exists(imagePath) || !IsImage(imagePath)) return;
-                                                SaveCustomCover(folder, imagePath);
-                                                if (renderFolderTiles != null) renderFolderTiles();
-                                                redrawSelectedFolderDetail?.Invoke();
-                                                ShowLibraryBrowserToast(ws, "Cover saved");
-                                            });
+                                            useFileAsFolderCover);
                                         tile.Margin = new Thickness(0, 0, fileIndex < rowFiles.Count - 1 ? detailTileGap : 0, 0);
                                         ws.DetailTiles.Add(tile);
                                         rowPanel.Children.Add(tile);

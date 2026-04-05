@@ -24,15 +24,17 @@ namespace PixelVaultNative
             var shouldRestoreFolderScroll = ws.PreserveFolderScrollOnNextRender && restoreFolderScrollOffset > 0.1d;
             ws.PreserveFolderScrollOnNextRender = false;
             var groupingMode = NormalizeLibraryGroupingMode(libraryGroupingMode);
+            var timelineMode = string.Equals(groupingMode, "timeline", StringComparison.OrdinalIgnoreCase);
             var sortMode = NormalizeLibraryFolderSortMode(libraryFolderSortMode);
             var flattenGroups = !string.Equals(groupingMode, "console", StringComparison.OrdinalIgnoreCase);
             var searchText = ws.AppliedLibrarySearchText;
             var searchNormalized = string.IsNullOrWhiteSpace(searchText) ? null : searchText.Trim().ToLowerInvariant();
             var projectionStopwatch = Stopwatch.StartNew();
-            var browserFolders = GetOrBuildLibraryBrowserFolderViews(folders, groupingMode);
+            var browserFolders = GetOrBuildLibraryBrowserFolderViews(folders, timelineMode ? "all" : groupingMode);
             projectionStopwatch.Stop();
             ws.ViewFolders.Clear();
             ws.ViewFolders.AddRange(browserFolders);
+            ApplyLibraryBrowserLayoutMode(panes);
             var filterSortStopwatch = Stopwatch.StartNew();
             var visibleFolders = searchNormalized == null
                 ? browserFolders
@@ -40,6 +42,20 @@ namespace PixelVaultNative
                     !string.IsNullOrEmpty(folder.SearchBlob)
                     && folder.SearchBlob.IndexOf(searchNormalized, StringComparison.Ordinal) >= 0)
                 .ToList();
+            filterSortStopwatch.Stop();
+            if (timelineMode)
+            {
+                var timelineView = BuildLibraryBrowserTimelineView(visibleFolders);
+                ws.PendingSessionRestore = false;
+                ws.PendingRestoreViewKey = null;
+                ws.PendingRestoreDetailScrollAfterShow = 0;
+                SetVirtualizedRows(panes.TileRows, new List<VirtualizedRowDefinition>(), true, null);
+                showFolder(timelineView);
+                renderStopwatch.Stop();
+                LogPerformanceSample("LibraryFolderRender", renderStopwatch, "mode=timeline; foldersLoaded=" + folders.Count + "; views=" + browserFolders.Count + "; visible=" + visibleFolders.Count + "; files=" + timelineView.FileCount + "; search=" + (string.IsNullOrWhiteSpace(searchText) ? "(none)" : searchText) + "; projectMs=" + projectionStopwatch.ElapsedMilliseconds + "; filterMs=" + filterSortStopwatch.ElapsedMilliseconds, 40);
+                LogLibraryBrowserFirstFolderListPaintOnce("mode=timeline; visible=" + visibleFolders.Count + "; files=" + timelineView.FileCount);
+                return;
+            }
             var orderedVisibleFolders = visibleFolders
                 .OrderByDescending(folder => string.Equals(sortMode, "recent", StringComparison.OrdinalIgnoreCase) ? GetLibraryBrowserFolderViewSortNewest(folder) : DateTime.MinValue)
                 .ThenByDescending(folder => string.Equals(sortMode, "photos", StringComparison.OrdinalIgnoreCase) ? folder.FileCount : 0)
@@ -48,7 +64,6 @@ namespace PixelVaultNative
                 .ThenBy(folder => DetermineLibraryBrowserGroup(folder))
                 .ThenBy(folder => folder.Name ?? string.Empty, StringComparer.OrdinalIgnoreCase)
                 .ToList();
-            filterSortStopwatch.Stop();
             var folderLayout = CalculateResponsiveLibraryFolderLayout(panes.TileScroll);
             var targetFolderColumns = folderLayout.Columns;
             var tileWidth = folderLayout.TileSize;

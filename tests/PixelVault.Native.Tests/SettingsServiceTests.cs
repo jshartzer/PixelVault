@@ -6,6 +6,15 @@ namespace PixelVaultNative.Tests;
 
 public sealed class SettingsServiceTests
 {
+    [Theory]
+    [InlineData("timeline")]
+    [InlineData("photo timeline")]
+    [InlineData("capture timeline")]
+    public void NormalizeLibraryGroupingMode_SupportsTimelineAliases(string raw)
+    {
+        Assert.Equal("timeline", SettingsService.NormalizeLibraryGroupingMode(raw));
+    }
+
     [Fact]
     public void SerializeSourceRoots_NormalizesSeparatorsAndDedupes()
     {
@@ -149,6 +158,30 @@ public sealed class SettingsServiceTests
             try { if (File.Exists(path)) File.Delete(path); } catch { /* ignore */ }
             try { if (File.Exists(exifStub)) File.Delete(exifStub); } catch { /* ignore */ }
             try { if (File.Exists(ffmpegStub)) File.Delete(ffmpegStub); } catch { /* ignore */ }
+        }
+    }
+
+    [Fact]
+    public void SaveToIni_ThenLoadFromIni_RoundTripsTimelineGrouping()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "PixelVault-settings-timeline-" + Guid.NewGuid().ToString("N") + ".ini");
+        try
+        {
+            var svc = new SettingsService();
+            svc.SaveToIni(path, new AppSettings
+            {
+                LibraryRoot = @"D:\lib",
+                LibraryGroupingMode = "timeline",
+                LibraryFolderTileSize = 220
+            });
+
+            var loaded = svc.LoadFromIni(path, new AppSettings(), Path.GetTempPath(), () => string.Empty, () => string.Empty);
+
+            Assert.Equal("timeline", loaded.LibraryGroupingMode);
+        }
+        finally
+        {
+            try { if (File.Exists(path)) File.Delete(path); } catch { /* ignore */ }
         }
     }
 }

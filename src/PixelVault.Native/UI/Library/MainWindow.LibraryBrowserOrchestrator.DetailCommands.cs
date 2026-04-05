@@ -113,7 +113,13 @@ namespace PixelVaultNative
             var visibleFiles = getVisibleDetailFilesOrdered();
             var visibleSet = new HashSet<string>(visibleFiles, StringComparer.OrdinalIgnoreCase);
             var selectedFiles = getSelectedDetailFiles();
+            var timelineView = IsLibraryBrowserTimelineView(ws.Current);
             HashSet<string> wantedFiles;
+            if (timelineView && selectedFiles.Count == 0 && string.IsNullOrWhiteSpace(filePath))
+            {
+                MessageBox.Show("Select one or more captures to edit in the timeline.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
             if (selectedFiles.Count > 0 && (string.IsNullOrWhiteSpace(filePath) || ws.SelectedDetailFiles.Contains(filePath)))
                 wantedFiles = new HashSet<string>(selectedFiles, StringComparer.OrdinalIgnoreCase);
             else if (selectedFiles.Count == 0 && string.IsNullOrWhiteSpace(filePath))
@@ -132,9 +138,17 @@ namespace PixelVaultNative
             }
             var displayFolder = getDisplayFolder(ws.Current);
             var actionFolder = getActionFolder(ws.Current) ?? displayFolder;
-            var selectedItems = BuildLibraryMetadataItems(displayFolder)
-                .Where(item => wantedFiles.Contains(item.FilePath))
-                .ToList();
+            var canBuildFromFolder = displayFolder != null
+                && !string.IsNullOrWhiteSpace(displayFolder.FolderPath)
+                && Directory.Exists(displayFolder.FolderPath);
+            var selectedItems = canBuildFromFolder
+                ? BuildLibraryMetadataItems(displayFolder)
+                    .Where(item => wantedFiles.Contains(item.FilePath))
+                    .ToList()
+                : wantedFiles
+                    .Select(file => BuildLibraryMetadataItemForPath(file, actionFolder))
+                    .Where(item => item != null)
+                    .ToList();
             if (selectedItems.Count == 0)
             {
                 MessageBox.Show("That capture could not be loaded for metadata editing.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -142,9 +156,11 @@ namespace PixelVaultNative
             }
             var selectedTitle = selectedItems.Count == 1
                 ? Path.GetFileName(selectedItems[0].FilePath)
-                : (visibleFiles.Count > 0 && selectedItems.Count == visibleFiles.Count
+                : (timelineView
+                    ? ("Timeline (" + selectedItems.Count + " selected)")
+                    : (visibleFiles.Count > 0 && selectedItems.Count == visibleFiles.Count
                     ? (ws.Current.Name + " (all " + selectedItems.Count + " captures)")
-                    : (ws.Current.Name + " (" + selectedItems.Count + " selected)"));
+                    : (ws.Current.Name + " (" + selectedItems.Count + " selected)")));
             status.Text = selectedItems.Count == 1 ? "Editing selected capture metadata" : "Editing selected capture metadata";
             Log("Opening library metadata editor for " + selectedItems.Count + " selected capture(s) in " + ws.Current.Name + ".");
             if (!ShowManualMetadataWindow(selectedItems, true, selectedTitle))

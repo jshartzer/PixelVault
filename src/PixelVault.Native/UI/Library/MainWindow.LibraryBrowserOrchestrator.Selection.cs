@@ -132,6 +132,7 @@ namespace PixelVaultNative
             return delegate
             {
                 var selectedFiles = getSelectedDetailFiles();
+                var timelineMode = IsLibraryBrowserTimelineMode();
                 foreach (var tile in ws.DetailTiles)
                 {
                     var file = tile == null ? string.Empty : tile.Tag as string;
@@ -140,11 +141,23 @@ namespace PixelVaultNative
                     tile.BorderBrush = isSelected ? Brush("#D46C63") : Brush("#2B3A44");
                     tile.BorderThickness = isSelected ? new Thickness(2) : new Thickness(1);
                 }
-                panes.DeleteSelectedButton.IsEnabled = ws.Current != null && selectedFiles.Count > 0;
-                panes.ThumbLabel.Text = selectedFiles.Count > 0 ? selectedFiles.Count + " selected" : "Screenshots";
+                panes.DeleteSelectedButton.IsEnabled = selectedFiles.Count > 0;
+                panes.ThumbLabel.Text = selectedFiles.Count > 0 ? selectedFiles.Count + " selected" : (timelineMode ? "Timeline" : "Screenshots");
+                if (panes.EditMetadataButton != null)
+                {
+                    panes.EditMetadataButton.IsEnabled = !ws.LibraryFoldersLoading && ws.Current != null && (!timelineMode || selectedFiles.Count > 0);
+                }
+                if (panes.OpenFolderButton != null)
+                {
+                    panes.OpenFolderButton.IsEnabled = !timelineMode && ws.Current != null && !ws.LibraryFoldersLoading;
+                }
                 if (panes.RefreshThisFolderButton != null)
                 {
-                    panes.RefreshThisFolderButton.IsEnabled = ws.Current != null && !ws.LibraryFoldersLoading;
+                    panes.RefreshThisFolderButton.IsEnabled = !timelineMode && ws.Current != null && !ws.LibraryFoldersLoading;
+                }
+                if (panes.ExitTimelineButton != null)
+                {
+                    panes.ExitTimelineButton.IsEnabled = !ws.LibraryFoldersLoading;
                 }
             };
         }

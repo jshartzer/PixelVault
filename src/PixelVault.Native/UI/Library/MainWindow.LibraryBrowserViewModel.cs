@@ -30,6 +30,7 @@ namespace PixelVaultNative
             internal bool SuppressSteamAppIdAutoResolve;
             internal bool SuppressSteamGridDbIdAutoResolve;
             internal bool IsMergedAcrossPlatforms;
+            internal bool IsTimelineProjection;
             /// <summary>Lowercase, newline-separated tokens for library search (name, paths, ids, platforms).</summary>
             internal string SearchBlob;
         }
@@ -56,6 +57,7 @@ namespace PixelVaultNative
                 SuppressSteamAppIdAutoResolve = view.SuppressSteamAppIdAutoResolve,
                 SuppressSteamGridDbIdAutoResolve = view.SuppressSteamGridDbIdAutoResolve,
                 IsMergedAcrossPlatforms = view.IsMergedAcrossPlatforms,
+                IsTimelineProjection = view.IsTimelineProjection,
                 SearchBlob = view.SearchBlob
             };
             clone.SourceFolders.AddRange(view.SourceFolders.Where(folder => folder != null));
@@ -84,6 +86,7 @@ namespace PixelVaultNative
         LibraryFolderInfo GetLibraryBrowserPrimaryFolder(LibraryBrowserFolderView view)
         {
             if (view == null) return null;
+            if (view.IsTimelineProjection) return null;
             if (view.PrimaryFolder != null) return view.PrimaryFolder;
             return view.SourceFolders.FirstOrDefault(folder => folder != null);
         }
@@ -116,6 +119,16 @@ namespace PixelVaultNative
         }
 
         string NormalizeLibraryGroupingMode(string value) => SettingsService.NormalizeLibraryGroupingMode(value);
+
+        bool IsLibraryBrowserTimelineMode()
+        {
+            return string.Equals(NormalizeLibraryGroupingMode(libraryGroupingMode), "timeline", StringComparison.OrdinalIgnoreCase);
+        }
+
+        bool IsLibraryBrowserTimelineView(LibraryBrowserFolderView view)
+        {
+            return view != null && view.IsTimelineProjection;
+        }
 
         string BuildLibraryBrowserViewKey(string groupingMode, string gameId, string name, string folderPath, string platformLabel)
         {
@@ -223,6 +236,10 @@ namespace PixelVaultNative
         {
             var itemCount = view == null ? 0 : Math.Max(view.FileCount, 0);
             var itemText = itemCount + " item" + (itemCount == 1 ? string.Empty : "s");
+            if (IsLibraryBrowserTimelineView(view))
+            {
+                return itemText + " | photo timeline";
+            }
             var sourceFolderCount = CountLibraryBrowserSourceFolders(view);
             var folderPathText = actionFolder == null ? string.Empty : actionFolder.FolderPath ?? string.Empty;
             if (ShouldShowLibraryBrowserPlatformContext())
@@ -260,6 +277,7 @@ namespace PixelVaultNative
 
         string BuildLibraryBrowserOpenFoldersLabel(LibraryBrowserFolderView view)
         {
+            if (IsLibraryBrowserTimelineView(view)) return "Open Source Folders";
             return CountLibraryBrowserSourceFolders(view) > 1 ? "Open Folders" : "Open Folder";
         }
 
@@ -290,9 +308,53 @@ namespace PixelVaultNative
                 + "; name=" + (view.Name ?? string.Empty)
                 + "; files=" + Math.Max(view.FileCount, 0)
                 + "; sourceFolders=" + CountLibraryBrowserSourceFolders(view)
+                + "; timeline=" + (view.IsTimelineProjection ? "1" : "0")
                 + "; platforms=" + platformText
                 + "; primaryFolder=" + FormatPathForTroubleshooting(view.PrimaryFolderPath ?? string.Empty)
                 + "; grouping=" + NormalizeLibraryGroupingMode(libraryGroupingMode);
+        }
+
+        LibraryBrowserFolderView BuildLibraryBrowserTimelineView(IEnumerable<LibraryBrowserFolderView> visibleFolders)
+        {
+            var sourceViews = (visibleFolders ?? Enumerable.Empty<LibraryBrowserFolderView>())
+                .Where(view => view != null)
+                .ToList();
+            var orderedImagePaths = sourceViews
+                .SelectMany(view => view.FilePaths ?? new string[0])
+                .Where(path => !string.IsNullOrWhiteSpace(path) && IsImage(path))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderByDescending(path => ResolveIndexedLibraryDate(libraryRoot, path))
+                .ThenBy(path => path, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            var newest = orderedImagePaths.Length == 0 ? DateTime.MinValue : ResolveIndexedLibraryDate(libraryRoot, orderedImagePaths[0]);
+            var timelineView = new LibraryBrowserFolderView
+            {
+                ViewKey = "timeline|capture-feed",
+                Name = "Timeline",
+                PrimaryFolderPath = string.Empty,
+                PrimaryFolder = null,
+                PrimaryPlatformLabel = string.Empty,
+                PlatformLabels = new string[0],
+                PlatformSummaryText = "Photo timeline",
+                FileCount = orderedImagePaths.Length,
+                PreviewImagePath = orderedImagePaths.FirstOrDefault() ?? string.Empty,
+                FilePaths = orderedImagePaths,
+                NewestCaptureUtcTicks = newest <= DateTime.MinValue ? 0 : newest.ToUniversalTime().Ticks,
+                SteamAppId = string.Empty,
+                SteamGridDbId = string.Empty,
+                SuppressSteamAppIdAutoResolve = true,
+                SuppressSteamGridDbIdAutoResolve = true,
+                IsMergedAcrossPlatforms = true,
+                IsTimelineProjection = true
+            };
+            timelineView.SourceFolders.AddRange(sourceViews
+                .SelectMany(view => view.SourceFolders)
+                .Where(folder => folder != null)
+                .GroupBy(folder => folder.FolderPath ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.First())
+                .OrderBy(folder => folder.Name ?? string.Empty, StringComparer.OrdinalIgnoreCase));
+            PopulateLibraryBrowserFolderViewSearchBlob(timelineView);
+            return timelineView;
         }
 
         void ApplyRemovedFilesToLibraryBrowserState(LibraryBrowserWorkingSet ws, IEnumerable<string> removedFiles)

@@ -80,6 +80,8 @@ namespace PixelVaultNative
                 Action refreshDetailSelectionUi = null;
                 Action deleteSelectedLibraryFiles = null;
                 Action openSelectedLibraryMetadataEditor = null;
+                var lastFolderGroupingMode = _shell.NormalizeLibraryGroupingMode(_shell.LibraryGroupingMode);
+                if (string.Equals(lastFolderGroupingMode, "timeline", StringComparison.OrdinalIgnoreCase)) lastFolderGroupingMode = "all";
                 Func<LibraryBrowserFolderView, LibraryFolderInfo> getDisplayFolder = delegate(LibraryBrowserFolderView view)
                 {
                     return _shell.BuildLibraryBrowserDisplayFolder(view);
@@ -114,10 +116,14 @@ namespace PixelVaultNative
 
                 refreshSortButtons = delegate
                 {
+                    var timelineMode = string.Equals(_shell.NormalizeLibraryGroupingMode(_shell.LibraryGroupingMode), "timeline", StringComparison.OrdinalIgnoreCase);
                     var normalized = _shell.NormalizeLibraryFolderSortMode(_shell.LibraryFolderSortMode);
-                    _shell.LibraryBrowserApplySortGroupPillState(panes.SortPlatformButton, string.Equals(normalized, "platform", StringComparison.OrdinalIgnoreCase));
-                    _shell.LibraryBrowserApplySortGroupPillState(panes.SortRecentButton, string.Equals(normalized, "recent", StringComparison.OrdinalIgnoreCase));
-                    _shell.LibraryBrowserApplySortGroupPillState(panes.SortPhotosButton, string.Equals(normalized, "photos", StringComparison.OrdinalIgnoreCase));
+                    _shell.LibraryBrowserApplySortGroupPillState(panes.SortPlatformButton, !timelineMode && string.Equals(normalized, "platform", StringComparison.OrdinalIgnoreCase));
+                    _shell.LibraryBrowserApplySortGroupPillState(panes.SortRecentButton, !timelineMode && string.Equals(normalized, "recent", StringComparison.OrdinalIgnoreCase));
+                    _shell.LibraryBrowserApplySortGroupPillState(panes.SortPhotosButton, !timelineMode && string.Equals(normalized, "photos", StringComparison.OrdinalIgnoreCase));
+                    panes.SortPlatformButton.IsEnabled = !timelineMode;
+                    panes.SortRecentButton.IsEnabled = !timelineMode;
+                    panes.SortPhotosButton.IsEnabled = !timelineMode;
                 };
 
                 refreshGroupingButtons = delegate
@@ -125,6 +131,7 @@ namespace PixelVaultNative
                     var normalized = _shell.NormalizeLibraryGroupingMode(_shell.LibraryGroupingMode);
                     _shell.LibraryBrowserApplySortGroupPillState(panes.GroupAllButton, string.Equals(normalized, "all", StringComparison.OrdinalIgnoreCase));
                     _shell.LibraryBrowserApplySortGroupPillState(panes.GroupConsoleButton, string.Equals(normalized, "console", StringComparison.OrdinalIgnoreCase));
+                    _shell.LibraryBrowserApplySortGroupPillState(panes.GroupTimelineButton, string.Equals(normalized, "timeline", StringComparison.OrdinalIgnoreCase));
                 };
 
                 setLibrarySortMode = delegate(string mode)
@@ -142,7 +149,13 @@ namespace PixelVaultNative
 
                 setLibraryGroupingMode = delegate(string mode)
                 {
-                    var normalized = _shell.NormalizeLibraryGroupingMode(mode);
+                    var normalized = string.Equals((mode ?? string.Empty).Trim(), "folders", StringComparison.OrdinalIgnoreCase)
+                        ? lastFolderGroupingMode
+                        : _shell.NormalizeLibraryGroupingMode(mode);
+                    if (!string.Equals(normalized, "timeline", StringComparison.OrdinalIgnoreCase))
+                    {
+                        lastFolderGroupingMode = normalized;
+                    }
                     if (!string.Equals(normalized, _shell.NormalizeLibraryGroupingMode(_shell.LibraryGroupingMode), StringComparison.OrdinalIgnoreCase))
                     {
                         _shell.LibraryGroupingMode = normalized;
