@@ -245,32 +245,37 @@ namespace PixelVaultNative
                                     return headerStack;
                                 }
                             });
-                            var timelinePackedRows = PackLibraryDetailFilesIntoVariableRows(
+                            var timelineMasonryChunks = BuildLibraryDetailMasonryChunks(
                                 groupFiles,
                                 packAvailableW,
                                 detailTileGap,
                                 effectiveTileSize,
                                 packMinW,
-                                adaptiveMaxTileSize);
-                            foreach (var rowEntries in timelinePackedRows)
+                                adaptiveMaxTileSize,
+                                true);
+                            foreach (var chunk in timelineMasonryChunks)
                             {
-                                var rowHeight = EstimateLibraryVariableDetailRowHeight(rowEntries, true);
+                                var chunkHeight = chunk.CanvasHeight + detailTileGap;
+                                var chunkCopy = chunk;
                                 virtualRows.Add(new VirtualizedRowDefinition
                                 {
-                                    Height = rowHeight,
+                                    Height = chunkHeight,
                                     Build = delegate
                                     {
-                                        var rowPanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, detailTileGap) };
-                                        for (int fileIndex = 0; fileIndex < rowEntries.Count; fileIndex++)
+                                        var canvas = new Canvas
                                         {
-                                            var file = rowEntries[fileIndex].File;
-                                            var rowTileWidth = rowEntries[fileIndex].Width;
-                                            var decodeW = CalculateLibraryDetailTileDecodeWidth(rowTileWidth, dpiScale);
+                                            Width = chunkCopy.CanvasWidth,
+                                            Height = chunkCopy.CanvasHeight,
+                                            Margin = new Thickness(0, 0, 0, detailTileGap)
+                                        };
+                                        foreach (var pl in chunkCopy.Placements)
+                                        {
+                                            var decodeW = CalculateLibraryDetailTileDecodeWidth(pl.Width, dpiScale);
                                             LibraryTimelineCaptureContext timelineContext;
-                                            if (!timelineContexts.TryGetValue(file, out timelineContext)) timelineContext = null;
+                                            if (!timelineContexts.TryGetValue(pl.File, out timelineContext)) timelineContext = null;
                                             var tile = CreateLibraryDetailTile(
-                                                file,
-                                                rowTileWidth,
+                                                pl.File,
+                                                pl.Width,
                                                 decodeW,
                                                 delegate { return SameLibraryBrowserSelection(ws.Current, renderFolder); },
                                                 openSingleFileMetadataEditor,
@@ -279,12 +284,14 @@ namespace PixelVaultNative
                                                 refreshDetailSelectionUi,
                                                 redrawSelectedFolderDetail,
                                                 null,
+                                                pl.Height,
                                                 timelineContext);
-                                            tile.Margin = new Thickness(0, 0, fileIndex < rowEntries.Count - 1 ? detailTileGap : 0, 0);
+                                            Canvas.SetLeft(tile, pl.X);
+                                            Canvas.SetTop(tile, pl.Y);
                                             ws.DetailTiles.Add(tile);
-                                            rowPanel.Children.Add(tile);
+                                            canvas.Children.Add(tile);
                                         }
-                                        return rowPanel;
+                                        return canvas;
                                     }
                                 });
                             }
@@ -311,27 +318,32 @@ namespace PixelVaultNative
                                     };
                                 }
                             });
-                            var normalPackedRows = PackLibraryDetailFilesIntoVariableRows(
+                            var normalMasonryChunks = BuildLibraryDetailMasonryChunks(
                                 groupFiles,
                                 packAvailableW,
                                 detailTileGap,
                                 effectiveTileSize,
                                 packMinW,
-                                adaptiveMaxTileSize);
-                            foreach (var rowEntries in normalPackedRows)
+                                adaptiveMaxTileSize,
+                                false);
+                            foreach (var chunk in normalMasonryChunks)
                             {
-                                var rowHeight = EstimateLibraryVariableDetailRowHeight(rowEntries, false);
+                                var chunkHeight = chunk.CanvasHeight + detailTileGap;
+                                var chunkCopy = chunk;
                                 virtualRows.Add(new VirtualizedRowDefinition
                                 {
-                                    Height = rowHeight,
+                                    Height = chunkHeight,
                                     Build = delegate
                                     {
-                                        var rowPanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, detailTileGap) };
-                                        for (int fileIndex = 0; fileIndex < rowEntries.Count; fileIndex++)
+                                        var canvas = new Canvas
                                         {
-                                            var file = rowEntries[fileIndex].File;
-                                            var rowTileWidth = rowEntries[fileIndex].Width;
-                                            var decodeW = CalculateLibraryDetailTileDecodeWidth(rowTileWidth, dpiScale);
+                                            Width = chunkCopy.CanvasWidth,
+                                            Height = chunkCopy.CanvasHeight,
+                                            Margin = new Thickness(0, 0, 0, detailTileGap)
+                                        };
+                                        foreach (var pl in chunkCopy.Placements)
+                                        {
+                                            var decodeW = CalculateLibraryDetailTileDecodeWidth(pl.Width, dpiScale);
                                             Action<string> useFileAsFolderCover = delegate(string imagePath)
                                             {
                                                 var folder = activeSelectedLibraryFolder;
@@ -342,8 +354,8 @@ namespace PixelVaultNative
                                                 ShowLibraryBrowserToast(ws, "Cover saved");
                                             };
                                             var tile = CreateLibraryDetailTile(
-                                                file,
-                                                rowTileWidth,
+                                                pl.File,
+                                                pl.Width,
                                                 decodeW,
                                                 delegate { return SameLibraryBrowserSelection(ws.Current, renderFolder); },
                                                 openSingleFileMetadataEditor,
@@ -352,12 +364,14 @@ namespace PixelVaultNative
                                                 refreshDetailSelectionUi,
                                                 redrawSelectedFolderDetail,
                                                 useFileAsFolderCover,
+                                                pl.Height,
                                                 null);
-                                            tile.Margin = new Thickness(0, 0, fileIndex < rowEntries.Count - 1 ? detailTileGap : 0, 0);
+                                            Canvas.SetLeft(tile, pl.X);
+                                            Canvas.SetTop(tile, pl.Y);
                                             ws.DetailTiles.Add(tile);
-                                            rowPanel.Children.Add(tile);
+                                            canvas.Children.Add(tile);
                                         }
-                                        return rowPanel;
+                                        return canvas;
                                     }
                                 });
                             }
@@ -820,6 +834,7 @@ namespace PixelVaultNative
                         ws == null ? new HashSet<string>(StringComparer.OrdinalIgnoreCase) : ws.SelectedDetailFiles,
                         refreshDetailSelectionUi,
                         redrawSelectedFolderDetail,
+                        null,
                         null,
                         timelineContext);
                     tile.Margin = new Thickness(0, 0, fileIndex < rowEntries.Count - 1 ? detailTileGap : 0, 0);

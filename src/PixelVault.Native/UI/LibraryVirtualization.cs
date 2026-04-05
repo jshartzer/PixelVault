@@ -419,7 +419,7 @@ namespace PixelVaultNative
             return footer;
         }
 
-        Border CreateLibraryDetailTile(string file, int size, int decodePixelWidth, Func<bool> shouldLoad, Action<string> openSingleFileMetadataEditor, Action<string, ModifierKeys> updateDetailSelection, HashSet<string> selectedDetailFiles, Action refreshDetailSelectionUi, Action redrawDetailPane, Action<string> useFileAsFolderCover, LibraryTimelineCaptureContext timelineContext = null)
+        Border CreateLibraryDetailTile(string file, int size, int decodePixelWidth, Func<bool> shouldLoad, Action<string> openSingleFileMetadataEditor, Action<string, ModifierKeys> updateDetailSelection, HashSet<string> selectedDetailFiles, Action refreshDetailSelectionUi, Action redrawDetailPane, Action<string> useFileAsFolderCover, int? masonryLayoutHeight = null, LibraryTimelineCaptureContext timelineContext = null)
         {
             var isVideoFile = IsVideo(file);
             var tileIsActive = true;
@@ -920,6 +920,30 @@ namespace PixelVaultNative
             contextMenu.Items.Add(new Separator());
             contextMenu.Items.Add(copyPathItem);
             tile.ContextMenu = contextMenu;
+            if (masonryLayoutHeight.HasValue)
+            {
+                var totalH = Math.Max(1, masonryLayoutHeight.Value);
+                tile.Height = totalH;
+                image.ClearValue(WidthProperty);
+                image.MaxWidth = size;
+                image.HorizontalAlignment = HorizontalAlignment.Stretch;
+                image.VerticalAlignment = VerticalAlignment.Center;
+                if (videoPreviewMedia != null)
+                {
+                    videoPreviewMedia.ClearValue(WidthProperty);
+                    videoPreviewMedia.MaxWidth = size;
+                    videoPreviewMedia.HorizontalAlignment = HorizontalAlignment.Stretch;
+                    videoPreviewMedia.VerticalAlignment = VerticalAlignment.Center;
+                }
+                if (tile.Child is Grid tileGrid && tileGrid.RowDefinitions.Count == 2)
+                {
+                    tileGrid.RowDefinitions[0] = new RowDefinition { Height = new GridLength(1, GridUnitType.Star) };
+                }
+                else if (tile.Child == presenter)
+                {
+                    presenter.VerticalAlignment = VerticalAlignment.Stretch;
+                }
+            }
             return tile;
         }
     }

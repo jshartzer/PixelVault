@@ -1,3 +1,8 @@
+## 0.935
+- **Release:** Version **0.935** — Library detail and timeline photo grids use **masonry-style** layout with **hero** tiles.
+- **Library / detail pane:** Captures in the screenshot and timeline feeds are placed in a **column masonry** flow (not strict horizontal rows). The first item and occasional highlights render as **wider two-column “hero”** tiles; other images use variable heights and pack around them. Layout is **chunked** for scrolling performance, with a **comfortable minimum column width** so thumbnails stay legible.
+- **Tiles:** Detail tiles accept a fixed masonry cell height so images and timeline footers respect the computed layout bounds.
+
 ## 0.934
 - **Release:** Version **0.934** — Library image decode DPI follow-through and timeline packed-card photo strips.
 - **Library / covers:** Folder cover tiles and the selected-folder header preview now use **DPI-scaled decode widths** (same helper family as the detail pane), so art stays sharper on high-DPI displays instead of capping like a 1× monitor.
