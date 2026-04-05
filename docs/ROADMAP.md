@@ -206,6 +206,7 @@ Candidate scope:
 - align progress copy across refresh, rebuild, imports, and cover fetches
 - review tab order and keyboard paths for common actions
 - do a small high-contrast and readability spot-check pass
+- add a full-library Library `Timeline` browse mode that reuses the current browser seams while shifting the active mode from folder-first to capture-first; see `C:\Codex\docs\LIBRARY_TIMELINE_MODE_PLAN.md`
 
 Definition of done:
 
