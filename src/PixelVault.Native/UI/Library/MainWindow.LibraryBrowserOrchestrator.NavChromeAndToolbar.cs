@@ -42,6 +42,7 @@ namespace PixelVaultNative
                 if (choice != MessageBoxResult.OK) return;
                 runCoverRefresh();
             };
+            navChrome.ExportStarredButton.Click += delegate { ExportStarredLibraryCapturesToFolder(libraryWindow); };
             navChrome.IntakeReviewButton.Click += delegate
             {
                 ShowIntakePreviewWindow(false);

@@ -13,6 +13,7 @@ namespace PixelVaultNative
                 SourceRootsSerialized = sourceRoot ?? string.Empty,
                 DestinationRoot = destinationRoot ?? string.Empty,
                 LibraryRoot = libraryRoot ?? string.Empty,
+                StarredExportFolder = starredExportFolder ?? string.Empty,
                 ExifToolPath = exifToolPath ?? string.Empty,
                 FfmpegPath = ffmpegPath ?? string.Empty,
                 SteamGridDbApiToken = steamGridDbApiToken ?? string.Empty,
@@ -37,6 +38,7 @@ namespace PixelVaultNative
             sourceRoot = s.SourceRootsSerialized ?? string.Empty;
             destinationRoot = s.DestinationRoot ?? string.Empty;
             libraryRoot = s.LibraryRoot ?? string.Empty;
+            starredExportFolder = s.StarredExportFolder ?? string.Empty;
             libraryIndexAnchor = s.LibraryIndexAnchor ?? string.Empty;
             exifToolPath = s.ExifToolPath ?? string.Empty;
             ffmpegPath = s.FfmpegPath ?? string.Empty;

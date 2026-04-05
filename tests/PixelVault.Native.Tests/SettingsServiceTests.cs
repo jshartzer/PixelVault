@@ -119,7 +119,8 @@ public sealed class SettingsServiceTests
                 LibraryGroupingMode = "console",
                 TroubleshootingLoggingEnabled = true,
                 LibraryDoubleClickSetsFolderCover = true,
-                LibraryBrowserFolderPaneWidth = 542.25
+                LibraryBrowserFolderPaneWidth = 542.25,
+                StarredExportFolder = @"D:\immich-drop"
             };
 
             var svc = new SettingsService();
@@ -140,6 +141,7 @@ public sealed class SettingsServiceTests
             Assert.True(loaded.TroubleshootingLoggingEnabled);
             Assert.True(loaded.LibraryDoubleClickSetsFolderCover);
             Assert.Equal(542.25, loaded.LibraryBrowserFolderPaneWidth, 5);
+            Assert.Equal(@"D:\immich-drop", loaded.StarredExportFolder, ignoreCase: true);
             Assert.Equal(loaded.LibraryRoot ?? string.Empty, loaded.LibraryIndexAnchor ?? string.Empty, ignoreCase: true);
         }
         finally

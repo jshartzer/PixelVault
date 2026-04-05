@@ -20,7 +20,7 @@ namespace PixelVaultNative
             {
                 colLeft.Width = new GridLength(1, GridUnitType.Star);
                 colLeft.MinWidth = LibraryBrowserFolderPaneSplitMinLeft;
-                colRight.Width = new GridLength(2, GridUnitType.Star);
+                colRight.Width = new GridLength(3, GridUnitType.Star);
                 colRight.MinWidth = LibraryBrowserFolderPaneSplitMinRight;
                 return;
             }

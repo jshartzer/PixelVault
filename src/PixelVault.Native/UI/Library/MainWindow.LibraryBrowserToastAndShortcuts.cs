@@ -93,6 +93,7 @@ namespace PixelVaultNative
                 root.Children.Add(row);
             }
             AddRow("F1", "Open this shortcut list");
+            AddRow("—", "Export Starred (toolbar): copy starred captures to the folder in Path Settings");
             AddRow("Enter", "Apply library search (search box)");
             AddRow("Ctrl + click", "Add or remove a capture from the selection");
             AddRow("Shift + click", "Select a range of captures from the anchor");

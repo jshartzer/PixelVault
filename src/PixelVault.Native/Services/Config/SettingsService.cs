@@ -68,6 +68,7 @@ namespace PixelVaultNative
                 if (key == "source") s.SourceRootsSerialized = SerializeSourceRoots(value);
                 else if (key == "destination") s.DestinationRoot = value ?? string.Empty;
                 else if (key == "library") s.LibraryRoot = value ?? string.Empty;
+                else if (key == "starred_export_folder") s.StarredExportFolder = value ?? string.Empty;
                 else if (key == "library_index_anchor") s.LibraryIndexAnchor = value ?? string.Empty;
                 else if (key == "exiftool" && !string.IsNullOrWhiteSpace(value)) s.ExifToolPath = value;
                 else if (key == "ffmpeg" && !string.IsNullOrWhiteSpace(value)) s.FfmpegPath = value;
@@ -172,6 +173,7 @@ namespace PixelVaultNative
                 "source=" + SerializeSourceRoots(state.SourceRootsSerialized),
                 "destination=" + (state.DestinationRoot ?? string.Empty),
                 "library=" + (state.LibraryRoot ?? string.Empty),
+                "starred_export_folder=" + (state.StarredExportFolder ?? string.Empty),
                 "library_index_anchor=" + anchorOut,
                 "exiftool=" + (state.ExifToolPath ?? string.Empty),
                 "ffmpeg=" + (state.FfmpegPath ?? string.Empty),

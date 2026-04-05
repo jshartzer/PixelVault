@@ -40,7 +40,7 @@ namespace PixelVaultNative
 
     public sealed partial class MainWindow : Window
     {
-        const string AppVersion = "0.891";
+        const string AppVersion = "0.896";
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
         const string ClearedExternalIdSentinel = "__PV_CLEARED__";
@@ -73,6 +73,7 @@ namespace PixelVaultNative
         string sourceRoot;
         string destinationRoot;
         string libraryRoot;
+        string starredExportFolder = string.Empty;
         /// <summary>Persisted companion to <c>library_index_anchor</c>; when it differs from the active library path, startup explains per-path indexes.</summary>
         string libraryIndexAnchor = string.Empty;
         readonly LibraryWorkspaceContext libraryWorkspace;

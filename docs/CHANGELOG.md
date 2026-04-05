@@ -1,3 +1,9 @@
+## 0.896
+- **Release:** Version **0.896** — on-demand **Export Starred** for Immich / external folders; default library split a bit wider for the detail pane.
+- **Library:** **Export Starred** toolbar button copies every **starred** file from the **photo metadata index** into **Path Settings → Starred export folder** (`starred_export_folder` in ini). Uses each file’s **base name** only; existing files in that folder are **overwritten**. Empty export path shows a pointer to Path Settings.
+- **Path Settings:** Optional **Starred export folder** row with browse.
+- **Layout:** Default folder : detail proportion is **1★ : 3★** (~¼ / ~¾) until you drag the splitter or a saved pixel width loads.
+
 ## 0.891
 - **Release:** Version **0.891** — Library **folder / detail splitter** persists across sessions (`library_browser_folder_pane_width` in **`PixelVault.settings.ini`**). Default is still **~⅓ / ~⅔** (1★:2★) until you drag the grabber; closing the library or finishing a drag saves the folder pane width, and narrow windows clamp it so the detail column keeps room.
 - **Library layout:** Folder tile cap **440**, **Tiles ±** preference applied in the responsive grid, **three tiles per row** until the pane is very wide, and **~⅓** default folder column width (same train as recent desktop layout tweaks).

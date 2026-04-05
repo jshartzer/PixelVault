@@ -18,6 +18,7 @@ namespace PixelVaultNative
             internal Button PhotographyGalleryButton;
             internal Button FilenameRulesButton;
             internal Button MyCoversButton;
+            internal Button ExportStarredButton;
             internal Button RefreshButton;
             internal Button FetchButton;
             internal Button IntakeReviewButton;
@@ -134,6 +135,14 @@ namespace PixelVaultNative
             chrome.MyCoversButton.Margin = new Thickness(0, 0, 12, 0);
             ApplyLibraryToolbarChrome(chrome.MyCoversButton, "#18242B", "#24353F", "#22323C", "#131D23");
             chrome.MyCoversButton.Content = BuildToolbarButtonContent("\uEB9F", "My Covers");
+            chrome.ExportStarredButton = Btn("Export Starred", null, "#20343A", Brushes.White);
+            chrome.ExportStarredButton.Width = 150;
+            chrome.ExportStarredButton.Height = 42;
+            chrome.ExportStarredButton.FontSize = 13;
+            chrome.ExportStarredButton.Margin = new Thickness(0, 0, 12, 0);
+            chrome.ExportStarredButton.ToolTip = "Copy starred captures to the folder set in Path Settings (overwrites same file names).";
+            ApplyLibraryToolbarChrome(chrome.ExportStarredButton, "#18242B", "#24353F", "#22323C", "#131D23");
+            chrome.ExportStarredButton.Content = BuildToolbarButtonContent("\uE81E", "Export Starred");
             chrome.RefreshButton = Btn("Refresh", null, "#20343A", Brushes.White);
             chrome.FetchButton = Btn("Fetch Covers", null, "#275D47", Brushes.White);
             chrome.RefreshButton.Width = 122;
@@ -193,6 +202,7 @@ namespace PixelVaultNative
             headerActions.Children.Add(chrome.PhotographyGalleryButton);
             headerActions.Children.Add(chrome.FilenameRulesButton);
             headerActions.Children.Add(chrome.MyCoversButton);
+            headerActions.Children.Add(chrome.ExportStarredButton);
             headerActions.Children.Add(chrome.RefreshButton);
             headerActions.Children.Add(chrome.FetchButton);
             headerActions.Children.Add(chrome.IntakeReviewButton);

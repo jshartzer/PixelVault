@@ -83,12 +83,15 @@ namespace PixelVaultNative
             var ffmpegBox = SettingsTextBox(panel, 4, "FFmpeg path", d.GetFfmpegPath(), labelFg, boxBg, boxFg, borderBrush, boxFg);
             var steamGridDbTokenBox = SettingsTextBox(panel, 5, "SteamGridDB token", d.GetSteamGridDbApiToken(), labelFg, boxBg, boxFg, borderBrush, boxFg);
             steamGridDbTokenBox.ToolTip = "Stored locally in PixelVault.settings.ini. Environment variables can also override it.";
+            var starredExportBox = SettingsTextBox(panel, 6, "Starred export folder (optional)", d.GetStarredExportFolder(), labelFg, boxBg, boxFg, borderBrush, boxFg);
+            starredExportBox.ToolTip = "Library → Export Starred copies files marked starred in the photo index here. Existing files with the same name are replaced.";
 
             SettingsBrowseButton(panel, 0, delegate { var picked = d.PickFolder(d.PrimarySourceRoot()); if (!string.IsNullOrWhiteSpace(picked)) sourceBox.Text = d.AppendSourceRoot(sourceBox.Text, picked); }, "Add Folder");
             SettingsBrowseButton(panel, 1, delegate { var picked = d.PickFolder(destinationBox.Text); if (!string.IsNullOrWhiteSpace(picked)) destinationBox.Text = picked; });
             SettingsBrowseButton(panel, 2, delegate { var picked = d.PickFolder(libraryBox.Text); if (!string.IsNullOrWhiteSpace(picked)) libraryBox.Text = picked; });
             SettingsBrowseButton(panel, 3, delegate { var picked = d.PickFile(exifBox.Text, "Executable (*.exe)|*.exe|All files (*.*)|*.*", null); if (!string.IsNullOrWhiteSpace(picked)) exifBox.Text = picked; });
             SettingsBrowseButton(panel, 4, delegate { var picked = d.PickFile(ffmpegBox.Text, "Executable (*.exe)|*.exe|All files (*.*)|*.*", null); if (!string.IsNullOrWhiteSpace(picked)) ffmpegBox.Text = picked; });
+            SettingsBrowseButton(panel, 6, delegate { var picked = d.PickFolder(starredExportBox.Text); if (!string.IsNullOrWhiteSpace(picked)) starredExportBox.Text = picked; });
 
             var pathScroll = new ScrollViewer
             {
@@ -113,6 +116,7 @@ namespace PixelVaultNative
                 d.SetSourceRoot(d.SerializeSourceRoots(sourceBox.Text));
                 d.SetDestinationRoot(destinationBox.Text);
                 d.SetLibraryRoot(libraryBox.Text);
+                d.SetStarredExportFolder((starredExportBox.Text ?? string.Empty).Trim());
                 d.SetExifToolPath(exifBox.Text);
                 d.SetFfmpegPath(ffmpegBox.Text);
                 d.ClearFailedFfmpegPosterKeys();

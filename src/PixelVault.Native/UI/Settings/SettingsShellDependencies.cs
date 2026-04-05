@@ -26,6 +26,7 @@ namespace PixelVaultNative
         public Func<string> SourceRootsSummary { get; set; }
         public Func<string> GetDestinationRoot { get; set; }
         public Func<string> GetLibraryRoot { get; set; }
+        public Func<string> GetStarredExportFolder { get; set; }
         public Func<string> GetLibraryWorkspaceRoot { get; set; }
         public Func<string> GetSavedCoversRoot { get; set; }
         public Func<string> GetExifToolPath { get; set; }
@@ -56,6 +57,7 @@ namespace PixelVaultNative
         public Action<string> SetSourceRoot { get; set; }
         public Action<string> SetDestinationRoot { get; set; }
         public Action<string> SetLibraryRoot { get; set; }
+        public Action<string> SetStarredExportFolder { get; set; }
         public Action<string> SetExifToolPath { get; set; }
         public Action<string> SetFfmpegPath { get; set; }
         public Action<string> SetSteamGridDbApiToken { get; set; }

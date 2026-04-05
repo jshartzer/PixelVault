@@ -36,10 +36,10 @@ namespace PixelVaultNative
                 root.Children.Add(navChrome.NavBar);
 
                 var contentGrid = new Grid();
-                // ~1/3 folder pane, ~2/3 detail by default (user-adjustable splitter).
+                // ~1/4 folder pane, ~3/4 detail by default (user-adjustable splitter); narrower than 1:2 so more room for captures.
                 contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = 300 });
                 contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(2, GridUnitType.Star), MinWidth = 260 });
+                contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(3, GridUnitType.Star), MinWidth = 260 });
                 Grid.SetRow(contentGrid, 1);
                 root.Children.Add(contentGrid);
 
@@ -227,6 +227,7 @@ namespace PixelVaultNative
                     panes.FolderTileLargerButton.IsEnabled = !isBusy;
                     panes.ShortcutsHelpButton.IsEnabled = !isBusy;
                     navChrome.FetchButton.IsEnabled = !isBusy;
+                    navChrome.ExportStarredButton.IsEnabled = !isBusy;
                     navChrome.ImportButton.IsEnabled = !isBusy;
                     navChrome.ImportCommentsButton.IsEnabled = !isBusy;
                     navChrome.ManualImportButton.IsEnabled = !isBusy;
