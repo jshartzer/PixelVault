@@ -1,3 +1,9 @@
+## 0.944
+- **Release:** Version **0.944** — Media-aware masonry sizing for the Library detail pane and timeline.
+- **Library / masonry layout:** Detail and timeline grids now size tiles from real media dimensions when available instead of the old hash-based fake ratios, so portrait, landscape, and video captures land in more intentional shapes.
+- **Library / sparse groups:** Day or folder groups with only a few captures now use fewer columns, so the pane can breathe instead of pinning those images into tiny cells across a wide surface.
+- **Library / featured tiles:** Wider captures can still promote into larger hero tiles, but the promotion is now bounded and shape-aware so the layout feels curated instead of random.
+
 ## 0.939
 - **Release:** Version **0.939** — **Rollback:** detail pane is again the **0.936 masonry** grid (reverts **0.937** / **0.938** `VirtualizingWrapPanel` + `ItemsControl`, which caused load failures and crashes).
 
