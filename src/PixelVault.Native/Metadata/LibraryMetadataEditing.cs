@@ -79,15 +79,21 @@ namespace PixelVaultNative
                 var rows = GetSavedGameIndexRowsForRoot(libraryRoot);
                 savedGameRow = FindSavedGameIndexRowById(rows, indexGameIdNorm);
             }
+            var guessedFromPathAndName = NormalizeGameIndexName(GuessGameIndexNameForFile(file));
             string gameName = string.Empty;
             if (savedGameRow != null && !string.IsNullOrWhiteSpace(NormalizeGameIndexName(savedGameRow.Name, savedGameRow.FolderPath)))
-                gameName = NormalizeGameIndexName(savedGameRow.Name, savedGameRow.FolderPath);
+            {
+                var rowName = NormalizeGameIndexName(savedGameRow.Name, savedGameRow.FolderPath);
+                gameName = string.Equals(rowName, guessedFromPathAndName, StringComparison.OrdinalIgnoreCase)
+                    ? rowName
+                    : (string.IsNullOrWhiteSpace(guessedFromPathAndName) ? rowName : guessedFromPathAndName);
+            }
             else if (folderPathUsable)
-                gameName = folder.Name ?? string.Empty;
+                gameName = guessedFromPathAndName;
             else
             {
                 gameName = Path.GetFileName(Path.GetDirectoryName(file)) ?? string.Empty;
-                if (string.IsNullOrWhiteSpace(gameName)) gameName = GetGameNameFromFileName(Path.GetFileNameWithoutExtension(file));
+                if (string.IsNullOrWhiteSpace(gameName)) gameName = NormalizeGameIndexName(GetGameNameFromFileName(Path.GetFileName(file)));
             }
             var steamAppId = folderPathUsable ? (folder.SteamAppId ?? string.Empty) : string.Empty;
             if (savedGameRow != null && !string.IsNullOrWhiteSpace(savedGameRow.SteamAppId))
@@ -146,7 +152,7 @@ namespace PixelVaultNative
                     continue;
                 }
                 var gameName = string.IsNullOrWhiteSpace(item.GameName)
-                    ? GetGameNameFromFileName(Path.GetFileNameWithoutExtension(item.FilePath))
+                    ? GetGameNameFromFileName(Path.GetFileName(item.FilePath))
                     : item.GameName;
                 var targetDirectory = Path.Combine(libraryRoot, GetSafeGameFolderName(gameName));
                 if (!Directory.Exists(targetDirectory))

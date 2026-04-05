@@ -314,8 +314,7 @@ namespace PixelVaultNative
                 GameIndexEditorRow savedRow;
                 rowsByGameId.TryGetValue(normalizedGameId, out savedRow);
                 var gameTitle = NormalizeGameIndexName(savedRow == null ? string.Empty : savedRow.Name);
-                if (string.IsNullOrWhiteSpace(gameTitle)) gameTitle = NormalizeGameIndexName(Path.GetFileName(Path.GetDirectoryName(file) ?? string.Empty));
-                if (string.IsNullOrWhiteSpace(gameTitle)) gameTitle = NormalizeGameIndexName(GetGameNameFromFileName(Path.GetFileNameWithoutExtension(file)));
+                if (string.IsNullOrWhiteSpace(gameTitle)) gameTitle = NormalizeGameIndexName(GuessGameIndexNameForFile(file));
                 if (string.IsNullOrWhiteSpace(gameTitle)) gameTitle = "Unknown Game";
                 var platformLabel = NormalizeConsoleLabel(savedRow == null ? (entry == null ? string.Empty : entry.ConsoleLabel) : savedRow.PlatformLabel);
                 if (string.IsNullOrWhiteSpace(platformLabel) || string.Equals(platformLabel, "Other", StringComparison.OrdinalIgnoreCase))

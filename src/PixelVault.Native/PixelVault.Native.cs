@@ -40,7 +40,7 @@ namespace PixelVaultNative
 
     public sealed partial class MainWindow : Window
     {
-        const string AppVersion = "0.926";
+        const string AppVersion = "0.930";
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
         const string ClearedExternalIdSentinel = "__PV_CLEARED__";
@@ -801,6 +801,23 @@ namespace PixelVaultNative
             if (!string.IsNullOrWhiteSpace(cleanedEdited)) return false;
             return previousSuppressed || !string.IsNullOrWhiteSpace(CleanTag(previousValue));
         }
+        double ResolveScrollViewerLayoutWidth(ScrollViewer scrollViewer, double fallback = 0)
+        {
+            if (scrollViewer == null) return Math.Max(0d, fallback);
+            var paddingWidth = scrollViewer.Padding.Left + scrollViewer.Padding.Right;
+            var viewportWidth = scrollViewer.ViewportWidth;
+            var actualWidth = scrollViewer.ActualWidth;
+            var resolved = Math.Max(viewportWidth, Math.Max(0d, actualWidth - paddingWidth));
+            if (scrollViewer.ComputedVerticalScrollBarVisibility == Visibility.Visible)
+            {
+                resolved = Math.Max(0d, resolved - SystemParameters.VerticalScrollBarWidth);
+            }
+            if (resolved <= 0d && scrollViewer.Parent is FrameworkElement parent)
+            {
+                resolved = Math.Max(0d, parent.ActualWidth - paddingWidth);
+            }
+            return resolved <= 0d ? Math.Max(0d, fallback) : resolved;
+        }
         int NormalizeLibraryFolderTileSize(int value) => SettingsService.NormalizeLibraryFolderTileSize(value);
         (int Columns, int TileSize) CalculateResponsiveLibraryFolderLayout(ScrollViewer scrollViewer)
         {
@@ -809,8 +826,7 @@ namespace PixelVaultNative
             const int libraryFolderMaxColumnsWideBand = 8;
             // When slack is nearly tied, allow a few extra pixels of slack to prefer a denser grid (e.g. 3 columns in the folder pane instead of 2).
             const double moreColumnsSlackBudgetPx = 12;
-            var viewportWidth = scrollViewer == null ? 0 : scrollViewer.ViewportWidth;
-            if (viewportWidth <= 0 && scrollViewer != null) viewportWidth = scrollViewer.ActualWidth;
+            var viewportWidth = ResolveScrollViewerLayoutWidth(scrollViewer);
             viewportWidth = Math.Max(120, viewportWidth - 18);
             // Per-band ceiling; 360–899 is typical library splitter width — allow up to 3 columns so covers use width instead of leaving a gutter beside a capped 2-column row.
             var maxColumnsCeiling = viewportWidth >= 1200 ? libraryFolderMaxColumnsWideBand : (viewportWidth >= 900 ? 4 : (viewportWidth >= 360 ? 3 : 1));
@@ -865,8 +881,7 @@ namespace PixelVaultNative
         }
         (int Columns, int TileSize) CalculateResponsiveLibraryDetailLayout(ScrollViewer scrollViewer)
         {
-            var viewportWidth = scrollViewer == null ? 0 : scrollViewer.ViewportWidth;
-            if (viewportWidth <= 0 && scrollViewer != null) viewportWidth = scrollViewer.ActualWidth;
+            var viewportWidth = ResolveScrollViewerLayoutWidth(scrollViewer);
             viewportWidth = Math.Max(120, viewportWidth - 64);
             var columns = viewportWidth >= 1800 ? 3 : (viewportWidth >= 900 ? 2 : 1);
             var tileWidth = (int)Math.Floor((viewportWidth - ((columns - 1) * 8)) / columns);
@@ -1232,9 +1247,20 @@ namespace PixelVaultNative
             return filenameParserService.Parse(file, string.IsNullOrWhiteSpace(root) ? libraryRoot : root);
         }
 
-        string GetGameNameFromFileName(string baseName)
+        /// <summary>Resolves a game title for sorting/organize. Pass <see cref="Path.GetFileName(string)"/> (with extension) when available so convention rules match; bare stems still work.</summary>
+        string GetGameNameFromFileName(string fileNameOrPath)
         {
-            return filenameParserService.GetGameTitleHint(baseName, libraryRoot);
+            if (string.IsNullOrWhiteSpace(fileNameOrPath)) return string.Empty;
+            var fileName = fileNameOrPath;
+            if (fileName.IndexOf('\\') >= 0 || fileName.IndexOf('/') >= 0)
+                fileName = Path.GetFileName(fileName.Trim());
+            if (string.IsNullOrWhiteSpace(fileName)) return string.Empty;
+            var parseInput = string.IsNullOrWhiteSpace(Path.GetExtension(fileName))
+                ? fileName + ".png"
+                : fileName;
+            var parsed = filenameParserService.Parse(parseInput, libraryRoot);
+            if (!string.IsNullOrWhiteSpace(parsed.GameTitleHint)) return parsed.GameTitleHint.Trim();
+            return filenameParserService.GetGameTitleHint(Path.GetFileNameWithoutExtension(parseInput), libraryRoot) ?? string.Empty;
         }
 
         string GetSafeGameFolderName(string name)
@@ -2531,8 +2557,6 @@ namespace PixelVaultNative
         }
     }
 }
-
-
 
 
 

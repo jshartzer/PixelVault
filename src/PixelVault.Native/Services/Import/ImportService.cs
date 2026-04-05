@@ -300,7 +300,7 @@ namespace PixelVaultNative
                     ? string.Empty
                     : d.GetSafeGameFolderName(d.GetGameNameFromFileName == null
                         ? Path.GetFileNameWithoutExtension(file)
-                        : d.GetGameNameFromFileName(Path.GetFileNameWithoutExtension(file)));
+                        : d.GetGameNameFromFileName(Path.GetFileName(file)));
                 var targetDirectory = Path.Combine(destinationRoot, folderName);
                 if (!fs.DirectoryExists(targetDirectory))
                 {

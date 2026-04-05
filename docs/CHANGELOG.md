@@ -1,3 +1,8 @@
+## 0.930
+- **Release:** Version **0.930** — Library pane-width layout follow-up for covers and timeline.
+- **Library / covers:** Folder rows now use the real pane width more reliably and expand sparse rows, so cover tiles spread out instead of leaving a wide dead gutter when the folder pane has room.
+- **Library / timeline:** Timeline/detail width-dependent layout now rerenders on meaningful pane-width changes even when the old column count stays the same, so packed day-card sizing tracks splitter and window changes more consistently.
+
 ## 0.926
 - **Release:** Version **0.926** — Library timeline now uses **packed day cards**.
 - **Library / timeline:** Sparse timeline days no longer each consume a full-width date band. Timeline now renders each day as a compact card, so low-volume days can sit side-by-side while still keeping the existing game, platform, time, and inline comment footer under each photo.

@@ -26,8 +26,10 @@ namespace PixelVaultNative
             internal string AppliedLibrarySearchText = string.Empty;
             internal int LastDetailTileSize = -1;
             internal int LastDetailColumns = -1;
+            internal double LastDetailViewportWidth;
             internal int LastFolderTileSize = -1;
             internal int LastFolderColumns = -1;
+            internal double LastFolderViewportWidth;
             internal bool LibraryFoldersLoading;
             internal int LibraryFolderRefreshVersion;
             internal int DetailRenderSequence;

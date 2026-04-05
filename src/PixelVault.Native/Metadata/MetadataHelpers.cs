@@ -331,11 +331,11 @@ namespace PixelVaultNative
             if (item == null) return false;
             var currentName = NormalizeGameIndexName(
                 string.IsNullOrWhiteSpace(item.GameName)
-                    ? GetGameNameFromFileName(Path.GetFileNameWithoutExtension(item.FilePath))
+                    ? GetGameNameFromFileName(Path.GetFileName(item.FilePath))
                     : item.GameName);
             var originalName = NormalizeGameIndexName(
                 string.IsNullOrWhiteSpace(item.OriginalGameName)
-                    ? GetGameNameFromFileName(Path.GetFileNameWithoutExtension(item.FilePath))
+                    ? GetGameNameFromFileName(Path.GetFileName(item.FilePath))
                     : item.OriginalGameName);
             if (!string.Equals(currentName, originalName, StringComparison.OrdinalIgnoreCase)) return true;
             return !string.Equals(

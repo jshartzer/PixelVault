@@ -76,8 +76,10 @@ namespace PixelVaultNative
             var folderLayout = CalculateResponsiveLibraryFolderLayout(panes.TileScroll);
             var targetFolderColumns = folderLayout.Columns;
             var tileWidth = folderLayout.TileSize;
+            var folderPaneWidth = ResolveScrollViewerLayoutWidth(panes.TileScroll);
             ws.LastFolderColumns = targetFolderColumns;
             ws.LastFolderTileSize = tileWidth;
+            ws.LastFolderViewportWidth = folderPaneWidth;
             var tileHeight = (int)Math.Round(tileWidth * 1.5d);
             var selectedFolder = FindMatchingLibraryBrowserView(ws.Current, browserFolders);
             if (selectedFolder != null)
@@ -106,10 +108,17 @@ namespace PixelVaultNative
                 PersistLibraryBrowserLastSelection(null);
             }
 
-            var folderCardHeight = tileHeight + 82;
-            var folderRowHeight = folderCardHeight + 14;
             var folderColumns = targetFolderColumns;
             var virtualRows = new List<VirtualizedRowDefinition>();
+            int ResolveFolderRowTileWidth(int rowCount)
+            {
+                if (rowCount <= 0) return tileWidth;
+                var availableWidth = Math.Max(tileWidth, folderPaneWidth - 4);
+                var rawFill = (int)Math.Floor((availableWidth - ((rowCount - 1) * 14d)) / Math.Max(1d, rowCount));
+                var roundedFill = Math.Max(tileWidth, (int)(Math.Round(rawFill / 16d) * 16));
+                var maxExpandedTile = Math.Max(tileWidth, Math.Min(1000, NormalizeLibraryFolderTileSize(libraryFolderTileSize) + 176));
+                return Math.Max(tileWidth, Math.Min(maxExpandedTile, roundedFill));
+            }
             if (orderedVisibleFolders.Count == 0)
             {
                 if (ws.PendingSessionRestore)
@@ -143,14 +152,18 @@ namespace PixelVaultNative
                 for (int rowStart = 0; rowStart < orderedVisibleFolders.Count; rowStart += folderColumns)
                 {
                     var rowFolders = orderedVisibleFolders.Skip(rowStart).Take(folderColumns).ToList();
+                    var rowTileWidth = ResolveFolderRowTileWidth(rowFolders.Count);
+                    var rowTileHeight = (int)Math.Round(rowTileWidth * 1.5d);
+                    var rowCardHeight = rowTileHeight + 82;
+                    var rowHeight = rowCardHeight + 14;
                     virtualRows.Add(new VirtualizedRowDefinition
                     {
-                        Height = folderRowHeight,
+                        Height = rowHeight,
                         Build = delegate
                         {
                             var flatWrap = new WrapPanel();
-                            foreach (var folder in rowFolders) flatWrap.Children.Add(buildFolderTile(folder, tileWidth, tileHeight, true));
-                            return new Border { Height = folderRowHeight, Background = Brushes.Transparent, Child = flatWrap };
+                            foreach (var folder in rowFolders) flatWrap.Children.Add(buildFolderTile(folder, rowTileWidth, rowTileHeight, true));
+                            return new Border { Height = rowHeight, Background = Brushes.Transparent, Child = flatWrap };
                         }
                     });
                 }
@@ -200,14 +213,18 @@ namespace PixelVaultNative
                     for (int rowStart = 0; rowStart < groupFolders.Count; rowStart += folderColumns)
                     {
                         var rowFolders = groupFolders.Skip(rowStart).Take(folderColumns).ToList();
+                        var rowTileWidth = ResolveFolderRowTileWidth(rowFolders.Count);
+                        var rowTileHeight = (int)Math.Round(rowTileWidth * 1.5d);
+                        var rowCardHeight = rowTileHeight + 82;
+                        var rowHeight = rowCardHeight + 14;
                         virtualRows.Add(new VirtualizedRowDefinition
                         {
-                            Height = folderRowHeight,
+                            Height = rowHeight,
                             Build = delegate
                             {
                                 var groupWrap = new WrapPanel();
-                                foreach (var folder in rowFolders) groupWrap.Children.Add(buildFolderTile(folder, tileWidth, tileHeight, false));
-                                return new Border { Height = folderRowHeight, Background = Brushes.Transparent, Child = groupWrap };
+                                foreach (var folder in rowFolders) groupWrap.Children.Add(buildFolderTile(folder, rowTileWidth, rowTileHeight, false));
+                                return new Border { Height = rowHeight, Background = Brushes.Transparent, Child = groupWrap };
                             }
                         });
                     }
