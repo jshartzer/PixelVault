@@ -40,7 +40,7 @@ namespace PixelVaultNative
 
     public sealed partial class MainWindow : Window
     {
-        const string AppVersion = "0.886";
+        const string AppVersion = "0.891";
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
         const string ClearedExternalIdSentinel = "__PV_CLEARED__";
@@ -81,7 +81,7 @@ namespace PixelVaultNative
         string exifToolPath;
         string ffmpegPath;
         string steamGridDbApiToken;
-        int libraryFolderTileSize = 240;
+        int libraryFolderTileSize = 300;
         string libraryFolderSortMode = "platform";
         string libraryGroupingMode = "all";
         bool troubleshootingLoggingEnabled;
@@ -93,6 +93,7 @@ namespace PixelVaultNative
         string _libraryBrowserPersistedLastViewKey = string.Empty;
         double _libraryBrowserPersistedFolderScroll;
         double _libraryBrowserPersistedDetailScroll;
+        double _libraryBrowserPersistedFolderPaneWidth;
         LibraryBrowserWorkingSet _libraryBrowserLiveWorkingSet;
         string _manualMetadataRecentTitleLabelsSerialized = string.Empty;
         Action<bool> activeLibraryFolderRefresh;
@@ -772,12 +773,15 @@ namespace PixelVaultNative
             var viewportWidth = scrollViewer == null ? 0 : scrollViewer.ViewportWidth;
             if (viewportWidth <= 0 && scrollViewer != null) viewportWidth = scrollViewer.ActualWidth;
             viewportWidth = Math.Max(120, viewportWidth - 18);
-            // Four columns once the pane is wide enough for ~4× min tile + gutters (default splitter favors the browser pane).
-            var columns = viewportWidth >= 700 ? 4 : (viewportWidth >= 600 ? 3 : (viewportWidth >= 400 ? 2 : 1));
-            var tileWidth = (int)Math.Floor((viewportWidth - ((columns - 1) * 14)) / columns);
+            // Default is three columns in the ~1/3-wide folder pane; fourth column only on very wide panes.
+            var columns = viewportWidth >= 1000 ? 4 : (viewportWidth >= 520 ? 3 : (viewportWidth >= 360 ? 2 : 1));
+            var rawTile = (int)Math.Floor((viewportWidth - ((columns - 1) * 14)) / (double)Math.Max(1, columns));
             var minTile = viewportWidth < 260 ? 112 : 140;
-            tileWidth = Math.Max(minTile, Math.Min(360, tileWidth));
-            tileWidth = Math.Max(minTile, Math.Min(360, (int)(Math.Round(tileWidth / 16d) * 16)));
+            var userCap = NormalizeLibraryFolderTileSize(libraryFolderTileSize);
+            const int layoutMaxTile = 440;
+            var tileWidth = Math.Max(minTile, Math.Min(Math.Min(layoutMaxTile, userCap), rawTile));
+            tileWidth = (int)(Math.Round(tileWidth / 16d) * 16);
+            tileWidth = Math.Max(minTile, Math.Min(Math.Min(layoutMaxTile, userCap), Math.Min(rawTile, tileWidth)));
             return (columns, tileWidth);
         }
         (int Columns, int TileSize) CalculateResponsiveLibraryDetailLayout(ScrollViewer scrollViewer)

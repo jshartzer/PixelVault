@@ -1,3 +1,7 @@
+## 0.891
+- **Release:** Version **0.891** — Library **folder / detail splitter** persists across sessions (`library_browser_folder_pane_width` in **`PixelVault.settings.ini`**). Default is still **~⅓ / ~⅔** (1★:2★) until you drag the grabber; closing the library or finishing a drag saves the folder pane width, and narrow windows clamp it so the detail column keeps room.
+- **Library layout:** Folder tile cap **440**, **Tiles ±** preference applied in the responsive grid, **three tiles per row** until the pane is very wide, and **~⅓** default folder column width (same train as recent desktop layout tweaks).
+
 ## 0.886
 - **Release:** Version **0.886** — Library **Edit IDs** lookup uses the same Steam search + match picker as manual metadata, then fills SteamGridDB when possible.
 - **Library (`Edit IDs`):** **Look up IDs** runs a Steam store search for the folder name; when several titles match, **Steam Matches** opens so you pick the correct App ID. Empty **SteamGridDB ID** is still resolved from the App ID (or game name) when a SteamGridDB token is configured. Only blank fields are overwritten; canceling the picker leaves IDs unchanged.

@@ -89,6 +89,7 @@
     <Compile Include="UI\Library\MainWindow.LibraryBrowserViewModel.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserRender.FolderList.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserSessionPersistence.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryBrowserSplitLayout.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserRender.DetailPane.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserShowOrchestration.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserShellBridge.cs" />

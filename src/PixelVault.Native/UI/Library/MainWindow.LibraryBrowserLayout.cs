@@ -37,6 +37,8 @@ namespace PixelVaultNative
             internal Button ShortcutsHelpButton;
             internal VirtualizedRowHost DetailRows;
             internal ScrollViewer ThumbScroll;
+            internal Grid LibrarySplitContentGrid;
+            internal DispatcherTimer FolderPaneSplitClampTimer;
         }
 
         LibraryBrowserPaneRefs BuildLibraryBrowserContentPanes(Grid contentGrid)
@@ -92,6 +94,7 @@ namespace PixelVaultNative
             panes.DetailResizeDebounceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(140) };
             panes.FolderResizeDebounceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(140) };
             panes.ScrollPersistDebounceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(450) };
+            panes.FolderPaneSplitClampTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
             searchPanel.Children.Add(searchBoxShell);
             Grid.SetRow(searchPanel, 0);
             filterGrid.Children.Add(searchPanel);
@@ -200,7 +203,7 @@ namespace PixelVaultNative
 
             var splitter = new GridSplitter
             {
-                Width = 12,
+                Width = LibraryBrowserFolderPaneSplitterWidth,
                 HorizontalAlignment = HorizontalAlignment.Stretch,
                 VerticalAlignment = VerticalAlignment.Stretch,
                 Background = Brush("#182028"),
@@ -212,6 +215,26 @@ namespace PixelVaultNative
             };
             Grid.SetColumn(splitter, 1);
             contentGrid.Children.Add(splitter);
+            splitter.DragCompleted += delegate
+            {
+                PersistLibraryBrowserFolderPaneWidthFromGrid(contentGrid);
+            };
+            panes.FolderPaneSplitClampTimer.Tick += delegate
+            {
+                panes.FolderPaneSplitClampTimer.Stop();
+                LibraryBrowserFolderSplitClampAfterResize(contentGrid);
+            };
+            contentGrid.SizeChanged += delegate
+            {
+                if (_libraryBrowserPersistedFolderPaneWidth <= 0.5) return;
+                if (contentGrid.ColumnDefinitions.Count < 1 || !contentGrid.ColumnDefinitions[0].Width.IsAbsolute) return;
+                panes.FolderPaneSplitClampTimer.Stop();
+                panes.FolderPaneSplitClampTimer.Start();
+            };
+            contentGrid.Loaded += delegate
+            {
+                ApplyLibraryBrowserFolderPaneSplit(contentGrid);
+            };
 
             var right = new Border { Background = Brush("#10171C"), Padding = new Thickness(26, 22, 26, 18), MinWidth = 0 };
             Grid.SetColumn(right, 2);
@@ -324,6 +347,9 @@ namespace PixelVaultNative
             rightGrid.Children.Add(panes.ThumbScroll);
             right.Child = rightGrid;
             contentGrid.Children.Add(right);
+
+            panes.LibrarySplitContentGrid = contentGrid;
+            ApplyLibraryBrowserFolderPaneSplit(contentGrid);
 
             return panes;
         }

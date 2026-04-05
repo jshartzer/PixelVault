@@ -36,9 +36,10 @@ namespace PixelVaultNative
                 root.Children.Add(navChrome.NavBar);
 
                 var contentGrid = new Grid();
-                contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(62, GridUnitType.Star), MinWidth = 280 });
+                // ~1/3 folder pane, ~2/3 detail by default (user-adjustable splitter).
+                contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = 300 });
                 contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(38, GridUnitType.Star), MinWidth = 260 });
+                contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(2, GridUnitType.Star), MinWidth = 260 });
                 Grid.SetRow(contentGrid, 1);
                 root.Children.Add(contentGrid);
 

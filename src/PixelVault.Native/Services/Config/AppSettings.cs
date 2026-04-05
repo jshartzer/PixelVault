@@ -12,7 +12,7 @@ namespace PixelVaultNative
         public string ExifToolPath = string.Empty;
         public string FfmpegPath = string.Empty;
         public string SteamGridDbApiToken = string.Empty;
-        public int LibraryFolderTileSize = 240;
+        public int LibraryFolderTileSize = 300;
         public string LibraryFolderSortMode = "platform";
         public string LibraryGroupingMode = "all";
         /// <summary>Committed library search box text (persists across sessions).</summary>
@@ -21,6 +21,8 @@ namespace PixelVaultNative
         public string LibraryBrowserLastViewKey = string.Empty;
         public double LibraryBrowserFolderScroll;
         public double LibraryBrowserDetailScroll;
+        /// <summary>Library folder pane width in pixels when using a fixed split; 0 = default ~⅓ / ~⅔ star layout.</summary>
+        public double LibraryBrowserFolderPaneWidth;
         /// <summary>Pipe-separated recent game title choice labels for manual metadata ComboBox (most recent first).</summary>
         public string ManualMetadataRecentTitleLabels = string.Empty;
         public bool TroubleshootingLoggingEnabled;
@@ -48,6 +50,7 @@ namespace PixelVaultNative
                 LibraryBrowserLastViewKey = s.LibraryBrowserLastViewKey ?? string.Empty,
                 LibraryBrowserFolderScroll = s.LibraryBrowserFolderScroll,
                 LibraryBrowserDetailScroll = s.LibraryBrowserDetailScroll,
+                LibraryBrowserFolderPaneWidth = s.LibraryBrowserFolderPaneWidth,
                 ManualMetadataRecentTitleLabels = s.ManualMetadataRecentTitleLabels ?? string.Empty,
                 TroubleshootingLoggingEnabled = s.TroubleshootingLoggingEnabled,
                 TroubleshootingLogRedactPaths = s.TroubleshootingLogRedactPaths,

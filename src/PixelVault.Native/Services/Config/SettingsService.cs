@@ -20,7 +20,7 @@ namespace PixelVaultNative
         public static int NormalizeLibraryFolderTileSize(int value)
         {
             if (value < 140) return 140;
-            if (value > 340) return 340;
+            if (value > 440) return 440;
             return value;
         }
 
@@ -87,6 +87,10 @@ namespace PixelVaultNative
                 else if (key == "library_browser_detail_scroll")
                 {
                     if (double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var dy)) s.LibraryBrowserDetailScroll = Math.Max(0, dy);
+                }
+                else if (key == "library_browser_folder_pane_width")
+                {
+                    if (double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var pw)) s.LibraryBrowserFolderPaneWidth = Math.Max(0, pw);
                 }
                 else if (key == "manual_metadata_recent_titles") s.ManualMetadataRecentTitleLabels = value ?? string.Empty;
                 else if (key == "troubleshooting_logging_enabled")
@@ -179,6 +183,7 @@ namespace PixelVaultNative
                 "library_browser_last_view_key=" + (state.LibraryBrowserLastViewKey ?? string.Empty).Replace("\r", " ").Replace("\n", " "),
                 "library_browser_folder_scroll=" + Math.Max(0, state.LibraryBrowserFolderScroll).ToString(CultureInfo.InvariantCulture),
                 "library_browser_detail_scroll=" + Math.Max(0, state.LibraryBrowserDetailScroll).ToString(CultureInfo.InvariantCulture),
+                "library_browser_folder_pane_width=" + Math.Max(0, state.LibraryBrowserFolderPaneWidth).ToString(CultureInfo.InvariantCulture),
                 "manual_metadata_recent_titles=" + (state.ManualMetadataRecentTitleLabels ?? string.Empty).Replace("\r", " ").Replace("\n", " "),
                 "troubleshooting_logging_enabled=" + (state.TroubleshootingLoggingEnabled ? "1" : "0"),
                 "troubleshooting_log_redact_paths=" + (state.TroubleshootingLogRedactPaths ? "1" : "0"),

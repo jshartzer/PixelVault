@@ -118,7 +118,8 @@ public sealed class SettingsServiceTests
                 LibraryFolderSortMode = "photos",
                 LibraryGroupingMode = "console",
                 TroubleshootingLoggingEnabled = true,
-                LibraryDoubleClickSetsFolderCover = true
+                LibraryDoubleClickSetsFolderCover = true,
+                LibraryBrowserFolderPaneWidth = 542.25
             };
 
             var svc = new SettingsService();
@@ -138,6 +139,7 @@ public sealed class SettingsServiceTests
             Assert.Equal("console", loaded.LibraryGroupingMode);
             Assert.True(loaded.TroubleshootingLoggingEnabled);
             Assert.True(loaded.LibraryDoubleClickSetsFolderCover);
+            Assert.Equal(542.25, loaded.LibraryBrowserFolderPaneWidth, 5);
             Assert.Equal(loaded.LibraryRoot ?? string.Empty, loaded.LibraryIndexAnchor ?? string.Empty, ignoreCase: true);
         }
         finally

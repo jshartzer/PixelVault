@@ -14,6 +14,8 @@ namespace PixelVaultNative
                 PersistLibraryBrowserCommittedSearch(ws.AppliedLibrarySearchText);
             }
             PersistLibraryBrowserScrollFromWorkingSet(ws);
+            if (ws.Panes.LibrarySplitContentGrid != null)
+                PersistLibraryBrowserFolderPaneWidthFromGrid(ws.Panes.LibrarySplitContentGrid);
             PersistLibraryBrowserLastSelection(ws.Current);
         }
 
