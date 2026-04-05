@@ -1,3 +1,9 @@
+## 0.983
+- **Release:** Version **0.983** — Game-level collection metadata schema groundwork.
+- **Game index / schema:** Added persisted game-level fields on **`game_index`** for **100% complete**, **completed date**, **favorite**, **showcase**, and **collection notes**.
+- **Migration safety:** Existing SQLite libraries upgrade in place by adding the new columns on open, so older databases and copied backup files continue loading without manual repair.
+- **Persistence paths:** Game-index clone / merge / assignment save paths now preserve the new collection fields instead of dropping them during normalization or backfill flows.
+
 ## 0.982
 - **Release:** Version **0.982** — Library folder chrome polish, intake icon, calmer cover grid.
 - **Library / folder covers:** Rounded **`RectangleGeometry`** clip on the cover frame so **`UniformToFill`** art does not paint past the corners; **horizontal spacing** between covers and layout **gap math** both use **12px**. Slightly **tighter** vertical row spacing.

@@ -55,11 +55,11 @@ Then use these based on the task:
 
 Current live build:
 
-- `0.982`
+- `0.983`
 
 Current executable:
 
-- `C:\Codex\dist\PixelVault-0.982\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.983\PixelVault.exe`
 
 Current build pointer:
 
@@ -93,12 +93,13 @@ Practical current focus:
 
 ## Current Stop Point
 
-The app is currently published at `0.982`.
+The app is currently published at `0.983`.
 
 **Notion:** [MainWindow extraction roadmap](https://www.notion.so/33573adc59b681d88b7dcd88cad53cb6) updated for Phase **E** capstone (**`ILibraryBrowserShell`**). If release rows in Notion lag `docs/CURRENT_BUILD.txt`, re-sync per `docs/DOC_SYNC_POLICY.md`.
 
 Recent extraction progress (repo):
 
+- **Game collection metadata schema (0.983):** Added persisted game-level fields on **`game_index`** for **100% complete**, **completed date**, **favorite**, **showcase**, and **collection notes**. SQLite upgrades older libraries in place with additive columns, and game-index normalization / assignment paths now preserve the new fields instead of dropping them during save or backfill.
 - **Library perf + chrome (0.980):** Detail snapshot builds reuse media dimension maps when possible, parallel-probe layouts for large folders, richer **PERF** / troubleshooting timings for hunts, global thin dark rounded **ScrollBar** theme, slightly higher decode concurrency.
 - **Packed card tile scale (0.975):** Packed day-card masonry uses a **1.25×** tile-width multiplier instead of **1.75×** for in-card targets and min/max column bounds (detail/timeline packed layout only).
 - **Library aspect-native tiles (0.974):** Masonry heights are **width ÷ aspect** per file with no shared height clamps; images and video previews use **Uniform** stretch only; timeline packed-card estimates reserve space for tall portraits.
