@@ -124,6 +124,18 @@ namespace PixelVaultNative
                 Action<LibraryDetailRenderSnapshot, bool> applyDetailSnapshot = null;
                 applyDetailSnapshot = delegate(LibraryDetailRenderSnapshot snapshot, bool logCompletion)
                 {
+                    Action<IEnumerable<VirtualizedRowDefinition>> commitDetailVirtualRows = delegate(IEnumerable<VirtualizedRowDefinition> rowEnum)
+                    {
+                        double? scrollRestore = restoreDetailScrollPending ? restoreDetailScrollOffset : null;
+                        if (!restoreDetailScrollPending && panes != null && panes.ThumbScroll != null)
+                        {
+                            var live = panes.ThumbScroll.VerticalOffset;
+                            if (live > 0.1d) scrollRestore = live;
+                        }
+                        var resetDetailScroll = !scrollRestore.HasValue;
+                        SetVirtualizedRows(panes.DetailRows, rowEnum, resetDetailScroll, scrollRestore);
+                        restoreDetailScrollPending = false;
+                    };
                     var snapshotStage = logCompletion ? "initial" : "refined";
                     if (renderVersion != ws.DetailRenderSequence)
                     {
@@ -182,7 +194,7 @@ namespace PixelVaultNative
                     if (snapshot == null || snapshot.Groups == null || snapshot.Groups.Count == 0)
                     {
                         ws.DetailFilesDisplayOrder.Clear();
-                        SetVirtualizedRows(panes.DetailRows, new[]
+                        commitDetailVirtualRows(new[]
                         {
                             new VirtualizedRowDefinition
                             {
@@ -192,8 +204,7 @@ namespace PixelVaultNative
                                     return new TextBlock { Text = timelineView ? "No captures found in the selected timeline range." : "No captures found in this folder.", Foreground = Brush("#A7B5BD") };
                                 }
                             }
-                        }, !restoreDetailScrollPending, restoreDetailScrollPending ? restoreDetailScrollOffset : null);
-                        restoreDetailScrollPending = false;
+                        });
                         if (refreshDetailSelectionUi != null) refreshDetailSelectionUi();
                         LogTroubleshooting("LibraryDetailRenderApplied",
                             "renderVersion=" + renderVersion
@@ -229,8 +240,7 @@ namespace PixelVaultNative
                         refreshDetailSelectionUi,
                         redrawSelectedFolderDetail,
                         renderFolderTiles);
-                    SetVirtualizedRows(panes.DetailRows, virtualRows, !restoreDetailScrollPending, restoreDetailScrollPending ? restoreDetailScrollOffset : null);
-                    restoreDetailScrollPending = false;
+                    commitDetailVirtualRows(virtualRows);
                     if (refreshDetailSelectionUi != null) refreshDetailSelectionUi();
                     LogTroubleshooting("LibraryDetailRenderApplied",
                         "renderVersion=" + renderVersion

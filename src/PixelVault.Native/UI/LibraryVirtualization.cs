@@ -36,9 +36,28 @@ namespace PixelVaultNative
             public readonly Dictionary<int, FrameworkElement> RecycledRowElements = new Dictionary<int, FrameworkElement>();
             /// <summary>Batches <see cref="RefreshVirtualizedRowHost"/> during window/pane resize so ScrollViewer layout storms do not queue hundreds of full virtual passes.</summary>
             internal DispatcherTimer ViewportResizeCoalesceTimer;
+            /// <summary>Batches virtual row rebuilds during ScrollViewer offset changes so wheel/trackpad scrolling does not remeasure visible rows every tick (jitter).</summary>
+            internal DispatcherTimer ScrollRefreshDebounceTimer;
         }
 
         const int VirtualizedRowHostViewportRefreshDebounceMs = 85;
+        const int VirtualizedRowHostScrollRefreshDebounceMs = 48;
+
+        void ScheduleVirtualizedRowHostScrollRefresh(VirtualizedRowHost host)
+        {
+            if (host == null || host.ScrollViewer == null) return;
+            if (host.ScrollRefreshDebounceTimer == null)
+            {
+                host.ScrollRefreshDebounceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(VirtualizedRowHostScrollRefreshDebounceMs) };
+                host.ScrollRefreshDebounceTimer.Tick += delegate
+                {
+                    host.ScrollRefreshDebounceTimer.Stop();
+                    RefreshVirtualizedRowHost(host);
+                };
+            }
+            host.ScrollRefreshDebounceTimer.Stop();
+            host.ScrollRefreshDebounceTimer.Start();
+        }
 
         void ScheduleVirtualizedRowHostViewportRefresh(VirtualizedRowHost host)
         {
@@ -49,6 +68,7 @@ namespace PixelVaultNative
                 host.ViewportResizeCoalesceTimer.Tick += delegate
                 {
                     host.ViewportResizeCoalesceTimer.Stop();
+                    host.ScrollRefreshDebounceTimer?.Stop();
                     RefreshVirtualizedRowHost(host);
                 };
             }
@@ -78,7 +98,14 @@ namespace PixelVaultNative
                 if (Math.Abs(e.VerticalChange) > 0.1 || Math.Abs(e.HorizontalChange) > 0.1)
                 {
                     host.ViewportResizeCoalesceTimer?.Stop();
-                    RefreshVirtualizedRowHost(host);
+                    var vh = host.ScrollViewer.ViewportHeight;
+                    if (vh > 1 && (Math.Abs(e.VerticalChange) >= vh * 0.88 || Math.Abs(e.HorizontalChange) >= host.ScrollViewer.ViewportWidth * 0.88))
+                    {
+                        host.ScrollRefreshDebounceTimer?.Stop();
+                        RefreshVirtualizedRowHost(host);
+                    }
+                    else
+                        ScheduleVirtualizedRowHostScrollRefresh(host);
                     return;
                 }
                 if (Math.Abs(e.ViewportHeightChange) > 0.1 || Math.Abs(e.ViewportWidthChange) > 0.1)
@@ -92,6 +119,7 @@ namespace PixelVaultNative
         {
             if (host == null) return;
             host.ViewportResizeCoalesceTimer?.Stop();
+            host.ScrollRefreshDebounceTimer?.Stop();
             host.Rows = rows == null ? new List<VirtualizedRowDefinition>() : new List<VirtualizedRowDefinition>(rows);
             host.FirstVisibleIndex = -1;
             host.LastVisibleIndex = -1;
@@ -201,7 +229,7 @@ namespace PixelVaultNative
                 {
                     element.Measure(new Size(measureWidth, double.PositiveInfinity));
                     var measuredHeight = Math.Max(1, Math.Ceiling(element.DesiredSize.Height));
-                    if (Math.Abs(measuredHeight - Math.Max(1, row.Height)) > 1)
+                    if (Math.Abs(measuredHeight - Math.Max(1, row.Height)) > 3)
                     {
                         row.Height = measuredHeight;
                         rowHeightChanged = true;
