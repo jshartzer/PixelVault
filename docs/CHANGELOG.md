@@ -1,7 +1,7 @@
 ## 0.982
 - **Release:** Version **0.982** — Library folder chrome polish, intake icon, calmer cover grid.
 - **Library / folder covers:** Rounded **`RectangleGeometry`** clip on the cover frame so **`UniformToFill`** art does not paint past the corners; **horizontal spacing** between covers and layout **gap math** both use **12px**. Slightly **tighter** vertical row spacing.
-- **Library / toolbar:** Removed **Most Photos** sort pill (**`photos`** sort remains valid if already saved in settings). **Upload queue** (intake preview) control uses new **`assets/IntakeReviewQueue.png`** (white backdrop knocked out for dark chrome) in the library nav and intake preview header, with vector fallback if the file is missing.
+- **Library / toolbar:** Removed **Most Photos** sort pill (**`photos`** sort remains valid if already saved in settings). **Upload queue** (intake preview) control uses new **`assets/IntakeReviewQueue.png`** (white backdrop knocked out for dark chrome) in the library nav and intake preview header, with vector fallback if the file is missing. The **library nav** intake glyph now **fills the button** (grid sized to the inner chrome, **`Stretch.Uniform`**, small inset); shared **`BuildGamepadGlyphCanvas`** for the vector fallback; PNG decode width **192** for sharper scaling.
 - **Library / folder grid:** Folder pane responsive layout **caps at 4 columns** (no more 5–8 on very wide splitters); **12px** inter-column gap in **`CalculateResponsiveLibraryFolderLayout`** matches tile margins; narrower tie-breaker slack for column choice.
 
 ## 0.981

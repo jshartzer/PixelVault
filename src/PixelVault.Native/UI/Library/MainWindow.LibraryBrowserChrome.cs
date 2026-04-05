@@ -159,17 +159,20 @@ namespace PixelVaultNative
             chrome.IntakeReviewButton.Margin = new Thickness(8, 0, 0, 0);
             chrome.IntakeReviewButton.ToolTip = "Preview upload queue";
             ApplyLibraryToolbarChrome(chrome.IntakeReviewButton, "#152028", "#253745", "#1E2D37", "#121C23");
-            var intakeReviewContent = new Grid();
+            // Inner size = button minus 1px toolbar border on each side so the glyph can use the full hit area (template centers content).
+            var intakeInnerW = chrome.IntakeReviewButton.Width - 2;
+            var intakeInnerH = chrome.IntakeReviewButton.Height - 2;
+            var intakeReviewContent = new Grid { Width = intakeInnerW, Height = intakeInnerH };
+            var inset = new Thickness(2);
             var intakeQueueIcon = LoadIntakeReviewQueueBitmap();
             if (intakeQueueIcon != null)
             {
                 var intakeImage = new Image
                 {
-                    Width = 42,
-                    Height = 28,
+                    Margin = inset,
                     Stretch = Stretch.Uniform,
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Center,
+                    HorizontalAlignment = HorizontalAlignment.Stretch,
+                    VerticalAlignment = VerticalAlignment.Stretch,
                     Source = intakeQueueIcon
                 };
                 RenderOptions.SetBitmapScalingMode(intakeImage, BitmapScalingMode.HighQuality);
@@ -179,12 +182,11 @@ namespace PixelVaultNative
             {
                 intakeReviewContent.Children.Add(new Viewbox
                 {
-                    Width = 42,
-                    Height = 28,
+                    Margin = inset,
                     Stretch = Stretch.Uniform,
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Center,
-                    Child = BuildGamepadGlyph(Brush("#F5F7FA"), 2.15, 42, 28)
+                    HorizontalAlignment = HorizontalAlignment.Stretch,
+                    VerticalAlignment = VerticalAlignment.Stretch,
+                    Child = BuildGamepadGlyphCanvas(Brush("#F5F7FA"), 2.15)
                 });
             }
             chrome.IntakeReviewBadgeText = new TextBlock

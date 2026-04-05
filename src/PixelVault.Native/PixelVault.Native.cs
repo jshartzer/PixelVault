@@ -382,7 +382,7 @@ namespace PixelVaultNative
         }
 
         SolidColorBrush Brush(string hex) { return UiBrushHelper.FromHex(hex); }
-        FrameworkElement BuildGamepadGlyph(Brush stroke, double strokeThickness, double width, double height)
+        Canvas BuildGamepadGlyphCanvas(Brush stroke, double strokeThickness)
         {
             var art = new Canvas { Width = 108, Height = 48 };
             art.Children.Add(new System.Windows.Shapes.Path
@@ -405,12 +405,16 @@ namespace PixelVaultNative
                 StrokeStartLineCap = PenLineCap.Round,
                 StrokeEndLineCap = PenLineCap.Round
             });
+            return art;
+        }
+        FrameworkElement BuildGamepadGlyph(Brush stroke, double strokeThickness, double width, double height)
+        {
             return new Viewbox
             {
                 Width = width,
                 Height = height,
                 Stretch = Stretch.Uniform,
-                Child = art
+                Child = BuildGamepadGlyphCanvas(stroke, strokeThickness)
             };
         }
         FrameworkElement BuildSymbolIcon(string glyph, string foregroundHex, double fontSize)
@@ -493,7 +497,7 @@ namespace PixelVaultNative
                 var bmp = new BitmapImage();
                 bmp.BeginInit();
                 bmp.UriSource = new Uri(path, UriKind.Absolute);
-                bmp.DecodePixelWidth = 128;
+                bmp.DecodePixelWidth = 192;
                 bmp.CacheOption = BitmapCacheOption.OnLoad;
                 bmp.EndInit();
                 bmp.Freeze();
