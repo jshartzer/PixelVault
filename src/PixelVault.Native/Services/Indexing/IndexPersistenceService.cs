@@ -268,6 +268,11 @@ CREATE TABLE IF NOT EXISTS game_index (
     preview_image_path TEXT NOT NULL DEFAULT '',
     file_paths TEXT NOT NULL DEFAULT '',
     index_added_utc_ticks INTEGER NOT NULL DEFAULT 0,
+    is_completed_100_percent INTEGER NOT NULL DEFAULT 0,
+    completed_utc_ticks INTEGER NOT NULL DEFAULT 0,
+    is_favorite INTEGER NOT NULL DEFAULT 0,
+    is_showcase INTEGER NOT NULL DEFAULT 0,
+    collection_notes TEXT NOT NULL DEFAULT '',
     PRIMARY KEY (root, game_id)
 );
 CREATE INDEX IF NOT EXISTS idx_game_index_root_identity ON game_index(root, name, platform_label);
@@ -329,49 +334,47 @@ CREATE INDEX IF NOT EXISTS idx_starred_export_root_dest ON starred_export_state(
             EnsurePhotoIndexCaptureTicksColumn(connection);
             EnsurePhotoIndexStarredColumn(connection);
             EnsureGameIndexIndexAddedUtcTicksColumn(connection);
+            EnsureGameIndexCollectionMetadataColumns(connection);
             EnsurePhotoIndexIndexAddedUtcTicksColumn(connection);
+        }
+
+        void EnsureGameIndexCollectionMetadataColumns(SqliteConnection connection)
+        {
+            EnsureDatabaseColumn(connection, "game_index", "is_completed_100_percent", "INTEGER NOT NULL DEFAULT 0");
+            EnsureDatabaseColumn(connection, "game_index", "completed_utc_ticks", "INTEGER NOT NULL DEFAULT 0");
+            EnsureDatabaseColumn(connection, "game_index", "is_favorite", "INTEGER NOT NULL DEFAULT 0");
+            EnsureDatabaseColumn(connection, "game_index", "is_showcase", "INTEGER NOT NULL DEFAULT 0");
+            EnsureDatabaseColumn(connection, "game_index", "collection_notes", "TEXT NOT NULL DEFAULT ''");
         }
 
         void EnsureGameIndexIndexAddedUtcTicksColumn(SqliteConnection connection)
         {
-            if (connection == null) return;
-            if (DatabaseTableHasColumn(connection, "game_index", "index_added_utc_ticks")) return;
-            using (var command = connection.CreateCommand())
-            {
-                command.CommandText = "ALTER TABLE game_index ADD COLUMN index_added_utc_ticks INTEGER NOT NULL DEFAULT 0;";
-                command.ExecuteNonQuery();
-            }
+            EnsureDatabaseColumn(connection, "game_index", "index_added_utc_ticks", "INTEGER NOT NULL DEFAULT 0");
         }
 
         void EnsurePhotoIndexIndexAddedUtcTicksColumn(SqliteConnection connection)
         {
-            if (connection == null) return;
-            if (DatabaseTableHasColumn(connection, "photo_index", "index_added_utc_ticks")) return;
-            using (var command = connection.CreateCommand())
-            {
-                command.CommandText = "ALTER TABLE photo_index ADD COLUMN index_added_utc_ticks INTEGER NOT NULL DEFAULT 0;";
-                command.ExecuteNonQuery();
-            }
+            EnsureDatabaseColumn(connection, "photo_index", "index_added_utc_ticks", "INTEGER NOT NULL DEFAULT 0");
         }
 
         void EnsurePhotoIndexCaptureTicksColumn(SqliteConnection connection)
         {
-            if (connection == null) return;
-            if (DatabaseTableHasColumn(connection, "photo_index", "capture_utc_ticks")) return;
-            using (var command = connection.CreateCommand())
-            {
-                command.CommandText = "ALTER TABLE photo_index ADD COLUMN capture_utc_ticks INTEGER NOT NULL DEFAULT 0;";
-                command.ExecuteNonQuery();
-            }
+            EnsureDatabaseColumn(connection, "photo_index", "capture_utc_ticks", "INTEGER NOT NULL DEFAULT 0");
         }
 
         void EnsurePhotoIndexStarredColumn(SqliteConnection connection)
         {
+            EnsureDatabaseColumn(connection, "photo_index", "starred", "INTEGER NOT NULL DEFAULT 0");
+        }
+
+        void EnsureDatabaseColumn(SqliteConnection connection, string tableName, string columnName, string columnDefinition)
+        {
             if (connection == null) return;
-            if (DatabaseTableHasColumn(connection, "photo_index", "starred")) return;
+            if (string.IsNullOrWhiteSpace(tableName) || string.IsNullOrWhiteSpace(columnName) || string.IsNullOrWhiteSpace(columnDefinition)) return;
+            if (DatabaseTableHasColumn(connection, tableName, columnName)) return;
             using (var command = connection.CreateCommand())
             {
-                command.CommandText = "ALTER TABLE photo_index ADD COLUMN starred INTEGER NOT NULL DEFAULT 0;";
+                command.CommandText = "ALTER TABLE " + tableName + " ADD COLUMN " + columnName + " " + columnDefinition + ";";
                 command.ExecuteNonQuery();
             }
         }
@@ -411,7 +414,8 @@ CREATE INDEX IF NOT EXISTS idx_starred_export_root_dest ON starred_export_state(
             using (var command = connection.CreateCommand())
             {
                 command.CommandText = @"
-SELECT game_id, folder_path, name, platform_label, steam_app_id, steam_grid_db_id, file_count, preview_image_path, file_paths, index_added_utc_ticks
+SELECT game_id, folder_path, name, platform_label, steam_app_id, steam_grid_db_id, file_count, preview_image_path, file_paths, index_added_utc_ticks,
+       is_completed_100_percent, completed_utc_ticks, is_favorite, is_showcase, collection_notes
 FROM game_index
 WHERE root = $root
 ORDER BY name COLLATE NOCASE, platform_label COLLATE NOCASE, game_id COLLATE NOCASE;";
@@ -436,7 +440,12 @@ ORDER BY name COLLATE NOCASE, platform_label COLLATE NOCASE, game_id COLLATE NOC
                             FilePaths = string.IsNullOrWhiteSpace(filePathsText)
                                 ? new string[0]
                                 : filePathsText.Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries).Where(File.Exists).ToArray(),
-                            IndexAddedUtcTicks = reader.IsDBNull(9) ? 0L : reader.GetInt64(9)
+                            IndexAddedUtcTicks = reader.IsDBNull(9) ? 0L : reader.GetInt64(9),
+                            IsCompleted100Percent = ReadSqliteBoolLoose(reader, 10),
+                            CompletedUtcTicks = reader.IsDBNull(11) ? 0L : reader.GetInt64(11),
+                            IsFavorite = ReadSqliteBoolLoose(reader, 12),
+                            IsShowcase = ReadSqliteBoolLoose(reader, 13),
+                            CollectionNotes = reader.IsDBNull(14) ? string.Empty : reader.GetString(14)
                         });
                     }
                 }
@@ -451,7 +460,8 @@ ORDER BY name COLLATE NOCASE, platform_label COLLATE NOCASE, game_id COLLATE NOC
             using (var command = connection.CreateCommand())
             {
                 command.CommandText = @"
-SELECT game_id, folder_path, name, platform_label, steam_app_id, steam_grid_db_id, file_count, preview_image_path, file_paths, index_added_utc_ticks
+SELECT game_id, folder_path, name, platform_label, steam_app_id, steam_grid_db_id, file_count, preview_image_path, file_paths, index_added_utc_ticks,
+       is_completed_100_percent, completed_utc_ticks, is_favorite, is_showcase, collection_notes
 FROM game_index
 ORDER BY name COLLATE NOCASE, platform_label COLLATE NOCASE, game_id COLLATE NOCASE;";
                 using (var reader = command.ExecuteReader())
@@ -474,7 +484,12 @@ ORDER BY name COLLATE NOCASE, platform_label COLLATE NOCASE, game_id COLLATE NOC
                             FilePaths = string.IsNullOrWhiteSpace(filePathsText)
                                 ? new string[0]
                                 : filePathsText.Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries).Where(File.Exists).ToArray(),
-                            IndexAddedUtcTicks = reader.IsDBNull(9) ? 0L : reader.GetInt64(9)
+                            IndexAddedUtcTicks = reader.IsDBNull(9) ? 0L : reader.GetInt64(9),
+                            IsCompleted100Percent = ReadSqliteBoolLoose(reader, 10),
+                            CompletedUtcTicks = reader.IsDBNull(11) ? 0L : reader.GetInt64(11),
+                            IsFavorite = ReadSqliteBoolLoose(reader, 12),
+                            IsShowcase = ReadSqliteBoolLoose(reader, 13),
+                            CollectionNotes = reader.IsDBNull(14) ? string.Empty : reader.GetString(14)
                         });
                     }
                 }
@@ -501,8 +516,8 @@ ORDER BY name COLLATE NOCASE, platform_label COLLATE NOCASE, game_id COLLATE NOC
                     {
                         insert.Transaction = transaction;
                         insert.CommandText = @"
-INSERT INTO game_index (root, game_id, folder_path, name, platform_label, steam_app_id, steam_grid_db_id, file_count, preview_image_path, file_paths, index_added_utc_ticks)
-VALUES ($root, $gameId, $folderPath, $name, $platformLabel, $steamAppId, $steamGridDbId, $fileCount, $previewImagePath, $filePaths, $indexAddedUtcTicks);";
+INSERT INTO game_index (root, game_id, folder_path, name, platform_label, steam_app_id, steam_grid_db_id, file_count, preview_image_path, file_paths, index_added_utc_ticks, is_completed_100_percent, completed_utc_ticks, is_favorite, is_showcase, collection_notes)
+VALUES ($root, $gameId, $folderPath, $name, $platformLabel, $steamAppId, $steamGridDbId, $fileCount, $previewImagePath, $filePaths, $indexAddedUtcTicks, $isCompleted100Percent, $completedUtcTicks, $isFavorite, $isShowcase, $collectionNotes);";
                         insert.Parameters.AddWithValue("$root", root ?? string.Empty);
                         insert.Parameters.AddWithValue("$gameId", NormalizeGameId(row.GameId));
                         insert.Parameters.AddWithValue("$folderPath", row.FolderPath ?? string.Empty);
@@ -514,6 +529,11 @@ VALUES ($root, $gameId, $folderPath, $name, $platformLabel, $steamAppId, $steamG
                         insert.Parameters.AddWithValue("$previewImagePath", row.PreviewImagePath ?? string.Empty);
                         insert.Parameters.AddWithValue("$filePaths", string.Join("|", (row.FilePaths ?? new string[0]).Where(File.Exists)));
                         insert.Parameters.AddWithValue("$indexAddedUtcTicks", row.IndexAddedUtcTicks > 0 ? row.IndexAddedUtcTicks : 0);
+                        insert.Parameters.AddWithValue("$isCompleted100Percent", row.IsCompleted100Percent ? 1L : 0L);
+                        insert.Parameters.AddWithValue("$completedUtcTicks", row.CompletedUtcTicks > 0 ? row.CompletedUtcTicks : 0L);
+                        insert.Parameters.AddWithValue("$isFavorite", row.IsFavorite ? 1L : 0L);
+                        insert.Parameters.AddWithValue("$isShowcase", row.IsShowcase ? 1L : 0L);
+                        insert.Parameters.AddWithValue("$collectionNotes", row.CollectionNotes ?? string.Empty);
                         insert.ExecuteNonQuery();
                     }
                 }
@@ -800,7 +820,8 @@ VALUES ($root, $fileName, $platformLabel, $conventionId, $firstSeenUtcTicks, $la
                         PreviewImagePath = parts.Length > 7 ? parts[7] : string.Empty,
                         FilePaths = parts.Length > 8 && !string.IsNullOrWhiteSpace(parts[8])
                             ? parts[8].Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries).Where(File.Exists).ToArray()
-                            : new string[0]
+                            : new string[0],
+                        CollectionNotes = string.Empty
                     });
                 }
                 else if (parts.Length >= 8)
@@ -817,7 +838,8 @@ VALUES ($root, $fileName, $platformLabel, $conventionId, $firstSeenUtcTicks, $la
                         PreviewImagePath = parts.Length > 6 ? parts[6] : string.Empty,
                         FilePaths = parts.Length > 7 && !string.IsNullOrWhiteSpace(parts[7])
                             ? parts[7].Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries).Where(File.Exists).ToArray()
-                            : new string[0]
+                            : new string[0],
+                        CollectionNotes = string.Empty
                     });
                 }
                 else if (parts.Length >= 4)
@@ -834,7 +856,8 @@ VALUES ($root, $fileName, $platformLabel, $conventionId, $firstSeenUtcTicks, $la
                         PreviewImagePath = parts.Length > 5 ? parts[5] : string.Empty,
                         FilePaths = parts.Length > 6 && !string.IsNullOrWhiteSpace(parts[6])
                             ? parts[6].Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries).Where(File.Exists).ToArray()
-                            : new string[0]
+                            : new string[0],
+                        CollectionNotes = string.Empty
                     });
                 }
             }
@@ -1138,7 +1161,12 @@ WHERE root = $root AND game_id = $oldGameId;";
                         SuppressSteamGridDbIdAutoResolve = legacyRow.SuppressSteamGridDbIdAutoResolve,
                         FileCount = legacyRow.FileCount,
                         PreviewImagePath = legacyRow.PreviewImagePath,
-                        FilePaths = legacyRow.FilePaths
+                        FilePaths = legacyRow.FilePaths,
+                        IsCompleted100Percent = legacyRow.IsCompleted100Percent,
+                        CompletedUtcTicks = legacyRow.CompletedUtcTicks,
+                        IsFavorite = legacyRow.IsFavorite,
+                        IsShowcase = legacyRow.IsShowcase,
+                        CollectionNotes = legacyRow.CollectionNotes ?? string.Empty
                     };
                 }
             }

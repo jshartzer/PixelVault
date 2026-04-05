@@ -85,6 +85,46 @@ public sealed class IndexPersistenceServiceTests
     }
 
     [Fact]
+    public void SaveAndLoadSavedGameIndexRows_RoundTripsCollectionMetadata()
+    {
+        using var harness = new IndexPersistenceHarness();
+        var existingFile = harness.CreateFile("library\\collection-cover.png");
+        var completedTicks = new DateTime(2025, 11, 3, 18, 45, 0, DateTimeKind.Utc).Ticks;
+
+        harness.Service.SaveSavedGameIndexRows(
+            harness.LibraryRoot,
+            new[]
+            {
+                new GameIndexEditorRow
+                {
+                    GameId = "G00125",
+                    Name = "Control",
+                    PlatformLabel = "Steam",
+                    SteamAppId = string.Empty,
+                    SteamGridDbId = string.Empty,
+                    FileCount = 1,
+                    FolderPath = Path.Combine(harness.RootPath, "library"),
+                    PreviewImagePath = existingFile,
+                    FilePaths = new[] { existingFile },
+                    IsCompleted100Percent = true,
+                    CompletedUtcTicks = completedTicks,
+                    IsFavorite = true,
+                    IsShowcase = true,
+                    CollectionNotes = "Foundation complete; ready for showcase shelf."
+                }
+            });
+
+        var rows = harness.Service.LoadSavedGameIndexRows(harness.LibraryRoot);
+
+        var row = Assert.Single(rows);
+        Assert.True(row.IsCompleted100Percent);
+        Assert.Equal(completedTicks, row.CompletedUtcTicks);
+        Assert.True(row.IsFavorite);
+        Assert.True(row.IsShowcase);
+        Assert.Equal("Foundation complete; ready for showcase shelf.", row.CollectionNotes);
+    }
+
+    [Fact]
     public void LoadSavedGameIndexRows_BackfillsExternalIdsFromPriorRootDatabase()
     {
         using var harness = new IndexPersistenceHarness();
@@ -195,6 +235,69 @@ VALUES ($root, 'G00999', 'E:/Game Captures/Alan Wake', 'Alan Wake', 'Steam', '10
         Assert.Equal("G00001", row.GameId);
         Assert.Equal("108710", row.SteamAppId);
         Assert.Equal("9991", row.SteamGridDbId);
+    }
+
+    [Fact]
+    public void LoadSavedGameIndexRows_UpgradesExistingDatabaseWithCollectionMetadataColumns()
+    {
+        using var harness = new IndexPersistenceHarness();
+        var existingFile = harness.CreateFile("library\\upgrade-cover.png");
+
+        var builder = new SqliteConnectionStringBuilder
+        {
+            DataSource = harness.IndexDatabasePath,
+            Mode = SqliteOpenMode.ReadWriteCreate
+        };
+        using (var connection = new SqliteConnection(builder.ToString()))
+        {
+            connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = @"
+CREATE TABLE game_index (
+    root TEXT NOT NULL,
+    game_id TEXT NOT NULL,
+    folder_path TEXT NOT NULL DEFAULT '',
+    name TEXT NOT NULL DEFAULT '',
+    platform_label TEXT NOT NULL DEFAULT '',
+    steam_app_id TEXT NOT NULL DEFAULT '',
+    steam_grid_db_id TEXT NOT NULL DEFAULT '',
+    file_count INTEGER NOT NULL DEFAULT 0,
+    preview_image_path TEXT NOT NULL DEFAULT '',
+    file_paths TEXT NOT NULL DEFAULT '',
+    index_added_utc_ticks INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (root, game_id)
+);
+INSERT INTO game_index (root, game_id, folder_path, name, platform_label, steam_app_id, steam_grid_db_id, file_count, preview_image_path, file_paths, index_added_utc_ticks)
+VALUES ($root, 'G00045', 'E:/Game Captures/Control', 'Control', 'Steam', '', '', 1, $previewImagePath, $filePaths, 0);";
+            command.Parameters.AddWithValue("$root", harness.LibraryRoot);
+            command.Parameters.AddWithValue("$previewImagePath", existingFile);
+            command.Parameters.AddWithValue("$filePaths", existingFile);
+            command.ExecuteNonQuery();
+        }
+
+        var loaded = harness.Service.LoadSavedGameIndexRows(harness.LibraryRoot);
+
+        var row = Assert.Single(loaded);
+        Assert.Equal("G00045", row.GameId);
+        Assert.False(row.IsCompleted100Percent);
+        Assert.Equal(0L, row.CompletedUtcTicks);
+        Assert.False(row.IsFavorite);
+        Assert.False(row.IsShowcase);
+        Assert.Equal(string.Empty, row.CollectionNotes);
+
+        using var verifyConnection = new SqliteConnection(builder.ToString());
+        verifyConnection.Open();
+        using var verifyCommand = verifyConnection.CreateCommand();
+        verifyCommand.CommandText = "SELECT COUNT(1) FROM pragma_table_info('game_index') WHERE name = 'is_completed_100_percent';";
+        Assert.Equal(1, Convert.ToInt32(verifyCommand.ExecuteScalar()));
+        verifyCommand.CommandText = "SELECT COUNT(1) FROM pragma_table_info('game_index') WHERE name = 'completed_utc_ticks';";
+        Assert.Equal(1, Convert.ToInt32(verifyCommand.ExecuteScalar()));
+        verifyCommand.CommandText = "SELECT COUNT(1) FROM pragma_table_info('game_index') WHERE name = 'is_favorite';";
+        Assert.Equal(1, Convert.ToInt32(verifyCommand.ExecuteScalar()));
+        verifyCommand.CommandText = "SELECT COUNT(1) FROM pragma_table_info('game_index') WHERE name = 'is_showcase';";
+        Assert.Equal(1, Convert.ToInt32(verifyCommand.ExecuteScalar()));
+        verifyCommand.CommandText = "SELECT COUNT(1) FROM pragma_table_info('game_index') WHERE name = 'collection_notes';";
+        Assert.Equal(1, Convert.ToInt32(verifyCommand.ExecuteScalar()));
     }
 
     [Fact]

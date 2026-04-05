@@ -114,6 +114,11 @@ namespace PixelVaultNative
                 FolderPath = (row.FolderPath ?? string.Empty).Trim(),
                 PreviewImagePath = (row.PreviewImagePath ?? string.Empty).Trim(),
                 FilePaths = (row.FilePaths ?? new string[0]).Where(path => !string.IsNullOrWhiteSpace(path)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
+                IsCompleted100Percent = row.IsCompleted100Percent,
+                CompletedUtcTicks = row.CompletedUtcTicks > 0 ? row.CompletedUtcTicks : 0L,
+                IsFavorite = row.IsFavorite,
+                IsShowcase = row.IsShowcase,
+                CollectionNotes = row.CollectionNotes ?? string.Empty,
                 IndexAddedUtcTicks = row.IndexAddedUtcTicks
             };
         }
@@ -241,6 +246,11 @@ namespace PixelVaultNative
                     FolderPath = folderPath ?? string.Empty,
                     PreviewImagePath = previewPath,
                     FilePaths = mergedFilePaths,
+                    IsCompleted100Percent = groupRows.Any(row => row.IsCompleted100Percent),
+                    CompletedUtcTicks = groupRows.Select(row => row.CompletedUtcTicks).Where(t => t > 0).DefaultIfEmpty(0L).Max(),
+                    IsFavorite = groupRows.Any(row => row.IsFavorite),
+                    IsShowcase = groupRows.Any(row => row.IsShowcase),
+                    CollectionNotes = groupRows.Select(row => row.CollectionNotes ?? string.Empty).FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty,
                     IndexAddedUtcTicks = mergedIndexAddedTicks
                 });
             }
@@ -337,6 +347,8 @@ namespace PixelVaultNative
                     (previous != null && previous.SuppressSteamGridDbIdAutoResolve) || row.SuppressSteamGridDbIdAutoResolve);
                 row.SteamAppId = cleanedSteamAppId;
                 row.SteamGridDbId = cleanedSteamGridDbId;
+                row.CompletedUtcTicks = row.CompletedUtcTicks > 0 ? row.CompletedUtcTicks : 0L;
+                row.CollectionNotes = row.CollectionNotes ?? string.Empty;
             }
         }
 

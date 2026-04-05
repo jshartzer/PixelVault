@@ -148,6 +148,11 @@ namespace PixelVaultNative
                 FolderPath = (row.FolderPath ?? string.Empty).Trim(),
                 PreviewImagePath = (row.PreviewImagePath ?? string.Empty).Trim(),
                 FilePaths = (row.FilePaths ?? new string[0]).Where(path => !string.IsNullOrWhiteSpace(path)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
+                IsCompleted100Percent = row.IsCompleted100Percent,
+                CompletedUtcTicks = row.CompletedUtcTicks > 0 ? row.CompletedUtcTicks : 0L,
+                IsFavorite = row.IsFavorite,
+                IsShowcase = row.IsShowcase,
+                CollectionNotes = row.CollectionNotes ?? string.Empty,
                 IndexAddedUtcTicks = row.IndexAddedUtcTicks
             };
         }

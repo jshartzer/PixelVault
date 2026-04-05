@@ -50,6 +50,12 @@ namespace PixelVaultNative
         public string FolderPath { get; set; }
         public string PreviewImagePath { get; set; }
         public string[] FilePaths { get; set; }
+        public bool IsCompleted100Percent { get; set; }
+        /// <summary>UTC ticks when the game was manually marked complete / 100% (0 = unknown / not set).</summary>
+        public long CompletedUtcTicks { get; set; }
+        public bool IsFavorite { get; set; }
+        public bool IsShowcase { get; set; }
+        public string CollectionNotes { get; set; }
         /// <summary>UTC ticks when this game row was first added to the index (0 = unknown / predates field).</summary>
         public long IndexAddedUtcTicks { get; set; }
         public string IndexAddedAtLocal => LibraryIndexRecordDisplay.FormatIndexAddedUtcLocal(IndexAddedUtcTicks);
