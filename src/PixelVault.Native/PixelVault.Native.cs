@@ -848,15 +848,15 @@ namespace PixelVaultNative
                     Stretch = Stretch.Uniform,
                     HorizontalAlignment = HorizontalAlignment.Right,
                     VerticalAlignment = VerticalAlignment.Top,
-                    Margin = new Thickness(0, 4, 4, 0),
+                    Margin = new Thickness(0, 10, 10, 0),
                     SnapsToDevicePixels = true,
                     Effect = new DropShadowEffect
                     {
                         Color = Colors.Black,
-                        BlurRadius = 6,
+                        BlurRadius = 14,
                         Direction = 270,
-                        ShadowDepth = 1,
-                        Opacity = 0.55
+                        ShadowDepth = 4,
+                        Opacity = 0.42
                     }
                 };
             }
@@ -2840,8 +2840,6 @@ namespace PixelVaultNative
         }
     }
 }
-
-
 
 
 
