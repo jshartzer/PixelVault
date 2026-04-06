@@ -479,6 +479,7 @@ namespace PixelVaultNative
             foreach (var basePath in new[]
             {
                 Path.Combine(appRoot, "assets"),
+                Path.Combine(appRoot, "assets", "assets"),
                 Path.GetFullPath(Path.Combine(appRoot, "..", "..", "assets"))
             }.Where(path => !string.IsNullOrWhiteSpace(path)).Distinct(StringComparer.OrdinalIgnoreCase))
             {
@@ -2840,7 +2841,6 @@ namespace PixelVaultNative
         }
     }
 }
-
 
 
 
