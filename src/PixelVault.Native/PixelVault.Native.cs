@@ -647,72 +647,19 @@ namespace PixelVaultNative
         BitmapSource LoadCompletionBadgeBitmap()
         {
             if (libraryCompletionBadgeBitmap != null) return libraryCompletionBadgeBitmap;
-            var path = ResolveWorkspaceAssetPath("100 Percent Icon.png");
+            var path = ResolveWorkspaceAssetPath("100 Percent Medal.png")
+                ?? ResolveWorkspaceAssetPath("100 Percent Icon.png");
             if (string.IsNullOrWhiteSpace(path)) return null;
             try
             {
                 var bmp = new BitmapImage();
                 bmp.BeginInit();
                 bmp.UriSource = new Uri(path, UriKind.Absolute);
-                bmp.DecodePixelWidth = 256;
+                bmp.DecodePixelHeight = 256;
                 bmp.CacheOption = BitmapCacheOption.OnLoad;
                 bmp.EndInit();
                 bmp.Freeze();
-                var converted = new FormatConvertedBitmap(bmp, PixelFormats.Pbgra32, null, 0);
-                converted.Freeze();
-                var width = converted.PixelWidth;
-                var height = converted.PixelHeight;
-                var stride = width * 4;
-                var pixels = new byte[stride * height];
-                converted.CopyPixels(pixels, stride, 0);
-                RemoveEdgeConnectedNearWhitePixels(pixels, width, height, stride);
-                KeepLargestOpaqueComponent(pixels, width, height, stride);
-
-                var minX = width;
-                var minY = height;
-                var maxX = -1;
-                var maxY = -1;
-                for (var y = 0; y < height; y++)
-                {
-                    for (var x = 0; x < width; x++)
-                    {
-                        var pixelOffset = (y * stride) + (x * 4);
-                        if (pixels[pixelOffset + 3] == 0) continue;
-                        if (x < minX) minX = x;
-                        if (x > maxX) maxX = x;
-                        if (y < minY) minY = y;
-                        if (y > maxY) maxY = y;
-                    }
-                }
-
-                if (maxX < minX || maxY < minY)
-                {
-                    libraryCompletionBadgeBitmap = converted;
-                    return libraryCompletionBadgeBitmap;
-                }
-
-                minX = Math.Max(0, minX - 2);
-                minY = Math.Max(0, minY - 2);
-                maxX = Math.Min(width - 1, maxX + 2);
-                maxY = Math.Min(height - 1, maxY + 2);
-                var croppedWidth = (maxX - minX) + 1;
-                var croppedHeight = (maxY - minY) + 1;
-                var croppedStride = croppedWidth * 4;
-                var croppedPixels = new byte[croppedStride * croppedHeight];
-                for (var y = 0; y < croppedHeight; y++)
-                {
-                    Buffer.BlockCopy(
-                        pixels,
-                        ((minY + y) * stride) + (minX * 4),
-                        croppedPixels,
-                        y * croppedStride,
-                        croppedStride);
-                }
-
-                var trimmed = new WriteableBitmap(croppedWidth, croppedHeight, 96, 96, PixelFormats.Pbgra32, null);
-                trimmed.WritePixels(new Int32Rect(0, 0, croppedWidth, croppedHeight), croppedPixels, croppedStride, 0);
-                trimmed.Freeze();
-                libraryCompletionBadgeBitmap = trimmed;
+                libraryCompletionBadgeBitmap = bmp;
                 return libraryCompletionBadgeBitmap;
             }
             catch
@@ -887,15 +834,21 @@ namespace PixelVaultNative
             var badgeBitmap = LoadCompletionBadgeBitmap();
             if (badgeBitmap != null)
             {
+                const double targetHeight = 78;
+                var targetWidth = targetHeight;
+                if (badgeBitmap.PixelWidth > 0 && badgeBitmap.PixelHeight > 0)
+                {
+                    targetWidth = Math.Max(44, Math.Min(92, targetHeight * badgeBitmap.PixelWidth / (double)badgeBitmap.PixelHeight));
+                }
                 return new Image
                 {
                     Source = badgeBitmap,
-                    Width = 52,
-                    Height = 52,
+                    Width = targetWidth,
+                    Height = targetHeight,
                     Stretch = Stretch.Uniform,
                     HorizontalAlignment = HorizontalAlignment.Right,
                     VerticalAlignment = VerticalAlignment.Top,
-                    Margin = new Thickness(0, 6, 6, 0),
+                    Margin = new Thickness(0, 4, 4, 0),
                     SnapsToDevicePixels = true,
                     Effect = new DropShadowEffect
                     {
@@ -2887,7 +2840,6 @@ namespace PixelVaultNative
         }
     }
 }
-
 
 
 
