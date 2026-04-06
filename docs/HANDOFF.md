@@ -55,11 +55,11 @@ Then use these based on the task:
 
 Current live build:
 
-- `0.992`
+- `0.993`
 
 Current executable:
 
-- `C:\Codex\dist\PixelVault-0.992\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.993\PixelVault.exe`
 
 Current build pointer:
 
@@ -93,12 +93,13 @@ Practical current focus:
 
 ## Current Stop Point
 
-The app is currently published at `0.992`.
+The app is currently published at `0.993`.
 
 **Notion:** [MainWindow extraction roadmap](https://www.notion.so/33573adc59b681d88b7dcd88cad53cb6) updated for Phase **E** capstone (**`ILibraryBrowserShell`**). If release rows in Notion lag `docs/CURRENT_BUILD.txt`, re-sync per `docs/DOC_SYNC_POLICY.md`.
 
 Recent extraction progress (repo):
 
+- **Published medal badge asset lookup fix (0.993):** The completion badge now resolves bundled medal artwork from the nested publish-assets path as well as the repo/source layouts, fixing the regression where the icon disappeared in published builds.
 - **Medal badge shadow/placement polish (0.992):** The medal completion badge now has a stronger downward shadow and sits slightly inset from the top-right corner so it reads more like an overlay element and less like it is clipped to the tile edge.
 - **Medal completion badge (0.991):** The library completion badge now uses the new medal artwork asset and scales from the image's natural aspect ratio, replacing the older text-mark treatment while keeping the top-right tile overlay behavior.
 - **100% badge visibility fix (0.990):** The 100% library badge now strips the white background while keeping the main glyph intact, fixing the follow-up regression where the badge could disappear entirely on covers.

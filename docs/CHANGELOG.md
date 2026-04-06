@@ -1,3 +1,7 @@
+## 0.993
+- **Release:** Version **0.993** — Published completion badge asset lookup fix.
+- **Library / 100% badge:** Fixed the medal badge asset lookup in published builds by checking the nested bundled assets path used by the release output, so the completion icon appears again outside the source tree.
+
 ## 0.992
 - **Release:** Version **0.992** — Medal badge shadow and placement polish.
 - **Library / 100% badge:** Added a stronger drop shadow beneath the medal completion badge and nudged the overlay inward so it sits off the top-right corner instead of hugging the tile edge.
