@@ -56,7 +56,7 @@ Then use these based on the task:
 
 Current live build:
 
-- `0.999.000`
+- `0.075.000`
 
 Current executable:
 
@@ -94,12 +94,13 @@ Practical current focus:
 
 ## Current Stop Point
 
-The app is currently published at `0.999.000`.
+The app is currently published at `0.075.000`.
 
 **Notion:** [MainWindow extraction roadmap](https://www.notion.so/33573adc59b681d88b7dcd88cad53cb6) updated for Phase **E** capstone (**`ILibraryBrowserShell`**). If release rows in Notion lag `docs/CURRENT_BUILD.txt`, re-sync per `docs/DOC_SYNC_POLICY.md`.
 
 Recent extraction progress (repo):
 
+- **Pre-V1 polish Slice C (0.075.000):** Library folder and detail **empty/loading** states with CTAs; version **renumber** to **`0.075.xxx`** for runway to 1.0. See **`docs/plans/PV-PLN-V1POL-001-pre-v1-polish-program.md`**.
 - **Library perf Steps 4–5 (0.999.000):** SQLite pragmas and sliced metadata reads/upserts for the library detail pane; deferred game-index warmup after the library window is shown (**`ApplicationIdle`**) instead of constructor preload. See **`docs/LIBRARY_PERFORMANCE_PLAN.md`**.
 - **Library detail pane Step 3 (0.998.000):** Viewport-aware decode scheduling (visible virtual rows use the priority image-load lane; overscan-only rows use the normal lane). Detail `VirtualizedRowHost` now recycles row elements like folder tiles; selection chrome stays correct via repopulating **`DetailTiles`** from the visible visual tree after each virtual pass. See **`docs/LIBRARY_PERFORMANCE_PLAN.md`** Step 3.
 - **Library thumbnail perf (0.997):** Smaller capped decode sizes for folder/detail/banner images, more parallel decode slots, async disk thumbnail writes, lower-priority bitmap apply on the UI thread, LowQuality scaling on grid tiles, and a larger in-memory LRU to reduce repeated decode churn when browsing.

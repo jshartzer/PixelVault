@@ -9,6 +9,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using PixelVaultNative.UI.Design;
 
 namespace PixelVaultNative
 {
@@ -44,10 +45,17 @@ namespace PixelVaultNative
             {
                 ws.SelectedDetailFiles.Clear();
                 ws.DetailFilesDisplayOrder.Clear();
-                SetVirtualizedRows(panes.DetailRows, new List<VirtualizedRowDefinition>(), true, null);
+                SetVirtualizedRows(panes.DetailRows, new List<VirtualizedRowDefinition>
+                {
+                    new VirtualizedRowDefinition
+                    {
+                        Height = 200,
+                        Build = delegate { return BuildLibraryDetailNoFolderSelectedPlaceholder(); }
+                    }
+                }, true, null);
                 if (refreshDetailSelectionUi != null) refreshDetailSelectionUi();
                 renderStopwatch.Stop();
-                LogPerformanceSample("LibraryDetailRender", renderStopwatch, "folder=(none); rows=0; files=0", 40);
+                LogPerformanceSample("LibraryDetailRender", renderStopwatch, "folder=(none); rows=1; files=0", 40);
                 return;
             }
             const int detailTileGap = 8;
@@ -98,10 +106,10 @@ namespace PixelVaultNative
                 {
                     new VirtualizedRowDefinition
                     {
-                        Height = 44,
+                        Height = 120,
                         Build = delegate
                         {
-                            return new TextBlock { Text = "Loading captures...", Foreground = Brush("#A7B5BD") };
+                            return BuildLibraryDetailLoadingPlaceholder();
                         }
                     }
                 }, true, null);
@@ -201,10 +209,14 @@ namespace PixelVaultNative
                         {
                             new VirtualizedRowDefinition
                             {
-                                Height = 44,
+                                Height = 200,
                                 Build = delegate
                                 {
-                                    return new TextBlock { Text = timelineView ? "No captures found in the selected timeline range." : "No captures found in this folder.", Foreground = Brush("#A7B5BD") };
+                                    return BuildLibraryDetailEmptyCapturesPlaceholder(
+                                        timelineView,
+                                        timelineRangeStart,
+                                        timelineRangeEnd,
+                                        redrawSelectedFolderDetail);
                                 }
                             }
                         });
@@ -828,6 +840,105 @@ namespace PixelVaultNative
                 Padding = new Thickness(0),
                 Child = stack
             };
+        }
+
+        FrameworkElement BuildLibraryDetailNoFolderSelectedPlaceholder()
+        {
+            var root = new StackPanel { Margin = new Thickness(8, 12, 12, 16) };
+            root.Children.Add(new TextBlock
+            {
+                Text = "Choose a game",
+                FontSize = 18,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = Brush(DesignTokens.TextOnInput)
+            });
+            root.Children.Add(new TextBlock
+            {
+                Text = "Select a folder on the left to browse captures, covers, and metadata for that game.",
+                Foreground = Brush(DesignTokens.TextLabelMuted),
+                FontSize = 13,
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 8, 0, 0)
+            });
+            return root;
+        }
+
+        FrameworkElement BuildLibraryDetailLoadingPlaceholder()
+        {
+            var root = new StackPanel { Margin = new Thickness(8, 12, 12, 0) };
+            root.Children.Add(new TextBlock
+            {
+                Text = "Loading captures",
+                FontSize = 16,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = Brush(DesignTokens.TextOnInput)
+            });
+            root.Children.Add(new TextBlock
+            {
+                Text = "Building thumbnails and layout for this folder.",
+                Foreground = Brush(DesignTokens.TextLabelMuted),
+                FontSize = 13,
+                Margin = new Thickness(0, 6, 0, 14)
+            });
+            var row = new StackPanel { Orientation = Orientation.Horizontal };
+            for (var i = 0; i < 5; i++)
+            {
+                row.Children.Add(new Border
+                {
+                    Width = 56,
+                    Height = 56,
+                    Margin = new Thickness(0, 0, 8, 0),
+                    CornerRadius = new CornerRadius(8),
+                    Background = Brush(DesignTokens.PanelElevated),
+                    BorderBrush = Brush(DesignTokens.BorderDefault),
+                    BorderThickness = new Thickness(1)
+                });
+            }
+            root.Children.Add(row);
+            return root;
+        }
+
+        FrameworkElement BuildLibraryDetailEmptyCapturesPlaceholder(bool timelineView, DateTime rangeStart, DateTime rangeEnd, Action redrawDetail)
+        {
+            var root = new StackPanel { Margin = new Thickness(8, 12, 12, 16), MaxWidth = 480 };
+            var title = timelineView ? "No captures in this range" : "No captures in this folder";
+            var body = timelineView
+                ? "Nothing falls between " + (rangeStart > DateTime.MinValue ? rangeStart.ToString("yyyy-MM-dd") : "start") + " and " + (rangeEnd > DateTime.MinValue ? rangeEnd.ToString("yyyy-MM-dd") : "end") + ". Widen the range or switch grouping."
+                : "This game folder has no screenshots or clips yet. Import captures or pick another folder.";
+            root.Children.Add(new TextBlock
+            {
+                Text = title,
+                FontSize = 18,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = Brush(DesignTokens.TextOnInput),
+                TextWrapping = TextWrapping.Wrap
+            });
+            root.Children.Add(new TextBlock
+            {
+                Text = body,
+                FontSize = 13,
+                Foreground = Brush(DesignTokens.TextLabelMuted),
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 8, 0, 12)
+            });
+            if (redrawDetail != null)
+            {
+                var b = new Button
+                {
+                    Content = "Refresh this view",
+                    Padding = new Thickness(14, 8, 14, 8),
+                    FontSize = 13,
+                    Cursor = Cursors.Hand,
+                    Foreground = Brushes.White,
+                    Background = Brush(DesignTokens.ActionSecondaryFill),
+                    BorderBrush = Brush(DesignTokens.BorderDefault),
+                    BorderThickness = new Thickness(1),
+                    HorizontalAlignment = HorizontalAlignment.Left
+                };
+                b.Click += delegate { redrawDetail(); };
+                root.Children.Add(b);
+            }
+            return root;
         }
     }
 }

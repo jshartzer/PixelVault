@@ -75,11 +75,15 @@ namespace PixelVaultNative
                 SetStatusLine = v => status = v,
                 SetLogBox = v => logBox = v,
                 GetStatusLine = () => status,
-                GetLogBox = () => logBox
+                GetLogBox = () => logBox,
+                GetConfiguredSourceRoots = () => GetSourceRoots(),
+                GetCacheRoot = () => cacheRoot,
+                GetActiveLibraryIndexDatabasePath = () => string.IsNullOrWhiteSpace(libraryRoot) ? string.Empty : IndexDatabasePath(libraryRoot),
+                GetDiagnosticsSessionId = () => _diagnosticsSessionId
             };
         }
 
-        void ShowSettingsWindow()
+        internal void ShowSettingsWindow()
         {
             SettingsShell.ShowMainSettingsDialog();
         }

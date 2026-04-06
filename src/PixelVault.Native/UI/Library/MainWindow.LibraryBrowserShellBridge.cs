@@ -188,8 +188,10 @@ namespace PixelVaultNative
                 Func<LibraryBrowserFolderView, int, int, bool, Button> buildFolderTile,
                 Action<LibraryBrowserFolderView> showFolder,
                 Action renderSelectedFolder,
-                Action selfRerender) =>
-                _m.LibraryBrowserRenderFolderList(ws, buildFolderTile, showFolder, renderSelectedFolder, selfRerender);
+                Action selfRerender,
+                Action clearLibrarySearchAndRerender,
+                Action refreshLibraryFoldersLoose) =>
+                _m.LibraryBrowserRenderFolderList(ws, buildFolderTile, showFolder, renderSelectedFolder, selfRerender, clearLibrarySearchAndRerender, refreshLibraryFoldersLoose);
 
             public void LibraryBrowserRefreshFoldersAsync(Window libraryWindow, LibraryBrowserWorkingSet ws, bool forceRefresh, Action renderTiles) =>
                 _m.LibraryBrowserRefreshFoldersAsync(libraryWindow, ws, forceRefresh, renderTiles);

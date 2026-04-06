@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Effects;
+using PixelVaultNative.UI.Design;
 
 namespace PixelVaultNative
 {
@@ -43,14 +44,19 @@ namespace PixelVaultNative
             window.ShowDialog();
         }
 
+        public void ShowHealthDashboardDialog()
+        {
+            HealthDashboardWindow.ShowDialog(d.OwnerWindow, d);
+        }
+
         public void ShowPathSettingsDialog()
         {
-            var pageBg = d.Brush("#0F1519");
-            var panelBg = d.Brush("#141B20");
-            var borderBrush = d.Brush("#27313A");
-            var labelFg = d.Brush("#A7B5BD");
-            var boxBg = d.Brush("#0D1218");
-            var boxFg = d.Brush("#E8EEF2");
+            var pageBg = d.Brush(DesignTokens.PageBackground);
+            var panelBg = d.Brush(DesignTokens.PanelElevated);
+            var borderBrush = d.Brush(DesignTokens.BorderDefault);
+            var labelFg = d.Brush(DesignTokens.TextLabelMuted);
+            var boxBg = d.Brush(DesignTokens.InputBackground);
+            var boxFg = d.Brush(DesignTokens.TextOnInput);
 
             var window = new Window
             {
@@ -102,9 +108,9 @@ namespace PixelVaultNative
             Grid.SetRow(pathScroll, 0);
             root.Children.Add(pathScroll);
             var buttons = new WrapPanel { Margin = new Thickness(0, 18, 0, 0) };
-            var save = d.Btn("Save Settings", null, "#2B7A52", Brushes.White);
+            var save = d.Btn("Save Settings", null, DesignTokens.ActionPrimaryFill, Brushes.White);
             save.Margin = new Thickness(0, 0, 12, 0);
-            var cancel = d.Btn("Cancel", null, "#20343A", Brushes.White);
+            var cancel = d.Btn("Cancel", null, DesignTokens.ActionSecondaryFill, Brushes.White);
             buttons.Children.Add(save);
             buttons.Children.Add(cancel);
             Grid.SetRow(buttons, 1);
@@ -170,22 +176,24 @@ namespace PixelVaultNative
             d.SetStatusLine(statusLocal);
             var headerActions = new WrapPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 14, 0, 0) };
             Action<Button> styleHeaderBtn = delegate(Button b) { b.Margin = new Thickness(0, 0, 10, 8); };
-            var pathSettingsTopButton = d.Btn("Path Settings", delegate { d.OpenPathSettingsDialog?.Invoke(); }, "#2B7A52", Brushes.White);
+            var pathSettingsTopButton = d.Btn("Path Settings", delegate { d.OpenPathSettingsDialog?.Invoke(); }, DesignTokens.ActionPrimaryFill, Brushes.White);
             styleHeaderBtn(pathSettingsTopButton);
-            var viewLogsTopButton = d.Btn("View Logs", delegate { d.OpenFolder(d.LogsRoot); }, "#20343A", Brushes.White);
+            var healthTopButton = d.Btn("Setup & health", delegate { ShowHealthDashboardDialog(); }, DesignTokens.ActionSecondaryFill, Brushes.White);
+            styleHeaderBtn(healthTopButton);
+            var viewLogsTopButton = d.Btn("View Logs", delegate { d.OpenFolder(d.LogsRoot); }, DesignTokens.ActionSecondaryFill, Brushes.White);
             styleHeaderBtn(viewLogsTopButton);
-            var myCoversTopButton = d.Btn("My Covers", delegate { d.OpenSavedCoversFolder(); }, "#20343A", Brushes.White);
+            var myCoversTopButton = d.Btn("My Covers", delegate { d.OpenSavedCoversFolder(); }, DesignTokens.ActionSecondaryFill, Brushes.White);
             styleHeaderBtn(myCoversTopButton);
-            var gameIndexTopButton = d.Btn("Game Index", delegate { d.OpenGameIndexEditor(); }, "#20343A", Brushes.White);
+            var gameIndexTopButton = d.Btn("Game Index", delegate { d.OpenGameIndexEditor(); }, DesignTokens.ActionSecondaryFill, Brushes.White);
             styleHeaderBtn(gameIndexTopButton);
-            var photoIndexTopButton = d.Btn("Photo Index", delegate { d.OpenPhotoIndexEditor(); }, "#20343A", Brushes.White);
+            var photoIndexTopButton = d.Btn("Photo Index", delegate { d.OpenPhotoIndexEditor(); }, DesignTokens.ActionSecondaryFill, Brushes.White);
             styleHeaderBtn(photoIndexTopButton);
-            var photographyTopButton = d.Btn("Photography", delegate { d.ShowPhotographyGallery(Window.GetWindow(statusLocal)); }, "#20343A", Brushes.White);
+            var photographyTopButton = d.Btn("Photography", delegate { d.ShowPhotographyGallery(Window.GetWindow(statusLocal)); }, DesignTokens.ActionSecondaryFill, Brushes.White);
             photographyTopButton.ToolTip = "Browse captures tagged for game photography";
             styleHeaderBtn(photographyTopButton);
-            var filenameRulesTopButton = d.Btn("Filename Rules", delegate { d.OpenFilenameConventionEditor(); }, "#20343A", Brushes.White);
+            var filenameRulesTopButton = d.Btn("Filename Rules", delegate { d.OpenFilenameConventionEditor(); }, DesignTokens.ActionSecondaryFill, Brushes.White);
             styleHeaderBtn(filenameRulesTopButton);
-            var changelogTopButton = d.Btn("Changelog", delegate { ChangelogWindow.ShowDialog(d.OwnerWindow, d.AppVersion, d.ChangelogPath); }, "#20343A", Brushes.White);
+            var changelogTopButton = d.Btn("Changelog", delegate { ChangelogWindow.ShowDialog(d.OwnerWindow, d.AppVersion, d.ChangelogPath); }, DesignTokens.ActionSecondaryFill, Brushes.White);
             styleHeaderBtn(changelogTopButton);
             var sp = new Border
             {
@@ -199,6 +207,7 @@ namespace PixelVaultNative
                 VerticalAlignment = VerticalAlignment.Center
             };
             headerActions.Children.Add(pathSettingsTopButton);
+            headerActions.Children.Add(healthTopButton);
             headerActions.Children.Add(viewLogsTopButton);
             headerActions.Children.Add(myCoversTopButton);
             headerActions.Children.Add(gameIndexTopButton);

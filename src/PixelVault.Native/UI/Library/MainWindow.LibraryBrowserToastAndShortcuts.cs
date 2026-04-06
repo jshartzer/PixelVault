@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
+using PixelVaultNative.UI.Design;
 
 namespace PixelVaultNative
 {
@@ -18,10 +19,10 @@ namespace PixelVaultNative
             Grid.SetRowSpan(layer, 2);
             ws.LibraryToastBorder = new Border
             {
-                Background = Brush("#E6231E24"),
-                BorderBrush = Brush("#3A4A55"),
+                Background = Brush(DesignTokens.ToastBackground),
+                BorderBrush = Brush(DesignTokens.ToastBorder),
                 BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(10),
+                CornerRadius = new CornerRadius(DesignTokens.RadiusToastDip),
                 Padding = new Thickness(14, 10, 14, 10),
                 MaxWidth = 420,
                 Visibility = Visibility.Collapsed,
@@ -29,7 +30,7 @@ namespace PixelVaultNative
             };
             ws.LibraryToastLabel = new TextBlock
             {
-                Foreground = Brush("#E8F0F5"),
+                Foreground = Brush(DesignTokens.TextToast),
                 FontSize = 12.5,
                 TextWrapping = TextWrapping.Wrap
             };
@@ -68,7 +69,7 @@ namespace PixelVaultNative
                 SizeToContent = SizeToContent.Height,
                 Owner = owner,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
-                Background = Brush("#0F1519"),
+                Background = Brush(DesignTokens.PageBackground),
                 ResizeMode = ResizeMode.NoResize
             };
             var root = new StackPanel { Margin = new Thickness(22, 18, 22, 22) };
@@ -85,8 +86,8 @@ namespace PixelVaultNative
                 var row = new Grid { Margin = new Thickness(0, 0, 0, 10) };
                 row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(160) });
                 row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                var k = new TextBlock { Text = keys, Foreground = Brush("#8EA0AA"), FontSize = 13 };
-                var d = new TextBlock { Text = desc, Foreground = Brush("#E4EDF2"), FontSize = 13, TextWrapping = TextWrapping.Wrap };
+                var k = new TextBlock { Text = keys, Foreground = Brush(DesignTokens.TextShortcutMuted), FontSize = 13 };
+                var d = new TextBlock { Text = desc, Foreground = Brush(DesignTokens.TextShortcutBody), FontSize = 13, TextWrapping = TextWrapping.Wrap };
                 row.Children.Add(k);
                 Grid.SetColumn(d, 1);
                 row.Children.Add(d);
@@ -97,7 +98,7 @@ namespace PixelVaultNative
             AddRow("Enter", "Apply library search (search box)");
             AddRow("Ctrl + click", "Add or remove a capture from the selection");
             AddRow("Shift + click", "Select a range of captures from the anchor");
-            var close = Btn("Close", null, "#275D47", Brushes.White);
+            var close = Btn("Close", null, DesignTokens.ActionShortcutDismissFill, Brushes.White);
             close.Margin = new Thickness(0, 18, 0, 0);
             close.HorizontalAlignment = HorizontalAlignment.Right;
             close.Click += delegate { w.Close(); };

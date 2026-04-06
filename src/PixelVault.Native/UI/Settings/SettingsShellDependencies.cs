@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -74,5 +75,17 @@ namespace PixelVaultNative
 
         /// <summary>Set after <see cref="SettingsShellHost"/> construction to open the path modal (avoids circular init).</summary>
         public Action OpenPathSettingsDialog { get; set; }
+
+        /// <summary>Configured intake source folder paths (may be empty or missing on disk).</summary>
+        public Func<IReadOnlyList<string>> GetConfiguredSourceRoots { get; set; }
+
+        /// <summary>PixelVault data cache root (indexes, thumbnails).</summary>
+        public Func<string> GetCacheRoot { get; set; }
+
+        /// <summary>SQLite path for the active library root, or empty if no library.</summary>
+        public Func<string> GetActiveLibraryIndexDatabasePath { get; set; }
+
+        /// <summary>Fixed troubleshooting session id for this app instance.</summary>
+        public Func<string> GetDiagnosticsSessionId { get; set; }
     }
 }

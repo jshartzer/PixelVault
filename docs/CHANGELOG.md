@@ -1,3 +1,10 @@
+## 0.075.000
+- **Release:** Version **0.075.000** — Pre-1.0 **version renumber** plus **library empty/loading polish** (Slice C, **`PV-PLN-V1POL-001`**).
+- **Versioning:** Active build train moves to **`0.075.000`** (middle segment **075**, patch **000**) to open space toward **`1.000.000`** while keeping the established **`M.AAA.BBB`** three-part format. **This number is lower than the prior `0.999.xxx` train only on paper** — behaviour and migrations are unchanged; older changelog headers remain below for history.
+- **Library / folder list:** When there are no visible folders, the left pane shows **loading skeleton tiles** or **guided empty states** (search miss, restrictive filter, or empty library) with actions: **Clear search**, **Show all games**, **Refresh folders**, **Settings…**.
+- **Library / detail pane:** **No folder selected**, **loading captures**, and **empty folder / empty timeline range** states use clearer titles, explanatory copy, light **tile placeholders** while loading, and **Refresh this view** when appropriate.
+- **Polish (earlier in this train):** Design tokens foundation, **Setup & health** dashboard from Settings, and related **`DesignTokens`** / **`HealthDashboardWindow`** work ship in this build.
+
 ## 0.999.000
 - **Release:** Version **0.999.000** — Library SQLite/detail I/O and startup housekeeping (performance plan Steps 4–5).
 - **SQLite / metadata index:** Tuned desktop index pragmas (WAL with **`synchronous=NORMAL`**, **`busy_timeout`**, **`temp_store=MEMORY`**, larger **`cache_size`**). Library detail loads **`photo_index`** only for the current visible file set; metadata repair uses batched **upserts** (**`ON CONFLICT DO UPDATE`**) instead of deleting the whole index for the root.

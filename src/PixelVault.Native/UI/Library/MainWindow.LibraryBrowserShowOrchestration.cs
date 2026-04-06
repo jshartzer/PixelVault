@@ -292,9 +292,18 @@ namespace PixelVaultNative
                 };
 
                 Action renderFolderTilesCore = null;
+                Action clearLibrarySearchAndRerender = delegate
+                {
+                    ws.PendingLibrarySearchText = string.Empty;
+                    ws.AppliedLibrarySearchText = string.Empty;
+                    if (panes.SearchBox != null) panes.SearchBox.Text = string.Empty;
+                    _shell.PersistLibraryBrowserCommittedSearch(string.Empty);
+                    if (renderFolderTilesCore != null) renderFolderTilesCore();
+                };
+                Action refreshLibraryFoldersLoose = delegate { refreshLibraryFoldersAsync(false); };
                 renderFolderTilesCore = delegate
                 {
-                    _shell.LibraryBrowserRenderFolderList(ws, buildFolderTile, showFolder, renderSelectedFolder, renderFolderTilesCore);
+                    _shell.LibraryBrowserRenderFolderList(ws, buildFolderTile, showFolder, renderSelectedFolder, renderFolderTilesCore, clearLibrarySearchAndRerender, refreshLibraryFoldersLoose);
                 };
                 renderTiles = renderFolderTilesCore;
 

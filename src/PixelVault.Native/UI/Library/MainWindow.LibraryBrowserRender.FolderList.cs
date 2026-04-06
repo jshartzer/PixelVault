@@ -4,7 +4,9 @@ using System.Diagnostics;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
+using PixelVaultNative.UI.Design;
 
 namespace PixelVaultNative
 {
@@ -15,7 +17,9 @@ namespace PixelVaultNative
             Func<LibraryBrowserFolderView, int, int, bool, Button> buildFolderTile,
             Action<LibraryBrowserFolderView> showFolder,
             Action renderSelectedFolder,
-            Action selfRerender)
+            Action selfRerender,
+            Action clearLibrarySearchAndRerender,
+            Action refreshLibraryFoldersLoose)
         {
             var panes = ws.Panes;
             var folders = ws.Folders;
@@ -150,19 +154,21 @@ namespace PixelVaultNative
                     ws.PendingRestoreViewKey = null;
                     ws.PendingRestoreDetailScrollAfterShow = 0;
                 }
+                var placeholderHeight = ws.LibraryFoldersLoading ? 220d : 300d;
                 virtualRows.Add(new VirtualizedRowDefinition
                 {
-                    Height = 44,
+                    Height = placeholderHeight,
                     Build = delegate
                     {
-                        return new TextBlock
-                        {
-                            Text = ws.LibraryFoldersLoading
-                                ? "Loading library folders..."
-                                : (string.IsNullOrWhiteSpace(searchText) ? "No library folders found." : "No folders match the current search."),
-                            Foreground = Brush("#A7B5BD"),
-                            Margin = new Thickness(0, 12, 0, 0)
-                        };
+                        return BuildLibraryFolderPanePlaceholder(
+                            ws.LibraryFoldersLoading,
+                            folders.Count,
+                            browserFolders.Count,
+                            filterMode,
+                            searchText,
+                            selfRerender,
+                            clearLibrarySearchAndRerender,
+                            refreshLibraryFoldersLoose);
                     }
                 });
                 SetVirtualizedRows(panes.TileRows, virtualRows, true, null);
@@ -258,6 +264,137 @@ namespace PixelVaultNative
             renderStopwatch.Stop();
             LogPerformanceSample("LibraryFolderRender", renderStopwatch, "mode=grouped; foldersLoaded=" + folders.Count + "; views=" + browserFolders.Count + "; visible=" + orderedVisibleFolders.Count + "; rows=" + virtualRows.Count + "; columns=" + folderColumns + "; grouping=" + groupingMode + "; search=" + (string.IsNullOrWhiteSpace(searchText) ? "(none)" : searchText) + "; sort=" + sortMode + "; projectMs=" + projectionStopwatch.ElapsedMilliseconds + "; filterMs=" + filterSortStopwatch.ElapsedMilliseconds, 40);
             LogLibraryBrowserFirstFolderListPaintOnce("mode=grouped; visible=" + orderedVisibleFolders.Count + "; rows=" + virtualRows.Count);
+        }
+
+        Button BuildLibraryFolderCtaButton(string label, RoutedEventHandler onClick)
+        {
+            var b = new Button
+            {
+                Content = label,
+                Padding = new Thickness(14, 8, 14, 8),
+                Margin = new Thickness(0, 4, 10, 0),
+                FontSize = 13,
+                Cursor = Cursors.Hand,
+                Foreground = Brushes.White,
+                Background = Brush(DesignTokens.ActionSecondaryFill),
+                BorderBrush = Brush(DesignTokens.BorderDefault),
+                BorderThickness = new Thickness(1)
+            };
+            b.Click += onClick;
+            return b;
+        }
+
+        FrameworkElement BuildLibraryFolderPanePlaceholder(
+            bool loading,
+            int rawFolderCount,
+            int projectedViewCount,
+            string filterMode,
+            string searchText,
+            Action selfRerender,
+            Action clearLibrarySearchAndRerender,
+            Action refreshLibraryFoldersLoose)
+        {
+            var root = new StackPanel { Margin = new Thickness(4, 8, 12, 16), MaxWidth = 520 };
+            if (loading)
+            {
+                root.Children.Add(new TextBlock
+                {
+                    Text = "Loading your library",
+                    FontSize = 18,
+                    FontWeight = FontWeights.SemiBold,
+                    Foreground = Brush(DesignTokens.TextOnInput)
+                });
+                root.Children.Add(new TextBlock
+                {
+                    Text = "Reading folders from disk and applying your filters. This should finish in a moment.",
+                    Foreground = Brush(DesignTokens.TextLabelMuted),
+                    FontSize = 13,
+                    TextWrapping = TextWrapping.Wrap,
+                    Margin = new Thickness(0, 8, 0, 16)
+                });
+                var skRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 8) };
+                for (var i = 0; i < 4; i++)
+                {
+                    skRow.Children.Add(new Border
+                    {
+                        Width = 72,
+                        Height = 96,
+                        Margin = new Thickness(0, 0, 10, 0),
+                        CornerRadius = new CornerRadius(10),
+                        Background = Brush(DesignTokens.PanelElevated),
+                        BorderBrush = Brush(DesignTokens.BorderDefault),
+                        BorderThickness = new Thickness(1)
+                    });
+                }
+                root.Children.Add(skRow);
+                return root;
+            }
+
+            var normFilter = NormalizeLibraryFolderFilterMode(filterMode);
+            var filterRestrictive = !string.Equals(normFilter, "all", StringComparison.OrdinalIgnoreCase);
+            var hasSearch = !string.IsNullOrWhiteSpace(searchText);
+            string title;
+            string body;
+
+            if (rawFolderCount == 0)
+            {
+                title = "No games in this library yet";
+                body = "Point PixelVault at capture folders in Path Settings (Settings → Path Settings), then refresh. Imports also appear after you move files into the library destination.";
+            }
+            else if (projectedViewCount == 0)
+            {
+                title = "Still preparing folders";
+                body = "The library has data but no browse rows yet. Try a refresh.";
+            }
+            else if (hasSearch)
+            {
+                title = "No folders match your search";
+                body = "Try another phrase, clear the search box, or check spelling.";
+            }
+            else if (filterRestrictive)
+            {
+                title = "No folders match this filter";
+                body = "Filter is set to “" + LibraryFolderFilterModeLabel(filterMode) + "”. Reset to All Games or pick another filter.";
+            }
+            else
+            {
+                title = "Nothing to show here";
+                body = "Try refreshing the library list or adjusting search.";
+            }
+
+            root.Children.Add(new TextBlock
+            {
+                Text = title,
+                FontSize = 18,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = Brush(DesignTokens.TextOnInput),
+                TextWrapping = TextWrapping.Wrap
+            });
+            root.Children.Add(new TextBlock
+            {
+                Text = body,
+                Foreground = Brush(DesignTokens.TextLabelMuted),
+                FontSize = 13,
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 8, 0, 12)
+            });
+
+            var actions = new WrapPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 4, 0, 0) };
+            if (hasSearch && clearLibrarySearchAndRerender != null)
+                actions.Children.Add(BuildLibraryFolderCtaButton("Clear search", delegate { clearLibrarySearchAndRerender(); }));
+            if (filterRestrictive)
+                actions.Children.Add(BuildLibraryFolderCtaButton("Show all games", delegate
+                {
+                    libraryFolderFilterMode = SettingsService.NormalizeLibraryFolderFilterMode("all");
+                    SaveSettings();
+                    selfRerender?.Invoke();
+                }));
+            if (refreshLibraryFoldersLoose != null)
+                actions.Children.Add(BuildLibraryFolderCtaButton("Refresh folders", delegate { refreshLibraryFoldersLoose(); }));
+            actions.Children.Add(BuildLibraryFolderCtaButton("Settings…", delegate { ShowSettingsWindow(); }));
+
+            root.Children.Add(actions);
+            return root;
         }
 
         void LibraryBrowserTryRestoreSessionSelection(

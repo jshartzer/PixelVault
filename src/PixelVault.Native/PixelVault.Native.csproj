@@ -64,6 +64,8 @@
     <Compile Include="UI\Intake\MainWindow.ManualMetadata.SteamSearch.cs" />
     <Compile Include="UI\Intake\MainWindow.ManualMetadata.Finish.cs" />
     <Compile Include="UI\UiBrushHelper.cs" />
+    <Compile Include="UI\Design\DesignTokens.cs" />
+    <Compile Include="UI\Diagnostics\HealthDashboardWindow.cs" />
     <Compile Include="UI\Progress\WorkflowProgressWindow.cs" />
     <Compile Include="UI\Editors\FilenameConventionEditorWindow.cs" />
     <Compile Include="UI\Editors\GameIndexEditorHost.cs" />
