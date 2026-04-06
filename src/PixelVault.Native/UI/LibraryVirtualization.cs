@@ -520,7 +520,7 @@ namespace PixelVaultNative
                 VerticalAlignment = VerticalAlignment.Stretch,
                 Visibility = Visibility.Collapsed
             };
-            RenderOptions.SetBitmapScalingMode(image, BitmapScalingMode.HighQuality);
+            RenderOptions.SetBitmapScalingMode(image, BitmapScalingMode.LowQuality);
             MediaElement videoPreviewMedia = null;
             TextBlock videoPreviewStatus = null;
             Border videoDurationBadge = null;

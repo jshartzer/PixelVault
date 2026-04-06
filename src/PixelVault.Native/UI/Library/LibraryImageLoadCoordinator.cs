@@ -13,8 +13,9 @@ namespace PixelVaultNative
 
         public LibraryImageLoadCoordinator()
         {
-            _normal = new SemaphoreSlim(Math.Max(2, Math.Min(Environment.ProcessorCount, 8)));
-            _priority = new SemaphoreSlim(Math.Max(2, Math.Min(Environment.ProcessorCount, 4)));
+            var cores = Environment.ProcessorCount;
+            _normal = new SemaphoreSlim(Math.Max(4, Math.Min(Math.Max(cores * 2, 6), 14)));
+            _priority = new SemaphoreSlim(Math.Max(3, Math.Min(Math.Max(cores + 2, 5), 8)));
         }
 
         public SemaphoreSlim GetLimiter(bool prioritize) => prioritize ? _priority : _normal;

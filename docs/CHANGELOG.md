@@ -1,3 +1,9 @@
+## 0.997
+- **Release:** Version **0.997** — Library thumbnail load and responsiveness.
+- **Perf — decodes:** Folder-cover and detail-tile **decode widths** follow on-screen size (~1.12–1.22× logical × DPI) with **lower caps** (covers **768**, detail **1280**, banner **1024** normalized steps) so startup and folder switches decode less data when the disk cache is cold.
+- **Perf — UI thread:** **QueueImageLoad** applies bitmaps at **Background** priority unless **`prioritize`**; **LowQuality** bitmap scaling for **CreateAsyncImageTile** and **CreateLibraryDetailTile** to reduce GPU cost on large grids.
+- **Perf — throughput:** **More concurrent** decode slots in **`LibraryImageLoadCoordinator`**; **PNG thumbnail cache writes** queued on the **thread pool** so encode no longer holds decode semaphores; in-memory decode LRU **900** entries.
+
 ## 0.996
 - **Release:** Version **0.996** — Startup 100% badge cache fix.
 - **Library / collection badges:** The startup folder-cache snapshot now carries the 100% completion state and also reapplies saved game-index rows while preloading cached folders, so completed-game medals should appear immediately instead of waiting for a later refresh.
@@ -40,6 +46,11 @@
 - **Game index / schema:** Added persisted game-level fields on **`game_index`** for **100% complete**, **completed date**, **favorite**, **showcase**, and **collection notes**.
 - **Migration safety:** Existing SQLite libraries upgrade in place by adding the new columns on open, so older databases and copied backup files continue loading without manual repair.
 - **Persistence paths:** Game-index clone / merge / assignment save paths now preserve the new collection fields instead of dropping them during normalization or backfill flows.
+
+## 0.983
+- **Release:** Version **0.983** — Faster library thumbnails, lighter decode work, smoother image queue.
+- **Library / images:** Folder-cover and detail-tile **decode widths** track on-screen size (~1.12–1.22× logical × DPI) with **lower caps** so cold cache and first paint do less work; folder covers cap at **768** px step, detail tiles at **1280**, banner preview capped **1024**. **BitmapScalingMode.LowQuality** for grid/async tiles (detail + folder async tile) to cut GPU scaling cost on large sets.
+- **Library / pipeline:** **Higher** concurrent **bitmap decode** slots (I/O-bound); **disk PNG thumbnail writes** no longer block decode workers (**ThreadPool** queue). **QueueImageLoad** uses **Background** dispatcher priority for non-priority work so the UI thread stays responsive during bursts. In-memory decode **LRU** raised **720 → 900** entries.
 
 ## 0.982
 - **Release:** Version **0.982** — Library folder chrome polish, intake icon, calmer cover grid.

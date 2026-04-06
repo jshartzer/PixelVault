@@ -51,11 +51,11 @@ namespace PixelVaultNative
 
     public sealed partial class MainWindow : Window
     {
-        const string AppVersion = "0.996";
+        const string AppVersion = "0.997";
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
         const string ClearedExternalIdSentinel = "__PV_CLEARED__";
-        const int MaxImageCacheEntries = 720;
+        const int MaxImageCacheEntries = 900;
         const int SteamRequestTimeoutMilliseconds = 15000;
         readonly string appRoot = AppDomain.CurrentDomain.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar);
         readonly string dataRoot;

@@ -55,11 +55,11 @@ Then use these based on the task:
 
 Current live build:
 
-- `0.996`
+- `0.997`
 
 Current executable:
 
-- `C:\Codex\dist\PixelVault-0.996\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.997\PixelVault.exe`
 
 Current build pointer:
 
@@ -99,6 +99,7 @@ The app is currently published at `0.996`.
 
 Recent extraction progress (repo):
 
+- **Library thumbnail perf (0.997):** Smaller capped decode sizes for folder/detail/banner images, more parallel decode slots, async disk thumbnail writes, lower-priority bitmap apply on the UI thread, LowQuality scaling on grid tiles, and a larger in-memory LRU to reduce repeated decode churn when browsing.
 - **Startup 100% badge cache fix (0.996):** The lightweight folder-cache snapshot now carries the 100% completion fields and reapplies saved game-index rows during startup prefill, so completion medals should appear immediately instead of waiting for a later refresh.
 - **Library sort/filter popup cleanup (0.995):** The old persistent sort row is now compact **Sort** and **Filter** popup buttons, folder filters persist across sessions, the selected-cover medal was removed again, and the bottom tile-size controls were tightened and aligned.
 - **Preview-cover completion badge (0.994):** The medal completion badge now renders on the selected game's main preview cover in the detail pane as well as the library grid tiles, which closes the gap where marked games could look undecorated in the primary cover view.

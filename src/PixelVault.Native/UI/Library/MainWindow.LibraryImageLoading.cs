@@ -95,6 +95,7 @@ namespace PixelVaultNative
                 }
             }).ContinueWith(delegate(Task<BitmapImage> task)
             {
+                var dispatchPriority = prioritize ? DispatcherPriority.Loaded : DispatcherPriority.Background;
                 imageControl.Dispatcher.BeginInvoke(new Action(delegate
                 {
                     if (!string.Equals(imageControl.Uid, requestToken, StringComparison.Ordinal)) return;
@@ -118,7 +119,7 @@ namespace PixelVaultNative
                     imageControl.Visibility = Visibility.Visible;
                     imageControl.InvalidateMeasure();
                     imageControl.InvalidateVisual();
-                }), DispatcherPriority.Render);
+                }), dispatchPriority);
             }, TaskScheduler.Default);
         }
 
@@ -155,7 +156,7 @@ namespace PixelVaultNative
                 VerticalAlignment = VerticalAlignment.Center,
                 Visibility = Visibility.Collapsed
             };
-            RenderOptions.SetBitmapScalingMode(image, BitmapScalingMode.HighQuality);
+            RenderOptions.SetBitmapScalingMode(image, BitmapScalingMode.LowQuality);
             presenter.Children.Add(placeholder);
             presenter.Children.Add(image);
             tile.Child = presenter;
@@ -183,25 +184,27 @@ namespace PixelVaultNative
             return libraryThumbnailPipeline.LoadFrozenBitmap(path, decodePixelWidth);
         }
 
-        /// <summary>Decode width for folder-cover art; scales with tile size and display DPI (capped at pipeline max).</summary>
+        /// <summary>Decode width for folder-cover art — proportional to on-screen tile, avoids oversized decodes that stall startup.</summary>
         int CalculateLibraryFolderArtDecodeWidth(int tileWidthLogical, double dpiScaleX = 1.0)
         {
-            var target = (int)Math.Ceiling((tileWidthLogical + 160) * Math.Max(1.0, dpiScaleX));
-            target = Math.Max(384, Math.Min(1600, target));
+            var d = Math.Max(1.0, dpiScaleX);
+            var target = (int)Math.Ceiling(tileWidthLogical * d * 1.22d);
+            target = Math.Max(256, Math.Min(768, target));
             return LibraryThumbnailPipeline.NormalizeDecodePixelWidth(target);
         }
 
         int CalculateLibraryBannerArtDecodeWidth(double dpiScaleX = 1.0)
         {
-            var target = (int)Math.Ceiling(720 * Math.Max(1.0, dpiScaleX));
-            target = Math.Max(512, Math.Min(1280, target));
+            var target = (int)Math.Ceiling(640 * Math.Max(1.0, dpiScaleX));
+            target = Math.Max(448, Math.Min(1024, target));
             return LibraryThumbnailPipeline.NormalizeDecodePixelWidth(target);
         }
 
         int CalculateLibraryDetailTileDecodeWidth(int tileWidthLogical, double dpiScaleX = 1.0)
         {
-            var target = (int)Math.Ceiling((tileWidthLogical + 128) * Math.Max(1.0, dpiScaleX));
-            target = Math.Max(384, Math.Min(1600, target));
+            var d = Math.Max(1.0, dpiScaleX);
+            var target = (int)Math.Ceiling(tileWidthLogical * d * 1.12d);
+            target = Math.Max(256, Math.Min(1280, target));
             return LibraryThumbnailPipeline.NormalizeDecodePixelWidth(target);
         }
 

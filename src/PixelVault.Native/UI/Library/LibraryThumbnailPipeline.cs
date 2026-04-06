@@ -89,7 +89,19 @@ namespace PixelVaultNative
                     image = LoadFrozenBitmap(fullPath, normalizedDecodePixelWidth);
                     if (image != null && !string.IsNullOrWhiteSpace(thumbnailPath) && !File.Exists(thumbnailPath))
                     {
-                        SaveThumbnailCache(image, thumbnailPath);
+                        var pathWrite = thumbnailPath;
+                        var frozenForDisk = image;
+                        ThreadPool.QueueUserWorkItem(delegate
+                        {
+                            try
+                            {
+                                SaveThumbnailCache(frozenForDisk, pathWrite);
+                            }
+                            catch (Exception ex)
+                            {
+                                _log("SaveThumbnailCache async: " + pathWrite + " — " + ex.Message);
+                            }
+                        });
                     }
                 }
                 _storeCachedImage(cacheKey, image);
