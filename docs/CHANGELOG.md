@@ -1,3 +1,7 @@
+## 0.995
+- **Release:** Version **0.995** — Library sort/filter popup cleanup.
+- **Library / chrome:** Split the old sort row into compact **Sort** and **Filter** popup buttons, added persisted folder filters for **100% Achievements**, **Cross-Platform**, and **25+ Captures**, switched sort choices to **Alphabetical**, **Date Captured**, **Date Added**, and **Most Photos**, removed the completion medal from the selected preview cover, and tightened the bottom tile-size controls so they align cleanly.
+
 ## 0.994
 - **Release:** Version **0.994** — Completion badge now shows on the selected library cover.
 - **Library / 100% badge:** Reused the medal badge on the selected game's preview cover in the detail pane, not just the folder-grid tile, so marked games now show the icon in the main cover view as well.
