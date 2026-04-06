@@ -1,3 +1,7 @@
+## 0.990
+- **Release:** Version **0.990** — 100% badge visibility fix.
+- **Library / 100% badge:** Fixed the badge asset cleanup so it removes the white background without erasing the actual `100%` mark. The overlay should be visible again on game tiles while keeping the cleaner floating treatment.
+
 ## 0.989
 - **Release:** Version **0.989** — 100% badge rendering polish.
 - **Library / 100% badge:** Removed the badge frame chrome, doubled the overlay footprint, and preprocess the asset so the edge-connected white background becomes transparent. The badge now reads much closer to floating text/markwork over the cover instead of a boxed icon.
