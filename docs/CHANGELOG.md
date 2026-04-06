@@ -1,3 +1,7 @@
+## 0.996
+- **Release:** Version **0.996** — Startup 100% badge cache fix.
+- **Library / collection badges:** The startup folder-cache snapshot now carries the 100% completion state and also reapplies saved game-index rows while preloading cached folders, so completed-game medals should appear immediately instead of waiting for a later refresh.
+
 ## 0.995
 - **Release:** Version **0.995** — Library sort/filter popup cleanup.
 - **Library / chrome:** Split the old sort row into compact **Sort** and **Filter** popup buttons, added persisted folder filters for **100% Achievements**, **Cross-Platform**, and **25+ Captures**, switched sort choices to **Alphabetical**, **Date Captured**, **Date Added**, and **Most Photos**, removed the completion medal from the selected preview cover, and tightened the bottom tile-size controls so they align cleanly.

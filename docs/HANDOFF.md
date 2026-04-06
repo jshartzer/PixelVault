@@ -55,11 +55,11 @@ Then use these based on the task:
 
 Current live build:
 
-- `0.995`
+- `0.996`
 
 Current executable:
 
-- `C:\Codex\dist\PixelVault-0.995\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.996\PixelVault.exe`
 
 Current build pointer:
 
@@ -93,12 +93,13 @@ Practical current focus:
 
 ## Current Stop Point
 
-The app is currently published at `0.995`.
+The app is currently published at `0.996`.
 
 **Notion:** [MainWindow extraction roadmap](https://www.notion.so/33573adc59b681d88b7dcd88cad53cb6) updated for Phase **E** capstone (**`ILibraryBrowserShell`**). If release rows in Notion lag `docs/CURRENT_BUILD.txt`, re-sync per `docs/DOC_SYNC_POLICY.md`.
 
 Recent extraction progress (repo):
 
+- **Startup 100% badge cache fix (0.996):** The lightweight folder-cache snapshot now carries the 100% completion fields and reapplies saved game-index rows during startup prefill, so completion medals should appear immediately instead of waiting for a later refresh.
 - **Library sort/filter popup cleanup (0.995):** The old persistent sort row is now compact **Sort** and **Filter** popup buttons, folder filters persist across sessions, the selected-cover medal was removed again, and the bottom tile-size controls were tightened and aligned.
 - **Preview-cover completion badge (0.994):** The medal completion badge now renders on the selected game's main preview cover in the detail pane as well as the library grid tiles, which closes the gap where marked games could look undecorated in the primary cover view.
 - **Published medal badge asset lookup fix (0.993):** The completion badge now resolves bundled medal artwork from the nested publish-assets path as well as the repo/source layouts, fixing the regression where the icon disappeared in published builds.
