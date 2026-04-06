@@ -148,30 +148,20 @@ $shortcut.TargetPath = $exePath
 $shortcut.WorkingDirectory = $outputDir
 $shortcut.Save()
 
+# Keep the N most recently written release folders. Do not use [version] sort: M.AAA.BBB strings like
+# 0.075.000 parse as 0.75.0 and sort below 0.989, so a fresh renumber build was incorrectly pruned.
 if ($KeepLatest -gt 0)
 {
-    $releaseDirs = Get-ChildItem $OutputRoot -Directory -Filter "PixelVault-*" |
+    $releaseDirs = @(Get-ChildItem $OutputRoot -Directory -Filter "PixelVault-*" |
         Where-Object { $_.Name -ne "PixelVault-current" } |
-        ForEach-Object {
-            $versionText = $_.Name.Substring("PixelVault-".Length)
-            $parsedVersion = $null
-            if ([version]::TryParse($versionText, [ref]$parsedVersion))
-            {
-                [PSCustomObject]@{
-                    Directory = $_
-                    Version = $parsedVersion
-                }
-            }
-        } |
-        Where-Object { $_ -ne $null } |
-        Sort-Object Version -Descending
+        Sort-Object LastWriteTime -Descending)
 
     $oldReleases = @($releaseDirs | Select-Object -Skip $KeepLatest)
     foreach ($release in $oldReleases)
     {
-        if ($null -eq $release -or $null -eq $release.Directory) { continue }
-        Remove-Item $release.Directory.FullName -Recurse -Force
-        Write-Host "Removed older release folder: $($release.Directory.FullName)"
+        if ($null -eq $release) { continue }
+        Remove-Item $release.FullName -Recurse -Force
+        Write-Host "Removed older release folder: $($release.FullName)"
     }
 }
 

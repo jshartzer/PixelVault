@@ -25,3 +25,5 @@ When you ship a new build:
 7. If you track releases in Notion, follow **`docs/DOC_SYNC_POLICY.md`** (Releases entry, smoke status).
 
 The publish script writes **`dist/PixelVault-M.AAA.BBB`**, refreshes the **`dist/PixelVault-current`** junction, copies `CHANGELOG.md` into the dist folder, and warns if the repo changelog lacks a header for that version.
+
+**Pruning older `dist` folders:** By default **`-KeepLatest 10`** removes older **`PixelVault-*`** directories after a publish. Sorting is by **folder last-write time** (newest kept), not by **`System.Version`**, so **`M.AAA.BBB`** renumbers such as **`0.075.000`** are not mistaken for “older” than **`0.989`**.
