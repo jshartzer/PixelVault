@@ -104,6 +104,7 @@ namespace PixelVaultNative
                 panes.OpenFolderButton.Content = BuildToolbarButtonContent("\uE8B7", "Open Folder");
                 panes.PreviewImage.Source = null;
                 panes.PreviewImage.Visibility = Visibility.Collapsed;
+                if (panes.PreviewCompletionBadge != null) panes.PreviewCompletionBadge.Visibility = Visibility.Collapsed;
                 renderSelectedFolder();
                 PersistLibraryBrowserLastSelection(null);
             }

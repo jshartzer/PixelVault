@@ -28,6 +28,7 @@ namespace PixelVaultNative
             internal TextBlock ThumbLabel;
             internal Border PreviewFrame;
             internal Image PreviewImage;
+            internal FrameworkElement PreviewCompletionBadge;
             internal TextBlock DetailTitle;
             internal WrapPanel DetailTitleBadgePanel;
             internal TextBlock DetailMeta;
@@ -276,8 +277,16 @@ namespace PixelVaultNative
                 ClipToBounds = true
             };
             panes.PreviewFrame = previewFrame;
+            var previewOverlay = new Grid();
             panes.PreviewImage = new Image { Stretch = Stretch.Uniform, MaxWidth = 210, MaxHeight = 315, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
-            previewFrame.Child = panes.PreviewImage;
+            previewOverlay.Children.Add(panes.PreviewImage);
+            panes.PreviewCompletionBadge = BuildLibraryTileCompletionBadge(94, new Thickness(0, 12, 12, 0));
+            if (panes.PreviewCompletionBadge != null)
+            {
+                panes.PreviewCompletionBadge.Visibility = Visibility.Collapsed;
+                previewOverlay.Children.Add(panes.PreviewCompletionBadge);
+            }
+            previewFrame.Child = previewOverlay;
             bannerGrid.Children.Add(previewFrame);
             var textStack = new StackPanel { MinWidth = 0 };
             var titleRow = new Grid { Margin = new Thickness(0, 0, 0, 0) };

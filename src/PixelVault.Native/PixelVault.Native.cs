@@ -830,12 +830,12 @@ namespace PixelVaultNative
             }
             return badge;
         }
-        FrameworkElement BuildLibraryTileCompletionBadge()
+        FrameworkElement BuildLibraryTileCompletionBadge(double targetHeight = 78, Thickness? margin = null)
         {
             var badgeBitmap = LoadCompletionBadgeBitmap();
+            var resolvedMargin = margin ?? new Thickness(0, 10, 10, 0);
             if (badgeBitmap != null)
             {
-                const double targetHeight = 78;
                 var targetWidth = targetHeight;
                 if (badgeBitmap.PixelWidth > 0 && badgeBitmap.PixelHeight > 0)
                 {
@@ -849,7 +849,7 @@ namespace PixelVaultNative
                     Stretch = Stretch.Uniform,
                     HorizontalAlignment = HorizontalAlignment.Right,
                     VerticalAlignment = VerticalAlignment.Top,
-                    Margin = new Thickness(0, 10, 10, 0),
+                    Margin = resolvedMargin,
                     SnapsToDevicePixels = true,
                     Effect = new DropShadowEffect
                     {
@@ -869,7 +869,7 @@ namespace PixelVaultNative
                 Foreground = Brushes.White,
                 HorizontalAlignment = HorizontalAlignment.Right,
                 VerticalAlignment = VerticalAlignment.Top,
-                Margin = new Thickness(0, 8, 8, 0),
+                Margin = resolvedMargin,
                 Effect = new DropShadowEffect
                 {
                     Color = Colors.Black,
@@ -2841,7 +2841,6 @@ namespace PixelVaultNative
         }
     }
 }
-
 
 
 
