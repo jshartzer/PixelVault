@@ -1,0 +1,446 @@
+You are working inside the PixelVault codebase. I am preparing for v1, and I want a comprehensive, modern, professional polish pass across the app.
+
+Your job is to create and then begin executing a detailed implementation plan based on the 10 polish pillars below. Do not treat this as a vague design brainstorm. Treat it as a concrete product-quality improvement program for the existing app.
+
+Important context:
+- PixelVault is already fairly mature. It already has significant work in place around library browsing, responsive layouts, cached thumbnails, SQLite-backed indexes, toasts, diagnostics, keyboard shortcuts, starred items, async/performance improvements, external tool integration, and multiple utility/editor surfaces.
+- I do NOT want a reckless redesign that breaks working flows.
+- Preserve the app’s current strengths: speed, practicality, clear workflows, and desktop utility value.
+- The goal is not to make it flashy. The goal is to make it feel intentional, trustworthy, cohesive, and production-ready.
+- Favor incremental, shippable slices over giant rewrites.
+- Avoid introducing framework churn or speculative architecture unless it clearly improves maintainability and polish.
+- When you change behavior, explain exactly why.
+- Before making large UI changes, inspect the existing code paths and current UX patterns and align with them.
+
+Your work must cover all 10 pillars:
+
+1. Design tokens / visual consistency
+2. Better loading states and perceived performance
+3. Replace unnecessary modal interruptions with inline feedback
+4. Strong empty states
+5. Move common edit flows into side panels/drawers where appropriate
+6. Subtle motion / transition polish
+7. Accessibility, clarity, and trust pass
+8. Command layer / command palette
+9. Smart views / curated library views
+10. Health / setup / diagnostics surface
+
+What I want from you:
+
+PHASE 1 — DISCOVERY AND AUDIT
+
+First, inspect the repository and produce a grounded audit of the current state. Do not give generic advice. Identify:
+- the main UI entry points
+- the primary library surface(s)
+- settings surfaces
+- existing editor windows
+- current toast/message/dialog patterns
+- current loading/progress indicators
+- current typography/color/spacing usage
+- repeated hardcoded UI values
+- current keyboard shortcut handling
+- current diagnostics/logging/setup flows
+- current places where context windows or secondary windows are opened
+- current quick actions that would benefit from drawers or a command palette
+- existing “smart view” building blocks already present in the data model or UI
+- any technical constraints that should shape implementation order
+
+Then produce a repo-specific “before state” summary for each of the 10 pillars.
+
+PHASE 2 — IMPLEMENTATION ROADMAP
+
+After the audit, produce a detailed roadmap with:
+- recommended implementation order
+- why that order is safest and highest-value
+- which parts are low-risk / medium-risk / high-risk
+- which changes are visual only vs behavioral
+- dependencies between tasks
+- which tasks should be split into separate commits
+- which tasks should be feature-flagged or guarded if needed
+
+Structure the roadmap into practical slices such as:
+- Slice A: design token foundation
+- Slice B: loading/skeleton states
+- Slice C: inline messaging and reduced modal churn
+- Slice D: empty state pass
+- Slice E: quick-edit drawer system
+- Slice F: motion/focus/accessibility pass
+- Slice G: command palette
+- Slice H: smart views
+- Slice I: health/setup surface
+- Slice J: final consistency cleanup
+
+For each slice, include:
+- files likely involved
+- what should change
+- what must stay the same
+- risks
+- acceptance criteria
+- test / verification checklist
+
+PHASE 3 — DETAILED IMPLEMENTATION REQUIREMENTS
+
+Implement the plan according to the requirements below.
+
+--------------------------------------------------
+1. DESIGN TOKENS / VISUAL CONSISTENCY
+--------------------------------------------------
+
+Goal:
+Create a lightweight design system so the app stops feeling like a collection of individually styled controls.
+
+Requirements:
+- Inventory all repeated hardcoded colors, corner radii, spacing values, button styles, and text sizes.
+- Consolidate them into a small shared design-token layer or equivalent centralized constants/helpers appropriate for this codebase.
+- Introduce semantic tokens where practical, such as:
+  - background tiers
+  - panel/background surfaces
+  - border strengths
+  - text primary / secondary / muted
+  - accent / success / warning / error / info
+  - primary / secondary / quiet / destructive action styles
+  - corner radius tiers
+  - spacing tiers
+- Do not over-engineer. Keep it simple and repo-appropriate.
+- Replace inconsistent button chrome and inconsistent spacing where possible.
+- Ensure toolbar buttons, pills, tiles, banners, and dialogs feel related.
+- Normalize hover, pressed, disabled, and selected states.
+- Create a clear visual hierarchy for:
+  - app-level primary actions
+  - contextual secondary actions
+  - utility actions
+  - destructive actions
+
+Deliverables:
+- shared token/style layer
+- migrated highest-visibility UI surfaces
+- list of remaining legacy areas if not all can be migrated safely
+
+Acceptance criteria:
+- fewer repeated style literals
+- visible improvement in consistency
+- no major visual regressions
+- no broken workflows
+
+--------------------------------------------------
+2. LOADING STATES / PERCEIVED PERFORMANCE
+--------------------------------------------------
+
+Goal:
+Make the app feel faster and more trustworthy even when work is still happening.
+
+Requirements:
+- Find current blank/awkward loading moments in:
+  - library folder grid
+  - selected folder detail pane
+  - cover art loading
+  - metadata fetches
+  - ID resolution
+  - intake preview / import-related surfaces
+  - editor opening flows
+- Replace blank waiting periods with localized loading states.
+- Add skeletons or placeholder shells where practical:
+  - folder tiles
+  - hero/cover area
+  - screenshot rows
+  - metadata panels
+- Prefer localized progress indicators instead of a generic full-screen waiting state when only part of the UI is updating.
+- Distinguish between:
+  - loading
+  - empty
+  - error
+  - stale-but-visible content being refreshed
+- Preserve already-visible content when refreshing if possible instead of flashing to empty.
+- Where a long-running task is already in progress, show status that tells the user what is happening in plain language.
+
+Acceptance criteria:
+- fewer “blank pop-in” moments
+- faster perceived response on folder switching and data refresh
+- clearer user trust in what the app is doing
+
+--------------------------------------------------
+3. INLINE FEEDBACK / REDUCE MODAL OVERUSE
+--------------------------------------------------
+
+Goal:
+Make feedback feel modern and contextual instead of interruptive.
+
+Requirements:
+- Audit all MessageBox/modal uses and classify them:
+  - truly blocking
+  - confirmation
+  - warning
+  - recoverable failure
+  - success/notice
+- Replace non-blocking successes and mild warnings with:
+  - toast
+  - inline banner
+  - message bar near the affected control/section
+- Keep modal dialogs only where they are genuinely justified:
+  - destructive confirmation
+  - critical failure
+  - decisions that must be made before continuing
+- Add retry affordances where appropriate.
+- For operations like cover fetch, ID lookup, setup/config issues, missing tools, or validation issues, prefer inline explanations with action buttons when possible.
+- Make sure feedback appears near the relevant surface whenever possible.
+
+Acceptance criteria:
+- fewer disruptive dialogs
+- clearer recovery paths
+- feedback feels attached to the relevant UI
+
+--------------------------------------------------
+4. EMPTY STATES
+--------------------------------------------------
+
+Goal:
+Make all “nothing here” states feel intentional and helpful.
+
+Requirements:
+Identify and improve empty states for areas such as:
+- no library selected / unavailable library
+- no search results
+- no upload items waiting
+- no cover found
+- no starred items
+- no smart-view items
+- no filename rule matches / no samples
+- no IDs available
+- no photos in a folder/group
+- missing setup/tooling/config
+
+For each empty state:
+- provide a short clear title
+- one concise explanatory sentence
+- one obvious next action when appropriate
+- avoid walls of text
+- avoid looking broken or unfinished
+
+Acceptance criteria:
+- no major app surface should feel like a dead blank area
+- empty states guide next action clearly
+
+--------------------------------------------------
+5. SIDE PANELS / DRAWERS FOR COMMON EDITS
+--------------------------------------------------
+
+Goal:
+Reduce unnecessary window sprawl and make common edits feel connected to the main library surface.
+
+Requirements:
+- Audit existing editor windows and decide which should stay separate windows vs which should become contextual drawers/panels.
+- Prioritize converting only the high-frequency, low-complexity edit flows, for example:
+  - quick metadata edit
+  - quick ID edit
+  - maybe folder actions/details
+- Do NOT force every complex editor into a drawer.
+- Keep heavyweight table/editor workflows as separate windows if that still makes sense.
+- New drawer/panel UX should:
+  - preserve context with the selected item/folder visible in the background
+  - support save/cancel clearly
+  - support loading/error states cleanly
+  - avoid fragile state handling
+- If full drawer conversion is too risky, create a staged architecture that enables it cleanly.
+
+Acceptance criteria:
+- quick edits feel more integrated
+- reduced window explosion for common tasks
+- no loss of functionality
+
+--------------------------------------------------
+6. SUBTLE MOTION / TRANSITIONS
+--------------------------------------------------
+
+Goal:
+Add restrained, functional motion that clarifies changes without slowing the app down.
+
+Requirements:
+- Add motion only where it improves comprehension:
+  - tile hover feedback
+  - expand/collapse transitions
+  - detail pane transition between selections
+  - fade-in for newly loaded imagery
+  - success affordance for toggles like star/favorite
+- Keep motion short and subtle.
+- Avoid flashy or decorative animation.
+- Avoid anything that makes the app feel slower.
+- Respect reduced-motion settings if practical in this environment.
+- Make sure motion is consistent with the design token layer.
+
+Acceptance criteria:
+- UI feels smoother and more modern
+- transitions clarify change
+- no annoying animation delays
+
+--------------------------------------------------
+7. ACCESSIBILITY / CLARITY / TRUST PASS
+--------------------------------------------------
+
+Goal:
+Make the app clearer, more usable, and more trustworthy.
+
+Requirements:
+Audit and improve:
+- keyboard focus visibility
+- tab order on important surfaces
+- contrast on dark surfaces
+- control hit target sizes
+- disabled-state clarity
+- destructive action clarity
+- loading language
+- error message wording
+- section headings and labels
+- discoverability of shortcuts and actions
+
+Also:
+- ensure primary actions are visually obvious
+- ensure destructive actions are clearly distinct
+- ensure small icon-only actions have tooltip/supporting labels where needed
+- improve confusing microcopy
+- ensure settings/setup failures are understandable
+
+Acceptance criteria:
+- stronger focus states
+- better readability
+- clearer error and recovery language
+- fewer ambiguous actions
+
+--------------------------------------------------
+8. COMMAND LAYER / COMMAND PALETTE
+--------------------------------------------------
+
+Goal:
+Introduce a modern command surface for power users and fast navigation.
+
+Requirements:
+- Design and implement a command palette or equivalent command layer appropriate for the app.
+- Include actions like:
+  - open library
+  - import
+  - import and comment
+  - manual import
+  - refresh
+  - fetch covers
+  - edit metadata
+  - edit IDs
+  - open settings
+  - open logs
+  - open filename rules
+  - open game index / photo index
+  - toggle grouping/view modes
+  - open diagnostics/setup/health
+  - focus search
+- Support keyboard invocation.
+- Make search useful and forgiving.
+- Keep first implementation simple and reliable.
+- If necessary, start with static commands before deeper contextual commands.
+- Bonus if contextual actions change based on current selection.
+
+Acceptance criteria:
+- keyboard-driven access to major functions
+- command surface feels responsive and useful
+- no fragile dependence on transient UI state
+
+--------------------------------------------------
+9. SMART VIEWS / CURATED VIEWS
+--------------------------------------------------
+
+Goal:
+Make the app feel more productized by surfacing useful curated views built from existing data.
+
+Requirements:
+Design and implement a smart-view system or equivalent filters for views such as:
+- Recently Imported
+- Starred
+- Missing Cover
+- Missing IDs
+- Needs Metadata
+- Videos
+- Photography
+- Unmatched / Needs Rule
+- Problem Files
+- possibly Recent Activity or Recently Added if distinct
+
+Important:
+- leverage existing data/state where possible
+- do not build giant new back-end systems unless necessary
+- start with the views that are easiest and most valuable
+- each smart view should have:
+  - clear definition
+  - clear entry point
+  - empty state
+  - clear relationship to the existing library browser
+
+Acceptance criteria:
+- smart views feel useful, not redundant
+- they reduce friction in common maintenance workflows
+- they integrate cleanly with existing browse/search patterns
+
+--------------------------------------------------
+10. HEALTH / SETUP / DIAGNOSTICS SURFACE
+--------------------------------------------------
+
+Goal:
+Give v1 a polished “control center” for operational health and setup.
+
+Requirements:
+Create or improve a dedicated surface showing items such as:
+- source path status
+- destination/library path status
+- ExifTool status
+- FFmpeg status
+- SteamGridDB token status
+- database/index/cache status
+- last scan / refresh information
+- troubleshooting logging status
+- quick actions such as:
+  - open logs
+  - copy diagnostics summary
+  - rebuild cache/index
+  - recheck tools
+  - open settings/path settings
+- Make the information readable to a non-technical user.
+- Prefer clear status rows/cards over raw debug text.
+- Keep advanced detail available without overwhelming the page.
+
+Acceptance criteria:
+- setup issues are easier to diagnose
+- app feels more production-ready and supportable
+- control center becomes a useful first-stop support surface
+
+PHASE 4 — EXECUTION RULES
+
+When implementing:
+- work in small, coherent slices
+- explain every non-obvious tradeoff
+- preserve behavior unless a change is intentional and justified
+- do not silently remove useful power-user functionality
+- prefer adapting existing code paths over inventing parallel systems
+- reuse existing abstractions where they are good enough
+- if code is too tangled, create clean seam layers but keep scope controlled
+- avoid giant speculative refactors
+- keep the app buildable at each step
+
+For each implementation slice:
+1. summarize what you found
+2. state exactly what you are changing
+3. state exactly what files are involved
+4. implement carefully
+5. explain any risks or follow-up work
+6. provide a concise manual test checklist
+
+PHASE 5 — OUTPUT FORMAT
+
+I want your response in this order:
+
+1. Current-state audit of PixelVault against the 10 pillars
+2. Prioritized roadmap with slices and rationale
+3. Concrete file-level implementation plan
+4. Begin implementation with the safest highest-value slice first
+5. After each slice, report:
+   - what changed
+   - what remains
+   - what should be tested next
+
+Final quality bar:
+This should result in a PixelVault v1 polish program that feels like the work of a thoughtful senior product engineer/designer working inside an existing desktop app, not a generic AI makeover.
