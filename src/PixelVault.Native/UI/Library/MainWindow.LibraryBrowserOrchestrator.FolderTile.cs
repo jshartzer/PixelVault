@@ -429,12 +429,6 @@ namespace PixelVaultNative
             panes.DetailTitle.Text = timelineView ? "Timeline" : info.Name;
             UpdateLibraryBrowserDetailTitleBadges(panes, timelineView ? null : info);
             panes.DetailMeta.Text = BuildLibraryBrowserDetailMetaText(info, actionFolder);
-            if (panes.PreviewCompletionBadge != null)
-            {
-                panes.PreviewCompletionBadge.Visibility = !timelineView && info.IsCompleted100Percent
-                    ? Visibility.Visible
-                    : Visibility.Collapsed;
-            }
             panes.OpenFolderButton.Content = BuildToolbarButtonContent("\uE8B7", BuildLibraryBrowserOpenFoldersLabel(info));
             if (timelineView)
             {

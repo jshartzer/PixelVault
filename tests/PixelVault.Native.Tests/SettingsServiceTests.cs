@@ -15,6 +15,27 @@ public sealed class SettingsServiceTests
         Assert.Equal("timeline", SettingsService.NormalizeLibraryGroupingMode(raw));
     }
 
+    [Theory]
+    [InlineData("alphabetical", "alpha")]
+    [InlineData("date captured", "captured")]
+    [InlineData("date added", "added")]
+    [InlineData("most photos", "photos")]
+    [InlineData("platform", "alpha")]
+    public void NormalizeLibraryFolderSortMode_SupportsMenuAliases(string raw, string expected)
+    {
+        Assert.Equal(expected, SettingsService.NormalizeLibraryFolderSortMode(raw));
+    }
+
+    [Theory]
+    [InlineData("100%", "completed")]
+    [InlineData("cross-platform", "crossplatform")]
+    [InlineData("25+ captures", "large")]
+    [InlineData("all", "all")]
+    public void NormalizeLibraryFolderFilterMode_SupportsAliases(string raw, string expected)
+    {
+        Assert.Equal(expected, SettingsService.NormalizeLibraryFolderFilterMode(raw));
+    }
+
     [Fact]
     public void SerializeSourceRoots_NormalizesSeparatorsAndDedupes()
     {
@@ -39,6 +60,7 @@ public sealed class SettingsServiceTests
                 "steamgriddb_token=secret",
                 "library_folder_tile_size=200",
                 "library_folder_sort_mode=recent",
+                "library_folder_filter_mode=100%",
                 "library_grouping_mode=console",
                 "troubleshooting_logging_enabled=1",
                 "library_double_click_set_folder_cover=1"
@@ -68,7 +90,8 @@ public sealed class SettingsServiceTests
             Assert.Equal(@"C:\tools\exiftool.exe", loaded.ExifToolPath, ignoreCase: true);
             Assert.Equal("secret", loaded.SteamGridDbApiToken);
             Assert.Equal(200, loaded.LibraryFolderTileSize);
-            Assert.Equal("recent", loaded.LibraryFolderSortMode);
+            Assert.Equal("added", loaded.LibraryFolderSortMode);
+            Assert.Equal("completed", loaded.LibraryFolderFilterMode);
             Assert.Equal("console", loaded.LibraryGroupingMode);
             Assert.True(loaded.TroubleshootingLoggingEnabled);
             Assert.True(loaded.LibraryDoubleClickSetsFolderCover);
@@ -125,6 +148,7 @@ public sealed class SettingsServiceTests
                 SteamGridDbApiToken = "tok",
                 LibraryFolderTileSize = 180,
                 LibraryFolderSortMode = "photos",
+                LibraryFolderFilterMode = "large",
                 LibraryGroupingMode = "console",
                 TroubleshootingLoggingEnabled = true,
                 LibraryDoubleClickSetsFolderCover = true,
@@ -146,6 +170,7 @@ public sealed class SettingsServiceTests
             Assert.Equal(original.SteamGridDbApiToken, loaded.SteamGridDbApiToken);
             Assert.Equal(SettingsService.NormalizeLibraryFolderTileSize(original.LibraryFolderTileSize), loaded.LibraryFolderTileSize);
             Assert.Equal("photos", loaded.LibraryFolderSortMode);
+            Assert.Equal("large", loaded.LibraryFolderFilterMode);
             Assert.Equal("console", loaded.LibraryGroupingMode);
             Assert.True(loaded.TroubleshootingLoggingEnabled);
             Assert.True(loaded.LibraryDoubleClickSetsFolderCover);

@@ -79,6 +79,7 @@ namespace PixelVaultNative
                 Action refreshSortButtons = null;
                 Action refreshGroupingButtons = null;
                 Action<string> setLibrarySortMode = null;
+                Action<string> setLibraryFilterMode = null;
                 Action<string> setLibraryGroupingMode = null;
                 Action<LibraryBrowserFolderView> showFolder = null;
                 Action<List<LibraryFolderInfo>, string, bool, bool, bool> runScopedCoverRefresh = null;
@@ -125,11 +126,26 @@ namespace PixelVaultNative
                 refreshSortButtons = delegate
                 {
                     var timelineMode = string.Equals(_shell.NormalizeLibraryGroupingMode(_shell.LibraryGroupingMode), "timeline", StringComparison.OrdinalIgnoreCase);
-                    var normalized = _shell.NormalizeLibraryFolderSortMode(_shell.LibraryFolderSortMode);
-                    _shell.LibraryBrowserApplySortGroupPillState(panes.SortPlatformButton, !timelineMode && string.Equals(normalized, "platform", StringComparison.OrdinalIgnoreCase));
-                    _shell.LibraryBrowserApplySortGroupPillState(panes.SortRecentButton, !timelineMode && string.Equals(normalized, "recent", StringComparison.OrdinalIgnoreCase));
-                    panes.SortPlatformButton.IsEnabled = !timelineMode;
-                    panes.SortRecentButton.IsEnabled = !timelineMode;
+                    var sortMode = _shell.NormalizeLibraryFolderSortMode(_shell.LibraryFolderSortMode);
+                    var filterMode = _shell.NormalizeLibraryFolderFilterMode(_shell.LibraryFolderFilterMode);
+                    _shell.LibraryBrowserApplySortGroupPillState(panes.SortMenuButton, !timelineMode && !string.Equals(sortMode, "alpha", StringComparison.OrdinalIgnoreCase));
+                    _shell.LibraryBrowserApplySortGroupPillState(panes.FilterMenuButton, !string.Equals(filterMode, "all", StringComparison.OrdinalIgnoreCase));
+                    panes.SortMenuButton.IsEnabled = !timelineMode;
+                    panes.FilterMenuButton.IsEnabled = true;
+                    var sortLabel =
+                        string.Equals(sortMode, "captured", StringComparison.OrdinalIgnoreCase) ? "Date Captured" :
+                        string.Equals(sortMode, "added", StringComparison.OrdinalIgnoreCase) ? "Date Added" :
+                        string.Equals(sortMode, "photos", StringComparison.OrdinalIgnoreCase) ? "Most Photos" :
+                        "Alphabetical";
+                    var filterLabel =
+                        string.Equals(filterMode, "completed", StringComparison.OrdinalIgnoreCase) ? "100% Achievements" :
+                        string.Equals(filterMode, "crossplatform", StringComparison.OrdinalIgnoreCase) ? "Cross-Platform" :
+                        string.Equals(filterMode, "large", StringComparison.OrdinalIgnoreCase) ? "25+ Captures" :
+                        "All Games";
+                    panes.SortMenuButton.ToolTip = timelineMode
+                        ? "Sort is fixed to capture time in Timeline view"
+                        : "Sort: " + sortLabel;
+                    panes.FilterMenuButton.ToolTip = "Filter: " + filterLabel;
                 };
 
                 refreshGroupingButtons = delegate
@@ -193,10 +209,21 @@ namespace PixelVaultNative
                 setLibrarySortMode = delegate(string mode)
                 {
                     var normalized = _shell.NormalizeLibraryFolderSortMode(mode);
-                    if (string.Equals(normalized, "played", StringComparison.OrdinalIgnoreCase)) normalized = "recent";
                     if (!string.Equals(normalized, _shell.NormalizeLibraryFolderSortMode(_shell.LibraryFolderSortMode), StringComparison.OrdinalIgnoreCase))
                     {
                         _shell.LibraryFolderSortMode = normalized;
+                        _shell.SaveSettings();
+                        if (renderTiles != null) renderTiles();
+                    }
+                    refreshSortButtons();
+                };
+
+                setLibraryFilterMode = delegate(string mode)
+                {
+                    var normalized = _shell.NormalizeLibraryFolderFilterMode(mode);
+                    if (!string.Equals(normalized, _shell.NormalizeLibraryFolderFilterMode(_shell.LibraryFolderFilterMode), StringComparison.OrdinalIgnoreCase))
+                    {
+                        _shell.LibraryFolderFilterMode = normalized;
                         _shell.SaveSettings();
                         if (renderTiles != null) renderTiles();
                     }
@@ -362,7 +389,8 @@ namespace PixelVaultNative
                     openSelectedLibraryMetadataEditor,
                     deleteSelectedLibraryFiles,
                     setLibraryGroupingMode,
-                    setLibrarySortMode);
+                    setLibrarySortMode,
+                    setLibraryFilterMode);
                 panes.ShortcutsHelpButton.Click += delegate { _shell.ShowLibraryBrowserKeyboardShortcutsHelp(libraryWindow); };
                 libraryWindow.PreviewKeyDown += delegate(object _, KeyEventArgs e)
                 {

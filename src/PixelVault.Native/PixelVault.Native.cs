@@ -95,7 +95,8 @@ namespace PixelVaultNative
         string ffmpegPath;
         string steamGridDbApiToken;
         int libraryFolderTileSize = 300;
-        string libraryFolderSortMode = "platform";
+        string libraryFolderSortMode = "alpha";
+        string libraryFolderFilterMode = "all";
         string libraryGroupingMode = "all";
         bool troubleshootingLoggingEnabled;
         bool troubleshootingLogRedactPaths;
@@ -1175,16 +1176,33 @@ namespace PixelVaultNative
             return (bestColumns, bestTileWidth);
         }
         string NormalizeLibraryFolderSortMode(string value) => SettingsService.NormalizeLibraryFolderSortMode(value);
+        string NormalizeLibraryFolderFilterMode(string value) => SettingsService.NormalizeLibraryFolderFilterMode(value);
         string LibraryFolderSortModeLabel(string value)
         {
             switch (NormalizeLibraryFolderSortMode(value))
             {
-                case "recent":
-                    return "Recently Added";
+                case "captured":
+                    return "Date Captured";
+                case "added":
+                    return "Date Added";
                 case "photos":
                     return "Most Photos";
                 default:
-                    return "Platform";
+                    return "Alphabetical";
+            }
+        }
+        string LibraryFolderFilterModeLabel(string value)
+        {
+            switch (NormalizeLibraryFolderFilterMode(value))
+            {
+                case "completed":
+                    return "100% Achievements";
+                case "crossplatform":
+                    return "Cross-Platform";
+                case "large":
+                    return "25+ Captures";
+                default:
+                    return "All Games";
             }
         }
         Button Btn(string t, RoutedEventHandler click, string bg, Brush fg) { var b = new Button { Content = t, Width = 176, Height = 48, Padding = new Thickness(18, 10, 18, 10), Margin = new Thickness(0, 0, 12, 12), Foreground = fg, Background = bg != null ? Brush(bg) : Brushes.White, BorderBrush = Brush("#C0CCD6"), BorderThickness = new Thickness(1), FontWeight = FontWeights.SemiBold, Effect = new DropShadowEffect { Color = Color.FromArgb(64, 18, 27, 36), BlurRadius = 16, ShadowDepth = 4, Direction = 270, Opacity = 0.55 } }; if (click != null) b.Click += click; return b; }
@@ -2841,7 +2859,6 @@ namespace PixelVaultNative
         }
     }
 }
-
 
 
 

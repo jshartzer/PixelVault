@@ -34,6 +34,12 @@ namespace PixelVaultNative
                 set => _m.libraryFolderSortMode = value;
             }
 
+            public string LibraryFolderFilterMode
+            {
+                get => _m.libraryFolderFilterMode;
+                set => _m.libraryFolderFilterMode = value;
+            }
+
             public string LibraryGroupingMode
             {
                 get => _m.libraryGroupingMode;
@@ -103,6 +109,8 @@ namespace PixelVaultNative
                 _m.LibraryBrowserScheduleIntakeReviewBadgeRefresh(libraryWindow, ws, navChrome);
 
             public string NormalizeLibraryFolderSortMode(string value) => _m.NormalizeLibraryFolderSortMode(value);
+
+            public string NormalizeLibraryFolderFilterMode(string value) => _m.NormalizeLibraryFolderFilterMode(value);
 
             public string NormalizeLibraryGroupingMode(string value) => _m.NormalizeLibraryGroupingMode(value);
 
@@ -245,8 +253,9 @@ namespace PixelVaultNative
                 Action openSelectedLibraryMetadataEditor,
                 Action deleteSelectedLibraryFiles,
                 Action<string> setLibraryGroupingMode,
-                Action<string> setLibrarySortMode) =>
-                _m.LibraryBrowserWireNavChromeAndToolbar(libraryWindow, ws, panes, navChrome, refreshIntakeReviewBadge, refreshLibraryFoldersAsync, runCoverRefresh, openSelectedLibraryMetadataEditor, deleteSelectedLibraryFiles, setLibraryGroupingMode, setLibrarySortMode);
+                Action<string> setLibrarySortMode,
+                Action<string> setLibraryFilterMode) =>
+                _m.LibraryBrowserWireNavChromeAndToolbar(libraryWindow, ws, panes, navChrome, refreshIntakeReviewBadge, refreshLibraryFoldersAsync, runCoverRefresh, openSelectedLibraryMetadataEditor, deleteSelectedLibraryFiles, setLibraryGroupingMode, setLibrarySortMode, setLibraryFilterMode);
         }
     }
 }

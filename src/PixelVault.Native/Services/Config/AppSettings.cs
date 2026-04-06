@@ -15,7 +15,8 @@ namespace PixelVaultNative
         public string FfmpegPath = string.Empty;
         public string SteamGridDbApiToken = string.Empty;
         public int LibraryFolderTileSize = 300;
-        public string LibraryFolderSortMode = "platform";
+        public string LibraryFolderSortMode = "alpha";
+        public string LibraryFolderFilterMode = "all";
         public string LibraryGroupingMode = "all";
         /// <summary>Committed library search box text (persists across sessions).</summary>
         public string LibraryBrowserSearchText = string.Empty;
@@ -47,7 +48,8 @@ namespace PixelVaultNative
                 FfmpegPath = s.FfmpegPath ?? string.Empty,
                 SteamGridDbApiToken = s.SteamGridDbApiToken ?? string.Empty,
                 LibraryFolderTileSize = s.LibraryFolderTileSize,
-                LibraryFolderSortMode = s.LibraryFolderSortMode ?? "platform",
+                LibraryFolderSortMode = s.LibraryFolderSortMode ?? "alpha",
+                LibraryFolderFilterMode = s.LibraryFolderFilterMode ?? "all",
                 LibraryGroupingMode = s.LibraryGroupingMode ?? "all",
                 LibraryBrowserSearchText = s.LibraryBrowserSearchText ?? string.Empty,
                 LibraryBrowserLastViewKey = s.LibraryBrowserLastViewKey ?? string.Empty,

@@ -1,5 +1,7 @@
 using System;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 
 namespace PixelVaultNative
 {
@@ -17,8 +19,26 @@ namespace PixelVaultNative
             Action openSelectedLibraryMetadataEditor,
             Action deleteSelectedLibraryFiles,
             Action<string> setLibraryGroupingMode,
-            Action<string> setLibrarySortMode)
+            Action<string> setLibrarySortMode,
+            Action<string> setLibraryFilterMode)
         {
+            void OpenLibraryButtonMenu(Button anchor, params MenuItem[] items)
+            {
+                if (anchor == null || items == null || items.Length == 0) return;
+                var menu = new ContextMenu
+                {
+                    PlacementTarget = anchor,
+                    Placement = PlacementMode.Bottom,
+                    StaysOpen = false
+                };
+                foreach (var item in items)
+                {
+                    if (item != null) menu.Items.Add(item);
+                }
+                anchor.ContextMenu = menu;
+                menu.IsOpen = true;
+            }
+
             navChrome.RefreshButton.Click += delegate
             {
                 if (refreshLibraryFoldersAsync != null) refreshLibraryFoldersAsync(false);
@@ -58,8 +78,78 @@ namespace PixelVaultNative
             panes.GroupConsoleButton.Click += delegate { setLibraryGroupingMode("console"); };
             panes.GroupTimelineButton.Click += delegate { setLibraryGroupingMode("timeline"); };
             panes.ExitTimelineButton.Click += delegate { setLibraryGroupingMode("folders"); };
-            panes.SortPlatformButton.Click += delegate { setLibrarySortMode("platform"); };
-            panes.SortRecentButton.Click += delegate { setLibrarySortMode("recent"); };
+            panes.SortMenuButton.Click += delegate
+            {
+                var alphaItem = new MenuItem
+                {
+                    Header = "Alphabetical",
+                    IsCheckable = true,
+                    IsChecked = string.Equals(NormalizeLibraryFolderSortMode(libraryFolderSortMode), "alpha", StringComparison.OrdinalIgnoreCase)
+                };
+                alphaItem.Click += delegate { setLibrarySortMode("alpha"); };
+
+                var capturedItem = new MenuItem
+                {
+                    Header = "Date Captured",
+                    IsCheckable = true,
+                    IsChecked = string.Equals(NormalizeLibraryFolderSortMode(libraryFolderSortMode), "captured", StringComparison.OrdinalIgnoreCase)
+                };
+                capturedItem.Click += delegate { setLibrarySortMode("captured"); };
+
+                var addedItem = new MenuItem
+                {
+                    Header = "Date Added",
+                    IsCheckable = true,
+                    IsChecked = string.Equals(NormalizeLibraryFolderSortMode(libraryFolderSortMode), "added", StringComparison.OrdinalIgnoreCase)
+                };
+                addedItem.Click += delegate { setLibrarySortMode("added"); };
+
+                var photosItem = new MenuItem
+                {
+                    Header = "Most Photos",
+                    IsCheckable = true,
+                    IsChecked = string.Equals(NormalizeLibraryFolderSortMode(libraryFolderSortMode), "photos", StringComparison.OrdinalIgnoreCase)
+                };
+                photosItem.Click += delegate { setLibrarySortMode("photos"); };
+
+                OpenLibraryButtonMenu(panes.SortMenuButton, alphaItem, capturedItem, addedItem, photosItem);
+            };
+            panes.FilterMenuButton.Click += delegate
+            {
+                var allItem = new MenuItem
+                {
+                    Header = "All Games",
+                    IsCheckable = true,
+                    IsChecked = string.Equals(NormalizeLibraryFolderFilterMode(libraryFolderFilterMode), "all", StringComparison.OrdinalIgnoreCase)
+                };
+                allItem.Click += delegate { setLibraryFilterMode("all"); };
+
+                var completedItem = new MenuItem
+                {
+                    Header = "100% Achievements",
+                    IsCheckable = true,
+                    IsChecked = string.Equals(NormalizeLibraryFolderFilterMode(libraryFolderFilterMode), "completed", StringComparison.OrdinalIgnoreCase)
+                };
+                completedItem.Click += delegate { setLibraryFilterMode("completed"); };
+
+                var crossPlatformItem = new MenuItem
+                {
+                    Header = "Cross-Platform",
+                    IsCheckable = true,
+                    IsChecked = string.Equals(NormalizeLibraryFolderFilterMode(libraryFolderFilterMode), "crossplatform", StringComparison.OrdinalIgnoreCase)
+                };
+                crossPlatformItem.Click += delegate { setLibraryFilterMode("crossplatform"); };
+
+                var largeItem = new MenuItem
+                {
+                    Header = "25+ Captures",
+                    IsCheckable = true,
+                    IsChecked = string.Equals(NormalizeLibraryFolderFilterMode(libraryFolderFilterMode), "large", StringComparison.OrdinalIgnoreCase)
+                };
+                largeItem.Click += delegate { setLibraryFilterMode("large"); };
+
+                OpenLibraryButtonMenu(panes.FilterMenuButton, allItem, completedItem, crossPlatformItem, largeItem);
+            };
         }
     }
 }

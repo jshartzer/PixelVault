@@ -35,6 +35,7 @@ namespace PixelVaultNative
             var shouldRestoreFolderScroll = ws.PreserveFolderScrollOnNextRender && restoreFolderScrollOffset > 0.1d;
             ws.PreserveFolderScrollOnNextRender = false;
             var sortMode = NormalizeLibraryFolderSortMode(libraryFolderSortMode);
+            var filterMode = NormalizeLibraryFolderFilterMode(libraryFolderFilterMode);
             var flattenGroups = !string.Equals(groupingMode, "console", StringComparison.OrdinalIgnoreCase);
             var searchText = ws.AppliedLibrarySearchText;
             var searchNormalized = string.IsNullOrWhiteSpace(searchText) ? null : searchText.Trim().ToLowerInvariant();
@@ -51,6 +52,28 @@ namespace PixelVaultNative
                     !string.IsNullOrEmpty(folder.SearchBlob)
                     && folder.SearchBlob.IndexOf(searchNormalized, StringComparison.Ordinal) >= 0)
                 .ToList();
+            visibleFolders = visibleFolders
+                .Where(folder =>
+                {
+                    switch (filterMode)
+                    {
+                        case "completed":
+                            return folder != null && folder.IsCompleted100Percent;
+                        case "crossplatform":
+                            return folder != null
+                                && (((folder.PlatformLabels ?? new string[0])
+                                    .Where(label => !string.IsNullOrWhiteSpace(label))
+                                    .Select(NormalizeConsoleLabel)
+                                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                                    .Count()) > 1
+                                    || folder.IsMergedAcrossPlatforms);
+                        case "large":
+                            return folder != null && folder.FileCount >= 25;
+                        default:
+                            return true;
+                    }
+                })
+                .ToList();
             filterSortStopwatch.Stop();
             if (timelineMode)
             {
@@ -66,12 +89,12 @@ namespace PixelVaultNative
                 return;
             }
             var orderedVisibleFolders = visibleFolders
-                .OrderByDescending(folder => string.Equals(sortMode, "recent", StringComparison.OrdinalIgnoreCase) ? GetLibraryBrowserFolderViewSortRecentlyAdded(folder) : DateTime.MinValue)
+                .OrderByDescending(folder => string.Equals(sortMode, "added", StringComparison.OrdinalIgnoreCase) ? GetLibraryBrowserFolderViewSortRecentlyAdded(folder) : DateTime.MinValue)
+                .ThenByDescending(folder => string.Equals(sortMode, "captured", StringComparison.OrdinalIgnoreCase) ? GetLibraryBrowserFolderViewSortNewest(folder) : DateTime.MinValue)
                 .ThenByDescending(folder => string.Equals(sortMode, "photos", StringComparison.OrdinalIgnoreCase) ? folder.FileCount : 0)
                 .ThenByDescending(folder => string.Equals(sortMode, "photos", StringComparison.OrdinalIgnoreCase) ? GetLibraryBrowserFolderViewSortNewest(folder) : DateTime.MinValue)
-                .ThenBy(folder => string.Equals(sortMode, "platform", StringComparison.OrdinalIgnoreCase) ? PlatformGroupOrder(DetermineLibraryBrowserGroup(folder)) : 0)
-                .ThenBy(folder => DetermineLibraryBrowserGroup(folder))
                 .ThenBy(folder => folder.Name ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(folder => DetermineLibraryBrowserGroup(folder))
                 .ToList();
             var folderLayout = CalculateResponsiveLibraryFolderLayout(panes.TileScroll);
             var targetFolderColumns = folderLayout.Columns;
@@ -104,7 +127,6 @@ namespace PixelVaultNative
                 panes.OpenFolderButton.Content = BuildToolbarButtonContent("\uE8B7", "Open Folder");
                 panes.PreviewImage.Source = null;
                 panes.PreviewImage.Visibility = Visibility.Collapsed;
-                if (panes.PreviewCompletionBadge != null) panes.PreviewCompletionBadge.Visibility = Visibility.Collapsed;
                 renderSelectedFolder();
                 PersistLibraryBrowserLastSelection(null);
             }

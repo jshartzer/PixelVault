@@ -18,7 +18,8 @@ namespace PixelVaultNative
                 FfmpegPath = ffmpegPath ?? string.Empty,
                 SteamGridDbApiToken = steamGridDbApiToken ?? string.Empty,
                 LibraryFolderTileSize = libraryFolderTileSize,
-                LibraryFolderSortMode = libraryFolderSortMode ?? "platform",
+                LibraryFolderSortMode = libraryFolderSortMode ?? "alpha",
+                LibraryFolderFilterMode = libraryFolderFilterMode ?? "all",
                 LibraryGroupingMode = libraryGroupingMode ?? "all",
                 LibraryBrowserSearchText = _libraryBrowserPersistedSearch ?? string.Empty,
                 LibraryBrowserLastViewKey = _libraryBrowserPersistedLastViewKey ?? string.Empty,
@@ -44,7 +45,8 @@ namespace PixelVaultNative
             ffmpegPath = s.FfmpegPath ?? string.Empty;
             steamGridDbApiToken = s.SteamGridDbApiToken ?? string.Empty;
             libraryFolderTileSize = s.LibraryFolderTileSize;
-            libraryFolderSortMode = s.LibraryFolderSortMode ?? "platform";
+            libraryFolderSortMode = s.LibraryFolderSortMode ?? "alpha";
+            libraryFolderFilterMode = s.LibraryFolderFilterMode ?? "all";
             libraryGroupingMode = s.LibraryGroupingMode ?? "all";
             _libraryBrowserPersistedSearch = s.LibraryBrowserSearchText ?? string.Empty;
             _libraryBrowserPersistedLastViewKey = s.LibraryBrowserLastViewKey ?? string.Empty;

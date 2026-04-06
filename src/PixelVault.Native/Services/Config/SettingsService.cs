@@ -27,9 +27,20 @@ namespace PixelVaultNative
         public static string NormalizeLibraryFolderSortMode(string value)
         {
             var normalized = (value ?? string.Empty).Trim().ToLowerInvariant();
-            if (normalized == "recent" || normalized == "recently added" || normalized == "recently-added") return "recent";
+            if (normalized == "alpha" || normalized == "alphabetical" || normalized == "alphabetic" || normalized == "name" || normalized == "platform") return "alpha";
+            if (normalized == "captured" || normalized == "date captured" || normalized == "capture date" || normalized == "date-captured" || normalized == "newest") return "captured";
+            if (normalized == "recent" || normalized == "recently added" || normalized == "recently-added" || normalized == "added" || normalized == "date added" || normalized == "date-added") return "added";
             if (normalized == "photos" || normalized == "most photos" || normalized == "photo count") return "photos";
-            return "platform";
+            return "alpha";
+        }
+
+        public static string NormalizeLibraryFolderFilterMode(string value)
+        {
+            var normalized = (value ?? string.Empty).Trim().ToLowerInvariant();
+            if (normalized == "completed" || normalized == "100" || normalized == "100%" || normalized == "100 percent" || normalized == "100 percent achievements") return "completed";
+            if (normalized == "crossplatform" || normalized == "cross-platform" || normalized == "cross platform" || normalized == "multiple platforms") return "crossplatform";
+            if (normalized == "large" || normalized == "25+" || normalized == "25 plus" || normalized == "25+ captures" || normalized == "large collection") return "large";
+            return "all";
         }
 
         public static string NormalizeLibraryGroupingMode(string value)
@@ -80,6 +91,7 @@ namespace PixelVaultNative
                 }
                 else if (key == "library_folder_sort_mode") s.LibraryFolderSortMode = NormalizeLibraryFolderSortMode(value);
                 else if (key == "library_grouping_mode") s.LibraryGroupingMode = NormalizeLibraryGroupingMode(value);
+                else if (key == "library_folder_filter_mode") s.LibraryFolderFilterMode = NormalizeLibraryFolderFilterMode(value);
                 else if (key == "library_browser_search") s.LibraryBrowserSearchText = value ?? string.Empty;
                 else if (key == "library_browser_last_view_key") s.LibraryBrowserLastViewKey = value ?? string.Empty;
                 else if (key == "library_browser_folder_scroll")
@@ -182,6 +194,7 @@ namespace PixelVaultNative
                 "library_folder_tile_size=" + NormalizeLibraryFolderTileSize(state.LibraryFolderTileSize),
                 "library_folder_sort_mode=" + NormalizeLibraryFolderSortMode(state.LibraryFolderSortMode),
                 "library_grouping_mode=" + NormalizeLibraryGroupingMode(state.LibraryGroupingMode),
+                "library_folder_filter_mode=" + NormalizeLibraryFolderFilterMode(state.LibraryFolderFilterMode),
                 "library_browser_search=" + (state.LibraryBrowserSearchText ?? string.Empty).Replace("\r", " ").Replace("\n", " "),
                 "library_browser_last_view_key=" + (state.LibraryBrowserLastViewKey ?? string.Empty).Replace("\r", " ").Replace("\n", " "),
                 "library_browser_folder_scroll=" + Math.Max(0, state.LibraryBrowserFolderScroll).ToString(CultureInfo.InvariantCulture),

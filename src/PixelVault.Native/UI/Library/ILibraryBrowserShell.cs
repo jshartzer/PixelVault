@@ -20,6 +20,7 @@ namespace PixelVaultNative
         double LibraryBrowserPersistedDetailScroll { get; }
 
         string LibraryFolderSortMode { get; set; }
+        string LibraryFolderFilterMode { get; set; }
         string LibraryGroupingMode { get; set; }
         int LibraryFolderTileSize { get; set; }
 
@@ -62,6 +63,7 @@ namespace PixelVaultNative
             MainWindow.LibraryBrowserNavChrome navChrome);
 
         string NormalizeLibraryFolderSortMode(string value);
+        string NormalizeLibraryFolderFilterMode(string value);
         string NormalizeLibraryGroupingMode(string value);
 
         void LibraryBrowserApplySortGroupPillState(Button button, bool active);
@@ -179,6 +181,7 @@ namespace PixelVaultNative
             Action openSelectedLibraryMetadataEditor,
             Action deleteSelectedLibraryFiles,
             Action<string> setLibraryGroupingMode,
-            Action<string> setLibrarySortMode);
+            Action<string> setLibrarySortMode,
+            Action<string> setLibraryFilterMode);
     }
 }
