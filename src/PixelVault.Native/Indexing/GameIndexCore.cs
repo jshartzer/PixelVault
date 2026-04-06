@@ -437,7 +437,12 @@ namespace PixelVaultNative
                     FileCount = folder.FileCount,
                     FolderPath = folder.FolderPath ?? string.Empty,
                     PreviewImagePath = folder.PreviewImagePath ?? string.Empty,
-                    FilePaths = folder.FilePaths ?? new string[0]
+                    FilePaths = folder.FilePaths ?? new string[0],
+                    IsCompleted100Percent = folder.IsCompleted100Percent,
+                    CompletedUtcTicks = folder.CompletedUtcTicks,
+                    IsFavorite = folder.IsFavorite,
+                    IsShowcase = folder.IsShowcase,
+                    CollectionNotes = folder.CollectionNotes ?? string.Empty
                 })
                 .ToList();
         }

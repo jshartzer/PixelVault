@@ -35,6 +35,11 @@ namespace PixelVaultNative
         public string SteamGridDbId;
         public bool SuppressSteamAppIdAutoResolve;
         public bool SuppressSteamGridDbIdAutoResolve;
+        public bool IsCompleted100Percent;
+        public long CompletedUtcTicks;
+        public bool IsFavorite;
+        public bool IsShowcase;
+        public string CollectionNotes;
     }
 
     sealed class GameIndexEditorRow

@@ -30,6 +30,8 @@ namespace PixelVaultNative
             internal string SteamGridDbId;
             internal bool SuppressSteamAppIdAutoResolve;
             internal bool SuppressSteamGridDbIdAutoResolve;
+            internal bool IsCompleted100Percent;
+            internal long CompletedUtcTicks;
             internal bool IsMergedAcrossPlatforms;
             internal bool IsTimelineProjection;
             /// <summary>Lowercase, newline-separated tokens for library search (name, paths, ids, platforms).</summary>
@@ -58,6 +60,8 @@ namespace PixelVaultNative
                 SteamGridDbId = view.SteamGridDbId,
                 SuppressSteamAppIdAutoResolve = view.SuppressSteamAppIdAutoResolve,
                 SuppressSteamGridDbIdAutoResolve = view.SuppressSteamGridDbIdAutoResolve,
+                IsCompleted100Percent = view.IsCompleted100Percent,
+                CompletedUtcTicks = view.CompletedUtcTicks,
                 IsMergedAcrossPlatforms = view.IsMergedAcrossPlatforms,
                 IsTimelineProjection = view.IsTimelineProjection,
                 SearchBlob = view.SearchBlob
@@ -110,6 +114,8 @@ namespace PixelVaultNative
             folder.SteamGridDbId = view.SteamGridDbId ?? string.Empty;
             folder.SuppressSteamAppIdAutoResolve = view.SuppressSteamAppIdAutoResolve;
             folder.SuppressSteamGridDbIdAutoResolve = view.SuppressSteamGridDbIdAutoResolve;
+            folder.IsCompleted100Percent = view.IsCompleted100Percent;
+            folder.CompletedUtcTicks = view.CompletedUtcTicks;
             if (string.IsNullOrWhiteSpace(folder.PlatformLabel)) folder.PlatformLabel = view.PrimaryPlatformLabel ?? string.Empty;
             return folder;
         }
@@ -904,6 +910,8 @@ namespace PixelVaultNative
                         SteamGridDbId = folder.SteamGridDbId ?? string.Empty,
                         SuppressSteamAppIdAutoResolve = folder.SuppressSteamAppIdAutoResolve,
                         SuppressSteamGridDbIdAutoResolve = folder.SuppressSteamGridDbIdAutoResolve,
+                        IsCompleted100Percent = folder.IsCompleted100Percent,
+                        CompletedUtcTicks = folder.CompletedUtcTicks,
                         IsMergedAcrossPlatforms = false
                     };
                     view.SourceFolders.Add(folder);
@@ -997,6 +1005,8 @@ namespace PixelVaultNative
                         SteamGridDbId = distinctSteamGridDbIds.Count == 1 ? distinctSteamGridDbIds[0] : string.Empty,
                         SuppressSteamAppIdAutoResolve = sourceFolders.All(folder => folder != null && folder.SuppressSteamAppIdAutoResolve),
                         SuppressSteamGridDbIdAutoResolve = sourceFolders.All(folder => folder != null && folder.SuppressSteamGridDbIdAutoResolve),
+                        IsCompleted100Percent = sourceFolders.Any(folder => folder != null && folder.IsCompleted100Percent),
+                        CompletedUtcTicks = sourceFolders.Select(folder => folder == null ? 0L : folder.CompletedUtcTicks).Where(ticks => ticks > 0).DefaultIfEmpty(0L).Max(),
                         IsMergedAcrossPlatforms = platformLabels.Length > 1
                     };
                     view.SourceFolders.AddRange(sourceFolders);

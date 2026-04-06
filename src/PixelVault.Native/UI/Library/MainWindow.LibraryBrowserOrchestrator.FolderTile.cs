@@ -12,6 +12,81 @@ namespace PixelVaultNative
 {
     public sealed partial class MainWindow
     {
+        bool SetLibraryBrowserCompletionState(LibraryBrowserFolderView view, bool isCompleted)
+        {
+            if (view == null || librarySession == null || !librarySession.HasLibraryRoot) return false;
+            var rows = librarySession.LoadSavedGameIndexRows();
+            var targetFolders = GetLibraryBrowserActionFolders(view);
+            if (targetFolders.Count == 0)
+            {
+                var primary = GetLibraryBrowserPrimaryFolder(view) ?? BuildLibraryBrowserDisplayFolder(view);
+                if (primary != null) targetFolders.Add(primary);
+            }
+            if (targetFolders.Count == 0) return false;
+
+            var changed = false;
+            foreach (var folder in targetFolders.Where(folder => folder != null))
+            {
+                var row = FindSavedGameIndexRowById(rows, folder.GameId) ?? FindSavedGameIndexRowByIdentity(rows, folder.Name, folder.PlatformLabel);
+                if (row == null)
+                {
+                    row = new GameIndexEditorRow
+                    {
+                        GameId = !string.IsNullOrWhiteSpace(NormalizeGameId(folder.GameId))
+                            ? NormalizeGameId(folder.GameId)
+                            : CreateGameId(rows.Select(existing => existing == null ? string.Empty : existing.GameId)),
+                        FolderPath = folder.FolderPath ?? string.Empty,
+                        Name = folder.Name ?? string.Empty,
+                        PlatformLabel = folder.PlatformLabel ?? string.Empty,
+                        SteamAppId = folder.SteamAppId ?? string.Empty,
+                        SteamGridDbId = folder.SteamGridDbId ?? string.Empty,
+                        SuppressSteamAppIdAutoResolve = folder.SuppressSteamAppIdAutoResolve,
+                        SuppressSteamGridDbIdAutoResolve = folder.SuppressSteamGridDbIdAutoResolve,
+                        FileCount = folder.FileCount,
+                        PreviewImagePath = folder.PreviewImagePath ?? string.Empty,
+                        FilePaths = folder.FilePaths ?? new string[0],
+                        IsCompleted100Percent = folder.IsCompleted100Percent,
+                        CompletedUtcTicks = folder.CompletedUtcTicks,
+                        IsFavorite = folder.IsFavorite,
+                        IsShowcase = folder.IsShowcase,
+                        CollectionNotes = folder.CollectionNotes ?? string.Empty,
+                        IndexAddedUtcTicks = DateTime.UtcNow.Ticks
+                    };
+                    rows.Add(row);
+                }
+
+                var targetCompletedTicks = isCompleted
+                    ? (row.CompletedUtcTicks > 0 ? row.CompletedUtcTicks : DateTime.UtcNow.Ticks)
+                    : 0L;
+
+                if (row.IsCompleted100Percent != isCompleted
+                    || row.CompletedUtcTicks != targetCompletedTicks
+                    || !string.Equals(folder.GameId ?? string.Empty, row.GameId ?? string.Empty, StringComparison.Ordinal))
+                {
+                    row.IsCompleted100Percent = isCompleted;
+                    row.CompletedUtcTicks = targetCompletedTicks;
+                    if (string.IsNullOrWhiteSpace(folder.GameId) && !string.IsNullOrWhiteSpace(row.GameId)) folder.GameId = row.GameId;
+                    changed = true;
+                }
+
+                folder.IsCompleted100Percent = isCompleted;
+                folder.CompletedUtcTicks = targetCompletedTicks;
+            }
+
+            if (!changed) return false;
+
+            librarySession.PersistGameIndexRows(rows);
+            var resolvedCompletedTicks = targetFolders.Select(folder => folder == null ? 0L : folder.CompletedUtcTicks).Where(ticks => ticks > 0).DefaultIfEmpty(0L).Max();
+            view.IsCompleted100Percent = targetFolders.Any(folder => folder != null && folder.IsCompleted100Percent);
+            view.CompletedUtcTicks = resolvedCompletedTicks;
+            if (view.PrimaryFolder != null)
+            {
+                view.PrimaryFolder.IsCompleted100Percent = view.IsCompleted100Percent;
+                view.PrimaryFolder.CompletedUtcTicks = resolvedCompletedTicks;
+            }
+            return true;
+        }
+
         FrameworkElement BuildLibraryBrowserDetailTitlePlatformBadge(string platformLabel)
         {
             var resolvedLabel = NormalizeConsoleLabel(platformLabel);
@@ -175,6 +250,7 @@ namespace PixelVaultNative
             };
             coverRoot.Children.Add(footerScrim);
             if (showPlatformBadgeOnTile) coverRoot.Children.Add(BuildLibraryTilePlatformBadge(badgePlatformLabel));
+            if (folder != null && folder.IsCompleted100Percent) coverRoot.Children.Add(BuildLibraryTileCompletionBadge());
             var imageBorder = new Border
             {
                 Width = tileWidth,
@@ -239,6 +315,25 @@ namespace PixelVaultNative
             };
             var editMetadataItem = new MenuItem { Header = "Edit Metadata" };
             editMetadataItem.Click += delegate { openLibraryMetadataEditor(folder); };
+            var markCompletedItem = new MenuItem
+            {
+                Header = "100% Achievements",
+                IsCheckable = true,
+                IsChecked = folder != null && folder.IsCompleted100Percent
+            };
+            markCompletedItem.Click += delegate
+            {
+                if (folder == null) return;
+                var changed = SetLibraryBrowserCompletionState(folder, markCompletedItem.IsChecked);
+                if (!changed)
+                {
+                    markCompletedItem.IsChecked = folder.IsCompleted100Percent;
+                    return;
+                }
+                if (renderTiles != null) renderTiles();
+                libraryToast?.Invoke(markCompletedItem.IsChecked ? "Marked 100% achievements" : "Cleared 100% achievements");
+                Log((markCompletedItem.IsChecked ? "Marked" : "Cleared") + " 100% achievements for " + BuildLibraryBrowserActionScopeLabel(folder) + ".");
+            };
             var editIdsItem = new MenuItem { Header = "Edit IDs...", IsEnabled = folder != null && !folder.IsMergedAcrossPlatforms };
             editIdsItem.Click += delegate
             {
@@ -268,6 +363,7 @@ namespace PixelVaultNative
             contextMenu.Items.Add(openFolderItem);
             contextMenu.Items.Add(copyFolderPathItem);
             contextMenu.Items.Add(editMetadataItem);
+            contextMenu.Items.Add(markCompletedItem);
             contextMenu.Items.Add(editIdsItem);
             contextMenu.Items.Add(new Separator());
             contextMenu.Items.Add(refreshThisFolderItem);

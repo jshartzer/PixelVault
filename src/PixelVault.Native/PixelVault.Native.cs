@@ -201,7 +201,12 @@ namespace PixelVaultNative
                 SteamAppId = folder.SteamAppId,
                 SteamGridDbId = folder.SteamGridDbId,
                 SuppressSteamAppIdAutoResolve = folder.SuppressSteamAppIdAutoResolve,
-                SuppressSteamGridDbIdAutoResolve = folder.SuppressSteamGridDbIdAutoResolve
+                SuppressSteamGridDbIdAutoResolve = folder.SuppressSteamGridDbIdAutoResolve,
+                IsCompleted100Percent = folder.IsCompleted100Percent,
+                CompletedUtcTicks = folder.CompletedUtcTicks,
+                IsFavorite = folder.IsFavorite,
+                IsShowcase = folder.IsShowcase,
+                CollectionNotes = folder.CollectionNotes
             };
         }
 
@@ -680,6 +685,51 @@ namespace PixelVaultNative
                     FontSize = 14,
                     FontWeight = FontWeights.Bold,
                     Foreground = Brush("#1D2931"),
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    TextAlignment = TextAlignment.Center
+                };
+            }
+            return badge;
+        }
+        FrameworkElement BuildLibraryTileCompletionBadge()
+        {
+            var iconPath = ResolveWorkspaceAssetPath("100 Percent Icon.png");
+            var badge = new Border
+            {
+                MinWidth = 34,
+                Height = 34,
+                CornerRadius = new CornerRadius(12),
+                Background = Brush("#D9101519"),
+                BorderBrush = Brush("#2D4755"),
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(4),
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Top,
+                Margin = new Thickness(0, 8, 8, 0),
+                Opacity = 0.98
+            };
+            if (!string.IsNullOrWhiteSpace(iconPath))
+            {
+                badge.Child = new Image
+                {
+                    Source = LoadImageSource(iconPath, 72),
+                    Width = 26,
+                    Height = 26,
+                    Stretch = Stretch.Uniform,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+            }
+            else
+            {
+                badge.Padding = new Thickness(8, 3, 8, 3);
+                badge.Child = new TextBlock
+                {
+                    Text = "100%",
+                    FontSize = 11,
+                    FontWeight = FontWeights.Bold,
+                    Foreground = Brushes.White,
                     HorizontalAlignment = HorizontalAlignment.Center,
                     VerticalAlignment = VerticalAlignment.Center,
                     TextAlignment = TextAlignment.Center
@@ -2648,7 +2698,6 @@ namespace PixelVaultNative
         }
     }
 }
-
 
 
 

@@ -268,6 +268,31 @@ namespace PixelVaultNative
                     folder.PreviewImagePath = saved.PreviewImagePath;
                     changed = true;
                 }
+                if (folder.IsCompleted100Percent != saved.IsCompleted100Percent)
+                {
+                    folder.IsCompleted100Percent = saved.IsCompleted100Percent;
+                    changed = true;
+                }
+                if (folder.CompletedUtcTicks != saved.CompletedUtcTicks)
+                {
+                    folder.CompletedUtcTicks = saved.CompletedUtcTicks;
+                    changed = true;
+                }
+                if (folder.IsFavorite != saved.IsFavorite)
+                {
+                    folder.IsFavorite = saved.IsFavorite;
+                    changed = true;
+                }
+                if (folder.IsShowcase != saved.IsShowcase)
+                {
+                    folder.IsShowcase = saved.IsShowcase;
+                    changed = true;
+                }
+                if (!string.Equals(folder.CollectionNotes ?? string.Empty, saved.CollectionNotes ?? string.Empty, StringComparison.Ordinal))
+                {
+                    folder.CollectionNotes = saved.CollectionNotes ?? string.Empty;
+                    changed = true;
+                }
             }
             return changed;
         }
@@ -297,7 +322,12 @@ namespace PixelVaultNative
                     SuppressSteamGridDbIdAutoResolve = folder.SuppressSteamGridDbIdAutoResolve,
                     FileCount = folder.FileCount,
                     PreviewImagePath = folder.PreviewImagePath ?? string.Empty,
-                    FilePaths = folder.FilePaths ?? new string[0]
+                    FilePaths = folder.FilePaths ?? new string[0],
+                    IsCompleted100Percent = folder.IsCompleted100Percent,
+                    CompletedUtcTicks = folder.CompletedUtcTicks,
+                    IsFavorite = folder.IsFavorite,
+                    IsShowcase = folder.IsShowcase,
+                    CollectionNotes = folder.CollectionNotes ?? string.Empty
                 });
             }
             else
@@ -318,6 +348,11 @@ namespace PixelVaultNative
                 saved.FileCount = folder.FileCount;
                 saved.PreviewImagePath = folder.PreviewImagePath ?? string.Empty;
                 saved.FilePaths = folder.FilePaths ?? new string[0];
+                saved.IsCompleted100Percent = folder.IsCompleted100Percent;
+                saved.CompletedUtcTicks = folder.CompletedUtcTicks;
+                saved.IsFavorite = folder.IsFavorite;
+                saved.IsShowcase = folder.IsShowcase;
+                saved.CollectionNotes = folder.CollectionNotes ?? string.Empty;
             }
             SaveSavedGameIndexRows(root, rows);
         }
