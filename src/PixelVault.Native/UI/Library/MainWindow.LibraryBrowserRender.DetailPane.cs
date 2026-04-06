@@ -234,6 +234,7 @@ namespace PixelVaultNative
                         snapshot.Groups,
                         timelineContexts,
                         mediaLayoutByFile,
+                        panes == null ? null : panes.ThumbScroll,
                         detailViewportWidth,
                         effectiveTileSize,
                         dpiScale,
@@ -284,8 +285,6 @@ namespace PixelVaultNative
                 try
                 {
                     traceStep("LibraryDetailBackgroundStart", "thread=" + Environment.CurrentManagedThreadId);
-                    var metadataIndex = librarySession.LoadLibraryMetadataIndex(false);
-                    traceStep("LibraryDetailMetadataIndexLoaded", "entries=" + metadataIndex.Count);
                     List<GameIndexEditorRow> savedGameRows = null;
                     if (timelineView)
                     {
@@ -297,6 +296,8 @@ namespace PixelVaultNative
                         .Distinct(StringComparer.OrdinalIgnoreCase)
                         .ToList();
                     traceStep("LibraryDetailFilesEnumerated", "files=" + detailFiles.Count);
+                    var metadataIndex = librarySession.LoadLibraryMetadataIndexForFilePaths(detailFiles);
+                    traceStep("LibraryDetailMetadataIndexLoaded", "entries=" + metadataIndex.Count + "; scope=detailFiles");
                     var filesMissingCaptureTicks = new List<string>();
                     if (librarySession.HasLibraryRoot && detailFiles.Count > 0)
                     {
@@ -469,7 +470,17 @@ namespace PixelVaultNative
                                 }
                             }
                             if (gameRowsChanged) librarySession.PersistGameIndexRows(savedGameRows);
-                            if (indexChanged) librarySession.SaveLibraryMetadataIndex(metadataIndex);
+                            if (indexChanged)
+                            {
+                                var repaired = new List<LibraryMetadataIndexEntry>();
+                                foreach (var file in filesMissingCaptureTicks)
+                                {
+                                    LibraryMetadataIndexEntry e;
+                                    if (metadataIndex.TryGetValue(file, out e) && e != null) repaired.Add(e);
+                                }
+
+                                librarySession.MergePersistLibraryMetadataIndexEntries(repaired);
+                            }
                             LogTroubleshooting("LibraryDetailMetadataRepairComplete",
                                 "renderVersion=" + renderVersion
                                 + "; files=" + filesMissingCaptureTicks.Count
@@ -592,6 +603,7 @@ namespace PixelVaultNative
             IList<LibraryDetailRenderGroup> groups,
             IDictionary<string, LibraryTimelineCaptureContext> timelineContexts,
             IReadOnlyDictionary<string, LibraryDetailMediaLayoutInfo> mediaLayoutByFile,
+            ScrollViewer detailScroll,
             double viewportWidth,
             int detailTileSize,
             double dpiScale,
@@ -614,6 +626,7 @@ namespace PixelVaultNative
                 .ToList();
             var packedRows = BuildLibraryTimelinePackedRows(desiredWidths, availableWidth, cardGap);
             var rowDefinitions = new List<VirtualizedRowDefinition>();
+            var nextRowDocumentTop = 0d;
             foreach (var row in packedRows)
             {
                 var rowIndexes = row == null ? new List<int>() : row.ToList();
@@ -635,11 +648,15 @@ namespace PixelVaultNative
                     .Select(card => card.Height)
                     .DefaultIfEmpty(ws == null ? 420d : ws.EstimatedDetailRowHeight)
                     .Max();
+                var rowVirtualHeight = Math.Max(ws == null ? 420 : ws.EstimatedDetailRowHeight, (int)Math.Ceiling(estimatedHeight + cardGap));
+                var capturedDocTop = nextRowDocumentTop;
+                nextRowDocumentTop += rowVirtualHeight;
                 rowDefinitions.Add(new VirtualizedRowDefinition
                 {
-                    Height = Math.Max(ws == null ? 420 : ws.EstimatedDetailRowHeight, (int)Math.Ceiling(estimatedHeight + cardGap)),
+                    Height = rowVirtualHeight,
                     Build = delegate
                     {
+                        var prioritizeDecodes = LibraryDetailTileRowIntersectsViewport(detailScroll, capturedDocTop, rowVirtualHeight);
                         var rowPanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, cardGap) };
                         for (var i = 0; i < rowCards.Count; i++)
                         {
@@ -649,6 +666,7 @@ namespace PixelVaultNative
                                 rowCards[i],
                                 timelineContexts,
                                 dpiScale,
+                                prioritizeDecodes,
                                 openSingleFileMetadataEditor,
                                 updateDetailSelection,
                                 refreshDetailSelectionUi,
@@ -721,6 +739,7 @@ namespace PixelVaultNative
             LibraryPackedDayCardLayout cardLayout,
             IDictionary<string, LibraryTimelineCaptureContext> timelineContexts,
             double dpiScale,
+            bool prioritizeRowDecodes,
             Action<string> openSingleFileMetadataEditor,
             Action<string, ModifierKeys> updateDetailSelection,
             Action refreshDetailSelectionUi,
@@ -792,10 +811,10 @@ namespace PixelVaultNative
                         redrawSelectedFolderDetail,
                         useFileAsFolderCover,
                         placement.Height,
-                        timelineView ? timelineContext : null);
+                        timelineView ? timelineContext : null,
+                        prioritizeRowDecodes);
                     Canvas.SetLeft(tile, placement.X);
                     Canvas.SetTop(tile, placement.Y);
-                    if (ws != null) ws.DetailTiles.Add(tile);
                     canvas.Children.Add(tile);
                 }
                 stack.Children.Add(canvas);

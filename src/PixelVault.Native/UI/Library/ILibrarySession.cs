@@ -46,6 +46,12 @@ namespace PixelVaultNative
         /// <summary>Load the library metadata index for <see cref="LibraryRoot"/> (empty dictionary when root is unset).</summary>
         Dictionary<string, LibraryMetadataIndexEntry> LoadLibraryMetadataIndex(bool forceDiskReload = false);
 
+        /// <summary>Load <c>photo_index</c> entries only for the given absolute file paths (empty when root unset or no paths).</summary>
+        Dictionary<string, LibraryMetadataIndexEntry> LoadLibraryMetadataIndexForFilePaths(IEnumerable<string> filePaths);
+
+        /// <summary>Upsert metadata index rows to SQLite and invalidate the host in-memory cache so the next full load is coherent.</summary>
+        void MergePersistLibraryMetadataIndexEntries(IEnumerable<LibraryMetadataIndexEntry> entries);
+
         /// <summary>Load saved game index rows for <see cref="LibraryRoot"/> (empty list when root is unset).</summary>
         List<GameIndexEditorRow> LoadSavedGameIndexRows();
 

@@ -411,6 +411,61 @@ VALUES ($root, 'G00045', 'E:/Game Captures/Control', 'Control', 'Steam', '', '',
     }
 
     [Fact]
+    public void LoadLibraryMetadataIndexEntriesForFilePaths_ReturnsOnlyRequestedRows()
+    {
+        using var harness = new IndexPersistenceHarness();
+        var fileA = harness.CreateFile("metadata\\a.png");
+        var fileB = harness.CreateFile("metadata\\b.png");
+        var fileC = harness.CreateFile("metadata\\c.png");
+
+        harness.Service.SaveLibraryMetadataIndexEntries(
+            harness.LibraryRoot,
+            new Dictionary<string, LibraryMetadataIndexEntry>(StringComparer.OrdinalIgnoreCase)
+            {
+                [fileA] = new LibraryMetadataIndexEntry { FilePath = fileA, Stamp = "sa", GameId = "G1", ConsoleLabel = "Steam", TagText = "Steam", CaptureUtcTicks = 10 },
+                [fileB] = new LibraryMetadataIndexEntry { FilePath = fileB, Stamp = "sb", GameId = "G2", ConsoleLabel = "Steam", TagText = "Steam", CaptureUtcTicks = 20 },
+                [fileC] = new LibraryMetadataIndexEntry { FilePath = fileC, Stamp = "sc", GameId = "G3", ConsoleLabel = "Steam", TagText = "Steam", CaptureUtcTicks = 30 }
+            });
+
+        var subset = harness.Service.LoadLibraryMetadataIndexEntriesForFilePaths(harness.LibraryRoot, new[] { fileB, fileA, Path.Combine(harness.RootPath, "metadata", "missing.png") });
+
+        Assert.Equal(2, subset.Count);
+        Assert.Equal("sa", subset[fileA].Stamp);
+        Assert.Equal("sb", subset[fileB].Stamp);
+        Assert.False(subset.ContainsKey(fileC));
+    }
+
+    [Fact]
+    public void UpsertLibraryMetadataIndexEntries_MergesWithoutDeletingOtherFiles()
+    {
+        using var harness = new IndexPersistenceHarness();
+        var fileA = harness.CreateFile("metadata\\upsert-a.png");
+        var fileB = harness.CreateFile("metadata\\upsert-b.png");
+
+        harness.Service.SaveLibraryMetadataIndexEntries(
+            harness.LibraryRoot,
+            new Dictionary<string, LibraryMetadataIndexEntry>(StringComparer.OrdinalIgnoreCase)
+            {
+                [fileA] = new LibraryMetadataIndexEntry { FilePath = fileA, Stamp = "oldA", GameId = "G9", ConsoleLabel = "Steam", TagText = "Steam", CaptureUtcTicks = 1 },
+                [fileB] = new LibraryMetadataIndexEntry { FilePath = fileB, Stamp = "keepB", GameId = "G8", ConsoleLabel = "Steam", TagText = "Steam", CaptureUtcTicks = 2 }
+            });
+
+        harness.Service.UpsertLibraryMetadataIndexEntries(
+            harness.LibraryRoot,
+            new[]
+            {
+                new LibraryMetadataIndexEntry { FilePath = fileA, Stamp = "newA", GameId = "G9", ConsoleLabel = "Steam", TagText = "Steam", CaptureUtcTicks = 100 }
+            });
+
+        var loaded = harness.Service.LoadLibraryMetadataIndexEntries(harness.LibraryRoot);
+        Assert.Equal(2, loaded.Count);
+        Assert.Equal("newA", loaded[fileA].Stamp);
+        Assert.Equal(100L, loaded[fileA].CaptureUtcTicks);
+        Assert.Equal("keepB", loaded[fileB].Stamp);
+        Assert.Equal(2L, loaded[fileB].CaptureUtcTicks);
+    }
+
+    [Fact]
     public void LoadSavedGameIndexRows_MigratesLegacyGameIndexFileIntoDatabase()
     {
         using var harness = new IndexPersistenceHarness();

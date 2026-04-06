@@ -376,9 +376,15 @@ namespace PixelVaultNative
             if (!File.Exists(path)) return;
             var lines = File.ReadAllLines(path);
             if (lines.Length < 3) return;
+            var headerLines = 2;
+            if (lines.Length > 2 && IsLibraryFolderCacheMetadataRevisionLine(lines[2]))
+                headerLines = 3;
+            if (lines.Length <= headerLines) return;
             bool changed = false;
-            var rewritten = new List<string> { lines[0], lines[1] };
-            foreach (var line in lines.Skip(2))
+            var rewritten = new List<string>();
+            for (var h = 0; h < headerLines; h++)
+                rewritten.Add(lines[h]);
+            foreach (var line in lines.Skip(headerLines))
             {
                 var parts = line.Split('\t');
                 if (parts.Length >= 8)

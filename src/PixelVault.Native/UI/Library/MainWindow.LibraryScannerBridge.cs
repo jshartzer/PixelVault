@@ -18,6 +18,8 @@ namespace PixelVaultNative
 
             public object LibraryMaintenanceSync => window.libraryMaintenanceSync;
 
+            public ReaderWriterLockSlim LibraryFolderCacheRwLock => window.libraryFolderCacheRwLock;
+
             public void EnsureLibraryRootExists(string root) => EnsureDir(root, "Library folder");
 
             public void EnsureExifTool() => window.EnsureExifTool();
@@ -56,6 +58,13 @@ namespace PixelVaultNative
             public void ClearLibraryFolderCache(string root) => window.ClearLibraryFolderCache(root);
 
             public string BuildLibraryFolderInventoryStamp(string root) => window.BuildLibraryFolderInventoryStamp(root);
+
+            public string BuildLibraryFolderStructuralStamp(string root) => window.BuildLibraryFolderStructuralStamp(root);
+
+            public string GetLibraryMetadataIndexRevision(string root) => window.GetLibraryMetadataIndexRevision(root);
+
+            public bool TryGetIndexOnlyFolderCacheRefresh(string root, string currentFullStamp, out List<string> mediaFilePathsOneLevelUnderRoot) =>
+                window.TryGetIndexOnlyFolderCacheRefresh(root, currentFullStamp, out mediaFilePathsOneLevelUnderRoot);
 
             public List<LibraryFolderInfo> LoadLibraryFolderCache(string root, string stamp) => window.LoadLibraryFolderCache(root, stamp);
 

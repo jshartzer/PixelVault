@@ -576,7 +576,7 @@ namespace PixelVaultNative
             return result;
         }
 
-        /// <summary>Async-shaped batch read; runs ExifTool work synchronously on the caller's context when awaited. Call from a thread-pool/async continuation (or wrap in <see cref="Task.Run(System.Action)"/>) so the UI thread is not blocked.</summary>
+        /// <summary>Batch keyword read on the **thread pool** (ExifTool is CPU/process-bound). Await with <c>ConfigureAwait(false)</c> when calling from UI code until you marshal results back to the dispatcher.</summary>
         public Task<Dictionary<string, string[]>> ReadEmbeddedKeywordTagsBatchAsync(IEnumerable<string> files, CancellationToken cancellationToken = default(CancellationToken))
         {
             var list = (files ?? Enumerable.Empty<string>())
@@ -584,10 +584,10 @@ namespace PixelVaultNative
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
             if (list.Count == 0) return Task.FromResult(new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase));
-            return Task.FromResult(ReadEmbeddedKeywordTagsBatch(list, cancellationToken));
+            return Task.Run(() => ReadEmbeddedKeywordTagsBatch(list, cancellationToken), cancellationToken);
         }
 
-        /// <summary>Async-shaped batch read; runs ExifTool work synchronously on the caller's context when awaited. Call from a thread-pool/async continuation (or wrap in <see cref="Task.Run(System.Action)"/>) so the UI thread is not blocked.</summary>
+        /// <summary>Batch embedded-metadata read on the **thread pool** (ExifTool is CPU/process-bound). Await with <c>ConfigureAwait(false)</c> when calling from UI code until you marshal results back to the dispatcher.</summary>
         public Task<Dictionary<string, EmbeddedMetadataSnapshot>> ReadEmbeddedMetadataBatchAsync(IEnumerable<string> files, CancellationToken cancellationToken = default(CancellationToken))
         {
             var list = (files ?? Enumerable.Empty<string>())
@@ -595,7 +595,7 @@ namespace PixelVaultNative
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
             if (list.Count == 0) return Task.FromResult(new Dictionary<string, EmbeddedMetadataSnapshot>(StringComparer.OrdinalIgnoreCase));
-            return Task.FromResult(ReadEmbeddedMetadataBatch(list, cancellationToken));
+            return Task.Run(() => ReadEmbeddedMetadataBatch(list, cancellationToken), cancellationToken);
         }
 
         public void EnsureExifTool()

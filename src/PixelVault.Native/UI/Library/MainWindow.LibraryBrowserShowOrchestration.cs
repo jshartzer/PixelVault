@@ -118,6 +118,7 @@ namespace PixelVaultNative
                 };
                 panes.DetailRows.AfterVisibleRowsRebuilt = delegate
                 {
+                    RepopulateLibraryDetailTilesFromVisibleRows(ws, panes.DetailRows);
                     if (refreshDetailSelectionUi != null) refreshDetailSelectionUi();
                 };
 
@@ -441,6 +442,7 @@ namespace PixelVaultNative
                 if (!autoRefreshLibraryFoldersOnStartup && _shell.StatusLine != null) _shell.StatusLine.Text = "Loading cached library folders...";
                 if (prefillLibraryFoldersFromSnapshotAsync != null) prefillLibraryFoldersFromSnapshotAsync();
                 if (refreshLibraryFoldersAsync != null && autoRefreshLibraryFoldersOnStartup) refreshLibraryFoldersAsync(false);
+                _shell.ScheduleDeferredGameIndexWarmup(libraryWindow);
             }
         }
     }

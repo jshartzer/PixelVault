@@ -452,6 +452,7 @@ namespace PixelVaultNative
             rightGrid.Children.Add(controls);
 
             panes.DetailRows = CreateVirtualizedRowHost(new Thickness(0), Brush("#0F151A"));
+            panes.DetailRows.RecycleVisibleRowElements = true;
             panes.ThumbScroll = panes.DetailRows.ScrollViewer;
             panes.ThumbScroll.HorizontalScrollBarVisibility = ScrollBarVisibility.Auto;
             Grid.SetRow(panes.ThumbScroll, 2);

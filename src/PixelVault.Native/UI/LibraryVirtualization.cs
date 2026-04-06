@@ -47,7 +47,7 @@ namespace PixelVaultNative
             public double ViewportHeightFallback = 720;
             public Action BeforeVisibleRowsRebuilt;
             public Action AfterVisibleRowsRebuilt;
-            /// <summary>When true, visible row <see cref="FrameworkElement"/>s are keyed by row index and reused across scroll refreshes (same <see cref="Rows"/> model). Cleared on <see cref="SetVirtualizedRows"/>. Do not use when <see cref="BeforeVisibleRowsRebuilt"/> assumes a full rebuild every time (e.g. detail pane repopulates parallel tile lists).</summary>
+            /// <summary>When true, visible row <see cref="FrameworkElement"/>s are keyed by row index and reused across scroll refreshes (same <see cref="Rows"/> model). Cleared on <see cref="SetVirtualizedRows"/>. Library detail pane uses this together with <see cref="RepopulateLibraryDetailTilesFromVisibleRows"/> after each virtual pass so selection chrome stays in sync.</summary>
             public bool RecycleVisibleRowElements;
             public readonly Dictionary<int, FrameworkElement> RecycledRowElements = new Dictionary<int, FrameworkElement>();
             /// <summary>Batches <see cref="RefreshVirtualizedRowHost"/> during window/pane resize so ScrollViewer layout storms do not queue hundreds of full virtual passes.</summary>
@@ -58,6 +58,34 @@ namespace PixelVaultNative
 
         const int VirtualizedRowHostViewportRefreshDebounceMs = 85;
         const int VirtualizedRowHostScrollRefreshDebounceMs = 48;
+
+        static bool LibraryDetailTileRowIntersectsViewport(ScrollViewer scroll, double rowDocumentTop, double rowHeight)
+        {
+            if (scroll == null) return true;
+            var v0 = scroll.VerticalOffset;
+            var v1 = v0 + Math.Max(1, scroll.ViewportHeight);
+            var top = rowDocumentTop;
+            var bottom = rowDocumentTop + Math.Max(1, rowHeight);
+            return bottom > v0 && top < v1;
+        }
+
+        static void RepopulateLibraryDetailTilesFromVisibleRows(LibraryBrowserWorkingSet ws, VirtualizedRowHost host)
+        {
+            if (ws == null || host?.VisibleRowsPanel == null) return;
+            ws.DetailTiles.Clear();
+            foreach (var element in host.VisibleRowsPanel.Children)
+            {
+                CollectLibraryDetailTileBorders(element as DependencyObject, ws.DetailTiles);
+            }
+        }
+
+        static void CollectLibraryDetailTileBorders(DependencyObject root, List<Border> sink)
+        {
+            if (root == null) return;
+            if (root is Border border && border.Tag is string path && !string.IsNullOrWhiteSpace(path) && (IsImage(path) || IsVideo(path))) sink.Add(border);
+            var count = VisualTreeHelper.GetChildrenCount(root);
+            for (var i = 0; i < count; i++) CollectLibraryDetailTileBorders(VisualTreeHelper.GetChild(root, i), sink);
+        }
 
         void ScheduleVirtualizedRowHostScrollRefresh(VirtualizedRowHost host)
         {
@@ -482,7 +510,7 @@ namespace PixelVaultNative
             tile.Clip = new RectangleGeometry(new Rect(0, 0, w, h), r, r);
         }
 
-        Border CreateLibraryDetailTile(string file, int size, int decodePixelWidth, Func<bool> shouldLoad, Action<string> openSingleFileMetadataEditor, Action<string, ModifierKeys> updateDetailSelection, HashSet<string> selectedDetailFiles, Action refreshDetailSelectionUi, Action redrawDetailPane, Action<string> useFileAsFolderCover, int? masonryLayoutHeight = null, LibraryTimelineCaptureContext timelineContext = null)
+        Border CreateLibraryDetailTile(string file, int size, int decodePixelWidth, Func<bool> shouldLoad, Action<string> openSingleFileMetadataEditor, Action<string, ModifierKeys> updateDetailSelection, HashSet<string> selectedDetailFiles, Action refreshDetailSelectionUi, Action redrawDetailPane, Action<string> useFileAsFolderCover, int? masonryLayoutHeight = null, LibraryTimelineCaptureContext timelineContext = null, bool prioritizeImageDecode = true)
         {
             var isVideoFile = IsVideo(file);
             var tileIsActive = true;
@@ -680,7 +708,7 @@ namespace PixelVaultNative
                 image.Source = loaded;
                 image.Visibility = Visibility.Visible;
                 placeholder.Visibility = Visibility.Collapsed;
-            }, true, shouldKeepLoading);
+            }, prioritizeImageDecode, shouldKeepLoading);
             tile.MouseLeftButtonDown += delegate(object sender, System.Windows.Input.MouseButtonEventArgs e)
             {
                 var clicked = sender as Border;

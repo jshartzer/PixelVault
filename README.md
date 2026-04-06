@@ -141,7 +141,7 @@ Build the live source with the SDK project:
 dotnet build C:\Codex\src\PixelVault.Native\PixelVault.Native.csproj -c Release
 ```
 
-Publish a new versioned folder under `dist\`. The script reads **`AppVersion`** from `PixelVault.Native.cs` when you omit `-Version`:
+Publish a new versioned folder under `dist\` (name pattern **`PixelVault-M.AAA.BBB`** per **`docs/POLICY.md`**). The script reads **`AppVersion`** from `PixelVault.Native.cs` when you omit `-Version`:
 
 ```powershell
 pwsh -File C:\Codex\scripts\Publish-PixelVault.ps1 -Force

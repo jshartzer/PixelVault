@@ -9,6 +9,24 @@ namespace PixelVault.Native.Tests;
 public sealed class LibraryFolderCacheIoTests
 {
     [Fact]
+    public void InventoryStampDiffersOnlyInDirectoryTicks_DetectsMtimeOnlyChange()
+    {
+        Assert.True(MainWindow.LibraryFolderCacheInventoryStampDiffersOnlyInDirectoryTicks("3|100|42", "3|200|42"));
+        Assert.False(MainWindow.LibraryFolderCacheInventoryStampDiffersOnlyInDirectoryTicks("3|100|42", "3|100|42"));
+        Assert.False(MainWindow.LibraryFolderCacheInventoryStampDiffersOnlyInDirectoryTicks("3|100|42", "4|200|42"));
+        Assert.False(MainWindow.LibraryFolderCacheInventoryStampDiffersOnlyInDirectoryTicks("3|100|42", "3|200|99"));
+    }
+
+    [Fact]
+    public void IsLibraryFolderCacheMetadataRevisionLine_RecognizesIndexRevisionFormat()
+    {
+        Assert.True(MainWindow.IsLibraryFolderCacheMetadataRevisionLine("12345|638547890123456789"));
+        Assert.True(MainWindow.IsLibraryFolderCacheMetadataRevisionLine("missing|0"));
+        Assert.False(MainWindow.IsLibraryFolderCacheMetadataRevisionLine("a\tb"));
+        Assert.False(MainWindow.IsLibraryFolderCacheMetadataRevisionLine("onlyPart"));
+    }
+
+    [Fact]
     public void SerializeAndParseLibraryFolderCacheRecord_PreservesCompletionFields()
     {
         var tempRoot = Path.Combine(Path.GetTempPath(), "PixelVault-Native-Tests", Guid.NewGuid().ToString("N"));

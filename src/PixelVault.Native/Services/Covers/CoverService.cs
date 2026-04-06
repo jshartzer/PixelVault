@@ -12,13 +12,9 @@ using System.Threading.Tasks;
 
 namespace PixelVaultNative
 {
+    /// <summary>Steam / SteamGridDB HTTP helpers; network entry points are <c>*Async</c> only.</summary>
     interface ICoverService
     {
-        string TryResolveSteamGridDbIdBySteamAppId(string steamAppId, CancellationToken cancellationToken = default(CancellationToken));
-        string TryResolveSteamGridDbIdByName(string title, CancellationToken cancellationToken = default(CancellationToken));
-        List<Tuple<string, string>> SearchSteamAppMatches(string title, CancellationToken cancellationToken = default(CancellationToken));
-        string TryResolveSteamAppId(string title, CancellationToken cancellationToken = default(CancellationToken));
-        string SteamName(string appId, CancellationToken cancellationToken = default(CancellationToken));
         Task<string> TryResolveSteamGridDbIdBySteamAppIdAsync(string steamAppId, CancellationToken cancellationToken = default(CancellationToken));
         Task<string> TryResolveSteamGridDbIdByNameAsync(string title, CancellationToken cancellationToken = default(CancellationToken));
         Task<List<Tuple<string, string>>> SearchSteamAppMatchesAsync(string title, CancellationToken cancellationToken = default(CancellationToken));
@@ -30,8 +26,6 @@ namespace PixelVaultNative
         string CachedCoverPath(string title);
         void DeleteCachedCover(string title);
         bool HasDedicatedLibraryCover(LibraryFolderInfo folder);
-        string TryDownloadSteamCover(string title, string appId, CancellationToken cancellationToken = default(CancellationToken));
-        string TryDownloadSteamGridDbCover(string title, string steamGridDbId, CancellationToken cancellationToken = default(CancellationToken));
         Task<string> TryDownloadSteamCoverAsync(string title, string appId, CancellationToken cancellationToken = default(CancellationToken));
         Task<string> TryDownloadSteamGridDbCoverAsync(string title, string steamGridDbId, CancellationToken cancellationToken = default(CancellationToken));
     }
@@ -56,6 +50,8 @@ namespace PixelVaultNative
         public Action<IEnumerable<string>> RemoveCachedImageEntries;
     }
 
+    /// <summary>Steam / SteamGridDB HTTP and local cover file helpers (<c>*Async</c> for network).</summary>
+    /// <remarks>Local file operations (<see cref="CustomCoverPath"/>, etc.) remain synchronous.</remarks>
     sealed class CoverService : ICoverService
     {
         readonly CoverServiceDependencies dependencies;
@@ -212,11 +208,6 @@ namespace PixelVaultNative
             ClearImageCache();
         }
 
-        public string TryResolveSteamGridDbIdBySteamAppId(string steamAppId, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            return TryResolveSteamGridDbIdBySteamAppIdAsync(steamAppId, cancellationToken).GetAwaiter().GetResult();
-        }
-
         public async Task<string> TryResolveSteamGridDbIdBySteamAppIdAsync(string steamAppId, CancellationToken cancellationToken = default(CancellationToken))
         {
             if (string.IsNullOrWhiteSpace(steamAppId) || !HasSteamGridDbApiToken()) return null;
@@ -262,11 +253,6 @@ namespace PixelVaultNative
             return null;
         }
 
-        public string TryResolveSteamGridDbIdByName(string title, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            return TryResolveSteamGridDbIdByNameAsync(title, cancellationToken).GetAwaiter().GetResult();
-        }
-
         public async Task<string> TryResolveSteamGridDbIdByNameAsync(string title, CancellationToken cancellationToken = default(CancellationToken))
         {
             if (string.IsNullOrWhiteSpace(title) || !HasSteamGridDbApiToken()) return null;
@@ -309,11 +295,6 @@ namespace PixelVaultNative
                 steamGridDbSearchCache[title] = null;
             }
             return null;
-        }
-
-        public List<Tuple<string, string>> SearchSteamAppMatches(string title, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            return SearchSteamAppMatchesAsync(title, cancellationToken).GetAwaiter().GetResult();
         }
 
         public async Task<List<Tuple<string, string>>> SearchSteamAppMatchesAsync(string title, CancellationToken cancellationToken = default(CancellationToken))
@@ -369,11 +350,6 @@ namespace PixelVaultNative
             return results;
         }
 
-        public string TryResolveSteamAppId(string title, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            return TryResolveSteamAppIdAsync(title, cancellationToken).GetAwaiter().GetResult();
-        }
-
         public async Task<string> TryResolveSteamAppIdAsync(string title, CancellationToken cancellationToken = default(CancellationToken))
         {
             string cached;
@@ -398,11 +374,6 @@ namespace PixelVaultNative
                 steamSearchCache[title] = null;
             }
             return null;
-        }
-
-        public string SteamName(string appId, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            return SteamNameAsync(appId, cancellationToken).GetAwaiter().GetResult();
         }
 
         public async Task<string> SteamNameAsync(string appId, CancellationToken cancellationToken = default(CancellationToken))
@@ -556,11 +527,6 @@ namespace PixelVaultNative
             return !string.IsNullOrWhiteSpace(CustomCoverPath(folder)) || CachedCoverPath(folder.Name) != null;
         }
 
-        public string TryDownloadSteamCover(string title, string appId, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            return TryDownloadSteamCoverAsync(title, appId, cancellationToken).GetAwaiter().GetResult();
-        }
-
         public async Task<string> TryDownloadSteamCoverAsync(string title, string appId, CancellationToken cancellationToken = default(CancellationToken))
         {
             if (string.IsNullOrWhiteSpace(title) || string.IsNullOrWhiteSpace(appId)) return null;
@@ -622,11 +588,6 @@ namespace PixelVaultNative
                 LogPerformanceSample("SteamCoverDownload", stopwatch, "title=" + title + "; appId=" + appId, 180);
             }
             return null;
-        }
-
-        public string TryDownloadSteamGridDbCover(string title, string steamGridDbId, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            return TryDownloadSteamGridDbCoverAsync(title, steamGridDbId, cancellationToken).GetAwaiter().GetResult();
         }
 
         public async Task<string> TryDownloadSteamGridDbCoverAsync(string title, string steamGridDbId, CancellationToken cancellationToken = default(CancellationToken))

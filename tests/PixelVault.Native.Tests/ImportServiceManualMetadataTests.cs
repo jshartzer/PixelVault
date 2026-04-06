@@ -50,16 +50,6 @@ sealed class StubCoverService : ICoverService
     public Task<string> SteamNameAsync(string appId, CancellationToken cancellationToken = default) =>
         Task.FromResult(string.Equals(appId, "123", StringComparison.Ordinal) ? "Resolved Store Title" : string.Empty);
 
-    public string TryResolveSteamGridDbIdBySteamAppId(string steamAppId, CancellationToken cancellationToken = default) => null;
-
-    public string TryResolveSteamGridDbIdByName(string title, CancellationToken cancellationToken = default) => null;
-
-    public List<Tuple<string, string>> SearchSteamAppMatches(string title, CancellationToken cancellationToken = default) => new List<Tuple<string, string>>();
-
-    public string TryResolveSteamAppId(string title, CancellationToken cancellationToken = default) => null;
-
-    public string SteamName(string appId, CancellationToken cancellationToken = default) => null;
-
     public Task<string> TryResolveSteamGridDbIdBySteamAppIdAsync(string steamAppId, CancellationToken cancellationToken = default) => Task.FromResult<string>(null);
 
     public Task<string> TryResolveSteamGridDbIdByNameAsync(string title, CancellationToken cancellationToken = default) => Task.FromResult<string>(null);
@@ -79,10 +69,6 @@ sealed class StubCoverService : ICoverService
     public void DeleteCachedCover(string title) { }
 
     public bool HasDedicatedLibraryCover(LibraryFolderInfo folder) => false;
-
-    public string TryDownloadSteamCover(string title, string appId, CancellationToken cancellationToken = default) => null;
-
-    public string TryDownloadSteamGridDbCover(string title, string steamGridDbId, CancellationToken cancellationToken = default) => null;
 
     public Task<string> TryDownloadSteamCoverAsync(string title, string appId, CancellationToken cancellationToken = default) => Task.FromResult<string>(null);
 

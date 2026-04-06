@@ -10,6 +10,8 @@ namespace PixelVaultNative
     {
         object LibraryMaintenanceSync { get; }
 
+        ReaderWriterLockSlim LibraryFolderCacheRwLock { get; }
+
         void EnsureLibraryRootExists(string root);
         void EnsureExifTool();
 
@@ -44,6 +46,12 @@ namespace PixelVaultNative
         void ClearLibraryFolderCache(string root);
 
         string BuildLibraryFolderInventoryStamp(string root);
+
+        string BuildLibraryFolderStructuralStamp(string root);
+
+        string GetLibraryMetadataIndexRevision(string root);
+
+        bool TryGetIndexOnlyFolderCacheRefresh(string root, string currentFullStamp, out List<string> mediaFilePathsOneLevelUnderRoot);
 
         List<LibraryFolderInfo> LoadLibraryFolderCache(string root, string stamp);
 

@@ -225,6 +225,8 @@ namespace PixelVaultNative
 
             public void RegisterLibraryBrowserLiveWorkingSet(LibraryBrowserWorkingSet ws) => _m.RegisterLibraryBrowserLiveWorkingSet(ws);
 
+            public void ScheduleDeferredGameIndexWarmup(Window libraryWindow) => _m.ScheduleDeferredGameIndexWarmup(libraryWindow);
+
             public void LibraryBrowserWirePaneEvents(
                 Window libraryWindow,
                 LibraryBrowserWorkingSet ws,

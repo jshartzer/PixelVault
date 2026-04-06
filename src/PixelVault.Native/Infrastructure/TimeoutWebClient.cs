@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace PixelVaultNative
 {
-    // Sync entry points call the async implementations with GetAwaiter().GetResult(); prefer DownloadStringAsync/DownloadFileAsync with await off the UI thread so HTTP does not block a thread-pool thread.
+    /// <summary>HttpClient wrapper with timeouts and download size limits. Use <see cref="DownloadStringAsync"/> / <see cref="DownloadFileAsync"/> only (no sync wrappers).</summary>
     sealed class TimeoutWebClient : IDisposable
     {
         /// <summary>Default cap for JSON/text responses (Steam store API, SteamGridDB search, etc.). Zero or negative disables the limit.</summary>
@@ -139,11 +139,6 @@ namespace PixelVaultNative
             return (fallbackEncoding ?? System.Text.Encoding.UTF8).GetString(bytes);
         }
 
-        public string DownloadString(string address, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            return DownloadStringAsync(address, cancellationToken).GetAwaiter().GetResult();
-        }
-
         public async Task<string> DownloadStringAsync(string address, CancellationToken cancellationToken = default(CancellationToken))
         {
             using (var request = BuildRequest(HttpMethod.Get, address))
@@ -160,11 +155,6 @@ namespace PixelVaultNative
                     }
                 }
             }
-        }
-
-        public void DownloadFile(string address, string filePath, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            DownloadFileAsync(address, filePath, cancellationToken).GetAwaiter().GetResult();
         }
 
         public async Task DownloadFileAsync(string address, string filePath, CancellationToken cancellationToken = default(CancellationToken))

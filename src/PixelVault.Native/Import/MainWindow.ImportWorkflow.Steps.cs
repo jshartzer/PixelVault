@@ -9,16 +9,6 @@ namespace PixelVaultNative
 {
     public sealed partial class MainWindow
     {
-        RenameStepResult RunRename()
-        {
-            return RunRename(importService.BuildSourceInventory(importSearchSubfoldersForRename).RenameScopeFiles);
-        }
-
-        RenameStepResult RunRename(IEnumerable<string> sourceFiles, Action<int, int, string> progress = null, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            return importService.RunSteamRename(sourceFiles, progress, cancellationToken);
-        }
-
         RenameStepResult RunManualRename(List<ManualMetadataItem> items, Action<int, int, string> progress = null, CancellationToken cancellationToken = default(CancellationToken))
         {
             return importService.RunManualRename(items, progress, cancellationToken);

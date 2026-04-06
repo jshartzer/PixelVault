@@ -19,7 +19,11 @@ namespace PixelVaultNative
         void SaveFilenameConventions(string root, IEnumerable<FilenameConventionRule> rules);
         void SaveSavedGameIndexRows(string root, IEnumerable<GameIndexEditorRow> rows);
         Dictionary<string, LibraryMetadataIndexEntry> LoadLibraryMetadataIndexEntries(string root);
+        /// <summary>Load <c>photo_index</c> rows for <paramref name="root"/> limited to <paramref name="filePaths"/> (batched IN queries). Omits paths with no row.</summary>
+        Dictionary<string, LibraryMetadataIndexEntry> LoadLibraryMetadataIndexEntriesForFilePaths(string root, IEnumerable<string> filePaths);
         void SaveLibraryMetadataIndexEntries(string root, Dictionary<string, LibraryMetadataIndexEntry> index);
+        /// <summary>Insert or replace rows in <c>photo_index</c> without deleting other files for the root.</summary>
+        void UpsertLibraryMetadataIndexEntries(string root, IEnumerable<LibraryMetadataIndexEntry> entries);
         /// <summary>Fingerprint by normalized source path for incremental Export Starred (per library root + export destination).</summary>
         Dictionary<string, string> LoadStarredExportFingerprints(string root, string exportDestinationNormalized);
         void UpsertStarredExportFingerprint(string root, string exportDestinationNormalized, string sourcePathNormalized, string fingerprint);
@@ -247,9 +251,15 @@ namespace PixelVaultNative
         {
             using (var pragma = connection.CreateCommand())
             {
-                // We keep foreign keys off here because the index tables are cache-style mirrors that are rebuilt
-                // and migrated in broad replacement passes rather than maintained as a relational source of truth.
-                pragma.CommandText = "PRAGMA journal_mode=WAL; PRAGMA foreign_keys=OFF;";
+                // Cache DB: WAL + NORMAL sync (safe together), generous page cache, temp in memory, busy wait for desktop contention.
+                // Foreign keys stay off — index tables are cache-style mirrors rebuilt in broad passes.
+                pragma.CommandText = @"
+PRAGMA journal_mode=WAL;
+PRAGMA synchronous=NORMAL;
+PRAGMA foreign_keys=OFF;
+PRAGMA busy_timeout=5000;
+PRAGMA temp_store=MEMORY;
+PRAGMA cache_size=-65536;";
                 pragma.ExecuteNonQuery();
             }
 
@@ -542,6 +552,30 @@ VALUES ($root, $gameId, $folderPath, $name, $platformLabel, $steamAppId, $steamG
             }
         }
 
+        LibraryMetadataIndexEntry MapPhotoIndexRow(SqliteDataReader reader, Dictionary<string, string> aliasMap)
+        {
+            var filePath = reader.IsDBNull(0) ? string.Empty : reader.GetString(0);
+            if (string.IsNullOrWhiteSpace(filePath)) return null;
+
+            var currentGameId = NormalizeGameId(reader.IsDBNull(2) ? string.Empty : reader.GetString(2));
+            string mappedGameId;
+            var storedConsoleLabel = reader.IsDBNull(3) ? string.Empty : reader.GetString(3);
+            var tagText = reader.IsDBNull(4) ? string.Empty : reader.GetString(4);
+            return new LibraryMetadataIndexEntry
+            {
+                FilePath = filePath,
+                Stamp = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
+                GameId = !string.IsNullOrWhiteSpace(currentGameId) && aliasMap != null && aliasMap.TryGetValue(currentGameId, out mappedGameId) ? mappedGameId : currentGameId,
+                ConsoleLabel = string.IsNullOrWhiteSpace(storedConsoleLabel)
+                    ? DetermineConsoleLabelFromTags(ParseTagText(tagText))
+                    : storedConsoleLabel,
+                TagText = tagText,
+                CaptureUtcTicks = reader.IsDBNull(5) ? 0L : reader.GetInt64(5),
+                Starred = ReadSqliteBoolLoose(reader, 6),
+                IndexAddedUtcTicks = reader.IsDBNull(7) ? 0L : reader.GetInt64(7)
+            };
+        }
+
         Dictionary<string, LibraryMetadataIndexEntry> ReadLibraryMetadataIndexFromDatabase(string root, SqliteConnection connection, Dictionary<string, string> aliasMap)
         {
             var index = new Dictionary<string, LibraryMetadataIndexEntry>(StringComparer.OrdinalIgnoreCase);
@@ -557,33 +591,107 @@ ORDER BY file_path COLLATE NOCASE;";
                 {
                     while (reader.Read())
                     {
-                        var filePath = reader.IsDBNull(0) ? string.Empty : reader.GetString(0);
                         // Do not skip missing files: a transient offline volume would empty the in-memory
                         // index and the next Save would DELETE+INSERT a tiny subset, effectively wiping SQLite.
-                        if (string.IsNullOrWhiteSpace(filePath)) continue;
-
-                        var currentGameId = NormalizeGameId(reader.IsDBNull(2) ? string.Empty : reader.GetString(2));
-                        string mappedGameId;
-                        var storedConsoleLabel = reader.IsDBNull(3) ? string.Empty : reader.GetString(3);
-                        var tagText = reader.IsDBNull(4) ? string.Empty : reader.GetString(4);
-                        index[filePath] = new LibraryMetadataIndexEntry
-                        {
-                            FilePath = filePath,
-                            Stamp = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
-                            GameId = !string.IsNullOrWhiteSpace(currentGameId) && aliasMap != null && aliasMap.TryGetValue(currentGameId, out mappedGameId) ? mappedGameId : currentGameId,
-                            ConsoleLabel = string.IsNullOrWhiteSpace(storedConsoleLabel)
-                                ? DetermineConsoleLabelFromTags(ParseTagText(tagText))
-                                : storedConsoleLabel,
-                            TagText = tagText,
-                            CaptureUtcTicks = reader.IsDBNull(5) ? 0L : reader.GetInt64(5),
-                            Starred = ReadSqliteBoolLoose(reader, 6),
-                            IndexAddedUtcTicks = reader.IsDBNull(7) ? 0L : reader.GetInt64(7)
-                        };
+                        var entry = MapPhotoIndexRow(reader, aliasMap);
+                        if (entry != null) index[entry.FilePath] = entry;
                     }
                 }
             }
 
             return index;
+        }
+
+        const int LibraryMetadataIndexPathBatchSize = 200;
+
+        public Dictionary<string, LibraryMetadataIndexEntry> LoadLibraryMetadataIndexEntriesForFilePaths(string root, IEnumerable<string> filePaths)
+        {
+            var result = new Dictionary<string, LibraryMetadataIndexEntry>(StringComparer.OrdinalIgnoreCase);
+            if (string.IsNullOrWhiteSpace(root)) return result;
+            var paths = (filePaths ?? Enumerable.Empty<string>())
+                .Where(p => !string.IsNullOrWhiteSpace(p))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (paths.Count == 0) return result;
+
+            var aliasMap = BuildSavedGameIdAliasMap(root);
+            using (var connection = OpenIndexDatabase(root))
+            {
+                for (var i = 0; i < paths.Count; i += LibraryMetadataIndexPathBatchSize)
+                {
+                    var batch = paths.Skip(i).Take(LibraryMetadataIndexPathBatchSize).ToList();
+                    using (var command = connection.CreateCommand())
+                    {
+                        var inParams = new List<string>(batch.Count);
+                        command.Parameters.AddWithValue("$root", root ?? string.Empty);
+                        for (var j = 0; j < batch.Count; j++)
+                        {
+                            var name = "$p" + j;
+                            inParams.Add(name);
+                            command.Parameters.AddWithValue(name, batch[j] ?? string.Empty);
+                        }
+
+                        command.CommandText = @"
+SELECT file_path, stamp, game_id, console_label, tag_text, capture_utc_ticks, starred, index_added_utc_ticks
+FROM photo_index
+WHERE root = $root AND file_path IN (" + string.Join(", ", inParams) + @")
+ORDER BY file_path COLLATE NOCASE;";
+                        using (var reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                var entry = MapPhotoIndexRow(reader, aliasMap);
+                                if (entry != null) result[entry.FilePath] = entry;
+                            }
+                        }
+                    }
+                }
+            }
+
+            return result;
+        }
+
+        public void UpsertLibraryMetadataIndexEntries(string root, IEnumerable<LibraryMetadataIndexEntry> entries)
+        {
+            var list = (entries ?? Enumerable.Empty<LibraryMetadataIndexEntry>())
+                .Where(e => e != null && !string.IsNullOrWhiteSpace(e.FilePath))
+                .ToList();
+            if (string.IsNullOrWhiteSpace(root) || list.Count == 0) return;
+
+            using (var connection = OpenIndexDatabase(root))
+            using (var transaction = connection.BeginTransaction())
+            {
+                foreach (var entry in list)
+                {
+                    using (var cmd = connection.CreateCommand())
+                    {
+                        cmd.Transaction = transaction;
+                        cmd.CommandText = @"
+INSERT INTO photo_index (root, file_path, stamp, game_id, console_label, tag_text, capture_utc_ticks, starred, index_added_utc_ticks)
+VALUES ($root, $filePath, $stamp, $gameId, $consoleLabel, $tagText, $captureUtcTicks, $starred, $indexAddedUtcTicks)
+ON CONFLICT(root, file_path) DO UPDATE SET
+    stamp = excluded.stamp,
+    game_id = excluded.game_id,
+    console_label = excluded.console_label,
+    tag_text = excluded.tag_text,
+    capture_utc_ticks = excluded.capture_utc_ticks,
+    starred = excluded.starred,
+    index_added_utc_ticks = excluded.index_added_utc_ticks;";
+                        cmd.Parameters.AddWithValue("$root", root ?? string.Empty);
+                        cmd.Parameters.AddWithValue("$filePath", entry.FilePath ?? string.Empty);
+                        cmd.Parameters.AddWithValue("$stamp", entry.Stamp ?? string.Empty);
+                        cmd.Parameters.AddWithValue("$gameId", NormalizeGameId(entry.GameId));
+                        cmd.Parameters.AddWithValue("$consoleLabel", entry.ConsoleLabel ?? string.Empty);
+                        cmd.Parameters.AddWithValue("$tagText", entry.TagText ?? string.Empty);
+                        cmd.Parameters.AddWithValue("$captureUtcTicks", entry.CaptureUtcTicks > 0 ? entry.CaptureUtcTicks : 0L);
+                        cmd.Parameters.AddWithValue("$starred", entry.Starred ? 1L : 0L);
+                        cmd.Parameters.AddWithValue("$indexAddedUtcTicks", entry.IndexAddedUtcTicks > 0 ? entry.IndexAddedUtcTicks : 0L);
+                        cmd.ExecuteNonQuery();
+                    }
+                }
+
+                transaction.Commit();
+            }
         }
 
         static bool ReadSqliteBoolLoose(SqliteDataReader reader, int ordinal)

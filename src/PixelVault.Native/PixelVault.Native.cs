@@ -51,7 +51,7 @@ namespace PixelVaultNative
 
     public sealed partial class MainWindow : Window
     {
-        const string AppVersion = "0.997";
+        const string AppVersion = "0.999.000";
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
         const string ClearedExternalIdSentinel = "__PV_CLEARED__";
@@ -79,6 +79,8 @@ namespace PixelVaultNative
         readonly Dictionary<string, LibraryMetadataIndexEntry> libraryMetadataIndex = new Dictionary<string, LibraryMetadataIndexEntry>(StringComparer.OrdinalIgnoreCase);
         readonly object libraryMetadataIndexSync = new object();
         readonly object libraryMaintenanceSync = new object();
+        /// <summary>Serializes folder-cache disk reads/writes and full <see cref="LibraryScanner.RebuildLibraryFolderCache"/> without blocking cache hits during metadata index maintenance.</summary>
+        internal readonly ReaderWriterLockSlim libraryFolderCacheRwLock = new ReaderWriterLockSlim(LockRecursionPolicy.NoRecursion);
         readonly object logFileSync = new object();
         string libraryMetadataIndexRoot;
 
@@ -184,6 +186,26 @@ namespace PixelVaultNative
                 clone[pair.Key] = CloneLibraryMetadataIndexEntry(pair.Value);
             }
             return clone;
+        }
+
+        Dictionary<string, LibraryMetadataIndexEntry> LoadLibraryMetadataIndexForFilePaths(string root, IEnumerable<string> filePaths)
+        {
+            if (string.IsNullOrWhiteSpace(root)) return new Dictionary<string, LibraryMetadataIndexEntry>(StringComparer.OrdinalIgnoreCase);
+            return indexPersistenceService.LoadLibraryMetadataIndexEntriesForFilePaths(root, filePaths);
+        }
+
+        /// <summary>Persist metadata index rows with SQLite UPSERT and drop the in-memory cache so the next full load reflects disk (avoids treating a partial merge as complete).</summary>
+        void MergePersistLibraryMetadataIndexEntries(string root, IEnumerable<LibraryMetadataIndexEntry> entries)
+        {
+            if (string.IsNullOrWhiteSpace(root) || entries == null) return;
+            var list = entries.Where(e => e != null && !string.IsNullOrWhiteSpace(e.FilePath)).ToList();
+            if (list.Count == 0) return;
+            indexPersistenceService.UpsertLibraryMetadataIndexEntries(root, list);
+            lock (libraryMetadataIndexSync)
+            {
+                libraryMetadataIndex.Clear();
+                libraryMetadataIndexRoot = root;
+            }
         }
 
         LibraryFolderInfo CloneLibraryFolderInfo(LibraryFolderInfo folder)
@@ -328,6 +350,8 @@ namespace PixelVaultNative
                 LoadLibraryMetadataIndex,
                 LoadSavedGameIndexRows,
                 SaveLibraryMetadataIndex,
+                LoadLibraryMetadataIndexForFilePaths,
+                MergePersistLibraryMetadataIndexEntries,
                 LoadLibraryFolderCacheSnapshot,
                 ResolveIndexedLibraryDate,
                 BuildResolvedLibraryMetadataIndexEntry,
@@ -365,14 +389,6 @@ namespace PixelVaultNative
             exifToolPath = Path.Combine(appRoot, "tools", "exiftool.exe");
             ffmpegPath = Path.Combine(appRoot, "tools", "ffmpeg.exe");
             LoadSettings();
-            try
-            {
-                if (!string.IsNullOrWhiteSpace(libraryRoot) && Directory.Exists(libraryRoot)) gameIndexService.GetSavedRowsForRoot(libraryRoot);
-            }
-            catch (Exception ex)
-            {
-                Log("Startup: could not preload saved game index for library root. " + ex.Message);
-            }
 
             Title = "PixelVault " + AppVersion;
             Width = PreferredLibraryWindowWidth();
@@ -1783,7 +1799,8 @@ namespace PixelVaultNative
             return false;
         }
 
-        int EnrichLibraryFoldersWithSteamAppIds(string root, List<LibraryFolderInfo> folders, Action<int, int, string> progress)
+        /// <summary>Resolves missing Steam App IDs using async Steam lookups (no synchronous blocking on async work). Await from UI; <paramref name="progress"/> may run on a thread-pool continuation after network waits.</summary>
+        async Task<int> EnrichLibraryFoldersWithSteamAppIdsAsync(string root, List<LibraryFolderInfo> folders, Action<int, int, string> progress, CancellationToken cancellationToken = default(CancellationToken))
         {
             var targetFolders = (folders ?? new List<LibraryFolderInfo>())
                 .Where(folder => folder != null && !string.IsNullOrWhiteSpace(folder.Name))
@@ -1795,6 +1812,7 @@ namespace PixelVaultNative
             int resolved = 0;
             for (int i = 0; i < targetFolders.Count; i++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var folder = targetFolders[i];
                 var detailPrefix = "Steam AppID " + (i + 1) + " of " + targetFolders.Count + " | " + folder.Name;
                 if (!string.IsNullOrWhiteSpace(folder.SteamAppId))
@@ -1802,7 +1820,8 @@ namespace PixelVaultNative
                     if (progress != null) progress(i + 1, targetFolders.Count, detailPrefix + " | already cached as " + folder.SteamAppId);
                     continue;
                 }
-                var appId = ResolveBestLibraryFolderSteamAppIdAsync(root, folder, true, CancellationToken.None).ConfigureAwait(false).GetAwaiter().GetResult();
+
+                var appId = await ResolveBestLibraryFolderSteamAppIdAsync(root, folder, true, cancellationToken).ConfigureAwait(false);
                 if (!string.IsNullOrWhiteSpace(appId))
                 {
                     var matchKey = BuildLibraryFolderMasterKey(folder);
@@ -1818,6 +1837,7 @@ namespace PixelVaultNative
                     if (progress != null) progress(i + 1, targetFolders.Count, detailPrefix + " | no match");
                 }
             }
+
             var stamp = BuildLibraryFolderInventoryStamp(root);
             var cached = LoadLibraryFolderCache(root, stamp);
             if (cached == null || cached.Count == 0)
@@ -1825,6 +1845,7 @@ namespace PixelVaultNative
                 RefreshCachedLibraryFoldersFromGameIndex(root);
                 return resolved;
             }
+
             foreach (var updated in folders.Where(entry => entry != null))
             {
                 var normalizedGameId = NormalizeGameId(updated.GameId);

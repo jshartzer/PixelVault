@@ -27,7 +27,7 @@ The active project workspace remains `C:\Codex`.
 
 Live packaged builds are published under:
 
-- `C:\Codex\dist\PixelVault-x.xxx`
+- `C:\Codex\dist\PixelVault-<M.AAA.BBB>\` — pattern under **Versioning Policy** (e.g. `PixelVault-0.998.000`)
 
 Shared persistent app data lives under:
 
@@ -35,29 +35,39 @@ Shared persistent app data lives under:
 
 ## Versioning Policy
 
-For a concise **release checklist** (commands and files to touch), see **`docs/VERSIONING.md`**. Bump sizing below remains authoritative.
+For a concise **release checklist** (commands and files to touch), see **`docs/VERSIONING.md`**. Rules below are authoritative.
 
-PixelVault uses decimal build versioning.
+### Canonical format
 
-General rule:
+- **`AppVersion`** is a **three-part** build string: **`M.AAA.BBB`** (two dots, **three segments**).
+- **Pre-1.0:** **`M`** is **`0`**. When you intentionally ship **1.0**, set **`M`** to **`1`** (then **`2`**, and so on for future major product lines if needed).
+- **`AAA`** and **`BBB`** are integers in **`000`…`999`**, each written with **exactly three decimal digits** (leading zeros). Examples: **`0.000.001`**, **`0.098.015`**, **`0.998.042`**, **`1.000.000`**.
+- **Sorting / folders / changelog headers** all use this same literal string (e.g. `dist\PixelVault-0.998.042\`).
 
-- very small fix or narrow cleanup: increment by roughly `0.001` to `0.004`
-- normal bugfix or focused UX improvement: increment by roughly `0.005`
-- feature-sized change or workflow adjustment: increment by roughly `0.010`
-- major data-model or architectural shift: increment by more than `0.010` when justified
+**Legacy history:** Older releases used a **two-part** decimal train (**`0.997`**, **`0.998`**, …). Those values remain in **`CHANGELOG.md`** and docs as historical headers. **New** releases must use **`M.AAA.BBB`** only.
 
-The exact bump should reflect the real size and risk of the change, not an arbitrary schedule.
+**Adoption:** The live train moved from **`0.998`** to **`0.998.000`** (see **`docs/CHANGELOG.md`**). Subsequent publishes increment **`BBB`** and **`AAA`** as below.
+
+### Bump sizing
+
+The **rightmost** segment (**`BBB`**) is the usual **patch / build tick**. The **middle** segment (**`AAA`**) is the larger **step** (roughly what used to be “minor” on the old fractional scale). Choose steps by scope and risk, not a fixed calendar.
+
+- **Very small** fix or narrow cleanup: add **`001`** to **`004`** to **`BBB`** (e.g. `0.998.000` → `0.998.003`).
+- **Normal** bugfix or focused UX improvement: add about **`005`** to **`BBB`** (e.g. `0.998.000` → `0.998.005`).
+- **Feature-sized** change or workflow adjustment: add **`001`** to **`AAA`** and set **`BBB`** to **`000`** (e.g. `0.998.014` → `0.999.000`). This replaces the old “increment by ~`0.010`” habit as a **middle-segment** step.
+- **Major** data-model or architectural shift: add **more than `001`** to **`AAA`** when justified, and reset **`BBB`** to **`000`** for that milestone.
+- **1.0:** when ready, move to **`1.000.000`**, then keep using **`AAA`** / **`BBB`** the same way (**`1.000.001`**, **`1.001.000`**, etc.).
 
 ### Release responsibilities
 
 When a new app build is published:
 
-1. Update `AppVersion` in the current live source file.
+1. Update `AppVersion` in the current live source file to the new **`M.AAA.BBB`** string.
 2. Build and publish from `C:\Codex\src\PixelVault.Native\PixelVault.Native.csproj`, normally through `C:\Codex\scripts\Publish-PixelVault.ps1`.
-3. Publish the build into a new folder under `C:\Codex\dist\PixelVault-x.xxx`.
+3. Publish the build into a new folder under `C:\Codex\dist\PixelVault-<M.AAA.BBB>\`.
 4. Copy the current source snapshot into that dist folder as `PixelVault.Native.cs`.
 5. Update `C:\Codex\docs\CURRENT_BUILD.txt`.
-6. Update `C:\Codex\docs\CHANGELOG.md`.
+6. Update `C:\Codex\docs\CHANGELOG.md` with a `## M.AAA.BBB` header.
 7. Update the version-local `CHANGELOG.md` inside the new dist folder.
 8. Repoint `C:\Codex\PixelVault.lnk` to the newest `PixelVault.exe`.
 
@@ -88,7 +98,7 @@ The SDK build project for that source tree lives at:
 
 Published builds should still carry a version-local source snapshot in:
 
-- `C:\Codex\dist\PixelVault-x.xxx\PixelVault.Native.cs`
+- `C:\Codex\dist\PixelVault-<M.AAA.BBB>\PixelVault.Native.cs`
 
 The modular extraction is acceptable as long as the behavioral contracts below remain stable.
 

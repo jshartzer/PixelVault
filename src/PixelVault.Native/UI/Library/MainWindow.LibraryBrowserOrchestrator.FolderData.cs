@@ -1,8 +1,10 @@
 using System;
+using System.IO;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Threading;
 namespace PixelVaultNative
 {
     public sealed partial class MainWindow
@@ -118,6 +120,24 @@ namespace PixelVaultNative
                 }
                 if (refreshLibraryFoldersAsync != null) refreshLibraryFoldersAsync(false);
             });
+        }
+
+        void ScheduleDeferredGameIndexWarmup(Window libraryWindow)
+        {
+            if (libraryWindow == null || gameIndexService == null) return;
+            libraryWindow.Dispatcher.BeginInvoke(new Action(delegate
+            {
+                try
+                {
+                    var root = libraryRoot;
+                    if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root)) return;
+                    gameIndexService.GetSavedRowsForRoot(root);
+                }
+                catch (Exception ex)
+                {
+                    Log("Deferred game index warmup failed. " + ex.Message);
+                }
+            }), DispatcherPriority.ApplicationIdle);
         }
     }
 }

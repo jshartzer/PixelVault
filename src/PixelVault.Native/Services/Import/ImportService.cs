@@ -30,10 +30,7 @@ namespace PixelVaultNative
         /// <summary>Deletes each path that exists (e.g. import “delete before processing”). Skips missing files.</summary>
         DeleteStepResult DeleteSourceFiles(IEnumerable<string> filePaths, Action<int, int, string> progress = null, CancellationToken cancellationToken = default);
 
-        /// <summary>Steam AppID-based renames in the upload folder (canonical store title + timestamp suffix rules).</summary>
-        RenameStepResult RunSteamRename(IEnumerable<string> sourceFiles, Action<int, int, string> progress = null, CancellationToken cancellationToken = default);
-
-        /// <summary>Async Steam rename (uses <see cref="ICoverService.SteamNameAsync"/>; prefer in background workflows).</summary>
+        /// <summary>Steam AppID-based renames in the upload folder (uses <see cref="ICoverService.SteamNameAsync"/> when store-title resolver is not injected). Use from async import workflows — do not block the WPF dispatcher.</summary>
         Task<RenameStepResult> RunSteamRenameAsync(IEnumerable<string> sourceFiles, Action<int, int, string> progress = null, CancellationToken cancellationToken = default);
 
         /// <summary>Loads saved + optional editor fallback game rows for manual-metadata title combo (thread-pool; host-supplied).</summary>
@@ -122,7 +119,7 @@ namespace PixelVaultNative
         /// <summary>Parse filename for intake (Steam AppID, title hint).</summary>
         public Func<string, FilenameParseResult> ParseFilenameForImport;
 
-        /// <summary>Optional override for Steam store title by AppID; when null, <see cref="RunSteamRename"/> uses <see cref="ICoverService.SteamNameAsync"/>.</summary>
+        /// <summary>Optional override for Steam store title by AppID; when null, <see cref="IImportService.RunSteamRenameAsync"/> uses <see cref="ICoverService.SteamNameAsync"/>.</summary>
         public Func<string, string> ResolveSteamStoreTitle;
 
         /// <summary>Record Steam AppID on the saved game index when first seen during rename.</summary>
@@ -398,11 +395,6 @@ namespace PixelVaultNative
             if (progress != null) progress(total, total, "Delete step complete: deleted " + deleted + ", skipped " + skipped + ".");
             if (deleted > 0 || skipped > 0) d.Log?.Invoke("Delete summary: deleted " + deleted + ", skipped " + skipped + ".");
             return new DeleteStepResult { Deleted = deleted, Skipped = skipped };
-        }
-
-        public RenameStepResult RunSteamRename(IEnumerable<string> sourceFiles, Action<int, int, string> progress = null, CancellationToken cancellationToken = default)
-        {
-            return RunSteamRenameAsync(sourceFiles, progress, cancellationToken).GetAwaiter().GetResult();
         }
 
         public async Task<RenameStepResult> RunSteamRenameAsync(IEnumerable<string> sourceFiles, Action<int, int, string> progress = null, CancellationToken cancellationToken = default)

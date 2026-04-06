@@ -37,14 +37,16 @@ namespace PixelVaultNative
             }
         }
 
+        /// <summary>Keyword batch read off the calling thread via <see cref="IMetadataService.ReadEmbeddedKeywordTagsBatchAsync"/> (thread-pool offload). Metadata scans use <see cref="IMetadataService.ReadEmbeddedKeywordTagsBatch"/> on parallel workers instead.</summary>
         Dictionary<string, string[]> ReadEmbeddedKeywordTagsBatch(IEnumerable<string> files, CancellationToken cancellationToken = default(CancellationToken))
         {
-            return metadataService.ReadEmbeddedKeywordTagsBatch(files, cancellationToken);
+            return metadataService.ReadEmbeddedKeywordTagsBatchAsync(files, cancellationToken).ConfigureAwait(false).GetAwaiter().GetResult();
         }
 
+        /// <summary>Embedded snapshot batch read off the UI thread (delegates to <see cref="IMetadataService.ReadEmbeddedMetadataBatchAsync"/>).</summary>
         Dictionary<string, EmbeddedMetadataSnapshot> ReadEmbeddedMetadataBatch(IEnumerable<string> files, CancellationToken cancellationToken = default(CancellationToken))
         {
-            return metadataService.ReadEmbeddedMetadataBatch(files, cancellationToken);
+            return metadataService.ReadEmbeddedMetadataBatchAsync(files, cancellationToken).ConfigureAwait(false).GetAwaiter().GetResult();
         }
 
         void MoveMetadataSidecarIfPresent(string sourceFile, string targetFile)

@@ -6,6 +6,27 @@ namespace PixelVaultNative
 {
     public sealed partial class MainWindow
     {
+        /// <summary>Stable signature of direct child folder <em>names</em> under <see cref="root"/> (count + hash); omits directory mtimes used in the full inventory stamp.</summary>
+        internal string BuildLibraryFolderStructuralStamp(string root)
+        {
+            unchecked
+            {
+                var folderCount = 0;
+                var names = new List<string>();
+                foreach (var dir in Directory.EnumerateDirectories(root))
+                {
+                    folderCount++;
+                    names.Add(Path.GetFileName(dir) ?? string.Empty);
+                }
+
+                names.Sort(StringComparer.OrdinalIgnoreCase);
+                var nameHash = 17;
+                for (var i = 0; i < names.Count; i++)
+                    nameHash = (nameHash * 31) + StringComparer.OrdinalIgnoreCase.GetHashCode(names[i]);
+                return folderCount + "|" + nameHash;
+            }
+        }
+
         string BuildLibraryFolderInventoryStamp(string root)
         {
             unchecked
