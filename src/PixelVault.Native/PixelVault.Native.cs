@@ -578,6 +578,72 @@ namespace PixelVaultNative
                 TryEnqueue(x, y + 1);
             }
         }
+        static void KeepLargestOpaqueComponent(byte[] pixels, int width, int height, int stride)
+        {
+            if (pixels == null || width <= 0 || height <= 0 || stride <= 0) return;
+            var visited = new bool[width * height];
+            List<int> largestComponent = null;
+            var queue = new Queue<int>();
+
+            for (var y = 0; y < height; y++)
+            {
+                for (var x = 0; x < width; x++)
+                {
+                    var startIndex = (y * width) + x;
+                    if (visited[startIndex]) continue;
+                    visited[startIndex] = true;
+                    var startOffset = (y * stride) + (x * 4);
+                    if (pixels[startOffset + 3] == 0) continue;
+
+                    var component = new List<int>();
+                    queue.Enqueue(startIndex);
+                    while (queue.Count > 0)
+                    {
+                        var index = queue.Dequeue();
+                        component.Add(index);
+                        var cx = index % width;
+                        var cy = index / width;
+
+                        void TryVisit(int nx, int ny)
+                        {
+                            if (nx < 0 || ny < 0 || nx >= width || ny >= height) return;
+                            var neighborIndex = (ny * width) + nx;
+                            if (visited[neighborIndex]) return;
+                            visited[neighborIndex] = true;
+                            var neighborOffset = (ny * stride) + (nx * 4);
+                            if (pixels[neighborOffset + 3] == 0) return;
+                            queue.Enqueue(neighborIndex);
+                        }
+
+                        TryVisit(cx - 1, cy);
+                        TryVisit(cx + 1, cy);
+                        TryVisit(cx, cy - 1);
+                        TryVisit(cx, cy + 1);
+                    }
+
+                    if (largestComponent == null || component.Count > largestComponent.Count)
+                    {
+                        largestComponent = component;
+                    }
+                }
+            }
+
+            if (largestComponent == null || largestComponent.Count == 0) return;
+
+            var keep = new bool[width * height];
+            foreach (var index in largestComponent) keep[index] = true;
+
+            for (var y = 0; y < height; y++)
+            {
+                for (var x = 0; x < width; x++)
+                {
+                    var index = (y * width) + x;
+                    if (keep[index]) continue;
+                    var pixelOffset = (y * stride) + (x * 4);
+                    pixels[pixelOffset + 3] = 0;
+                }
+            }
+        }
         BitmapSource LoadCompletionBadgeBitmap()
         {
             if (libraryCompletionBadgeBitmap != null) return libraryCompletionBadgeBitmap;
@@ -600,6 +666,7 @@ namespace PixelVaultNative
                 var pixels = new byte[stride * height];
                 converted.CopyPixels(pixels, stride, 0);
                 RemoveEdgeConnectedNearWhitePixels(pixels, width, height, stride);
+                KeepLargestOpaqueComponent(pixels, width, height, stride);
 
                 var minX = width;
                 var minY = height;
@@ -826,10 +893,18 @@ namespace PixelVaultNative
                     Width = 52,
                     Height = 52,
                     Stretch = Stretch.Uniform,
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Center,
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    VerticalAlignment = VerticalAlignment.Top,
                     Margin = new Thickness(0, 6, 6, 0),
-                    SnapsToDevicePixels = true
+                    SnapsToDevicePixels = true,
+                    Effect = new DropShadowEffect
+                    {
+                        Color = Colors.Black,
+                        BlurRadius = 6,
+                        Direction = 270,
+                        ShadowDepth = 1,
+                        Opacity = 0.55
+                    }
                 };
             }
             return new TextBlock
@@ -2812,8 +2887,6 @@ namespace PixelVaultNative
         }
     }
 }
-
-
 
 
 
