@@ -70,6 +70,7 @@ namespace PixelVaultNative
         readonly LibraryBitmapLruCache libraryBitmapCache = new LibraryBitmapLruCache(MaxImageCacheEntries);
         readonly LibraryImageLoadCoordinator imageLoadCoordinator = new LibraryImageLoadCoordinator();
         LibraryThumbnailPipeline libraryThumbnailPipeline;
+        BitmapSource libraryCompletionBadgeBitmap;
         readonly SemaphoreSlim videoClipInfoWarmLimiter = new SemaphoreSlim(2);
         readonly SemaphoreSlim videoPreviewWarmLimiter = new SemaphoreSlim(1);
         readonly HashSet<string> failedFfmpegPosterKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -530,6 +531,128 @@ namespace PixelVaultNative
                 return null;
             }
         }
+        static bool IsNearWhiteBitmapPixel(byte[] pixels, int offset)
+        {
+            if (pixels == null || offset < 0 || offset + 3 >= pixels.Length) return false;
+            var alpha = pixels[offset + 3];
+            if (alpha == 0) return false;
+            return pixels[offset] >= 240 && pixels[offset + 1] >= 240 && pixels[offset + 2] >= 240;
+        }
+        static void RemoveEdgeConnectedNearWhitePixels(byte[] pixels, int width, int height, int stride)
+        {
+            if (pixels == null || width <= 0 || height <= 0 || stride <= 0) return;
+            var visited = new bool[width * height];
+            var queue = new Queue<int>();
+            void TryEnqueue(int x, int y)
+            {
+                if (x < 0 || y < 0 || x >= width || y >= height) return;
+                var index = (y * width) + x;
+                if (visited[index]) return;
+                var pixelOffset = (y * stride) + (x * 4);
+                if (!IsNearWhiteBitmapPixel(pixels, pixelOffset)) return;
+                visited[index] = true;
+                queue.Enqueue(index);
+            }
+
+            for (var x = 0; x < width; x++)
+            {
+                TryEnqueue(x, 0);
+                TryEnqueue(x, height - 1);
+            }
+            for (var y = 1; y < height - 1; y++)
+            {
+                TryEnqueue(0, y);
+                TryEnqueue(width - 1, y);
+            }
+
+            while (queue.Count > 0)
+            {
+                var index = queue.Dequeue();
+                var x = index % width;
+                var y = index / width;
+                var pixelOffset = (y * stride) + (x * 4);
+                pixels[pixelOffset + 3] = 0;
+                TryEnqueue(x - 1, y);
+                TryEnqueue(x + 1, y);
+                TryEnqueue(x, y - 1);
+                TryEnqueue(x, y + 1);
+            }
+        }
+        BitmapSource LoadCompletionBadgeBitmap()
+        {
+            if (libraryCompletionBadgeBitmap != null) return libraryCompletionBadgeBitmap;
+            var path = ResolveWorkspaceAssetPath("100 Percent Icon.png");
+            if (string.IsNullOrWhiteSpace(path)) return null;
+            try
+            {
+                var bmp = new BitmapImage();
+                bmp.BeginInit();
+                bmp.UriSource = new Uri(path, UriKind.Absolute);
+                bmp.DecodePixelWidth = 256;
+                bmp.CacheOption = BitmapCacheOption.OnLoad;
+                bmp.EndInit();
+                bmp.Freeze();
+                var converted = new FormatConvertedBitmap(bmp, PixelFormats.Pbgra32, null, 0);
+                converted.Freeze();
+                var width = converted.PixelWidth;
+                var height = converted.PixelHeight;
+                var stride = width * 4;
+                var pixels = new byte[stride * height];
+                converted.CopyPixels(pixels, stride, 0);
+                RemoveEdgeConnectedNearWhitePixels(pixels, width, height, stride);
+
+                var minX = width;
+                var minY = height;
+                var maxX = -1;
+                var maxY = -1;
+                for (var y = 0; y < height; y++)
+                {
+                    for (var x = 0; x < width; x++)
+                    {
+                        var pixelOffset = (y * stride) + (x * 4);
+                        if (pixels[pixelOffset + 3] == 0) continue;
+                        if (x < minX) minX = x;
+                        if (x > maxX) maxX = x;
+                        if (y < minY) minY = y;
+                        if (y > maxY) maxY = y;
+                    }
+                }
+
+                if (maxX < minX || maxY < minY)
+                {
+                    libraryCompletionBadgeBitmap = converted;
+                    return libraryCompletionBadgeBitmap;
+                }
+
+                minX = Math.Max(0, minX - 2);
+                minY = Math.Max(0, minY - 2);
+                maxX = Math.Min(width - 1, maxX + 2);
+                maxY = Math.Min(height - 1, maxY + 2);
+                var croppedWidth = (maxX - minX) + 1;
+                var croppedHeight = (maxY - minY) + 1;
+                var croppedStride = croppedWidth * 4;
+                var croppedPixels = new byte[croppedStride * croppedHeight];
+                for (var y = 0; y < croppedHeight; y++)
+                {
+                    Buffer.BlockCopy(
+                        pixels,
+                        ((minY + y) * stride) + (minX * 4),
+                        croppedPixels,
+                        y * croppedStride,
+                        croppedStride);
+                }
+
+                var trimmed = new WriteableBitmap(croppedWidth, croppedHeight, 96, 96, PixelFormats.Pbgra32, null);
+                trimmed.WritePixels(new Int32Rect(0, 0, croppedWidth, croppedHeight), croppedPixels, croppedStride, 0);
+                trimmed.Freeze();
+                libraryCompletionBadgeBitmap = trimmed;
+                return libraryCompletionBadgeBitmap;
+            }
+            catch
+            {
+                return null;
+            }
+        }
         string ResolveLibrarySectionIconPath(string platformLabel)
         {
             var normalized = NormalizeConsoleLabel(platformLabel);
@@ -694,48 +817,39 @@ namespace PixelVaultNative
         }
         FrameworkElement BuildLibraryTileCompletionBadge()
         {
-            var iconPath = ResolveWorkspaceAssetPath("100 Percent Icon.png");
-            var badge = new Border
+            var badgeBitmap = LoadCompletionBadgeBitmap();
+            if (badgeBitmap != null)
             {
-                MinWidth = 34,
-                Height = 34,
-                CornerRadius = new CornerRadius(12),
-                Background = Brush("#D9101519"),
-                BorderBrush = Brush("#2D4755"),
-                BorderThickness = new Thickness(1),
-                Padding = new Thickness(4),
+                return new Image
+                {
+                    Source = badgeBitmap,
+                    Width = 52,
+                    Height = 52,
+                    Stretch = Stretch.Uniform,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(0, 6, 6, 0),
+                    SnapsToDevicePixels = true
+                };
+            }
+            return new TextBlock
+            {
+                Text = "100%",
+                FontSize = 22,
+                FontWeight = FontWeights.Bold,
+                Foreground = Brushes.White,
                 HorizontalAlignment = HorizontalAlignment.Right,
                 VerticalAlignment = VerticalAlignment.Top,
                 Margin = new Thickness(0, 8, 8, 0),
-                Opacity = 0.98
+                Effect = new DropShadowEffect
+                {
+                    Color = Colors.Black,
+                    BlurRadius = 6,
+                    Direction = 270,
+                    ShadowDepth = 1,
+                    Opacity = 0.75
+                }
             };
-            if (!string.IsNullOrWhiteSpace(iconPath))
-            {
-                badge.Child = new Image
-                {
-                    Source = LoadImageSource(iconPath, 72),
-                    Width = 26,
-                    Height = 26,
-                    Stretch = Stretch.Uniform,
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Center
-                };
-            }
-            else
-            {
-                badge.Padding = new Thickness(8, 3, 8, 3);
-                badge.Child = new TextBlock
-                {
-                    Text = "100%",
-                    FontSize = 11,
-                    FontWeight = FontWeights.Bold,
-                    Foreground = Brushes.White,
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Center,
-                    TextAlignment = TextAlignment.Center
-                };
-            }
-            return badge;
         }
         FrameworkElement BuildLibrarySectionHeader(string platformLabel, int folderCount, bool sectionCollapsed, Action toggleSectionCollapse)
         {
@@ -2698,7 +2812,6 @@ namespace PixelVaultNative
         }
     }
 }
-
 
 
 
