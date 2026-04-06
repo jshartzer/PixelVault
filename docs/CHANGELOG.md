@@ -1,3 +1,8 @@
+## 0.988
+- **Release:** Version **0.988** — Library 100% achievement badge toggle.
+- **Library / folder tiles:** Added a right-click **`100% Achievements`** toggle on game tiles. Marking a tile now persists immediately and shows the new **`assets/100 Percent Icon.png`** badge in the tile’s top-right corner without waiting for a refresh.
+- **Projection / persistence:** The library folder/view projection now carries completion state from saved game-index rows so the badge survives merged views, folder cache alignment, and normal library reloads.
+
 ## 0.983
 - **Release:** Version **0.983** — Game-level collection metadata schema groundwork.
 - **Game index / schema:** Added persisted game-level fields on **`game_index`** for **100% complete**, **completed date**, **favorite**, **showcase**, and **collection notes**.
