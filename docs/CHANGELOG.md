@@ -1,3 +1,7 @@
+## 0.989
+- **Release:** Version **0.989** — 100% badge rendering polish.
+- **Library / 100% badge:** Removed the badge frame chrome, doubled the overlay footprint, and preprocess the asset so the edge-connected white background becomes transparent. The badge now reads much closer to floating text/markwork over the cover instead of a boxed icon.
+
 ## 0.988
 - **Release:** Version **0.988** — Library 100% achievement badge toggle.
 - **Library / folder tiles:** Added a right-click **`100% Achievements`** toggle on game tiles. Marking a tile now persists immediately and shows the new **`assets/100 Percent Icon.png`** badge in the tile’s top-right corner without waiting for a refresh.

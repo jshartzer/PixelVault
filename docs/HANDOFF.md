@@ -55,11 +55,11 @@ Then use these based on the task:
 
 Current live build:
 
-- `0.988`
+- `0.989`
 
 Current executable:
 
-- `C:\Codex\dist\PixelVault-0.988\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.989\PixelVault.exe`
 
 Current build pointer:
 
@@ -93,12 +93,13 @@ Practical current focus:
 
 ## Current Stop Point
 
-The app is currently published at `0.988`.
+The app is currently published at `0.989`.
 
 **Notion:** [MainWindow extraction roadmap](https://www.notion.so/33573adc59b681d88b7dcd88cad53cb6) updated for Phase **E** capstone (**`ILibraryBrowserShell`**). If release rows in Notion lag `docs/CURRENT_BUILD.txt`, re-sync per `docs/DOC_SYNC_POLICY.md`.
 
 Recent extraction progress (repo):
 
+- **100% badge rendering polish (0.989):** The 100% library badge now drops the visible frame, renders much larger, and preprocesses the source bitmap so the edge-connected white background becomes transparent before the overlay is drawn.
 - **Library 100% badge toggle (0.988):** Library game tiles now expose a right-click **`100% Achievements`** toggle that persists immediately to the saved game index and shows the new **`100 Percent Icon.png`** badge in the tile’s top-right corner. The flag now flows through folder-cache alignment and browse projection so it survives normal library reloads.
 - **Game collection metadata schema (0.983):** Added persisted game-level fields on **`game_index`** for **100% complete**, **completed date**, **favorite**, **showcase**, and **collection notes**. SQLite upgrades older libraries in place with additive columns, and game-index normalization / assignment paths now preserve the new fields instead of dropping them during save or backfill.
 - **Library perf + chrome (0.980):** Detail snapshot builds reuse media dimension maps when possible, parallel-probe layouts for large folders, richer **PERF** / troubleshooting timings for hunts, global thin dark rounded **ScrollBar** theme, slightly higher decode concurrency.
