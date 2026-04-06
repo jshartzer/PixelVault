@@ -1,3 +1,7 @@
+## 0.992
+- **Release:** Version **0.992** — Medal badge shadow and placement polish.
+- **Library / 100% badge:** Added a stronger drop shadow beneath the medal completion badge and nudged the overlay inward so it sits off the top-right corner instead of hugging the tile edge.
+
 ## 0.991
 - **Release:** Version **0.991** — Medal asset for 100% completion badge.
 - **Library / 100% badge:** Replaced the floating `100%` text treatment with the new medal artwork and let the overlay scale from the image's own aspect ratio so it keeps the intended shape on library tiles.
