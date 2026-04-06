@@ -1,3 +1,7 @@
+## 0.991
+- **Release:** Version **0.991** — Medal asset for 100% completion badge.
+- **Library / 100% badge:** Replaced the floating `100%` text treatment with the new medal artwork and let the overlay scale from the image's own aspect ratio so it keeps the intended shape on library tiles.
+
 ## 0.990
 - **Release:** Version **0.990** — 100% badge visibility fix.
 - **Library / 100% badge:** Fixed the badge asset cleanup so it removes the white background without erasing the actual `100%` mark. The overlay should be visible again on game tiles while keeping the cleaner floating treatment.
