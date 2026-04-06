@@ -41,6 +41,7 @@ Before making app changes, read:
 
 Then use these based on the task:
 
+- `C:\Codex\docs\LIBRARY_PERFORMANCE_PLAN.md` — library/app **performance** roadmap (folder cache, metadata, detail pane); Notion map under **MainWindow extraction roadmap**
 - `C:\Codex\docs\completed-projects\README.md` for **finished initiatives** (e.g. MainWindow extraction Phases A–F) — not active handoff
 - `C:\Codex\docs\ARCHITECTURE_REFACTOR_PLAN.md` for refactor **principles** (tiered MainWindow bar, `ILibraryScanHost` as port, FS/async scope)—pairs with extraction and service docs below
 - `C:\Codex\docs\PROJECT_CONTEXT.md` for architecture and data model

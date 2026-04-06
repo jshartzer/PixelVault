@@ -1,6 +1,6 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 
 namespace PixelVaultNative
 {
@@ -11,20 +11,25 @@ namespace PixelVaultNative
             unchecked
             {
                 long latestDirTicks = 0;
-                int folderCount = 0;
-                int nameHash = 17;
-
-                foreach (var dir in Directory.EnumerateDirectories(root).OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
+                var folderCount = 0;
+                var names = new List<string>();
+                foreach (var dir in Directory.EnumerateDirectories(root))
                 {
                     folderCount++;
                     var dirTicks = Directory.GetLastWriteTimeUtc(dir).Ticks;
                     if (dirTicks > latestDirTicks) latestDirTicks = dirTicks;
-                    nameHash = (nameHash * 31) + StringComparer.OrdinalIgnoreCase.GetHashCode(Path.GetFileName(dir) ?? string.Empty);
+                    names.Add(Path.GetFileName(dir) ?? string.Empty);
                 }
+                names.Sort(StringComparer.OrdinalIgnoreCase);
+                var nameHash = 17;
+                for (var i = 0; i < names.Count; i++)
+                    nameHash = (nameHash * 31) + StringComparer.OrdinalIgnoreCase.GetHashCode(names[i]);
 
                 // Keep the startup cache stamp tied to the visible library folder inventory, not index-db writes.
                 // Import/scan flows explicitly rewrite the folder cache when they change the library, so folding the
                 // SQLite file timestamp into the stamp only causes unnecessary NAS-wide rebuilds on startup.
+                // Enumeration is single-pass; we sort direct child *names* only (same order as sorting full paths
+                // under one parent) so compares stay cheaper than OrderBy on long NAS paths.
                 return folderCount + "|" + latestDirTicks + "|" + nameHash;
             }
         }
