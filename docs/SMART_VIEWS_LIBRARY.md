@@ -21,3 +21,27 @@ Canonical mode strings are normalized by `SettingsService.NormalizeLibraryFolder
 - **Search** (search box) further narrows rows using `SearchBlob` (lowercased name, paths, ids, platforms).
 
 **Sort** and **grouping** modes are separate settings; see `NormalizeLibraryFolderSortMode` and `NormalizeLibraryGroupingMode` in `SettingsService.cs`.
+
+---
+
+## Browse row projection (`GameSummary`-shaped)
+
+Library folder rows in the browser are materialized as **`MainWindow.LibraryBrowserFolderView`** (see `MainWindow.LibraryBrowserViewModel.cs`) after merging **`LibraryFolderInfo`** from the folder cache. For **API- and mobile-friendly** snapshots without WPF, use **`LibraryBrowseFolderSummary`** (`UI/Library/LibraryBrowseFolderSummary.cs`), built via **`LibraryBrowseFolderSummary.FromFolderView(...)`**.
+
+| Concept (see `docs/ios_foundation_guide.md`) | `LibraryBrowserFolderView` / summary field | Notes |
+|---------------------------------------------|--------------------------------------------|--------|
+| Stable row identity | `ViewKey` | Session restore, grouping variants may encode path segments. |
+| Game / list id | `GameId` | Saved game-index id; may be empty. |
+| Display title | `Name` | |
+| Primary disk location | `PrimaryFolderPath` | Cross-platform merge still has one “primary” path for chrome. |
+| Console context | `PrimaryPlatformLabel`, `PlatformLabels`, `PlatformSummaryText` | Normalized labels drive filters, badges, grouping. |
+| Library stats | `FileCount`, `PreviewImagePath` | `nocover` filter uses `PreviewImagePath` only (no existence check). |
+| Recency | `NewestCaptureUtcTicks`, `NewestRecentSortUtcTicks` | Sort modes (`captured`, `added`, `photos`). |
+| External ids | `SteamAppId`, `SteamGridDbId` | `missingid` filter when Steam-tagged. |
+| Collection | `IsCompleted100Percent`, `CompletedUtcTicks` | `completed` filter. |
+| Merge | `IsMergedAcrossPlatforms` | `crossplatform` filter. |
+| Synthetic row | `IsTimelineProjection` | Timeline synthetic views; not a disk folder. |
+| Search (desktop) | `SearchBlob` | **Not** on `LibraryBrowseFolderSummary` — keep search client-side or rebuild from fields on a service. |
+| Rich refs | `SourceFolders`, `PrimaryFolder`, `FilePaths` | **Not** on summary — use **`LibraryFolderInfo`** / detail APIs when full paths are required (`GameDetail`-shaped work). |
+
+**Plan:** `docs/plans/PV-PLN-UI-001-ui-thin-mainwindow-ios-aligned.md` Step 4.

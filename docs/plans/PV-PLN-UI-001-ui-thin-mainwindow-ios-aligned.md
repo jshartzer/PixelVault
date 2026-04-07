@@ -119,6 +119,8 @@ Implement as **small vertical slices**. After each slice: **`dotnet test`** (`Pi
 
 **TEST GATE:** Folder list, search, filters, grouping unchanged.
 
+**Progress (2026-04-06):** **`LibraryBrowseFolderSummary`** + **`FromFolderView`** in `UI/Library/LibraryBrowseFolderSummary.cs`; field mapping documented in **`docs/SMART_VIEWS_LIBRARY.md`** (appendix). Unit tests in **`LibraryBrowseFolderSummaryTests`**. No change to folder-list projection order yet — map at API/export boundaries as needed.
+
 ---
 
 ### Step 5 — Star / comment writes: single orchestration entry
@@ -179,5 +181,6 @@ Before merging a slice, ask:
 | 2026-04-06 | **`LibraryDetailMediaLayoutInfo`** moved from `MainWindow.LibraryPhotoMasonryLayout.cs` into **`LibraryDetailRenderModels.cs`**. |
 | 2026-04-06 | **Step 2 done:** `MaxImageCacheEntries`, `libraryBitmapCache`, `imageLoadCoordinator`, `libraryThumbnailPipeline` field declarations → **`MainWindow.LibraryImageLoading.cs`**; **`InitializeLibraryThumbnailPipeline(thumbsRoot)`** owns pipeline construction (ctor calls it). |
 | 2026-04-06 | **Step 3 (incremental):** Session-routing helpers + capture/photography/folder-cache call sites → **`ILibrarySession`** when root is active library. |
+| 2026-04-06 | **Step 4 (initial):** **`LibraryBrowseFolderSummary`**, **`SMART_VIEWS_LIBRARY.md`** browse appendix, tests. |
 
 When execution starts, reference **`PV-PLN-UI-001`** in commits; Notion per **`docs/DOC_SYNC_POLICY.md`** if milestones are tracked there.
