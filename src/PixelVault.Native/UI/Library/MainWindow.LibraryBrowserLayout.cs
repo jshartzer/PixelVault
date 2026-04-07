@@ -59,6 +59,11 @@ namespace PixelVaultNative
             internal Border RightPane;
             internal Border LibraryDetailBanner;
             internal Grid LibraryDetailBannerGrid;
+            internal Border PhotoWorkspaceHeaderMenuHit;
+            internal Border PhotoWorkspaceTitleReadabilityBorder;
+            internal Border PhotoWorkspaceHeroBannerStrip;
+            internal Image PhotoWorkspaceHeroBannerImage;
+            internal Grid PhotoWorkspaceHeroBannerRoot;
             internal DockPanel LibraryDetailControlsDock;
             internal DispatcherTimer FolderPaneSplitClampTimer;
         }
@@ -322,10 +327,74 @@ namespace PixelVaultNative
 
             var banner = new Border { Background = Brushes.Transparent, Padding = new Thickness(0), Margin = new Thickness(0, 0, 0, 18) };
             panes.LibraryDetailBanner = banner;
-            var bannerGrid = new Grid();
-            panes.LibraryDetailBannerGrid = bannerGrid;
-            bannerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto, MinWidth = 96, MaxWidth = 240 });
-            bannerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = 140 });
+            var headerHost = new Grid();
+            panes.LibraryDetailBannerGrid = headerHost;
+            headerHost.ClipToBounds = true;
+            headerHost.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            headerHost.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            headerHost.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto, MinWidth = 96, MaxWidth = 240 });
+            headerHost.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = 140 });
+
+            panes.PhotoWorkspaceHeroBannerImage = new Image
+            {
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Top,
+                Stretch = Stretch.UniformToFill,
+                Opacity = 0.92,
+                IsHitTestVisible = false
+            };
+            var heroBottomScrim = new Border { IsHitTestVisible = false, VerticalAlignment = VerticalAlignment.Stretch };
+            var heroScrimBrush = new LinearGradientBrush
+            {
+                StartPoint = new Point(0.5, 0),
+                EndPoint = new Point(0.5, 1)
+            };
+            heroScrimBrush.GradientStops.Add(new GradientStop(Color.FromArgb(0, 16, 23, 28), 0));
+            heroScrimBrush.GradientStops.Add(new GradientStop(Color.FromArgb(115, 16, 23, 28), 0.5));
+            heroScrimBrush.GradientStops.Add(new GradientStop(Color.FromArgb(228, 10, 15, 20), 1));
+            if (heroScrimBrush.CanFreeze) heroScrimBrush.Freeze();
+            heroBottomScrim.Background = heroScrimBrush;
+            panes.PhotoWorkspaceHeroBannerRoot = new Grid
+            {
+                ClipToBounds = true,
+                Background = Brush("#10171C"),
+                VerticalAlignment = VerticalAlignment.Top,
+                Height = LibraryPhotoWorkspaceHeroBandHeight
+            };
+            panes.PhotoWorkspaceHeroBannerRoot.Children.Add(panes.PhotoWorkspaceHeroBannerImage);
+            panes.PhotoWorkspaceHeroBannerRoot.Children.Add(heroBottomScrim);
+            panes.PhotoWorkspaceHeroBannerStrip = new Border
+            {
+                Child = panes.PhotoWorkspaceHeroBannerRoot,
+                Background = Brushes.Transparent,
+                BorderBrush = Brush("#27313A"),
+                BorderThickness = new Thickness(0, 0, 0, 1),
+                Margin = new Thickness(0),
+                Visibility = Visibility.Collapsed,
+                VerticalAlignment = VerticalAlignment.Top,
+                Height = LibraryPhotoWorkspaceHeroBandHeight,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                ToolTip = "Right-click for cover and banner art actions"
+            };
+            Grid.SetRow(panes.PhotoWorkspaceHeroBannerStrip, 0);
+            Grid.SetColumnSpan(panes.PhotoWorkspaceHeroBannerStrip, 2);
+            Panel.SetZIndex(panes.PhotoWorkspaceHeroBannerStrip, 0);
+            headerHost.Children.Add(panes.PhotoWorkspaceHeroBannerStrip);
+
+            panes.PhotoWorkspaceHeaderMenuHit = new Border
+            {
+                Background = Brushes.Transparent,
+                VerticalAlignment = VerticalAlignment.Top,
+                Height = LibraryPhotoWorkspaceHeroBandHeight,
+                Visibility = Visibility.Collapsed,
+                Cursor = Cursors.Arrow
+            };
+            AutomationProperties.SetName(panes.PhotoWorkspaceHeaderMenuHit, "Game banner cover actions");
+            Grid.SetRow(panes.PhotoWorkspaceHeaderMenuHit, 0);
+            Grid.SetColumnSpan(panes.PhotoWorkspaceHeaderMenuHit, 2);
+            Panel.SetZIndex(panes.PhotoWorkspaceHeaderMenuHit, 1);
+            headerHost.Children.Add(panes.PhotoWorkspaceHeaderMenuHit);
+
             var previewFrame = new Border
             {
                 HorizontalAlignment = HorizontalAlignment.Left,
@@ -344,16 +413,27 @@ namespace PixelVaultNative
             panes.PreviewFrame = previewFrame;
             panes.PreviewImage = new Image { Stretch = Stretch.Uniform, MaxWidth = 210, MaxHeight = 315, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
             previewFrame.Child = panes.PreviewImage;
-            bannerGrid.Children.Add(previewFrame);
-            var textStack = new StackPanel { MinWidth = 0 };
-            var titleRow = new Grid { Margin = new Thickness(0, 0, 0, 0) };
-            titleRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            titleRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            Grid.SetRow(previewFrame, 0);
+            Grid.SetColumn(previewFrame, 0);
+            Panel.SetZIndex(previewFrame, 2);
+            headerHost.Children.Add(previewFrame);
+            var detailChromePanel = new Border
+            {
+                Background = Brushes.Transparent,
+                CornerRadius = new CornerRadius(8),
+                Padding = new Thickness(12, 10, 14, 10),
+                Margin = new Thickness(0, 10, 0, 0)
+            };
+            panes.PhotoWorkspaceTitleReadabilityBorder = detailChromePanel;
+            var chromeStack = new StackPanel { MinWidth = 0 };
+            var titleRow = new DockPanel { Margin = new Thickness(0, 0, 0, 0), LastChildFill = true };
             panes.DetailTitle = new TextBlock { Text = "Select a folder", FontSize = 28, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, TextWrapping = TextWrapping.Wrap };
             panes.DetailTitleBadgePanel = new WrapPanel { Margin = new Thickness(12, 4, 0, 0), Visibility = Visibility.Collapsed, VerticalAlignment = VerticalAlignment.Top };
+            DockPanel.SetDock(panes.DetailTitle, Dock.Left);
+            DockPanel.SetDock(panes.DetailTitleBadgePanel, Dock.Right);
             titleRow.Children.Add(panes.DetailTitle);
-            Grid.SetColumn(panes.DetailTitleBadgePanel, 1);
             titleRow.Children.Add(panes.DetailTitleBadgePanel);
+            chromeStack.Children.Add(titleRow);
             panes.DetailMeta = new TextBlock { Text = "Browse the library you chose in Settings.", Foreground = Brush("#9CB1BC"), Margin = new Thickness(0, 8, 0, 14), TextWrapping = TextWrapping.Wrap, FontSize = 13.5 };
             panes.OpenFolderButton = Btn("Open Folder", null, "#275D47", Brushes.White);
             panes.EditMetadataButton = Btn("Edit Metadata", null, "#20343A", Brushes.White);
@@ -400,13 +480,17 @@ namespace PixelVaultNative
             panes.PhotoCaptureLayoutButton.Margin = new Thickness(12, 0, 0, 0);
             panes.PhotoCaptureLayoutButton.VerticalAlignment = VerticalAlignment.Center;
             bannerButtonRow.Children.Add(panes.PhotoCaptureLayoutButton);
-            textStack.Children.Add(titleRow);
-            textStack.Children.Add(panes.DetailMeta);
-            textStack.Children.Add(bannerButtonRow);
-            Grid.SetColumn(textStack, 1);
-            bannerGrid.Children.Add(textStack);
-            banner.Child = bannerGrid;
+            chromeStack.Children.Add(panes.DetailMeta);
+            chromeStack.Children.Add(bannerButtonRow);
+            detailChromePanel.Child = chromeStack;
+            Grid.SetRow(detailChromePanel, 0);
+            Grid.SetColumn(detailChromePanel, 1);
+            Panel.SetZIndex(detailChromePanel, 2);
+            headerHost.Children.Add(detailChromePanel);
+            banner.Child = headerHost;
             rightGrid.Children.Add(banner);
+            Grid.SetRow(banner, 0);
+            AutomationProperties.SetName(panes.PhotoWorkspaceHeroBannerStrip, "Game banner");
 
             var controls = new DockPanel { Margin = new Thickness(0, 4, 0, 14) };
             panes.LibraryDetailControlsDock = controls;

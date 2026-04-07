@@ -193,11 +193,30 @@ namespace PixelVaultNative
             return LibraryThumbnailPipeline.NormalizeDecodePixelWidth(target);
         }
 
+        /// <summary>Decode width for library banner / hero art. Uses <paramref name="widthHint"/>.<c>ActualWidth</c> when laid out so wide windows do not force huge decodes.</summary>
+        int CalculateLibraryBannerArtDecodeWidth(FrameworkElement widthHint, double dpiScaleX = 1.0)
+        {
+            var w = 640.0;
+            try
+            {
+                if (widthHint != null)
+                {
+                    var aw = widthHint.ActualWidth;
+                    if (aw > 1) w = aw;
+                }
+            }
+            catch
+            {
+            }
+
+            var target = (int)Math.Ceiling(w * Math.Max(1.0, dpiScaleX) * 1.08);
+            target = Math.Max(512, Math.Min(1600, target));
+            return LibraryThumbnailPipeline.NormalizeDecodePixelWidth(target);
+        }
+
         int CalculateLibraryBannerArtDecodeWidth(double dpiScaleX = 1.0)
         {
-            var target = (int)Math.Ceiling(640 * Math.Max(1.0, dpiScaleX));
-            target = Math.Max(448, Math.Min(1024, target));
-            return LibraryThumbnailPipeline.NormalizeDecodePixelWidth(target);
+            return CalculateLibraryBannerArtDecodeWidth(null, dpiScaleX);
         }
 
         int CalculateLibraryDetailTileDecodeWidth(int tileWidthLogical, double dpiScaleX = 1.0)

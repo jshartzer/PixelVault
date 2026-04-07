@@ -246,6 +246,24 @@ namespace PixelVaultNative
                 Action renderFolderTiles) =>
                 _m.LibraryBrowserRenderSelectedFolderDetail(ws, libraryWindow, openSingleFileMetadataEditor, updateDetailSelection, refreshDetailSelectionUi, redrawSelectedFolderDetail, renderFolderTiles);
 
+            public void LibraryBrowserWirePhotoWorkspaceHeroMenus(
+                LibraryBrowserWorkingSet ws,
+                LibraryBrowserPaneRefs panes,
+                Window libraryWindow,
+                Action<LibraryBrowserFolderView> showFolder,
+                Action renderTiles,
+                Action<List<LibraryFolderInfo>, string, bool, bool, bool> runScopedCoverRefresh,
+                Action<string> libraryToast,
+                Action refreshPhotoWorkspaceHeroBanner) =>
+                _m.LibraryBrowserWirePhotoWorkspaceHeroMenus(ws, panes, libraryWindow, showFolder, renderTiles, runScopedCoverRefresh, libraryToast, refreshPhotoWorkspaceHeroBanner);
+
+            public void LibraryBrowserRefreshPhotoWorkspaceHeroBanner(
+                LibraryBrowserWorkingSet ws,
+                LibraryBrowserPaneRefs panes,
+                Window libraryWindow,
+                LibraryBrowserFolderView info) =>
+                _m.LibraryBrowserRefreshPhotoWorkspaceHeroBanner(ws, panes, libraryWindow, info);
+
             public FrameworkElement LibraryBrowserBuildFolderTile(
                 LibraryBrowserFolderView folder,
                 int tileWidth,

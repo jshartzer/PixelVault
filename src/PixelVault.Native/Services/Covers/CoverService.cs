@@ -28,6 +28,12 @@ namespace PixelVaultNative
         bool HasDedicatedLibraryCover(LibraryFolderInfo folder);
         Task<string> TryDownloadSteamCoverAsync(string title, string appId, CancellationToken cancellationToken = default(CancellationToken));
         Task<string> TryDownloadSteamGridDbCoverAsync(string title, string steamGridDbId, CancellationToken cancellationToken = default(CancellationToken));
+        string CustomHeroPath(LibraryFolderInfo folder);
+        void SaveCustomHero(LibraryFolderInfo folder, string sourcePath);
+        void ClearCustomHero(LibraryFolderInfo folder);
+        string CachedHeroPath(string title);
+        Task<string> TryDownloadSteamGridDbHeroAsync(string title, string steamGridDbId, CancellationToken cancellationToken = default(CancellationToken));
+        Task<string> TryDownloadSteamStoreHeaderHeroAsync(string title, string appId, CancellationToken cancellationToken = default(CancellationToken));
     }
 
     sealed class CoverServiceDependencies
@@ -452,6 +458,97 @@ namespace PixelVaultNative
             return null;
         }
 
+        static string HeroCacheFileBase(string safeTitleBase)
+        {
+            return "hero-" + safeTitleBase;
+        }
+
+        string HeroCacheFileBaseFromTitle(string title)
+        {
+            return HeroCacheFileBase(SafeCacheName(title));
+        }
+
+        public string CustomHeroPath(LibraryFolderInfo folder)
+        {
+            var key = CustomCoverKey(folder);
+            if (string.IsNullOrWhiteSpace(key)) return null;
+            foreach (var ext in new[] { ".jpg", ".jpeg", ".png", ".bmp", ".gif" })
+            {
+                var path = Path.Combine(dependencies.CoversRoot, "custom-hero-" + key + ext);
+                if (File.Exists(path)) return path;
+            }
+            return null;
+        }
+
+        public void SaveCustomHero(LibraryFolderInfo folder, string sourcePath)
+        {
+            if (folder == null || string.IsNullOrWhiteSpace(sourcePath) || !File.Exists(sourcePath)) return;
+            var key = CustomCoverKey(folder);
+            if (string.IsNullOrWhiteSpace(key)) return;
+            Directory.CreateDirectory(dependencies.CoversRoot);
+            var invalidated = new List<string>();
+            foreach (var ext in new[] { ".jpg", ".jpeg", ".png", ".bmp", ".gif" })
+            {
+                var existing = Path.Combine(dependencies.CoversRoot, "custom-hero-" + key + ext);
+                if (File.Exists(existing))
+                {
+                    invalidated.Add(existing);
+                    File.Delete(existing);
+                }
+            }
+            var extension = Path.GetExtension(sourcePath);
+            if (string.IsNullOrWhiteSpace(extension)) extension = ".png";
+            var target = Path.Combine(dependencies.CoversRoot, "custom-hero-" + key + extension.ToLowerInvariant());
+            if (dependencies.FileSystem != null) dependencies.FileSystem.CopyFile(sourcePath, target, true);
+            else File.Copy(sourcePath, target, true);
+            invalidated.Add(target);
+            InvalidateCoverImageCache(invalidated);
+        }
+
+        public void ClearCustomHero(LibraryFolderInfo folder)
+        {
+            var key = CustomCoverKey(folder);
+            if (string.IsNullOrWhiteSpace(key)) return;
+            var invalidated = new List<string>();
+            foreach (var ext in new[] { ".jpg", ".jpeg", ".png", ".bmp", ".gif" })
+            {
+                var existing = Path.Combine(dependencies.CoversRoot, "custom-hero-" + key + ext);
+                if (File.Exists(existing))
+                {
+                    invalidated.Add(existing);
+                    File.Delete(existing);
+                }
+            }
+            InvalidateCoverImageCache(invalidated);
+        }
+
+        public string CachedHeroPath(string title)
+        {
+            var safe = HeroCacheFileBaseFromTitle(title);
+            foreach (var ext in new[] { ".jpg", ".jpeg", ".png" })
+            {
+                var path = Path.Combine(dependencies.CoversRoot, safe + ext);
+                if (File.Exists(path)) return path;
+            }
+            return null;
+        }
+
+        void PurgeCachedHeroDownloads(string title)
+        {
+            var safe = HeroCacheFileBaseFromTitle(title);
+            var invalidated = new List<string>();
+            foreach (var ext in new[] { ".jpg", ".jpeg", ".png", ".bmp", ".gif" })
+            {
+                var path = Path.Combine(dependencies.CoversRoot, safe + ext);
+                if (File.Exists(path))
+                {
+                    invalidated.Add(path);
+                    File.Delete(path);
+                }
+            }
+            InvalidateCoverImageCache(invalidated);
+        }
+
         public void SaveCustomCover(LibraryFolderInfo folder, string sourcePath)
         {
             if (folder == null || string.IsNullOrWhiteSpace(sourcePath) || !File.Exists(sourcePath)) return;
@@ -624,6 +721,85 @@ namespace PixelVaultNative
             {
                 stopwatch.Stop();
                 LogPerformanceSample("SteamGridDbCoverDownload", stopwatch, "title=" + title + "; stid=" + steamGridDbId, 180);
+            }
+            return null;
+        }
+
+        public async Task<string> TryDownloadSteamGridDbHeroAsync(string title, string steamGridDbId, CancellationToken cancellationToken = default(CancellationToken))
+        {
+            if (string.IsNullOrWhiteSpace(title) || string.IsNullOrWhiteSpace(steamGridDbId) || !HasSteamGridDbApiToken()) return null;
+            cancellationToken.ThrowIfCancellationRequested();
+            var stopwatch = Stopwatch.StartNew();
+            try
+            {
+                Directory.CreateDirectory(dependencies.CoversRoot);
+                using (var wc = CreateSteamGridDbWebClient())
+                {
+                    if (wc == null) return null;
+                    var json = await wc.DownloadStringAsync(
+                        "https://www.steamgriddb.com/api/v2/heroes/game/" + Uri.EscapeDataString(steamGridDbId) + "?dimensions=3840x1240,1920x620,1600x650,930x310&types=static&nsfw=false&humor=false&limit=1",
+                        cancellationToken).ConfigureAwait(false);
+                    var match = Regex.Match(json, "\"url\"\\s*:\\s*\"(?<u>(?:\\\\.|[^\"])*)\"");
+                    if (!match.Success) return null;
+                    var url = Regex.Unescape(match.Groups["u"].Value).Replace("\\/", "/");
+                    var ext = Path.GetExtension(new Uri(url).AbsolutePath);
+                    if (string.IsNullOrWhiteSpace(ext)) ext = ".png";
+                    PurgeCachedHeroDownloads(title);
+                    var target = Path.Combine(dependencies.CoversRoot, HeroCacheFileBaseFromTitle(title) + ext);
+                    await wc.DownloadFileAsync(url, target, cancellationToken).ConfigureAwait(false);
+                    if (File.Exists(target) && new FileInfo(target).Length > 0) return target;
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                Log("SteamGridDB hero download failed for " + title + ". " + ex.Message);
+            }
+            finally
+            {
+                stopwatch.Stop();
+                LogPerformanceSample("SteamGridDbHeroDownload", stopwatch, "title=" + title + "; stid=" + steamGridDbId, 180);
+            }
+            return null;
+        }
+
+        public async Task<string> TryDownloadSteamStoreHeaderHeroAsync(string title, string appId, CancellationToken cancellationToken = default(CancellationToken))
+        {
+            if (string.IsNullOrWhiteSpace(title) || string.IsNullOrWhiteSpace(appId)) return null;
+            cancellationToken.ThrowIfCancellationRequested();
+            var stopwatch = Stopwatch.StartNew();
+            try
+            {
+                Directory.CreateDirectory(dependencies.CoversRoot);
+                using (var wc = CreateSteamWebClient())
+                {
+                    var json = await wc.DownloadStringAsync("https://store.steampowered.com/api/appdetails?appids=" + appId + "&l=english", cancellationToken).ConfigureAwait(false);
+                    var match = Regex.Match(json, "\"header_image\"\\s*:\\s*\"(?<u>(?:\\\\.|[^\"])*)\"");
+                    if (!match.Success) return null;
+                    var url = Regex.Unescape(match.Groups["u"].Value).Replace("\\/", "/");
+                    var ext = Path.GetExtension(new Uri(url).AbsolutePath);
+                    if (string.IsNullOrWhiteSpace(ext)) ext = ".jpg";
+                    PurgeCachedHeroDownloads(title);
+                    var target = Path.Combine(dependencies.CoversRoot, HeroCacheFileBaseFromTitle(title) + ext);
+                    await wc.DownloadFileAsync(url, target, cancellationToken).ConfigureAwait(false);
+                    return File.Exists(target) && new FileInfo(target).Length > 0 ? target : null;
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                Log("Steam store header (hero) download failed for " + title + ". " + ex.Message);
+            }
+            finally
+            {
+                stopwatch.Stop();
+                LogPerformanceSample("SteamStoreHeaderHeroDownload", stopwatch, "title=" + title + "; appId=" + appId, 180);
             }
             return null;
         }

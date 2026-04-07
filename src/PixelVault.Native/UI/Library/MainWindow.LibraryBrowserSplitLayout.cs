@@ -1,6 +1,7 @@
 using System;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 
 namespace PixelVaultNative
 {
@@ -12,6 +13,8 @@ namespace PixelVaultNative
         /// <summary>Default width for the Photo-workspace cover rail; sized so two columns + tile margins avoid horizontal scroll at typical DPI.</summary>
         internal const double LibraryBrowserPhotoRailWidth = 308;
         internal const double LibraryBrowserPhotoDividerStripWidth = 28;
+        /// <summary>Fixed hero band height in captures view — matches Steam-style headers and avoids unbounded vertical scaling when the window grows.</summary>
+        internal const double LibraryPhotoWorkspaceHeroBandHeight = 316;
 
         void ApplyLibraryBrowserLayoutMode(LibraryBrowserPaneRefs panes, LibraryWorkspaceMode workspaceMode)
         {
@@ -42,6 +45,10 @@ namespace PixelVaultNative
                 panes.PhotoCaptureLayoutButton.Visibility = isPhoto ? Visibility.Visible : Visibility.Collapsed;
             if (panes.GroupTimelineButton != null)
                 panes.GroupTimelineButton.Visibility = isPhoto ? Visibility.Collapsed : Visibility.Visible;
+            if (panes.PhotoWorkspaceHeroBannerStrip != null)
+                panes.PhotoWorkspaceHeroBannerStrip.Visibility = isPhoto ? Visibility.Visible : Visibility.Collapsed;
+            if (panes.PhotoWorkspaceHeaderMenuHit != null)
+                panes.PhotoWorkspaceHeaderMenuHit.Visibility = isPhoto ? Visibility.Visible : Visibility.Collapsed;
 
             if (isTimeline)
             {
@@ -116,12 +123,32 @@ namespace PixelVaultNative
         void ApplyLibraryPhotoDetailChromeLayout(LibraryBrowserPaneRefs panes, bool photoWorkspaceCompact)
         {
             if (panes?.RightPane == null) return;
+            void ClearPhotoReadabilityChrome()
+            {
+                if (panes.PhotoWorkspaceTitleReadabilityBorder != null) panes.PhotoWorkspaceTitleReadabilityBorder.Background = Brushes.Transparent;
+            }
+
             if (photoWorkspaceCompact)
             {
                 panes.RightPane.Padding = new Thickness(26, 10, 26, 12);
-                if (panes.LibraryDetailBanner != null) panes.LibraryDetailBanner.Margin = new Thickness(0, 0, 0, 6);
-                if (panes.LibraryDetailControlsDock != null) panes.LibraryDetailControlsDock.Margin = new Thickness(0, 0, 0, 6);
+                if (panes.LibraryDetailBanner != null) panes.LibraryDetailBanner.Margin = new Thickness(0, 0, 0, 4);
+                if (panes.LibraryDetailControlsDock != null) panes.LibraryDetailControlsDock.Margin = new Thickness(0, 2, 0, 6);
                 if (panes.DetailMeta != null) panes.DetailMeta.Margin = new Thickness(0, 4, 0, 6);
+                if (panes.PhotoWorkspaceTitleReadabilityBorder != null)
+                {
+                    var chrome = panes.PhotoWorkspaceTitleReadabilityBorder;
+                    chrome.Background = new SolidColorBrush(Color.FromArgb(0xBC, 0x12, 0x1A, 0x22));
+                    chrome.Margin = new Thickness(0, 4, 0, 0);
+                    Grid.SetRow(chrome, 1);
+                    Grid.SetColumn(chrome, 0);
+                    Grid.SetColumnSpan(chrome, 2);
+                }
+                if (panes.PreviewFrame != null)
+                {
+                    Grid.SetRow(panes.PreviewFrame, 0);
+                    Grid.SetColumn(panes.PreviewFrame, 0);
+                    Grid.SetColumnSpan(panes.PreviewFrame, 1);
+                }
                 if (panes.LibraryDetailBannerGrid != null && panes.LibraryDetailBannerGrid.ColumnDefinitions.Count > 0)
                 {
                     var c0 = panes.LibraryDetailBannerGrid.ColumnDefinitions[0];
@@ -132,10 +159,25 @@ namespace PixelVaultNative
             }
             else
             {
+                ClearPhotoReadabilityChrome();
                 panes.RightPane.Padding = new Thickness(26, 22, 26, 18);
                 if (panes.LibraryDetailBanner != null) panes.LibraryDetailBanner.Margin = new Thickness(0, 0, 0, 18);
                 if (panes.LibraryDetailControlsDock != null) panes.LibraryDetailControlsDock.Margin = new Thickness(0, 4, 0, 14);
                 if (panes.DetailMeta != null) panes.DetailMeta.Margin = new Thickness(0, 8, 0, 14);
+                if (panes.PhotoWorkspaceTitleReadabilityBorder != null)
+                {
+                    var chrome = panes.PhotoWorkspaceTitleReadabilityBorder;
+                    chrome.Margin = new Thickness(0, 10, 0, 0);
+                    Grid.SetRow(chrome, 0);
+                    Grid.SetColumn(chrome, 1);
+                    Grid.SetColumnSpan(chrome, 1);
+                }
+                if (panes.PreviewFrame != null)
+                {
+                    Grid.SetRow(panes.PreviewFrame, 0);
+                    Grid.SetColumn(panes.PreviewFrame, 0);
+                    Grid.SetColumnSpan(panes.PreviewFrame, 1);
+                }
                 if (panes.LibraryDetailBannerGrid != null && panes.LibraryDetailBannerGrid.ColumnDefinitions.Count > 0)
                 {
                     var c0 = panes.LibraryDetailBannerGrid.ColumnDefinitions[0];

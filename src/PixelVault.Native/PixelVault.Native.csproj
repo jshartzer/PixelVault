@@ -102,6 +102,7 @@
     <Compile Include="UI\Library\MainWindow.LibraryBrowserQuickEditDrawer.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserSessionPersistence.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserSplitLayout.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryBrowserPhotoHero.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserRender.DetailPane.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserShowOrchestration.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserShellBridge.cs" />

@@ -2376,6 +2376,102 @@ namespace PixelVaultNative
             return coverService.CachedCoverPath(title);
         }
 
+        string CustomHeroPath(LibraryFolderInfo folder)
+        {
+            return coverService.CustomHeroPath(folder);
+        }
+
+        void SaveCustomHero(LibraryFolderInfo folder, string sourcePath)
+        {
+            coverService.SaveCustomHero(folder, sourcePath);
+        }
+
+        void ClearCustomHero(LibraryFolderInfo folder)
+        {
+            coverService.ClearCustomHero(folder);
+        }
+
+        string CachedHeroPath(string title)
+        {
+            return coverService.CachedHeroPath(title);
+        }
+
+        bool TryGetCustomOrCachedHeroPath(LibraryFolderInfo folder, out string path)
+        {
+            path = null;
+            if (folder == null) return false;
+            var custom = CustomHeroPath(folder);
+            if (!string.IsNullOrWhiteSpace(custom))
+            {
+                path = custom;
+                return true;
+            }
+
+            var cached = CachedHeroPath(folder.Name);
+            if (cached != null)
+            {
+                path = cached;
+                return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>Photo-workspace banner: custom or downloaded hero/header cache only — not library cover or folder preview.</summary>
+        internal string GetLibraryHeroBannerPathForDisplayOnly(LibraryFolderInfo folder)
+        {
+            return TryGetCustomOrCachedHeroPath(folder, out var p) ? p : null;
+        }
+
+        async Task<string> ResolveLibraryHeroBannerWithDownloadAsync(LibraryFolderInfo folder, CancellationToken cancellationToken = default(CancellationToken))
+        {
+            if (folder == null) return null;
+            if (TryGetCustomOrCachedHeroPath(folder, out var early)) return early;
+            var grid = await TryDownloadSteamGridDbHeroAsync(folder, cancellationToken).ConfigureAwait(false);
+            if (!string.IsNullOrWhiteSpace(grid) && File.Exists(grid)) return grid;
+            var header = await TryDownloadSteamStoreHeaderHeroAsync(folder, cancellationToken).ConfigureAwait(false);
+            if (!string.IsNullOrWhiteSpace(header) && File.Exists(header)) return header;
+            return null;
+        }
+
+        async Task<string> TryDownloadSteamGridDbHeroAsync(LibraryFolderInfo folder, CancellationToken cancellationToken = default(CancellationToken))
+        {
+            if (folder == null || !HasSteamGridDbApiToken()) return null;
+            try
+            {
+                var steamGridDbId = await ResolveBestLibraryFolderSteamGridDbIdAsync(libraryRoot, folder, cancellationToken).ConfigureAwait(false);
+                return await coverService.TryDownloadSteamGridDbHeroAsync(folder.Name, steamGridDbId, cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                Log("SteamGridDB hero download failed for " + (folder.Name ?? "unknown title") + ". " + ex.Message);
+            }
+            return null;
+        }
+
+        async Task<string> TryDownloadSteamStoreHeaderHeroAsync(LibraryFolderInfo folder, CancellationToken cancellationToken = default(CancellationToken))
+        {
+            if (folder == null) return null;
+            try
+            {
+                var appId = await ResolveBestLibraryFolderSteamAppIdAsync(libraryRoot, folder, true, cancellationToken).ConfigureAwait(false);
+                return await coverService.TryDownloadSteamStoreHeaderHeroAsync(folder.Name, appId, cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                Log("Steam header hero download failed for " + (folder.Name ?? "unknown title") + ". " + ex.Message);
+            }
+            return null;
+        }
+
         async Task<string> TryDownloadSteamCoverAsync(LibraryFolderInfo folder, CancellationToken cancellationToken = default(CancellationToken))
         {
             if (folder == null) return null;

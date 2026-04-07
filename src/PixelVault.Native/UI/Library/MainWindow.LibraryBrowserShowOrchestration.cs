@@ -286,6 +286,7 @@ namespace PixelVaultNative
                 {
                     _shell.LibraryBrowserRenderSelectedFolderDetail(ws, libraryWindow, openSingleFileMetadataEditor, updateDetailSelection, refreshDetailSelectionUi, renderSelectedFolder, renderTiles);
                     if (ws.Current == null) ws.DetailSelectionAnchorIndex = -1;
+                    _shell.LibraryBrowserRefreshPhotoWorkspaceHeroBanner(ws, panes, libraryWindow, ws.Current);
                 };
 
                 Func<LibraryBrowserFolderView, int, int, bool, FrameworkElement> buildFolderTile = delegate(LibraryBrowserFolderView folder, int tileWidth, int tileHeight, bool showPlatformBadge)
@@ -419,6 +420,18 @@ namespace PixelVaultNative
                         _shell.LibraryBrowserOpenSingleFileMetadataEditor(ws, null, getVisibleDetailFilesOrdered, getSelectedDetailFiles, getDisplayFolder, getActionFolder, refreshLibraryFoldersAsync);
                     });
                 };
+                _shell.LibraryBrowserWirePhotoWorkspaceHeroMenus(
+                    ws,
+                    panes,
+                    libraryWindow,
+                    showFolder,
+                    renderTiles,
+                    runScopedCoverRefresh,
+                    msg => _shell.LibraryBrowserShowToast(ws, msg),
+                    delegate
+                    {
+                        _shell.LibraryBrowserRefreshPhotoWorkspaceHeroBanner(ws, panes, libraryWindow, ws.Current);
+                    });
                 _shell.LibraryBrowserWireNavChromeAndToolbar(
                     libraryWindow,
                     ws,

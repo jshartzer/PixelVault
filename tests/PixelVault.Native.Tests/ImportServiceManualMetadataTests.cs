@@ -73,6 +73,18 @@ sealed class StubCoverService : ICoverService
     public Task<string> TryDownloadSteamCoverAsync(string title, string appId, CancellationToken cancellationToken = default) => Task.FromResult<string>(null);
 
     public Task<string> TryDownloadSteamGridDbCoverAsync(string title, string steamGridDbId, CancellationToken cancellationToken = default) => Task.FromResult<string>(null);
+
+    public string CustomHeroPath(LibraryFolderInfo folder) => null;
+
+    public void SaveCustomHero(LibraryFolderInfo folder, string sourcePath) { }
+
+    public void ClearCustomHero(LibraryFolderInfo folder) { }
+
+    public string CachedHeroPath(string title) => null;
+
+    public Task<string> TryDownloadSteamGridDbHeroAsync(string title, string steamGridDbId, CancellationToken cancellationToken = default) => Task.FromResult<string>(null);
+
+    public Task<string> TryDownloadSteamStoreHeaderHeroAsync(string title, string appId, CancellationToken cancellationToken = default) => Task.FromResult<string>(null);
 }
 
 sealed class StubGameIndexEditorAssignmentService : IGameIndexEditorAssignmentService
