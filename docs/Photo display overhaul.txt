@@ -1,0 +1,215 @@
+PixelVault Banner Hero Header Plan — AI-Friendly Prompt for Cursor
+
+Project context:
+- Work from C:\Codex
+- Live source is C:\Codex\src\PixelVault.Native\PixelVault.Native.cs and the extracted Library UI partials under C:\Codex\src\PixelVault.Native\UI\Library\
+- Current published version is 0.999.000 per CURRENT_BUILD.txt and HANDOFF.md
+- This is a shipped UI behavior change
+- Preserve existing library performance work, including folder virtualization, detail virtualization, viewport-aware decode priority, and sliced metadata reads/upserts from the current performance plan and changelog
+
+Goal:
+Redesign Game View so the current duplicated cover usage is removed and replaced with a banner-based hero header. The banner should use game art fetched from the same external art ecosystem we already use for covers: Steam app APIs first where possible, SteamGridDB as fallback. The banner should create a strong game identity header without wasting vertical space needed by screenshots.
+
+Primary design decision:
+In Game View, do not show the same game cover twice.
+- Remove the duplicate large-cover presentation in the left navigation area / rail
+- Replace the tall cover-based header with a banner hero section
+- Let screenshots become the dominant vertical content immediately below the header
+
+Desired Game View structure:
+1. Top hero banner header
+   - Horizontal banner spanning across the Game View header region
+   - Moderate fixed height, approximately 180–240 px
+   - Banner image dimmed with a dark overlay
+   - Banner image fades toward the right so text and buttons can sit on a clean readable surface
+   - Optional subtle top-to-bottom fade into the screenshot content area
+
+2. Overlay content on banner
+   - Game title
+   - Metadata line(s), such as:
+     - capture count
+     - source folder count
+     - folder path or abbreviated path when useful
+   - Action buttons:
+     - Open Folder / Open Folders
+     - Edit Metadata
+     - Refresh Folder
+     - any existing game-level actions that belong in Game View
+   - Layout should be compact and horizontally efficient, not tall and stacked
+
+3. Screenshot area below
+   - Screenshots should begin immediately below the banner
+   - This should gain meaningful vertical space compared to the current cover-heavy header
+   - Preserve existing masonry / adaptive screenshot behavior and performance optimizations
+
+4. Left navigation rail
+   - This becomes navigation-only
+   - Do not show a second large cover for the active game
+   - Use small cover thumbnails or a simplified visual list
+   - Keep the rail useful for hopping between games while leaving visual emphasis to the banner + screenshots
+
+Banner art source strategy:
+Use the same external ID/art pipeline the app already uses for cover art:
+- Steam App ID lookup where appropriate
+- SteamGridDB ID lookup where appropriate
+- Existing cached ID persistence must continue to work
+- Existing custom cover behavior must not be broken
+
+Add banner art resolution using this strategy:
+1. Try to resolve a dedicated banner/hero image from Steam for the current game
+2. If Steam cannot provide a suitable banner image, try SteamGridDB
+3. Cache the downloaded banner art separately from portrait cover art
+4. Preserve custom cover behavior for portrait covers; do not let banner work overwrite cover work
+5. If no banner exists, gracefully fall back to:
+   - portrait cover-derived header treatment
+   - or a lightweight plain dark header
+   - but do not block Game View on banner availability
+
+Important architectural rule:
+Do not cram this into one giant MainWindow edit.
+Use the current extracted Library structure where possible:
+- LibraryBrowserHost / ILibraryBrowserShell / LibraryBrowserShowOrchestration
+- MainWindow.LibraryBrowserChrome.cs
+- MainWindow.LibraryBrowserLayout.cs
+- MainWindow.LibraryBrowserRender.DetailPane.cs
+- existing cover service / session / cache seams
+
+Reuse and extend existing art resolution patterns instead of creating one-off HTTP code in UI rendering.
+
+Implementation plan:
+
+Phase 1 — Define the banner feature cleanly
+Create a distinct concept for header banner art, separate from portrait cover art.
+
+Requirements:
+- Add a banner art resolution path that is independent from portrait cover resolution
+- Use existing game identifiers:
+  - Steam App ID
+  - SteamGridDB ID
+- Reuse current async-only network patterns
+- Reuse current cache-root structure, but store banners in a separate subfolder or clearly separated naming scheme
+- Ensure no sync HTTP calls are introduced
+
+Suggested concepts to add:
+- ResolveLibraryBannerArtAsync or equivalent async banner-art resolver
+- CachedBannerPath helper or equivalent
+- Optional ForceRefresh banner path if later needed, but not required in the first pass
+
+Behavior:
+- Banner lookup should be lazy/on-demand in Game View
+- It should not block the initial library window from opening
+- It should not trigger unnecessary whole-library refreshes
+
+Phase 2 — Banner data flow and caching
+Implement banner lookup using the existing cover pipeline patterns.
+
+Requirements:
+- Prefer Steam banner/hero-capable assets when available
+- Fallback to SteamGridDB horizontal art/banner art where available
+- Cache banner downloads locally
+- Associate them with the same normalized game identity used for existing cover art lookup
+- Avoid duplicate downloads across sessions
+
+Performance requirements:
+- Banner resolution must be async
+- UI should render immediately with a fallback header, then upgrade when banner art arrives
+- Use the thread pool / async dispatcher handoff pattern already used by other library art loading
+- Do not regress current image decode / cache behavior
+
+Phase 3 — Replace the current cover-heavy Game View header
+Reshape Game View header rendering around the new banner.
+
+Requirements:
+- Remove large redundant cover usage from the current Game View header
+- Introduce a banner background region
+- Layer the following on top of the banner:
+  - title
+  - metadata
+  - action buttons
+
+Visual treatment:
+- Banner should be dimmed enough for reliable text contrast
+- Add a horizontal gradient fade toward the text/button side
+- Optionally add a vertical fade at the lower edge into the screenshot region
+- The header should feel premium but compact
+
+Layout rules:
+- Keep height restrained (~180–240 px)
+- Avoid wasting vertical space
+- Prefer horizontal grouping over tall vertical stacking
+- Buttons should remain readable and clickable in snapped/narrow windows
+
+Phase 4 — Simplify the left rail
+Remove duplicate identity emphasis from the rail.
+
+Requirements:
+- Left rail becomes navigation-first
+- Use small covers or compact list tiles only
+- The active game remains highlighted
+- No second large cover for the selected game
+- Keep search, sort, filter, and grouping controls above the rail if that still fits the mode
+
+Goal:
+The banner owns the visual identity. The rail owns navigation.
+
+Phase 5 — Fallback behavior and resilience
+Handle missing or slow banner art gracefully.
+
+Requirements:
+- If banner art is not available, the Game View should still look intentional
+- Fallback options can include:
+  - dark gradient header
+  - blurred/dimmed portrait cover treatment
+  - plain compact header with title/actions
+- Never let missing banner art break Game View layout
+- Never let failed HTTP/art lookup stall screenshot rendering
+
+Phase 6 — Persistence and maintenance expectations
+Make the feature fit current persistence and cache behavior.
+
+Requirements:
+- Use existing stored Steam/SteamGridDB IDs where available
+- Continue to benefit from current active-root library session and cache usage
+- Banner cache should persist across sessions
+- Avoid invalidating folder cache unnecessarily when banner art changes
+- Do not regress current cover-fetch or merged-row behavior
+
+UI/UX rules:
+1. In Game View, show cover identity once, not twice
+2. Banner should create identity without consuming too much vertical space
+3. Screenshots should gain vertical room immediately from this change
+4. The header should remain readable across varied banner art
+5. The result should feel like a polished desktop app, not a web page mockup
+
+What to avoid:
+- Do not keep the current large portrait cover and simply add a banner behind it
+- Do not show the same game art twice at dominant scale
+- Do not add blocking network work to the UI thread
+- Do not break current virtualization and detail rendering behavior
+- Do not mix banner cache and portrait cover cache in a way that causes collisions
+- Do not force a full-library refresh just to resolve one game’s banner
+
+Expected output from Cursor:
+1. Analyze current portrait cover resolution flow and identify the cleanest extension point for banner art
+2. Implement async banner art resolution/caching with Steam-first and SteamGridDB fallback behavior
+3. Replace the current Game View header with a banner-based hero header
+4. Simplify the left rail so it is navigation-first
+5. Preserve existing screenshot rendering behavior below the header
+6. Summarize:
+   - what files changed
+   - what new helpers/services/state were added
+   - how banner lookup works
+   - what fallback behavior exists
+   - any recommended follow-up polish
+
+Manual verification checklist:
+- Open Library and enter Game View for a game with known external art
+- Verify the new hero banner appears
+- Verify title, metadata, and buttons remain readable over the banner
+- Verify screenshots start higher on the page than before
+- Verify the left rail no longer duplicates the selected game cover at large scale
+- Verify narrow/snapped windows still look intentional
+- Verify switching between games does not visibly hang
+- Verify games without a banner still render a clean header
+- Verify existing portrait covers still work
+- Verify no regressions to cover fetching, cached IDs, or screenshot virtualization

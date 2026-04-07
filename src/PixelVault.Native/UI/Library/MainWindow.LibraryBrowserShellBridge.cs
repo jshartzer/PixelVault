@@ -52,6 +52,12 @@ namespace PixelVaultNative
                 set => _m.libraryFolderTileSize = value;
             }
 
+            public int LibraryPhotoTileSize
+            {
+                get => _m.libraryPhotoTileSize;
+                set => _m.libraryPhotoTileSize = value;
+            }
+
             public Action<bool> ActiveLibraryFolderRefresh
             {
                 get => _m.activeLibraryFolderRefresh;
@@ -121,6 +127,8 @@ namespace PixelVaultNative
             public void SaveSettings() => _m.SaveSettings();
 
             public int NormalizeLibraryFolderTileSizeValue(int value) => _m.NormalizeLibraryFolderTileSize(value);
+
+            public int NormalizeLibraryPhotoTileSizeValue(int value) => _m.NormalizeLibraryPhotoTileSize(value);
 
             public List<LibraryFolderInfo> GetLibraryBrowserActionFolders(LibraryBrowserFolderView view) => _m.GetLibraryBrowserActionFolders(view);
 
@@ -200,8 +208,15 @@ namespace PixelVaultNative
                 Action<bool> refreshLibraryFoldersAsync,
                 Action<List<LibraryFolderInfo>, string, bool, bool, bool> runScopedCoverRefresh,
                 Action<LibraryBrowserFolderView> openLibraryMetadataEditor,
-                Action<string> libraryToast) =>
-                _m.LibraryBrowserBuildFolderTile(folder, tileWidth, tileHeight, showPlatformBadge, showFolder, renderTiles, refreshLibraryFoldersAsync, runScopedCoverRefresh, openLibraryMetadataEditor, libraryToast);
+                Action<string> libraryToast,
+                LibraryBrowserWorkingSet ws) =>
+                _m.LibraryBrowserBuildFolderTile(folder, tileWidth, tileHeight, showPlatformBadge, showFolder, renderTiles, refreshLibraryFoldersAsync, runScopedCoverRefresh, openLibraryMetadataEditor, libraryToast, ws);
+
+            public void LibraryBrowserExitPhotoWorkspace(LibraryBrowserWorkingSet ws, Action renderTiles) =>
+                _m.LibraryBrowserExitPhotoWorkspace(ws, renderTiles);
+
+            public void LibraryBrowserEnterPhotoWorkspaceFromSelection(LibraryBrowserWorkingSet ws, Action<LibraryBrowserFolderView> showFolder) =>
+                _m.LibraryBrowserEnterPhotoWorkspaceFromSelection(ws, showFolder);
 
             public void LibraryBrowserShowSelectedFolder(
                 LibraryBrowserWorkingSet ws,
@@ -288,6 +303,15 @@ namespace PixelVaultNative
                 Action<string> setLibrarySortMode,
                 Action<string> setLibraryFilterMode) =>
                 _m.LibraryBrowserWireNavChromeAndToolbar(libraryWindow, ws, panes, navChrome, refreshIntakeReviewBadge, refreshLibraryFoldersAsync, runCoverRefresh, openSelectedLibraryMetadataEditor, deleteSelectedLibraryFiles, setLibraryGroupingMode, setLibrarySortMode, setLibraryFilterMode);
+
+            public void LibraryBrowserMountQuickEditDrawer(Grid root, LibraryBrowserWorkingSet ws) =>
+                _m.LibraryBrowserMountQuickEditDrawer(root, ws);
+
+            public void LibraryBrowserSetQuickEditDrawerOpen(LibraryBrowserWorkingSet ws, bool open) =>
+                _m.LibraryBrowserSetQuickEditDrawerOpen(ws, open);
+
+            public void LibraryBrowserToggleQuickEditDrawer(LibraryBrowserWorkingSet ws) =>
+                _m.LibraryBrowserToggleQuickEditDrawer(ws);
         }
     }
 }

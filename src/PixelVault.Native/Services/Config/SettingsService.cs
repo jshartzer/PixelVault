@@ -24,6 +24,14 @@ namespace PixelVaultNative
             return value;
         }
 
+        /// <summary>Clamps persisted library capture-grid tile size to a sane decode/layout range.</summary>
+        public static int NormalizeLibraryPhotoTileSize(int value)
+        {
+            if (value < 220) return 220;
+            if (value > 560) return 560;
+            return value;
+        }
+
         public static string NormalizeLibraryFolderSortMode(string value)
         {
             var normalized = (value ?? string.Empty).Trim().ToLowerInvariant();
@@ -40,9 +48,8 @@ namespace PixelVaultNative
             if (normalized == "completed" || normalized == "100" || normalized == "100%" || normalized == "100 percent" || normalized == "100 percent achievements") return "completed";
             if (normalized == "crossplatform" || normalized == "cross-platform" || normalized == "cross platform" || normalized == "multiple platforms") return "crossplatform";
             if (normalized == "large" || normalized == "25+" || normalized == "25 plus" || normalized == "25+ captures" || normalized == "large collection") return "large";
-            if (normalized == "needssteam" || normalized == "needs_steam" || normalized == "steam no app" || normalized == "missing steam appid" || normalized == "missing steam app id" || normalized == "steam missing appid") return "needssteam";
+            if (normalized == "missingid" || normalized == "missing_id" || normalized == "missing id" || normalized == "missing ids" || normalized == "needs id" || normalized == "needssteam" || normalized == "needs_steam" || normalized == "steam no app" || normalized == "missing steam appid" || normalized == "missing steam app id" || normalized == "steam missing appid" || normalized == "needssteamgrid" || normalized == "needs_steam_grid" || normalized == "missing steamgriddb" || normalized == "missing steam grid" || normalized == "steam missing grid" || normalized == "steam griddb" || normalized == "missinggameid" || normalized == "missing_game_id" || normalized == "no game id" || normalized == "no gameid" || normalized == "needs game id") return "missingid";
             if (normalized == "nocover" || normalized == "no_cover" || normalized == "no cover" || normalized == "missing cover" || normalized == "without cover") return "nocover";
-            if (normalized == "missinggameid" || normalized == "missing_game_id" || normalized == "no game id" || normalized == "no gameid" || normalized == "needs game id") return "missinggameid";
             return "all";
         }
 
@@ -91,6 +98,10 @@ namespace PixelVaultNative
                 else if (key == "library_folder_tile_size")
                 {
                     if (int.TryParse(value, out var parsedSize)) s.LibraryFolderTileSize = NormalizeLibraryFolderTileSize(parsedSize);
+                }
+                else if (key == "library_photo_tile_size")
+                {
+                    if (int.TryParse(value, out var photoSize)) s.LibraryPhotoTileSize = NormalizeLibraryPhotoTileSize(photoSize);
                 }
                 else if (key == "library_folder_sort_mode") s.LibraryFolderSortMode = NormalizeLibraryFolderSortMode(value);
                 else if (key == "library_grouping_mode") s.LibraryGroupingMode = NormalizeLibraryGroupingMode(value);
@@ -195,6 +206,7 @@ namespace PixelVaultNative
                 "ffmpeg=" + (state.FfmpegPath ?? string.Empty),
                 "steamgriddb_token=" + (state.SteamGridDbApiToken ?? string.Empty),
                 "library_folder_tile_size=" + NormalizeLibraryFolderTileSize(state.LibraryFolderTileSize),
+                "library_photo_tile_size=" + NormalizeLibraryPhotoTileSize(state.LibraryPhotoTileSize),
                 "library_folder_sort_mode=" + NormalizeLibraryFolderSortMode(state.LibraryFolderSortMode),
                 "library_grouping_mode=" + NormalizeLibraryGroupingMode(state.LibraryGroupingMode),
                 "library_folder_filter_mode=" + NormalizeLibraryFolderFilterMode(state.LibraryFolderFilterMode),

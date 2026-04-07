@@ -46,6 +46,17 @@ namespace PixelVaultNative
             internal Border LibraryToastBorder;
             internal TextBlock LibraryToastLabel;
             internal DispatcherTimer LibraryToastTimer;
+            internal Grid QuickEditDrawerHost;
+            internal bool QuickEditDrawerOpen;
+
+            /// <summary>See <see cref="LibraryWorkspaceMode"/> (<c>PV-PLN-LIBWS-001</c>).</summary>
+            internal LibraryWorkspaceMode WorkspaceMode = LibraryWorkspaceMode.Folder;
+
+            internal bool IsFolderWorkspaceMode => WorkspaceMode == LibraryWorkspaceMode.Folder;
+
+            internal bool IsPhotoWorkspaceMode => WorkspaceMode == LibraryWorkspaceMode.Photo;
+
+            internal bool IsTimelineWorkspaceMode => WorkspaceMode == LibraryWorkspaceMode.Timeline;
         }
     }
 }

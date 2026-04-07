@@ -33,6 +33,10 @@ namespace PixelVaultNative
             {
                 Source = new Uri("pack://application:,,,/PixelVault;component/Themes/PixelVaultScrollBars.xaml", UriKind.Absolute)
             });
+            app.Resources.MergedDictionaries.Add(new ResourceDictionary
+            {
+                Source = new Uri("pack://application:,,,/PixelVault;component/Themes/PixelVaultFocus.xaml", UriKind.Absolute)
+            });
         }
 
         [STAThread]
@@ -97,6 +101,7 @@ namespace PixelVaultNative
         string ffmpegPath;
         string steamGridDbApiToken;
         int libraryFolderTileSize = 300;
+        int libraryPhotoTileSize = 340;
         string libraryFolderSortMode = "alpha";
         string libraryFolderFilterMode = "all";
         string libraryGroupingMode = "all";
@@ -357,7 +362,8 @@ namespace PixelVaultNative
                 BuildResolvedLibraryMetadataIndexEntry,
                 RefreshLibraryCoversAsync,
                 ShowLibraryMetadataScanWindow,
-                EnsureDir);
+                EnsureDir,
+                indexPersistenceService);
             importService.AttachLibrarySessionAccessor(() => librarySession);
             gameIndexService = new GameIndexService(new GameIndexServiceDependencies
             {
@@ -662,6 +668,71 @@ namespace PixelVaultNative
                 }
             }
         }
+
+        /// <summary>~12% less saturation + slight warm shift so medal reads quieter against dark UI chrome.</summary>
+        static BitmapSource TuneCompletionBadgeBitmap(BitmapSource source)
+        {
+            if (source == null) return null;
+            var fmt = PixelFormats.Pbgra32;
+            BitmapSource src;
+            if (source.Format == fmt)
+            {
+                src = source;
+            }
+            else
+            {
+                var converted = new FormatConvertedBitmap(source, fmt, null, 0);
+                converted.Freeze();
+                src = converted;
+            }
+
+            var w = src.PixelWidth;
+            var h = src.PixelHeight;
+            if (w <= 0 || h <= 0) return source;
+
+            var stride = w * 4;
+            var pixels = new byte[stride * h];
+            src.CopyPixels(pixels, stride, 0);
+            const double satRetain = 0.88;
+            var invW = w <= 1 ? 0.0 : 1.0 / (w - 1);
+            var invH = h <= 1 ? 0.0 : 1.0 / (h - 1);
+            for (var y = 0; y < h; y++)
+            {
+                var fy = y * invH;
+                for (var x = 0; x < w; x++)
+                {
+                    var i = (y * stride) + (x * 4);
+                    if (pixels[i + 3] == 0) continue;
+                    var fx = x * invW;
+                    var B = pixels[i];
+                    var G = pixels[i + 1];
+                    var R = pixels[i + 2];
+                    var lum = 0.299 * R + 0.587 * G + 0.114 * B;
+                    var r = lum + (R - lum) * satRetain;
+                    var g = lum + (G - lum) * satRetain;
+                    var b = lum + (B - lum) * satRetain;
+                    r = Math.Min(255, r + 4);
+                    g = Math.Min(255, g + 1);
+                    b = Math.Max(0, b - 6);
+                    // Subtle TL highlight / BR shade (baked; avoids a rectangular gloss layer in WPF).
+                    var lightMul = 1.0 + (1.0 - fx) * (1.0 - fy) * 0.068 - fx * fy * 0.058;
+                    if (lightMul < 0.94) lightMul = 0.94;
+                    if (lightMul > 1.07) lightMul = 1.07;
+                    r *= lightMul;
+                    g *= lightMul;
+                    b *= lightMul;
+                    pixels[i] = (byte)Math.Max(0, Math.Min(255, Math.Round(b)));
+                    pixels[i + 1] = (byte)Math.Max(0, Math.Min(255, Math.Round(g)));
+                    pixels[i + 2] = (byte)Math.Max(0, Math.Min(255, Math.Round(r)));
+                }
+            }
+
+            var wb = new WriteableBitmap(w, h, 96, 96, fmt, null);
+            wb.WritePixels(new Int32Rect(0, 0, w, h), pixels, stride, 0);
+            wb.Freeze();
+            return wb;
+        }
+
         BitmapSource LoadCompletionBadgeBitmap()
         {
             if (libraryCompletionBadgeBitmap != null) return libraryCompletionBadgeBitmap;
@@ -677,7 +748,14 @@ namespace PixelVaultNative
                 bmp.CacheOption = BitmapCacheOption.OnLoad;
                 bmp.EndInit();
                 bmp.Freeze();
-                libraryCompletionBadgeBitmap = bmp;
+                try
+                {
+                    libraryCompletionBadgeBitmap = TuneCompletionBadgeBitmap(bmp) ?? bmp;
+                }
+                catch
+                {
+                    libraryCompletionBadgeBitmap = bmp;
+                }
                 return libraryCompletionBadgeBitmap;
             }
             catch
@@ -850,40 +928,15 @@ namespace PixelVaultNative
         FrameworkElement BuildLibraryTileCompletionBadge(double targetHeight = 66, Thickness? margin = null)
         {
             var badgeBitmap = LoadCompletionBadgeBitmap();
-            var resolvedMargin = margin ?? new Thickness(0, 14, 14, 0);
+            var resolvedMargin = margin ?? new Thickness(0, 13, 12, 0);
             var shadow = new DropShadowEffect
             {
                 Color = Colors.Black,
-                BlurRadius = 18,
-                ShadowDepth = 6,
+                BlurRadius = 20,
+                ShadowDepth = 5,
                 Direction = 315,
-                Opacity = 0.55
+                Opacity = 0.52
             };
-            var rimBrush = new SolidColorBrush(Color.FromArgb(60, 255, 255, 255));
-            if (rimBrush.CanFreeze) rimBrush.Freeze();
-
-            Border WrapWithRimAndShadow(FrameworkElement inner)
-            {
-                var rim = new Border
-                {
-                    CornerRadius = new CornerRadius(999),
-                    BorderBrush = rimBrush,
-                    BorderThickness = new Thickness(1),
-                    Background = Brushes.Transparent,
-                    ClipToBounds = true,
-                    Child = inner
-                };
-                return new Border
-                {
-                    HorizontalAlignment = HorizontalAlignment.Right,
-                    VerticalAlignment = VerticalAlignment.Top,
-                    Margin = resolvedMargin,
-                    Background = Brushes.Transparent,
-                    Child = rim,
-                    Effect = shadow,
-                    IsHitTestVisible = false
-                };
-            }
 
             if (badgeBitmap != null)
             {
@@ -892,15 +945,19 @@ namespace PixelVaultNative
                 {
                     targetWidth = Math.Max(44, Math.Min(92, targetHeight * badgeBitmap.PixelWidth / (double)badgeBitmap.PixelHeight));
                 }
-                var image = new Image
+                return new Image
                 {
                     Source = badgeBitmap,
                     Width = targetWidth,
                     Height = targetHeight,
                     Stretch = Stretch.Uniform,
-                    SnapsToDevicePixels = true
+                    SnapsToDevicePixels = true,
+                    Effect = shadow,
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    VerticalAlignment = VerticalAlignment.Top,
+                    Margin = resolvedMargin,
+                    IsHitTestVisible = false
                 };
-                return WrapWithRimAndShadow(image);
             }
 
             var text = new TextBlock
@@ -911,9 +968,22 @@ namespace PixelVaultNative
                 Foreground = Brushes.White,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(10, 4, 10, 4)
+                Effect = shadow
             };
-            return WrapWithRimAndShadow(text);
+            text.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            var tw = Math.Max(44, Math.Ceiling(text.DesiredSize.Width) + 18);
+            var th = Math.Max(28, Math.Ceiling(text.DesiredSize.Height) + 8);
+            var textHost = new Grid
+            {
+                Width = tw,
+                Height = th,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Top,
+                Margin = resolvedMargin,
+                IsHitTestVisible = false
+            };
+            textHost.Children.Add(text);
+            return textHost;
         }
         FrameworkElement BuildLibrarySectionHeader(string platformLabel, int folderCount, bool sectionCollapsed, Action toggleSectionCollapse)
         {
@@ -1101,6 +1171,7 @@ namespace PixelVaultNative
             return resolved <= 0d ? Math.Max(0d, fallback) : resolved;
         }
         int NormalizeLibraryFolderTileSize(int value) => SettingsService.NormalizeLibraryFolderTileSize(value);
+        int NormalizeLibraryPhotoTileSize(int value) => SettingsService.NormalizeLibraryPhotoTileSize(value);
         (int Columns, int TileSize) CalculateResponsiveLibraryFolderLayout(ScrollViewer scrollViewer)
         {
             // Match folder cover tile Margin right (horizontal rhythm between columns).
@@ -1161,7 +1232,7 @@ namespace PixelVaultNative
             }
             return (bestColumns, bestTileW);
         }
-        (int Columns, int TileSize) CalculateResponsiveLibraryDetailLayout(ScrollViewer scrollViewer)
+        (int Columns, int TileSize) CalculateResponsiveLibraryDetailLayout(ScrollViewer scrollViewer, bool applySavedPhotoTileSizePreference)
         {
             const int gapPx = 8;
             const double moreColumnsSlackBudgetPx = 16d;
@@ -1207,6 +1278,15 @@ namespace PixelVaultNative
                 }
             }
 
+            if (applySavedPhotoTileSizePreference)
+            {
+                var userCap = NormalizeLibraryPhotoTileSize(libraryPhotoTileSize);
+                var span = viewportWidth - (bestColumns - 1) * gapPx;
+                var rawFill = (int)Math.Floor(span / (double)bestColumns);
+                var capped = Math.Max(minTile, Math.Min(userCap, rawFill));
+                bestTileWidth = ClampRoundedTile(capped);
+            }
+
             return (bestColumns, bestTileWidth);
         }
         string NormalizeLibraryFolderSortMode(string value) => SettingsService.NormalizeLibraryFolderSortMode(value);
@@ -1235,17 +1315,21 @@ namespace PixelVaultNative
                     return "Cross-Platform";
                 case "large":
                     return "25+ Captures";
-                case "needssteam":
-                    return "Steam · missing App ID";
-                case "missinggameid":
-                    return "Missing game ID";
+                case "missingid":
+                    return "Missing ID";
                 case "nocover":
                     return "No cover path";
                 default:
                     return "All Games";
             }
         }
-        Button Btn(string t, RoutedEventHandler click, string bg, Brush fg) { var b = new Button { Content = t, Width = 176, Height = 48, Padding = new Thickness(18, 10, 18, 10), Margin = new Thickness(0, 0, 12, 12), Foreground = fg, Background = bg != null ? Brush(bg) : Brushes.White, BorderBrush = Brush("#C0CCD6"), BorderThickness = new Thickness(1), FontWeight = FontWeights.SemiBold, Effect = new DropShadowEffect { Color = Color.FromArgb(64, 18, 27, 36), BlurRadius = 16, ShadowDepth = 4, Direction = 270, Opacity = 0.55 } }; if (click != null) b.Click += click; return b; }
+        Button Btn(string t, RoutedEventHandler click, string bg, Brush fg)
+        {
+            var b = new Button { Content = t, Width = 176, Height = 48, Padding = new Thickness(18, 10, 18, 10), Margin = new Thickness(0, 0, 12, 12), Foreground = fg, Background = bg != null ? Brush(bg) : Brushes.White, BorderBrush = Brush("#C0CCD6"), BorderThickness = new Thickness(1), FontWeight = FontWeights.SemiBold, Effect = new DropShadowEffect { Color = Color.FromArgb(64, 18, 27, 36), BlurRadius = 16, ShadowDepth = 4, Direction = 270, Opacity = 0.55 } };
+            if (click != null) b.Click += click;
+            AccessibilityUi.TryApplyFocusVisualStyle(b);
+            return b;
+        }
         Style LibraryToolbarButtonStyle(string backgroundHex, string borderHex, string hoverBackgroundHex, string pressedBackgroundHex, string foregroundHex = "#F4F7FA")
         {
             var style = new Style(typeof(Button));

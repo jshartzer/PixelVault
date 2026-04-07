@@ -1,0 +1,376 @@
+PixelVault Responsive Layout Feedback
+=====================================
+
+Date: 2026-04-06
+Purpose: Handoff note for Cursor covering both the original product/design feedback and the current Codex layout analysis.
+
+
+1. Original Feedback / Design Brief
+-----------------------------------
+
+The current PixelVault layout looks good at normal desktop widths, but it starts to break down when the app is snapped left or right, or when the window becomes tall and narrow.
+
+Observed issues:
+
+- The right-hand detail pane is the biggest problem area.
+- Buttons near the top of the detail pane get cut off.
+- The header/title area above the screenshots becomes cramped or obscured.
+- The app still needs to feel polished and intentional when reshaped, not merely "technically functional."
+
+What matters most:
+
+- This is a WPF desktop app, not a web app.
+- The library grid is the main experience and should keep priority in narrower layouts.
+- In narrow layouts, the detail pane should probably give way before the main browsing surface does.
+- The UI should keep a strong desktop-app feel, not drift toward a phone-like/mobile-feeling layout.
+- The solution should be appearance-conscious, not just a mechanical resize fix.
+
+Open to these kinds of patterns:
+
+- Stacked layout in narrow mode
+- Collapsible detail pane
+- Overlay/detail drawer
+- Adaptive breakpoints
+- Toolbar overflow
+- Moving or regrouping action buttons
+- Any other responsive desktop pattern that preserves polish
+
+Requested analysis goals:
+
+- Identify the layout assumptions that are failing
+- Determine whether the issue is mainly caused by:
+  - bad Grid row/column strategy
+  - missing responsive breakpoints
+  - bad ScrollViewer placement
+  - fixed/min sizes in the wrong places
+  - overly rigid header/action layout
+  - or some combination
+- Propose several responsive directions without locking into one too early
+- Compare the options thoughtfully
+- End with a recommended direction to explore first, but not a rigid implementation plan
+
+
+2. Codex Feedback / Current Read
+--------------------------------
+
+Short version:
+
+This does not look like one isolated layout bug. It looks like a combination of:
+
+- a shell that assumes a persistent two-column desktop layout
+- a detail header that is too rigid internally
+- fixed/min widths that protect the detail pane and its controls too long
+- scroll behavior that only helps the screenshot content, not the entire detail surface
+- missing true "narrow window" layout states
+
+My read is that the most important failure is not that the detail pane exists; it is that the detail pane still behaves as though it always deserves to remain a full desktop sidebar.
+
+
+3. Structural Causes
+--------------------
+
+A. Missing responsive breakpoints / layout states
+
+This feels like the primary cause.
+
+The shell currently has a strong default split layout, but not a real responsive mode for narrow windows. Width changes cause the tile layout to recompute, but the larger shell composition does not seem to change meaningfully when the window gets tall and narrow.
+
+That means the same structure keeps compressing itself instead of switching to a more appropriate state.
+
+
+B. Overly rigid detail header and action layout
+
+This feels like the second biggest cause.
+
+The detail banner/header area is doing a lot at once:
+
+- cover/preview image
+- large title
+- title badges
+- metadata text
+- a multi-button action row
+
+Those pieces are arranged in a desktop-friendly way, but they do not appear to have a graceful "compact desktop" composition. In practice that creates exactly the symptom being reported: the title/header gets crowded and the action buttons lose room.
+
+
+C. Fixed/min sizes in the wrong places
+
+This is clearly part of the issue.
+
+The current layout protects several things with fixed widths or minimums:
+
+- shell split columns
+- preview column
+- preview image bounds
+- timeline controls
+- toolbar buttons in several places
+
+Each individual minimum may seem reasonable, but together they create a layout that resists compression until it fails.
+
+
+D. ScrollViewer placement is helping the wrong region
+
+This is an amplifier rather than the root cause.
+
+The screenshot list/content scrolls, but the header/banner/actions above it are in fixed auto rows. That means the pane can scroll the screenshot content while still leaving the top chrome cramped. So the layout is not treating the detail area as one adaptable surface.
+
+
+E. Grid strategy is expressing the assumptions above
+
+The grid setup itself is not "wrong" in a vacuum, but it encodes a strong assumption:
+
+- folder/library pane on the left
+- detail pane on the right
+- right pane is always present unless the app is in timeline mode
+
+That works for normal desktop widths, but it is not enough for a narrow-window desktop experience.
+
+
+4. Repo-Grounded Observations
+-----------------------------
+
+These are useful context points for Cursor, based on the current WPF shell under C:\Codex.
+
+- The library browser shell uses a persistent two-column content grid by default, with a left pane and right pane. The default setup is 1* / splitter / 3* with minimum widths of 300 and 260.
+- There is already a special alternate layout mode for timeline mode, which collapses the left pane and gives the right pane the full width. That means the codebase already supports the idea of changing shell composition based on view state.
+- The detail pane header/banner is composed as a preview column plus a text/action column, with preview min/max sizing and a fixed multi-button row.
+- The screenshot content area has its own ScrollViewer, but the banner/header area above it is not part of the same scrolling surface.
+- The shell already contains a right-side drawer pattern for "Quick edit." That is important because it means an overlay/drawer interaction would fit the codebase's existing UI vocabulary.
+
+Relevant files observed during analysis:
+
+- C:\Codex\src\PixelVault.Native\UI\Library\MainWindow.LibraryBrowserShowOrchestration.cs
+- C:\Codex\src\PixelVault.Native\UI\Library\MainWindow.LibraryBrowserSplitLayout.cs
+- C:\Codex\src\PixelVault.Native\UI\Library\MainWindow.LibraryBrowserLayout.cs
+- C:\Codex\src\PixelVault.Native\UI\Library\MainWindow.LibraryBrowserQuickEditDrawer.cs
+- C:\Codex\src\PixelVault.Native\UI\Library\MainWindow.LibraryBrowserOrchestrator.PaneEvents.cs
+
+
+5. Responsive Directions to Explore
+-----------------------------------
+
+Option 1: Keep the right inspector, but make it internally adaptive
+
+What the UI becomes in narrow mode:
+
+- The app stays as a two-column layout.
+- The detail pane remains docked on the right.
+- Inside the detail pane, the banner becomes more flexible:
+  - title can wrap sooner
+  - badges can move below the title
+  - action buttons can wrap, group, or overflow
+  - the preview can shrink earlier or move above the text block
+  - screenshot controls can split across lines instead of fighting for one row
+
+Tradeoffs:
+
+- Least disruptive to the product's current visual identity
+- Keeps the familiar inspector/sidebar feeling
+- Still leaves the library permanently giving up width to the detail pane
+- May only postpone the failure instead of truly solving it
+
+Ease of implementation:
+
+- Easiest option
+
+Hard parts:
+
+- Avoiding an improvised or messy "everything wraps everywhere" feeling
+- Keeping the compact state attractive instead of merely compressed
+
+Fit for PixelVault:
+
+- Good as a baseline cleanup
+- Probably not enough as the final answer if the library grid is supposed to remain primary
+
+
+Option 2: Collapsible detail inspector
+
+What the UI becomes in narrow mode:
+
+- The library remains the main full browsing surface.
+- The detail pane is no longer always open.
+- It can collapse to a slimmer inspector rail, a "Details" affordance, or a toggleable side panel.
+- When opened, it still behaves like a serious desktop inspector, not a mobile screen.
+
+Tradeoffs:
+
+- Strong desktop-tool feel
+- Protects the library grid well
+- Adds one extra interaction step to open details
+- Requires careful visual design so the collapsed state still feels intentional and premium
+
+Ease of implementation:
+
+- Moderate
+
+Hard parts:
+
+- Good open/close affordance
+- Clear selected-state behavior
+- Avoiding the feeling that important information has been "hidden"
+
+Fit for PixelVault:
+
+- Very strong
+- Matches the priority that browsing is primary
+
+
+Option 3: Detail overlay drawer
+
+What the UI becomes in narrow mode:
+
+- The library uses nearly the full width.
+- Selecting or invoking details opens a right-side drawer or detail sheet over the browsing surface.
+- The drawer can feel like a tool inspector rather than a modal dialog.
+
+Tradeoffs:
+
+- Visually polished if handled well
+- Preserves the grid as the main canvas
+- The overlay can obscure content while open
+- Risk of feeling intrusive if it becomes the default interaction too often
+
+Ease of implementation:
+
+- Moderate to hard
+
+Hard parts:
+
+- Overlay behavior, focus behavior, dismissal behavior
+- Choosing how much width the drawer occupies
+- Preventing the interaction from feeling modal or heavy-handed
+
+Fit for PixelVault:
+
+- Strong
+- Especially appealing because there is already a right-side drawer pattern in the codebase
+
+
+Option 4: Stacked desktop layout in narrow mode
+
+What the UI becomes in narrow mode:
+
+- The library remains on top
+- The detail pane moves below it
+- The narrow-window experience becomes more vertical, but still desktop-like
+- A horizontal split or a clearly separated lower details region could make this feel intentional
+
+Tradeoffs:
+
+- Very robust structurally
+- Easy to understand
+- Fits a tall snapped window surprisingly well
+- Can drift toward a generic "responsive stack" feeling if not designed carefully
+
+Ease of implementation:
+
+- Moderate
+
+Hard parts:
+
+- Preserving elegance and avoiding a "fallback layout" look
+- Managing vertical space so the top and bottom panes both stay useful
+
+Fit for PixelVault:
+
+- Viable, but visually riskier than the inspector-based options
+
+
+Option 5: Hybrid staged behavior
+
+What the UI becomes in narrow mode:
+
+- At comfortable widths: docked inspector as today
+- At medium widths: same docked inspector, but with more adaptive internal layout
+- At narrower widths: detail pane stops being a permanently docked column and becomes either collapsible or drawer-based
+
+Tradeoffs:
+
+- Best overall UX if done well
+- Avoids one abrupt layout jump
+- Lets the app remain desktop-feeling across a wider range of window sizes
+- More complexity in code and testing because there are multiple layout states
+
+Ease of implementation:
+
+- Hardest overall
+
+Hard parts:
+
+- Defining breakpoints/states cleanly
+- Preventing state transitions from feeling arbitrary
+- Keeping each mode visually related to the others
+
+Fit for PixelVault:
+
+- Best long-term fit
+
+
+6. Comparative Take
+-------------------
+
+If the goal is the quickest improvement:
+
+- Option 1 is the fastest, because it mostly reshapes the current detail header/actions without changing the overall product model.
+
+If the goal is best desktop feel:
+
+- Option 2 and Option 3 feel strongest.
+- Both read more like desktop inspector patterns than mobile/responsive tricks.
+
+If the goal is protecting the library grid first:
+
+- Option 2 and Option 3 are the strongest.
+- They let the detail pane "give way" as the window narrows, which matches the stated product priority.
+
+If the goal is the safest structurally:
+
+- Option 4 is the most mechanically robust, but it is also the one most likely to dilute the intended look if not carefully art-directed.
+
+If the goal is the best final product direction:
+
+- Option 5 is the most compelling because it combines desktop polish with realistic narrow-window behavior.
+
+
+7. Recommended Direction to Explore First
+-----------------------------------------
+
+The best direction to explore first is:
+
+Hybrid inspector behavior
+
+Meaning:
+
+- keep the current docked detail pane at normal widths
+- make the detail banner/header/actions much more adaptive at medium widths
+- stop treating the detail pane as a permanently entitled column once the window gets genuinely narrow
+- at that point, convert it into either a collapsible inspector or a drawer-style inspector
+
+Why this feels best for PixelVault:
+
+- It protects the library grid, which is the main experience
+- It keeps a polished desktop-tool identity
+- It avoids making the app feel like a phone UI
+- It aligns with patterns the codebase already hints at:
+  - there is already an alternate full-width mode for timeline
+  - there is already a right-side drawer pattern in the library browser shell
+
+Important note:
+
+I would not treat "make the current right pane wrap better" as the final answer by itself.
+It is useful as part of the solution, but not sufficient as the full design direction if the app needs to feel truly intentional when snapped narrow.
+
+
+8. Bottom Line
+--------------
+
+This looks like a shell-level responsiveness problem expressed through a fragile detail header.
+
+The right next design conversation is not "how do we stop clipping buttons?"
+
+It is:
+
+"What role should the detail pane play when width becomes scarce, and how do we make that role feel elegant in a desktop app?"
+
+For PixelVault, the most promising answer is that the library remains the stable canvas, and the detail pane becomes more conditional, more adaptive, and less entitled to permanent width.

@@ -10,12 +10,13 @@ Canonical mode strings are normalized by `SettingsService.NormalizeLibraryFolder
 | `completed` | 100% Achievements | `folder.IsCompleted100Percent` is true. |
 | `crossplatform` | Cross-Platform | More than one distinct normalized platform label **or** `folder.IsMergedAcrossPlatforms`. |
 | `large` | 25+ Captures | `folder.FileCount >= 25`. |
-| `needssteam` | Steam · missing App ID | `SteamAppId` is blank **and** the folder is tagged as Steam: normalized `PrimaryPlatformLabel` is Steam **or** any entry in `PlatformLabels` normalizes to Steam. |
-| `missinggameid` | Missing game ID | `GameId` is null or whitespace on the folder view row (no assigned game-index id). Combined “All” rows only carry an id when every merged folder shares the same normalized id; otherwise `GameId` is blank and matches here. |
+| `missingid` | Missing ID | **Any of:** `GameId` is blank (no game-index id), **or** the folder is **Steam-tagged** (see note) **and** (`SteamAppId` is blank **or** `SteamGridDbId` is blank). |
 | `nocover` | No cover path | `PreviewImagePath` is null or whitespace (no on-disk existence check). |
 
 **Notes**
 
+- **Steam-tagged folder:** normalized `PrimaryPlatformLabel` is Steam **or** any entry in `PlatformLabels` normalizes to Steam (same rules as `LibraryBrowserFolderViewIsSteamTagged` / the Filter menu).
+- **Legacy persisted values** `needssteam`, `needssteamgrid`, and `missinggameid` (and their text aliases) normalize to **`missingid`**.
 - **Timeline** grouping builds a synthetic view; filters still apply to the underlying folder rows that feed the timeline.
 - **Search** (search box) further narrows rows using `SearchBlob` (lowercased name, paths, ids, platforms).
 

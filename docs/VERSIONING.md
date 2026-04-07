@@ -27,3 +27,14 @@ When you ship a new build:
 The publish script writes **`dist/PixelVault-M.AAA.BBB`**, refreshes the **`dist/PixelVault-current`** junction, copies `CHANGELOG.md` into the dist folder, and warns if the repo changelog lacks a header for that version.
 
 **Pruning older `dist` folders:** By default **`-KeepLatest 10`** removes older **`PixelVault-*`** directories after a publish. Sorting is by **folder last-write time** (newest kept), not by **`System.Version`**, so **`M.AAA.BBB`** renumbers such as **`0.075.000`** are not mistaken for “older” than **`0.989`**.
+
+## App testing folder (not a release)
+
+For a **fixed-path** build you can pin in Explorer or the taskbar—**`dotnet publish`** on **`src\PixelVault.Native`** plus **`assets`** and **`tools`** from the repo (it does **not** pull from **`dist\`**). Same layout as a publish but **no** version bump, **no** `dist\PixelVault-*`, **no** `PixelVault-current`, **no** repo-root shortcut updates:
+
+```powershell
+cd C:\Codex
+.\scripts\Build-PixelVault-AppTesting.ps1
+```
+
+Default output: **`C:\Codex\App Testing\`** (overwritten each run). Optional: **`-OutputPath`**, **`-IncludeSourceBundle`**, **`-IncludeBootstrapSettings`**, **`-SelfContained`**. Creates **`PixelVault.lnk`** inside that folder unless **`-ShortcutName ""`**.

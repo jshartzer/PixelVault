@@ -149,21 +149,13 @@ namespace PixelVaultNative
                 };
                 largeItem.Click += delegate { setLibraryFilterMode("large"); };
 
-                var needsSteamItem = new MenuItem
+                var missingIdItem = new MenuItem
                 {
-                    Header = "Steam · missing App ID",
+                    Header = "Missing ID",
                     IsCheckable = true,
-                    IsChecked = string.Equals(NormalizeLibraryFolderFilterMode(libraryFolderFilterMode), "needssteam", StringComparison.OrdinalIgnoreCase)
+                    IsChecked = string.Equals(NormalizeLibraryFolderFilterMode(libraryFolderFilterMode), "missingid", StringComparison.OrdinalIgnoreCase)
                 };
-                needsSteamItem.Click += delegate { setLibraryFilterMode("needssteam"); };
-
-                var missingGameIdItem = new MenuItem
-                {
-                    Header = "Missing game ID",
-                    IsCheckable = true,
-                    IsChecked = string.Equals(NormalizeLibraryFolderFilterMode(libraryFolderFilterMode), "missinggameid", StringComparison.OrdinalIgnoreCase)
-                };
-                missingGameIdItem.Click += delegate { setLibraryFilterMode("missinggameid"); };
+                missingIdItem.Click += delegate { setLibraryFilterMode("missingid"); };
 
                 var noCoverItem = new MenuItem
                 {
@@ -173,7 +165,7 @@ namespace PixelVaultNative
                 };
                 noCoverItem.Click += delegate { setLibraryFilterMode("nocover"); };
 
-                OpenLibraryButtonMenu(panes.FilterMenuButton, allItem, completedItem, crossPlatformItem, largeItem, needsSteamItem, missingGameIdItem, noCoverItem);
+                OpenLibraryButtonMenu(panes.FilterMenuButton, allItem, completedItem, crossPlatformItem, largeItem, missingIdItem, noCoverItem);
             };
         }
     }

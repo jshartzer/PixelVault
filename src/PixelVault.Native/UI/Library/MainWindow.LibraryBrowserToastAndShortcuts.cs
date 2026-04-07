@@ -2,6 +2,7 @@ using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using PixelVaultNative.UI.Design;
 
@@ -41,7 +42,18 @@ namespace PixelVaultNative
             ws.LibraryToastTimer.Tick += delegate
             {
                 ws.LibraryToastTimer.Stop();
-                if (ws.LibraryToastBorder != null)
+                if (ws.LibraryToastBorder == null) return;
+                if (SystemParameters.ClientAreaAnimation)
+                {
+                    var fade = new DoubleAnimation(ws.LibraryToastBorder.Opacity, 0d, TimeSpan.FromMilliseconds(140));
+                    fade.Completed += delegate
+                    {
+                        ws.LibraryToastBorder.Visibility = Visibility.Collapsed;
+                        ws.LibraryToastBorder.Opacity = 0d;
+                    };
+                    ws.LibraryToastBorder.BeginAnimation(UIElement.OpacityProperty, fade);
+                }
+                else
                 {
                     ws.LibraryToastBorder.Visibility = Visibility.Collapsed;
                     ws.LibraryToastBorder.Opacity = 0d;
@@ -53,9 +65,18 @@ namespace PixelVaultNative
         {
             if (ws == null || ws.LibraryToastBorder == null || ws.LibraryToastLabel == null || string.IsNullOrWhiteSpace(message)) return;
             ws.LibraryToastTimer?.Stop();
+            ws.LibraryToastBorder.BeginAnimation(UIElement.OpacityProperty, null);
             ws.LibraryToastLabel.Text = message.Trim();
             ws.LibraryToastBorder.Visibility = Visibility.Visible;
-            ws.LibraryToastBorder.Opacity = 1d;
+            if (SystemParameters.ClientAreaAnimation)
+            {
+                ws.LibraryToastBorder.Opacity = 0d;
+                ws.LibraryToastBorder.BeginAnimation(UIElement.OpacityProperty, new DoubleAnimation(0d, 1d, TimeSpan.FromMilliseconds(120)));
+            }
+            else
+            {
+                ws.LibraryToastBorder.Opacity = 1d;
+            }
             ws.LibraryToastTimer?.Start();
         }
 
@@ -133,6 +154,7 @@ namespace PixelVaultNative
                 root.Children.Add(row);
             }
             AddRow("F1", "Open this shortcut list");
+            AddRow("Ctrl + Shift + E", "Toggle quick edit panel (side drawer)");
             AddRow("Ctrl + Shift + P", "Command palette (library tools, sort, filter, import)");
             AddRow("⋯ (footer)", "Open command palette (same as Ctrl+Shift+P)");
             AddRow("—", "Export Starred (toolbar): copy starred captures to the folder in Path Settings");

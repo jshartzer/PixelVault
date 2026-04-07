@@ -15,6 +15,8 @@ namespace PixelVaultNative
         public string FfmpegPath = string.Empty;
         public string SteamGridDbApiToken = string.Empty;
         public int LibraryFolderTileSize = 300;
+        /// <summary>Preferred capture tile width (px) for non-timeline library detail grids; clamped to the viewport (<c>PV-PLN-LIBWS-001</c> Step 6).</summary>
+        public int LibraryPhotoTileSize = 340;
         public string LibraryFolderSortMode = "alpha";
         public string LibraryFolderFilterMode = "all";
         public string LibraryGroupingMode = "all";
@@ -48,6 +50,7 @@ namespace PixelVaultNative
                 FfmpegPath = s.FfmpegPath ?? string.Empty,
                 SteamGridDbApiToken = s.SteamGridDbApiToken ?? string.Empty,
                 LibraryFolderTileSize = s.LibraryFolderTileSize,
+                LibraryPhotoTileSize = s.LibraryPhotoTileSize,
                 LibraryFolderSortMode = s.LibraryFolderSortMode ?? "alpha",
                 LibraryFolderFilterMode = s.LibraryFolderFilterMode ?? "all",
                 LibraryGroupingMode = s.LibraryGroupingMode ?? "all",

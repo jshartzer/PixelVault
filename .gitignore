@@ -1,3 +1,6 @@
+# Local app testing output (scripts/Build-PixelVault-AppTesting.ps1)
+App Testing/
+
 # Generated binaries
 dist/PixelVault-*/
 dist/PixelVault-current/

@@ -108,5 +108,12 @@ namespace PixelVaultNative
 
         /// <summary>Record Steam AppID on the saved game index for <paramref name="gameDisplayName"/> when first seen (active library root only).</summary>
         void EnsureSteamAppIdInActiveLibrary(string gameDisplayName, string steamAppId);
+
+        /// <summary>Fingerprint map for Export Starred incremental copy (active library root + destination).</summary>
+        Dictionary<string, string> LoadStarredExportFingerprints(string exportDestinationNormalized);
+
+        void UpsertStarredExportFingerprint(string exportDestinationNormalized, string sourcePathNormalized, string fingerprint);
+
+        void PruneStarredExportFingerprints(string exportDestinationNormalized, IReadOnlyCollection<string> activeSourcePathsNormalized);
     }
 }

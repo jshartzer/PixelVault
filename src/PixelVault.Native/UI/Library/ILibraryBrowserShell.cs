@@ -23,6 +23,7 @@ namespace PixelVaultNative
         string LibraryFolderFilterMode { get; set; }
         string LibraryGroupingMode { get; set; }
         int LibraryFolderTileSize { get; set; }
+        int LibraryPhotoTileSize { get; set; }
 
         Action<bool> ActiveLibraryFolderRefresh { get; set; }
         LibraryFolderInfo ActiveSelectedLibraryFolder { get; set; }
@@ -70,6 +71,7 @@ namespace PixelVaultNative
         void LibraryBrowserApplySortGroupPillState(Button button, bool active);
         void SaveSettings();
         int NormalizeLibraryFolderTileSizeValue(int value);
+        int NormalizeLibraryPhotoTileSizeValue(int value);
         List<LibraryFolderInfo> GetLibraryBrowserActionFolders(MainWindow.LibraryBrowserFolderView view);
         string BuildLibraryBrowserActionScopeLabel(MainWindow.LibraryBrowserFolderView view);
         void LibrarySaveCustomCover(LibraryFolderInfo folder, string sourcePath);
@@ -127,7 +129,13 @@ namespace PixelVaultNative
             Action<bool> refreshLibraryFoldersAsync,
             Action<List<LibraryFolderInfo>, string, bool, bool, bool> runScopedCoverRefresh,
             Action<MainWindow.LibraryBrowserFolderView> openLibraryMetadataEditor,
-            Action<string> libraryToast);
+            Action<string> libraryToast,
+            MainWindow.LibraryBrowserWorkingSet ws);
+
+        void LibraryBrowserExitPhotoWorkspace(MainWindow.LibraryBrowserWorkingSet ws, Action renderTiles);
+
+        /// <summary>Enter Photo workspace using <see cref="MainWindow.LibraryBrowserWorkingSet.Current"/> if valid.</summary>
+        void LibraryBrowserEnterPhotoWorkspaceFromSelection(MainWindow.LibraryBrowserWorkingSet ws, Action<MainWindow.LibraryBrowserFolderView> showFolder);
 
         void LibraryBrowserShowSelectedFolder(
             MainWindow.LibraryBrowserWorkingSet ws,
@@ -202,5 +210,11 @@ namespace PixelVaultNative
             Action<string> setLibraryGroupingMode,
             Action<string> setLibrarySortMode,
             Action<string> setLibraryFilterMode);
+
+        void LibraryBrowserMountQuickEditDrawer(Grid root, MainWindow.LibraryBrowserWorkingSet ws);
+
+        void LibraryBrowserSetQuickEditDrawerOpen(MainWindow.LibraryBrowserWorkingSet ws, bool open);
+
+        void LibraryBrowserToggleQuickEditDrawer(MainWindow.LibraryBrowserWorkingSet ws);
     }
 }

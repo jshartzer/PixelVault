@@ -52,15 +52,32 @@ public sealed class LibraryBrowserCombinedMergeTests
     }
 
     [Fact]
-    public void NeedsSteam_FilterFalse_OnMergedRow_WhenSteamIdComesFromMerge()
+    public void MissingId_FilterFalse_OnMergedRow_WhenAllIdsPresent()
     {
         var merged = new MainWindow.LibraryBrowserFolderView
         {
             PrimaryPlatformLabel = "Xbox",
             SteamAppId = "2050650",
+            SteamGridDbId = "5528",
+            GameId = "game-row",
             PlatformLabels = new[] { "Steam", "Xbox" },
             IsMergedAcrossPlatforms = true
         };
-        Assert.False(MainWindow.LibraryBrowserFolderViewMatchesFilter("needssteam", merged, Norm));
+        Assert.False(MainWindow.LibraryBrowserFolderViewMatchesFilter("missingid", merged, Norm));
+    }
+
+    [Fact]
+    public void MissingId_FilterTrue_OnMergedRow_WhenGameIdStillMissing()
+    {
+        var merged = new MainWindow.LibraryBrowserFolderView
+        {
+            PrimaryPlatformLabel = "Xbox",
+            SteamAppId = "2050650",
+            SteamGridDbId = "5528",
+            GameId = "",
+            PlatformLabels = new[] { "Steam", "Xbox" },
+            IsMergedAcrossPlatforms = true
+        };
+        Assert.True(MainWindow.LibraryBrowserFolderViewMatchesFilter("missingid", merged, Norm));
     }
 }

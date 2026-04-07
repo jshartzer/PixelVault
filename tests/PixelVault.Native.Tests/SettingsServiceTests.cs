@@ -27,16 +27,30 @@ public sealed class SettingsServiceTests
     }
 
     [Theory]
+    [InlineData(100, 220)]
+    [InlineData(280, 280)]
+    [InlineData(600, 560)]
+    public void NormalizeLibraryPhotoTileSize_ClampsToRange(int input, int expected)
+    {
+        Assert.Equal(expected, SettingsService.NormalizeLibraryPhotoTileSize(input));
+    }
+
+    [Theory]
     [InlineData("100%", "completed")]
     [InlineData("cross-platform", "crossplatform")]
     [InlineData("25+ captures", "large")]
     [InlineData("all", "all")]
-    [InlineData("needssteam", "needssteam")]
-    [InlineData("missing steam app id", "needssteam")]
+    [InlineData("missingid", "missingid")]
+    [InlineData("missing id", "missingid")]
+    [InlineData("needssteam", "missingid")]
+    [InlineData("missing steam app id", "missingid")]
+    [InlineData("needssteamgrid", "missingid")]
+    [InlineData("missing steam grid", "missingid")]
+    [InlineData("steam griddb", "missingid")]
     [InlineData("nocover", "nocover")]
     [InlineData("no cover", "nocover")]
-    [InlineData("missinggameid", "missinggameid")]
-    [InlineData("needs game id", "missinggameid")]
+    [InlineData("missinggameid", "missingid")]
+    [InlineData("needs game id", "missingid")]
     public void NormalizeLibraryFolderFilterMode_SupportsAliases(string raw, string expected)
     {
         Assert.Equal(expected, SettingsService.NormalizeLibraryFolderFilterMode(raw));
@@ -65,6 +79,7 @@ public sealed class SettingsServiceTests
                 "ffmpeg=",
                 "steamgriddb_token=secret",
                 "library_folder_tile_size=200",
+                "library_photo_tile_size=410",
                 "library_folder_sort_mode=recent",
                 "library_folder_filter_mode=100%",
                 "library_grouping_mode=console",
@@ -81,6 +96,7 @@ public sealed class SettingsServiceTests
                 FfmpegPath = string.Empty,
                 SteamGridDbApiToken = string.Empty,
                 LibraryFolderTileSize = 240,
+                LibraryPhotoTileSize = 260,
                 LibraryFolderSortMode = "platform",
                 LibraryGroupingMode = "all",
                 TroubleshootingLoggingEnabled = false
@@ -96,6 +112,7 @@ public sealed class SettingsServiceTests
             Assert.Equal(@"C:\tools\exiftool.exe", loaded.ExifToolPath, ignoreCase: true);
             Assert.Equal("secret", loaded.SteamGridDbApiToken);
             Assert.Equal(200, loaded.LibraryFolderTileSize);
+            Assert.Equal(410, loaded.LibraryPhotoTileSize);
             Assert.Equal("added", loaded.LibraryFolderSortMode);
             Assert.Equal("completed", loaded.LibraryFolderFilterMode);
             Assert.Equal("console", loaded.LibraryGroupingMode);
@@ -153,6 +170,7 @@ public sealed class SettingsServiceTests
                 FfmpegPath = ffmpegStub,
                 SteamGridDbApiToken = "tok",
                 LibraryFolderTileSize = 180,
+                LibraryPhotoTileSize = 310,
                 LibraryFolderSortMode = "photos",
                 LibraryFolderFilterMode = "large",
                 LibraryGroupingMode = "console",
@@ -175,6 +193,7 @@ public sealed class SettingsServiceTests
             Assert.Equal(original.FfmpegPath, loaded.FfmpegPath, ignoreCase: true);
             Assert.Equal(original.SteamGridDbApiToken, loaded.SteamGridDbApiToken);
             Assert.Equal(SettingsService.NormalizeLibraryFolderTileSize(original.LibraryFolderTileSize), loaded.LibraryFolderTileSize);
+            Assert.Equal(SettingsService.NormalizeLibraryPhotoTileSize(original.LibraryPhotoTileSize), loaded.LibraryPhotoTileSize);
             Assert.Equal("photos", loaded.LibraryFolderSortMode);
             Assert.Equal("large", loaded.LibraryFolderFilterMode);
             Assert.Equal("console", loaded.LibraryGroupingMode);

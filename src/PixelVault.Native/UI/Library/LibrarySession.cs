@@ -24,6 +24,7 @@ namespace PixelVaultNative
         readonly LibraryCoverRefreshAsyncInvoker _refreshLibraryCovers;
         readonly LibraryMetadataScanInvoker _runLibraryMetadataScan;
         readonly Action<string, string> _ensureDirectoryAccessible;
+        readonly IIndexPersistenceService _indexPersistence;
 
         internal LibrarySession(
             LibraryWorkspaceContext workspace,
@@ -40,7 +41,8 @@ namespace PixelVaultNative
             Func<string, string, string, EmbeddedMetadataSnapshot, LibraryMetadataIndexEntry, Dictionary<string, LibraryMetadataIndexEntry>, List<GameIndexEditorRow>, LibraryMetadataIndexEntry> buildResolvedLibraryMetadataIndexEntry,
             LibraryCoverRefreshAsyncInvoker refreshLibraryCovers,
             LibraryMetadataScanInvoker runLibraryMetadataScan,
-            Action<string, string> ensureDirectoryAccessible)
+            Action<string, string> ensureDirectoryAccessible,
+            IIndexPersistenceService indexPersistence)
         {
             _workspace = workspace ?? throw new ArgumentNullException(nameof(workspace));
             _scanner = scanner ?? throw new ArgumentNullException(nameof(scanner));
@@ -57,6 +59,7 @@ namespace PixelVaultNative
             _refreshLibraryCovers = refreshLibraryCovers ?? throw new ArgumentNullException(nameof(refreshLibraryCovers));
             _runLibraryMetadataScan = runLibraryMetadataScan ?? throw new ArgumentNullException(nameof(runLibraryMetadataScan));
             _ensureDirectoryAccessible = ensureDirectoryAccessible ?? throw new ArgumentNullException(nameof(ensureDirectoryAccessible));
+            _indexPersistence = indexPersistence ?? throw new ArgumentNullException(nameof(indexPersistence));
         }
 
         public string LibraryRoot => _workspace.LibraryRoot;
@@ -216,6 +219,25 @@ namespace PixelVaultNative
             if (string.Equals(row.SteamAppId ?? string.Empty, steamAppId, StringComparison.Ordinal)) return;
             row.SteamAppId = steamAppId;
             PersistGameIndexRows(rows);
+        }
+
+        public Dictionary<string, string> LoadStarredExportFingerprints(string exportDestinationNormalized)
+        {
+            if (!HasLibraryRoot)
+                return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            return _indexPersistence.LoadStarredExportFingerprints(LibraryRoot, exportDestinationNormalized ?? string.Empty);
+        }
+
+        public void UpsertStarredExportFingerprint(string exportDestinationNormalized, string sourcePathNormalized, string fingerprint)
+        {
+            if (!HasLibraryRoot) return;
+            _indexPersistence.UpsertStarredExportFingerprint(LibraryRoot, exportDestinationNormalized ?? string.Empty, sourcePathNormalized ?? string.Empty, fingerprint ?? string.Empty);
+        }
+
+        public void PruneStarredExportFingerprints(string exportDestinationNormalized, IReadOnlyCollection<string> activeSourcePathsNormalized)
+        {
+            if (!HasLibraryRoot) return;
+            _indexPersistence.PruneStarredExportFingerprints(LibraryRoot, exportDestinationNormalized ?? string.Empty, activeSourcePathsNormalized);
         }
     }
 }

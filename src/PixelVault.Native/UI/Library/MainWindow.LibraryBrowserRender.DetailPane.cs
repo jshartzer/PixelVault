@@ -59,7 +59,9 @@ namespace PixelVaultNative
                 return;
             }
             const int detailTileGap = 8;
-            var detailLayout = CalculateResponsiveLibraryDetailLayout(panes.ThumbScroll);
+            var renderFolder = ws.Current;
+            var timelineView = IsLibraryBrowserTimelineView(renderFolder);
+            var detailLayout = CalculateResponsiveLibraryDetailLayout(panes.ThumbScroll, !timelineView);
             var size = detailLayout.TileSize;
             ws.LastDetailViewportWidth = ResolveScrollViewerLayoutWidth(panes == null ? null : panes.ThumbScroll);
             var shouldRestoreDetailScroll = ws.PreserveDetailScrollOnNextRender && ws.PreservedDetailScrollOffset > 0.1d;
@@ -68,8 +70,6 @@ namespace PixelVaultNative
             ws.PreserveDetailScrollOnNextRender = false;
             var resetRowsToLoading = ws.ResetDetailRowsToLoadingOnNextRender;
             ws.ResetDetailRowsToLoadingOnNextRender = false;
-            var renderFolder = ws.Current;
-            var timelineView = IsLibraryBrowserTimelineView(renderFolder);
             var detailViewportWidth = ws.LastDetailViewportWidth;
             int ResolveAdaptiveDetailMaxTileSize(double viewportWidth)
             {
@@ -81,7 +81,7 @@ namespace PixelVaultNative
                 return 232;
             }
             var adaptiveMaxTileSize = ResolveAdaptiveDetailMaxTileSize(detailViewportWidth);
-            var effectiveTileSize = Math.Min(size, adaptiveMaxTileSize);
+            var effectiveTileSize = timelineView ? Math.Min(size, adaptiveMaxTileSize) : size;
             var targetDetailColumns = Math.Max(1, CalculateVirtualizedTileColumns(panes == null ? null : panes.ThumbScroll, effectiveTileSize, detailTileGap, 6));
             ws.LastDetailColumns = targetDetailColumns;
             ws.LastDetailTileSize = effectiveTileSize;

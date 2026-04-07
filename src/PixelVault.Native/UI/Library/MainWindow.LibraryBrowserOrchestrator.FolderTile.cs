@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
@@ -173,7 +174,8 @@ namespace PixelVaultNative
             Action<bool> refreshLibraryFoldersAsync,
             Action<List<LibraryFolderInfo>, string, bool, bool, bool> runScopedCoverRefresh,
             Action<LibraryBrowserFolderView> openLibraryMetadataEditor,
-            Action<string> libraryToast)
+            Action<string> libraryToast,
+            LibraryBrowserWorkingSet ws)
         {
             var displayFolder = BuildLibraryBrowserDisplayFolder(folder);
             var actionFolder = GetLibraryBrowserPrimaryFolder(folder) ?? displayFolder;
@@ -266,6 +268,13 @@ namespace PixelVaultNative
             imageBorder.Clip = roundedCoverClip;
             tile.Content = imageBorder;
             tile.Click += delegate { showFolder(folder); };
+            tile.PreviewMouseDoubleClick += delegate(object _, MouseButtonEventArgs e)
+            {
+                if (e.ChangedButton != MouseButton.Left) return;
+                if (folder == null || IsLibraryBrowserTimelineView(folder) || IsLibraryBrowserTimelineMode()) return;
+                e.Handled = true;
+                LibraryBrowserEnterPhotoWorkspace(ws, folder, showFolder);
+            };
             var contextMenu = new ContextMenu();
             var openMyCoversItem = new MenuItem { Header = "Open My Covers Folder" };
             openMyCoversItem.Click += delegate { OpenSavedCoversFolder(); };

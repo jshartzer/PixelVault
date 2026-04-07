@@ -50,13 +50,15 @@ public class LibraryCommandPaletteRegistryTests
             FilterFolders100Percent = () => { },
             FilterFoldersCrossPlatform = () => { },
             FilterFolders25PlusCaptures = () => { },
-            FilterFoldersNeedsSteamAppId = () => { },
-            FilterFoldersMissingGameId = () => { },
+            FilterFoldersMissingId = () => { },
             FilterFoldersNoCover = () => { },
+            ToggleQuickEditDrawer = () => { },
             GroupFoldersAllGames = () => { },
             GroupFoldersByConsole = () => { },
             GroupFoldersTimeline = () => { },
-            GroupFoldersFolderGrid = () => { }
+            GroupFoldersFolderGrid = () => { },
+            EnterPhotoWorkspace = () => { },
+            ExitPhotoWorkspace = () => { }
         };
         var map = LibraryCommandPaletteRegistry.BuildHandlerMap(ctx);
         foreach (var spec in LibraryCommandPaletteRegistry.All)

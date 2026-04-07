@@ -28,6 +28,7 @@ namespace PixelVaultNative
             new("export_starred", "Export Starred", "Copy starred to export folder", "star export"),
             new("refresh_covers", "Refresh all covers", "Re-fetch art for whole library", "grid steam fetch"),
             new("shortcuts", "Keyboard shortcuts", "Same as F1", "keys help"),
+            new("quick_edit_panel", "Quick edit panel", "Side drawer for fast edits (shell)", "drawer sidebar"),
             new("sort_alpha", "Sort folders · Alphabetical", "Folder list order", "sort a-z name abc"),
             new("sort_captured", "Sort folders · Date captured", "Folder list order", "sort when taken"),
             new("sort_added", "Sort folders · Date added", "Folder list order", "sort recent library"),
@@ -36,13 +37,14 @@ namespace PixelVaultNative
             new("filter_completed", "Filter · 100% achievements", "Completed games only", "medal 100 percent"),
             new("filter_crossplatform", "Filter · Cross-platform", "Multi-platform folders", "cross play"),
             new("filter_large", "Filter · 25+ captures", "Folders with many screenshots", "large library"),
-            new("filter_needs_steam", "Filter · Steam missing App ID", "Steam games with no Steam App ID", "needs steam appid"),
-            new("filter_missing_game_id", "Filter · Missing game ID", "Folders with no saved game index ID", "no igdb game row"),
+            new("filter_missing_id", "Filter · Missing ID", "No game-index id, or Steam-tagged with missing App ID or Grid ID", "steam appid stid game row"),
             new("filter_no_cover", "Filter · No cover path", "Folders without a saved cover path", "missing cover art"),
             new("group_all", "Group · All games", "Single folder list", "grouping flat"),
             new("group_console", "Group · By console", "Platform sections", "grouping xbox playstation"),
             new("group_timeline", "Group · Timeline", "Calendar view", "grouping dates"),
-            new("group_folders", "Group · Folders", "Exit timeline to folder cards", "grouping grid")
+            new("group_folders", "Group · Folders", "Exit timeline to folder cards", "grouping grid"),
+            new("workspace_open_captures", "Workspace · Open captures", "Photo view for the selected game (double-click a cover)", "photos screenshots game workspace"),
+            new("workspace_back_to_folders", "Workspace · Back to folder list", "Leave captures view (Esc also works)", "folders grid close photos")
         };
 
         internal static void ValidateInvariants()
@@ -85,6 +87,7 @@ namespace PixelVaultNative
             Bind("export_starred", ctx.ExportStarred);
             Bind("refresh_covers", ctx.RefreshAllCovers);
             Bind("shortcuts", ctx.ShowKeyboardShortcuts);
+            Bind("quick_edit_panel", ctx.ToggleQuickEditDrawer);
             Bind("sort_alpha", ctx.SortFoldersAlpha);
             Bind("sort_captured", ctx.SortFoldersDateCaptured);
             Bind("sort_added", ctx.SortFoldersDateAdded);
@@ -93,13 +96,14 @@ namespace PixelVaultNative
             Bind("filter_completed", ctx.FilterFolders100Percent);
             Bind("filter_crossplatform", ctx.FilterFoldersCrossPlatform);
             Bind("filter_large", ctx.FilterFolders25PlusCaptures);
-            Bind("filter_needs_steam", ctx.FilterFoldersNeedsSteamAppId);
-            Bind("filter_missing_game_id", ctx.FilterFoldersMissingGameId);
+            Bind("filter_missing_id", ctx.FilterFoldersMissingId);
             Bind("filter_no_cover", ctx.FilterFoldersNoCover);
             Bind("group_all", ctx.GroupFoldersAllGames);
             Bind("group_console", ctx.GroupFoldersByConsole);
             Bind("group_timeline", ctx.GroupFoldersTimeline);
             Bind("group_folders", ctx.GroupFoldersFolderGrid);
+            Bind("workspace_open_captures", ctx.EnterPhotoWorkspace);
+            Bind("workspace_back_to_folders", ctx.ExitPhotoWorkspace);
             return d;
         }
     }

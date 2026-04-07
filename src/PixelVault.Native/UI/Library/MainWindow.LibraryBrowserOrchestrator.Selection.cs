@@ -142,7 +142,21 @@ namespace PixelVaultNative
                     tile.BorderThickness = isSelected ? new Thickness(2) : new Thickness(1);
                 }
                 panes.DeleteSelectedButton.IsEnabled = selectedFiles.Count > 0;
-                panes.ThumbLabel.Text = selectedFiles.Count > 0 ? selectedFiles.Count + " selected" : (timelineMode ? "Timeline" : "Screenshots");
+                if (timelineMode)
+                {
+                    panes.ThumbLabel.Visibility = Visibility.Visible;
+                    panes.ThumbLabel.Text = selectedFiles.Count > 0 ? selectedFiles.Count + " selected" : "Timeline";
+                }
+                else if (selectedFiles.Count > 0)
+                {
+                    panes.ThumbLabel.Visibility = Visibility.Visible;
+                    panes.ThumbLabel.Text = selectedFiles.Count + " selected";
+                }
+                else
+                {
+                    panes.ThumbLabel.Visibility = Visibility.Collapsed;
+                    panes.ThumbLabel.Text = string.Empty;
+                }
                 if (panes.EditMetadataButton != null)
                 {
                     panes.EditMetadataButton.IsEnabled = !ws.LibraryFoldersLoading && ws.Current != null && (!timelineMode || selectedFiles.Count > 0);
@@ -159,6 +173,7 @@ namespace PixelVaultNative
                 {
                     panes.ExitTimelineButton.IsEnabled = !ws.LibraryFoldersLoading;
                 }
+                LibraryBrowserSyncOpenCapturesToolbarButton(panes);
             };
         }
     }

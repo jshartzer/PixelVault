@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 
 namespace PixelVaultNative
@@ -45,7 +46,9 @@ namespace PixelVaultNative
 
                 var panes = _shell.BuildLibraryBrowserContentPanes(contentGrid);
                 var ws = new LibraryBrowserWorkingSet { Panes = panes };
+                MainWindow.LibraryBrowserSyncWorkspaceModeWithGrouping(ws, _shell.LibraryGroupingMode);
                 _shell.LibraryBrowserMountToastHost(root, ws);
+                _shell.LibraryBrowserMountQuickEditDrawer(root, ws);
                 libraryWindow.Content = root;
                 ws.AppliedLibrarySearchText = _shell.LibraryBrowserPersistedSearch;
                 ws.PendingLibrarySearchText = ws.AppliedLibrarySearchText;
@@ -236,10 +239,16 @@ namespace PixelVaultNative
                     {
                         lastFolderGroupingMode = normalized;
                     }
-                    if (!string.Equals(normalized, _shell.NormalizeLibraryGroupingMode(_shell.LibraryGroupingMode), StringComparison.OrdinalIgnoreCase))
+                    var previousGrouping = _shell.NormalizeLibraryGroupingMode(_shell.LibraryGroupingMode);
+                    if (!string.Equals(normalized, previousGrouping, StringComparison.OrdinalIgnoreCase))
                     {
                         _shell.LibraryGroupingMode = normalized;
                         _shell.SaveSettings();
+                    }
+                    // Must run before render: ApplyLibraryBrowserLayoutMode uses ws.WorkspaceMode (PV-PLN-LIBWS-001).
+                    MainWindow.LibraryBrowserSyncWorkspaceModeWithGrouping(ws, _shell.LibraryGroupingMode);
+                    if (!string.Equals(normalized, previousGrouping, StringComparison.OrdinalIgnoreCase))
+                    {
                         if (renderTiles != null) renderTiles();
                     }
                     refreshSortButtons?.Invoke();
@@ -279,7 +288,8 @@ namespace PixelVaultNative
                         refreshLibraryFoldersAsync,
                         runScopedCoverRefresh,
                         openLibraryMetadataEditor,
-                        msg => _shell.LibraryBrowserShowToast(ws, msg));
+                        msg => _shell.LibraryBrowserShowToast(ws, msg),
+                        ws);
                 };
 
                 showFolder = delegate(LibraryBrowserFolderView info)
@@ -326,8 +336,11 @@ namespace PixelVaultNative
                     navChrome.RefreshButton.IsEnabled = !isBusy;
                     panes.EditMetadataButton.IsEnabled = !isBusy;
                     panes.RefreshThisFolderButton.IsEnabled = !isBusy && ws.Current != null;
-                    panes.FolderTileSmallerButton.IsEnabled = !isBusy;
-                    panes.FolderTileLargerButton.IsEnabled = !isBusy;
+                    if (panes.OpenCapturesButton != null && isBusy) panes.OpenCapturesButton.IsEnabled = false;
+                    if (panes.ExitPhotoWorkspaceButton != null) panes.ExitPhotoWorkspaceButton.IsEnabled = !isBusy;
+                    if (panes.PhotoWorkspaceDividerToggleButton != null) panes.PhotoWorkspaceDividerToggleButton.IsEnabled = !isBusy;
+                    panes.FolderCoverLayoutButton.IsEnabled = !isBusy;
+                    if (panes.PhotoCaptureLayoutButton != null) panes.PhotoCaptureLayoutButton.IsEnabled = !isBusy;
                     panes.ShortcutsHelpButton.IsEnabled = !isBusy;
                     if (panes.CommandPaletteButton != null) panes.CommandPaletteButton.IsEnabled = !isBusy;
                     navChrome.FetchButton.IsEnabled = !isBusy;
@@ -399,6 +412,12 @@ namespace PixelVaultNative
                     setLibrarySortMode,
                     setLibraryFilterMode);
                 panes.ShortcutsHelpButton.Click += delegate { _shell.ShowLibraryBrowserKeyboardShortcutsHelp(libraryWindow); };
+                if (panes.ExitPhotoWorkspaceButton != null)
+                    panes.ExitPhotoWorkspaceButton.Click += delegate { _shell.LibraryBrowserExitPhotoWorkspace(ws, renderTiles); };
+                if (panes.PhotoWorkspaceDividerToggleButton != null)
+                    panes.PhotoWorkspaceDividerToggleButton.Click += delegate { _shell.LibraryBrowserExitPhotoWorkspace(ws, renderTiles); };
+                if (panes.OpenCapturesButton != null)
+                    panes.OpenCapturesButton.Click += delegate { _shell.LibraryBrowserEnterPhotoWorkspaceFromSelection(ws, showFolder); };
 
                 Action refreshAllCoversWithConfirm = delegate
                 {
@@ -457,19 +476,33 @@ namespace PixelVaultNative
                     FilterFolders100Percent = () => setLibraryFilterMode("completed"),
                     FilterFoldersCrossPlatform = () => setLibraryFilterMode("crossplatform"),
                     FilterFolders25PlusCaptures = () => setLibraryFilterMode("large"),
-                    FilterFoldersNeedsSteamAppId = () => setLibraryFilterMode("needssteam"),
-                    FilterFoldersMissingGameId = () => setLibraryFilterMode("missinggameid"),
+                    FilterFoldersMissingId = () => setLibraryFilterMode("missingid"),
                     FilterFoldersNoCover = () => setLibraryFilterMode("nocover"),
+                    ToggleQuickEditDrawer = () => _shell.LibraryBrowserToggleQuickEditDrawer(ws),
                     GroupFoldersAllGames = () => setLibraryGroupingMode("all"),
                     GroupFoldersByConsole = () => setLibraryGroupingMode("console"),
                     GroupFoldersTimeline = () => setLibraryGroupingMode("timeline"),
-                    GroupFoldersFolderGrid = () => setLibraryGroupingMode("folders")
+                    GroupFoldersFolderGrid = () => setLibraryGroupingMode("folders"),
+                    EnterPhotoWorkspace = () => _shell.LibraryBrowserEnterPhotoWorkspaceFromSelection(ws, showFolder),
+                    ExitPhotoWorkspace = () => _shell.LibraryBrowserExitPhotoWorkspace(ws, renderTiles)
                 };
 
                 panes.CommandPaletteButton.Click += delegate { _shell.ShowLibraryCommandPalette(libraryWindow, paletteCtx, null); };
 
                 libraryWindow.PreviewKeyDown += delegate(object _, KeyEventArgs e)
                 {
+                    if (e.Key == Key.Escape && ws.QuickEditDrawerOpen)
+                    {
+                        e.Handled = true;
+                        _shell.LibraryBrowserSetQuickEditDrawerOpen(ws, false);
+                        return;
+                    }
+                    if (e.Key == Key.Escape && ws.WorkspaceMode == LibraryWorkspaceMode.Photo)
+                    {
+                        e.Handled = true;
+                        _shell.LibraryBrowserExitPhotoWorkspace(ws, renderTiles);
+                        return;
+                    }
                     if (e.Key == Key.F1)
                     {
                         e.Handled = true;
@@ -480,22 +513,64 @@ namespace PixelVaultNative
                     {
                         e.Handled = true;
                         _shell.ShowLibraryCommandPalette(libraryWindow, paletteCtx, null);
+                        return;
+                    }
+                    if (e.Key == Key.E && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+                    {
+                        e.Handled = true;
+                        _shell.LibraryBrowserToggleQuickEditDrawer(ws);
                     }
                 };
-                panes.FolderTileSmallerButton.Click += delegate
+                var folderCoverLayoutMenu = new ContextMenu();
+                void AddFolderCoverPreset(string label, int px)
                 {
-                    _shell.LibraryFolderTileSize = _shell.NormalizeLibraryFolderTileSizeValue(_shell.LibraryFolderTileSize - 20);
-                    _shell.SaveSettings();
-                    if (renderTiles != null) renderTiles();
-                    _shell.LibraryBrowserShowToast(ws, "Folder tiles: " + _shell.LibraryFolderTileSize);
-                };
-                panes.FolderTileLargerButton.Click += delegate
+                    var item = new MenuItem { Header = label };
+                    item.Click += delegate
+                    {
+                        _shell.LibraryFolderTileSize = _shell.NormalizeLibraryFolderTileSizeValue(px);
+                        _shell.SaveSettings();
+                        if (renderTiles != null) renderTiles();
+                        _shell.LibraryBrowserShowToast(ws, "Cover size: " + label);
+                    };
+                    folderCoverLayoutMenu.Items.Add(item);
+                }
+                AddFolderCoverPreset("Compact", 200);
+                AddFolderCoverPreset("Comfortable", 260);
+                AddFolderCoverPreset("Balanced", 300);
+                AddFolderCoverPreset("Roomy", 380);
+                AddFolderCoverPreset("Large", 480);
+                panes.FolderCoverLayoutButton.Click += delegate
                 {
-                    _shell.LibraryFolderTileSize = _shell.NormalizeLibraryFolderTileSizeValue(_shell.LibraryFolderTileSize + 20);
-                    _shell.SaveSettings();
-                    if (renderTiles != null) renderTiles();
-                    _shell.LibraryBrowserShowToast(ws, "Folder tiles: " + _shell.LibraryFolderTileSize);
+                    folderCoverLayoutMenu.PlacementTarget = panes.FolderCoverLayoutButton;
+                    folderCoverLayoutMenu.Placement = PlacementMode.Bottom;
+                    folderCoverLayoutMenu.IsOpen = true;
                 };
+                if (panes.PhotoCaptureLayoutButton != null)
+                {
+                    var photoCaptureLayoutMenu = new ContextMenu();
+                    void AddPhotoCapturePreset(string label, int px)
+                    {
+                        var item = new MenuItem { Header = label };
+                        item.Click += delegate
+                        {
+                            _shell.LibraryPhotoTileSize = _shell.NormalizeLibraryPhotoTileSizeValue(px);
+                            _shell.SaveSettings();
+                            if (renderSelectedFolder != null) renderSelectedFolder();
+                            _shell.LibraryBrowserShowToast(ws, "Photo size: " + label);
+                        };
+                        photoCaptureLayoutMenu.Items.Add(item);
+                    }
+                    AddPhotoCapturePreset("Compact", 280);
+                    AddPhotoCapturePreset("Medium", 340);
+                    AddPhotoCapturePreset("Comfortable", 400);
+                    AddPhotoCapturePreset("Large", 480);
+                    panes.PhotoCaptureLayoutButton.Click += delegate
+                    {
+                        photoCaptureLayoutMenu.PlacementTarget = panes.PhotoCaptureLayoutButton;
+                        photoCaptureLayoutMenu.Placement = PlacementMode.Bottom;
+                        photoCaptureLayoutMenu.IsOpen = true;
+                    };
+                }
                 panes.TimelinePresetTodayButton.Click += delegate { applyTimelinePreset("today"); };
                 panes.TimelinePresetMonthButton.Click += delegate { applyTimelinePreset("month"); };
                 panes.TimelinePresetThirtyDaysButton.Click += delegate { applyTimelinePreset("30d"); };

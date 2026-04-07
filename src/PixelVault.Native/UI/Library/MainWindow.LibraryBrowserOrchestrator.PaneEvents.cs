@@ -23,7 +23,8 @@ namespace PixelVaultNative
                 {
                     panes.DetailResizeDebounceTimer.Stop();
                     if (ws.Current == null) return;
-                    var layout = CalculateResponsiveLibraryDetailLayout(panes.ThumbScroll);
+                    var usePhotoDensity = ws.Current != null && !IsLibraryBrowserTimelineView(ws.Current);
+                    var layout = CalculateResponsiveLibraryDetailLayout(panes.ThumbScroll, usePhotoDensity);
                     var viewportWidth = ResolveScrollViewerLayoutWidth(panes.ThumbScroll);
                     if (layout.Columns == ws.LastDetailColumns
                         && layout.TileSize == ws.LastDetailTileSize

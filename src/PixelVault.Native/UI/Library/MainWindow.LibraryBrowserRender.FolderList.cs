@@ -48,7 +48,7 @@ namespace PixelVaultNative
             projectionStopwatch.Stop();
             ws.ViewFolders.Clear();
             ws.ViewFolders.AddRange(browserFolders);
-            ApplyLibraryBrowserLayoutMode(panes);
+            ApplyLibraryBrowserLayoutMode(panes, ws.WorkspaceMode);
             var filterSortStopwatch = Stopwatch.StartNew();
             var visibleFolders = searchNormalized == null
                 ? browserFolders

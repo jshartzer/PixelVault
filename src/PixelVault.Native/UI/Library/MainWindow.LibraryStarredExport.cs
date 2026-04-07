@@ -108,7 +108,7 @@ namespace PixelVaultNative
             Dictionary<string, LibraryMetadataIndexEntry> metadataIndex = null;
             try
             {
-                metadataIndex = LoadLibraryMetadataIndex(root, false);
+                metadataIndex = librarySession.LoadLibraryMetadataIndex(false);
                 foreach (var kv in metadataIndex)
                 {
                     if (kv.Value == null || !kv.Value.Starred) continue;
@@ -151,10 +151,9 @@ namespace PixelVaultNative
                 LibraryMetadataIndexEntry e;
                 entryByPath[p] = metadataIndex != null && metadataIndex.TryGetValue(p, out e) ? e : null;
             }
-            var rootForDb = root;
             _ = Task.Run(delegate
             {
-                var tracking = indexPersistenceService.LoadStarredExportFingerprints(rootForDb, destNorm);
+                var tracking = librarySession.LoadStarredExportFingerprints(destNorm);
                 var copied = 0;
                 var skipped = 0;
                 var failed = 0;
@@ -187,7 +186,7 @@ namespace PixelVaultNative
                             Directory.CreateDirectory(dstDir);
                         ClearReadOnlyForOverwrite(dst);
                         fileSystemService.CopyFile(src, dst, true);
-                        indexPersistenceService.UpsertStarredExportFingerprint(rootForDb, destNorm, srcNorm, fingerprint);
+                        librarySession.UpsertStarredExportFingerprint(destNorm, srcNorm, fingerprint);
                         tracking[srcNorm] = fingerprint;
                         copied++;
                     }
@@ -198,7 +197,7 @@ namespace PixelVaultNative
                     }
                 }
                 var activeNorm = pathsOrdered.Select(NormalizePathForStarredExportTracking).Where(s => !string.IsNullOrWhiteSpace(s)).ToList();
-                indexPersistenceService.PruneStarredExportFingerprints(rootForDb, destNorm, activeNorm);
+                librarySession.PruneStarredExportFingerprints(destNorm, activeNorm);
                 dispatcher.BeginInvoke(new Action(delegate
                 {
                     var summary = "Export Starred: " + copied + " copied, " + skipped + " up to date" + (failed > 0 ? ", " + failed + " failed" : string.Empty) + " → " + destNorm;

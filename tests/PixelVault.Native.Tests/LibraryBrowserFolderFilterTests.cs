@@ -15,41 +15,75 @@ public sealed class LibraryBrowserFolderFilterTests
     }
 
     [Fact]
-    public void MatchesFilter_NeedsSteam_RequiresSteamPlatformAndBlankAppId()
+    public void MatchesFilter_MissingId_WhenGameIndexIdBlank()
     {
-        var steamNoId = new MainWindow.LibraryBrowserFolderView
+        var noId = new MainWindow.LibraryBrowserFolderView { GameId = "", FileCount = 1 };
+        Assert.True(MainWindow.LibraryBrowserFolderViewMatchesFilter("missingid", noId, Norm));
+
+        var hasId = new MainWindow.LibraryBrowserFolderView { GameId = "abc-123", FileCount = 1 };
+        Assert.False(MainWindow.LibraryBrowserFolderViewMatchesFilter("missingid", hasId, Norm));
+    }
+
+    [Fact]
+    public void MatchesFilter_MissingId_WhenSteamTagged_AndSteamAppBlank()
+    {
+        var steamNoApp = new MainWindow.LibraryBrowserFolderView
         {
             PrimaryPlatformLabel = "Steam",
             SteamAppId = "",
+            SteamGridDbId = "5528",
+            GameId = "g",
             PlatformLabels = new[] { "Steam" }
         };
-        Assert.True(MainWindow.LibraryBrowserFolderViewMatchesFilter("needssteam", steamNoId, Norm));
+        Assert.True(MainWindow.LibraryBrowserFolderViewMatchesFilter("missingid", steamNoApp, Norm));
 
-        var steamWithId = new MainWindow.LibraryBrowserFolderView
+        var steamWithApp = new MainWindow.LibraryBrowserFolderView
         {
             PrimaryPlatformLabel = "Steam",
             SteamAppId = "123",
+            SteamGridDbId = "5528",
+            GameId = "g",
             PlatformLabels = new[] { "Steam" }
         };
-        Assert.False(MainWindow.LibraryBrowserFolderViewMatchesFilter("needssteam", steamWithId, Norm));
+        Assert.False(MainWindow.LibraryBrowserFolderViewMatchesFilter("missingid", steamWithApp, Norm));
+    }
 
+    [Fact]
+    public void MatchesFilter_MissingId_WhenSteamTagged_AndSteamGridBlank()
+    {
+        var steamNoGrid = new MainWindow.LibraryBrowserFolderView
+        {
+            PrimaryPlatformLabel = "Steam",
+            SteamGridDbId = "",
+            SteamAppId = "123",
+            GameId = "g",
+            PlatformLabels = new[] { "Steam" }
+        };
+        Assert.True(MainWindow.LibraryBrowserFolderViewMatchesFilter("missingid", steamNoGrid, Norm));
+
+        var steamWithGrid = new MainWindow.LibraryBrowserFolderView
+        {
+            PrimaryPlatformLabel = "Steam",
+            SteamGridDbId = "5528",
+            SteamAppId = "123",
+            GameId = "g",
+            PlatformLabels = new[] { "Steam" }
+        };
+        Assert.False(MainWindow.LibraryBrowserFolderViewMatchesFilter("missingid", steamWithGrid, Norm));
+    }
+
+    [Fact]
+    public void MatchesFilter_MissingId_NonSteam_IgnoresSteamFields_WhenGameIdPresent()
+    {
         var xbox = new MainWindow.LibraryBrowserFolderView
         {
             PrimaryPlatformLabel = "Xbox",
             SteamAppId = "",
+            SteamGridDbId = "",
+            GameId = "g1",
             PlatformLabels = new[] { "Xbox" }
         };
-        Assert.False(MainWindow.LibraryBrowserFolderViewMatchesFilter("needssteam", xbox, Norm));
-    }
-
-    [Fact]
-    public void MatchesFilter_MissingGameId_UsesGameIdField()
-    {
-        var noId = new MainWindow.LibraryBrowserFolderView { GameId = "", FileCount = 1 };
-        Assert.True(MainWindow.LibraryBrowserFolderViewMatchesFilter("missinggameid", noId, Norm));
-
-        var hasId = new MainWindow.LibraryBrowserFolderView { GameId = "abc-123", FileCount = 1 };
-        Assert.False(MainWindow.LibraryBrowserFolderViewMatchesFilter("missinggameid", hasId, Norm));
+        Assert.False(MainWindow.LibraryBrowserFolderViewMatchesFilter("missingid", xbox, Norm));
     }
 
     [Fact]

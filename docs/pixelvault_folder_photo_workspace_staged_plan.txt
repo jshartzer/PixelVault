@@ -1,0 +1,538 @@
+PixelVault Folder / Photo Workspace Shift — Staged Plan for Cursor
+==================================================================
+
+Codified plan ID (canonical for execution, including **Timeline as third mode**):
+  docs/plans/PV-PLN-LIBWS-001-library-workspace-modes.md  (PV-PLN-LIBWS-001)
+
+Date: 2026-04-06
+Workspace: C:\Codex
+Purpose: Replace the current "two surfaces competing at once" model with a cleaner workspace model where folder browsing is the default and photo browsing opens as its own focused state.
+
+
+0. Core Direction
+-----------------
+
+This project is not mainly a header redesign.
+
+The main problem is that the current Library UI tries to show folder browsing and photo/detail browsing as two peer surfaces at the same time. That creates constant competition for space, especially in snapped or tall/narrow windows.
+
+The new primary UX model should be:
+
+- Folder view is the default workspace.
+- That is all the user sees at rest.
+- Double-clicking a game/folder opens the photo workspace so it takes over the screen instead of fighting beside the folder browser.
+- A visible open/close affordance should exist in addition to double-click:
+  - an embedded arrow, chevron, or enter/open control on the tile
+  - a close/back arrow in photo mode
+- Photo mode may later retain a very slim navigation rail for hopping between games, but that is secondary and should not be allowed to compete with the photo surface.
+
+Header/banner work is secondary polish inside photo mode, not the central design idea.
+
+
+1. Product Goals
+----------------
+
+These should guide every stage:
+
+- Stop the left and right sides from competing for width.
+- Make folder browsing the default experience.
+- Make photo browsing feel like entering a focused workspace, not opening a cramped sidebar.
+- Preserve a polished desktop-app feel.
+- Keep narrow/snap states intentional without turning the UI into a phone layout.
+- Add manual control over cover/photo density instead of over-automating layout behavior.
+
+Density-control goal:
+
+- Add a control that lets the user choose cover size/columns and photo size/columns.
+- The UI should default to the user's last choice.
+- The app may still clamp to what physically fits, but it should not constantly "outsmart" the user.
+
+
+2. Design Rules
+---------------
+
+Rules that should stay true:
+
+- Folder mode:
+  - search, filters, sort, and grouping controls remain available
+  - the folder grid is the main canvas
+- Photo mode:
+  - photos/captures become the main canvas
+  - folder browsing is no longer co-equal
+  - if a navigation rail exists, it must be narrow and clearly subordinate
+- Do not solve this primarily with a more complicated header.
+- Do not keep the current side-by-side model as the default and merely decorate it.
+- Do not let auto-responsiveness fight the new manual density controls.
+
+
+3. Current Codebase Hooks
+-------------------------
+
+Use the existing seams instead of adding one-off logic.
+
+Main layout / shell:
+
+- C:\Codex\src\PixelVault.Native\UI\Library\MainWindow.LibraryBrowserShowOrchestration.cs
+- C:\Codex\src\PixelVault.Native\UI\Library\MainWindow.LibraryBrowserLayout.cs
+- C:\Codex\src\PixelVault.Native\UI\Library\MainWindow.LibraryBrowserSplitLayout.cs
+
+Folder rendering:
+
+- C:\Codex\src\PixelVault.Native\UI\Library\MainWindow.LibraryBrowserRender.FolderList.cs
+- C:\Codex\src\PixelVault.Native\UI\Library\MainWindow.LibraryBrowserOrchestrator.FolderTile.cs
+
+Photo/detail rendering:
+
+- C:\Codex\src\PixelVault.Native\UI\Library\MainWindow.LibraryBrowserRender.DetailPane.cs
+
+Current per-window state:
+
+- C:\Codex\src\PixelVault.Native\UI\Library\MainWindow.LibraryBrowserWorkingSet.cs
+
+Existing useful precedents:
+
+- Timeline mode already collapses the left pane and lets the right pane take over:
+  - C:\Codex\src\PixelVault.Native\UI\Library\MainWindow.LibraryBrowserSplitLayout.cs
+- A right-side drawer pattern already exists for quick edit:
+  - C:\Codex\src\PixelVault.Native\UI\Library\MainWindow.LibraryBrowserQuickEditDrawer.cs
+- Folder tile size is already persisted:
+  - AppSettings / SettingsService / MainWindow.SettingsPersistence / ILibraryBrowserShell
+
+This means the codebase already supports:
+
+- alternate layout states
+- per-session workspace state
+- persisted display preferences
+
+
+4. High-Level Delivery Strategy
+-------------------------------
+
+Do this in stages, not in one rewrite.
+
+Recommended order:
+
+Stage 1. Define explicit workspace modes: Folder Mode and Photo Mode
+Stage 2. Implement shell takeover behavior so the two modes no longer compete
+Stage 3. Add explicit open/close interactions
+Stage 4. Add manual density controls and persistence for both surfaces
+Stage 5. Optionally add a slim jump rail in Photo Mode
+Stage 6. Simplify and polish the Photo Mode header/actions
+Stage 7. Optional hero/banner art enhancement
+Stage 8. Verification and cleanup
+
+Why this order:
+
+- It solves the real UX problem before any visual flourish work
+- It lets the app improve even if banner art is never added
+- It isolates layout/model changes from art-fetching work
+
+
+5. Stage-by-Stage Plan
+----------------------
+
+Stage 1 — Introduce explicit workspace modes
+--------------------------------------------
+
+Objective:
+
+Make the app consciously understand the difference between browsing folders and browsing photos.
+
+New concept:
+
+- Folder Mode = browsing grid is primary
+- Photo Mode = photo/capture workspace is primary
+
+What to add:
+
+- A workspace-mode state field in LibraryBrowserWorkingSet or equivalent
+- Small helpers that answer:
+  - are we in Folder Mode?
+  - are we in Photo Mode?
+  - what is the active selected folder/game?
+
+Behavior expectations:
+
+- Single-click selection in Folder Mode can still set the active game
+- Double-click should enter Photo Mode
+- Photo Mode should preserve which game is open
+- Closing Photo Mode should return to Folder Mode without losing the user's place
+
+Suggested files:
+
+- C:\Codex\src\PixelVault.Native\UI\Library\MainWindow.LibraryBrowserWorkingSet.cs
+- C:\Codex\src\PixelVault.Native\UI\Library\MainWindow.LibraryBrowserShowOrchestration.cs
+- C:\Codex\src\PixelVault.Native\UI\Library\MainWindow.LibraryBrowserOrchestrator.FolderTile.cs
+
+Acceptance criteria:
+
+- Workspace mode exists as a real concept, not just implied visibility toggles
+- Entering and leaving Photo Mode can be expressed cleanly in code
+
+
+Stage 2 — Make Folder Mode and Photo Mode take over the shell
+--------------------------------------------------------------
+
+Objective:
+
+Stop rendering both browsing surfaces as peers by default.
+
+New default shell behavior:
+
+- Folder Mode:
+  - folder browser takes the main content area
+  - photo/detail surface is collapsed or hidden
+- Photo Mode:
+  - photo/detail surface takes the main content area
+  - folder browser is collapsed or hidden in the first pass
+
+Important:
+
+Do not start with a slim rail yet.
+First, prove the takeover model works cleanly.
+
+Implementation direction:
+
+- Reuse the current split-layout/state logic pattern instead of inventing a second layout system
+- Timeline mode already collapses one side; use that as precedent
+- Extend or refactor ApplyLibraryBrowserLayoutMode(...) so it accounts for workspace mode, not just timeline mode
+
+Suggested files:
+
+- C:\Codex\src\PixelVault.Native\UI\Library\MainWindow.LibraryBrowserSplitLayout.cs
+- C:\Codex\src\PixelVault.Native\UI\Library\MainWindow.LibraryBrowserLayout.cs
+- C:\Codex\src\PixelVault.Native\UI\Library\MainWindow.LibraryBrowserShowOrchestration.cs
+
+Acceptance criteria:
+
+- In Folder Mode, the user is not paying for a permanent photo pane
+- In Photo Mode, the user is not paying for a permanent wide folder pane
+- The competition problem is materially reduced before any visual polish work
+
+
+Stage 3 — Add clear open/close interactions
+-------------------------------------------
+
+Objective:
+
+Make mode changes feel intentional and discoverable.
+
+Required interactions:
+
+- Double-click a folder/game tile to enter Photo Mode
+- Add an explicit UI affordance to open Photo Mode without double-click
+  - arrow
+  - chevron
+  - enter/open button
+- Add a clear close/back affordance in Photo Mode
+  - back arrow
+  - close drawer chevron
+  - or same arrow reversed
+
+Behavior expectations:
+
+- Entering Photo Mode should preserve the selected game
+- Exiting Photo Mode should return to the previous folder-browse position and scroll state
+- Keyboard users should have a path too
+
+Suggested files:
+
+- C:\Codex\src\PixelVault.Native\UI\Library\MainWindow.LibraryBrowserOrchestrator.FolderTile.cs
+- C:\Codex\src\PixelVault.Native\UI\Library\MainWindow.LibraryBrowserShowOrchestration.cs
+- C:\Codex\src\PixelVault.Native\UI\Library\MainWindow.LibraryBrowserSessionPersistence.cs
+
+Acceptance criteria:
+
+- Photo Mode feels like an intentional workspace entry, not a hidden state
+- Closing it returns the user cleanly to browsing
+
+
+Stage 4 — Add manual density controls and persist them
+------------------------------------------------------
+
+Objective:
+
+Give the user direct control over cover/photo density instead of trying to solve everything through responsive heuristics.
+
+This stage is a major part of the design, not a minor option.
+
+What to add:
+
+- A control for folder browsing density:
+  - cover size
+  - optional preferred columns or density preset
+- A control for photo browsing density:
+  - photo size
+  - preferred columns or density preset
+
+Strong recommendation:
+
+Use one intentional "View" / "Layout" button per workspace rather than a pile of little plus/minus controls.
+
+Possible UX:
+
+- Folder Mode:
+  - Small / Medium / Large covers
+  - or 3 / 4 / 5 columns where appropriate
+- Photo Mode:
+  - 2 / 3 / 4 columns
+  - Small / Medium / Large photo density
+
+Important implementation rule:
+
+- The user's chosen density should drive the layout
+- The viewport may clamp the result to what fits
+- But the app should not continuously override the user's preference with aggressive automatic recomputation
+
+Persistence work:
+
+- Add stored settings for photo mode density
+- Extend existing folder-tile persistence if needed
+- Save and restore across sessions
+
+Likely settings files:
+
+- C:\Codex\src\PixelVault.Native\Services\Config\AppSettings.cs
+- C:\Codex\src\PixelVault.Native\Services\Config\SettingsService.cs
+- C:\Codex\src\PixelVault.Native\UI\Settings\MainWindow.SettingsPersistence.cs
+- C:\Codex\src\PixelVault.Native\UI\Library\ILibraryBrowserShell.cs
+- C:\Codex\src\PixelVault.Native\UI\Library\MainWindow.LibraryBrowserShellBridge.cs
+
+Likely layout/render files:
+
+- C:\Codex\src\PixelVault.Native\UI\Library\MainWindow.LibraryBrowserRender.FolderList.cs
+- C:\Codex\src\PixelVault.Native\UI\Library\MainWindow.LibraryBrowserRender.DetailPane.cs
+
+Acceptance criteria:
+
+- User can choose and keep a preferred folder density
+- User can choose and keep a preferred photo density
+- The app defaults to the saved preference on next launch
+
+
+Stage 5 — Add an optional slim jump rail in Photo Mode
+------------------------------------------------------
+
+Objective:
+
+After the takeover model works, optionally reintroduce a very narrow navigation helper in Photo Mode.
+
+This is optional and should not happen before Stage 2 is stable.
+
+Desired rail behavior:
+
+- very narrow
+- clearly subordinate to the photo workspace
+- small covers or compact entries only
+- still lets the user scroll through games and hop between them
+- filter/search controls can remain above if they still fit cleanly
+
+Non-goal:
+
+- Do not recreate the current wide left pane
+- Do not bring back the same visual competition under a thinner name
+
+Implementation direction:
+
+- Start with "no rail" as the first Photo Mode
+- Add the slim jump rail only if it clearly improves usability
+
+Suggested files:
+
+- C:\Codex\src\PixelVault.Native\UI\Library\MainWindow.LibraryBrowserLayout.cs
+- C:\Codex\src\PixelVault.Native\UI\Library\MainWindow.LibraryBrowserSplitLayout.cs
+- C:\Codex\src\PixelVault.Native\UI\Library\MainWindow.LibraryBrowserRender.FolderList.cs
+
+Acceptance criteria:
+
+- Photo Mode remains clearly photo-first
+- The optional rail helps navigation without competing for attention
+
+
+Stage 6 — Simplify and compact the Photo Mode header/actions
+------------------------------------------------------------
+
+Objective:
+
+Once Photo Mode owns the screen, make its top area efficient and clean.
+
+Important:
+
+This is now a secondary stage, not the main redesign.
+
+What to do:
+
+- Remove the old "sidebar header" assumptions
+- Build a compact top region for:
+  - game title
+  - metadata
+  - actions
+- Make the actions fit cleanly in narrow desktop widths
+
+Suggested behavior:
+
+- wide mode: inline actions
+- medium/narrow mode: compact grouping or overflow for lower-priority actions
+- never clip
+
+Acceptance criteria:
+
+- The top of Photo Mode feels compact and desktop-like
+- Screenshots begin high enough to feel materially improved
+
+
+Stage 7 — Optional hero/banner enhancement
+------------------------------------------
+
+Objective:
+
+Only after the workspace model is stable, optionally add hero/banner art to Photo Mode.
+
+This is enhancement work, not the core solution.
+
+Rules:
+
+- Photo Mode must already look good without banner art
+- Banner art must not become required for the redesign to feel successful
+- Keep portrait cover art and banner art as separate concepts and caches
+
+If implemented, reuse:
+
+- C:\Codex\src\PixelVault.Native\Services\Covers\CoverService.cs
+- C:\Codex\src\PixelVault.Native\PixelVault.Native.cs
+
+Acceptance criteria:
+
+- Banner art improves the photo workspace when available
+- Missing art does not reduce UI quality
+
+
+Stage 8 — Verification and cleanup
+----------------------------------
+
+Objective:
+
+Lock in the new interaction model and ensure there are no performance or persistence regressions.
+
+Must verify:
+
+- Folder Mode is the default
+- Double-click/open affordance enters Photo Mode
+- Close/back returns to Folder Mode
+- Scroll state feels sane when moving between modes
+- Folder density persists
+- Photo density persists
+- Snap/narrow window states still look intentional
+- Existing virtualization still behaves
+- Timeline mode still behaves
+- Existing art/caching behavior still behaves
+
+
+6. Recommended PR / Task Breakdown
+----------------------------------
+
+PR 1:
+
+- Stage 1
+- Add explicit workspace mode concept
+
+PR 2:
+
+- Stage 2 + Stage 3
+- Implement shell takeover behavior and open/close interactions
+
+PR 3:
+
+- Stage 4
+- Add persisted manual density controls for both surfaces
+
+PR 4:
+
+- Stage 5 + Stage 6
+- Optional slim jump rail and compact Photo Mode top chrome
+
+PR 5:
+
+- Stage 7
+- Optional hero/banner enhancement only if still desired after the workspace shift lands
+
+PR 6:
+
+- Stage 8
+- verification cleanup and refinement
+
+
+7. Technical Rules for Cursor
+-----------------------------
+
+Rules:
+
+- Preserve folder virtualization
+- Preserve detail virtualization
+- Preserve viewport-aware decode priority
+- Preserve batched metadata reads/upserts
+- Do not block the UI thread when switching modes
+- Do not tie density behavior entirely to auto-width calculations
+- Do not make the old side-by-side competition the default again
+
+Prefer:
+
+- small extracted helpers
+- explicit workspace-mode state
+- explicit open/close commands
+- saved preferences for folder and photo density
+- clamped-but-user-led layout rules
+
+
+8. Suggested New Concepts
+-------------------------
+
+Possible new state concepts:
+
+- LibraryWorkspaceMode.Folder
+- LibraryWorkspaceMode.Photo
+- optional "Photo Mode with slim rail" later
+
+Possible new persisted settings:
+
+- LibraryPhotoTileSize
+- LibraryPhotoPreferredColumns
+- optional folder preferred columns if you want more control than tile size alone
+
+Possible new UI controls:
+
+- Folder View button/menu
+- Photo View button/menu
+- explicit Enter Photo Mode chevron
+- explicit Exit Photo Mode chevron/back button
+
+
+9. Manual Verification Checklist
+--------------------------------
+
+- Launch Library: only folder browsing is shown by default
+- Select a folder/game: selection updates, but photo workspace does not crowd the shell at rest
+- Double-click a folder/game: Photo Mode opens and takes over
+- Use the explicit arrow/open control: Photo Mode also opens
+- Use the close/back arrow: returns to Folder Mode cleanly
+- If slim jump rail is enabled, it stays clearly secondary
+- Adjust folder density and restart: setting persists
+- Adjust photo density and restart: setting persists
+- Narrow/snap the window: no obvious competition or clipped controls
+- Photo browsing remains smooth
+- Folder browsing remains smooth
+- Existing cover/photo rendering performance is not obviously worse
+
+
+10. Final Instruction to Cursor
+-------------------------------
+
+Do not start with a hero header.
+
+Start by changing the workspace model so Folder Mode and Photo Mode stop competing with each other.
+
+The main success condition is:
+
+PixelVault feels cleaner and more intentional because the user is either browsing folders or browsing photos, instead of being forced to look at both canvases fighting for the same screen.
+
+Only after that is stable should header/banner treatment be treated as a polish layer.
