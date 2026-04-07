@@ -2,6 +2,8 @@
 
 **Purpose:** Rank follow-up work after publishing **0.854**. Aligns with `PERFORMANCE_TODO.md`, `PERFORMANCE_MONOLITH_SLICE_PLAN.md`, `CODE_QUALITY_IMPROVEMENT_PLAN.md`, and `ARCHITECTURE_REFACTOR_PLAN.md`.
 
+**Staged MainWindow thin-out (post–extraction A–F):** see **`docs/plans/PV-PLN-UI-001-ui-thin-mainwindow-ios-aligned.md`** and **`docs/ios_foundation_guide.md`**.
+
 **Notion (Project Wiki):** [Next trim and optimization plan (post-0.854)](https://www.notion.so/33873adc59b68131ae12f82c97363684) — mirror of this doc; update when tiers complete (`DOC_SYNC_POLICY.md`).
 
 **Small UI / polish backlog (tiered by effort):** `docs/SMALL_FEATURE_TODO.md` — same items as [PixelVault HQ — Small Feature To-Do](https://www.notion.so/cf63eb7c2524470d9b9a601ab46f4cc6), grouped into quick vs medium vs larger work.
