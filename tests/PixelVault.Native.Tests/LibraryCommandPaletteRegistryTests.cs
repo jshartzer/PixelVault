@@ -51,6 +51,7 @@ public class LibraryCommandPaletteRegistryTests
             FilterFoldersCrossPlatform = () => { },
             FilterFolders25PlusCaptures = () => { },
             FilterFoldersNeedsSteamAppId = () => { },
+            FilterFoldersMissingGameId = () => { },
             FilterFoldersNoCover = () => { },
             GroupFoldersAllGames = () => { },
             GroupFoldersByConsole = () => { },

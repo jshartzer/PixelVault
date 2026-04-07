@@ -37,6 +37,7 @@ namespace PixelVaultNative
             new("filter_crossplatform", "Filter · Cross-platform", "Multi-platform folders", "cross play"),
             new("filter_large", "Filter · 25+ captures", "Folders with many screenshots", "large library"),
             new("filter_needs_steam", "Filter · Steam missing App ID", "Steam games with no Steam App ID", "needs steam appid"),
+            new("filter_missing_game_id", "Filter · Missing game ID", "Folders with no saved game index ID", "no igdb game row"),
             new("filter_no_cover", "Filter · No cover path", "Folders without a saved cover path", "missing cover art"),
             new("group_all", "Group · All games", "Single folder list", "grouping flat"),
             new("group_console", "Group · By console", "Platform sections", "grouping xbox playstation"),
@@ -93,6 +94,7 @@ namespace PixelVaultNative
             Bind("filter_crossplatform", ctx.FilterFoldersCrossPlatform);
             Bind("filter_large", ctx.FilterFolders25PlusCaptures);
             Bind("filter_needs_steam", ctx.FilterFoldersNeedsSteamAppId);
+            Bind("filter_missing_game_id", ctx.FilterFoldersMissingGameId);
             Bind("filter_no_cover", ctx.FilterFoldersNoCover);
             Bind("group_all", ctx.GroupFoldersAllGames);
             Bind("group_console", ctx.GroupFoldersByConsole);

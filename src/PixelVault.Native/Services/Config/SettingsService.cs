@@ -42,6 +42,7 @@ namespace PixelVaultNative
             if (normalized == "large" || normalized == "25+" || normalized == "25 plus" || normalized == "25+ captures" || normalized == "large collection") return "large";
             if (normalized == "needssteam" || normalized == "needs_steam" || normalized == "steam no app" || normalized == "missing steam appid" || normalized == "missing steam app id" || normalized == "steam missing appid") return "needssteam";
             if (normalized == "nocover" || normalized == "no_cover" || normalized == "no cover" || normalized == "missing cover" || normalized == "without cover") return "nocover";
+            if (normalized == "missinggameid" || normalized == "missing_game_id" || normalized == "no game id" || normalized == "no gameid" || normalized == "needs game id") return "missinggameid";
             return "all";
         }
 

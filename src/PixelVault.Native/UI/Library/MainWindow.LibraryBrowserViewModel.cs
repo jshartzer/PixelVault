@@ -824,6 +824,51 @@ namespace PixelVaultNative
             }
         }
 
+        /// <summary>
+        /// Picks one external id (Steam App / SteamGrid DB) for merged "All" rows. Previously we required a single distinct id across
+        /// every source folder, which left merged tiles blank when Steam and another copy disagreed even though the Steam install had a valid id.
+        /// Prefer Steam-labeled folders first; otherwise use a single id only when all non-empty values agree.
+        /// </summary>
+        internal static string MergeLibraryBrowserExternalIdsForCombinedView(
+            IReadOnlyList<LibraryFolderInfo> sourceFolders,
+            Func<LibraryFolderInfo, string> pickId,
+            Func<string, string> normalizeConsoleLabel)
+        {
+            if (sourceFolders == null || sourceFolders.Count == 0 || pickId == null) return string.Empty;
+            var normConsole = normalizeConsoleLabel ?? (s => s ?? string.Empty);
+            var normSteam = normConsole("Steam");
+
+            string CleanPicked(LibraryFolderInfo folder)
+            {
+                if (folder == null) return string.Empty;
+                return CleanTag(pickId(folder) ?? string.Empty);
+            }
+
+            bool IsSteamPlatform(LibraryFolderInfo folder)
+            {
+                if (folder == null) return false;
+                return string.Equals(normConsole(folder.PlatformLabel ?? string.Empty), normSteam, StringComparison.OrdinalIgnoreCase);
+            }
+
+            var steamScoped = sourceFolders
+                .Where(IsSteamPlatform)
+                .Select(CleanPicked)
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (steamScoped.Count == 1) return steamScoped[0];
+
+            var all = sourceFolders
+                .Where(folder => folder != null)
+                .Select(CleanPicked)
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (all.Count == 1) return all[0];
+
+            return string.Empty;
+        }
+
         /// <summary>Returns cached merged rows for "All" grouping when folder data unchanged; console mode is always rebuilt and clears the cache.</summary>
         List<LibraryBrowserFolderView> GetOrBuildLibraryBrowserFolderViews(IReadOnlyList<LibraryFolderInfo> folders, string groupingMode)
         {
@@ -948,18 +993,8 @@ namespace PixelVaultNative
                         .OrderBy(label => PlatformGroupOrder(label))
                         .ThenBy(label => label, StringComparer.OrdinalIgnoreCase)
                         .ToArray();
-                    var distinctSteamAppIds = sourceFolders
-                        .Select(folder => CleanTag(folder.SteamAppId))
-                        .Where(value => !string.IsNullOrWhiteSpace(value))
-                        .Distinct(StringComparer.OrdinalIgnoreCase)
-                        .ToList();
                     var distinctGameIds = sourceFolders
                         .Select(folder => NormalizeGameId(folder.GameId))
-                        .Where(value => !string.IsNullOrWhiteSpace(value))
-                        .Distinct(StringComparer.OrdinalIgnoreCase)
-                        .ToList();
-                    var distinctSteamGridDbIds = sourceFolders
-                        .Select(folder => CleanTag(folder.SteamGridDbId))
                         .Where(value => !string.IsNullOrWhiteSpace(value))
                         .Distinct(StringComparer.OrdinalIgnoreCase)
                         .ToList();
@@ -1001,8 +1036,8 @@ namespace PixelVaultNative
                         FilePaths = orderedPaths,
                         NewestCaptureUtcTicks = tickMax,
                         NewestRecentSortUtcTicks = tickMaxRecent,
-                        SteamAppId = distinctSteamAppIds.Count == 1 ? distinctSteamAppIds[0] : string.Empty,
-                        SteamGridDbId = distinctSteamGridDbIds.Count == 1 ? distinctSteamGridDbIds[0] : string.Empty,
+                        SteamAppId = MergeLibraryBrowserExternalIdsForCombinedView(sourceFolders, f => f.SteamAppId, NormalizeConsoleLabel),
+                        SteamGridDbId = MergeLibraryBrowserExternalIdsForCombinedView(sourceFolders, f => f.SteamGridDbId, NormalizeConsoleLabel),
                         SuppressSteamAppIdAutoResolve = sourceFolders.All(folder => folder != null && folder.SuppressSteamAppIdAutoResolve),
                         SuppressSteamGridDbIdAutoResolve = sourceFolders.All(folder => folder != null && folder.SuppressSteamGridDbIdAutoResolve),
                         IsCompleted100Percent = sourceFolders.Any(folder => folder != null && folder.IsCompleted100Percent),

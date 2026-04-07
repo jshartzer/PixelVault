@@ -43,6 +43,16 @@ public sealed class LibraryBrowserFolderFilterTests
     }
 
     [Fact]
+    public void MatchesFilter_MissingGameId_UsesGameIdField()
+    {
+        var noId = new MainWindow.LibraryBrowserFolderView { GameId = "", FileCount = 1 };
+        Assert.True(MainWindow.LibraryBrowserFolderViewMatchesFilter("missinggameid", noId, Norm));
+
+        var hasId = new MainWindow.LibraryBrowserFolderView { GameId = "abc-123", FileCount = 1 };
+        Assert.False(MainWindow.LibraryBrowserFolderViewMatchesFilter("missinggameid", hasId, Norm));
+    }
+
+    [Fact]
     public void MatchesFilter_NoCover_UsesPreviewPathOnly()
     {
         var noPath = new MainWindow.LibraryBrowserFolderView { PreviewImagePath = "" };

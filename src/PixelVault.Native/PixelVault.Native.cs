@@ -1219,6 +1219,8 @@ namespace PixelVaultNative
                     return "25+ Captures";
                 case "needssteam":
                     return "Steam · missing App ID";
+                case "missinggameid":
+                    return "Missing game ID";
                 case "nocover":
                     return "No cover path";
                 default:

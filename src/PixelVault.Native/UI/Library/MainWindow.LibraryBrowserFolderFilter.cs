@@ -36,6 +36,8 @@ namespace PixelVaultNative
                             return true;
                     }
                     return false;
+                case "missinggameid":
+                    return string.IsNullOrWhiteSpace(folder.GameId);
                 case "nocover":
                     return string.IsNullOrWhiteSpace(folder.PreviewImagePath);
                 default:

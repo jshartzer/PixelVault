@@ -35,6 +35,8 @@ public sealed class SettingsServiceTests
     [InlineData("missing steam app id", "needssteam")]
     [InlineData("nocover", "nocover")]
     [InlineData("no cover", "nocover")]
+    [InlineData("missinggameid", "missinggameid")]
+    [InlineData("needs game id", "missinggameid")]
     public void NormalizeLibraryFolderFilterMode_SupportsAliases(string raw, string expected)
     {
         Assert.Equal(expected, SettingsService.NormalizeLibraryFolderFilterMode(raw));

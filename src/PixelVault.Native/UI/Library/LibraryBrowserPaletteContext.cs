@@ -33,6 +33,7 @@ namespace PixelVaultNative
         public Action FilterFoldersCrossPlatform { get; init; }
         public Action FilterFolders25PlusCaptures { get; init; }
         public Action FilterFoldersNeedsSteamAppId { get; init; }
+        public Action FilterFoldersMissingGameId { get; init; }
         public Action FilterFoldersNoCover { get; init; }
 
         public Action GroupFoldersAllGames { get; init; }

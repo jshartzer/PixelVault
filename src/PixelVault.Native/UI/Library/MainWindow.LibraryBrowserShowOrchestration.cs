@@ -458,6 +458,7 @@ namespace PixelVaultNative
                     FilterFoldersCrossPlatform = () => setLibraryFilterMode("crossplatform"),
                     FilterFolders25PlusCaptures = () => setLibraryFilterMode("large"),
                     FilterFoldersNeedsSteamAppId = () => setLibraryFilterMode("needssteam"),
+                    FilterFoldersMissingGameId = () => setLibraryFilterMode("missinggameid"),
                     FilterFoldersNoCover = () => setLibraryFilterMode("nocover"),
                     GroupFoldersAllGames = () => setLibraryGroupingMode("all"),
                     GroupFoldersByConsole = () => setLibraryGroupingMode("console"),

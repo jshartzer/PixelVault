@@ -11,6 +11,7 @@ Canonical mode strings are normalized by `SettingsService.NormalizeLibraryFolder
 | `crossplatform` | Cross-Platform | More than one distinct normalized platform label **or** `folder.IsMergedAcrossPlatforms`. |
 | `large` | 25+ Captures | `folder.FileCount >= 25`. |
 | `needssteam` | Steam · missing App ID | `SteamAppId` is blank **and** the folder is tagged as Steam: normalized `PrimaryPlatformLabel` is Steam **or** any entry in `PlatformLabels` normalizes to Steam. |
+| `missinggameid` | Missing game ID | `GameId` is null or whitespace on the folder view row (no assigned game-index id). Combined “All” rows only carry an id when every merged folder shares the same normalized id; otherwise `GameId` is blank and matches here. |
 | `nocover` | No cover path | `PreviewImagePath` is null or whitespace (no on-disk existence check). |
 
 **Notes**
