@@ -10,18 +10,11 @@ namespace PixelVaultNative
             if (IsLibraryBrowserTimelineMode()) return;
             if (ws.WorkspaceMode == LibraryWorkspaceMode.Photo && SameLibraryBrowserSelection(ws.Current, folder))
                 return;
-            if (ws.Panes.TileScroll != null)
-            {
-                var y = ws.Panes.TileScroll.VerticalOffset;
-                if (y > 0.1d)
-                {
-                    ws.PreservedFolderScrollOffset = Math.Max(0d, y);
-                    ws.PreserveFolderScrollOnNextRender = true;
-                }
-            }
+            ws.ScrollPhotoRailSelectionToTopPending = true;
             ws.WorkspaceMode = LibraryWorkspaceMode.Photo;
             showFolder(folder);
             ApplyLibraryBrowserLayoutMode(ws.Panes, ws.WorkspaceMode);
+            ws.RefreshSortFilterChrome?.Invoke();
         }
 
         internal void LibraryBrowserExitPhotoWorkspace(LibraryBrowserWorkingSet ws, Action renderTiles)
@@ -29,6 +22,7 @@ namespace PixelVaultNative
             if (ws == null || ws.WorkspaceMode != LibraryWorkspaceMode.Photo) return;
             ws.WorkspaceMode = LibraryWorkspaceMode.Folder;
             ApplyLibraryBrowserLayoutMode(ws.Panes, ws.WorkspaceMode);
+            ws.RefreshSortFilterChrome?.Invoke();
             renderTiles?.Invoke();
         }
 

@@ -9,7 +9,8 @@ namespace PixelVaultNative
         internal const double LibraryBrowserFolderPaneSplitMinLeft = 300;
         internal const double LibraryBrowserFolderPaneSplitMinRight = 260;
         internal const double LibraryBrowserFolderPaneSplitterWidth = 12;
-        internal const double LibraryBrowserPhotoRailWidth = 268;
+        /// <summary>Default width for the Photo-workspace cover rail; sized so two columns + tile margins avoid horizontal scroll at typical DPI.</summary>
+        internal const double LibraryBrowserPhotoRailWidth = 308;
         internal const double LibraryBrowserPhotoDividerStripWidth = 28;
 
         void ApplyLibraryBrowserLayoutMode(LibraryBrowserPaneRefs panes, LibraryWorkspaceMode workspaceMode)
@@ -24,19 +25,23 @@ namespace PixelVaultNative
             var isPhoto = workspaceMode == LibraryWorkspaceMode.Photo;
             var isFolder = workspaceMode == LibraryWorkspaceMode.Folder;
             var hideGameChrome = isTimeline;
+            var hideDetailCoverPreview = isTimeline || isPhoto;
 
             if (panes.LeftPane != null) panes.LeftPane.Visibility = isTimeline ? Visibility.Collapsed : Visibility.Visible;
             if (panes.Splitter != null) panes.Splitter.Visibility = Visibility.Collapsed;
             if (panes.PhotoWorkspaceDividerToggleButton != null)
                 panes.PhotoWorkspaceDividerToggleButton.Visibility = isPhoto ? Visibility.Visible : Visibility.Collapsed;
-            if (panes.PreviewFrame != null) panes.PreviewFrame.Visibility = hideGameChrome ? Visibility.Collapsed : Visibility.Visible;
+            if (panes.PreviewFrame != null) panes.PreviewFrame.Visibility = hideDetailCoverPreview ? Visibility.Collapsed : Visibility.Visible;
             if (panes.OpenFolderButton != null) panes.OpenFolderButton.Visibility = hideGameChrome ? Visibility.Collapsed : Visibility.Visible;
             if (panes.RefreshThisFolderButton != null) panes.RefreshThisFolderButton.Visibility = hideGameChrome ? Visibility.Collapsed : Visibility.Visible;
             if (panes.ExitTimelineButton != null) panes.ExitTimelineButton.Visibility = isTimeline ? Visibility.Visible : Visibility.Collapsed;
-            if (panes.ExitPhotoWorkspaceButton != null) panes.ExitPhotoWorkspaceButton.Visibility = isPhoto ? Visibility.Visible : Visibility.Collapsed;
             if (panes.TimelineFilterPanel != null) panes.TimelineFilterPanel.Visibility = isTimeline ? Visibility.Visible : Visibility.Collapsed;
+            if (panes.GroupAllButton != null) panes.GroupAllButton.Visibility = isPhoto ? Visibility.Collapsed : Visibility.Visible;
+            if (panes.GroupConsoleButton != null) panes.GroupConsoleButton.Visibility = isPhoto ? Visibility.Collapsed : Visibility.Visible;
             if (panes.PhotoCaptureLayoutButton != null)
                 panes.PhotoCaptureLayoutButton.Visibility = isPhoto ? Visibility.Visible : Visibility.Collapsed;
+            if (panes.GroupTimelineButton != null)
+                panes.GroupTimelineButton.Visibility = isPhoto ? Visibility.Collapsed : Visibility.Visible;
 
             if (isTimeline)
             {
@@ -48,6 +53,7 @@ namespace PixelVaultNative
                 colSplitter.MinWidth = 0;
                 colRight.MinWidth = LibraryBrowserFolderPaneSplitMinRight;
                 colRight.Width = new GridLength(1, GridUnitType.Star);
+                ApplyLibraryPhotoDetailChromeLayout(panes, false);
                 LibraryBrowserSyncOpenCapturesToolbarButton(panes);
                 return;
             }
@@ -62,6 +68,11 @@ namespace PixelVaultNative
                 colSplitter.MinWidth = LibraryBrowserPhotoDividerStripWidth;
                 colRight.MinWidth = LibraryBrowserFolderPaneSplitMinRight;
                 colRight.Width = new GridLength(1, GridUnitType.Star);
+                if (panes.LibraryFooterCommandsPanel != null) panes.LibraryFooterCommandsPanel.Visibility = Visibility.Collapsed;
+                if (panes.LibraryFooterStatusLine != null) panes.LibraryFooterStatusLine.Visibility = Visibility.Collapsed;
+                if (panes.PhotoRailColumnPickerHost != null) panes.PhotoRailColumnPickerHost.Visibility = Visibility.Visible;
+                _libraryBrowserLiveWorkingSet?.RefreshPhotoRailColumnPickerUi?.Invoke();
+                ApplyLibraryPhotoDetailChromeLayout(panes, true);
                 LibraryBrowserSyncOpenCapturesToolbarButton(panes);
                 return;
             }
@@ -76,9 +87,49 @@ namespace PixelVaultNative
                 colSplitter.MinWidth = 0;
                 colRight.MinWidth = 0;
                 colRight.Width = new GridLength(0);
+                if (panes.LibraryFooterCommandsPanel != null) panes.LibraryFooterCommandsPanel.Visibility = Visibility.Visible;
+                if (panes.LibraryFooterStatusLine != null) panes.LibraryFooterStatusLine.Visibility = Visibility.Visible;
+                if (panes.PhotoRailColumnPickerHost != null) panes.PhotoRailColumnPickerHost.Visibility = Visibility.Collapsed;
+                ApplyLibraryPhotoDetailChromeLayout(panes, false);
+                if (panes.GroupAllButton != null) panes.GroupAllButton.Visibility = Visibility.Visible;
+                if (panes.GroupConsoleButton != null) panes.GroupConsoleButton.Visibility = Visibility.Visible;
             }
 
             LibraryBrowserSyncOpenCapturesToolbarButton(panes);
+        }
+
+        /// <summary>Tighter right-pane chrome in Photo workspace after removing the cover preview — more room for the capture grid.</summary>
+        void ApplyLibraryPhotoDetailChromeLayout(LibraryBrowserPaneRefs panes, bool photoWorkspaceCompact)
+        {
+            if (panes?.RightPane == null) return;
+            if (photoWorkspaceCompact)
+            {
+                panes.RightPane.Padding = new Thickness(26, 10, 26, 12);
+                if (panes.LibraryDetailBanner != null) panes.LibraryDetailBanner.Margin = new Thickness(0, 0, 0, 6);
+                if (panes.LibraryDetailControlsDock != null) panes.LibraryDetailControlsDock.Margin = new Thickness(0, 0, 0, 6);
+                if (panes.DetailMeta != null) panes.DetailMeta.Margin = new Thickness(0, 4, 0, 6);
+                if (panes.LibraryDetailBannerGrid != null && panes.LibraryDetailBannerGrid.ColumnDefinitions.Count > 0)
+                {
+                    var c0 = panes.LibraryDetailBannerGrid.ColumnDefinitions[0];
+                    c0.MinWidth = 0;
+                    c0.MaxWidth = 0;
+                    c0.Width = new GridLength(0);
+                }
+            }
+            else
+            {
+                panes.RightPane.Padding = new Thickness(26, 22, 26, 18);
+                if (panes.LibraryDetailBanner != null) panes.LibraryDetailBanner.Margin = new Thickness(0, 0, 0, 18);
+                if (panes.LibraryDetailControlsDock != null) panes.LibraryDetailControlsDock.Margin = new Thickness(0, 4, 0, 14);
+                if (panes.DetailMeta != null) panes.DetailMeta.Margin = new Thickness(0, 8, 0, 14);
+                if (panes.LibraryDetailBannerGrid != null && panes.LibraryDetailBannerGrid.ColumnDefinitions.Count > 0)
+                {
+                    var c0 = panes.LibraryDetailBannerGrid.ColumnDefinitions[0];
+                    c0.MinWidth = 96;
+                    c0.MaxWidth = 240;
+                    c0.Width = GridLength.Auto;
+                }
+            }
         }
 
         void LibraryBrowserSyncOpenCapturesToolbarButton(LibraryBrowserPaneRefs panes)

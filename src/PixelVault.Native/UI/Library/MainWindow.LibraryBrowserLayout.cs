@@ -24,8 +24,7 @@ namespace PixelVaultNative
             internal Button GroupConsoleButton;
             internal Button GroupTimelineButton;
             internal Button OpenCapturesButton;
-            internal Button SortMenuButton;
-            internal Button FilterMenuButton;
+            internal Button SortFilterMenuButton;
             internal VirtualizedRowHost TileRows;
             internal ScrollViewer TileScroll;
             internal TextBlock ThumbLabel;
@@ -38,7 +37,6 @@ namespace PixelVaultNative
             internal Button EditMetadataButton;
             internal Button RefreshThisFolderButton;
             internal Button ExitTimelineButton;
-            internal Button ExitPhotoWorkspaceButton;
             internal WrapPanel TimelineFilterPanel;
             internal Button TimelinePresetTodayButton;
             internal Button TimelinePresetMonthButton;
@@ -48,12 +46,20 @@ namespace PixelVaultNative
             internal Button DeleteSelectedButton;
             internal Button FolderCoverLayoutButton;
             internal Button PhotoCaptureLayoutButton;
+            internal StackPanel PhotoRailColumnPickerHost;
+            internal Button PhotoRailColumnOneButton;
+            internal Button PhotoRailColumnTwoButton;
+            internal StackPanel LibraryFooterCommandsPanel;
+            internal TextBlock LibraryFooterStatusLine;
             internal Button CommandPaletteButton;
             internal Button ShortcutsHelpButton;
             internal VirtualizedRowHost DetailRows;
             internal ScrollViewer ThumbScroll;
             internal Grid LibrarySplitContentGrid;
             internal Border RightPane;
+            internal Border LibraryDetailBanner;
+            internal Grid LibraryDetailBannerGrid;
+            internal DockPanel LibraryDetailControlsDock;
             internal DispatcherTimer FolderPaneSplitClampTimer;
         }
 
@@ -117,28 +123,19 @@ namespace PixelVaultNative
             filterGrid.Children.Add(searchPanel);
             var browserToolbar = new Grid();
             browserToolbar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            browserToolbar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             browserToolbar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             browserToolbar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             browserToolbar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             browserToolbar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            panes.SortMenuButton = Btn("Sort", null, "#20343A", Brushes.White);
-            panes.SortMenuButton.Width = 82;
-            panes.SortMenuButton.Height = 34;
-            panes.SortMenuButton.FontSize = 11.5;
-            panes.SortMenuButton.Margin = new Thickness(0, 0, 8, 0);
-            panes.SortMenuButton.ToolTip = "Choose folder sort order";
-            ApplyLibraryPillChrome(panes.SortMenuButton, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
-            panes.FilterMenuButton = Btn("Filter", null, "#20343A", Brushes.White);
-            panes.FilterMenuButton.Width = 86;
-            panes.FilterMenuButton.Height = 34;
-            panes.FilterMenuButton.FontSize = 11.5;
-            panes.FilterMenuButton.Margin = new Thickness(0, 0, 10, 0);
-            panes.FilterMenuButton.ToolTip = "Filter visible games";
-            ApplyLibraryPillChrome(panes.FilterMenuButton, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
-            browserToolbar.Children.Add(panes.SortMenuButton);
-            Grid.SetColumn(panes.FilterMenuButton, 1);
-            browserToolbar.Children.Add(panes.FilterMenuButton);
+            panes.SortFilterMenuButton = Btn("Sort / filter ▾", null, "#20343A", Brushes.White);
+            panes.SortFilterMenuButton.MinWidth = 118;
+            panes.SortFilterMenuButton.Height = 34;
+            panes.SortFilterMenuButton.FontSize = 11.5;
+            panes.SortFilterMenuButton.Margin = new Thickness(0, 0, 8, 0);
+            panes.SortFilterMenuButton.Padding = new Thickness(10, 0, 10, 0);
+            panes.SortFilterMenuButton.ToolTip = "Sort order and visibility filter";
+            ApplyLibraryPillChrome(panes.SortFilterMenuButton, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
+            browserToolbar.Children.Add(panes.SortFilterMenuButton);
             panes.GroupAllButton = Btn("All", null, "#20343A", Brushes.White);
             panes.GroupAllButton.Width = 58;
             panes.GroupAllButton.Height = 32;
@@ -157,11 +154,11 @@ namespace PixelVaultNative
             panes.GroupTimelineButton.FontSize = 11.5;
             panes.GroupTimelineButton.Margin = new Thickness(0);
             ApplyLibraryPillChrome(panes.GroupTimelineButton, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
-            Grid.SetColumn(panes.GroupAllButton, 3);
+            Grid.SetColumn(panes.GroupAllButton, 2);
             browserToolbar.Children.Add(panes.GroupAllButton);
-            Grid.SetColumn(panes.GroupConsoleButton, 4);
+            Grid.SetColumn(panes.GroupConsoleButton, 3);
             browserToolbar.Children.Add(panes.GroupConsoleButton);
-            Grid.SetColumn(panes.GroupTimelineButton, 5);
+            Grid.SetColumn(panes.GroupTimelineButton, 4);
             browserToolbar.Children.Add(panes.GroupTimelineButton);
             browserToolbar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             panes.OpenCapturesButton = Btn("Captures", null, "#1F3340", Brushes.White);
@@ -170,7 +167,7 @@ namespace PixelVaultNative
             panes.OpenCapturesButton.Margin = new Thickness(10, 0, 0, 0);
             panes.OpenCapturesButton.ToolTip = "Open captures view (double-click a cover)";
             ApplyLibraryPillChrome(panes.OpenCapturesButton, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
-            Grid.SetColumn(panes.OpenCapturesButton, 6);
+            Grid.SetColumn(panes.OpenCapturesButton, 5);
             browserToolbar.Children.Add(panes.OpenCapturesButton);
             var toolbarScroll = new ScrollViewer
             {
@@ -197,6 +194,7 @@ namespace PixelVaultNative
             footerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(10) });
             footerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             var footerButtons = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            panes.LibraryFooterCommandsPanel = footerButtons;
             panes.CommandPaletteButton = Btn("⋯", null, "#20343A", Brushes.White);
             panes.CommandPaletteButton.Width = 32;
             panes.CommandPaletteButton.Height = 32;
@@ -220,7 +218,7 @@ namespace PixelVaultNative
             panes.FolderCoverLayoutButton.FontSize = 11;
             panes.FolderCoverLayoutButton.Padding = new Thickness(10, 0, 10, 0);
             panes.FolderCoverLayoutButton.Margin = new Thickness(0, 0, 6, 0);
-            panes.FolderCoverLayoutButton.ToolTip = "Folder cover density (saved)";
+            panes.FolderCoverLayoutButton.ToolTip = "Folder cover density (saved). Ctrl+scroll on the cover list to fine-tune.";
             ApplyLibraryPillChrome(panes.FolderCoverLayoutButton, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
             panes.FolderCoverLayoutButton.VerticalAlignment = VerticalAlignment.Center;
             footerButtons.Children.Add(panes.CommandPaletteButton);
@@ -230,7 +228,21 @@ namespace PixelVaultNative
             status.VerticalAlignment = VerticalAlignment.Center;
             status.Margin = new Thickness(12, 0, 0, 0);
             Grid.SetColumn(status, 2);
+            panes.LibraryFooterStatusLine = status;
             footerGrid.Children.Add(status);
+            panes.PhotoRailColumnPickerHost = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Visibility = Visibility.Collapsed
+            };
+            panes.PhotoRailColumnOneButton = ApplyLibraryCircleToolbarChrome(new Button { Content = "1", Margin = new Thickness(0, 0, 10, 0), ToolTip = "One column of covers" }, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
+            panes.PhotoRailColumnTwoButton = ApplyLibraryCircleToolbarChrome(new Button { Content = "2", ToolTip = "Two columns of covers" }, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
+            panes.PhotoRailColumnPickerHost.Children.Add(panes.PhotoRailColumnOneButton);
+            panes.PhotoRailColumnPickerHost.Children.Add(panes.PhotoRailColumnTwoButton);
+            Grid.SetColumnSpan(panes.PhotoRailColumnPickerHost, 3);
+            footerGrid.Children.Add(panes.PhotoRailColumnPickerHost);
             Grid.SetRow(footerGrid, 2);
             leftGrid.Children.Add(footerGrid);
             left.Child = leftGrid;
@@ -309,7 +321,9 @@ namespace PixelVaultNative
             rightGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
 
             var banner = new Border { Background = Brushes.Transparent, Padding = new Thickness(0), Margin = new Thickness(0, 0, 0, 18) };
+            panes.LibraryDetailBanner = banner;
             var bannerGrid = new Grid();
+            panes.LibraryDetailBannerGrid = bannerGrid;
             bannerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto, MinWidth = 96, MaxWidth = 240 });
             bannerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = 140 });
             var previewFrame = new Border
@@ -345,46 +359,47 @@ namespace PixelVaultNative
             panes.EditMetadataButton = Btn("Edit Metadata", null, "#20343A", Brushes.White);
             panes.RefreshThisFolderButton = Btn("Refresh folder", null, "#20343A", Brushes.White);
             panes.ExitTimelineButton = Btn("Folder Browser", null, "#20343A", Brushes.White);
-            panes.ExitPhotoWorkspaceButton = Btn("Back to folders", null, "#20343A", Brushes.White);
             panes.OpenFolderButton.Content = BuildToolbarButtonContent("\uE8B7", "Open Folder");
             panes.RefreshThisFolderButton.Content = BuildToolbarButtonContent("\uE72C", "Refresh folder");
             panes.ExitTimelineButton.Content = BuildToolbarButtonContent("\uE72B", "Folder Browser");
-            panes.ExitPhotoWorkspaceButton.Content = BuildToolbarButtonContent("\uE72B", "Back to folders");
             panes.RefreshThisFolderButton.ToolTip = "Refresh IDs and cover art for this folder only";
             panes.ExitTimelineButton.ToolTip = "Return to the folder browser";
             ApplyLibraryPillChrome(panes.OpenFolderButton, "#1F3340", "#314754", "#29424F", "#172630");
             ApplyLibraryPillChrome(panes.EditMetadataButton, "#1C2A32", "#2A3C46", "#22323C", "#141E24");
             ApplyLibraryPillChrome(panes.RefreshThisFolderButton, "#1C2A32", "#2A3C46", "#22323C", "#141E24");
             ApplyLibraryPillChrome(panes.ExitTimelineButton, "#1C2A32", "#2A3C46", "#22323C", "#141E24");
-            ApplyLibraryPillChrome(panes.ExitPhotoWorkspaceButton, "#1C2A32", "#2A3C46", "#22323C", "#141E24");
             panes.OpenFolderButton.Height = 38;
             panes.EditMetadataButton.Height = 38;
             panes.RefreshThisFolderButton.Height = 38;
             panes.ExitTimelineButton.Height = 38;
-            panes.ExitPhotoWorkspaceButton.Height = 38;
             panes.OpenFolderButton.Margin = new Thickness(0, 0, 12, 0);
             panes.EditMetadataButton.Margin = new Thickness(0, 0, 12, 0);
             panes.RefreshThisFolderButton.Margin = new Thickness(0, 0, 12, 0);
             panes.ExitTimelineButton.Margin = new Thickness(0);
             panes.ExitTimelineButton.Visibility = Visibility.Collapsed;
-            panes.ExitPhotoWorkspaceButton.Margin = new Thickness(12, 0, 0, 0);
-            panes.ExitPhotoWorkspaceButton.Visibility = Visibility.Collapsed;
-            panes.ExitPhotoWorkspaceButton.ToolTip = "Return to the folder list (Esc)";
-            var bannerButtonRow = new Grid { Margin = new Thickness(0, 8, 0, 0), HorizontalAlignment = HorizontalAlignment.Left };
+            panes.PhotoCaptureLayoutButton = Btn("Photo size ▾", null, "#20343A", Brushes.White);
+            panes.PhotoCaptureLayoutButton.MinWidth = 108;
+            panes.PhotoCaptureLayoutButton.Height = 30;
+            panes.PhotoCaptureLayoutButton.FontSize = 11;
+            panes.PhotoCaptureLayoutButton.Padding = new Thickness(10, 0, 10, 0);
+            panes.PhotoCaptureLayoutButton.ToolTip = "Capture tile density (saved). Ctrl+scroll on the capture grid to fine-tune (beyond menu max).";
+            ApplyLibraryPillChrome(panes.PhotoCaptureLayoutButton, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
+            panes.PhotoCaptureLayoutButton.Visibility = Visibility.Collapsed;
+            var bannerButtonRow = new Grid { Margin = new Thickness(0, 8, 0, 0) };
+            bannerButtonRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             bannerButtonRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            bannerButtonRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            bannerButtonRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            bannerButtonRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            bannerButtonRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            bannerButtonRow.Children.Add(panes.OpenFolderButton);
-            Grid.SetColumn(panes.EditMetadataButton, 1);
-            bannerButtonRow.Children.Add(panes.EditMetadataButton);
-            Grid.SetColumn(panes.RefreshThisFolderButton, 2);
-            bannerButtonRow.Children.Add(panes.RefreshThisFolderButton);
-            Grid.SetColumn(panes.ExitTimelineButton, 3);
-            bannerButtonRow.Children.Add(panes.ExitTimelineButton);
-            Grid.SetColumn(panes.ExitPhotoWorkspaceButton, 4);
-            bannerButtonRow.Children.Add(panes.ExitPhotoWorkspaceButton);
+            var bannerActionsLeft = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Left };
+            bannerActionsLeft.Children.Add(panes.OpenFolderButton);
+            bannerActionsLeft.Children.Add(panes.EditMetadataButton);
+            bannerActionsLeft.Children.Add(panes.RefreshThisFolderButton);
+            bannerActionsLeft.Children.Add(panes.ExitTimelineButton);
+            Grid.SetColumn(bannerActionsLeft, 0);
+            bannerButtonRow.Children.Add(bannerActionsLeft);
+            Grid.SetColumn(panes.PhotoCaptureLayoutButton, 1);
+            panes.PhotoCaptureLayoutButton.HorizontalAlignment = HorizontalAlignment.Right;
+            panes.PhotoCaptureLayoutButton.Margin = new Thickness(12, 0, 0, 0);
+            panes.PhotoCaptureLayoutButton.VerticalAlignment = VerticalAlignment.Center;
+            bannerButtonRow.Children.Add(panes.PhotoCaptureLayoutButton);
             textStack.Children.Add(titleRow);
             textStack.Children.Add(panes.DetailMeta);
             textStack.Children.Add(bannerButtonRow);
@@ -394,6 +409,7 @@ namespace PixelVaultNative
             rightGrid.Children.Add(banner);
 
             var controls = new DockPanel { Margin = new Thickness(0, 4, 0, 14) };
+            panes.LibraryDetailControlsDock = controls;
             panes.ThumbLabel = new TextBlock { Text = "Screenshots", FontSize = 22, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, VerticalAlignment = VerticalAlignment.Center };
             controls.Children.Add(panes.ThumbLabel);
             var sliderPanel = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
@@ -467,17 +483,6 @@ namespace PixelVaultNative
                 BorderThickness = new Thickness(1)
             };
             panes.TimelineFilterPanel.Children.Add(panes.TimelineEndDatePicker);
-            panes.PhotoCaptureLayoutButton = Btn("Photo size ▾", null, "#20343A", Brushes.White);
-            panes.PhotoCaptureLayoutButton.MinWidth = 108;
-            panes.PhotoCaptureLayoutButton.Height = 30;
-            panes.PhotoCaptureLayoutButton.FontSize = 11;
-            panes.PhotoCaptureLayoutButton.Padding = new Thickness(10, 0, 10, 0);
-            panes.PhotoCaptureLayoutButton.Margin = new Thickness(0, 0, 12, 0);
-            panes.PhotoCaptureLayoutButton.ToolTip = "Capture tile density in this workspace (saved)";
-            ApplyLibraryPillChrome(panes.PhotoCaptureLayoutButton, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
-            panes.PhotoCaptureLayoutButton.Visibility = Visibility.Collapsed;
-            panes.PhotoCaptureLayoutButton.VerticalAlignment = VerticalAlignment.Center;
-            sliderPanel.Children.Add(panes.PhotoCaptureLayoutButton);
             sliderPanel.Children.Add(panes.TimelineFilterPanel);
             panes.DeleteSelectedButton = new Button
             {

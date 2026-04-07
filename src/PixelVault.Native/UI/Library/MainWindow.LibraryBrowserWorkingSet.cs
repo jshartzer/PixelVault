@@ -52,6 +52,14 @@ namespace PixelVaultNative
             /// <summary>See <see cref="LibraryWorkspaceMode"/> (<c>PV-PLN-LIBWS-001</c>).</summary>
             internal LibraryWorkspaceMode WorkspaceMode = LibraryWorkspaceMode.Folder;
 
+            /// <summary>Refreshes sort/filter chrome when <see cref="WorkspaceMode"/> changes (photo rail uses separate persisted sort/filter).</summary>
+            internal Action RefreshSortFilterChrome;
+
+            internal Action RefreshPhotoRailColumnPickerUi;
+
+            /// <summary>When true, next folder rail render scrolls so <see cref="Current"/> is at the top (Photo workspace).</summary>
+            internal bool ScrollPhotoRailSelectionToTopPending;
+
             internal bool IsFolderWorkspaceMode => WorkspaceMode == LibraryWorkspaceMode.Folder;
 
             internal bool IsPhotoWorkspaceMode => WorkspaceMode == LibraryWorkspaceMode.Photo;

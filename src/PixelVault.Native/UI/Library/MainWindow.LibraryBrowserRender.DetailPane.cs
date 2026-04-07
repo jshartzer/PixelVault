@@ -82,7 +82,9 @@ namespace PixelVaultNative
             }
             var adaptiveMaxTileSize = ResolveAdaptiveDetailMaxTileSize(detailViewportWidth);
             var effectiveTileSize = timelineView ? Math.Min(size, adaptiveMaxTileSize) : size;
-            var targetDetailColumns = Math.Max(1, CalculateVirtualizedTileColumns(panes == null ? null : panes.ThumbScroll, effectiveTileSize, detailTileGap, 6));
+            var targetDetailColumns = timelineView
+                ? Math.Max(1, CalculateVirtualizedTileColumns(panes == null ? null : panes.ThumbScroll, effectiveTileSize, detailTileGap, 6))
+                : Math.Max(1, detailLayout.Columns);
             ws.LastDetailColumns = targetDetailColumns;
             ws.LastDetailTileSize = effectiveTileSize;
             ws.EstimatedDetailRowHeight = EstimateLibraryVariableDetailRowHeight(
@@ -713,15 +715,27 @@ namespace PixelVaultNative
             const int masonryTileGap = 4;
             const double packedTileSizeScale = 1.25d;
             var innerPackWidth = Math.Max(240d, cardWidth);
-            var targetTileWidth = timelineView
-                ? (int)Math.Round((innerPackWidth >= 1280d ? 620 : (innerPackWidth >= 980d ? 520 : (innerPackWidth >= 760d ? 440 : 360))) * packedTileSizeScale)
-                : (int)Math.Round((innerPackWidth >= 980d ? 500 : (innerPackWidth >= 760d ? 420 : 330)) * packedTileSizeScale);
-            var minTileWidth = timelineView
-                ? Math.Max((int)Math.Round(360 * packedTileSizeScale), Math.Min(targetTileWidth, (int)Math.Floor(innerPackWidth * 0.5d)))
-                : Math.Max((int)Math.Round(280 * packedTileSizeScale), Math.Min(targetTileWidth, (int)Math.Floor(innerPackWidth * 0.44d)));
-            var maxTileWidth = groupFiles.Count == 1
-                ? (int)Math.Floor(innerPackWidth)
-                : Math.Min((int)Math.Floor(innerPackWidth), targetTileWidth + (int)Math.Round((timelineView ? 180 : 120) * packedTileSizeScale));
+            int targetTileWidth;
+            int minTileWidth;
+            int maxTileWidth;
+            if (timelineView)
+            {
+                targetTileWidth = (int)Math.Round((innerPackWidth >= 1280d ? 620 : (innerPackWidth >= 980d ? 520 : (innerPackWidth >= 760d ? 440 : 360))) * packedTileSizeScale);
+                minTileWidth = Math.Max((int)Math.Round(360 * packedTileSizeScale), Math.Min(targetTileWidth, (int)Math.Floor(innerPackWidth * 0.5d)));
+                maxTileWidth = groupFiles.Count == 1
+                    ? (int)Math.Floor(innerPackWidth)
+                    : Math.Min((int)Math.Floor(innerPackWidth), targetTileWidth + (int)Math.Round(180 * packedTileSizeScale));
+            }
+            else
+            {
+                // Packed day cards previously ignored detailTileSize; wire user density (PV-PLN-LIBWS-001 Step 6).
+                var userBase = Math.Max(160, detailTileSize);
+                targetTileWidth = (int)Math.Round(Math.Min(userBase * packedTileSizeScale, Math.Max(220 * packedTileSizeScale, innerPackWidth * 0.72)));
+                minTileWidth = Math.Max((int)Math.Round(200 * packedTileSizeScale), Math.Min(targetTileWidth, (int)Math.Floor(innerPackWidth * 0.38)));
+                maxTileWidth = groupFiles.Count == 1
+                    ? (int)Math.Floor(innerPackWidth)
+                    : Math.Min((int)Math.Floor(innerPackWidth), targetTileWidth + (int)Math.Round(120 * packedTileSizeScale));
+            }
             maxTileWidth = Math.Max(minTileWidth, maxTileWidth);
             var chunks = BuildLibraryDetailMasonryChunks(
                 groupFiles,

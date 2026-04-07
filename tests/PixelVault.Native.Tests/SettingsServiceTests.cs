@@ -27,12 +27,50 @@ public sealed class SettingsServiceTests
     }
 
     [Theory]
-    [InlineData(100, 220)]
+    [InlineData(100, 160)]
     [InlineData(280, 280)]
-    [InlineData(600, 560)]
+    [InlineData(9999, 1400)]
     public void NormalizeLibraryPhotoTileSize_ClampsToRange(int input, int expected)
     {
         Assert.Equal(expected, SettingsService.NormalizeLibraryPhotoTileSize(input));
+    }
+
+    [Theory]
+    [InlineData(40, 48)]
+    [InlineData(200, 200)]
+    [InlineData(5000, 1000)]
+    public void NormalizeLibraryFolderTileSize_ClampsToRange(int input, int expected)
+    {
+        Assert.Equal(expected, SettingsService.NormalizeLibraryFolderTileSize(input));
+    }
+
+    [Theory]
+    [InlineData(-1, 0)]
+    [InlineData(0, 0)]
+    [InlineData(5, 5)]
+    [InlineData(99, 12)]
+    public void NormalizeLibraryFolderGridColumnCount_Clamps(int input, int expected)
+    {
+        Assert.Equal(expected, SettingsService.NormalizeLibraryFolderGridColumnCount(input));
+    }
+
+    [Theory]
+    [InlineData(9, 8)]
+    [InlineData(3, 3)]
+    public void NormalizeLibraryPhotoGridColumnCount_Clamps(int input, int expected)
+    {
+        Assert.Equal(expected, SettingsService.NormalizeLibraryPhotoGridColumnCount(input));
+    }
+
+    [Theory]
+    [InlineData(-1, 0)]
+    [InlineData(0, 0)]
+    [InlineData(1, 1)]
+    [InlineData(2, 2)]
+    [InlineData(9, 2)]
+    public void NormalizeLibraryPhotoRailFolderGridColumnCount_ClampsToTwoOrAuto(int input, int expected)
+    {
+        Assert.Equal(expected, SettingsService.NormalizeLibraryPhotoRailFolderGridColumnCount(input));
     }
 
     [Theory]
@@ -80,6 +118,8 @@ public sealed class SettingsServiceTests
                 "steamgriddb_token=secret",
                 "library_folder_tile_size=200",
                 "library_photo_tile_size=410",
+                "library_folder_grid_columns=3",
+                "library_photo_grid_columns=4",
                 "library_folder_sort_mode=recent",
                 "library_folder_filter_mode=100%",
                 "library_grouping_mode=console",
@@ -97,6 +137,8 @@ public sealed class SettingsServiceTests
                 SteamGridDbApiToken = string.Empty,
                 LibraryFolderTileSize = 240,
                 LibraryPhotoTileSize = 260,
+                LibraryFolderGridColumnCount = 1,
+                LibraryPhotoGridColumnCount = 2,
                 LibraryFolderSortMode = "platform",
                 LibraryGroupingMode = "all",
                 TroubleshootingLoggingEnabled = false
@@ -113,6 +155,8 @@ public sealed class SettingsServiceTests
             Assert.Equal("secret", loaded.SteamGridDbApiToken);
             Assert.Equal(200, loaded.LibraryFolderTileSize);
             Assert.Equal(410, loaded.LibraryPhotoTileSize);
+            Assert.Equal(3, loaded.LibraryFolderGridColumnCount);
+            Assert.Equal(4, loaded.LibraryPhotoGridColumnCount);
             Assert.Equal("added", loaded.LibraryFolderSortMode);
             Assert.Equal("completed", loaded.LibraryFolderFilterMode);
             Assert.Equal("console", loaded.LibraryGroupingMode);
@@ -171,9 +215,15 @@ public sealed class SettingsServiceTests
                 SteamGridDbApiToken = "tok",
                 LibraryFolderTileSize = 180,
                 LibraryPhotoTileSize = 310,
+                LibraryFolderGridColumnCount = 2,
+                LibraryPhotoGridColumnCount = 0,
                 LibraryFolderSortMode = "photos",
                 LibraryFolderFilterMode = "large",
                 LibraryGroupingMode = "console",
+                LibraryPhotoRailFolderTileSize = 190,
+                LibraryPhotoRailFolderSortMode = "captured",
+                LibraryPhotoRailFolderFilterMode = "large",
+                LibraryPhotoRailFolderGridColumnCount = 2,
                 TroubleshootingLoggingEnabled = true,
                 LibraryDoubleClickSetsFolderCover = true,
                 LibraryBrowserFolderPaneWidth = 542.25,
@@ -194,9 +244,15 @@ public sealed class SettingsServiceTests
             Assert.Equal(original.SteamGridDbApiToken, loaded.SteamGridDbApiToken);
             Assert.Equal(SettingsService.NormalizeLibraryFolderTileSize(original.LibraryFolderTileSize), loaded.LibraryFolderTileSize);
             Assert.Equal(SettingsService.NormalizeLibraryPhotoTileSize(original.LibraryPhotoTileSize), loaded.LibraryPhotoTileSize);
+            Assert.Equal(SettingsService.NormalizeLibraryFolderGridColumnCount(original.LibraryFolderGridColumnCount), loaded.LibraryFolderGridColumnCount);
+            Assert.Equal(SettingsService.NormalizeLibraryPhotoGridColumnCount(original.LibraryPhotoGridColumnCount), loaded.LibraryPhotoGridColumnCount);
             Assert.Equal("photos", loaded.LibraryFolderSortMode);
             Assert.Equal("large", loaded.LibraryFolderFilterMode);
             Assert.Equal("console", loaded.LibraryGroupingMode);
+            Assert.Equal(SettingsService.NormalizeLibraryFolderTileSize(original.LibraryPhotoRailFolderTileSize), loaded.LibraryPhotoRailFolderTileSize);
+            Assert.Equal("captured", loaded.LibraryPhotoRailFolderSortMode);
+            Assert.Equal("large", loaded.LibraryPhotoRailFolderFilterMode);
+            Assert.Equal(2, loaded.LibraryPhotoRailFolderGridColumnCount);
             Assert.True(loaded.TroubleshootingLoggingEnabled);
             Assert.True(loaded.LibraryDoubleClickSetsFolderCover);
             Assert.Equal(542.25, loaded.LibraryBrowserFolderPaneWidth, 5);

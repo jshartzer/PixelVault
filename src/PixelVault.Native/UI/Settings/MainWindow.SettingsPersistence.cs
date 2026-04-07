@@ -19,6 +19,12 @@ namespace PixelVaultNative
                 SteamGridDbApiToken = steamGridDbApiToken ?? string.Empty,
                 LibraryFolderTileSize = libraryFolderTileSize,
                 LibraryPhotoTileSize = libraryPhotoTileSize,
+                LibraryFolderGridColumnCount = libraryFolderGridColumnCount,
+                LibraryPhotoGridColumnCount = libraryPhotoGridColumnCount,
+                LibraryPhotoRailFolderTileSize = libraryPhotoRailFolderTileSize,
+                LibraryPhotoRailFolderSortMode = libraryPhotoRailFolderSortMode ?? "alpha",
+                LibraryPhotoRailFolderFilterMode = libraryPhotoRailFolderFilterMode ?? "all",
+                LibraryPhotoRailFolderGridColumnCount = libraryPhotoRailFolderGridColumnCount,
                 LibraryFolderSortMode = libraryFolderSortMode ?? "alpha",
                 LibraryFolderFilterMode = libraryFolderFilterMode ?? "all",
                 LibraryGroupingMode = libraryGroupingMode ?? "all",
@@ -47,6 +53,12 @@ namespace PixelVaultNative
             steamGridDbApiToken = s.SteamGridDbApiToken ?? string.Empty;
             libraryFolderTileSize = s.LibraryFolderTileSize;
             libraryPhotoTileSize = s.LibraryPhotoTileSize;
+            libraryFolderGridColumnCount = s.LibraryFolderGridColumnCount;
+            libraryPhotoGridColumnCount = s.LibraryPhotoGridColumnCount;
+            libraryPhotoRailFolderTileSize = s.LibraryPhotoRailFolderTileSize;
+            libraryPhotoRailFolderSortMode = s.LibraryPhotoRailFolderSortMode ?? "alpha";
+            libraryPhotoRailFolderFilterMode = s.LibraryPhotoRailFolderFilterMode ?? "all";
+            libraryPhotoRailFolderGridColumnCount = s.LibraryPhotoRailFolderGridColumnCount;
             libraryFolderSortMode = s.LibraryFolderSortMode ?? "alpha";
             libraryFolderFilterMode = s.LibraryFolderFilterMode ?? "all";
             libraryGroupingMode = s.LibraryGroupingMode ?? "all";

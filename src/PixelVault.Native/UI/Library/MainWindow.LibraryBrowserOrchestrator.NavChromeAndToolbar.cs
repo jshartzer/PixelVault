@@ -22,7 +22,7 @@ namespace PixelVaultNative
             Action<string> setLibrarySortMode,
             Action<string> setLibraryFilterMode)
         {
-            void OpenLibraryButtonMenu(Button anchor, params MenuItem[] items)
+            void OpenLibraryButtonMenu(Button anchor, params object[] items)
             {
                 if (anchor == null || items == null || items.Length == 0) return;
                 var menu = new ContextMenu
@@ -33,7 +33,8 @@ namespace PixelVaultNative
                 };
                 foreach (var item in items)
                 {
-                    if (item != null) menu.Items.Add(item);
+                    if (item is MenuItem mi) menu.Items.Add(mi);
+                    else if (item is Separator) menu.Items.Add(new Separator());
                 }
                 anchor.ContextMenu = menu;
                 menu.IsOpen = true;
@@ -79,13 +80,15 @@ namespace PixelVaultNative
             panes.GroupConsoleButton.Click += delegate { setLibraryGroupingMode("console"); };
             panes.GroupTimelineButton.Click += delegate { setLibraryGroupingMode("timeline"); };
             panes.ExitTimelineButton.Click += delegate { setLibraryGroupingMode("folders"); };
-            panes.SortMenuButton.Click += delegate
+            panes.SortFilterMenuButton.Click += delegate
             {
+                var sortNorm = NormalizeLibraryFolderSortMode(libraryFolderSortMode);
+                var filterNorm = NormalizeLibraryFolderFilterMode(libraryFolderFilterMode);
                 var alphaItem = new MenuItem
                 {
                     Header = "Alphabetical",
                     IsCheckable = true,
-                    IsChecked = string.Equals(NormalizeLibraryFolderSortMode(libraryFolderSortMode), "alpha", StringComparison.OrdinalIgnoreCase)
+                    IsChecked = string.Equals(sortNorm, "alpha", StringComparison.OrdinalIgnoreCase)
                 };
                 alphaItem.Click += delegate { setLibrarySortMode("alpha"); };
 
@@ -93,7 +96,7 @@ namespace PixelVaultNative
                 {
                     Header = "Date Captured",
                     IsCheckable = true,
-                    IsChecked = string.Equals(NormalizeLibraryFolderSortMode(libraryFolderSortMode), "captured", StringComparison.OrdinalIgnoreCase)
+                    IsChecked = string.Equals(sortNorm, "captured", StringComparison.OrdinalIgnoreCase)
                 };
                 capturedItem.Click += delegate { setLibrarySortMode("captured"); };
 
@@ -101,7 +104,7 @@ namespace PixelVaultNative
                 {
                     Header = "Date Added",
                     IsCheckable = true,
-                    IsChecked = string.Equals(NormalizeLibraryFolderSortMode(libraryFolderSortMode), "added", StringComparison.OrdinalIgnoreCase)
+                    IsChecked = string.Equals(sortNorm, "added", StringComparison.OrdinalIgnoreCase)
                 };
                 addedItem.Click += delegate { setLibrarySortMode("added"); };
 
@@ -109,19 +112,15 @@ namespace PixelVaultNative
                 {
                     Header = "Most Photos",
                     IsCheckable = true,
-                    IsChecked = string.Equals(NormalizeLibraryFolderSortMode(libraryFolderSortMode), "photos", StringComparison.OrdinalIgnoreCase)
+                    IsChecked = string.Equals(sortNorm, "photos", StringComparison.OrdinalIgnoreCase)
                 };
                 photosItem.Click += delegate { setLibrarySortMode("photos"); };
 
-                OpenLibraryButtonMenu(panes.SortMenuButton, alphaItem, capturedItem, addedItem, photosItem);
-            };
-            panes.FilterMenuButton.Click += delegate
-            {
                 var allItem = new MenuItem
                 {
                     Header = "All Games",
                     IsCheckable = true,
-                    IsChecked = string.Equals(NormalizeLibraryFolderFilterMode(libraryFolderFilterMode), "all", StringComparison.OrdinalIgnoreCase)
+                    IsChecked = string.Equals(filterNorm, "all", StringComparison.OrdinalIgnoreCase)
                 };
                 allItem.Click += delegate { setLibraryFilterMode("all"); };
 
@@ -129,7 +128,7 @@ namespace PixelVaultNative
                 {
                     Header = "100% Achievements",
                     IsCheckable = true,
-                    IsChecked = string.Equals(NormalizeLibraryFolderFilterMode(libraryFolderFilterMode), "completed", StringComparison.OrdinalIgnoreCase)
+                    IsChecked = string.Equals(filterNorm, "completed", StringComparison.OrdinalIgnoreCase)
                 };
                 completedItem.Click += delegate { setLibraryFilterMode("completed"); };
 
@@ -137,7 +136,7 @@ namespace PixelVaultNative
                 {
                     Header = "Cross-Platform",
                     IsCheckable = true,
-                    IsChecked = string.Equals(NormalizeLibraryFolderFilterMode(libraryFolderFilterMode), "crossplatform", StringComparison.OrdinalIgnoreCase)
+                    IsChecked = string.Equals(filterNorm, "crossplatform", StringComparison.OrdinalIgnoreCase)
                 };
                 crossPlatformItem.Click += delegate { setLibraryFilterMode("crossplatform"); };
 
@@ -145,7 +144,7 @@ namespace PixelVaultNative
                 {
                     Header = "25+ Captures",
                     IsCheckable = true,
-                    IsChecked = string.Equals(NormalizeLibraryFolderFilterMode(libraryFolderFilterMode), "large", StringComparison.OrdinalIgnoreCase)
+                    IsChecked = string.Equals(filterNorm, "large", StringComparison.OrdinalIgnoreCase)
                 };
                 largeItem.Click += delegate { setLibraryFilterMode("large"); };
 
@@ -153,7 +152,7 @@ namespace PixelVaultNative
                 {
                     Header = "Missing ID",
                     IsCheckable = true,
-                    IsChecked = string.Equals(NormalizeLibraryFolderFilterMode(libraryFolderFilterMode), "missingid", StringComparison.OrdinalIgnoreCase)
+                    IsChecked = string.Equals(filterNorm, "missingid", StringComparison.OrdinalIgnoreCase)
                 };
                 missingIdItem.Click += delegate { setLibraryFilterMode("missingid"); };
 
@@ -161,11 +160,23 @@ namespace PixelVaultNative
                 {
                     Header = "No cover path",
                     IsCheckable = true,
-                    IsChecked = string.Equals(NormalizeLibraryFolderFilterMode(libraryFolderFilterMode), "nocover", StringComparison.OrdinalIgnoreCase)
+                    IsChecked = string.Equals(filterNorm, "nocover", StringComparison.OrdinalIgnoreCase)
                 };
                 noCoverItem.Click += delegate { setLibraryFilterMode("nocover"); };
 
-                OpenLibraryButtonMenu(panes.FilterMenuButton, allItem, completedItem, crossPlatformItem, largeItem, missingIdItem, noCoverItem);
+                OpenLibraryButtonMenu(
+                    panes.SortFilterMenuButton,
+                    alphaItem,
+                    capturedItem,
+                    addedItem,
+                    photosItem,
+                    new Separator(),
+                    allItem,
+                    completedItem,
+                    crossPlatformItem,
+                    largeItem,
+                    missingIdItem,
+                    noCoverItem);
             };
         }
     }

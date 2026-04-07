@@ -102,6 +102,12 @@ namespace PixelVaultNative
         string steamGridDbApiToken;
         int libraryFolderTileSize = 300;
         int libraryPhotoTileSize = 340;
+        int libraryFolderGridColumnCount;
+        int libraryPhotoGridColumnCount;
+        int libraryPhotoRailFolderTileSize = 200;
+        string libraryPhotoRailFolderSortMode = "alpha";
+        string libraryPhotoRailFolderFilterMode = "all";
+        int libraryPhotoRailFolderGridColumnCount;
         string libraryFolderSortMode = "alpha";
         string libraryFolderFilterMode = "all";
         string libraryGroupingMode = "all";
@@ -1172,30 +1178,53 @@ namespace PixelVaultNative
         }
         int NormalizeLibraryFolderTileSize(int value) => SettingsService.NormalizeLibraryFolderTileSize(value);
         int NormalizeLibraryPhotoTileSize(int value) => SettingsService.NormalizeLibraryPhotoTileSize(value);
-        (int Columns, int TileSize) CalculateResponsiveLibraryFolderLayout(ScrollViewer scrollViewer)
+        int NormalizeLibraryFolderGridColumnCount(int value) => SettingsService.NormalizeLibraryFolderGridColumnCount(value);
+        int NormalizeLibraryPhotoGridColumnCount(int value) => SettingsService.NormalizeLibraryPhotoGridColumnCount(value);
+        int NormalizeLibraryPhotoRailFolderGridColumnCount(int value) => SettingsService.NormalizeLibraryPhotoRailFolderGridColumnCount(value);
+        (int Columns, int TileSize) CalculateResponsiveLibraryFolderLayout(ScrollViewer scrollViewer, bool photoWorkspaceRail = false)
         {
             // Match folder cover tile Margin right (horizontal rhythm between columns).
             const int gapPx = 12;
-            // Hard cap: at most four covers per row so tiles stay larger and column count does not jump 5–8 on wide layouts.
-            const int libraryFolderMaxColumns = 4;
-            // When slack is nearly tied on a narrow folder pane, prefer one more column only within this budget (stable wide layouts avoid this).
+            var libraryFolderMaxColumnsAuto = photoWorkspaceRail ? 2 : 4;
+            const int layoutMinTile = 48;
+            const int layoutMaxTile = 1000;
             const double moreColumnsSlackBudgetPx = 8;
             var viewportWidth = ResolveScrollViewerLayoutWidth(scrollViewer);
             viewportWidth = Math.Max(120, viewportWidth - 18);
-            var maxColumnsCeiling = viewportWidth >= 360 ? libraryFolderMaxColumns : 1;
-            var preferDenseGridInSplitPane = viewportWidth < 900;
-            var minTile = viewportWidth < 260 ? 112 : 140;
-            var userCap = NormalizeLibraryFolderTileSize(libraryFolderTileSize);
-            const int layoutMaxTile = 1000;
-            int TileWidthForColumns(int c, int rawEqualSplit)
+            var fixedColsRaw = photoWorkspaceRail
+                ? NormalizeLibraryPhotoRailFolderGridColumnCount(libraryPhotoRailFolderGridColumnCount)
+                : NormalizeLibraryFolderGridColumnCount(libraryFolderGridColumnCount);
+            // Photo rail: column toggle is only 1 or 2; unset (0) behaves like two-up.
+            var fixedCols = photoWorkspaceRail && fixedColsRaw == 0 ? 2 : fixedColsRaw;
+            var userCap = NormalizeLibraryFolderTileSize(photoWorkspaceRail ? libraryPhotoRailFolderTileSize : libraryFolderTileSize);
+            if (photoWorkspaceRail && fixedCols > 0)
+                userCap = layoutMaxTile;
+            int TileWidthForColumns(int c, int rawEqualSplit, int floorTile)
             {
-                var tileWidth = Math.Max(minTile, Math.Min(layoutMaxTile, rawEqualSplit));
+                var tileWidth = Math.Max(floorTile, Math.Min(layoutMaxTile, rawEqualSplit));
                 tileWidth = (int)(Math.Round(tileWidth / 16d) * 16);
-                tileWidth = Math.Max(minTile, Math.Min(layoutMaxTile, Math.Min(rawEqualSplit, tileWidth)));
-                while (tileWidth > minTile && c * tileWidth + (c - 1) * gapPx > viewportWidth)
-                    tileWidth = Math.Max(minTile, tileWidth - 16);
+                tileWidth = Math.Max(floorTile, Math.Min(layoutMaxTile, Math.Min(rawEqualSplit, tileWidth)));
+                while (tileWidth > floorTile && c * tileWidth + (c - 1) * gapPx > viewportWidth)
+                    tileWidth = Math.Max(floorTile, tileWidth - 16);
                 return tileWidth;
             }
+            if (fixedCols > 0)
+            {
+                var c = Math.Min(fixedCols, photoWorkspaceRail ? 2 : 12);
+                while (c > 1)
+                {
+                    var rawProbe = (int)Math.Floor((viewportWidth - ((c - 1) * gapPx)) / (double)c);
+                    if (rawProbe >= layoutMinTile) break;
+                    c--;
+                }
+                c = Math.Max(1, c);
+                var rawFill = (int)Math.Floor((viewportWidth - ((c - 1) * gapPx)) / (double)c);
+                var capped = Math.Max(layoutMinTile, Math.Min(userCap, rawFill));
+                var bestW = TileWidthForColumns(c, capped, layoutMinTile);
+                return (c, bestW);
+            }
+            var maxColumnsCeiling = viewportWidth >= 360 ? libraryFolderMaxColumnsAuto : 1;
+            var preferDenseGridInSplitPane = viewportWidth < 900;
             bool ShouldPreferLayout(double slack, int c, int tileW, double prevSlack, int prevC, int prevTileW)
             {
                 if (slack < prevSlack - 0.5) return true;
@@ -1209,13 +1238,13 @@ namespace PixelVaultNative
                 return false;
             }
             var bestColumns = 1;
-            var bestTileW = minTile;
+            var bestTileW = layoutMinTile;
             var bestSlack = double.MaxValue;
             for (var c = 1; c <= maxColumnsCeiling; c++)
             {
                 var rawTile = (int)Math.Floor((viewportWidth - ((c - 1) * gapPx)) / (double)c);
-                if (rawTile < minTile) continue;
-                var tileWidth = TileWidthForColumns(c, rawTile);
+                if (rawTile < layoutMinTile) continue;
+                var tileWidth = TileWidthForColumns(c, rawTile, layoutMinTile);
                 var used = c * tileWidth + (c - 1) * gapPx;
                 var slack = viewportWidth - used;
                 if (!(slack > -0.5)) continue;
@@ -1227,8 +1256,8 @@ namespace PixelVaultNative
             {
                 var span = viewportWidth - (bestColumns - 1) * gapPx;
                 var rawFill = (int)Math.Floor(span / (double)bestColumns);
-                var capped = Math.Max(minTile, Math.Min(userCap, rawFill));
-                bestTileW = TileWidthForColumns(bestColumns, capped);
+                var capped = Math.Max(layoutMinTile, Math.Min(userCap, rawFill));
+                bestTileW = TileWidthForColumns(bestColumns, capped, layoutMinTile);
             }
             return (bestColumns, bestTileW);
         }
@@ -1239,9 +1268,12 @@ namespace PixelVaultNative
             const double libraryDetailPhotoTileSizeScale = 1.75d;
             var viewportWidth = ResolveScrollViewerLayoutWidth(scrollViewer);
             viewportWidth = Math.Max(160, viewportWidth - 24);
-            var maxColumnsCeiling = viewportWidth >= 1100d ? 4 : (viewportWidth >= 560d ? 3 : (viewportWidth >= 360d ? 2 : 1));
+            var maxColumnsCeiling = viewportWidth >= 1280d ? 8 : viewportWidth >= 1040d ? 6 : viewportWidth >= 820d ? 5 : viewportWidth >= 560d ? 4 : viewportWidth >= 380d ? 3 : 2;
+            if (viewportWidth < 300d) maxColumnsCeiling = 1;
             var minTile = (int)Math.Round((viewportWidth < 420d ? 156 : (viewportWidth < 900d ? 176 : 208)) * libraryDetailPhotoTileSizeScale);
-            var layoutMaxTile = (int)Math.Round(900d * libraryDetailPhotoTileSizeScale);
+            var layoutMaxTile = applySavedPhotoTileSizePreference
+                ? Math.Max((int)Math.Round(900d * libraryDetailPhotoTileSizeScale), SettingsService.LibraryPhotoTileScrollHardMax + 200)
+                : (int)Math.Round(900d * libraryDetailPhotoTileSizeScale);
 
             int ClampRoundedTile(int rawEqualSplit)
             {
@@ -1255,36 +1287,67 @@ namespace PixelVaultNative
             var bestTileWidth = ClampRoundedTile((int)Math.Floor(viewportWidth));
             var bestSlack = Math.Max(0d, viewportWidth - bestTileWidth);
 
-            for (var columns = 1; columns <= maxColumnsCeiling; columns++)
-            {
-                var rawEqualSplit = (int)Math.Floor((viewportWidth - ((columns - 1) * gapPx)) / columns);
-                if (rawEqualSplit < minTile) continue;
-                var tileWidth = ClampRoundedTile(rawEqualSplit);
-                var usedWidth = (columns * tileWidth) + ((columns - 1) * gapPx);
-                var slack = Math.Max(0d, viewportWidth - usedWidth);
-                if (slack + moreColumnsSlackBudgetPx < bestSlack)
-                {
-                    bestColumns = columns;
-                    bestTileWidth = tileWidth;
-                    bestSlack = slack;
-                    continue;
-                }
-
-                if (slack <= bestSlack + moreColumnsSlackBudgetPx && columns > bestColumns)
-                {
-                    bestColumns = columns;
-                    bestTileWidth = tileWidth;
-                    bestSlack = slack;
-                }
-            }
-
             if (applySavedPhotoTileSizePreference)
             {
                 var userCap = NormalizeLibraryPhotoTileSize(libraryPhotoTileSize);
-                var span = viewportWidth - (bestColumns - 1) * gapPx;
-                var rawFill = (int)Math.Floor(span / (double)bestColumns);
-                var capped = Math.Max(minTile, Math.Min(userCap, rawFill));
-                bestTileWidth = ClampRoundedTile(capped);
+                var fixedPhotoCols = NormalizeLibraryPhotoGridColumnCount(libraryPhotoGridColumnCount);
+                if (fixedPhotoCols > 0)
+                {
+                    var c = Math.Min(fixedPhotoCols, maxColumnsCeiling);
+                    while (c > 1)
+                    {
+                        var rawFillProbe = (int)Math.Floor((viewportWidth - ((c - 1) * gapPx)) / (double)c);
+                        if (rawFillProbe >= minTile) break;
+                        c--;
+                    }
+                    c = Math.Max(1, c);
+                    bestColumns = c;
+                    var rawFillFixed = (int)Math.Floor((viewportWidth - ((bestColumns - 1) * gapPx)) / (double)bestColumns);
+                    var cappedFixed = Math.Max(minTile, Math.Min(userCap, rawFillFixed));
+                    bestTileWidth = ClampRoundedTile(cappedFixed);
+                }
+                else
+                {
+                    bestTileWidth = ClampRoundedTile(minTile);
+                    for (var columns = 1; columns <= maxColumnsCeiling; columns++)
+                    {
+                        var rawFill = (int)Math.Floor((viewportWidth - ((columns - 1) * gapPx)) / (double)columns);
+                        if (rawFill < minTile) continue;
+                        var capped = Math.Max(minTile, Math.Min(userCap, rawFill));
+                        var tileW = ClampRoundedTile(capped);
+                        if (tileW > bestTileWidth || (tileW == bestTileWidth && columns < bestColumns))
+                        {
+                            bestTileWidth = tileW;
+                            bestColumns = columns;
+                        }
+                    }
+                }
+            }
+            else
+            {
+                var autoMaxCols = viewportWidth >= 1100d ? 4 : (viewportWidth >= 560d ? 3 : (viewportWidth >= 360d ? 2 : 1));
+                for (var columns = 1; columns <= autoMaxCols; columns++)
+                {
+                    var rawEqualSplit = (int)Math.Floor((viewportWidth - ((columns - 1) * gapPx)) / columns);
+                    if (rawEqualSplit < minTile) continue;
+                    var tileWidth = ClampRoundedTile(rawEqualSplit);
+                    var usedWidth = (columns * tileWidth) + ((columns - 1) * gapPx);
+                    var slack = Math.Max(0d, viewportWidth - usedWidth);
+                    if (slack + moreColumnsSlackBudgetPx < bestSlack)
+                    {
+                        bestColumns = columns;
+                        bestTileWidth = tileWidth;
+                        bestSlack = slack;
+                        continue;
+                    }
+
+                    if (slack <= bestSlack + moreColumnsSlackBudgetPx && columns > bestColumns)
+                    {
+                        bestColumns = columns;
+                        bestTileWidth = tileWidth;
+                        bestSlack = slack;
+                    }
+                }
             }
 
             return (bestColumns, bestTileWidth);
@@ -1399,6 +1462,71 @@ namespace PixelVaultNative
             button.MinWidth = 0;
             return button;
         }
+
+        Style LibraryCircleToolbarButtonStyle(string backgroundHex, string borderHex, string hoverBackgroundHex, string pressedBackgroundHex, string foregroundHex = "#DCE6EC")
+        {
+            var style = new Style(typeof(Button));
+            style.Setters.Add(new Setter(Control.ForegroundProperty, Brush(foregroundHex)));
+            style.Setters.Add(new Setter(Control.BackgroundProperty, Brush(backgroundHex)));
+            style.Setters.Add(new Setter(Control.BorderBrushProperty, Brush(borderHex)));
+            style.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(1)));
+            style.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(0)));
+            style.Setters.Add(new Setter(Control.FontWeightProperty, FontWeights.SemiBold));
+            style.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Center));
+            style.Setters.Add(new Setter(Control.VerticalContentAlignmentProperty, VerticalAlignment.Center));
+            style.Setters.Add(new Setter(UIElement.SnapsToDevicePixelsProperty, true));
+            style.Setters.Add(new Setter(UIElement.EffectProperty, null));
+            style.Setters.Add(new Setter(Control.TemplateProperty, BuildLibraryCircleToolbarButtonTemplate(backgroundHex, borderHex, hoverBackgroundHex, pressedBackgroundHex)));
+            return style;
+        }
+
+        ControlTemplate BuildLibraryCircleToolbarButtonTemplate(string backgroundHex, string borderHex, string hoverBackgroundHex, string pressedBackgroundHex)
+        {
+            var template = new ControlTemplate(typeof(Button));
+            var borderFactory = new FrameworkElementFactory(typeof(Border));
+            borderFactory.Name = "Chrome";
+            borderFactory.SetValue(Border.BackgroundProperty, Brush(backgroundHex));
+            borderFactory.SetValue(Border.BorderBrushProperty, Brush(borderHex));
+            borderFactory.SetValue(Border.BorderThicknessProperty, new Thickness(1));
+            borderFactory.SetValue(Border.CornerRadiusProperty, new CornerRadius(18));
+
+            var contentFactory = new FrameworkElementFactory(typeof(ContentPresenter));
+            contentFactory.SetValue(ContentPresenter.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+            contentFactory.SetValue(ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
+            contentFactory.SetValue(ContentPresenter.MarginProperty, new Thickness(0));
+            borderFactory.AppendChild(contentFactory);
+            template.VisualTree = borderFactory;
+
+            var hoverTrigger = new Trigger { Property = UIElement.IsMouseOverProperty, Value = true };
+            hoverTrigger.Setters.Add(new Setter(Border.BackgroundProperty, Brush(hoverBackgroundHex), "Chrome"));
+            hoverTrigger.Setters.Add(new Setter(Border.BorderBrushProperty, Brush(hoverBackgroundHex), "Chrome"));
+            template.Triggers.Add(hoverTrigger);
+
+            var pressedTrigger = new Trigger { Property = System.Windows.Controls.Primitives.ButtonBase.IsPressedProperty, Value = true };
+            pressedTrigger.Setters.Add(new Setter(Border.BackgroundProperty, Brush(pressedBackgroundHex), "Chrome"));
+            pressedTrigger.Setters.Add(new Setter(Border.BorderBrushProperty, Brush(pressedBackgroundHex), "Chrome"));
+            template.Triggers.Add(pressedTrigger);
+
+            var disabledTrigger = new Trigger { Property = UIElement.IsEnabledProperty, Value = false };
+            disabledTrigger.Setters.Add(new Setter(UIElement.OpacityProperty, 0.45));
+            template.Triggers.Add(disabledTrigger);
+
+            return template;
+        }
+
+        Button ApplyLibraryCircleToolbarChrome(Button button, string backgroundHex, string borderHex, string hoverBackgroundHex, string pressedBackgroundHex, string foregroundHex = "#DCE6EC")
+        {
+            button.Style = LibraryCircleToolbarButtonStyle(backgroundHex, borderHex, hoverBackgroundHex, pressedBackgroundHex, foregroundHex);
+            button.Cursor = System.Windows.Input.Cursors.Hand;
+            button.Width = 36;
+            button.Height = 36;
+            button.Padding = new Thickness(0);
+            button.FontSize = 14;
+            button.MinWidth = 0;
+            AccessibilityUi.TryApplyFocusVisualStyle(button);
+            return button;
+        }
+
         ControlTemplate BuildRoundedTileButtonTemplate()
         {
             var template = new ControlTemplate(typeof(Button));

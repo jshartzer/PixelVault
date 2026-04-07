@@ -58,6 +58,42 @@ namespace PixelVaultNative
                 set => _m.libraryPhotoTileSize = value;
             }
 
+            public int LibraryFolderGridColumnCount
+            {
+                get => _m.libraryFolderGridColumnCount;
+                set => _m.libraryFolderGridColumnCount = value;
+            }
+
+            public int LibraryPhotoGridColumnCount
+            {
+                get => _m.libraryPhotoGridColumnCount;
+                set => _m.libraryPhotoGridColumnCount = value;
+            }
+
+            public int LibraryPhotoRailFolderTileSize
+            {
+                get => _m.libraryPhotoRailFolderTileSize;
+                set => _m.libraryPhotoRailFolderTileSize = value;
+            }
+
+            public string LibraryPhotoRailFolderSortMode
+            {
+                get => _m.libraryPhotoRailFolderSortMode;
+                set => _m.libraryPhotoRailFolderSortMode = value;
+            }
+
+            public string LibraryPhotoRailFolderFilterMode
+            {
+                get => _m.libraryPhotoRailFolderFilterMode;
+                set => _m.libraryPhotoRailFolderFilterMode = value;
+            }
+
+            public int LibraryPhotoRailFolderGridColumnCount
+            {
+                get => _m.libraryPhotoRailFolderGridColumnCount;
+                set => _m.libraryPhotoRailFolderGridColumnCount = value;
+            }
+
             public Action<bool> ActiveLibraryFolderRefresh
             {
                 get => _m.activeLibraryFolderRefresh;
@@ -130,6 +166,12 @@ namespace PixelVaultNative
 
             public int NormalizeLibraryPhotoTileSizeValue(int value) => _m.NormalizeLibraryPhotoTileSize(value);
 
+            public int NormalizeLibraryFolderGridColumnCountValue(int value) => _m.NormalizeLibraryFolderGridColumnCount(value);
+
+            public int NormalizeLibraryPhotoGridColumnCountValue(int value) => _m.NormalizeLibraryPhotoGridColumnCount(value);
+
+            public int NormalizeLibraryPhotoRailFolderGridColumnCountValue(int value) => _m.NormalizeLibraryPhotoRailFolderGridColumnCount(value);
+
             public List<LibraryFolderInfo> GetLibraryBrowserActionFolders(LibraryBrowserFolderView view) => _m.GetLibraryBrowserActionFolders(view);
 
             public string BuildLibraryBrowserActionScopeLabel(LibraryBrowserFolderView view) => _m.BuildLibraryBrowserActionScopeLabel(view);
@@ -198,7 +240,7 @@ namespace PixelVaultNative
                 Action renderFolderTiles) =>
                 _m.LibraryBrowserRenderSelectedFolderDetail(ws, libraryWindow, openSingleFileMetadataEditor, updateDetailSelection, refreshDetailSelectionUi, redrawSelectedFolderDetail, renderFolderTiles);
 
-            public Button LibraryBrowserBuildFolderTile(
+            public FrameworkElement LibraryBrowserBuildFolderTile(
                 LibraryBrowserFolderView folder,
                 int tileWidth,
                 int tileHeight,
@@ -228,7 +270,7 @@ namespace PixelVaultNative
 
             public void LibraryBrowserRenderFolderList(
                 LibraryBrowserWorkingSet ws,
-                Func<LibraryBrowserFolderView, int, int, bool, Button> buildFolderTile,
+                Func<LibraryBrowserFolderView, int, int, bool, FrameworkElement> buildFolderTile,
                 Action<LibraryBrowserFolderView> showFolder,
                 Action renderSelectedFolder,
                 Action selfRerender,

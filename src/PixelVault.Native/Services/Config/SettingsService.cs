@@ -17,18 +17,49 @@ namespace PixelVaultNative
                 .Distinct(StringComparer.OrdinalIgnoreCase));
         }
 
+        /// <summary>Largest photo-size preset in the library menu; Ctrl+scroll can go up to <see cref="LibraryPhotoTileScrollHardMax"/> (250% of this).</summary>
+        public const int LibraryPhotoTileMenuLargestPreset = 560;
+
+        /// <summary>Max capture tile width when using Ctrl+scroll — 150% above the largest menu preset (total 250% of <see cref="LibraryPhotoTileMenuLargestPreset"/>).</summary>
+        public static int LibraryPhotoTileScrollHardMax => (int)Math.Round(LibraryPhotoTileMenuLargestPreset * 2.5d);
+
         public static int NormalizeLibraryFolderTileSize(int value)
         {
-            if (value < 140) return 140;
+            if (value < 48) return 48;
             if (value > 1000) return 1000;
             return value;
         }
 
-        /// <summary>Clamps persisted library capture-grid tile size to a sane decode/layout range.</summary>
+        /// <summary>Clamps library capture tile width; upper bound allows zoom past menu presets via Ctrl+scroll.</summary>
         public static int NormalizeLibraryPhotoTileSize(int value)
         {
-            if (value < 220) return 220;
-            if (value > 560) return 560;
+            if (value < 160) return 160;
+            var max = LibraryPhotoTileScrollHardMax;
+            if (value > max) return max;
+            return value;
+        }
+
+        /// <summary>0 = auto column count from viewport and tile size; 1–12 = fixed columns (clamped to what fits).</summary>
+        public static int NormalizeLibraryFolderGridColumnCount(int value)
+        {
+            if (value < 0) return 0;
+            if (value > 12) return 12;
+            return value;
+        }
+
+        /// <summary>0 = auto; 1–8 = fixed columns for non-timeline capture grids.</summary>
+        public static int NormalizeLibraryPhotoGridColumnCount(int value)
+        {
+            if (value < 0) return 0;
+            if (value > 8) return 8;
+            return value;
+        }
+
+        /// <summary>Photo workspace left rail: 0 = auto (at most 2 columns), 1 or 2 = fixed.</summary>
+        public static int NormalizeLibraryPhotoRailFolderGridColumnCount(int value)
+        {
+            if (value < 0) return 0;
+            if (value > 2) return 2;
             return value;
         }
 
@@ -102,6 +133,26 @@ namespace PixelVaultNative
                 else if (key == "library_photo_tile_size")
                 {
                     if (int.TryParse(value, out var photoSize)) s.LibraryPhotoTileSize = NormalizeLibraryPhotoTileSize(photoSize);
+                }
+                else if (key == "library_folder_grid_columns")
+                {
+                    if (int.TryParse(value, out var fc)) s.LibraryFolderGridColumnCount = NormalizeLibraryFolderGridColumnCount(fc);
+                }
+                else if (key == "library_photo_grid_columns")
+                {
+                    if (int.TryParse(value, out var pc)) s.LibraryPhotoGridColumnCount = NormalizeLibraryPhotoGridColumnCount(pc);
+                }
+                else if (key == "library_photo_rail_folder_tile_size")
+                {
+                    if (int.TryParse(value, out var rts)) s.LibraryPhotoRailFolderTileSize = NormalizeLibraryFolderTileSize(rts);
+                }
+                else if (key == "library_photo_rail_folder_sort_mode")
+                    s.LibraryPhotoRailFolderSortMode = NormalizeLibraryFolderSortMode(value);
+                else if (key == "library_photo_rail_folder_filter_mode")
+                    s.LibraryPhotoRailFolderFilterMode = NormalizeLibraryFolderFilterMode(value);
+                else if (key == "library_photo_rail_folder_grid_columns")
+                {
+                    if (int.TryParse(value, out var rgc)) s.LibraryPhotoRailFolderGridColumnCount = NormalizeLibraryPhotoRailFolderGridColumnCount(rgc);
                 }
                 else if (key == "library_folder_sort_mode") s.LibraryFolderSortMode = NormalizeLibraryFolderSortMode(value);
                 else if (key == "library_grouping_mode") s.LibraryGroupingMode = NormalizeLibraryGroupingMode(value);
@@ -207,6 +258,12 @@ namespace PixelVaultNative
                 "steamgriddb_token=" + (state.SteamGridDbApiToken ?? string.Empty),
                 "library_folder_tile_size=" + NormalizeLibraryFolderTileSize(state.LibraryFolderTileSize),
                 "library_photo_tile_size=" + NormalizeLibraryPhotoTileSize(state.LibraryPhotoTileSize),
+                "library_folder_grid_columns=" + NormalizeLibraryFolderGridColumnCount(state.LibraryFolderGridColumnCount),
+                "library_photo_grid_columns=" + NormalizeLibraryPhotoGridColumnCount(state.LibraryPhotoGridColumnCount),
+                "library_photo_rail_folder_tile_size=" + NormalizeLibraryFolderTileSize(state.LibraryPhotoRailFolderTileSize),
+                "library_photo_rail_folder_sort_mode=" + NormalizeLibraryFolderSortMode(state.LibraryPhotoRailFolderSortMode),
+                "library_photo_rail_folder_filter_mode=" + NormalizeLibraryFolderFilterMode(state.LibraryPhotoRailFolderFilterMode),
+                "library_photo_rail_folder_grid_columns=" + NormalizeLibraryPhotoRailFolderGridColumnCount(state.LibraryPhotoRailFolderGridColumnCount),
                 "library_folder_sort_mode=" + NormalizeLibraryFolderSortMode(state.LibraryFolderSortMode),
                 "library_grouping_mode=" + NormalizeLibraryGroupingMode(state.LibraryGroupingMode),
                 "library_folder_filter_mode=" + NormalizeLibraryFolderFilterMode(state.LibraryFolderFilterMode),

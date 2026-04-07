@@ -14,7 +14,7 @@ namespace PixelVaultNative
     {
         void LibraryBrowserRenderFolderList(
             LibraryBrowserWorkingSet ws,
-            Func<LibraryBrowserFolderView, int, int, bool, Button> buildFolderTile,
+            Func<LibraryBrowserFolderView, int, int, bool, FrameworkElement> buildFolderTile,
             Action<LibraryBrowserFolderView> showFolder,
             Action renderSelectedFolder,
             Action selfRerender,
@@ -26,6 +26,7 @@ namespace PixelVaultNative
             var renderStopwatch = Stopwatch.StartNew();
             var groupingMode = NormalizeLibraryGroupingMode(libraryGroupingMode);
             var timelineMode = string.Equals(groupingMode, "timeline", StringComparison.OrdinalIgnoreCase);
+            var photoWorkspaceRail = ws.WorkspaceMode == LibraryWorkspaceMode.Photo;
             if (!timelineMode && panes?.TileScroll != null && !ws.PreserveFolderScrollOnNextRender)
             {
                 var liveFolderScroll = panes.TileScroll.VerticalOffset;
@@ -81,7 +82,7 @@ namespace PixelVaultNative
                 .ThenBy(folder => folder.Name ?? string.Empty, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(folder => DetermineLibraryBrowserGroup(folder))
                 .ToList();
-            var folderLayout = CalculateResponsiveLibraryFolderLayout(panes.TileScroll);
+            var folderLayout = CalculateResponsiveLibraryFolderLayout(panes.TileScroll, photoWorkspaceRail);
             var targetFolderColumns = folderLayout.Columns;
             var tileWidth = folderLayout.TileSize;
             var folderPaneWidth = ResolveScrollViewerLayoutWidth(panes.TileScroll);
@@ -124,7 +125,10 @@ namespace PixelVaultNative
                 var availableWidth = Math.Max(tileWidth, folderPaneWidth - 4);
                 var rawFill = (int)Math.Floor((availableWidth - ((rowCount - 1) * 12d)) / Math.Max(1d, rowCount));
                 var roundedFill = Math.Max(tileWidth, (int)(Math.Round(rawFill / 16d) * 16));
-                var maxExpandedTile = Math.Max(tileWidth, Math.Min(1000, NormalizeLibraryFolderTileSize(libraryFolderTileSize) + 176));
+                var userFolderTileCap = photoWorkspaceRail
+                    ? 1000
+                    : NormalizeLibraryFolderTileSize(libraryFolderTileSize);
+                var maxExpandedTile = Math.Max(tileWidth, Math.Min(1000, userFolderTileCap + 176));
                 return Math.Max(tileWidth, Math.Min(maxExpandedTile, roundedFill));
             }
             if (orderedVisibleFolders.Count == 0)
@@ -177,7 +181,31 @@ namespace PixelVaultNative
                         }
                     });
                 }
-                SetVirtualizedRows(panes.TileRows, virtualRows, !shouldRestoreFolderScroll, shouldRestoreFolderScroll ? (double?)restoreFolderScrollOffset : null);
+                var resetFlatScroll = !shouldRestoreFolderScroll;
+                double? flatScrollRestore = shouldRestoreFolderScroll ? (double?)restoreFolderScrollOffset : null;
+                if (photoWorkspaceRail && ws.ScrollPhotoRailSelectionToTopPending && ws.Current != null)
+                {
+                    var selIdx = orderedVisibleFolders.FindIndex(f => SameLibraryBrowserSelection(ws.Current, f));
+                    if (selIdx >= 0)
+                    {
+                        var targetRow = selIdx / folderColumns;
+                        double y = 0;
+                        for (var r = 0; r < targetRow; r++)
+                        {
+                            var rowFolders = orderedVisibleFolders.Skip(r * folderColumns).Take(folderColumns).ToList();
+                            if (rowFolders.Count == 0) break;
+                            var rtw = ResolveFolderRowTileWidth(rowFolders.Count);
+                            var rth = (int)Math.Round(rtw * 1.5d);
+                            var rowCardHeight = rth + 16;
+                            y += rowCardHeight + 14;
+                        }
+                        flatScrollRestore = y;
+                        resetFlatScroll = false;
+                    }
+                    ws.ScrollPhotoRailSelectionToTopPending = false;
+                }
+                else if (ws.ScrollPhotoRailSelectionToTopPending) ws.ScrollPhotoRailSelectionToTopPending = false;
+                SetVirtualizedRows(panes.TileRows, virtualRows, resetFlatScroll, flatScrollRestore);
                 LibraryBrowserTryRestoreSessionSelection(ws, browserFolders, orderedVisibleFolders, showFolder);
                 renderStopwatch.Stop();
                 LogPerformanceSample("LibraryFolderRender", renderStopwatch, "mode=flat; foldersLoaded=" + folders.Count + "; views=" + browserFolders.Count + "; visible=" + orderedVisibleFolders.Count + "; rows=" + virtualRows.Count + "; columns=" + folderColumns + "; grouping=" + groupingMode + "; search=" + (string.IsNullOrWhiteSpace(searchText) ? "(none)" : searchText) + "; sort=" + sortMode + "; projectMs=" + projectionStopwatch.ElapsedMilliseconds + "; filterMs=" + filterSortStopwatch.ElapsedMilliseconds, 40);
@@ -240,7 +268,43 @@ namespace PixelVaultNative
                     }
                 }
             }
-            SetVirtualizedRows(panes.TileRows, virtualRows, !shouldRestoreFolderScroll, shouldRestoreFolderScroll ? (double?)restoreFolderScrollOffset : null);
+            double? groupedTopScroll = null;
+            if (photoWorkspaceRail && ws.ScrollPhotoRailSelectionToTopPending && ws.Current != null)
+            {
+                double yAcc = 0;
+                foreach (var folderGroup in folderGroups)
+                {
+                    var groupLabel = folderGroup.Key;
+                    var sectionCollapsed = ws.CollapsedPlatformSections.Contains(groupLabel);
+                    yAcc += 82;
+                    if (sectionCollapsed) continue;
+                    var groupFolders = folderGroup.ToList();
+                    for (var rowStart = 0; rowStart < groupFolders.Count; rowStart += folderColumns)
+                    {
+                        var rowFolders = groupFolders.Skip(rowStart).Take(folderColumns).ToList();
+                        if (rowFolders.Any(f => SameLibraryBrowserSelection(ws.Current, f)))
+                        {
+                            groupedTopScroll = yAcc;
+                            break;
+                        }
+                        var grw = ResolveFolderRowTileWidth(rowFolders.Count);
+                        var grh = (int)Math.Round(grw * 1.5d);
+                        var growCard = grh + 14;
+                        yAcc += growCard + 12;
+                    }
+                    if (groupedTopScroll.HasValue) break;
+                }
+                ws.ScrollPhotoRailSelectionToTopPending = false;
+            }
+            else if (ws.ScrollPhotoRailSelectionToTopPending) ws.ScrollPhotoRailSelectionToTopPending = false;
+            var resetGroupedScroll = !shouldRestoreFolderScroll;
+            double? groupedScrollRestore = shouldRestoreFolderScroll ? (double?)restoreFolderScrollOffset : null;
+            if (groupedTopScroll.HasValue)
+            {
+                resetGroupedScroll = false;
+                groupedScrollRestore = groupedTopScroll;
+            }
+            SetVirtualizedRows(panes.TileRows, virtualRows, resetGroupedScroll, groupedScrollRestore);
             LibraryBrowserTryRestoreSessionSelection(ws, browserFolders, orderedVisibleFolders, showFolder);
             renderStopwatch.Stop();
             LogPerformanceSample("LibraryFolderRender", renderStopwatch, "mode=grouped; foldersLoaded=" + folders.Count + "; views=" + browserFolders.Count + "; visible=" + orderedVisibleFolders.Count + "; rows=" + virtualRows.Count + "; columns=" + folderColumns + "; grouping=" + groupingMode + "; search=" + (string.IsNullOrWhiteSpace(searchText) ? "(none)" : searchText) + "; sort=" + sortMode + "; projectMs=" + projectionStopwatch.ElapsedMilliseconds + "; filterMs=" + filterSortStopwatch.ElapsedMilliseconds, 40);

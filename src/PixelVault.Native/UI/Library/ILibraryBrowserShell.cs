@@ -24,6 +24,12 @@ namespace PixelVaultNative
         string LibraryGroupingMode { get; set; }
         int LibraryFolderTileSize { get; set; }
         int LibraryPhotoTileSize { get; set; }
+        int LibraryFolderGridColumnCount { get; set; }
+        int LibraryPhotoGridColumnCount { get; set; }
+        int LibraryPhotoRailFolderTileSize { get; set; }
+        string LibraryPhotoRailFolderSortMode { get; set; }
+        string LibraryPhotoRailFolderFilterMode { get; set; }
+        int LibraryPhotoRailFolderGridColumnCount { get; set; }
 
         Action<bool> ActiveLibraryFolderRefresh { get; set; }
         LibraryFolderInfo ActiveSelectedLibraryFolder { get; set; }
@@ -72,6 +78,9 @@ namespace PixelVaultNative
         void SaveSettings();
         int NormalizeLibraryFolderTileSizeValue(int value);
         int NormalizeLibraryPhotoTileSizeValue(int value);
+        int NormalizeLibraryFolderGridColumnCountValue(int value);
+        int NormalizeLibraryPhotoGridColumnCountValue(int value);
+        int NormalizeLibraryPhotoRailFolderGridColumnCountValue(int value);
         List<LibraryFolderInfo> GetLibraryBrowserActionFolders(MainWindow.LibraryBrowserFolderView view);
         string BuildLibraryBrowserActionScopeLabel(MainWindow.LibraryBrowserFolderView view);
         void LibrarySaveCustomCover(LibraryFolderInfo folder, string sourcePath);
@@ -119,7 +128,7 @@ namespace PixelVaultNative
             Action redrawSelectedFolderDetail,
             Action renderFolderTiles);
 
-        Button LibraryBrowserBuildFolderTile(
+        System.Windows.FrameworkElement LibraryBrowserBuildFolderTile(
             MainWindow.LibraryBrowserFolderView folder,
             int tileWidth,
             int tileHeight,
@@ -146,7 +155,7 @@ namespace PixelVaultNative
 
         void LibraryBrowserRenderFolderList(
             MainWindow.LibraryBrowserWorkingSet ws,
-            Func<MainWindow.LibraryBrowserFolderView, int, int, bool, Button> buildFolderTile,
+            Func<MainWindow.LibraryBrowserFolderView, int, int, bool, System.Windows.FrameworkElement> buildFolderTile,
             Action<MainWindow.LibraryBrowserFolderView> showFolder,
             Action renderSelectedFolder,
             Action selfRerender,

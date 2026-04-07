@@ -164,7 +164,7 @@ namespace PixelVaultNative
             panes.DetailTitleBadgePanel.Visibility = panes.DetailTitleBadgePanel.Children.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         }
 
-        Button LibraryBrowserBuildFolderTile(
+        FrameworkElement LibraryBrowserBuildFolderTile(
             LibraryBrowserFolderView folder,
             int tileWidth,
             int tileHeight,
@@ -186,11 +186,12 @@ namespace PixelVaultNative
             var tileFallbackText = string.IsNullOrWhiteSpace(folder == null ? string.Empty : folder.Name)
                 ? badgePlatformLabel
                 : folder.Name;
+            var tileMargin = new Thickness(0, 0, 12, 14);
             var tile = new Button
             {
                 Width = tileWidth,
                 Height = tileHeight,
-                Margin = new Thickness(0, 0, 12, 14),
+                Margin = new Thickness(0),
                 Padding = new Thickness(0),
                 Background = Brush("#151E24"),
                 BorderBrush = Brush("#25333D"),
@@ -252,7 +253,8 @@ namespace PixelVaultNative
             };
             coverRoot.Children.Add(footerScrim);
             if (showPlatformBadgeOnTile) coverRoot.Children.Add(BuildLibraryTilePlatformBadge(badgePlatformLabel));
-            if (folder != null && folder.IsCompleted100Percent) coverRoot.Children.Add(BuildLibraryTileCompletionBadge());
+            if (folder != null && folder.IsCompleted100Percent && ws?.WorkspaceMode != LibraryWorkspaceMode.Photo)
+                coverRoot.Children.Add(BuildLibraryTileCompletionBadge());
             var imageBorder = new Border
             {
                 Width = tileWidth,
@@ -383,6 +385,23 @@ namespace PixelVaultNative
             contextMenu.Items.Add(setCoverItem);
             contextMenu.Items.Add(clearCoverItem);
             tile.ContextMenu = contextMenu;
+            var railShowsActiveGame = ws?.WorkspaceMode == LibraryWorkspaceMode.Photo
+                && folder != null
+                && SameLibraryBrowserSelection(ws.Current, folder);
+            if (railShowsActiveGame)
+            {
+                return new Border
+                {
+                    CornerRadius = new CornerRadius(14),
+                    BorderBrush = Brush("#4A9FE8"),
+                    BorderThickness = new Thickness(2),
+                    Background = Brushes.Transparent,
+                    Margin = tileMargin,
+                    SnapsToDevicePixels = true,
+                    Child = tile
+                };
+            }
+            tile.Margin = tileMargin;
             return tile;
         }
 
@@ -440,6 +459,14 @@ namespace PixelVaultNative
             panes.DetailMeta.Text = BuildLibraryBrowserDetailMetaText(info, actionFolder);
             panes.OpenFolderButton.Content = BuildToolbarButtonContent("\uE8B7", BuildLibraryBrowserOpenFoldersLabel(info));
             if (timelineView)
+            {
+                panes.PreviewImage.Source = null;
+                panes.PreviewImage.Visibility = Visibility.Collapsed;
+                PersistLibraryBrowserLastSelection(info);
+                renderSelectedFolder();
+                return;
+            }
+            if (ws.WorkspaceMode == LibraryWorkspaceMode.Photo)
             {
                 panes.PreviewImage.Source = null;
                 panes.PreviewImage.Visibility = Visibility.Collapsed;

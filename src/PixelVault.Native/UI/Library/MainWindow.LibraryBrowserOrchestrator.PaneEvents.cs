@@ -1,6 +1,7 @@
 using System;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 
 namespace PixelVaultNative
 {
@@ -36,7 +37,8 @@ namespace PixelVaultNative
                 panes.FolderResizeDebounceTimer.Tick += delegate
                 {
                     panes.FolderResizeDebounceTimer.Stop();
-                    var layout = CalculateResponsiveLibraryFolderLayout(panes.TileScroll);
+                    var photoRail = ws.WorkspaceMode == LibraryWorkspaceMode.Photo;
+                    var layout = CalculateResponsiveLibraryFolderLayout(panes.TileScroll, photoRail);
                     var viewportWidth = ResolveScrollViewerLayoutWidth(panes.TileScroll);
                     if (layout.Columns == ws.LastFolderColumns
                         && layout.TileSize == ws.LastFolderTileSize
@@ -63,6 +65,26 @@ namespace PixelVaultNative
                     panes.FolderResizeDebounceTimer.Stop();
                     panes.FolderResizeDebounceTimer.Start();
                 }
+            };
+            panes.TileScroll.PreviewMouseWheel += delegate(object _, MouseWheelEventArgs e)
+            {
+                if ((Keyboard.Modifiers & ModifierKeys.Control) == 0) return;
+                e.Handled = true;
+                if (ws.WorkspaceMode == LibraryWorkspaceMode.Photo) return;
+                libraryFolderTileSize = NormalizeLibraryFolderTileSize(libraryFolderTileSize + (e.Delta > 0 ? 16 : -16));
+                SaveSettings();
+                if (renderTiles != null) renderTiles();
+                ShowLibraryBrowserToast(ws, "Covers: " + libraryFolderTileSize + " px");
+            };
+            panes.ThumbScroll.PreviewMouseWheel += delegate(object _, MouseWheelEventArgs e)
+            {
+                if ((Keyboard.Modifiers & ModifierKeys.Control) == 0) return;
+                if (ws.Current == null || IsLibraryBrowserTimelineView(ws.Current)) return;
+                e.Handled = true;
+                libraryPhotoTileSize = NormalizeLibraryPhotoTileSize(libraryPhotoTileSize + (e.Delta > 0 ? 12 : -12));
+                SaveSettings();
+                if (renderSelectedFolder != null) renderSelectedFolder();
+                ShowLibraryBrowserToast(ws, "Captures: " + libraryPhotoTileSize + " px");
             };
             if (panes.ScrollPersistDebounceTimer != null)
             {

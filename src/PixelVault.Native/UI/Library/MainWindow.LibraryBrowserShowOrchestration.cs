@@ -132,20 +132,30 @@ namespace PixelVaultNative
                     var timelineMode = string.Equals(_shell.NormalizeLibraryGroupingMode(_shell.LibraryGroupingMode), "timeline", StringComparison.OrdinalIgnoreCase);
                     var sortMode = _shell.NormalizeLibraryFolderSortMode(_shell.LibraryFolderSortMode);
                     var filterMode = _shell.NormalizeLibraryFolderFilterMode(_shell.LibraryFolderFilterMode);
-                    _shell.LibraryBrowserApplySortGroupPillState(panes.SortMenuButton, !timelineMode && !string.Equals(sortMode, "alpha", StringComparison.OrdinalIgnoreCase));
-                    _shell.LibraryBrowserApplySortGroupPillState(panes.FilterMenuButton, !string.Equals(filterMode, "all", StringComparison.OrdinalIgnoreCase));
-                    panes.SortMenuButton.IsEnabled = !timelineMode;
-                    panes.FilterMenuButton.IsEnabled = true;
+                    var sortActive = !timelineMode && !string.Equals(sortMode, "alpha", StringComparison.OrdinalIgnoreCase);
+                    var filterActive = !string.Equals(filterMode, "all", StringComparison.OrdinalIgnoreCase);
+                    _shell.LibraryBrowserApplySortGroupPillState(panes.SortFilterMenuButton, sortActive || filterActive);
+                    panes.SortFilterMenuButton.IsEnabled = !timelineMode;
                     var sortLabel =
                         string.Equals(sortMode, "captured", StringComparison.OrdinalIgnoreCase) ? "Date Captured" :
                         string.Equals(sortMode, "added", StringComparison.OrdinalIgnoreCase) ? "Date Added" :
                         string.Equals(sortMode, "photos", StringComparison.OrdinalIgnoreCase) ? "Most Photos" :
                         "Alphabetical";
                     var filterLabel = _shell.LibraryFolderFilterModeLabel(filterMode);
-                    panes.SortMenuButton.ToolTip = timelineMode
-                        ? "Sort is fixed to capture time in Timeline view"
-                        : "Sort: " + sortLabel;
-                    panes.FilterMenuButton.ToolTip = "Filter: " + filterLabel;
+                    panes.SortFilterMenuButton.ToolTip = timelineMode
+                        ? "Sort is fixed in Timeline view; filter: " + filterLabel
+                        : "Sort: " + sortLabel + "; Filter: " + filterLabel;
+                    if (ws.WorkspaceMode == LibraryWorkspaceMode.Photo) ws.RefreshPhotoRailColumnPickerUi?.Invoke();
+                };
+                ws.RefreshSortFilterChrome = refreshSortButtons;
+                ws.RefreshPhotoRailColumnPickerUi = delegate
+                {
+                    if (panes.PhotoRailColumnOneButton == null || panes.PhotoRailColumnTwoButton == null) return;
+                    var raw = _shell.LibraryPhotoRailFolderGridColumnCount;
+                    var norm = _shell.NormalizeLibraryPhotoRailFolderGridColumnCountValue(raw);
+                    var effective = norm <= 0 ? 2 : norm;
+                    _shell.LibraryBrowserApplySortGroupPillState(panes.PhotoRailColumnOneButton, effective == 1);
+                    _shell.LibraryBrowserApplySortGroupPillState(panes.PhotoRailColumnTwoButton, effective == 2);
                 };
 
                 refreshGroupingButtons = delegate
@@ -213,6 +223,7 @@ namespace PixelVaultNative
                     {
                         _shell.LibraryFolderSortMode = normalized;
                         _shell.SaveSettings();
+                        if (ws.WorkspaceMode == LibraryWorkspaceMode.Photo) ws.ScrollPhotoRailSelectionToTopPending = true;
                         if (renderTiles != null) renderTiles();
                     }
                     refreshSortButtons();
@@ -225,6 +236,7 @@ namespace PixelVaultNative
                     {
                         _shell.LibraryFolderFilterMode = normalized;
                         _shell.SaveSettings();
+                        if (ws.WorkspaceMode == LibraryWorkspaceMode.Photo) ws.ScrollPhotoRailSelectionToTopPending = true;
                         if (renderTiles != null) renderTiles();
                     }
                     refreshSortButtons();
@@ -276,7 +288,7 @@ namespace PixelVaultNative
                     if (ws.Current == null) ws.DetailSelectionAnchorIndex = -1;
                 };
 
-                Func<LibraryBrowserFolderView, int, int, bool, Button> buildFolderTile = delegate(LibraryBrowserFolderView folder, int tileWidth, int tileHeight, bool showPlatformBadge)
+                Func<LibraryBrowserFolderView, int, int, bool, FrameworkElement> buildFolderTile = delegate(LibraryBrowserFolderView folder, int tileWidth, int tileHeight, bool showPlatformBadge)
                 {
                     return _shell.LibraryBrowserBuildFolderTile(
                         folder,
@@ -337,10 +349,11 @@ namespace PixelVaultNative
                     panes.EditMetadataButton.IsEnabled = !isBusy;
                     panes.RefreshThisFolderButton.IsEnabled = !isBusy && ws.Current != null;
                     if (panes.OpenCapturesButton != null && isBusy) panes.OpenCapturesButton.IsEnabled = false;
-                    if (panes.ExitPhotoWorkspaceButton != null) panes.ExitPhotoWorkspaceButton.IsEnabled = !isBusy;
                     if (panes.PhotoWorkspaceDividerToggleButton != null) panes.PhotoWorkspaceDividerToggleButton.IsEnabled = !isBusy;
                     panes.FolderCoverLayoutButton.IsEnabled = !isBusy;
                     if (panes.PhotoCaptureLayoutButton != null) panes.PhotoCaptureLayoutButton.IsEnabled = !isBusy;
+                    if (panes.PhotoRailColumnOneButton != null) panes.PhotoRailColumnOneButton.IsEnabled = !isBusy;
+                    if (panes.PhotoRailColumnTwoButton != null) panes.PhotoRailColumnTwoButton.IsEnabled = !isBusy;
                     panes.ShortcutsHelpButton.IsEnabled = !isBusy;
                     if (panes.CommandPaletteButton != null) panes.CommandPaletteButton.IsEnabled = !isBusy;
                     navChrome.FetchButton.IsEnabled = !isBusy;
@@ -412,8 +425,6 @@ namespace PixelVaultNative
                     setLibrarySortMode,
                     setLibraryFilterMode);
                 panes.ShortcutsHelpButton.Click += delegate { _shell.ShowLibraryBrowserKeyboardShortcutsHelp(libraryWindow); };
-                if (panes.ExitPhotoWorkspaceButton != null)
-                    panes.ExitPhotoWorkspaceButton.Click += delegate { _shell.LibraryBrowserExitPhotoWorkspace(ws, renderTiles); };
                 if (panes.PhotoWorkspaceDividerToggleButton != null)
                     panes.PhotoWorkspaceDividerToggleButton.Click += delegate { _shell.LibraryBrowserExitPhotoWorkspace(ws, renderTiles); };
                 if (panes.OpenCapturesButton != null)
@@ -503,48 +514,92 @@ namespace PixelVaultNative
                         _shell.LibraryBrowserExitPhotoWorkspace(ws, renderTiles);
                         return;
                     }
-                    if (e.Key == Key.F1)
+                    var hideMiniChromeKeys = ws.WorkspaceMode == LibraryWorkspaceMode.Photo;
+                    if (!hideMiniChromeKeys && e.Key == Key.F1)
                     {
                         e.Handled = true;
                         _shell.ShowLibraryBrowserKeyboardShortcutsHelp(libraryWindow);
                         return;
                     }
-                    if (e.Key == Key.P && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+                    if (!hideMiniChromeKeys && e.Key == Key.P && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
                     {
                         e.Handled = true;
                         _shell.ShowLibraryCommandPalette(libraryWindow, paletteCtx, null);
                         return;
                     }
-                    if (e.Key == Key.E && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+                    if (!hideMiniChromeKeys && e.Key == Key.E && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
                     {
                         e.Handled = true;
                         _shell.LibraryBrowserToggleQuickEditDrawer(ws);
                     }
                 };
                 var folderCoverLayoutMenu = new ContextMenu();
-                void AddFolderCoverPreset(string label, int px)
-                {
-                    var item = new MenuItem { Header = label };
-                    item.Click += delegate
-                    {
-                        _shell.LibraryFolderTileSize = _shell.NormalizeLibraryFolderTileSizeValue(px);
-                        _shell.SaveSettings();
-                        if (renderTiles != null) renderTiles();
-                        _shell.LibraryBrowserShowToast(ws, "Cover size: " + label);
-                    };
-                    folderCoverLayoutMenu.Items.Add(item);
-                }
-                AddFolderCoverPreset("Compact", 200);
-                AddFolderCoverPreset("Comfortable", 260);
-                AddFolderCoverPreset("Balanced", 300);
-                AddFolderCoverPreset("Roomy", 380);
-                AddFolderCoverPreset("Large", 480);
                 panes.FolderCoverLayoutButton.Click += delegate
                 {
+                    if (ws.WorkspaceMode == LibraryWorkspaceMode.Photo) return;
+                    folderCoverLayoutMenu.Items.Clear();
+                    void AddFolderCoverPreset(string label, int px)
+                    {
+                        var item = new MenuItem { Header = label };
+                        item.Click += delegate
+                        {
+                            var norm = _shell.NormalizeLibraryFolderTileSizeValue(px);
+                            _shell.LibraryFolderTileSize = norm;
+                            _shell.SaveSettings();
+                            if (renderTiles != null) renderTiles();
+                            _shell.LibraryBrowserShowToast(ws, "Cover size: " + label + " (" + norm + " px)");
+                        };
+                        folderCoverLayoutMenu.Items.Add(item);
+                    }
+                    AddFolderCoverPreset("Compact", 52);
+                    AddFolderCoverPreset("Medium", 220);
+                    AddFolderCoverPreset("Comfortable", 380);
+                    AddFolderCoverPreset("Roomy", 560);
+                    AddFolderCoverPreset("Large (max)", 1000);
+                    var folderColumnsMenu = new MenuItem { Header = "Columns" };
+                    void AddFolderColumnChoice(string label, int cols)
+                    {
+                        var colItem = new MenuItem { Header = label };
+                        colItem.Click += delegate
+                        {
+                            _shell.LibraryFolderGridColumnCount = _shell.NormalizeLibraryFolderGridColumnCountValue(cols);
+                            _shell.SaveSettings();
+                            if (renderTiles != null) renderTiles();
+                            _shell.LibraryBrowserShowToast(ws, cols <= 0 ? "Cover columns: auto" : "Cover columns: " + cols);
+                        };
+                        folderColumnsMenu.Items.Add(colItem);
+                    }
+                    AddFolderColumnChoice("Auto", 0);
+                    for (var colN = 1; colN <= 8; colN++)
+                    {
+                        var captured = colN;
+                        AddFolderColumnChoice(captured.ToString(), captured);
+                    }
+                    folderCoverLayoutMenu.Items.Add(folderColumnsMenu);
                     folderCoverLayoutMenu.PlacementTarget = panes.FolderCoverLayoutButton;
                     folderCoverLayoutMenu.Placement = PlacementMode.Bottom;
                     folderCoverLayoutMenu.IsOpen = true;
                 };
+                if (panes.PhotoRailColumnOneButton != null)
+                {
+                    panes.PhotoRailColumnOneButton.Click += delegate
+                    {
+                        _shell.LibraryPhotoRailFolderGridColumnCount = 1;
+                        _shell.SaveSettings();
+                        if (renderTiles != null) renderTiles();
+                        ws.RefreshPhotoRailColumnPickerUi?.Invoke();
+                    };
+                }
+                if (panes.PhotoRailColumnTwoButton != null)
+                {
+                    panes.PhotoRailColumnTwoButton.Click += delegate
+                    {
+                        _shell.LibraryPhotoRailFolderGridColumnCount = 2;
+                        _shell.SaveSettings();
+                        if (renderTiles != null) renderTiles();
+                        ws.RefreshPhotoRailColumnPickerUi?.Invoke();
+                    };
+                }
                 if (panes.PhotoCaptureLayoutButton != null)
                 {
                     var photoCaptureLayoutMenu = new ContextMenu();
@@ -560,10 +615,30 @@ namespace PixelVaultNative
                         };
                         photoCaptureLayoutMenu.Items.Add(item);
                     }
-                    AddPhotoCapturePreset("Compact", 280);
-                    AddPhotoCapturePreset("Medium", 340);
-                    AddPhotoCapturePreset("Comfortable", 400);
-                    AddPhotoCapturePreset("Large", 480);
+                    AddPhotoCapturePreset("Compact", 220);
+                    AddPhotoCapturePreset("Medium", 360);
+                    AddPhotoCapturePreset("Comfortable", 460);
+                    AddPhotoCapturePreset("Large (menu max)", SettingsService.LibraryPhotoTileMenuLargestPreset);
+                    var photoColumnsMenu = new MenuItem { Header = "Columns" };
+                    void AddPhotoColumnChoice(string label, int cols)
+                    {
+                        var colItem = new MenuItem { Header = label };
+                        colItem.Click += delegate
+                        {
+                            _shell.LibraryPhotoGridColumnCount = _shell.NormalizeLibraryPhotoGridColumnCountValue(cols);
+                            _shell.SaveSettings();
+                            if (renderSelectedFolder != null) renderSelectedFolder();
+                            _shell.LibraryBrowserShowToast(ws, cols <= 0 ? "Capture columns: auto" : "Capture columns: " + cols);
+                        };
+                        photoColumnsMenu.Items.Add(colItem);
+                    }
+                    AddPhotoColumnChoice("Auto", 0);
+                    for (var pc = 1; pc <= 8; pc++)
+                    {
+                        var captured = pc;
+                        AddPhotoColumnChoice(captured.ToString(), captured);
+                    }
+                    photoCaptureLayoutMenu.Items.Add(photoColumnsMenu);
                     panes.PhotoCaptureLayoutButton.Click += delegate
                     {
                         photoCaptureLayoutMenu.PlacementTarget = panes.PhotoCaptureLayoutButton;

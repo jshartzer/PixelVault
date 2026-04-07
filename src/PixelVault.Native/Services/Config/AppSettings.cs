@@ -17,6 +17,16 @@ namespace PixelVaultNative
         public int LibraryFolderTileSize = 300;
         /// <summary>Preferred capture tile width (px) for non-timeline library detail grids; clamped to the viewport (<c>PV-PLN-LIBWS-001</c> Step 6).</summary>
         public int LibraryPhotoTileSize = 340;
+        /// <summary>0 = auto folder columns; 1–12 = fixed column count (clamped to viewport).</summary>
+        public int LibraryFolderGridColumnCount;
+        /// <summary>0 = auto capture columns; 1–8 = fixed (non-timeline).</summary>
+        public int LibraryPhotoGridColumnCount;
+        /// <summary>Captures (Photo) workspace slim rail: cover tile size, independent from main folder grid.</summary>
+        public int LibraryPhotoRailFolderTileSize = 200;
+        public string LibraryPhotoRailFolderSortMode = "alpha";
+        public string LibraryPhotoRailFolderFilterMode = "all";
+        /// <summary>0 = auto (max 2 cols); 1–2 = fixed for the rail.</summary>
+        public int LibraryPhotoRailFolderGridColumnCount;
         public string LibraryFolderSortMode = "alpha";
         public string LibraryFolderFilterMode = "all";
         public string LibraryGroupingMode = "all";
@@ -51,6 +61,12 @@ namespace PixelVaultNative
                 SteamGridDbApiToken = s.SteamGridDbApiToken ?? string.Empty,
                 LibraryFolderTileSize = s.LibraryFolderTileSize,
                 LibraryPhotoTileSize = s.LibraryPhotoTileSize,
+                LibraryFolderGridColumnCount = s.LibraryFolderGridColumnCount,
+                LibraryPhotoGridColumnCount = s.LibraryPhotoGridColumnCount,
+                LibraryPhotoRailFolderTileSize = s.LibraryPhotoRailFolderTileSize,
+                LibraryPhotoRailFolderSortMode = s.LibraryPhotoRailFolderSortMode ?? "alpha",
+                LibraryPhotoRailFolderFilterMode = s.LibraryPhotoRailFolderFilterMode ?? "all",
+                LibraryPhotoRailFolderGridColumnCount = s.LibraryPhotoRailFolderGridColumnCount,
                 LibraryFolderSortMode = s.LibraryFolderSortMode ?? "alpha",
                 LibraryFolderFilterMode = s.LibraryFolderFilterMode ?? "all",
                 LibraryGroupingMode = s.LibraryGroupingMode ?? "all",
