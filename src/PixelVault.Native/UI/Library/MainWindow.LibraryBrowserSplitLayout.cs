@@ -15,6 +15,8 @@ namespace PixelVaultNative
         internal const double LibraryBrowserPhotoDividerStripWidth = 28;
         /// <summary>Fixed hero band height in captures view — matches Steam-style headers and avoids unbounded vertical scaling when the window grows.</summary>
         internal const double LibraryPhotoWorkspaceHeroBandHeight = 316;
+        /// <summary>Negative top margin pulls title chrome up over the hero so the grid gains vertical space and art shows through the panel.</summary>
+        internal const double LibraryPhotoWorkspaceChromeOverlapHeroPixels = 76;
 
         void ApplyLibraryBrowserLayoutMode(LibraryBrowserPaneRefs panes, LibraryWorkspaceMode workspaceMode)
         {
@@ -137,11 +139,14 @@ namespace PixelVaultNative
                 if (panes.PhotoWorkspaceTitleReadabilityBorder != null)
                 {
                     var chrome = panes.PhotoWorkspaceTitleReadabilityBorder;
-                    chrome.Background = new SolidColorBrush(Color.FromArgb(0xBC, 0x12, 0x1A, 0x22));
-                    chrome.Margin = new Thickness(0, 4, 0, 0);
-                    Grid.SetRow(chrome, 1);
+                    chrome.Background = new SolidColorBrush(Color.FromArgb(0xA8, 0x12, 0x1A, 0x22));
+                    chrome.VerticalAlignment = VerticalAlignment.Bottom;
+                    chrome.HorizontalAlignment = HorizontalAlignment.Stretch;
+                    chrome.Margin = new Thickness(0, -LibraryPhotoWorkspaceChromeOverlapHeroPixels, 0, 0);
+                    Grid.SetRow(chrome, 0);
                     Grid.SetColumn(chrome, 0);
                     Grid.SetColumnSpan(chrome, 2);
+                    Panel.SetZIndex(chrome, 4);
                 }
                 if (panes.PreviewFrame != null)
                 {
@@ -167,10 +172,13 @@ namespace PixelVaultNative
                 if (panes.PhotoWorkspaceTitleReadabilityBorder != null)
                 {
                     var chrome = panes.PhotoWorkspaceTitleReadabilityBorder;
+                    chrome.VerticalAlignment = VerticalAlignment.Top;
+                    chrome.HorizontalAlignment = HorizontalAlignment.Stretch;
                     chrome.Margin = new Thickness(0, 10, 0, 0);
                     Grid.SetRow(chrome, 0);
                     Grid.SetColumn(chrome, 1);
                     Grid.SetColumnSpan(chrome, 1);
+                    Panel.SetZIndex(chrome, 2);
                 }
                 if (panes.PreviewFrame != null)
                 {

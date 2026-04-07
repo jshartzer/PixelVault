@@ -193,30 +193,41 @@ namespace PixelVaultNative
             return LibraryThumbnailPipeline.NormalizeDecodePixelWidth(target);
         }
 
-        /// <summary>Decode width for library banner / hero art. Uses <paramref name="widthHint"/>.<c>ActualWidth</c> when laid out so wide windows do not force huge decodes.</summary>
-        int CalculateLibraryBannerArtDecodeWidth(FrameworkElement widthHint, double dpiScaleX = 1.0)
+        /// <summary>
+        /// Decode width for library banner / hero art (device pixels). Uses <paramref name="widthHint"/>.<c>ActualWidth</c> when laid out;
+        /// otherwise estimates from <paramref name="layoutFallbackWindow"/> so first paint is not stuck at ~640px.
+        /// </summary>
+        int CalculateLibraryBannerArtDecodeWidth(FrameworkElement widthHint, Window layoutFallbackWindow, double dpiScaleX = 1.0)
         {
-            var w = 640.0;
+            var d = Math.Max(1.0, dpiScaleX);
+            double w;
             try
             {
-                if (widthHint != null)
+                if (widthHint != null && widthHint.ActualWidth > 1) w = widthHint.ActualWidth;
+                else if (layoutFallbackWindow != null && layoutFallbackWindow.ActualWidth > 120)
+                    w = Math.Max(960.0, layoutFallbackWindow.ActualWidth - 400);
+                else
                 {
-                    var aw = widthHint.ActualWidth;
-                    if (aw > 1) w = aw;
+                    var legacy = (int)Math.Ceiling(640 * d * 1.08);
+                    legacy = Math.Max(448, Math.Min(1024, legacy));
+                    return LibraryThumbnailPipeline.NormalizeDecodePixelWidth(legacy);
                 }
             }
             catch
             {
+                var legacy = (int)Math.Ceiling(640 * d * 1.08);
+                legacy = Math.Max(448, Math.Min(1024, legacy));
+                return LibraryThumbnailPipeline.NormalizeDecodePixelWidth(legacy);
             }
 
-            var target = (int)Math.Ceiling(w * Math.Max(1.0, dpiScaleX) * 1.08);
-            target = Math.Max(512, Math.Min(1600, target));
+            var target = (int)Math.Ceiling(w * d * 1.22);
+            target = Math.Max(768, Math.Min(4096, target));
             return LibraryThumbnailPipeline.NormalizeDecodePixelWidth(target);
         }
 
         int CalculateLibraryBannerArtDecodeWidth(double dpiScaleX = 1.0)
         {
-            return CalculateLibraryBannerArtDecodeWidth(null, dpiScaleX);
+            return CalculateLibraryBannerArtDecodeWidth(null, null, dpiScaleX);
         }
 
         int CalculateLibraryDetailTileDecodeWidth(int tileWidthLogical, double dpiScaleX = 1.0)

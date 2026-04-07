@@ -329,7 +329,7 @@ namespace PixelVaultNative
             panes.LibraryDetailBanner = banner;
             var headerHost = new Grid();
             panes.LibraryDetailBannerGrid = headerHost;
-            headerHost.ClipToBounds = true;
+            headerHost.ClipToBounds = false;
             headerHost.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             headerHost.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             headerHost.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto, MinWidth = 96, MaxWidth = 240 });

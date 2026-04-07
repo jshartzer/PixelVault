@@ -194,7 +194,7 @@ namespace PixelVaultNative
                 QueueImageLoad(
                     panes.PhotoWorkspaceHeroBannerImage,
                     path,
-                    CalculateLibraryBannerArtDecodeWidth(panes.PhotoWorkspaceHeroBannerRoot, ResolveLibraryDpiScale(panes.PhotoWorkspaceHeroBannerImage)),
+                    CalculateLibraryBannerArtDecodeWidth(panes.PhotoWorkspaceHeroBannerRoot, libraryWindow, ResolveLibraryDpiScale(panes.PhotoWorkspaceHeroBannerImage)),
                     delegate(BitmapImage loaded) { panes.PhotoWorkspaceHeroBannerImage.Source = loaded; },
                     true,
                     delegate { return SameLibraryBrowserSelection(ws.Current, infoCapture); });

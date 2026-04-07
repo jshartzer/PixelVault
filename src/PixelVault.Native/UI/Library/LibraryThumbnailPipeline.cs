@@ -47,7 +47,12 @@ namespace PixelVaultNative
             if (decodePixelWidth <= 768) return 768;
             if (decodePixelWidth <= 960) return 960;
             if (decodePixelWidth <= 1280) return 1280;
-            return 1600;
+            if (decodePixelWidth <= 1600) return 1600;
+            if (decodePixelWidth <= 1920) return 1920;
+            if (decodePixelWidth <= 2560) return 2560;
+            if (decodePixelWidth <= 3200) return 3200;
+            if (decodePixelWidth <= 3840) return 3840;
+            return 4096;
         }
 
         public BitmapImage LoadImageSource(string path, int decodePixelWidth)
