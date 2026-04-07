@@ -127,7 +127,7 @@ namespace PixelVaultNative
                             var inner = t.Exception == null ? null : t.Exception.Flatten().InnerException;
                             var msg = inner == null ? "Photography gallery failed to load." : inner.Message;
                             _host.LogError("PhotographyGalleryWindow", t.Exception);
-                            MessageBox.Show(msg, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
+                            MainWindow.NotifyOrMessageBox(_host.NotifyUser, msg, MessageBoxImage.Error);
                             Close();
                             return;
                         }
@@ -165,7 +165,7 @@ namespace PixelVaultNative
                     catch (Exception ex)
                     {
                         _host.LogError("PhotographyGalleryWindow", ex);
-                        MessageBox.Show(ex.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
+                        MainWindow.NotifyOrMessageBox(_host.NotifyUser, ex.Message, MessageBoxImage.Error);
                     }
                 }));
             }, CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);

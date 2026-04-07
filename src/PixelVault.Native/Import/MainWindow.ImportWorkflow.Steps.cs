@@ -136,7 +136,7 @@ namespace PixelVaultNative
             {
                 status.Text = "Sort failed";
                 Log(ex.Message);
-                MessageBox.Show(ex.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
+                TryLibraryToast(ex.Message, MessageBoxImage.Error);
             }
         }
 
@@ -146,7 +146,7 @@ namespace PixelVaultNative
             if (result.Sorted == 0 && result.FoldersCreated == 0)
             {
                 if (updateUi) status.Text = "Nothing to sort";
-                if (interactive) MessageBox.Show("There are no root-level media files in the destination folder to sort right now.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
+                if (interactive) TryLibraryToast("There are no root-level media files in the destination folder to sort right now.");
                 return result;
             }
             if (updateUi) status.Text = "Destination sorted";
@@ -163,7 +163,7 @@ namespace PixelVaultNative
                 {
                     status.Text = "Nothing to undo";
                     Log("Undo requested, but there is no saved import manifest.");
-                    MessageBox.Show("There is no saved import to undo yet.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
+                    TryLibraryToast("There is no saved import to undo yet.");
                     return;
                 }
 
@@ -181,7 +181,7 @@ namespace PixelVaultNative
             {
                 status.Text = "Undo failed";
                 Log(ex.Message);
-                MessageBox.Show(ex.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
+                TryLibraryToast(ex.Message, MessageBoxImage.Error);
             }
         }
     }

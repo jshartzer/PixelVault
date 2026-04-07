@@ -82,6 +82,10 @@
     <Compile Include="UI\Settings\MainWindow.SettingsPersistence.cs" />
     <Compile Include="UI\Library\LibraryWorkspaceContext.cs" />
     <Compile Include="UI\Library\ILibraryBrowserShell.cs" />
+    <Compile Include="UI\Library\LibraryBrowserPaletteContext.cs" />
+    <Compile Include="UI\Library\LibraryCommandPaletteRegistry.cs" />
+    <Compile Include="UI\Library\LibraryCommandPaletteWindow.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryBrowserPaletteCommands.cs" />
     <Compile Include="UI\Library\ILibrarySession.cs" />
     <Compile Include="UI\Library\LibrarySession.cs" />
     <Compile Include="UI\Library\LibraryBrowserHost.cs" />
@@ -91,6 +95,7 @@
     <Compile Include="UI\Library\MainWindow.LibraryBrowserViewModel.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryPhotoMasonryLayout.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserRender.FolderList.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryBrowserFolderFilter.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserSessionPersistence.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserSplitLayout.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserRender.DetailPane.cs" />

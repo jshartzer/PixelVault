@@ -86,7 +86,7 @@ namespace PixelVaultNative
             {
                 status.Text = "Workflow failed";
                 LogException("Import workflow", ex);
-                MessageBox.Show(ex.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
+                TryLibraryToast(ex.Message, MessageBoxImage.Error);
             }
         }
 
@@ -107,7 +107,7 @@ namespace PixelVaultNative
                 {
                     status.Text = "No manual intake items";
                     Log("Manual intake opened, but no unmatched image files were found.");
-                    MessageBox.Show("There are no unmatched intake images waiting for manual metadata.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
+                    TryLibraryToast("There are no unmatched intake images waiting for manual metadata.");
                     RefreshPreview();
                     return;
                 }
@@ -128,7 +128,7 @@ namespace PixelVaultNative
             {
                 status.Text = "Manual intake failed";
                 LogException("Import workflow", ex);
-                MessageBox.Show(ex.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
+                TryLibraryToast(ex.Message, MessageBoxImage.Error);
             }
         }
 

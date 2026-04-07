@@ -425,7 +425,7 @@ namespace PixelVaultNative
             {
                 if (h.SelectedItems == null || h.SelectedItems.Count == 0 || h.Items == null || h.Items.Count < 2)
                 {
-                    MessageBox.Show("Select one or more files. There must be a previous file in the list to copy from.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
+                    TryLibraryToast("Select one or more files. There must be a previous file in the list to copy from.");
                     return;
                 }
                 var ordered = h.SelectedItems
@@ -436,7 +436,7 @@ namespace PixelVaultNative
                 if (ordered.Count == 0) return;
                 if (ordered[0].Index < 1)
                 {
-                    MessageBox.Show("There is no previous file above the current selection in the list.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
+                    TryLibraryToast("There is no previous file above the current selection in the list.");
                     return;
                 }
                 foreach (var x in ordered)

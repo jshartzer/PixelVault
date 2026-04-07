@@ -74,7 +74,7 @@ namespace PixelVaultNative
                     if (caught != null)
                     {
                         LogException("ToggleLibraryFileStarredByPath", caught);
-                        MessageBox.Show(caught.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        TryLibraryToast("Could not update star: " + caught.Message, MessageBoxImage.Warning);
                     }
                     uiAfter?.Invoke();
                 }));
@@ -116,7 +116,7 @@ namespace PixelVaultNative
             catch (Exception ex)
             {
                 LogException("ToggleLibraryFileGamePhotographyTagByPath", ex);
-                MessageBox.Show(ex.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Warning);
+                TryLibraryToast(ex.Message, MessageBoxImage.Warning);
             }
         }
 
@@ -168,7 +168,7 @@ namespace PixelVaultNative
                     if (caught != null)
                     {
                         LogException("SaveLibraryFileCommentByPath", caught);
-                        MessageBox.Show(caught.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        TryLibraryToast("Could not save comment: " + caught.Message, MessageBoxImage.Warning);
                         uiAfter?.Invoke(false);
                         return;
                     }
@@ -188,7 +188,7 @@ namespace PixelVaultNative
             var item = BuildLibraryMetadataItemForPath(filePath, null);
             if (item == null)
             {
-                MessageBox.Show("That file could not be loaded for metadata editing.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
+                TryLibraryToast("That file could not be loaded for metadata editing.");
                 return;
             }
             var title = Path.GetFileName(filePath);

@@ -15,14 +15,14 @@ namespace PixelVaultNative
                 var pendingItems = h.SelectedItems.Distinct().ToList();
                 if (pendingItems.Count == 0)
                 {
-                    MessageBox.Show(importService.GetManualMetadataFinishEmptySelectionMessage(h.LibraryMode, h.ImportAndEditMode), "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
+                    TryLibraryToast(importService.GetManualMetadataFinishEmptySelectionMessage(h.LibraryMode, h.ImportAndEditMode));
                     return;
                 }
                 if (h.UseCustomTimeBox.IsChecked == true) saveSelectedDateTime();
                 importService.ApplyManualMetadataTagTextToPlatformFlags(pendingItems);
                 if (importService.ManualMetadataItemsMissingOtherPlatformName(pendingItems))
                 {
-                    MessageBox.Show("Enter a platform name in the Other box before applying changes.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
+                    TryLibraryToast("Enter a platform name in the Other box before applying changes.");
                     return;
                 }
                 if (h.ImportAndEditMode)

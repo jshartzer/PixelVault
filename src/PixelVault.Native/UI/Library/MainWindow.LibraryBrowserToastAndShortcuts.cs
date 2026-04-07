@@ -59,6 +59,45 @@ namespace PixelVaultNative
             ws.LibraryToastTimer?.Start();
         }
 
+        internal static string NormalizeForLibraryToast(string message, int maxChars = 400)
+        {
+            if (string.IsNullOrWhiteSpace(message)) return string.Empty;
+            var s = message.Trim().Replace("\r\n", "\n").Replace('\r', '\n').Replace('\n', ' ');
+            while (s.IndexOf("  ", StringComparison.Ordinal) >= 0) s = s.Replace("  ", " ", StringComparison.Ordinal);
+            s = s.Trim();
+            if (s.Length <= maxChars) return s;
+            return s.Substring(0, maxChars - 3) + "...";
+        }
+
+        /// <summary>Uses <paramref name="notify"/> when set (e.g. library toast); otherwise <see cref="MessageBox"/> with normalized text.</summary>
+        internal static void NotifyOrMessageBox(Action<string, MessageBoxImage> notify, string message, MessageBoxImage icon = MessageBoxImage.Information)
+        {
+            if (string.IsNullOrWhiteSpace(message)) return;
+            if (notify != null)
+            {
+                notify(message, icon);
+                return;
+            }
+            var text = NormalizeForLibraryToast(message);
+            if (string.IsNullOrEmpty(text)) return;
+            MessageBox.Show(text, "PixelVault", MessageBoxButton.OK, icon);
+        }
+
+        /// <summary>Shows a library toast when the browser working set is live; otherwise a non-blocking notice is unavailable so we fall back to <see cref="MessageBox"/>.</summary>
+        internal void TryLibraryToast(string message, MessageBoxImage fallbackIcon = MessageBoxImage.Information)
+        {
+            if (string.IsNullOrWhiteSpace(message)) return;
+            var text = NormalizeForLibraryToast(message);
+            if (string.IsNullOrEmpty(text)) return;
+            var ws = _libraryBrowserLiveWorkingSet;
+            if (ws != null && ws.LibraryToastBorder != null)
+            {
+                ShowLibraryBrowserToast(ws, text);
+                return;
+            }
+            MessageBox.Show(text, "PixelVault", MessageBoxButton.OK, fallbackIcon);
+        }
+
         void ShowLibraryBrowserKeyboardShortcutsHelp(Window owner)
         {
             var w = new Window
@@ -94,6 +133,8 @@ namespace PixelVaultNative
                 root.Children.Add(row);
             }
             AddRow("F1", "Open this shortcut list");
+            AddRow("Ctrl + Shift + P", "Command palette (library tools, sort, filter, import)");
+            AddRow("⋯ (footer)", "Open command palette (same as Ctrl+Shift+P)");
             AddRow("—", "Export Starred (toolbar): copy starred captures to the folder in Path Settings");
             AddRow("Enter", "Apply library search (search box)");
             AddRow("Ctrl + click", "Add or remove a capture from the selection");

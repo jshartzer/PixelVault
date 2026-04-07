@@ -962,13 +962,15 @@ namespace PixelVaultNative
                         else
                         {
                             if (status != null) status.Text = "Clip preview unavailable";
-                            MessageBox.Show("PixelVault could not generate a preview clip for this video. Check the FFmpeg path in Path Settings and try again.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
+                            TryLibraryToast("Could not generate a clip preview. Check the FFmpeg path in Path Settings.");
                         }
                     }
                     catch (Exception ex)
                     {
                         if (status != null) status.Text = "Clip preview unavailable";
-                        MessageBox.Show("PixelVault could not generate a preview clip for this video." + Environment.NewLine + Environment.NewLine + ex.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        var vm = ex.Message;
+                        if (vm.Length > 220) vm = vm.Substring(0, 217) + "...";
+                        TryLibraryToast("Clip preview failed: " + vm, MessageBoxImage.Warning);
                     }
                     finally
                     {

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media.Imaging;
 
@@ -48,6 +49,8 @@ namespace PixelVaultNative
         public Action PrepareExifOnBackgroundThread { get; init; }
         public Action<string> SetAppStatus { get; init; }
         public Action<string, Exception> LogError { get; init; }
+        /// <summary>Optional; when set, load failures use library toast when available.</summary>
+        public Action<string, MessageBoxImage> NotifyUser { get; init; }
         public Action OpenLibraryFolder { get; init; }
         public Action<string> OpenImageWithShell { get; init; }
         public Action<Image, string, int, Action<BitmapImage>> QueueImageLoad { get; init; }

@@ -29,7 +29,7 @@ namespace PixelVaultNative
             catch (Exception ex)
             {
                 _owner.LogException("LibraryBrowserHost.Show", ex);
-                MessageBox.Show(ex.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
+                _owner.TryLibraryToast(ex.Message, MessageBoxImage.Error);
             }
         }
     }

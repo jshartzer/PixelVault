@@ -1,3 +1,20 @@
+## 0.075.005
+- **Release:** Version **0.075.005** — **Slice F** (**PV-PLN-V1POL-001**): **curated folder filters** documented in **`docs/SMART_VIEWS_LIBRARY.md`**; two new persisted filter modes — **`needssteam`** (Steam-tagged folders with blank **Steam App ID**) and **`nocover`** (blank **PreviewImagePath**); shared predicate **`LibraryBrowserFolderViewMatchesFilter`**; **Filter** menu + command palette entries + settings aliases; tests for normalize, predicates, and full palette registry binding.
+
+## 0.075.004
+- **Release:** Version **0.075.004** — **Slice E** (**PV-PLN-V1POL-001**): library command palette **registry** (**LibraryCommandPaletteRegistry**) with stable Ids, search **keywords**, and **BuildHandlerMap**; **footer ⋯** opens the palette; **sort / filter / group** folder commands and **clear folder search**; filter matches title, hint, and keywords; **Tab** moves focus from search into the list. **xUnit** tests for registry invariants and full-context binding.
+
+## 0.075.003
+- **Release:** Version **0.075.003** — **Slice D** wrap-up + **Slice E** start (**PV-PLN-V1POL-001**).
+- **Modals:** Remaining library-adjacent confirms now **center on the correct owner window** where it matters: **delete captures** (detail pane), **refresh all covers** (nav), **metadata review** finish (**YesNoCancel** / **OKCancel**).
+- **Command palette (Slice E):** **Ctrl+Shift+P** in the library opens a **searchable command list** (import, indexes, settings, **Setup & health**, photography gallery, starred export, refresh folders, shortcuts help, etc.). Footer and **F1** help list updated.
+
+## 0.075.002
+- **Release:** Version **0.075.002** — **Slice D** (**PV-PLN-V1POL-001**) continued: **`MainWindow.NotifyOrMessageBox`** routes **OK-only** messages through an optional **`NotifyUser`** callback (wired to **`TryLibraryToast`** from **`MainWindow`**) for **photo index**, **game index**, and **filename convention** editors; **intake preview** fatal errors; **photography gallery** load failures; **manual metadata** informational prompts (Steam search, copy-from-previous, finish validation). **Undo** “nothing to undo” uses **`TryLibraryToast`**. Multi-choice **OKCancel** / **YesNoCancel** dialogs are unchanged.
+
+## 0.075.001
+- **Release:** Version **0.075.001** — **Library toasts** (Slice D, **`PV-PLN-V1POL-001`**) — second batch: shared **`NormalizeForLibraryToast`** (collapse newlines, cap length); **`TryLibraryToast`** is **`internal`** for hosts. When the library browser is live, **OK-only** notices use the toast instead of **`MessageBox`** for: index editors / filename rules entry errors (**`OpenPhotoIndexEditor`**, **`OpenGameIndexEditor`**, **`OpenFilenameConventionEditor`**), **library metadata apply** failure after the progress dialog, **Export Starred**, **Settings** “library folder changed” guidance, **import** workflow / manual intake / sort / undo errors and informational empty states, **photography gallery** open failure, **`LibraryBrowserHost`**, and **game photography tag** toggle errors. **Confirmations** (e.g. undo import **OKCancel**) stay modal.
+
 ## 0.075.000
 - **Release:** Version **0.075.000** — Pre-1.0 **version renumber** plus **library empty/loading polish** (Slice C, **`PV-PLN-V1POL-001`**).
 - **Versioning:** Active build train moves to **`0.075.000`** (middle segment **075**, patch **000**) to open space toward **`1.000.000`** while keeping the established **`M.AAA.BBB`** three-part format. **This number is lower than the prior `0.999.xxx` train only on paper** — behaviour and migrations are unchanged; older changelog headers remain below for history.

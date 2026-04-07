@@ -55,6 +55,7 @@ namespace PixelVaultNative
             navChrome.FetchButton.Click += delegate
             {
                 var choice = MessageBox.Show(
+                    libraryWindow,
                     "Refresh cover art for the entire library?",
                     "PixelVault",
                     MessageBoxButton.OKCancel,
@@ -148,7 +149,23 @@ namespace PixelVaultNative
                 };
                 largeItem.Click += delegate { setLibraryFilterMode("large"); };
 
-                OpenLibraryButtonMenu(panes.FilterMenuButton, allItem, completedItem, crossPlatformItem, largeItem);
+                var needsSteamItem = new MenuItem
+                {
+                    Header = "Steam · missing App ID",
+                    IsCheckable = true,
+                    IsChecked = string.Equals(NormalizeLibraryFolderFilterMode(libraryFolderFilterMode), "needssteam", StringComparison.OrdinalIgnoreCase)
+                };
+                needsSteamItem.Click += delegate { setLibraryFilterMode("needssteam"); };
+
+                var noCoverItem = new MenuItem
+                {
+                    Header = "No cover path",
+                    IsCheckable = true,
+                    IsChecked = string.Equals(NormalizeLibraryFolderFilterMode(libraryFolderFilterMode), "nocover", StringComparison.OrdinalIgnoreCase)
+                };
+                noCoverItem.Click += delegate { setLibraryFilterMode("nocover"); };
+
+                OpenLibraryButtonMenu(panes.FilterMenuButton, allItem, completedItem, crossPlatformItem, largeItem, needsSteamItem, noCoverItem);
             };
         }
     }

@@ -20,7 +20,7 @@ namespace PixelVaultNative
                 }
                 if (h.SelectedItems.Count == 0)
                 {
-                    MessageBox.Show("Select one or more captures before searching Steam.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
+                    TryLibraryToast("Select one or more captures before searching Steam.");
                     return;
                 }
                 var query = CleanTag(h.SteamSearchBox.Text);
@@ -40,7 +40,7 @@ namespace PixelVaultNative
                 }
                 if (string.IsNullOrWhiteSpace(query))
                 {
-                    MessageBox.Show("Enter a game title or a numeric Steam AppID in the search box, then click Search Steam.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
+                    TryLibraryToast("Enter a game title or a numeric Steam AppID in the search box, then click Search Steam.");
                     return;
                 }
 

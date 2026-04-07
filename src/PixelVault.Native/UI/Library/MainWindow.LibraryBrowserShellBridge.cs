@@ -112,6 +112,8 @@ namespace PixelVaultNative
 
             public string NormalizeLibraryFolderFilterMode(string value) => _m.NormalizeLibraryFolderFilterMode(value);
 
+            public string LibraryFolderFilterModeLabel(string value) => _m.LibraryFolderFilterModeLabel(value);
+
             public string NormalizeLibraryGroupingMode(string value) => _m.NormalizeLibraryGroupingMode(value);
 
             public void LibraryBrowserApplySortGroupPillState(Button button, bool active) => _m.LibraryBrowserApplySortGroupPillState(button, active);
@@ -134,6 +136,31 @@ namespace PixelVaultNative
 
             public void ShowLibraryBrowserKeyboardShortcutsHelp(Window owner) => _m.ShowLibraryBrowserKeyboardShortcutsHelp(owner);
 
+            public void ShowLibraryCommandPalette(Window owner, LibraryBrowserPaletteContext context, string initialSearch) =>
+                LibraryCommandPaletteWindow.Show(owner, context, initialSearch);
+
+            public void LibraryBrowserPaletteOpenSettings() => _m.LibraryBrowserPaletteOpenSettings();
+
+            public void LibraryBrowserPaletteOpenHealthDashboard(Window owner) => _m.LibraryBrowserPaletteOpenHealthDashboard(owner);
+
+            public void LibraryBrowserPaletteOpenGameIndex() => _m.LibraryBrowserPaletteOpenGameIndex();
+
+            public void LibraryBrowserPaletteOpenPhotoIndex() => _m.LibraryBrowserPaletteOpenPhotoIndex();
+
+            public void LibraryBrowserPaletteOpenFilenameRules() => _m.LibraryBrowserPaletteOpenFilenameRules();
+
+            public void LibraryBrowserPaletteOpenPhotographyGallery(Window owner) => _m.LibraryBrowserPaletteOpenPhotographyGallery(owner);
+
+            public void LibraryBrowserPaletteOpenSavedCoversFolder() => _m.LibraryBrowserPaletteOpenSavedCoversFolder();
+
+            public void LibraryBrowserPaletteRunImport(bool withReview) => _m.LibraryBrowserPaletteRunImport(withReview);
+
+            public void LibraryBrowserPaletteOpenManualIntake() => _m.LibraryBrowserPaletteOpenManualIntake();
+
+            public void LibraryBrowserPaletteShowIntakePreview() => _m.LibraryBrowserPaletteShowIntakePreview();
+
+            public void LibraryBrowserPaletteExportStarred(Window owner) => _m.LibraryBrowserPaletteExportStarred(owner);
+
             public void LibraryBrowserOpenSingleFileMetadataEditor(
                 LibraryBrowserWorkingSet ws,
                 string filePath,
@@ -145,12 +172,13 @@ namespace PixelVaultNative
                 _m.LibraryBrowserOpenSingleFileMetadataEditor(ws, filePath, getVisibleDetailFilesOrdered, getSelectedDetailFiles, getDisplayFolder, getActionFolder, refreshLibraryFoldersAsync);
 
             public void LibraryBrowserDeleteSelectedCaptures(
+                Window owner,
                 LibraryBrowserWorkingSet ws,
                 Func<List<string>> getSelectedDetailFiles,
                 Action renderTiles,
                 Action renderSelectedFolder,
                 Action<bool> refreshLibraryFoldersAsync) =>
-                _m.LibraryBrowserDeleteSelectedCaptures(ws, getSelectedDetailFiles, renderTiles, renderSelectedFolder, refreshLibraryFoldersAsync);
+                _m.LibraryBrowserDeleteSelectedCaptures(owner, ws, getSelectedDetailFiles, renderTiles, renderSelectedFolder, refreshLibraryFoldersAsync);
 
             public void LibraryBrowserRenderSelectedFolderDetail(
                 LibraryBrowserWorkingSet ws,

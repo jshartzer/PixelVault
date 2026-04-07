@@ -26,6 +26,8 @@ namespace PixelVaultNative
 
     internal sealed class GameIndexEditorServices
     {
+        /// <summary>Optional; when set (e.g. library toast), used for OK-only errors instead of a modal.</summary>
+        public Action<string, MessageBoxImage> NotifyUser { get; set; }
         public Action<string> SetStatus { get; set; }
         public Action<string> Log { get; set; }
         public Func<string, RoutedEventHandler, string, Brush, Button> CreateButton { get; set; }
@@ -286,7 +288,7 @@ namespace PixelVaultNative
                             var flattened = t.Exception == null ? null : t.Exception.Flatten();
                             var err = flattened == null ? new Exception("Reload failed.") : flattened.InnerExceptions.First();
                             services.Log("Game index reload failed. " + err);
-                            MessageBox.Show("Could not reload the game index." + Environment.NewLine + Environment.NewLine + err.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
+                            MainWindow.NotifyOrMessageBox(services.NotifyUser, "Could not reload the game index." + Environment.NewLine + Environment.NewLine + err.Message, MessageBoxImage.Error);
                             refreshStatus();
                             return;
                         }
@@ -399,7 +401,7 @@ namespace PixelVaultNative
                 {
                     services.SetStatus("Game index resolve failed");
                     services.Log("Failed to resolve external game index IDs. " + resolveEx.Message);
-                    MessageBox.Show("Could not resolve external IDs for the game index." + Environment.NewLine + Environment.NewLine + resolveEx.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
+                    MainWindow.NotifyOrMessageBox(services.NotifyUser, "Could not resolve external IDs for the game index." + Environment.NewLine + Environment.NewLine + resolveEx.Message, MessageBoxImage.Error);
                 }
             };
             openFolderButton.Click += delegate
@@ -449,7 +451,7 @@ namespace PixelVaultNative
                 {
                     services.SetStatus("Game index save failed");
                     services.Log("Failed to save game index. " + saveEx.Message);
-                    MessageBox.Show("Could not save the game index." + Environment.NewLine + Environment.NewLine + saveEx.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
+                    MainWindow.NotifyOrMessageBox(services.NotifyUser, "Could not save the game index." + Environment.NewLine + Environment.NewLine + saveEx.Message, MessageBoxImage.Error);
                 }
             };
             editorWindow.Closed += delegate

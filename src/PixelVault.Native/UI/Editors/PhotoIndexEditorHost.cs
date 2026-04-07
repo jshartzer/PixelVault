@@ -11,6 +11,8 @@ namespace PixelVaultNative
 {
     internal sealed class PhotoIndexEditorServices
     {
+        /// <summary>Optional; when set (e.g. library toast), used for OK-only errors instead of a modal.</summary>
+        public Action<string, MessageBoxImage> NotifyUser { get; set; }
         public Action<string> SetStatus { get; set; }
         public Action<string> Log { get; set; }
         public Func<string, RoutedEventHandler, string, Brush, Button> CreateButton { get; set; }
@@ -376,7 +378,7 @@ namespace PixelVaultNative
                 {
                     services.SetStatus("Photo index save failed");
                     services.Log("Failed to save photo index. " + saveEx.Message);
-                    MessageBox.Show("Could not save the photo index." + Environment.NewLine + Environment.NewLine + saveEx.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
+                    MainWindow.NotifyOrMessageBox(services.NotifyUser, "Could not save the photo index." + Environment.NewLine + Environment.NewLine + saveEx.Message, MessageBoxImage.Error);
                 }
             };
             editorWindow.Closed += delegate

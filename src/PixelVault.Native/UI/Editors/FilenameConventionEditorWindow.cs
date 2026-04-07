@@ -14,6 +14,8 @@ namespace PixelVaultNative
 {
     internal sealed class FilenameConventionEditorServices
     {
+        /// <summary>Optional; when set (e.g. library toast), used for OK-only notices instead of a modal.</summary>
+        public Action<string, MessageBoxImage> NotifyUser { get; set; }
         public IFilenameRulesService RulesService { get; set; }
         public IFilenameParserService ParserService { get; set; }
         public Action<string> SetStatus { get; set; }
@@ -666,13 +668,13 @@ namespace PixelVaultNative
             {
                 if (sample == null)
                 {
-                    MessageBox.Show("Select a recent unmatched sample first.", "PixelVault");
+                    MainWindow.NotifyOrMessageBox(services.NotifyUser, "Select a recent unmatched sample first.");
                     return;
                 }
                 var candidate = services.RulesService.CreateRuleFromSample(sample);
                 if (candidate == null || string.IsNullOrWhiteSpace(candidate.PatternText ?? candidate.Pattern))
                 {
-                    MessageBox.Show("Could not turn the selected sample into a starter rule.", "PixelVault");
+                    MainWindow.NotifyOrMessageBox(services.NotifyUser, "Could not turn the selected sample into a starter rule.");
                     return;
                 }
 
@@ -828,7 +830,7 @@ namespace PixelVaultNative
                 {
                     services.SetStatus("Filename rule save failed");
                     services.Log("Failed to save filename rules. " + saveEx.Message);
-                    MessageBox.Show("Could not save the filename rules." + Environment.NewLine + Environment.NewLine + saveEx.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
+                    MainWindow.NotifyOrMessageBox(services.NotifyUser, "Could not save the filename rules." + Environment.NewLine + Environment.NewLine + saveEx.Message, MessageBoxImage.Error);
                 }
             }
 
@@ -876,7 +878,7 @@ namespace PixelVaultNative
                 var chosen = ShowPromoteChooser();
                 if (chosen.Length == 0)
                 {
-                    if (!samples.Any(sample => sample != null && sample.OccurrenceCount >= 2)) MessageBox.Show("There are no repeated unmatched samples yet. Select a sample and use Create Rule From Sample instead.", "PixelVault");
+                    if (!samples.Any(sample => sample != null && sample.OccurrenceCount >= 2)) MainWindow.NotifyOrMessageBox(services.NotifyUser, "There are no repeated unmatched samples yet. Select a sample and use Create Rule From Sample instead.");
                     return;
                 }
                 foreach (var sample in chosen) CreateRuleFromSample(sample);
@@ -887,7 +889,7 @@ namespace PixelVaultNative
                 var builtInRule = builtInGrid.SelectedItem as FilenameConventionRule;
                 if (builtInRule == null)
                 {
-                    MessageBox.Show("Select a built-in rule first.", "PixelVault");
+                    MainWindow.NotifyOrMessageBox(services.NotifyUser, "Select a built-in rule first.");
                     return;
                 }
 
@@ -896,7 +898,7 @@ namespace PixelVaultNative
                 dirty = true;
                 RefreshLists(true);
                 SelectCustomRule(overrideRule, false);
-                MessageBox.Show("This does not delete the built-in rule. PixelVault saved a custom override for this library and marked it disabled. Save the rules to make that override active.", "PixelVault");
+                MainWindow.NotifyOrMessageBox(services.NotifyUser, "This does not delete the built-in rule. PixelVault saved a custom override for this library and marked it disabled. Save the rules to make that override active.");
             };
             reloadButton.Click += delegate { ReloadState(); };
             saveTopButton.Click += delegate { SaveRules(); };

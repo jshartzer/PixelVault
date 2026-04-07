@@ -87,7 +87,7 @@ namespace PixelVaultNative
             Log("Library folder path differs from library_index_anchor — per-path index scope. " + libraryIndexAnchor + " vs " + (libraryRoot ?? string.Empty));
             try
             {
-                MessageBox.Show(msg, "PixelVault — library folder changed", MessageBoxButton.OK, MessageBoxImage.Information);
+                TryLibraryToast(msg, MessageBoxImage.Information);
             }
             catch
             {

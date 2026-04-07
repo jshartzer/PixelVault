@@ -23,6 +23,8 @@ namespace PixelVaultNative
         public Action<IntakePreviewSummary> LogSummary { get; set; }
         public Func<string, RoutedEventHandler, string, Brush, Button> CreateButton { get; set; }
         public Func<string, Brush> PreviewBadge { get; set; }
+        /// <summary>Optional; when set, OK-only errors use library toast when available.</summary>
+        public Action<string, MessageBoxImage> NotifyUser { get; set; }
         public Func<string, int> PlatformOrder { get; set; }
         public Func<DateTime, string> FormatTimestamp { get; set; }
         public Func<string, string> FilenameGuess { get; set; }
@@ -471,7 +473,7 @@ namespace PixelVaultNative
                 if (services.SyncSettingsDocumentError != null) services.SyncSettingsDocumentError(ex.Message);
                 if (services.SetStatus != null) services.SetStatus("Preview failed");
                 if (services.Log != null) services.Log(ex.Message);
-                MessageBox.Show(ex.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
+                MainWindow.NotifyOrMessageBox(services.NotifyUser, ex.Message, MessageBoxImage.Error);
             }
         }
     }

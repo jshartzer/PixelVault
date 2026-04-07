@@ -27,7 +27,7 @@ namespace PixelVaultNative
             var targetFolders = (requestedFolders ?? new List<LibraryFolderInfo>()).Where(folder => folder != null && !string.IsNullOrWhiteSpace(folder.FolderPath)).ToList();
             if (targetFolders.Count == 0)
             {
-                MessageBox.Show("No library folder is available for cover refresh.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
+                ShowLibraryBrowserToast(ws, "No library folder is available for cover refresh.");
                 return;
             }
             var resolvedScopeLabel = string.IsNullOrWhiteSpace(scopeLabel) ? (targetFolders.Count == 1 ? "selected folder" : "library") : scopeLabel.Trim();
@@ -130,7 +130,9 @@ namespace PixelVaultNative
                             if (progressMeta != null) progressMeta.Text = refreshError.Message;
                             appendProgress("ERROR: " + refreshError.Message);
                             LogException("Library cover refresh", refreshError);
-                            MessageBox.Show(refreshError.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
+                            var errText = refreshError.Message;
+                            if (errText.Length > 400) errText = errText.Substring(0, 397) + "...";
+                            ShowLibraryBrowserToast(ws, "Cover refresh failed: " + errText);
                         }
                         else
                         {
@@ -173,7 +175,9 @@ namespace PixelVaultNative
                     actionButton.IsEnabled = true;
                     actionButton.Content = "Close";
                 }
-                MessageBox.Show(ex.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
+                var msg = ex.Message;
+                if (msg.Length > 400) msg = msg.Substring(0, 397) + "...";
+                ShowLibraryBrowserToast(ws, "Cover refresh failed: " + msg);
             }
         }
     }

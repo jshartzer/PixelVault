@@ -57,26 +57,7 @@ namespace PixelVaultNative
                     && folder.SearchBlob.IndexOf(searchNormalized, StringComparison.Ordinal) >= 0)
                 .ToList();
             visibleFolders = visibleFolders
-                .Where(folder =>
-                {
-                    switch (filterMode)
-                    {
-                        case "completed":
-                            return folder != null && folder.IsCompleted100Percent;
-                        case "crossplatform":
-                            return folder != null
-                                && (((folder.PlatformLabels ?? new string[0])
-                                    .Where(label => !string.IsNullOrWhiteSpace(label))
-                                    .Select(NormalizeConsoleLabel)
-                                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                                    .Count()) > 1
-                                    || folder.IsMergedAcrossPlatforms);
-                        case "large":
-                            return folder != null && folder.FileCount >= 25;
-                        default:
-                            return true;
-                    }
-                })
+                .Where(folder => LibraryBrowserFolderViewMatchesFilter(filterMode, folder, NormalizeConsoleLabel))
                 .ToList();
             filterSortStopwatch.Stop();
             if (timelineMode)

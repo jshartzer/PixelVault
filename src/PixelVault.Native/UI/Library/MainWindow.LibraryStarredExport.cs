@@ -92,12 +92,7 @@ namespace PixelVaultNative
             var dest = (starredExportFolder ?? string.Empty).Trim();
             if (string.IsNullOrWhiteSpace(dest))
             {
-                MessageBox.Show(
-                    owner,
-                    "Set a Starred export folder in Path Settings, then try again.",
-                    "Export Starred",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
+                TryLibraryToast("Export Starred: set a folder in Path Settings, then try again.");
                 return;
             }
             var root = libraryWorkspace != null && !string.IsNullOrWhiteSpace(libraryWorkspace.LibraryRoot)
@@ -105,12 +100,7 @@ namespace PixelVaultNative
                 : libraryRoot;
             if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root))
             {
-                MessageBox.Show(
-                    owner,
-                    "Library folder is not set or was not found.",
-                    "Export Starred",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
+                TryLibraryToast("Export Starred: library folder is not set or was not found.");
                 return;
             }
 
@@ -130,18 +120,13 @@ namespace PixelVaultNative
             catch (Exception ex)
             {
                 LogException("Export Starred (enumerate)", ex);
-                MessageBox.Show(owner, ex.Message, "Export Starred", MessageBoxButton.OK, MessageBoxImage.Warning);
+                TryLibraryToast("Export Starred: " + ex.Message, MessageBoxImage.Warning);
                 return;
             }
 
             if (paths.Count == 0)
             {
-                MessageBox.Show(
-                    owner,
-                    "No starred files found in the photo index for this library.",
-                    "Export Starred",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
+                TryLibraryToast("Export Starred: no starred files in the photo index for this library.");
                 return;
             }
 
@@ -152,7 +137,7 @@ namespace PixelVaultNative
             catch (Exception ex)
             {
                 LogException("Export Starred (create folder)", ex);
-                MessageBox.Show(owner, "Could not create or access the export folder." + Environment.NewLine + Environment.NewLine + ex.Message, "Export Starred", MessageBoxButton.OK, MessageBoxImage.Warning);
+                TryLibraryToast("Export Starred: could not create or access the export folder. " + ex.Message, MessageBoxImage.Warning);
                 return;
             }
 
@@ -222,25 +207,11 @@ namespace PixelVaultNative
                         ? "Export Starred: " + copied + " updated, " + skipped + " skipped"
                         : "Export Starred: " + failed + " failed";
                     if (failed == 0)
-                    {
-                        MessageBox.Show(
-                            owner,
-                            copied + " file" + (copied == 1 ? string.Empty : "s") + " copied (new or changed)." + Environment.NewLine
-                            + skipped + " already up to date." + Environment.NewLine + Environment.NewLine + destNorm,
-                            "Export Starred",
-                            MessageBoxButton.OK,
-                            MessageBoxImage.Information);
-                    }
+                        TryLibraryToast(summary);
                     else
-                    {
-                        MessageBox.Show(
-                            owner,
-                            copied + " copied, " + skipped + " skipped, " + failed + " failed."
-                            + (string.IsNullOrWhiteSpace(lastError) ? string.Empty : Environment.NewLine + Environment.NewLine + lastError),
-                            "Export Starred",
-                            MessageBoxButton.OK,
+                        TryLibraryToast(
+                            summary + (string.IsNullOrWhiteSpace(lastError) ? string.Empty : " — " + lastError),
                             MessageBoxImage.Warning);
-                    }
                 }));
             });
         }

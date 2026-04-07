@@ -116,7 +116,7 @@ Recommended order balances **safety**, **reuse of seams** (`ILibraryBrowserShell
 | C | `MainWindow.LibraryBrowserRender.FolderList.cs`, `MainWindow.LibraryBrowserRender.DetailPane.cs` |
 | D | Grep `MessageBox.Show` under `src/PixelVault.Native` |
 | E | New `CommandPaletteWindow` + chord in `LibraryBrowserShowOrchestration` |
-| F | `SettingsService` filter modes, `LibraryScanner` / index queries, library chrome |
+| F | `SettingsService` filter modes, `LibraryScanner` / index queries, library chrome — see **`docs/SMART_VIEWS_LIBRARY.md`** |
 | G | Drawer host + `ILibraryBrowserShell` bridge |
 | H/J | `App.xaml` themes, shared `Button`/`Focus` styles |
 
@@ -145,3 +145,6 @@ Planning/status for this initiative: **[PV-PLN-V1POL-001 — Pre-V1 polish progr
 | Date | Change |
 |------|--------|
 | 2026-04-05 | Initial plan authored in repo (`PV-PLN-V1POL-001`). |
+| 2026-04-05 | Slice **D** (MessageBox audit / toasts) treated complete for ship scope; Slice **E** started — library **Ctrl+Shift+P** command palette + confirm dialogs parented to library/review window. |
+| 2026-04-05 | Slice **E**: **LibraryCommandPaletteRegistry** (ids + keywords), **⋯** toolbar control, sort/filter/group + clear-search commands, keyword filtering, **Tab** to list; tests for registry invariants + handler binding. |
+| 2026-04-05 | Slice **F** (first cut): **`docs/SMART_VIEWS_LIBRARY.md`**, filters **`needssteam`** / **`nocover`**, **Filter** menu + palette; **`LibraryBrowserFolderViewMatchesFilter`** + tests. |

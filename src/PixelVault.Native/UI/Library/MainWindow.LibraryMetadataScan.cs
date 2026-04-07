@@ -16,7 +16,7 @@ namespace PixelVaultNative
         {
             if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root))
             {
-                MessageBox.Show("Library folder not found. Check Settings before running a metadata rebuild.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
+                TryLibraryToast("Library folder not found. Check Path Settings before running a metadata rebuild.");
                 return;
             }
 
@@ -132,7 +132,9 @@ namespace PixelVaultNative
                             if (progressMeta != null) progressMeta.Text = scanError.Message;
                             appendProgress("ERROR: " + scanError.Message);
                             LogException("Library metadata scan", scanError);
-                            MessageBox.Show(scanError.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
+                            var emsg = scanError.Message;
+                            if (emsg.Length > 400) emsg = emsg.Substring(0, 397) + "...";
+                            TryLibraryToast("Library scan failed: " + emsg, MessageBoxImage.Warning);
                         }
                         else
                         {
@@ -172,7 +174,9 @@ namespace PixelVaultNative
                     actionButton.IsEnabled = true;
                     actionButton.Content = "Close";
                 }
-                MessageBox.Show(ex.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
+                var emsg2 = ex.Message;
+                if (emsg2.Length > 400) emsg2 = emsg2.Substring(0, 397) + "...";
+                TryLibraryToast("Library scan failed: " + emsg2, MessageBoxImage.Warning);
             }
         }
     }

@@ -15,12 +15,12 @@ namespace PixelVaultNative
         {
             if (folder == null)
             {
-                MessageBox.Show("Choose a library folder first.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
+                TryLibraryToast("Choose a library folder first.");
                 return;
             }
             if (string.IsNullOrWhiteSpace(libraryRoot) || !Directory.Exists(libraryRoot))
             {
-                MessageBox.Show("Library folder not found. Check Settings before editing IDs.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
+                TryLibraryToast("Library folder not found. Check Path Settings before editing IDs.");
                 return;
             }
 
@@ -132,7 +132,7 @@ namespace PixelVaultNative
                 var queryTitle = CleanTag(folder.Name ?? string.Empty);
                 if (string.IsNullOrWhiteSpace(queryTitle))
                 {
-                    MessageBox.Show("This folder has no name to search with.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
+                    TryLibraryToast("This folder has no name to search with.");
                     return;
                 }
                 cancelButton.IsEnabled = false;
@@ -187,7 +187,7 @@ namespace PixelVaultNative
                             hint += Environment.NewLine + Environment.NewLine + "Add a SteamGridDB API token in Settings to enable SteamGridDB ID lookup.";
                         else if (string.IsNullOrWhiteSpace(existingGrid) && HasSteamGridDbApiToken() && !string.IsNullOrWhiteSpace(appForGrid))
                             hint += Environment.NewLine + Environment.NewLine + "SteamGridDB did not return a single confident match for that title.";
-                        MessageBox.Show(hint, "Look up IDs", MessageBoxButton.OK, MessageBoxImage.Information);
+                        TryLibraryToast(hint.Replace(Environment.NewLine, " "));
                     }
                     else
                     {
@@ -200,13 +200,13 @@ namespace PixelVaultNative
                             else if (string.IsNullOrWhiteSpace(existingGrid)) lines.Add("SteamGridDB ID: no confident match (you can search the site manually).");
                         }
                         else if (string.IsNullOrWhiteSpace(existingGrid)) lines.Add("SteamGridDB ID: skipped (no API token in Settings).");
-                        MessageBox.Show(string.Join(Environment.NewLine, lines), "Look up IDs", MessageBoxButton.OK, MessageBoxImage.Information);
+                        TryLibraryToast(string.Join(" · ", lines));
                     }
                 }
                 catch (Exception ex)
                 {
                     LogException("Look up folder IDs", ex);
-                    MessageBox.Show("Lookup failed." + Environment.NewLine + Environment.NewLine + ex.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    TryLibraryToast("ID lookup failed: " + ex.Message, MessageBoxImage.Warning);
                 }
                 finally
                 {
@@ -261,7 +261,7 @@ namespace PixelVaultNative
                 catch (Exception ex)
                 {
                     LogException("Save folder IDs", ex);
-                    MessageBox.Show("Could not save the folder IDs." + Environment.NewLine + Environment.NewLine + ex.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
+                    TryLibraryToast("Could not save folder IDs: " + ex.Message, MessageBoxImage.Warning);
                 }
             };
 

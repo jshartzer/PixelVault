@@ -96,7 +96,7 @@ namespace PixelVaultNative
                         progressMeta.Text = error.Message;
                         appendProgress("ERROR: " + error.Message);
                         LogException("Import workflow", error);
-                        MessageBox.Show(error.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
+                        TryLibraryToast(error.Message, MessageBoxImage.Error);
                         return;
                     }
 
@@ -117,7 +117,7 @@ namespace PixelVaultNative
                         progressMeta.Text = ex.Message;
                         appendProgress("ERROR: " + ex.Message);
                         LogException("Import workflow", ex);
-                        MessageBox.Show(ex.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
+                        TryLibraryToast(ex.Message, MessageBoxImage.Error);
                     }
                 }));
             }, TaskScheduler.Default);

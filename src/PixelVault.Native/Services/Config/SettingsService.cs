@@ -40,6 +40,8 @@ namespace PixelVaultNative
             if (normalized == "completed" || normalized == "100" || normalized == "100%" || normalized == "100 percent" || normalized == "100 percent achievements") return "completed";
             if (normalized == "crossplatform" || normalized == "cross-platform" || normalized == "cross platform" || normalized == "multiple platforms") return "crossplatform";
             if (normalized == "large" || normalized == "25+" || normalized == "25 plus" || normalized == "25+ captures" || normalized == "large collection") return "large";
+            if (normalized == "needssteam" || normalized == "needs_steam" || normalized == "steam no app" || normalized == "missing steam appid" || normalized == "missing steam app id" || normalized == "steam missing appid") return "needssteam";
+            if (normalized == "nocover" || normalized == "no_cover" || normalized == "no cover" || normalized == "missing cover" || normalized == "without cover") return "nocover";
             return "all";
         }
 

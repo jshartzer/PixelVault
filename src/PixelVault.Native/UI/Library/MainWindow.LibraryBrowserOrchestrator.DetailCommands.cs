@@ -9,6 +9,7 @@ namespace PixelVaultNative
     public sealed partial class MainWindow
     {
         void LibraryBrowserDeleteSelectedCaptures(
+            Window owner,
             LibraryBrowserWorkingSet ws,
             Func<List<string>> getSelectedDetailFiles,
             Action renderTiles,
@@ -17,7 +18,7 @@ namespace PixelVaultNative
         {
             if (ws.Current == null)
             {
-                MessageBox.Show("Choose a capture first.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
+                ShowLibraryBrowserToast(ws, "Choose a capture first.");
                 return;
             }
             var selectedFiles = getSelectedDetailFiles()
@@ -26,10 +27,11 @@ namespace PixelVaultNative
                 .ToList();
             if (selectedFiles.Count == 0)
             {
-                MessageBox.Show("Select one or more captures to delete.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
+                ShowLibraryBrowserToast(ws, "Select one or more captures to delete.");
                 return;
             }
             var confirm = MessageBox.Show(
+                owner,
                 "Delete " + selectedFiles.Count + " selected capture(s) from the library?\n\nThis removes the file" + (selectedFiles.Count == 1 ? string.Empty : "s") + " from disk and removes the photo index record" + (selectedFiles.Count == 1 ? string.Empty : "s") + ".",
                 "Delete Capture",
                 MessageBoxButton.OKCancel,
@@ -86,11 +88,11 @@ namespace PixelVaultNative
                     : "Deleted " + removedFiles.Count + " capture(s) with " + failures.Count + " failure(s)");
             if (failures.Count > 0)
             {
-                MessageBox.Show(
-                    "Some files could not be deleted." + Environment.NewLine + Environment.NewLine + string.Join(Environment.NewLine, failures.Take(8).ToArray()),
-                    "PixelVault",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
+                var detail = string.Join(" · ", failures.Take(4));
+                if (detail.Length > 320) detail = detail.Substring(0, 317) + "...";
+                ShowLibraryBrowserToast(ws,
+                    "Some files could not be deleted"
+                    + (string.IsNullOrWhiteSpace(detail) ? string.Empty : " — " + detail));
             }
             if (removedFiles.Count > 0) NotifyPhotographyGalleryAfterLibraryFilesRemoved();
         }
@@ -106,7 +108,7 @@ namespace PixelVaultNative
         {
             if (ws.Current == null)
             {
-                MessageBox.Show("Choose a capture first.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
+                ShowLibraryBrowserToast(ws, "Choose a capture first.");
                 return;
             }
             EnsureExifTool();
@@ -117,7 +119,7 @@ namespace PixelVaultNative
             HashSet<string> wantedFiles;
             if (timelineView && selectedFiles.Count == 0 && string.IsNullOrWhiteSpace(filePath))
             {
-                MessageBox.Show("Select one or more captures to edit in the timeline.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
+                ShowLibraryBrowserToast(ws, "Select one or more captures to edit in the timeline.");
                 return;
             }
             if (selectedFiles.Count > 0 && (string.IsNullOrWhiteSpace(filePath) || ws.SelectedDetailFiles.Contains(filePath)))
@@ -128,12 +130,12 @@ namespace PixelVaultNative
                 wantedFiles = new HashSet<string>(new[] { filePath }, StringComparer.OrdinalIgnoreCase);
             else
             {
-                MessageBox.Show("Choose a capture first.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
+                ShowLibraryBrowserToast(ws, "Choose a capture first.");
                 return;
             }
             if (wantedFiles.Count == 0)
             {
-                MessageBox.Show("Choose a capture first.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
+                ShowLibraryBrowserToast(ws, "Choose a capture first.");
                 return;
             }
             var displayFolder = getDisplayFolder(ws.Current);
@@ -151,7 +153,7 @@ namespace PixelVaultNative
                     .ToList();
             if (selectedItems.Count == 0)
             {
-                MessageBox.Show("That capture could not be loaded for metadata editing.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
+                ShowLibraryBrowserToast(ws, "That capture could not be loaded for metadata editing.");
                 return;
             }
             var selectedTitle = selectedItems.Count == 1
@@ -190,7 +192,7 @@ namespace PixelVaultNative
         {
             if (focusFolder == null)
             {
-                MessageBox.Show("Choose a library folder first.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
+                ShowLibraryBrowserToast(ws, "Choose a library folder first.");
                 return;
             }
             showFolder(focusFolder);

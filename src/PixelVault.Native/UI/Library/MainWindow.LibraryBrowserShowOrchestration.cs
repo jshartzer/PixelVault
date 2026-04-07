@@ -138,11 +138,7 @@ namespace PixelVaultNative
                         string.Equals(sortMode, "added", StringComparison.OrdinalIgnoreCase) ? "Date Added" :
                         string.Equals(sortMode, "photos", StringComparison.OrdinalIgnoreCase) ? "Most Photos" :
                         "Alphabetical";
-                    var filterLabel =
-                        string.Equals(filterMode, "completed", StringComparison.OrdinalIgnoreCase) ? "100% Achievements" :
-                        string.Equals(filterMode, "crossplatform", StringComparison.OrdinalIgnoreCase) ? "Cross-Platform" :
-                        string.Equals(filterMode, "large", StringComparison.OrdinalIgnoreCase) ? "25+ Captures" :
-                        "All Games";
+                    var filterLabel = _shell.LibraryFolderFilterModeLabel(filterMode);
                     panes.SortMenuButton.ToolTip = timelineMode
                         ? "Sort is fixed to capture time in Timeline view"
                         : "Sort: " + sortLabel;
@@ -262,7 +258,7 @@ namespace PixelVaultNative
 
                 deleteSelectedLibraryFiles = delegate
                 {
-                    _shell.LibraryBrowserDeleteSelectedCaptures(ws, getSelectedDetailFiles, renderTiles, renderSelectedFolder, refreshLibraryFoldersAsync);
+                    _shell.LibraryBrowserDeleteSelectedCaptures(libraryWindow, ws, getSelectedDetailFiles, renderTiles, renderSelectedFolder, refreshLibraryFoldersAsync);
                 };
 
                 renderSelectedFolder = delegate
@@ -333,6 +329,7 @@ namespace PixelVaultNative
                     panes.FolderTileSmallerButton.IsEnabled = !isBusy;
                     panes.FolderTileLargerButton.IsEnabled = !isBusy;
                     panes.ShortcutsHelpButton.IsEnabled = !isBusy;
+                    if (panes.CommandPaletteButton != null) panes.CommandPaletteButton.IsEnabled = !isBusy;
                     navChrome.FetchButton.IsEnabled = !isBusy;
                     navChrome.ExportStarredButton.IsEnabled = !isBusy;
                     navChrome.ImportButton.IsEnabled = !isBusy;
@@ -402,11 +399,87 @@ namespace PixelVaultNative
                     setLibrarySortMode,
                     setLibraryFilterMode);
                 panes.ShortcutsHelpButton.Click += delegate { _shell.ShowLibraryBrowserKeyboardShortcutsHelp(libraryWindow); };
+
+                Action refreshAllCoversWithConfirm = delegate
+                {
+                    var choice = MessageBox.Show(
+                        libraryWindow,
+                        "Refresh cover art for the entire library?",
+                        "PixelVault",
+                        MessageBoxButton.OKCancel,
+                        MessageBoxImage.Question);
+                    if (choice != MessageBoxResult.OK) return;
+                    runCoverRefresh();
+                };
+                var paletteCtx = new LibraryBrowserPaletteContext
+                {
+                    RefreshLibraryFolders = () => refreshLibraryFoldersAsync?.Invoke(false),
+                    ClearLibrarySearch = clearLibrarySearchAndRerender,
+                    OpenSettings = delegate
+                    {
+                        _shell.LibraryBrowserPaletteOpenSettings();
+                        refreshIntakeReviewBadge?.Invoke();
+                    },
+                    OpenHealthDashboard = () => _shell.LibraryBrowserPaletteOpenHealthDashboard(libraryWindow),
+                    OpenGameIndex = () => _shell.LibraryBrowserPaletteOpenGameIndex(),
+                    OpenPhotoIndex = () => _shell.LibraryBrowserPaletteOpenPhotoIndex(),
+                    OpenFilenameRules = () => _shell.LibraryBrowserPaletteOpenFilenameRules(),
+                    OpenPhotographyGallery = () => _shell.LibraryBrowserPaletteOpenPhotographyGallery(libraryWindow),
+                    OpenSavedCoversFolder = () => _shell.LibraryBrowserPaletteOpenSavedCoversFolder(),
+                    RunImportQuick = delegate
+                    {
+                        _shell.LibraryBrowserPaletteRunImport(false);
+                        refreshIntakeReviewBadge?.Invoke();
+                    },
+                    RunImportWithReview = delegate
+                    {
+                        _shell.LibraryBrowserPaletteRunImport(true);
+                        refreshIntakeReviewBadge?.Invoke();
+                    },
+                    OpenManualIntake = delegate
+                    {
+                        _shell.LibraryBrowserPaletteOpenManualIntake();
+                        refreshIntakeReviewBadge?.Invoke();
+                    },
+                    OpenIntakePreview = delegate
+                    {
+                        _shell.LibraryBrowserPaletteShowIntakePreview();
+                        refreshIntakeReviewBadge?.Invoke();
+                    },
+                    ExportStarred = () => _shell.LibraryBrowserPaletteExportStarred(libraryWindow),
+                    RefreshAllCovers = refreshAllCoversWithConfirm,
+                    ShowKeyboardShortcuts = () => _shell.ShowLibraryBrowserKeyboardShortcutsHelp(libraryWindow),
+                    SortFoldersAlpha = () => setLibrarySortMode("alpha"),
+                    SortFoldersDateCaptured = () => setLibrarySortMode("captured"),
+                    SortFoldersDateAdded = () => setLibrarySortMode("added"),
+                    SortFoldersMostPhotos = () => setLibrarySortMode("photos"),
+                    FilterFoldersAll = () => setLibraryFilterMode("all"),
+                    FilterFolders100Percent = () => setLibraryFilterMode("completed"),
+                    FilterFoldersCrossPlatform = () => setLibraryFilterMode("crossplatform"),
+                    FilterFolders25PlusCaptures = () => setLibraryFilterMode("large"),
+                    FilterFoldersNeedsSteamAppId = () => setLibraryFilterMode("needssteam"),
+                    FilterFoldersNoCover = () => setLibraryFilterMode("nocover"),
+                    GroupFoldersAllGames = () => setLibraryGroupingMode("all"),
+                    GroupFoldersByConsole = () => setLibraryGroupingMode("console"),
+                    GroupFoldersTimeline = () => setLibraryGroupingMode("timeline"),
+                    GroupFoldersFolderGrid = () => setLibraryGroupingMode("folders")
+                };
+
+                panes.CommandPaletteButton.Click += delegate { _shell.ShowLibraryCommandPalette(libraryWindow, paletteCtx, null); };
+
                 libraryWindow.PreviewKeyDown += delegate(object _, KeyEventArgs e)
                 {
-                    if (e.Key != Key.F1) return;
-                    e.Handled = true;
-                    _shell.ShowLibraryBrowserKeyboardShortcutsHelp(libraryWindow);
+                    if (e.Key == Key.F1)
+                    {
+                        e.Handled = true;
+                        _shell.ShowLibraryBrowserKeyboardShortcutsHelp(libraryWindow);
+                        return;
+                    }
+                    if (e.Key == Key.P && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+                    {
+                        e.Handled = true;
+                        _shell.ShowLibraryCommandPalette(libraryWindow, paletteCtx, null);
+                    }
                 };
                 panes.FolderTileSmallerButton.Click += delegate
                 {

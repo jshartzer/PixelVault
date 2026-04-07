@@ -258,7 +258,7 @@ namespace PixelVaultNative
                 var processCount = items.Count - deleteCount;
                 if (deleteCount > 0)
                 {
-                    var deleteChoice = MessageBox.Show(deleteCount + " image(s) are marked for deletion.\n" + processCount + " image(s) will continue through metadata and move.\n\nYes = Finish and delete them\nNo = Finish without deleting\nCancel = Keep reviewing", "Finish Processing", MessageBoxButton.YesNoCancel, MessageBoxImage.Warning);
+                    var deleteChoice = MessageBox.Show(reviewWindow, deleteCount + " image(s) are marked for deletion.\n" + processCount + " image(s) will continue through metadata and move.\n\nYes = Finish and delete them\nNo = Finish without deleting\nCancel = Keep reviewing", "Finish Processing", MessageBoxButton.YesNoCancel, MessageBoxImage.Warning);
                     if (deleteChoice == MessageBoxResult.Cancel) return;
                     if (deleteChoice == MessageBoxResult.No)
                     {
@@ -278,7 +278,7 @@ namespace PixelVaultNative
                 }
                 else
                 {
-                    var confirm = MessageBox.Show(processCount + " image(s) will continue through metadata and move.\n\nFinish processing?", "Finish Processing", MessageBoxButton.OKCancel, MessageBoxImage.Question);
+                    var confirm = MessageBox.Show(reviewWindow, processCount + " image(s) will continue through metadata and move.\n\nFinish processing?", "Finish Processing", MessageBoxButton.OKCancel, MessageBoxImage.Question);
                     if (confirm != MessageBoxResult.OK) return;
                 }
                 reviewWindow.DialogResult = true;

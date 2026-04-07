@@ -64,6 +64,7 @@ namespace PixelVaultNative
 
         string NormalizeLibraryFolderSortMode(string value);
         string NormalizeLibraryFolderFilterMode(string value);
+        string LibraryFolderFilterModeLabel(string value);
         string NormalizeLibraryGroupingMode(string value);
 
         void LibraryBrowserApplySortGroupPillState(Button button, bool active);
@@ -76,6 +77,19 @@ namespace PixelVaultNative
         void LibraryBrowserMountToastHost(Grid rootGrid, MainWindow.LibraryBrowserWorkingSet ws);
         void LibraryBrowserShowToast(MainWindow.LibraryBrowserWorkingSet ws, string message);
         void ShowLibraryBrowserKeyboardShortcutsHelp(Window owner);
+        void ShowLibraryCommandPalette(Window owner, LibraryBrowserPaletteContext context, string initialSearch);
+
+        void LibraryBrowserPaletteOpenSettings();
+        void LibraryBrowserPaletteOpenHealthDashboard(Window owner);
+        void LibraryBrowserPaletteOpenGameIndex();
+        void LibraryBrowserPaletteOpenPhotoIndex();
+        void LibraryBrowserPaletteOpenFilenameRules();
+        void LibraryBrowserPaletteOpenPhotographyGallery(Window owner);
+        void LibraryBrowserPaletteOpenSavedCoversFolder();
+        void LibraryBrowserPaletteRunImport(bool withReview);
+        void LibraryBrowserPaletteOpenManualIntake();
+        void LibraryBrowserPaletteShowIntakePreview();
+        void LibraryBrowserPaletteExportStarred(Window owner);
 
         void LibraryBrowserOpenSingleFileMetadataEditor(
             MainWindow.LibraryBrowserWorkingSet ws,
@@ -87,6 +101,7 @@ namespace PixelVaultNative
             Action<bool> refreshLibraryFoldersAsync);
 
         void LibraryBrowserDeleteSelectedCaptures(
+            Window owner,
             MainWindow.LibraryBrowserWorkingSet ws,
             Func<List<string>> getSelectedDetailFiles,
             Action renderTiles,

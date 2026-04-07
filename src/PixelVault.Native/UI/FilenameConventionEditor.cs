@@ -288,7 +288,7 @@ namespace PixelVaultNative
         {
             if (string.IsNullOrWhiteSpace(libraryRoot) || !Directory.Exists(libraryRoot))
             {
-                MessageBox.Show("Library folder not found. Check Settings before opening filename rules.", "PixelVault");
+                TryLibraryToast("Library folder not found. Check Settings before opening filename rules.");
                 return;
             }
             if (filenameConventionEditorWindow != null)
@@ -311,6 +311,7 @@ namespace PixelVaultNative
                     w => { if (ReferenceEquals(filenameConventionEditorWindow, w)) filenameConventionEditorWindow = null; },
                     new FilenameConventionEditorServices
                     {
+                        NotifyUser = (msg, icon) => TryLibraryToast(msg, icon),
                         RulesService = filenameRulesService,
                         ParserService = filenameParserService,
                         SetStatus = delegate(string text) { if (status != null) status.Text = text; },
@@ -325,7 +326,7 @@ namespace PixelVaultNative
             {
                 status.Text = "Filename rules unavailable";
                 Log("Failed to open filename rules. " + ex.Message);
-                MessageBox.Show("Could not open the filename rules." + Environment.NewLine + Environment.NewLine + ex.Message, "PixelVault");
+                TryLibraryToast("Could not open the filename rules." + Environment.NewLine + Environment.NewLine + ex.Message, MessageBoxImage.Error);
             }
         }
     }

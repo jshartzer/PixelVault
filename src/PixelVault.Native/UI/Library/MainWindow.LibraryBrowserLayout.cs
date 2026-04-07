@@ -44,6 +44,7 @@ namespace PixelVaultNative
             internal Button DeleteSelectedButton;
             internal Button FolderTileSmallerButton;
             internal Button FolderTileLargerButton;
+            internal Button CommandPaletteButton;
             internal Button ShortcutsHelpButton;
             internal VirtualizedRowHost DetailRows;
             internal ScrollViewer ThumbScroll;
@@ -182,13 +183,21 @@ namespace PixelVaultNative
             footerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(10) });
             footerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             var footerButtons = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            panes.CommandPaletteButton = Btn("⋯", null, "#20343A", Brushes.White);
+            panes.CommandPaletteButton.Width = 32;
+            panes.CommandPaletteButton.Height = 32;
+            panes.CommandPaletteButton.FontSize = 18;
+            panes.CommandPaletteButton.FontWeight = FontWeights.Bold;
+            panes.CommandPaletteButton.Margin = new Thickness(0, 0, 6, 0);
+            panes.CommandPaletteButton.ToolTip = "Commands (Ctrl+Shift+P)";
+            ApplyLibraryPillChrome(panes.CommandPaletteButton, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
             panes.ShortcutsHelpButton = Btn("?", null, "#20343A", Brushes.White);
             panes.ShortcutsHelpButton.Width = 32;
             panes.ShortcutsHelpButton.Height = 32;
             panes.ShortcutsHelpButton.FontSize = 14;
             panes.ShortcutsHelpButton.FontWeight = FontWeights.Bold;
             panes.ShortcutsHelpButton.Margin = new Thickness(0, 0, 6, 0);
-            panes.ShortcutsHelpButton.ToolTip = "Keyboard shortcuts (F1)";
+            panes.ShortcutsHelpButton.ToolTip = "Keyboard shortcuts (F1) · Command palette (Ctrl+Shift+P)";
             ApplyLibraryPillChrome(panes.ShortcutsHelpButton, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
             panes.ShortcutsHelpButton.Height = 32;
             panes.FolderTileSmallerButton = Btn("Tiles −", null, "#20343A", Brushes.White);
@@ -215,6 +224,7 @@ namespace PixelVaultNative
             panes.FolderTileLargerButton.Padding = new Thickness(8, 0, 8, 0);
             panes.FolderTileSmallerButton.VerticalAlignment = VerticalAlignment.Center;
             panes.FolderTileLargerButton.VerticalAlignment = VerticalAlignment.Center;
+            footerButtons.Children.Add(panes.CommandPaletteButton);
             footerButtons.Children.Add(panes.ShortcutsHelpButton);
             footerButtons.Children.Add(panes.FolderTileSmallerButton);
             footerButtons.Children.Add(panes.FolderTileLargerButton);

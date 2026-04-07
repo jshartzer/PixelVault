@@ -51,7 +51,7 @@ namespace PixelVaultNative
 
     public sealed partial class MainWindow : Window
     {
-        const string AppVersion = "0.075.000";
+        const string AppVersion = "0.075.005";
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
         const string ClearedExternalIdSentinel = "__PV_CLEARED__";
@@ -1217,6 +1217,10 @@ namespace PixelVaultNative
                     return "Cross-Platform";
                 case "large":
                     return "25+ Captures";
+                case "needssteam":
+                    return "Steam · missing App ID";
+                case "nocover":
+                    return "No cover path";
                 default:
                     return "All Games";
             }
@@ -1548,7 +1552,7 @@ namespace PixelVaultNative
                     closeButton.IsEnabled = true;
                     status.Text = "Library metadata failed";
                     LogException("Library metadata apply", error);
-                    MessageBox.Show(error.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
+                    TryLibraryToast(error.Message, MessageBoxImage.Error);
                 }));
             });
 
@@ -2478,7 +2482,7 @@ namespace PixelVaultNative
         {
             if (string.IsNullOrWhiteSpace(libraryRoot) || !Directory.Exists(libraryRoot))
             {
-                MessageBox.Show("Library folder not found. Check Settings before opening the photo index.", "PixelVault");
+                TryLibraryToast("Library folder not found. Check Settings before opening the photo index.");
                 return;
             }
             if (photoIndexEditorWindow != null)
@@ -2501,6 +2505,7 @@ namespace PixelVaultNative
                     w => { if (ReferenceEquals(photoIndexEditorWindow, w)) photoIndexEditorWindow = null; },
                     new PhotoIndexEditorServices
                     {
+                        NotifyUser = (msg, icon) => TryLibraryToast(msg, icon),
                         SetStatus = delegate(string text) { if (status != null) status.Text = text; },
                         Log = Log,
                         CreateButton = Btn,
@@ -2520,14 +2525,14 @@ namespace PixelVaultNative
             {
                 status.Text = "Photo index unavailable";
                 Log("Failed to open photo index. " + ex.Message);
-                MessageBox.Show("Could not open the photo index." + Environment.NewLine + Environment.NewLine + ex.Message, "PixelVault");
+                TryLibraryToast("Could not open the photo index." + Environment.NewLine + Environment.NewLine + ex.Message, MessageBoxImage.Error);
             }
         }
         void OpenGameIndexEditor()
         {
             if (string.IsNullOrWhiteSpace(libraryRoot) || !Directory.Exists(libraryRoot))
             {
-                MessageBox.Show("Library folder not found. Check Settings before opening the game index.", "PixelVault");
+                TryLibraryToast("Library folder not found. Check Settings before opening the game index.");
                 return;
             }
             if (gameIndexEditorWindow != null)
@@ -2568,7 +2573,7 @@ namespace PixelVaultNative
                         var flattened = loadTask.Exception == null ? null : loadTask.Exception.Flatten();
                         var err = flattened == null ? new Exception("Game index load failed.") : flattened.InnerExceptions.First();
                         LogException("Game index load", err);
-                        MessageBox.Show("Could not load the game index." + Environment.NewLine + Environment.NewLine + err.Message, "PixelVault");
+                        TryLibraryToast("Could not load the game index." + Environment.NewLine + Environment.NewLine + err.Message, MessageBoxImage.Error);
                         return;
                     }
 
@@ -2586,6 +2591,7 @@ namespace PixelVaultNative
                             w => { if (ReferenceEquals(gameIndexEditorWindow, w)) gameIndexEditorWindow = null; },
                             new GameIndexEditorServices
                             {
+                                NotifyUser = (msg, icon) => TryLibraryToast(msg, icon),
                                 SetStatus = delegate(string text) { if (status != null) status.Text = text; },
                                 Log = Log,
                                 CreateButton = Btn,
@@ -2609,7 +2615,7 @@ namespace PixelVaultNative
                     {
                         if (status != null) status.Text = "Game index unavailable";
                         LogException("Open game index", ex);
-                        MessageBox.Show("Could not open the game index." + Environment.NewLine + Environment.NewLine + ex.Message, "PixelVault");
+                        TryLibraryToast("Could not open the game index." + Environment.NewLine + Environment.NewLine + ex.Message, MessageBoxImage.Error);
                     }
                 }));
             }, CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);

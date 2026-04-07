@@ -233,6 +233,7 @@ namespace PixelVaultNative
                     PrepareExifOnBackgroundThread = EnsureExifTool,
                     SetAppStatus = delegate(string text) { if (status != null) status.Text = text; },
                     LogError = LogException,
+                    NotifyUser = (msg, icon) => TryLibraryToast(msg, icon),
                     OpenLibraryFolder = delegate { OpenFolder(libraryRoot); },
                     OpenImageWithShell = OpenWithShell,
                     QueueImageLoad = delegate(Image img, string path, int w, Action<BitmapImage> onDone)
@@ -279,7 +280,7 @@ namespace PixelVaultNative
             catch (Exception ex)
             {
                 LogException("ShowPhotographyGallery", ex);
-                MessageBox.Show(ex.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
+                TryLibraryToast(ex.Message, MessageBoxImage.Error);
             }
         }
 

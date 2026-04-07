@@ -51,7 +51,9 @@ namespace PixelVaultNative
                             + "; message=" + loadError.Message
                             + "; exception=" + FormatExceptionForTroubleshooting(loadError));
                         if (renderTiles != null) renderTiles();
-                        MessageBox.Show(loadError.Message, "PixelVault", MessageBoxButton.OK, MessageBoxImage.Error);
+                        var err = loadError.Message;
+                        if (err.Length > 400) err = err.Substring(0, 397) + "...";
+                        ShowLibraryBrowserToast(ws, "Library load failed: " + err);
                         return;
                     }
 

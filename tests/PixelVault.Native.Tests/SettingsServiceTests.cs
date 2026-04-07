@@ -31,6 +31,10 @@ public sealed class SettingsServiceTests
     [InlineData("cross-platform", "crossplatform")]
     [InlineData("25+ captures", "large")]
     [InlineData("all", "all")]
+    [InlineData("needssteam", "needssteam")]
+    [InlineData("missing steam app id", "needssteam")]
+    [InlineData("nocover", "nocover")]
+    [InlineData("no cover", "nocover")]
     public void NormalizeLibraryFolderFilterMode_SupportsAliases(string raw, string expected)
     {
         Assert.Equal(expected, SettingsService.NormalizeLibraryFolderFilterMode(raw));
