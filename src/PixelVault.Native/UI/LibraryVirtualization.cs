@@ -442,7 +442,7 @@ namespace PixelVaultNative
                 timelineContext.Comment = nextComment;
                 refreshCommentChrome();
                 saveInFlight = true;
-                SaveLibraryFileCommentByPath(filePath, nextComment, delegate(bool success)
+                librarySession.RequestSaveCaptureComment(filePath, nextComment, delegate(bool success)
                 {
                     saveInFlight = false;
                     if (!success)
@@ -614,7 +614,7 @@ namespace PixelVaultNative
                 showDetailStarChrome(false);
                 detailStarButton.Click += delegate
                 {
-                    ToggleLibraryFileStarredByPath(file, delegate
+                    librarySession.RequestToggleCaptureStarred(file, _ =>
                     {
                         applyDetailStarVisual();
                         if (redrawDetailPane != null) redrawDetailPane();
@@ -921,7 +921,7 @@ namespace PixelVaultNative
             };
             starMenuItem.Click += delegate
             {
-                ToggleLibraryFileStarredByPath(file, delegate
+                librarySession.RequestToggleCaptureStarred(file, _ =>
                 {
                     if (redrawDetailPane != null) redrawDetailPane();
                 });

@@ -61,6 +61,7 @@ Source notes that fed this list (some content superseded by landed work): `LIBRA
 | **11** Async-first I/O | Web client, metadata/cover async surfaces, import Steam rename async, etc. |
 | Game index routing | **1a–1c** `IGameIndexService`, `GetSavedRowsForRoot`, parser/scanner bridges. |
 | Image pipeline | `LibraryBitmapLruCache`, `LibraryImageLoadCoordinator`, `LibraryThumbnailPipeline`. |
+| **2026-04 — Library jank / folder open** | Star glyph: `TryGetLibraryFileStarredFromIndex` uses in-memory index (`TryGetLibraryMetadataStarredFromCachedIndex`) — no full dictionary clone per tile. Folder file list: `GetFilesForLibraryFolderEntry` batches `LoadLibraryMetadataIndexForFilePaths` before platform filter to avoid per-file embedded tag reads. Detail pane: masonry row defs built off UI thread; metadata repair capped (140) with deferred background chunks (~36 files, ~100 ms gap) + idle dispatcher refresh when the same folder is still selected. |
 
 Details and release notes: `CHANGELOG.md`, `HANDOFF.md`, `completed-projects/README.md`.
 

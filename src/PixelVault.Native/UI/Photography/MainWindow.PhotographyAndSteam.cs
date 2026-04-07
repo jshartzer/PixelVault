@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -182,36 +181,10 @@ namespace PixelVaultNative
         void TogglePhotographyGalleryEntryStarred(PhotographyGalleryEntry entry)
         {
             if (entry == null || string.IsNullOrWhiteSpace(entry.FullPath) || !File.Exists(entry.FullPath)) return;
-            var root = libraryWorkspace.LibraryRoot;
-            if (string.IsNullOrWhiteSpace(root)) return;
-            var fullPath = entry.FullPath;
-            var dispatcher = Dispatcher;
-            Task.Run(delegate
+            var wasStarred = entry.Starred;
+            librarySession.RequestToggleCaptureStarred(entry.FullPath, success =>
             {
-                bool ok = false;
-                bool newStarred = false;
-                Exception caught = null;
-                try
-                {
-                    var index = LoadLibraryMetadataIndexViaSessionWhenActive(root, true);
-                    LibraryMetadataIndexEntry row;
-                    if (!index.TryGetValue(fullPath, out row) || row == null) return;
-                    newStarred = !row.Starred;
-                    ApplyEmbeddedXmpStarRating(fullPath, newStarred);
-                    row.Starred = newStarred;
-                    row.Stamp = BuildLibraryMetadataStamp(fullPath);
-                    SaveLibraryMetadataIndexViaSessionWhenActive(root, index);
-                    ok = true;
-                }
-                catch (Exception ex)
-                {
-                    caught = ex;
-                }
-                dispatcher.BeginInvoke(new Action(delegate
-                {
-                    if (caught != null) LogException("TogglePhotographyGalleryEntryStarred", caught);
-                    else if (ok) entry.Starred = newStarred;
-                }));
+                if (success) entry.Starred = !wasStarred;
             });
         }
 

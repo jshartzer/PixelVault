@@ -181,21 +181,45 @@ namespace PixelVaultNative
             }
         }
 
+        /// <summary>Must be called with <see cref="libraryMetadataIndexSync"/> held. Populates the in-memory metadata cache for <paramref name="root"/> when stale or <paramref name="forceDiskReload"/>.</summary>
+        void EnsureLibraryMetadataIndexCacheForRoot(string root, bool forceDiskReload)
+        {
+            if (!forceDiskReload
+                && string.Equals(libraryMetadataIndexRoot, root, StringComparison.OrdinalIgnoreCase)
+                && libraryMetadataIndex.Count > 0)
+            {
+                return;
+            }
+
+            libraryMetadataIndex.Clear();
+            libraryMetadataIndexRoot = root;
+            foreach (var pair in indexPersistenceService.LoadLibraryMetadataIndexEntries(root))
+            {
+                libraryMetadataIndex[pair.Key] = CloneLibraryMetadataIndexEntry(pair.Value);
+            }
+        }
+
         Dictionary<string, LibraryMetadataIndexEntry> LoadLibraryMetadataIndex(string root, bool forceDiskReload = false)
         {
             lock (libraryMetadataIndexSync)
             {
-                if (!forceDiskReload && string.Equals(libraryMetadataIndexRoot, root, StringComparison.OrdinalIgnoreCase) && libraryMetadataIndex.Count > 0)
-                {
-                    return CloneLibraryMetadataIndexEntries(libraryMetadataIndex);
-                }
-                libraryMetadataIndex.Clear();
-                libraryMetadataIndexRoot = root;
-                foreach (var pair in indexPersistenceService.LoadLibraryMetadataIndexEntries(root))
-                {
-                    libraryMetadataIndex[pair.Key] = CloneLibraryMetadataIndexEntry(pair.Value);
-                }
+                EnsureLibraryMetadataIndexCacheForRoot(root, forceDiskReload);
                 return CloneLibraryMetadataIndexEntries(libraryMetadataIndex);
+            }
+        }
+
+        /// <summary>Reads starred state from the in-memory index cache without cloning the full dictionary (hot path: one lookup per gallery tile).</summary>
+        bool TryGetLibraryMetadataStarredFromCachedIndex(string root, string filePath, out bool starred)
+        {
+            starred = false;
+            if (string.IsNullOrWhiteSpace(root) || string.IsNullOrWhiteSpace(filePath)) return false;
+            lock (libraryMetadataIndexSync)
+            {
+                EnsureLibraryMetadataIndexCacheForRoot(root, false);
+                LibraryMetadataIndexEntry row;
+                if (!libraryMetadataIndex.TryGetValue(filePath, out row) || row == null) return false;
+                starred = row.Starred;
+                return true;
             }
         }
 

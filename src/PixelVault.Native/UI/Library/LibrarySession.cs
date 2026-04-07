@@ -25,6 +25,8 @@ namespace PixelVaultNative
         readonly LibraryMetadataScanInvoker _runLibraryMetadataScan;
         readonly Action<string, string> _ensureDirectoryAccessible;
         readonly IIndexPersistenceService _indexPersistence;
+        readonly Action<string, Action<bool>> _requestToggleCaptureStarred;
+        readonly Action<string, string, Action<bool>> _requestSaveCaptureComment;
 
         internal LibrarySession(
             LibraryWorkspaceContext workspace,
@@ -42,7 +44,9 @@ namespace PixelVaultNative
             LibraryCoverRefreshAsyncInvoker refreshLibraryCovers,
             LibraryMetadataScanInvoker runLibraryMetadataScan,
             Action<string, string> ensureDirectoryAccessible,
-            IIndexPersistenceService indexPersistence)
+            IIndexPersistenceService indexPersistence,
+            Action<string, Action<bool>> requestToggleCaptureStarred,
+            Action<string, string, Action<bool>> requestSaveCaptureComment)
         {
             _workspace = workspace ?? throw new ArgumentNullException(nameof(workspace));
             _scanner = scanner ?? throw new ArgumentNullException(nameof(scanner));
@@ -60,6 +64,8 @@ namespace PixelVaultNative
             _runLibraryMetadataScan = runLibraryMetadataScan ?? throw new ArgumentNullException(nameof(runLibraryMetadataScan));
             _ensureDirectoryAccessible = ensureDirectoryAccessible ?? throw new ArgumentNullException(nameof(ensureDirectoryAccessible));
             _indexPersistence = indexPersistence ?? throw new ArgumentNullException(nameof(indexPersistence));
+            _requestToggleCaptureStarred = requestToggleCaptureStarred;
+            _requestSaveCaptureComment = requestSaveCaptureComment;
         }
 
         public string LibraryRoot => _workspace.LibraryRoot;
@@ -122,6 +128,40 @@ namespace PixelVaultNative
         {
             if (string.IsNullOrWhiteSpace(LibraryRoot) || index == null) return;
             _saveLibraryMetadataIndex(LibraryRoot, index);
+        }
+
+        public void RequestToggleCaptureStarred(string absoluteFilePath, Action<bool> onCompleted = null)
+        {
+            if (string.IsNullOrWhiteSpace(absoluteFilePath) || !HasLibraryRoot)
+            {
+                onCompleted?.Invoke(false);
+                return;
+            }
+
+            if (_requestToggleCaptureStarred == null)
+            {
+                onCompleted?.Invoke(false);
+                return;
+            }
+
+            _requestToggleCaptureStarred(absoluteFilePath, onCompleted);
+        }
+
+        public void RequestSaveCaptureComment(string absoluteFilePath, string comment, Action<bool> onCompleted = null)
+        {
+            if (string.IsNullOrWhiteSpace(absoluteFilePath) || !HasLibraryRoot)
+            {
+                onCompleted?.Invoke(false);
+                return;
+            }
+
+            if (_requestSaveCaptureComment == null)
+            {
+                onCompleted?.Invoke(false);
+                return;
+            }
+
+            _requestSaveCaptureComment(absoluteFilePath, comment ?? string.Empty, onCompleted);
         }
 
         public List<LibraryFolderInfo> LoadLibraryFolderCacheSnapshot()

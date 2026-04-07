@@ -16,11 +16,7 @@ namespace PixelVaultNative
             if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath)) return false;
             var root = libraryRoot;
             if (string.IsNullOrWhiteSpace(root)) return false;
-            var index = LoadLibraryMetadataIndexViaSessionWhenActive(root, false);
-            LibraryMetadataIndexEntry row;
-            if (!index.TryGetValue(filePath, out row) || row == null) return false;
-            starred = row.Starred;
-            return true;
+            return TryGetLibraryMetadataStarredFromCachedIndex(root, filePath, out starred);
         }
 
         void ApplyEmbeddedXmpStarRating(string filePath, bool starred)
@@ -44,39 +40,60 @@ namespace PixelVaultNative
             });
         }
 
-        /// <summary>Runs Exif write + index save on a worker thread; invokes <paramref name="uiAfter"/> on the UI dispatcher when finished (success or failure).</summary>
-        void ToggleLibraryFileStarredByPath(string filePath, Action uiAfter = null)
+        /// <summary>Host worker for <see cref="ILibrarySession.RequestToggleCaptureStarred"/> — Exif + index on a worker thread; <paramref name="uiAfter"/> receives whether the star was toggled in the index.</summary>
+        void ToggleLibraryFileStarredByPath(string filePath, Action<bool> uiAfter = null)
         {
-            if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath)) return;
+            if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
+            {
+                uiAfter?.Invoke(false);
+                return;
+            }
+
             var root = libraryWorkspace.LibraryRoot;
-            if (string.IsNullOrWhiteSpace(root)) return;
+            if (string.IsNullOrWhiteSpace(root))
+            {
+                uiAfter?.Invoke(false);
+                return;
+            }
+
             var dispatcher = Dispatcher;
             Task.Run(delegate
             {
                 Exception caught = null;
+                var applied = false;
                 try
                 {
                     var index = LoadLibraryMetadataIndexViaSessionWhenActive(root, true);
                     LibraryMetadataIndexEntry row;
-                    if (!index.TryGetValue(filePath, out row) || row == null) return;
+                    if (!index.TryGetValue(filePath, out row) || row == null)
+                    {
+                        dispatcher.BeginInvoke(new Action(delegate { uiAfter?.Invoke(false); }));
+                        return;
+                    }
+
                     var nextStarred = !row.Starred;
                     ApplyEmbeddedXmpStarRating(filePath, nextStarred);
                     row.Starred = nextStarred;
                     row.Stamp = BuildLibraryMetadataStamp(filePath);
                     SaveLibraryMetadataIndexViaSessionWhenActive(root, index);
+                    applied = true;
                 }
                 catch (Exception ex)
                 {
                     caught = ex;
                 }
+
                 dispatcher.BeginInvoke(new Action(delegate
                 {
                     if (caught != null)
                     {
                         LogException("ToggleLibraryFileStarredByPath", caught);
                         TryLibraryToast("Could not update star: " + caught.Message, MessageBoxImage.Warning);
+                        uiAfter?.Invoke(false);
+                        return;
                     }
-                    uiAfter?.Invoke();
+
+                    uiAfter?.Invoke(applied);
                 }));
             });
         }
@@ -120,7 +137,7 @@ namespace PixelVaultNative
             }
         }
 
-        /// <summary>Writes an embedded comment for a single library capture without reopening the full manual metadata window.</summary>
+        /// <summary>Host worker for <see cref="ILibrarySession.RequestSaveCaptureComment"/> — embedded comment via manual-metadata path + index stamp refresh.</summary>
         void SaveLibraryFileCommentByPath(string filePath, string comment, Action<bool> uiAfter = null)
         {
             if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))

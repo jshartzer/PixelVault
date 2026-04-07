@@ -9,6 +9,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using PixelVaultNative.UI.Design;
 
 namespace PixelVaultNative
@@ -120,6 +121,8 @@ namespace PixelVaultNative
                     + "; reason=" + (resetRowsToLoading ? "selection-change" : "empty-pane"));
             }
             if (refreshDetailSelectionUi != null) refreshDetailSelectionUi();
+            const int LibraryDetailMetadataRepairMaxFilesPerPass = 140;
+            var detailDpiScaleForBackground = ResolveLibraryDpiScale(panes?.ThumbScroll);
             Task.Run(async delegate
             {
                 LibraryDetailQuickSnapshotPerf? quickSnapshotPerf = null;
@@ -132,8 +135,31 @@ namespace PixelVaultNative
                         + (string.IsNullOrWhiteSpace(details) ? string.Empty : "; ")
                         + BuildLibraryBrowserTroubleshootingLabel(renderFolder));
                 };
-                Action<LibraryDetailRenderSnapshot, bool> applyDetailSnapshot = null;
-                applyDetailSnapshot = delegate(LibraryDetailRenderSnapshot snapshot, bool logCompletion)
+                Func<LibraryDetailRenderSnapshot, List<VirtualizedRowDefinition>> buildVirtualRowsForSnapshot = delegate(LibraryDetailRenderSnapshot snapshot)
+                {
+                    if (snapshot == null || snapshot.Groups == null || snapshot.Groups.Count == 0) return null;
+                    var timelineCtx = snapshot.TimelineContextByFile ?? new Dictionary<string, LibraryTimelineCaptureContext>(StringComparer.OrdinalIgnoreCase);
+                    var mediaMap = snapshot.MediaLayoutByFile ?? new Dictionary<string, LibraryDetailMediaLayoutInfo>(StringComparer.OrdinalIgnoreCase);
+                    return BuildLibraryPackedDayCardRowDefinitions(
+                        ws,
+                        renderFolder,
+                        snapshot.Groups,
+                        timelineCtx,
+                        mediaMap,
+                        panes == null ? null : panes.ThumbScroll,
+                        detailViewportWidth,
+                        effectiveTileSize,
+                        detailDpiScaleForBackground,
+                        timelineView,
+                        openSingleFileMetadataEditor,
+                        updateDetailSelection,
+                        refreshDetailSelectionUi,
+                        redrawSelectedFolderDetail,
+                        renderFolderTiles);
+                };
+
+                Action<LibraryDetailRenderSnapshot, bool, List<VirtualizedRowDefinition>> applyDetailSnapshot = null;
+                applyDetailSnapshot = delegate(LibraryDetailRenderSnapshot snapshot, bool logCompletion, List<VirtualizedRowDefinition> prebuiltVirtualRows)
                 {
                     Stopwatch uiApplySw = null;
                     if (logCompletion) uiApplySw = Stopwatch.StartNew();
@@ -237,27 +263,8 @@ namespace PixelVaultNative
                     }
 
                     var detailColumns = targetDetailColumns;
-                    var dpiScale = ResolveLibraryDpiScale(panes?.ThumbScroll);
-                    var packAvailableW = Math.Max((double)effectiveTileSize, detailViewportWidth - 6d);
-                    var packMinW = Math.Max(140, (int)Math.Floor(effectiveTileSize * 0.62));
-                    var virtualRows = new List<VirtualizedRowDefinition>();
-
-                    virtualRows = BuildLibraryPackedDayCardRowDefinitions(
-                        ws,
-                        renderFolder,
-                        snapshot.Groups,
-                        timelineContexts,
-                        mediaLayoutByFile,
-                        panes == null ? null : panes.ThumbScroll,
-                        detailViewportWidth,
-                        effectiveTileSize,
-                        dpiScale,
-                        timelineView,
-                        openSingleFileMetadataEditor,
-                        updateDetailSelection,
-                        refreshDetailSelectionUi,
-                        redrawSelectedFolderDetail,
-                        renderFolderTiles);
+                    var virtualRows = prebuiltVirtualRows ?? buildVirtualRowsForSnapshot(snapshot);
+                    if (virtualRows == null) virtualRows = new List<VirtualizedRowDefinition>();
                     commitDetailVirtualRows(virtualRows);
                     if (refreshDetailSelectionUi != null) refreshDetailSelectionUi();
                     LogTroubleshooting("LibraryDetailRenderApplied",
@@ -409,7 +416,8 @@ namespace PixelVaultNative
                         + "; visibleFiles=" + quickSnapshot.VisibleFiles.Count);
                     traceStep("LibraryDetailQuickSnapshotDispatchStart", "stage=initial");
                     var dispatcherWallSw = Stopwatch.StartNew();
-                    await libraryWindow.Dispatcher.InvokeAsync((Action)(delegate { applyDetailSnapshot(quickSnapshot, true); }));
+                    var quickVirtualRows = buildVirtualRowsForSnapshot(quickSnapshot);
+                    await libraryWindow.Dispatcher.InvokeAsync((Action)(delegate { applyDetailSnapshot(quickSnapshot, true, quickVirtualRows); }));
                     traceStep("LibraryDetailQuickSnapshotDispatchComplete", "stage=initial; dispatcherWallMs=" + dispatcherWallSw.ElapsedMilliseconds);
                     Dictionary<string, EmbeddedMetadataSnapshot> timelineMetadataSnapshots = null;
                     if (timelineView && quickSnapshot.VisibleFiles.Count > 0)
@@ -443,7 +451,8 @@ namespace PixelVaultNative
                             if (commentsChanged)
                             {
                                 traceStep("LibraryDetailTimelineMetadataDispatchStart", "stage=comment-refresh");
-                                await libraryWindow.Dispatcher.InvokeAsync((Action)(delegate { applyDetailSnapshot(commentSnapshot, false); }));
+                                var commentVirtualRows = buildVirtualRowsForSnapshot(commentSnapshot);
+                                await libraryWindow.Dispatcher.InvokeAsync((Action)(delegate { applyDetailSnapshot(commentSnapshot, false, commentVirtualRows); }));
                                 traceStep("LibraryDetailTimelineMetadataDispatchComplete", "stage=comment-refresh");
                                 quickSnapshot = commentSnapshot;
                             }
@@ -462,19 +471,32 @@ namespace PixelVaultNative
 
                     if (filesMissingCaptureTicks.Count > 0)
                     {
+                        var repairTargets = filesMissingCaptureTicks.Count <= LibraryDetailMetadataRepairMaxFilesPerPass
+                            ? filesMissingCaptureTicks
+                            : filesMissingCaptureTicks.Take(LibraryDetailMetadataRepairMaxFilesPerPass).ToList();
+                        List<string> deferredMetadataRepairFiles = null;
+                        if (repairTargets.Count < filesMissingCaptureTicks.Count)
+                        {
+                            deferredMetadataRepairFiles = filesMissingCaptureTicks.Skip(repairTargets.Count).ToList();
+                            LogTroubleshooting("LibraryDetailMetadataRepairCapped",
+                                "renderVersion=" + renderVersion
+                                + "; repairNow=" + repairTargets.Count
+                                + "; repairDeferred=" + deferredMetadataRepairFiles.Count
+                                + "; " + BuildLibraryBrowserTroubleshootingLabel(renderFolder));
+                        }
                         LogTroubleshooting("LibraryDetailMetadataRepairStart",
                             "renderVersion=" + renderVersion
-                            + "; files=" + filesMissingCaptureTicks.Count
+                            + "; files=" + repairTargets.Count
                             + "; " + BuildLibraryBrowserTroubleshootingLabel(renderFolder));
                         try
                         {
                             if (savedGameRows == null) savedGameRows = librarySession.LoadSavedGameIndexRows();
                             traceStep("LibraryDetailMetadataRepairRowsLoaded", "savedGameRows=" + savedGameRows.Count);
-                            var metadataByFile = await metadataService.ReadEmbeddedMetadataBatchAsync(filesMissingCaptureTicks, CancellationToken.None).ConfigureAwait(false);
+                            var metadataByFile = await metadataService.ReadEmbeddedMetadataBatchAsync(repairTargets, CancellationToken.None).ConfigureAwait(false);
                             traceStep("LibraryDetailMetadataRepairBatchRead", "metadataResults=" + metadataByFile.Count);
                             var indexChanged = false;
                             var gameRowsChanged = false;
-                            foreach (var file in filesMissingCaptureTicks)
+                            foreach (var file in repairTargets)
                             {
                                 EmbeddedMetadataSnapshot metadataSnapshot;
                                 if (!metadataByFile.TryGetValue(file, out metadataSnapshot) || metadataSnapshot == null) metadataSnapshot = new EmbeddedMetadataSnapshot();
@@ -497,7 +519,7 @@ namespace PixelVaultNative
                             if (indexChanged)
                             {
                                 var repaired = new List<LibraryMetadataIndexEntry>();
-                                foreach (var file in filesMissingCaptureTicks)
+                                foreach (var file in repairTargets)
                                 {
                                     LibraryMetadataIndexEntry e;
                                     if (metadataIndex.TryGetValue(file, out e) && e != null) repaired.Add(e);
@@ -507,7 +529,7 @@ namespace PixelVaultNative
                             }
                             LogTroubleshooting("LibraryDetailMetadataRepairComplete",
                                 "renderVersion=" + renderVersion
-                                + "; files=" + filesMissingCaptureTicks.Count
+                                + "; files=" + repairTargets.Count
                                 + "; indexChanged=" + indexChanged
                                 + "; gameRowsChanged=" + gameRowsChanged);
                         }
@@ -558,8 +580,19 @@ namespace PixelVaultNative
                         if (!layoutUnchanged)
                         {
                             traceStep("LibraryDetailRefinedSnapshotDispatchStart", "stage=refined");
-                            await libraryWindow.Dispatcher.InvokeAsync((Action)(delegate { applyDetailSnapshot(refinedSnapshot, false); }));
+                            var refinedVirtualRows = buildVirtualRowsForSnapshot(refinedSnapshot);
+                            await libraryWindow.Dispatcher.InvokeAsync((Action)(delegate { applyDetailSnapshot(refinedSnapshot, false, refinedVirtualRows); }));
                             traceStep("LibraryDetailRefinedSnapshotDispatchComplete", "stage=refined");
+                        }
+
+                        if (deferredMetadataRepairFiles != null && deferredMetadataRepairFiles.Count > 0)
+                        {
+                            ScheduleDeferredLibraryDetailMetadataRepair(
+                                deferredMetadataRepairFiles,
+                                ws,
+                                renderFolder,
+                                libraryWindow,
+                                redrawSelectedFolderDetail);
                         }
                     }
                     traceStep("LibraryDetailBackgroundComplete", "done=true");
@@ -594,6 +627,145 @@ namespace PixelVaultNative
                     }));
                 }
             });
+        }
+
+        void ScheduleDeferredLibraryDetailMetadataRepair(
+            List<string> deferredFiles,
+            LibraryBrowserWorkingSet ws,
+            LibraryBrowserFolderView renderFolder,
+            Window libraryWindow,
+            Action redrawSelectedFolderDetail)
+        {
+            if (deferredFiles == null || deferredFiles.Count == 0) return;
+            var root = libraryRoot;
+            if (string.IsNullOrWhiteSpace(root) || librarySession == null || !librarySession.HasLibraryRoot) return;
+            if (!string.Equals(root, librarySession.LibraryRoot, StringComparison.OrdinalIgnoreCase)) return;
+
+            var sessionGen = Interlocked.Increment(ref _libraryDeferredMetadataRepairGeneration);
+            var filesCopy = deferredFiles.ToList();
+            var folderLabel = BuildLibraryBrowserTroubleshootingLabel(renderFolder);
+
+            LogTroubleshooting("LibraryDetailMetadataRepairDeferredScheduled",
+                "gen=" + sessionGen + "; files=" + filesCopy.Count + "; " + folderLabel);
+
+            _ = Task.Run(async delegate
+            {
+                try
+                {
+                    await RunDeferredLibraryDetailMetadataRepairCoreAsync(
+                        sessionGen,
+                        root,
+                        filesCopy,
+                        ws,
+                        renderFolder,
+                        libraryWindow,
+                        redrawSelectedFolderDetail,
+                        folderLabel).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    LogException("Deferred library metadata repair | " + folderLabel, ex);
+                }
+            });
+        }
+
+        async Task RunDeferredLibraryDetailMetadataRepairCoreAsync(
+            int sessionGen,
+            string root,
+            List<string> deferredFiles,
+            LibraryBrowserWorkingSet ws,
+            LibraryBrowserFolderView renderFolder,
+            Window libraryWindow,
+            Action redrawSelectedFolderDetail,
+            string folderLabelForLog)
+        {
+            const int deferredChunkSize = 36;
+            if (string.IsNullOrWhiteSpace(root) || deferredFiles == null || deferredFiles.Count == 0) return;
+
+            var metadataIndex = librarySession.LoadLibraryMetadataIndexForFilePaths(deferredFiles);
+            var savedGameRows = librarySession.LoadSavedGameIndexRows();
+
+            for (var i = 0; i < deferredFiles.Count; i += deferredChunkSize)
+            {
+                if (Volatile.Read(ref _libraryDeferredMetadataRepairGeneration) != sessionGen)
+                {
+                    LogTroubleshooting("LibraryDetailMetadataRepairDeferredCancelled", "expectedGen=" + sessionGen + "; " + folderLabelForLog);
+                    return;
+                }
+
+                var take = Math.Min(deferredChunkSize, deferredFiles.Count - i);
+                var chunk = new List<string>(take);
+                for (var j = 0; j < take; j++)
+                {
+                    var path = deferredFiles[i + j];
+                    if (!string.IsNullOrWhiteSpace(path) && File.Exists(path)) chunk.Add(path);
+                }
+
+                if (chunk.Count == 0) continue;
+
+                Dictionary<string, EmbeddedMetadataSnapshot> metadataByFile;
+                try
+                {
+                    metadataByFile = await metadataService.ReadEmbeddedMetadataBatchAsync(chunk, CancellationToken.None).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    LogException("Deferred library metadata repair batch | " + folderLabelForLog, ex);
+                    await Task.Delay(120).ConfigureAwait(false);
+                    continue;
+                }
+
+                var indexChanged = false;
+                var gameRowsChanged = false;
+                foreach (var file in chunk)
+                {
+                    EmbeddedMetadataSnapshot metadataSnapshot;
+                    if (!metadataByFile.TryGetValue(file, out metadataSnapshot) || metadataSnapshot == null) metadataSnapshot = new EmbeddedMetadataSnapshot();
+                    LibraryMetadataIndexEntry existingEntry;
+                    if (!metadataIndex.TryGetValue(file, out existingEntry)) existingEntry = null;
+                    var stamp = BuildLibraryMetadataStamp(file);
+                    var previousGameId = existingEntry == null ? string.Empty : NormalizeGameId(existingEntry.GameId);
+                    var previousConsole = existingEntry == null ? string.Empty : NormalizeConsoleLabel(existingEntry.ConsoleLabel);
+                    var rebuiltEntry = librarySession.BuildResolvedLibraryMetadataIndexEntry(file, stamp, metadataSnapshot, existingEntry, metadataIndex, savedGameRows);
+                    metadataIndex[file] = rebuiltEntry;
+                    SetCachedFileTags(file, ParseTagText(rebuiltEntry.TagText), MetadataCacheStamp(file));
+                    indexChanged = true;
+                    if (!string.Equals(previousGameId, NormalizeGameId(rebuiltEntry.GameId), StringComparison.OrdinalIgnoreCase)
+                        || !string.Equals(previousConsole, NormalizeConsoleLabel(rebuiltEntry.ConsoleLabel), StringComparison.OrdinalIgnoreCase))
+                    {
+                        gameRowsChanged = true;
+                    }
+                }
+
+                if (gameRowsChanged) librarySession.PersistGameIndexRows(savedGameRows);
+                if (indexChanged)
+                {
+                    var repaired = new List<LibraryMetadataIndexEntry>();
+                    foreach (var file in chunk)
+                    {
+                        LibraryMetadataIndexEntry e;
+                        if (metadataIndex.TryGetValue(file, out e) && e != null) repaired.Add(e);
+                    }
+
+                    if (repaired.Count > 0) librarySession.MergePersistLibraryMetadataIndexEntries(repaired);
+                }
+
+                await Task.Delay(100).ConfigureAwait(false);
+            }
+
+            if (Volatile.Read(ref _libraryDeferredMetadataRepairGeneration) != sessionGen) return;
+
+            LogTroubleshooting("LibraryDetailMetadataRepairDeferredComplete",
+                "gen=" + sessionGen + "; files=" + deferredFiles.Count + "; " + folderLabelForLog);
+
+            if (libraryWindow == null || redrawSelectedFolderDetail == null) return;
+
+            await libraryWindow.Dispatcher.InvokeAsync((Action)delegate
+            {
+                if (Volatile.Read(ref _libraryDeferredMetadataRepairGeneration) != sessionGen) return;
+                if (ws == null || !SameLibraryBrowserSelection(ws.Current, renderFolder)) return;
+                redrawSelectedFolderDetail();
+            }, DispatcherPriority.ApplicationIdle);
         }
 
         readonly struct LibraryDetailQuickSnapshotPerf

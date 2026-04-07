@@ -58,6 +58,12 @@ namespace PixelVaultNative
         /// <summary>Persist the library metadata index for <see cref="LibraryRoot"/> (no-op when root is unset).</summary>
         void SaveLibraryMetadataIndex(Dictionary<string, LibraryMetadataIndexEntry> index);
 
+        /// <summary>Toggle starred flag in the photo index and embedded XMP for <paramref name="absoluteFilePath"/> (host no-op when inapplicable). <paramref name="onCompleted"/> is <c>true</c> when the index row was updated; <c>false</c> if skipped or failed. Runs on the UI thread.</summary>
+        void RequestToggleCaptureStarred(string absoluteFilePath, Action<bool> onCompleted = null);
+
+        /// <summary>Save embedded comment for <paramref name="absoluteFilePath"/> (host no-op when inapplicable). <paramref name="onCompleted"/> receives whether a write was performed; runs on UI thread.</summary>
+        void RequestSaveCaptureComment(string absoluteFilePath, string comment, Action<bool> onCompleted = null);
+
         /// <summary>Load folder-cache snapshot lines for <see cref="LibraryRoot"/> if present; otherwise <c>null</c>.</summary>
         List<LibraryFolderInfo> LoadLibraryFolderCacheSnapshot();
 

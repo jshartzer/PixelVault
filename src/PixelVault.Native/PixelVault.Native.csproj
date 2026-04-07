@@ -131,6 +131,7 @@
     <Compile Include="UI\LibraryVirtualization.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="MainWindow.IndexServicesWiring.cs" />
+    <Compile Include="MainWindow.StartupInitialization.cs" />
     <Compile Include="PixelVault.Native.cs" />
   </ItemGroup>
 

@@ -118,6 +118,8 @@ namespace PixelVaultNative
         double _libraryBrowserPersistedDetailScroll;
         double _libraryBrowserPersistedFolderPaneWidth;
         LibraryBrowserWorkingSet _libraryBrowserLiveWorkingSet;
+        /// <summary>Incremented to cancel in-flight deferred metadata repair when a new deferral is scheduled.</summary>
+        int _libraryDeferredMetadataRepairGeneration;
         string _manualMetadataRecentTitleLabelsSerialized = string.Empty;
         Action<bool> activeLibraryFolderRefresh;
         /// <summary>When the library browser is active, runs full-library cover fetch (SteamGrid / IDs). Cleared when the hosted library window closes.</summary>
@@ -234,142 +236,49 @@ namespace PixelVaultNative
         public MainWindow()
         {
             _diagnosticsSessionId = Guid.NewGuid().ToString("N").Substring(0, 8);
-            dataRoot = ResolvePersistentDataRoot(appRoot);
-            logsRoot = Path.Combine(dataRoot, "logs");
-            cacheRoot = Path.Combine(dataRoot, "cache");
-            coversRoot = Path.Combine(cacheRoot, "covers");
-            thumbsRoot = Path.Combine(cacheRoot, "thumbs");
+            var paths = ComputePersistentStorageLayout(appRoot, ResolvePersistentDataRoot);
+            dataRoot = paths.DataRoot;
+            logsRoot = paths.LogsRoot;
+            cacheRoot = paths.CacheRoot;
+            coversRoot = paths.CoversRoot;
+            thumbsRoot = paths.ThumbsRoot;
+            savedCoversRoot = paths.SavedCoversRoot;
+            settingsPath = paths.SettingsPath;
+            changelogPath = paths.ChangelogPath;
+            undoManifestPath = paths.UndoManifestPath;
             InitializeLibraryThumbnailPipeline(thumbsRoot);
-            savedCoversRoot = Path.Combine(dataRoot, "saved-covers");
-            settingsPath = Path.Combine(dataRoot, "PixelVault.settings.ini");
-            changelogPath = Path.Combine(appRoot, "CHANGELOG.md");
-            undoManifestPath = Path.Combine(cacheRoot, "last-import.tsv");
-            settingsService = new SettingsService();
-            fileSystemService = new FileSystemService();
-            coverService = new CoverService(new CoverServiceDependencies
-            {
-                FileSystem = fileSystemService,
-                AppVersion = AppVersion,
-                CoversRoot = coversRoot,
-                RequestTimeoutMilliseconds = SteamRequestTimeoutMilliseconds,
-                GetSteamGridDbApiToken = delegate { return CurrentSteamGridDbApiToken(); },
-                NormalizeTitle = delegate(string value) { return NormalizeTitle(value); },
-                NormalizeConsoleLabel = delegate(string value) { return NormalizeConsoleLabel(value); },
-                SafeCacheName = delegate(string value) { return SafeCacheName(value); },
-                StripTags = delegate(string value) { return StripTags(value); },
-                Sanitize = delegate(string value) { return Sanitize(value); },
-                Log = delegate(string message) { Log(message); },
-                LogPerformanceSample = delegate(string area, Stopwatch stopwatch, string detail, long thresholdMilliseconds) { LogPerformanceSample(area, stopwatch, detail, thresholdMilliseconds); },
-                ClearImageCache = delegate { ClearImageCache(); },
-                RemoveCachedImageEntries = delegate(IEnumerable<string> paths) { RemoveCachedImageEntries(paths); }
-            });
+            (settingsService, fileSystemService) = CreateSettingsAndFileServices();
+            coverService = CreateCoverService(this, fileSystemService, coversRoot);
             (indexPersistenceService, filenameParserService, gameIndexEditorAssignmentService, filenameRulesService) = CreateIndexFilenameRulesServices(cacheRoot, this);
-            metadataService = new MetadataService(new MetadataServiceDependencies
-            {
-                GetExifToolPath = delegate { return exifToolPath; },
-                CacheRoot = cacheRoot,
-                IsVideo = delegate(string file) { return IsVideo(file); },
-                MetadataSidecarPath = delegate(string file) { return MetadataSidecarPath(file); },
-                MetadataReadPath = delegate(string file) { return MetadataReadPath(file); },
-                BuildMetadataTagSet = delegate(IEnumerable<string> platformTags, IEnumerable<string> extraTags, bool addPhotographyTag) { return BuildMetadataTagSet(platformTags, extraTags, addPhotographyTag); },
-                CleanComment = delegate(string value) { return CleanComment(value); },
-                CleanTag = delegate(string value) { return CleanTag(value); },
-                ParseEmbeddedMetadataDateValue = delegate(string value) { return ParseEmbeddedMetadataDateValue(value); },
-                GetMetadataWorkerCount = delegate(int workItems) { return GetMetadataWorkerCount(workItems); },
-                Log = delegate(string message) { Log(message); },
-                RunExe = delegate(string file, string[] args, string cwd, bool logOutput) { RunExe(file, args, cwd, logOutput); },
-                RunExeCapture = delegate(string file, string[] args, string cwd, bool logOutput, CancellationToken cancellationToken) { return RunExeCapture(file, args, cwd, logOutput, cancellationToken); }
-            });
-            libraryScanner = new LibraryScanner(new LibraryScanHost(this), metadataService, fileSystemService);
-            importService = new ImportService(new ImportServiceDependencies
-            {
-                UndoManifestPath = () => undoManifestPath,
-                GetDestinationRoot = () => destinationRoot,
-                GetLibraryRoot = () => libraryRoot,
-                GetConflictMode = CurrentConflictMode,
-                UniquePath = Unique,
-                MoveMetadataSidecarIfPresent = MoveMetadataSidecarIfPresent,
-                AddSidecarUndoEntryIfPresent = AddSidecarUndoEntryIfPresent,
-                Log = Log,
-                IsMedia = IsMedia,
-                GetSafeGameFolderName = GetSafeGameFolderName,
-                GetGameNameFromFileName = GetGameNameFromFileName,
-                EnsureDirectoryExists = EnsureDir,
-                GetLibraryScanner = () => libraryScanner,
-                EnumerateSourceMediaFiles = EnumerateSourceFiles,
-                ParseFilenameForImport = ParseFilename,
-                EnsureSteamAppIdInGameIndex = EnsureSteamAppIdInGameIndex,
-                SanitizeManualRenameGameTitle = Sanitize,
-                NormalizeTitleForManualRename = NormalizeTitle,
-                FileSystem = fileSystemService,
-                MetadataService = metadataService,
-                GetFileCreationTime = path => File.GetCreationTime(path),
-                GetFileLastWriteTime = path => File.GetLastWriteTime(path),
-                GamePhotographyTagLabel = GamePhotographyTag,
-                CoverService = coverService,
-                NormalizeGameIndexName = name => NormalizeGameIndexName(name),
-                DetermineManualMetadataPlatformLabel = DetermineManualMetadataPlatformLabel,
-                ManualMetadataChangesGroupingIdentity = ManualMetadataChangesGroupingIdentity,
-                GameIndexEditorAssignment = gameIndexEditorAssignmentService,
-                BuildManualMetadataGameTitleChoiceLabel = (name, platform) => BuildGameTitleChoiceLabel(name, platform),
-                ParseManualMetadataTagText = ParseTagText,
-                CleanTag = CleanTag,
-                LoadManualMetadataGameTitleRowsAsync = (root, ct) => Task.Factory.StartNew(() =>
-                {
-                    ct.ThrowIfCancellationRequested();
-                    var rows = GetSavedGameIndexRowsForRoot(root);
-                    if (rows == null || rows.Count == 0) rows = LoadGameIndexEditorRowsCore(root, null);
-                    return rows ?? new List<GameIndexEditorRow>();
-                }, ct, TaskCreationOptions.None, TaskScheduler.Default)
-            });
+            metadataService = CreateMetadataService(this, cacheRoot);
+            libraryScanner = CreateLibraryScanner(this, metadataService, fileSystemService);
+            importService = new ImportService(BuildImportServiceDependencies(
+                this,
+                libraryScanner,
+                fileSystemService,
+                metadataService,
+                coverService,
+                gameIndexEditorAssignmentService));
             libraryWorkspace = new LibraryWorkspaceContext(this);
-            librarySession = new LibrarySession(
+            librarySession = CreateLibrarySessionForStartup(
+                this,
                 libraryWorkspace,
                 libraryScanner,
                 fileSystemService,
                 gameIndexEditorAssignmentService,
-                LoadLibraryMetadataIndex,
-                LoadSavedGameIndexRows,
-                SaveLibraryMetadataIndex,
-                LoadLibraryMetadataIndexForFilePaths,
-                MergePersistLibraryMetadataIndexEntries,
-                LoadLibraryFolderCacheSnapshot,
-                ResolveIndexedLibraryDate,
-                BuildResolvedLibraryMetadataIndexEntry,
-                RefreshLibraryCoversAsync,
-                ShowLibraryMetadataScanWindow,
-                EnsureDir,
                 indexPersistenceService);
             importService.AttachLibrarySessionAccessor(() => librarySession);
-            gameIndexService = new GameIndexService(new GameIndexServiceDependencies
-            {
-                LibraryScanner = libraryScanner,
-                LibrarySession = librarySession,
-                IndexPersistence = indexPersistenceService,
-                GameIndexEditorAssignment = gameIndexEditorAssignmentService,
-                HostLibraryRoot = () => libraryRoot,
-                MergeGameIndexRows = rows => MergeGameIndexRows(rows),
-                BuildGameIndexRowsFromFolders = folders => BuildGameIndexRowsFromFolders(folders),
-                RefreshCachedLibraryFoldersFromGameIndex = RefreshCachedLibraryFoldersFromGameIndex,
-                ApplyEditorSaveRowPolicies = ApplyGameIndexEditorSaveRowPolicies,
-                BuildGameIndexSaveAliasMap = BuildGameIndexSaveAliasMap,
-                AlignLibraryFoldersToGameIndex = AlignLibraryFoldersToGameIndex,
-                RewriteGameIdAliasesInLibraryFolderCacheFile = RewriteGameIdAliasesInLibraryFolderCacheFile
-            });
-            Directory.CreateDirectory(dataRoot);
-            Directory.CreateDirectory(logsRoot);
-            Directory.CreateDirectory(cacheRoot);
-            Directory.CreateDirectory(coversRoot);
-            Directory.CreateDirectory(thumbsRoot);
-            Directory.CreateDirectory(savedCoversRoot);
+            gameIndexService = CreateGameIndexServiceForStartup(
+                this,
+                libraryScanner,
+                librarySession,
+                indexPersistenceService,
+                gameIndexEditorAssignmentService);
+            CreateStartupDirectories();
             EnsureSavedCoversReadme();
             if (!File.Exists(changelogPath)) File.WriteAllText(changelogPath, "# PixelVault Changelog\r\n\r\n## 0.530\r\n- Replaced the broken library separator glyph with a plain pipe so folder details read cleanly.\r\n- Grouped the Game Library folders into collapsible Steam, PS5, Xbox, Multiple Tags, and Other sections.\r\n- Increased the library folder art size a bit and tightened the caption text underneath for a cleaner browse view.\r\n");
             MigratePersistentDataFromLegacyVersions();
-            sourceRoot = @"E:\Game Capture Uploads";
-            destinationRoot = @"E:\Game Captures";
-            libraryRoot = destinationRoot;
-            exifToolPath = Path.Combine(appRoot, "tools", "exiftool.exe");
-            ffmpegPath = Path.Combine(appRoot, "tools", "ffmpeg.exe");
+            InitializeDefaultWorkspaceRootsAndTools();
             LoadSettings();
 
             Title = "PixelVault " + AppVersion;
@@ -1821,13 +1730,20 @@ namespace PixelVaultNative
                     .ToList();
             }
             if (string.IsNullOrWhiteSpace(folder.FolderPath) || !Directory.Exists(folder.FolderPath)) return new List<string>();
-            IEnumerable<string> files = imagesOnly
+            IEnumerable<string> filesEnumerable = imagesOnly
                 ? GetCachedFolderImages(folder.FolderPath)
                 : Directory.EnumerateFiles(folder.FolderPath, "*.*", SearchOption.TopDirectoryOnly).Where(IsMedia);
+            var candidates = filesEnumerable.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
             var desired = NormalizeConsoleLabel(folder.PlatformLabel);
-            return files
-                .Where(file => NormalizeConsoleLabel(DetermineFolderPlatform(new List<string> { file }, null)) == desired)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
+            if (candidates.Count == 0) return candidates;
+            Dictionary<string, LibraryMetadataIndexEntry> indexForProbe = null;
+            if (!string.IsNullOrWhiteSpace(libraryRoot))
+            {
+                indexForProbe = LoadLibraryMetadataIndexForFilePaths(libraryRoot, candidates);
+            }
+
+            return candidates
+                .Where(file => NormalizeConsoleLabel(DetermineFolderPlatform(new List<string> { file }, indexForProbe)) == desired)
                 .ToList();
         }
 
