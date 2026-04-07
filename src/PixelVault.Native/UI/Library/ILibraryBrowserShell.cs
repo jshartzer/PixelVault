@@ -32,6 +32,8 @@ namespace PixelVaultNative
         int LibraryPhotoRailFolderGridColumnCount { get; set; }
 
         Action<bool> ActiveLibraryFolderRefresh { get; set; }
+        /// <summary>When set, runs full-library cover fetch (same as former toolbar Fetch covers).</summary>
+        Action ActiveLibraryFullCoverRefresh { get; set; }
         LibraryFolderInfo ActiveSelectedLibraryFolder { get; set; }
 
         TextBlock StatusLine { get; }
@@ -213,7 +215,6 @@ namespace PixelVaultNative
             MainWindow.LibraryBrowserNavChrome navChrome,
             Action refreshIntakeReviewBadge,
             Action<bool> refreshLibraryFoldersAsync,
-            Action runCoverRefresh,
             Action openSelectedLibraryMetadataEditor,
             Action deleteSelectedLibraryFiles,
             Action<string> setLibraryGroupingMode,

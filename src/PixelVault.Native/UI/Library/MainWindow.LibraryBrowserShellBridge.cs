@@ -100,6 +100,12 @@ namespace PixelVaultNative
                 set => _m.activeLibraryFolderRefresh = value;
             }
 
+            public Action ActiveLibraryFullCoverRefresh
+            {
+                get => _m.activeLibraryFullCoverRefresh;
+                set => _m.activeLibraryFullCoverRefresh = value;
+            }
+
             public LibraryFolderInfo ActiveSelectedLibraryFolder
             {
                 get => _m.activeSelectedLibraryFolder;
@@ -338,13 +344,12 @@ namespace PixelVaultNative
                 LibraryBrowserNavChrome navChrome,
                 Action refreshIntakeReviewBadge,
                 Action<bool> refreshLibraryFoldersAsync,
-                Action runCoverRefresh,
                 Action openSelectedLibraryMetadataEditor,
                 Action deleteSelectedLibraryFiles,
                 Action<string> setLibraryGroupingMode,
                 Action<string> setLibrarySortMode,
                 Action<string> setLibraryFilterMode) =>
-                _m.LibraryBrowserWireNavChromeAndToolbar(libraryWindow, ws, panes, navChrome, refreshIntakeReviewBadge, refreshLibraryFoldersAsync, runCoverRefresh, openSelectedLibraryMetadataEditor, deleteSelectedLibraryFiles, setLibraryGroupingMode, setLibrarySortMode, setLibraryFilterMode);
+                _m.LibraryBrowserWireNavChromeAndToolbar(libraryWindow, ws, panes, navChrome, refreshIntakeReviewBadge, refreshLibraryFoldersAsync, openSelectedLibraryMetadataEditor, deleteSelectedLibraryFiles, setLibraryGroupingMode, setLibrarySortMode, setLibraryFilterMode);
 
             public void LibraryBrowserMountQuickEditDrawer(Grid root, LibraryBrowserWorkingSet ws) =>
                 _m.LibraryBrowserMountQuickEditDrawer(root, ws);

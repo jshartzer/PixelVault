@@ -1,6 +1,9 @@
+using System;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Threading;
 
 namespace PixelVaultNative
 {
@@ -16,14 +19,17 @@ namespace PixelVaultNative
             internal Button GameIndexButton;
             internal Button PhotoIndexButton;
             internal Button PhotographyGalleryButton;
-            internal Button FilenameRulesButton;
             internal Button MyCoversButton;
             internal Button ExportStarredButton;
             internal Button RefreshButton;
-            internal Button FetchButton;
             internal Button IntakeReviewButton;
             internal Border IntakeReviewBadge;
             internal TextBlock IntakeReviewBadgeText;
+            internal ScrollViewer HeaderActionsScrollViewer;
+            internal Border HeaderScrollLeftNudge;
+            internal Border HeaderScrollRightNudge;
+            internal DispatcherTimer HeaderScrollHoverTimer;
+            internal int HeaderScrollHoverDirection;
         }
 
         Window GetOrCreateLibraryBrowserWindow(bool reuseMainWindow)
@@ -61,8 +67,7 @@ namespace PixelVaultNative
             };
             var navGrid = new Grid();
             navGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            navGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            navGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            navGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = 0 });
 
             chrome.ImportButton = Btn("Import", null, "#2B7A52", Brushes.White);
             chrome.ImportButton.Width = 142;
@@ -89,15 +94,8 @@ namespace PixelVaultNative
             importActions.Children.Add(chrome.ImportButton);
             importActions.Children.Add(chrome.ImportCommentsButton);
             importActions.Children.Add(chrome.ManualImportButton);
-            var importScroll = new ScrollViewer
-            {
-                HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
-                VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
-                VerticalContentAlignment = VerticalAlignment.Center,
-                Content = importActions
-            };
-            Grid.SetColumn(importScroll, 0);
-            navGrid.Children.Add(importScroll);
+            Grid.SetColumn(importActions, 0);
+            navGrid.Children.Add(importActions);
             chrome.SettingsButton = Btn("Settings", null, "#20343A", Brushes.White);
             chrome.SettingsButton.Width = 122;
             chrome.SettingsButton.Height = 42;
@@ -128,13 +126,6 @@ namespace PixelVaultNative
             chrome.PhotographyGalleryButton.ToolTip = "Browse captures tagged for game photography";
             ApplyLibraryToolbarChrome(chrome.PhotographyGalleryButton, "#18242B", "#24353F", "#22323C", "#131D23");
             chrome.PhotographyGalleryButton.Content = BuildToolbarButtonContent("\uE722", "Photography");
-            chrome.FilenameRulesButton = Btn("Filename Rules", null, "#20343A", Brushes.White);
-            chrome.FilenameRulesButton.Width = 122;
-            chrome.FilenameRulesButton.Height = 42;
-            chrome.FilenameRulesButton.FontSize = 13;
-            chrome.FilenameRulesButton.Margin = new Thickness(0, 0, 12, 0);
-            ApplyLibraryToolbarChrome(chrome.FilenameRulesButton, "#18242B", "#24353F", "#22323C", "#131D23");
-            chrome.FilenameRulesButton.ToolTip = "Filename parsing rules for imports and grouping";
             chrome.MyCoversButton = Btn("My Covers", null, "#20343A", Brushes.White);
             chrome.MyCoversButton.Width = 122;
             chrome.MyCoversButton.Height = 42;
@@ -152,16 +143,11 @@ namespace PixelVaultNative
             ApplyLibraryToolbarChrome(chrome.ExportStarredButton, "#18242B", "#24353F", "#22323C", "#131D23");
             chrome.ExportStarredButton.Content = BuildToolbarButtonContent("\uE81E", "Export Starred");
             chrome.RefreshButton = Btn("Refresh", null, "#20343A", Brushes.White);
-            chrome.FetchButton = Btn("Fetch Covers", null, "#275D47", Brushes.White);
             chrome.RefreshButton.Width = 122;
-            chrome.FetchButton.Width = 136;
             chrome.RefreshButton.Margin = new Thickness(8, 0, 0, 0);
-            chrome.FetchButton.Margin = new Thickness(8, 0, 0, 0);
             ApplyLibraryToolbarChrome(chrome.RefreshButton, "#18242B", "#24353F", "#22323C", "#131D23");
-            ApplyLibraryToolbarChrome(chrome.FetchButton, "#234E3B", "#2F6950", "#2C604A", "#1B3F31");
             chrome.RefreshButton.Content = BuildToolbarButtonContent("\uE72C", "Refresh");
             chrome.RefreshButton.ToolTip = "Rescan library folders from disk";
-            chrome.FetchButton.ToolTip = "Resolve IDs and download cover art for the whole library";
             chrome.IntakeReviewButton = Btn(string.Empty, null, "#152028", Brushes.White);
             chrome.IntakeReviewButton.Width = 76;
             chrome.IntakeReviewButton.Height = 56;
@@ -225,29 +211,162 @@ namespace PixelVaultNative
             };
             intakeReviewContent.Children.Add(chrome.IntakeReviewBadge);
             chrome.IntakeReviewButton.Content = intakeReviewContent;
-            var headerActions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
+            var headerActions = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Center
+            };
             headerActions.Children.Add(chrome.SettingsButton);
             headerActions.Children.Add(chrome.GameIndexButton);
             headerActions.Children.Add(chrome.PhotoIndexButton);
             headerActions.Children.Add(chrome.PhotographyGalleryButton);
-            headerActions.Children.Add(chrome.FilenameRulesButton);
             headerActions.Children.Add(chrome.MyCoversButton);
             headerActions.Children.Add(chrome.ExportStarredButton);
             headerActions.Children.Add(chrome.RefreshButton);
-            headerActions.Children.Add(chrome.FetchButton);
             headerActions.Children.Add(chrome.IntakeReviewButton);
             var headerScroll = new ScrollViewer
             {
-                HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Hidden,
                 VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
                 VerticalContentAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(12, 0, 0, 0),
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                HorizontalContentAlignment = HorizontalAlignment.Right,
+                MinWidth = 0,
                 Content = headerActions
             };
-            Grid.SetColumn(headerScroll, 2);
-            navGrid.Children.Add(headerScroll);
+            chrome.HeaderActionsScrollViewer = headerScroll;
+
+            chrome.HeaderScrollLeftNudge = BuildLibraryNavHeaderScrollNudge(true);
+            chrome.HeaderScrollRightNudge = BuildLibraryNavHeaderScrollNudge(false);
+            chrome.HeaderScrollHoverTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(18) };
+            chrome.HeaderScrollHoverTimer.Tick += delegate
+            {
+                if (chrome.HeaderScrollHoverDirection == 0 || chrome.HeaderActionsScrollViewer == null) return;
+                var sv = chrome.HeaderActionsScrollViewer;
+                var step = chrome.HeaderScrollHoverDirection * 8.0;
+                var target = sv.HorizontalOffset + step;
+                sv.ScrollToHorizontalOffset(Math.Max(0d, Math.Min(sv.ScrollableWidth, target)));
+                UpdateLibraryNavChromeHeaderScrollNudges(chrome);
+            };
+            chrome.HeaderScrollLeftNudge.MouseEnter += delegate
+            {
+                chrome.HeaderScrollHoverDirection = -1;
+                chrome.HeaderScrollHoverTimer?.Start();
+            };
+            chrome.HeaderScrollLeftNudge.MouseLeave += delegate
+            {
+                chrome.HeaderScrollHoverDirection = 0;
+                chrome.HeaderScrollHoverTimer?.Stop();
+            };
+            chrome.HeaderScrollRightNudge.MouseEnter += delegate
+            {
+                chrome.HeaderScrollHoverDirection = 1;
+                chrome.HeaderScrollHoverTimer?.Start();
+            };
+            chrome.HeaderScrollRightNudge.MouseLeave += delegate
+            {
+                chrome.HeaderScrollHoverDirection = 0;
+                chrome.HeaderScrollHoverTimer?.Stop();
+            };
+
+            var middleHost = new Grid { Margin = new Thickness(12, 0, 0, 0), MinWidth = 0 };
+            middleHost.Children.Add(headerScroll);
+            middleHost.Children.Add(chrome.HeaderScrollLeftNudge);
+            middleHost.Children.Add(chrome.HeaderScrollRightNudge);
+            Grid.SetColumn(middleHost, 1);
+            navGrid.Children.Add(middleHost);
+
+            void pinTrailingAndRefreshNudges()
+            {
+                PinLibraryNavHeaderScrollToTrailingEdgeIfOverflow(chrome);
+                UpdateLibraryNavChromeHeaderScrollNudges(chrome);
+            }
+
+            headerScroll.ScrollChanged += delegate { UpdateLibraryNavChromeHeaderScrollNudges(chrome); };
+            headerScroll.SizeChanged += delegate { pinTrailingAndRefreshNudges(); };
+            headerActions.SizeChanged += delegate { pinTrailingAndRefreshNudges(); };
+            navGrid.SizeChanged += delegate { pinTrailingAndRefreshNudges(); };
+            chrome.NavBar.Loaded += delegate
+            {
+                chrome.NavBar.Dispatcher.BeginInvoke(new Action(pinTrailingAndRefreshNudges), DispatcherPriority.Loaded);
+            };
+
             chrome.NavBar.Child = navGrid;
             return chrome;
+        }
+
+        static LinearGradientBrush BuildLibraryNavNudgeGradientFadeFromLeft()
+        {
+            var br = new LinearGradientBrush { StartPoint = new Point(0, 0), EndPoint = new Point(1, 0) };
+            br.GradientStops.Add(new GradientStop(Color.FromArgb(200, 14, 20, 26), 0));
+            br.GradientStops.Add(new GradientStop(Color.FromArgb(0, 14, 20, 26), 1));
+            if (br.CanFreeze) br.Freeze();
+            return br;
+        }
+
+        static LinearGradientBrush BuildLibraryNavNudgeGradientFadeFromRight()
+        {
+            var br = new LinearGradientBrush { StartPoint = new Point(0, 0), EndPoint = new Point(1, 0) };
+            br.GradientStops.Add(new GradientStop(Color.FromArgb(0, 14, 20, 26), 0));
+            br.GradientStops.Add(new GradientStop(Color.FromArgb(200, 14, 20, 26), 1));
+            if (br.CanFreeze) br.Freeze();
+            return br;
+        }
+
+        static Border BuildLibraryNavHeaderScrollNudge(bool leftEdge)
+        {
+            var b = new Border
+            {
+                Width = 40,
+                HorizontalAlignment = leftEdge ? HorizontalAlignment.Left : HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Stretch,
+                Background = leftEdge ? BuildLibraryNavNudgeGradientFadeFromLeft() : BuildLibraryNavNudgeGradientFadeFromRight(),
+                Cursor = System.Windows.Input.Cursors.Hand,
+                Visibility = Visibility.Collapsed,
+                Padding = new Thickness(leftEdge ? 6 : 0, 0, leftEdge ? 0 : 6, 0)
+            };
+            Panel.SetZIndex(b, 3);
+            AutomationProperties.SetName(b, leftEdge ? "Scroll library toolbar left" : "Scroll library toolbar right");
+            b.Child = new TextBlock
+            {
+                Text = leftEdge ? "\uE76B" : "\uE76C",
+                FontFamily = new FontFamily("Segoe MDL2 Assets"),
+                FontSize = 13,
+                Foreground = UiBrushHelper.FromHex("#DCE8EF"),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Opacity = 0.92
+            };
+            return b;
+        }
+
+        static void PinLibraryNavHeaderScrollToTrailingEdgeIfOverflow(LibraryBrowserNavChrome chrome)
+        {
+            if (chrome?.HeaderActionsScrollViewer == null) return;
+            var sv = chrome.HeaderActionsScrollViewer;
+            var viewport = sv.ViewportWidth;
+            var extent = sv.ExtentWidth;
+            if (viewport <= 0 || extent <= viewport + 0.5) return;
+            sv.ScrollToHorizontalOffset(sv.ScrollableWidth);
+        }
+
+        static void UpdateLibraryNavChromeHeaderScrollNudges(LibraryBrowserNavChrome chrome)
+        {
+            if (chrome?.HeaderActionsScrollViewer == null || chrome.HeaderScrollLeftNudge == null || chrome.HeaderScrollRightNudge == null) return;
+            var sv = chrome.HeaderActionsScrollViewer;
+            var viewport = sv.ViewportWidth;
+            var extent = sv.ExtentWidth;
+            if (viewport <= 0 || extent <= viewport + 0.5)
+            {
+                chrome.HeaderScrollLeftNudge.Visibility = Visibility.Collapsed;
+                chrome.HeaderScrollRightNudge.Visibility = Visibility.Collapsed;
+                if (Math.Abs(sv.HorizontalOffset) > 0.01) sv.ScrollToHorizontalOffset(0);
+                return;
+            }
+            var maxScroll = Math.Max(0d, sv.ScrollableWidth);
+            chrome.HeaderScrollLeftNudge.Visibility = sv.HorizontalOffset > 0.75 ? Visibility.Visible : Visibility.Collapsed;
+            chrome.HeaderScrollRightNudge.Visibility = sv.HorizontalOffset < maxScroll - 0.75 ? Visibility.Visible : Visibility.Collapsed;
         }
     }
 }

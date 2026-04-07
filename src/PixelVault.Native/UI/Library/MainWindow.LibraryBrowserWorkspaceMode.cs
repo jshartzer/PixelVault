@@ -15,6 +15,7 @@ namespace PixelVaultNative
             showFolder(folder);
             ApplyLibraryBrowserLayoutMode(ws.Panes, ws.WorkspaceMode);
             ws.RefreshSortFilterChrome?.Invoke();
+            ws.RerenderFolderList?.Invoke();
         }
 
         internal void LibraryBrowserExitPhotoWorkspace(LibraryBrowserWorkingSet ws, Action renderTiles)

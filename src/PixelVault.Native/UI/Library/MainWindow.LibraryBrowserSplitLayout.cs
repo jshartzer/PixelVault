@@ -72,6 +72,13 @@ namespace PixelVaultNative
                 if (panes.LibraryFooterStatusLine != null) panes.LibraryFooterStatusLine.Visibility = Visibility.Collapsed;
                 if (panes.PhotoRailColumnPickerHost != null) panes.PhotoRailColumnPickerHost.Visibility = Visibility.Visible;
                 _libraryBrowserLiveWorkingSet?.RefreshPhotoRailColumnPickerUi?.Invoke();
+                if (panes.SortFilterMenuButton != null)
+                {
+                    Grid.SetColumn(panes.SortFilterMenuButton, 0);
+                    Grid.SetColumnSpan(panes.SortFilterMenuButton, 6);
+                    panes.SortFilterMenuButton.HorizontalAlignment = HorizontalAlignment.Center;
+                    panes.SortFilterMenuButton.Margin = new Thickness(0, 0, 0, 0);
+                }
                 ApplyLibraryPhotoDetailChromeLayout(panes, true);
                 LibraryBrowserSyncOpenCapturesToolbarButton(panes);
                 return;
@@ -90,6 +97,13 @@ namespace PixelVaultNative
                 if (panes.LibraryFooterCommandsPanel != null) panes.LibraryFooterCommandsPanel.Visibility = Visibility.Visible;
                 if (panes.LibraryFooterStatusLine != null) panes.LibraryFooterStatusLine.Visibility = Visibility.Visible;
                 if (panes.PhotoRailColumnPickerHost != null) panes.PhotoRailColumnPickerHost.Visibility = Visibility.Collapsed;
+                if (panes.SortFilterMenuButton != null)
+                {
+                    Grid.SetColumnSpan(panes.SortFilterMenuButton, 1);
+                    Grid.SetColumn(panes.SortFilterMenuButton, 0);
+                    panes.SortFilterMenuButton.ClearValue(FrameworkElement.HorizontalAlignmentProperty);
+                    panes.SortFilterMenuButton.Margin = new Thickness(0, 0, 8, 0);
+                }
                 ApplyLibraryPhotoDetailChromeLayout(panes, false);
                 if (panes.GroupAllButton != null) panes.GroupAllButton.Visibility = Visibility.Visible;
                 if (panes.GroupConsoleButton != null) panes.GroupConsoleButton.Visibility = Visibility.Visible;

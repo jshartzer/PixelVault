@@ -124,6 +124,8 @@ namespace PixelVaultNative
         LibraryBrowserWorkingSet _libraryBrowserLiveWorkingSet;
         string _manualMetadataRecentTitleLabelsSerialized = string.Empty;
         Action<bool> activeLibraryFolderRefresh;
+        /// <summary>When the library browser is active, runs full-library cover fetch (SteamGrid / IDs). Cleared when the hosted library window closes.</summary>
+        Action activeLibraryFullCoverRefresh;
         LibraryFolderInfo activeSelectedLibraryFolder;
 
         TextBox logBox;

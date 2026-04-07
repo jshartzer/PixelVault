@@ -191,8 +191,16 @@ namespace PixelVaultNative
             var photographyTopButton = d.Btn("Photography", delegate { d.ShowPhotographyGallery(Window.GetWindow(statusLocal)); }, DesignTokens.ActionSecondaryFill, Brushes.White);
             photographyTopButton.ToolTip = "Browse captures tagged for game photography";
             styleHeaderBtn(photographyTopButton);
-            var filenameRulesTopButton = d.Btn("Filename Rules", delegate { d.OpenFilenameConventionEditor(); }, DesignTokens.ActionSecondaryFill, Brushes.White);
+            var filenameRulesTopButton = d.Btn("Renaming rules", delegate { d.OpenFilenameConventionEditor(); }, DesignTokens.ActionSecondaryFill, Brushes.White);
+            filenameRulesTopButton.ToolTip = "How capture filenames are parsed for imports and grouping";
             styleHeaderBtn(filenameRulesTopButton);
+            var fetchCoversTopButton = d.Btn(
+                "Fetch covers",
+                delegate { d.PromptFetchCoversForLibrary?.Invoke(Window.GetWindow(statusLocal) ?? d.OwnerWindow); },
+                DesignTokens.ActionShortcutDismissFill,
+                Brushes.White);
+            fetchCoversTopButton.ToolTip = "Resolve IDs and download cover art for the whole library (occasional maintenance)";
+            styleHeaderBtn(fetchCoversTopButton);
             var changelogTopButton = d.Btn("Changelog", delegate { ChangelogWindow.ShowDialog(d.OwnerWindow, d.AppVersion, d.ChangelogPath); }, DesignTokens.ActionSecondaryFill, Brushes.White);
             styleHeaderBtn(changelogTopButton);
             var sp = new Border
@@ -214,6 +222,7 @@ namespace PixelVaultNative
             headerActions.Children.Add(photoIndexTopButton);
             headerActions.Children.Add(photographyTopButton);
             headerActions.Children.Add(filenameRulesTopButton);
+            headerActions.Children.Add(fetchCoversTopButton);
             headerActions.Children.Add(changelogTopButton);
             headerActions.Children.Add(sp);
             headerGrid.Children.Add(hs);

@@ -15,7 +15,6 @@ namespace PixelVaultNative
             LibraryBrowserNavChrome navChrome,
             Action refreshIntakeReviewBadge,
             Action<bool> refreshLibraryFoldersAsync,
-            Action runCoverRefresh,
             Action openSelectedLibraryMetadataEditor,
             Action deleteSelectedLibraryFiles,
             Action<string> setLibraryGroupingMode,
@@ -48,22 +47,10 @@ namespace PixelVaultNative
             navChrome.GameIndexButton.Click += delegate { OpenGameIndexEditor(); };
             navChrome.PhotoIndexButton.Click += delegate { OpenPhotoIndexEditor(); };
             navChrome.PhotographyGalleryButton.Click += delegate { ShowPhotographyGallery(libraryWindow); };
-            navChrome.FilenameRulesButton.Click += delegate { OpenFilenameConventionEditor(); };
             navChrome.MyCoversButton.Click += delegate { OpenSavedCoversFolder(); };
             navChrome.ImportButton.Click += delegate { RunWorkflow(false); if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge(); };
             navChrome.ImportCommentsButton.Click += delegate { RunWorkflow(true); if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge(); };
             navChrome.ManualImportButton.Click += delegate { OpenManualIntakeWindow(); if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge(); };
-            navChrome.FetchButton.Click += delegate
-            {
-                var choice = MessageBox.Show(
-                    libraryWindow,
-                    "Refresh cover art for the entire library?",
-                    "PixelVault",
-                    MessageBoxButton.OKCancel,
-                    MessageBoxImage.Question);
-                if (choice != MessageBoxResult.OK) return;
-                runCoverRefresh();
-            };
             navChrome.ExportStarredButton.Click += delegate { ExportStarredLibraryCapturesToFolder(libraryWindow); };
             navChrome.IntakeReviewButton.Click += delegate
             {

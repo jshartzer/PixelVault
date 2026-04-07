@@ -269,7 +269,11 @@ namespace PixelVaultNative
             if (roundedCoverClip.CanFreeze) roundedCoverClip.Freeze();
             imageBorder.Clip = roundedCoverClip;
             tile.Content = imageBorder;
-            tile.Click += delegate { showFolder(folder); };
+            tile.Click += delegate
+            {
+                showFolder(folder);
+                if (ws?.WorkspaceMode == LibraryWorkspaceMode.Photo && renderTiles != null) renderTiles();
+            };
             tile.PreviewMouseDoubleClick += delegate(object _, MouseButtonEventArgs e)
             {
                 if (e.ChangedButton != MouseButton.Left) return;

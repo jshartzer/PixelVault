@@ -18,7 +18,7 @@ namespace PixelVaultNative
             new("health", "Setup & health", "Paths, tools, diagnostics", "diagnostics troubleshooting"),
             new("game_index", "Game index", "Master game rows", "steam grid"),
             new("photo_index", "Photo index", "Per-file index cache", "sqlite metadata"),
-            new("filename_rules", "Filename rules", "Convention editor", "parsing pattern"),
+            new("filename_rules", "Renaming rules", "Filename convention editor", "parsing pattern filename"),
             new("photography_gallery", "Photography gallery", "Tagged captures", "screenshots"),
             new("saved_covers", "Saved covers folder", "Open bundled covers on disk", "covers disk"),
             new("import", "Import", "Move queue into library", "upload intake"),

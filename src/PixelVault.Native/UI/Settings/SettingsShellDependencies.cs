@@ -23,6 +23,8 @@ namespace PixelVaultNative
         public Action OpenPhotoIndexEditor { get; set; }
         public Action OpenFilenameConventionEditor { get; set; }
         public Action<Window> ShowPhotographyGallery { get; set; }
+        /// <summary>Library full cover refresh with confirmation; pass the active settings (or other) dialog as owner for modal dialogs.</summary>
+        public Action<Window> PromptFetchCoversForLibrary { get; set; }
 
         public Func<string> SourceRootsSummary { get; set; }
         public Func<string> GetDestinationRoot { get; set; }

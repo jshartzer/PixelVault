@@ -1,3 +1,5 @@
+using System.Windows;
+
 namespace PixelVaultNative
 {
     public sealed partial class MainWindow
@@ -79,8 +81,34 @@ namespace PixelVaultNative
                 GetConfiguredSourceRoots = () => GetSourceRoots(),
                 GetCacheRoot = () => cacheRoot,
                 GetActiveLibraryIndexDatabasePath = () => string.IsNullOrWhiteSpace(libraryRoot) ? string.Empty : IndexDatabasePath(libraryRoot),
-                GetDiagnosticsSessionId = () => _diagnosticsSessionId
+                GetDiagnosticsSessionId = () => _diagnosticsSessionId,
+                PromptFetchCoversForLibrary = PromptFetchCoversForLibraryFromSettings
             };
+        }
+
+        void PromptFetchCoversForLibraryFromSettings(Window owner)
+        {
+            var run = activeLibraryFullCoverRefresh;
+            var o = owner ?? this;
+            if (run == null)
+            {
+                MessageBox.Show(
+                    o,
+                    "Open the Library window first to refresh covers for the whole library.",
+                    "PixelVault",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            var choice = MessageBox.Show(
+                o,
+                "Refresh cover art for the entire library?",
+                "PixelVault",
+                MessageBoxButton.OKCancel,
+                MessageBoxImage.Question);
+            if (choice != MessageBoxResult.OK) return;
+            run();
         }
 
         internal void ShowSettingsWindow()

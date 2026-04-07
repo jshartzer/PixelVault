@@ -57,6 +57,9 @@ namespace PixelVaultNative
 
             internal Action RefreshPhotoRailColumnPickerUi;
 
+            /// <summary>Re-runs <see cref="MainWindow.LibraryBrowserRenderFolderList"/> (folder grid / photo rail tiles).</summary>
+            internal Action RerenderFolderList;
+
             /// <summary>When true, next folder rail render scrolls so <see cref="Current"/> is at the top (Photo workspace).</summary>
             internal bool ScrollPhotoRailSelectionToTopPending;
 

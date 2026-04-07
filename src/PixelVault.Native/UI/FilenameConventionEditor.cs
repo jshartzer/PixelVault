@@ -324,7 +324,7 @@ namespace PixelVaultNative
             }
             catch (Exception ex)
             {
-                status.Text = "Filename rules unavailable";
+                status.Text = "Renaming rules unavailable";
                 Log("Failed to open filename rules. " + ex.Message);
                 TryLibraryToast("Could not open the filename rules." + Environment.NewLine + Environment.NewLine + ex.Message, MessageBoxImage.Error);
             }

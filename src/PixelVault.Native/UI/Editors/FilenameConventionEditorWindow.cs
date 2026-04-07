@@ -41,7 +41,7 @@ namespace PixelVaultNative
             if (services.CreateButton == null) throw new ArgumentNullException(nameof(services) + "." + nameof(services.CreateButton));
             if (services.NormalizeConsoleLabel == null) throw new ArgumentNullException(nameof(services) + "." + nameof(services.NormalizeConsoleLabel));
             if (services.CleanTag == null) throw new ArgumentNullException(nameof(services) + "." + nameof(services.CleanTag));
-            services.SetStatus("Loading filename rules");
+            services.SetStatus("Loading renaming rules");
 
             List<FilenameConventionRule> customRules = new List<FilenameConventionRule>();
             List<FilenameConventionRule> builtInRules = new List<FilenameConventionRule>();
@@ -53,7 +53,7 @@ namespace PixelVaultNative
 
             var editorWindow = new Window
             {
-                Title = "PixelVault " + appVersion + " Filename Rules",
+                Title = "PixelVault " + appVersion + " Renaming Rules",
                 Width = 1480,
                 Height = 980,
                 MinWidth = 1220,
@@ -147,7 +147,7 @@ namespace PixelVaultNative
 
             var header = new Border { Background = B("#161C20"), CornerRadius = new CornerRadius(20), Padding = new Thickness(24), Margin = new Thickness(0, 0, 0, 18) };
             var headerStack = new StackPanel();
-            headerStack.Children.Add(new TextBlock { Text = "Filename Rules", FontSize = 30, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White });
+            headerStack.Children.Add(new TextBlock { Text = "Renaming rules", FontSize = 30, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White });
             headerStack.Children.Add(new TextBlock { Text = "Use recent unmatched samples to create readable rules, inspect the shipped built-ins, and save library-specific overrides with confidence.", Margin = new Thickness(0, 10, 0, 0), FontSize = 14, Foreground = B("#B7C6C0"), TextWrapping = TextWrapping.Wrap });
             headerStack.Children.Add(new TextBlock { Text = "Readable rule examples: [appid]_[yyyy][MM][dd][HH][mm][ss][opt-counter].[ext:media], [title]_[yyyy][MM][dd].[ext:image], clip_[unixms].[ext:video], or [contains:PS5].", Margin = new Thickness(0, 10, 0, 0), FontSize = 13, Foreground = B("#D8C7A4"), TextWrapping = TextWrapping.Wrap });
             header.Child = headerStack;
@@ -197,7 +197,7 @@ namespace PixelVaultNative
             controlsRow.Children.Add(disableBuiltInButton);
 
             var reloadButton = MakeButton("Reload", "#EEF2F5", B("#33424D"), 140);
-            SetButtonToolTip(reloadButton, "Discard unsaved changes and reload filename rules from disk.");
+            SetButtonToolTip(reloadButton, "Discard unsaved changes and reload renaming rules from disk.");
             Grid.SetColumn(reloadButton, 4);
             controlsRow.Children.Add(reloadButton);
 
@@ -213,12 +213,12 @@ namespace PixelVaultNative
             controlsRow.Children.Add(helperText);
 
             var saveTopButton = MakeButton("Save Rules", "#275D47", Brushes.White, 170);
-            SetButtonToolTip(saveTopButton, "Validate and save custom filename rules for this library.");
+            SetButtonToolTip(saveTopButton, "Validate and save custom renaming rules for this library.");
             Grid.SetColumn(saveTopButton, 6);
             controlsRow.Children.Add(saveTopButton);
 
             var closeTopButton = MakeButton("Close", "#EEF2F5", B("#33424D"), 140);
-            SetButtonToolTip(closeTopButton, "Close the filename rules window.");
+            SetButtonToolTip(closeTopButton, "Close the renaming rules window.");
             closeTopButton.Margin = new Thickness(0);
             Grid.SetColumn(closeTopButton, 7);
             controlsRow.Children.Add(closeTopButton);
@@ -823,14 +823,14 @@ namespace PixelVaultNative
                     RefreshLists(false);
 
                     services.RefreshPreviewIfNeeded();
-                    services.SetStatus("Filename rules saved.");
+                    services.SetStatus("Renaming rules saved.");
                     services.Log("Saved " + customRules.Count + " custom filename rule(s) to the index database.");
                 }
                 catch (Exception saveEx)
                 {
-                    services.SetStatus("Filename rule save failed");
-                    services.Log("Failed to save filename rules. " + saveEx.Message);
-                    MainWindow.NotifyOrMessageBox(services.NotifyUser, "Could not save the filename rules." + Environment.NewLine + Environment.NewLine + saveEx.Message, MessageBoxImage.Error);
+                    services.SetStatus("Renaming rule save failed");
+                    services.Log("Failed to save renaming rules. " + saveEx.Message);
+                    MainWindow.NotifyOrMessageBox(services.NotifyUser, "Could not save the renaming rules." + Environment.NewLine + Environment.NewLine + saveEx.Message, MessageBoxImage.Error);
                 }
             }
 
@@ -838,7 +838,7 @@ namespace PixelVaultNative
             {
                 if (dirty)
                 {
-                    var choice = MessageBox.Show("Discard unsaved filename-rule edits and reload from disk?", "Reload Filename Rules", MessageBoxButton.OKCancel, MessageBoxImage.Question);
+                    var choice = MessageBox.Show("Discard unsaved renaming-rule edits and reload from disk?", "Reload renaming rules", MessageBoxButton.OKCancel, MessageBoxImage.Question);
                     if (choice != MessageBoxResult.OK) return;
                 }
 
@@ -848,8 +848,8 @@ namespace PixelVaultNative
                 LoadRuleIntoEditor(null, false);
                 if (samples.Count > 0) sampleGrid.SelectedItem = samples[0];
                 RefreshLists(true);
-                services.SetStatus("Filename rules reloaded");
-                services.Log("Reloaded filename rules and recent samples from the index database.");
+                services.SetStatus("Renaming rules reloaded");
+                services.Log("Reloaded renaming rules and recent samples from the index database.");
             }
 
             foreach (var textBox in new[] { nameBox, priorityBox, patternBox, tagsBox, conventionIdBox, appIdGroupBox, titleGroupBox, timestampGroupBox, timestampFormatBox })
@@ -942,7 +942,7 @@ namespace PixelVaultNative
             editorWindow.Closing += delegate(object sender, System.ComponentModel.CancelEventArgs args)
             {
                 if (!dirty) return;
-                var choice = MessageBox.Show("You have unsaved filename-rule changes." + Environment.NewLine + Environment.NewLine + "Close without saving?", "Close Filename Rules", MessageBoxButton.OKCancel, MessageBoxImage.Warning);
+                var choice = MessageBox.Show("You have unsaved renaming-rule changes." + Environment.NewLine + Environment.NewLine + "Close without saving?", "Close renaming rules", MessageBoxButton.OKCancel, MessageBoxImage.Warning);
                 if (choice != MessageBoxResult.OK) args.Cancel = true;
             };
 
@@ -956,8 +956,8 @@ namespace PixelVaultNative
             LoadRuleIntoEditor(null, false);
             if (samples.Count > 0) sampleGrid.SelectedItem = samples[0];
             RefreshLists(true);
-            services.SetStatus("Filename rules ready");
-            services.Log("Opened filename rule editor.");
+            services.SetStatus("Renaming rules ready");
+            services.Log("Opened renaming rules editor.");
             editorWindow.Show();
             editorWindow.Activate();
         }

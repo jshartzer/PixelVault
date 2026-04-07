@@ -324,6 +324,7 @@ namespace PixelVaultNative
                     _shell.LibraryBrowserRenderFolderList(ws, buildFolderTile, showFolder, renderSelectedFolder, renderFolderTilesCore, clearLibrarySearchAndRerender, refreshLibraryFoldersLoose);
                 };
                 renderTiles = renderFolderTilesCore;
+                ws.RerenderFolderList = renderFolderTilesCore;
 
                 refreshLibraryFoldersAsync = delegate(bool forceRefresh)
                 {
@@ -356,7 +357,6 @@ namespace PixelVaultNative
                     if (panes.PhotoRailColumnTwoButton != null) panes.PhotoRailColumnTwoButton.IsEnabled = !isBusy;
                     panes.ShortcutsHelpButton.IsEnabled = !isBusy;
                     if (panes.CommandPaletteButton != null) panes.CommandPaletteButton.IsEnabled = !isBusy;
-                    navChrome.FetchButton.IsEnabled = !isBusy;
                     navChrome.ExportStarredButton.IsEnabled = !isBusy;
                     navChrome.ImportButton.IsEnabled = !isBusy;
                     navChrome.ImportCommentsButton.IsEnabled = !isBusy;
@@ -394,6 +394,14 @@ namespace PixelVaultNative
                 {
                     runScopedCoverRefresh(ws.Folders, "library", false, false, true);
                 };
+                _shell.ActiveLibraryFullCoverRefresh = runCoverRefresh;
+                if (!reuseMainWindow)
+                {
+                    libraryWindow.Closed += delegate
+                    {
+                        if (_shell.ActiveLibraryFullCoverRefresh == runCoverRefresh) _shell.ActiveLibraryFullCoverRefresh = null;
+                    };
+                }
                 applySearchFilter = delegate
                 {
                     panes.SearchDebounceTimer.Stop();
@@ -418,7 +426,6 @@ namespace PixelVaultNative
                     navChrome,
                     refreshIntakeReviewBadge,
                     refreshLibraryFoldersAsync,
-                    runCoverRefresh,
                     openSelectedLibraryMetadataEditor,
                     deleteSelectedLibraryFiles,
                     setLibraryGroupingMode,
