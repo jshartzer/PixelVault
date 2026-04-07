@@ -174,5 +174,7 @@ Before merging a slice, ask:
 |------|--------|
 | 2026-04-06 | Initial plan: post–A–F UI thin-out; iOS foundation alignment; staged Steps 1–7. |
 | 2026-04-06 | **Step 1 done:** `LibraryDetailRenderSnapshot`, `LibraryDetailRenderGroup`, `LibraryTimelineCaptureContext` → `src/PixelVault.Native/UI/Library/LibraryDetailRenderModels.cs` (registered in `.csproj`). |
+| 2026-04-06 | **`LibraryDetailMediaLayoutInfo`** moved from `MainWindow.LibraryPhotoMasonryLayout.cs` into **`LibraryDetailRenderModels.cs`**. |
+| 2026-04-06 | **Step 2 done:** `MaxImageCacheEntries`, `libraryBitmapCache`, `imageLoadCoordinator`, `libraryThumbnailPipeline` field declarations → **`MainWindow.LibraryImageLoading.cs`**; ctor assignment in `PixelVault.Native.cs` unchanged. |
 
 When execution starts, reference **`PV-PLN-UI-001`** in commits; Notion per **`docs/DOC_SYNC_POLICY.md`** if milestones are tracked there.

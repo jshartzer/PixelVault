@@ -10,15 +10,6 @@ namespace PixelVaultNative
 {
     public sealed partial class MainWindow
     {
-        internal sealed class LibraryDetailMediaLayoutInfo
-        {
-            internal long LastWriteUtcTicks;
-            internal long FileLength;
-            internal int PixelWidth;
-            internal int PixelHeight;
-            internal bool IsVideo;
-        }
-
         readonly object _libraryDetailMediaLayoutInfoSync = new object();
         readonly Dictionary<string, LibraryDetailMediaLayoutInfo> _libraryDetailMediaLayoutInfoCache = new Dictionary<string, LibraryDetailMediaLayoutInfo>(StringComparer.OrdinalIgnoreCase);
 

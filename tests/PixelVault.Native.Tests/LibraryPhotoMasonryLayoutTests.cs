@@ -12,7 +12,7 @@ public sealed class LibraryPhotoMasonryLayoutTests
         var files = new[] { "a.png", "b.png", "c.png", "d.png", "e.png" };
         var media = files.ToDictionary(
             file => file,
-            _ => new MainWindow.LibraryDetailMediaLayoutInfo { PixelWidth = 3840, PixelHeight = 2160 },
+            _ => new LibraryDetailMediaLayoutInfo { PixelWidth = 3840, PixelHeight = 2160 },
             System.StringComparer.OrdinalIgnoreCase);
         var chunks = MainWindow.BuildLibraryDetailMasonryChunks(
             files,
@@ -36,7 +36,7 @@ public sealed class LibraryPhotoMasonryLayoutTests
         var files = Enumerable.Range(0, 120).Select(i => $"f{i}.png").ToArray();
         var media = files.ToDictionary(
             file => file,
-            _ => new MainWindow.LibraryDetailMediaLayoutInfo { PixelWidth = 2560, PixelHeight = 1440 },
+            _ => new LibraryDetailMediaLayoutInfo { PixelWidth = 2560, PixelHeight = 1440 },
             System.StringComparer.OrdinalIgnoreCase);
         var chunks = MainWindow.BuildLibraryDetailMasonryChunks(
             files,
@@ -59,9 +59,9 @@ public sealed class LibraryPhotoMasonryLayoutTests
     public void BuildLibraryDetailMasonryChunks_UsesFewerColumns_ForSparseGroups()
     {
         var files = new[] { "single.png" };
-        var media = new System.Collections.Generic.Dictionary<string, MainWindow.LibraryDetailMediaLayoutInfo>(System.StringComparer.OrdinalIgnoreCase)
+        var media = new System.Collections.Generic.Dictionary<string, LibraryDetailMediaLayoutInfo>(System.StringComparer.OrdinalIgnoreCase)
         {
-            ["single.png"] = new MainWindow.LibraryDetailMediaLayoutInfo { PixelWidth = 3840, PixelHeight = 2160 }
+            ["single.png"] = new LibraryDetailMediaLayoutInfo { PixelWidth = 3840, PixelHeight = 2160 }
         };
 
         var chunks = MainWindow.BuildLibraryDetailMasonryChunks(
@@ -83,10 +83,10 @@ public sealed class LibraryPhotoMasonryLayoutTests
     public void BuildLibraryDetailMasonryChunks_UsesMediaAspectRatio_ForTileHeight()
     {
         var files = new[] { "wide.png", "portrait.png" };
-        var media = new System.Collections.Generic.Dictionary<string, MainWindow.LibraryDetailMediaLayoutInfo>(System.StringComparer.OrdinalIgnoreCase)
+        var media = new System.Collections.Generic.Dictionary<string, LibraryDetailMediaLayoutInfo>(System.StringComparer.OrdinalIgnoreCase)
         {
-            ["wide.png"] = new MainWindow.LibraryDetailMediaLayoutInfo { PixelWidth = 3840, PixelHeight = 2160 },
-            ["portrait.png"] = new MainWindow.LibraryDetailMediaLayoutInfo { PixelWidth = 1080, PixelHeight = 1920 }
+            ["wide.png"] = new LibraryDetailMediaLayoutInfo { PixelWidth = 3840, PixelHeight = 2160 },
+            ["portrait.png"] = new LibraryDetailMediaLayoutInfo { PixelWidth = 1080, PixelHeight = 1920 }
         };
 
         var chunks = MainWindow.BuildLibraryDetailMasonryChunks(

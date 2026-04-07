@@ -11,8 +11,14 @@ using System.Windows.Threading;
 
 namespace PixelVaultNative
 {
+    /// <summary>Library image LRU cache, async load coordinator, decode pipeline, and <see cref="QueueImageLoad"/> (PV-PLN-UI-001 Step 2).</summary>
     public sealed partial class MainWindow
     {
+        const int MaxImageCacheEntries = 900;
+        readonly LibraryBitmapLruCache libraryBitmapCache = new LibraryBitmapLruCache(MaxImageCacheEntries);
+        readonly LibraryImageLoadCoordinator imageLoadCoordinator = new LibraryImageLoadCoordinator();
+        LibraryThumbnailPipeline libraryThumbnailPipeline;
+
         void ClearImageCache()
         {
             libraryBitmapCache.Clear();

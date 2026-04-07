@@ -59,7 +59,6 @@ namespace PixelVaultNative
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
         const string ClearedExternalIdSentinel = "__PV_CLEARED__";
-        const int MaxImageCacheEntries = 900;
         const int SteamRequestTimeoutMilliseconds = 15000;
         readonly string appRoot = AppDomain.CurrentDomain.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar);
         readonly string dataRoot;
@@ -71,9 +70,6 @@ namespace PixelVaultNative
         readonly string settingsPath;
         readonly string changelogPath;
         readonly string undoManifestPath;
-        readonly LibraryBitmapLruCache libraryBitmapCache = new LibraryBitmapLruCache(MaxImageCacheEntries);
-        readonly LibraryImageLoadCoordinator imageLoadCoordinator = new LibraryImageLoadCoordinator();
-        LibraryThumbnailPipeline libraryThumbnailPipeline;
         BitmapSource libraryCompletionBadgeBitmap;
         readonly SemaphoreSlim videoClipInfoWarmLimiter = new SemaphoreSlim(2);
         readonly SemaphoreSlim videoPreviewWarmLimiter = new SemaphoreSlim(1);
