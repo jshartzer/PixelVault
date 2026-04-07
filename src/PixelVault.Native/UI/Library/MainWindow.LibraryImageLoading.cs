@@ -19,6 +19,17 @@ namespace PixelVaultNative
         readonly LibraryImageLoadCoordinator imageLoadCoordinator = new LibraryImageLoadCoordinator();
         LibraryThumbnailPipeline libraryThumbnailPipeline;
 
+        void InitializeLibraryThumbnailPipeline(string thumbsRootDirectory)
+        {
+            libraryThumbnailPipeline = new LibraryThumbnailPipeline(
+                thumbsRootDirectory,
+                IsVideo,
+                EnsureVideoPoster,
+                Log,
+                libraryBitmapCache.TryGet,
+                libraryBitmapCache.Store);
+        }
+
         void ClearImageCache()
         {
             libraryBitmapCache.Clear();

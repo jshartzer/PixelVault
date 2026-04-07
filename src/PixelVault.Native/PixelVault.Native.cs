@@ -239,13 +239,7 @@ namespace PixelVaultNative
             cacheRoot = Path.Combine(dataRoot, "cache");
             coversRoot = Path.Combine(cacheRoot, "covers");
             thumbsRoot = Path.Combine(cacheRoot, "thumbs");
-            libraryThumbnailPipeline = new LibraryThumbnailPipeline(
-                thumbsRoot,
-                IsVideo,
-                EnsureVideoPoster,
-                Log,
-                libraryBitmapCache.TryGet,
-                libraryBitmapCache.Store);
+            InitializeLibraryThumbnailPipeline(thumbsRoot);
             savedCoversRoot = Path.Combine(dataRoot, "saved-covers");
             settingsPath = Path.Combine(dataRoot, "PixelVault.settings.ini");
             changelogPath = Path.Combine(appRoot, "CHANGELOG.md");
