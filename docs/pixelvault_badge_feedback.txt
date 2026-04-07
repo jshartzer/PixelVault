@@ -1,0 +1,45 @@
+UI Refinement Request – Completion Badge Styling
+
+I want to improve how the 100% completion badge appears on library tiles
+so it feels like part of the UI rather than an image pasted on top.
+
+1.  Stronger, directional drop shadow
+
+Effect = new DropShadowEffect { Color = Colors.Black, BlurRadius = 18,
+ShadowDepth = 6, Direction = 315, Opacity = 0.55 }
+
+Goal: - Increase separation from the background - Make the badge feel
+elevated above the card
+
+2.  Add subtle rim highlight
+
+new Border { CornerRadius = new CornerRadius(999), BorderBrush = new
+SolidColorBrush(Color.FromArgb(60, 255, 255, 255)), BorderThickness =
+new Thickness(1), Child = badgeImage }
+
+Goal: - Add slight contrast on all backgrounds - Give the badge a more
+physical/UI-integrated look
+
+3.  Adjust positioning (less cramped)
+
+Margin = new Thickness(0, 14, 14, 0)
+
+Goal: - Improve visual balance - Match card padding better
+
+4.  Slight size reduction
+
+targetHeight = 64–70
+
+Goal: - Make it feel like a status indicator, not a sticker
+
+5.  Optional: Add hover interaction
+
+Default: RenderTransform = new ScaleTransform(1.0, 1.0)
+
+Hover: ScaleTransform → 1.05
+
+Goal: - Make the badge feel interactive and intentional
+
+Overall Objective: The badge should feel like a native UI element with
+depth and presence, not a flat overlay. Prioritize subtlety and
+consistency with the existing dark theme.
