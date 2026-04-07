@@ -164,6 +164,57 @@ namespace PixelVaultNative
             panes.DetailTitleBadgePanel.Visibility = panes.DetailTitleBadgePanel.Children.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         }
 
+        void RefreshPhotoWorkspacePlatformFilterBadges(LibraryBrowserWorkingSet ws, LibraryBrowserPaneRefs panes, LibraryBrowserFolderView game)
+        {
+            if (panes?.DetailTitleBadgePanel == null || ws == null) return;
+            if (ws.WorkspaceMode != LibraryWorkspaceMode.Photo) return;
+            panes.DetailTitleBadgePanel.Children.Clear();
+            if (game == null || IsLibraryBrowserTimelineView(game))
+            {
+                panes.DetailTitleBadgePanel.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            var labels = (game.PlatformLabels ?? Array.Empty<string>())
+                .Where(label => !string.IsNullOrWhiteSpace(label))
+                .Select(NormalizeConsoleLabel)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(label => PlatformGroupOrder(label))
+                .ThenBy(label => label, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (labels.Count == 0 && !string.IsNullOrWhiteSpace(game.PrimaryPlatformLabel))
+                labels.Add(NormalizeConsoleLabel(game.PrimaryPlatformLabel));
+
+            foreach (var label in labels)
+            {
+                var core = BuildLibraryBrowserDetailTitlePlatformBadge(label);
+                if (core == null) continue;
+                if (core is FrameworkElement fe) fe.Margin = new Thickness(0);
+                var excluded = ws.PhotoRailExcludedConsoleLabels.Contains(label);
+                var hit = new Border
+                {
+                    Child = core,
+                    Opacity = excluded ? 0.35 : 1,
+                    Background = Brushes.Transparent,
+                    Cursor = Cursors.Hand,
+                    Margin = new Thickness(0, 0, 6, 6),
+                    VerticalAlignment = VerticalAlignment.Center,
+                    ToolTip = excluded ? "Show " + label + " captures" : "Hide " + label + " captures"
+                };
+                hit.MouseLeftButtonDown += delegate(object _, MouseButtonEventArgs e)
+                {
+                    e.Handled = true;
+                    if (ws.PhotoRailExcludedConsoleLabels.Contains(label)) ws.PhotoRailExcludedConsoleLabels.Remove(label);
+                    else ws.PhotoRailExcludedConsoleLabels.Add(label);
+                    RefreshPhotoWorkspacePlatformFilterBadges(ws, panes, ws.Current);
+                    ws.RefreshDetailPaneForPhotoFilters?.Invoke();
+                };
+                panes.DetailTitleBadgePanel.Children.Add(hit);
+            }
+
+            panes.DetailTitleBadgePanel.Visibility = panes.DetailTitleBadgePanel.Children.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+
         FrameworkElement LibraryBrowserBuildFolderTile(
             LibraryBrowserFolderView folder,
             int tileWidth,
@@ -433,6 +484,11 @@ namespace PixelVaultNative
                 panes.PreviewImage.Source = null;
                 panes.PreviewImage.Visibility = Visibility.Collapsed;
                 panes.PreviewImage.Uid = Guid.NewGuid().ToString("N");
+                if (ws.WorkspaceMode == LibraryWorkspaceMode.Photo)
+                {
+                    ws.ScrollPhotoRailSelectionToTopPending = true;
+                    ws.PhotoRailExcludedConsoleLabels.Clear();
+                }
             }
             ws.ResetDetailRowsToLoadingOnNextRender = selectionChanged;
             ws.PreserveDetailScrollOnNextRender = false;
@@ -459,7 +515,8 @@ namespace PixelVaultNative
             var timelineView = IsLibraryBrowserTimelineView(info);
             activeSelectedLibraryFolder = timelineView ? null : CloneLibraryFolderInfo(actionFolder);
             panes.DetailTitle.Text = timelineView ? "Timeline" : info.Name;
-            UpdateLibraryBrowserDetailTitleBadges(panes, timelineView ? null : info);
+            if (ws.WorkspaceMode != LibraryWorkspaceMode.Photo)
+                UpdateLibraryBrowserDetailTitleBadges(panes, timelineView ? null : info);
             panes.DetailMeta.Text = BuildLibraryBrowserDetailMetaText(info, actionFolder);
             panes.OpenFolderButton.Content = BuildToolbarButtonContent("\uE8B7", BuildLibraryBrowserOpenFoldersLabel(info));
             if (timelineView)
@@ -475,6 +532,7 @@ namespace PixelVaultNative
                 panes.PreviewImage.Source = null;
                 panes.PreviewImage.Visibility = Visibility.Collapsed;
                 PersistLibraryBrowserLastSelection(info);
+                RefreshPhotoWorkspacePlatformFilterBadges(ws, panes, info);
                 renderSelectedFolder();
                 return;
             }

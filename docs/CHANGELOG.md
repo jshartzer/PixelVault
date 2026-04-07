@@ -1,3 +1,6 @@
+## 0.075.007
+- **Release:** Version **0.075.007** — **Photo workspace** (**`PV-PLN-LIBWS-001`**): console **badges** beside the game title (grid layout, **right-aligned**) list only platforms for the **selected** game. Each badge is **clickable**: active badges show captures for that platform; **dimmed** badges mean those captures are **hidden in the main photo/detail pane** (the **mini cover rail is not filtered**). Hit targets use a transparent **`Border`** (no default button focus rectangle). **Changing the selected game** clears platform toggles and keeps **scroll active game to top** on the rail when appropriate. State: **`PhotoRailExcludedConsoleLabels`**, **`RefreshDetailPaneForPhotoFilters`**; filtering applies in **`LibraryBrowserRenderSelectedFolderDetail`** using **`DetermineFolderPlatform`** and the metadata index.
+
 ## 0.075.006
 - **Release:** Version **0.075.006** — **Library 100% completion badge** polish (see **`docs/pixelvault_badge_feedback.txt`**): stronger directional **drop shadow** (blur, depth, upper-left light); **subtle light rim** on a rounded capsule around the medal art; slightly **smaller** default size and **inset** margins so it reads as a status glyph; **`IsHitTestVisible = false`** on the shell so folder tiles still receive clicks. Text **100%** fallback uses the same chrome.
 

@@ -21,6 +21,7 @@ namespace PixelVaultNative
         internal void LibraryBrowserExitPhotoWorkspace(LibraryBrowserWorkingSet ws, Action renderTiles)
         {
             if (ws == null || ws.WorkspaceMode != LibraryWorkspaceMode.Photo) return;
+            ws.PhotoRailExcludedConsoleLabels.Clear();
             ws.WorkspaceMode = LibraryWorkspaceMode.Folder;
             ApplyLibraryBrowserLayoutMode(ws.Panes, ws.WorkspaceMode);
             ws.RefreshSortFilterChrome?.Invoke();

@@ -15,6 +15,8 @@ namespace PixelVaultNative
             internal readonly List<LibraryBrowserFolderView> ViewFolders = new List<LibraryBrowserFolderView>();
             internal LibraryBrowserFolderView Current;
             internal readonly HashSet<string> CollapsedPlatformSections = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            /// <summary>Photo workspace: normalized console labels whose captures are hidden in the main photo pane (badges appear dimmed).</summary>
+            internal readonly HashSet<string> PhotoRailExcludedConsoleLabels = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             internal readonly HashSet<string> SelectedDetailFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             internal readonly List<Border> DetailTiles = new List<Border>();
             internal readonly List<string> DetailFilesDisplayOrder = new List<string>();
@@ -59,6 +61,9 @@ namespace PixelVaultNative
 
             /// <summary>Re-runs <see cref="MainWindow.LibraryBrowserRenderFolderList"/> (folder grid / photo rail tiles).</summary>
             internal Action RerenderFolderList;
+
+            /// <summary>Re-renders the library detail / photo pane (applies console badge filters in Photo workspace).</summary>
+            internal Action RefreshDetailPaneForPhotoFilters;
 
             /// <summary>When true, next folder rail render scrolls so <see cref="Current"/> is at the top (Photo workspace).</summary>
             internal bool ScrollPhotoRailSelectionToTopPending;

@@ -56,11 +56,11 @@ Then use these based on the task:
 
 Current live build:
 
-- `0.075.006`
+- `0.075.007`
 
 Current executable:
 
-- `C:\Codex\dist\PixelVault-0.075.006\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.075.007\PixelVault.exe`
 
 Current build pointer:
 
@@ -94,12 +94,13 @@ Practical current focus:
 
 ## Current Stop Point
 
-The app is currently published at `0.075.006`.
+The app is currently published at `0.075.007`.
 
 **Notion:** [MainWindow extraction roadmap](https://www.notion.so/33573adc59b681d88b7dcd88cad53cb6) updated for Phase **E** capstone (**`ILibraryBrowserShell`**). If release rows in Notion lag `docs/CURRENT_BUILD.txt`, re-sync per `docs/DOC_SYNC_POLICY.md`.
 
 Recent extraction progress (repo):
 
+- **Library photo workspace — console capture filter (0.075.007):** In **Photo** mode, title **platform badges** (per game) filter which consoles’ captures appear in the **main photo pane**; the **cover rail** stays complete. Badges use non-button hit targets; switching games resets toggles. Plan: **`docs/plans/PV-PLN-LIBWS-001-library-workspace-modes.md`**.
 - **Pre-V1 polish Slice C (0.075.000):** Library folder and detail **empty/loading** states with CTAs; version **renumber** to **`0.075.xxx`** for runway to 1.0. See **`docs/plans/PV-PLN-V1POL-001-pre-v1-polish-program.md`**.
 - **Library perf Steps 4–5 (0.999.000):** SQLite pragmas and sliced metadata reads/upserts for the library detail pane; deferred game-index warmup after the library window is shown (**`ApplicationIdle`**) instead of constructor preload. See **`docs/LIBRARY_PERFORMANCE_PLAN.md`**.
 - **Library detail pane Step 3 (0.998.000):** Viewport-aware decode scheduling (visible virtual rows use the priority image-load lane; overscan-only rows use the normal lane). Detail `VirtualizedRowHost` now recycles row elements like folder tiles; selection chrome stays correct via repopulating **`DetailTiles`** from the visible visual tree after each virtual pass. See **`docs/LIBRARY_PERFORMANCE_PLAN.md`** Step 3.

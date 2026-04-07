@@ -329,12 +329,22 @@ namespace PixelVaultNative
                         + "; missingCaptureTicks=" + filesMissingCaptureTicks.Count
                         + "; hasLibraryRoot=" + librarySession.HasLibraryRoot);
 
+                    bool PhotoWorkspaceShouldHideCapture(string path)
+                    {
+                        if (timelineView) return false;
+                        if (ws.WorkspaceMode != LibraryWorkspaceMode.Photo) return false;
+                        if (ws.PhotoRailExcludedConsoleLabels == null || ws.PhotoRailExcludedConsoleLabels.Count == 0) return false;
+                        var plat = NormalizeConsoleLabel(DetermineFolderPlatform(new List<string> { path }, metadataIndex, null));
+                        return ws.PhotoRailExcludedConsoleLabels.Contains(plat);
+                    }
+
                     Func<Dictionary<string, EmbeddedMetadataSnapshot>, LibraryDetailRenderSnapshot, LibraryDetailRenderSnapshot> buildSnapshot = delegate(Dictionary<string, EmbeddedMetadataSnapshot> timelineMetadataSnapshots, LibraryDetailRenderSnapshot reuseMediaFrom)
                     {
                         var segmentSw = Stopwatch.StartNew();
                         var datedFiles = detailFiles
                             .Select(file => new { FilePath = file, CaptureDate = librarySession.ResolveIndexedLibraryDate(file, metadataIndex) })
                             .Where(entry => !timelineView || LibraryTimelineRangeContainsCapture(entry.CaptureDate, timelineRangeStart, timelineRangeEnd))
+                            .Where(entry => !PhotoWorkspaceShouldHideCapture(entry.FilePath))
                             .OrderByDescending(entry => entry.CaptureDate)
                             .ThenBy(entry => entry.FilePath, StringComparer.OrdinalIgnoreCase)
                             .ToList();

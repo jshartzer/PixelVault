@@ -426,11 +426,27 @@ namespace PixelVaultNative
             };
             panes.PhotoWorkspaceTitleReadabilityBorder = detailChromePanel;
             var chromeStack = new StackPanel { MinWidth = 0 };
-            var titleRow = new DockPanel { Margin = new Thickness(0, 0, 0, 0), LastChildFill = true };
-            panes.DetailTitle = new TextBlock { Text = "Select a folder", FontSize = 28, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, TextWrapping = TextWrapping.Wrap };
-            panes.DetailTitleBadgePanel = new WrapPanel { Margin = new Thickness(12, 4, 0, 0), Visibility = Visibility.Collapsed, VerticalAlignment = VerticalAlignment.Top };
-            DockPanel.SetDock(panes.DetailTitle, Dock.Left);
-            DockPanel.SetDock(panes.DetailTitleBadgePanel, Dock.Right);
+            var titleRow = new Grid { Margin = new Thickness(0, 0, 0, 0) };
+            titleRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = 0 });
+            titleRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            panes.DetailTitle = new TextBlock
+            {
+                Text = "Select a folder",
+                FontSize = 28,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = Brushes.White,
+                TextWrapping = TextWrapping.Wrap,
+                VerticalAlignment = VerticalAlignment.Top,
+                Margin = new Thickness(0, 0, 12, 0)
+            };
+            panes.DetailTitleBadgePanel = new WrapPanel
+            {
+                Visibility = Visibility.Collapsed,
+                VerticalAlignment = VerticalAlignment.Top,
+                HorizontalAlignment = HorizontalAlignment.Right
+            };
+            Grid.SetColumn(panes.DetailTitle, 0);
+            Grid.SetColumn(panes.DetailTitleBadgePanel, 1);
             titleRow.Children.Add(panes.DetailTitle);
             titleRow.Children.Add(panes.DetailTitleBadgePanel);
             chromeStack.Children.Add(titleRow);

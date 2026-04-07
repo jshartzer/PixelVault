@@ -326,6 +326,7 @@ namespace PixelVaultNative
                 };
                 renderTiles = renderFolderTilesCore;
                 ws.RerenderFolderList = renderFolderTilesCore;
+                ws.RefreshDetailPaneForPhotoFilters = renderSelectedFolder;
 
                 refreshLibraryFoldersAsync = delegate(bool forceRefresh)
                 {

@@ -156,3 +156,8 @@ When execution starts, reference **`PV-PLN-LIBWS-001`** in commits and, if used,
 | Date | Change |
 |------|--------|
 | 2026-04-06 | Initial plan: three-mode workspace (Folder / Photo / Timeline); staged delivery with test gates. |
+| 2026-04-06 | **Shipped in 0.075.007:** Photo mode detail header — **per-game** console badges **right of the title**; badges **toggle visibility** of that platform’s captures in the **photo/detail grid** only (mini cover rail unchanged). Dimmed = excluded; selection change clears exclusions. See **`docs/CHANGELOG.md` (0.075.007)**. |
+
+## Recent implementation (repo)
+
+- **0.075.007 — Photo detail console filter:** Working set holds normalized excluded labels (`PhotoRailExcludedConsoleLabels`); detail render filters file lists via `DetermineFolderPlatform` + metadata index. `RefreshDetailPaneForPhotoFilters` re-renders only the detail pane on badge toggle. Title row uses a two-column grid so badges stay right-aligned with the game name.
