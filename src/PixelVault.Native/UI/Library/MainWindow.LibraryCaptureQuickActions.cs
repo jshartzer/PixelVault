@@ -16,7 +16,7 @@ namespace PixelVaultNative
             if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath)) return false;
             var root = libraryRoot;
             if (string.IsNullOrWhiteSpace(root)) return false;
-            var index = LoadLibraryMetadataIndex(root, false);
+            var index = LoadLibraryMetadataIndexViaSessionWhenActive(root, false);
             LibraryMetadataIndexEntry row;
             if (!index.TryGetValue(filePath, out row) || row == null) return false;
             starred = row.Starred;
@@ -56,14 +56,14 @@ namespace PixelVaultNative
                 Exception caught = null;
                 try
                 {
-                    var index = LoadLibraryMetadataIndex(root, true);
+                    var index = LoadLibraryMetadataIndexViaSessionWhenActive(root, true);
                     LibraryMetadataIndexEntry row;
                     if (!index.TryGetValue(filePath, out row) || row == null) return;
                     var nextStarred = !row.Starred;
                     ApplyEmbeddedXmpStarRating(filePath, nextStarred);
                     row.Starred = nextStarred;
                     row.Stamp = BuildLibraryMetadataStamp(filePath);
-                    SaveLibraryMetadataIndex(root, index);
+                    SaveLibraryMetadataIndexViaSessionWhenActive(root, index);
                 }
                 catch (Exception ex)
                 {
@@ -86,7 +86,7 @@ namespace PixelVaultNative
             if (string.IsNullOrWhiteSpace(filePath)) return false;
             var root = libraryRoot;
             if (string.IsNullOrWhiteSpace(root)) return false;
-            var index = LoadLibraryMetadataIndex(root, false);
+            var index = LoadLibraryMetadataIndexViaSessionWhenActive(root, false);
             LibraryMetadataIndexEntry row;
             if (!index.TryGetValue(filePath, out row) || row == null) return false;
             var tagText = row.TagText ?? string.Empty;
@@ -147,12 +147,12 @@ namespace PixelVaultNative
                             RunManualMetadata(new List<ManualMetadataItem> { item }, null, CancellationToken.None);
                             if (!string.IsNullOrWhiteSpace(root))
                             {
-                                var index = LoadLibraryMetadataIndex(root, true);
+                                var index = LoadLibraryMetadataIndexViaSessionWhenActive(root, true);
                                 LibraryMetadataIndexEntry row;
                                 if (index.TryGetValue(filePath, out row) && row != null)
                                 {
                                     row.Stamp = BuildLibraryMetadataStamp(filePath);
-                                    SaveLibraryMetadataIndex(root, index);
+                                    SaveLibraryMetadataIndexViaSessionWhenActive(root, index);
                                 }
                             }
                             saved = true;

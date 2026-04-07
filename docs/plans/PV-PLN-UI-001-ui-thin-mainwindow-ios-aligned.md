@@ -104,6 +104,8 @@ Implement as **small vertical slices**. After each slice: **`dotnet test`** (`Pi
 
 **TEST GATE:** Detail load, metadata repair, star toggle, timeline footers.
 
+**Progress (2026-04-06):** Added **`LoadLibraryMetadataIndexViaSessionWhenActive`** / **`SaveLibraryMetadataIndexViaSessionWhenActive`** on `MainWindow` (`LibraryMetadataIndexing.cs`). Library UI paths (**capture quick actions**, **photography gallery**, **folder cache IO** stamp validation) call through **`ILibrarySession`** when `root` matches the active library; otherwise behavior unchanged.
+
 ---
 
 ### Step 4 — Library browse projection: document + first DTO seam
@@ -176,5 +178,6 @@ Before merging a slice, ask:
 | 2026-04-06 | **Step 1 done:** `LibraryDetailRenderSnapshot`, `LibraryDetailRenderGroup`, `LibraryTimelineCaptureContext` → `src/PixelVault.Native/UI/Library/LibraryDetailRenderModels.cs` (registered in `.csproj`). |
 | 2026-04-06 | **`LibraryDetailMediaLayoutInfo`** moved from `MainWindow.LibraryPhotoMasonryLayout.cs` into **`LibraryDetailRenderModels.cs`**. |
 | 2026-04-06 | **Step 2 done:** `MaxImageCacheEntries`, `libraryBitmapCache`, `imageLoadCoordinator`, `libraryThumbnailPipeline` field declarations → **`MainWindow.LibraryImageLoading.cs`**; **`InitializeLibraryThumbnailPipeline(thumbsRoot)`** owns pipeline construction (ctor calls it). |
+| 2026-04-06 | **Step 3 (incremental):** Session-routing helpers + capture/photography/folder-cache call sites → **`ILibrarySession`** when root is active library. |
 
 When execution starts, reference **`PV-PLN-UI-001`** in commits; Notion per **`docs/DOC_SYNC_POLICY.md`** if milestones are tracked there.

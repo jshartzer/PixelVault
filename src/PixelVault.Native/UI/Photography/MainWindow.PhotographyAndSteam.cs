@@ -14,7 +14,7 @@ namespace PixelVaultNative
     {
         List<string> GetTaggedImagesCached(string root, bool forceRefresh, params string[] tagCandidates)
         {
-            var index = LoadLibraryMetadataIndex(root, false);
+            var index = LoadLibraryMetadataIndexViaSessionWhenActive(root, false);
             if (!forceRefresh)
             {
                 var stamp = BuildPhotographyGalleryCacheStampFromIndex(index);
@@ -43,7 +43,7 @@ namespace PixelVaultNative
                 }
             }
 
-            var stampForSave = BuildPhotographyGalleryCacheStampFromIndex(LoadLibraryMetadataIndex(root, false));
+            var stampForSave = BuildPhotographyGalleryCacheStampFromIndex(LoadLibraryMetadataIndexViaSessionWhenActive(root, false));
             SaveTaggedImageCache(root, stampForSave, fresh);
             return fresh;
         }
@@ -157,7 +157,7 @@ namespace PixelVaultNative
 
         List<PhotographyGalleryEntry> BuildPhotographyGalleryEntries(IEnumerable<string> files)
         {
-            var index = LoadLibraryMetadataIndex(libraryWorkspace.LibraryRoot, false);
+            var index = LoadLibraryMetadataIndexViaSessionWhenActive(libraryWorkspace.LibraryRoot, false);
             return (files ?? Enumerable.Empty<string>())
                 .Where(f => !string.IsNullOrWhiteSpace(f))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -193,14 +193,14 @@ namespace PixelVaultNative
                 Exception caught = null;
                 try
                 {
-                    var index = LoadLibraryMetadataIndex(root, true);
+                    var index = LoadLibraryMetadataIndexViaSessionWhenActive(root, true);
                     LibraryMetadataIndexEntry row;
                     if (!index.TryGetValue(fullPath, out row) || row == null) return;
                     newStarred = !row.Starred;
                     ApplyEmbeddedXmpStarRating(fullPath, newStarred);
                     row.Starred = newStarred;
                     row.Stamp = BuildLibraryMetadataStamp(fullPath);
-                    SaveLibraryMetadataIndex(root, index);
+                    SaveLibraryMetadataIndexViaSessionWhenActive(root, index);
                     ok = true;
                 }
                 catch (Exception ex)

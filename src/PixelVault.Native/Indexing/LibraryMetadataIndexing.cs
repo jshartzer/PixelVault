@@ -260,5 +260,29 @@ namespace PixelVaultNative
             return result;
         }
 
+        /// <summary>
+        /// Prefer <see cref="ILibrarySession"/> for the active library (PV-PLN-UI-001 Step 3);
+        /// falls back to <see cref="LoadLibraryMetadataIndex(string, bool)"/> when <paramref name="root"/> differs.
+        /// </summary>
+        Dictionary<string, LibraryMetadataIndexEntry> LoadLibraryMetadataIndexViaSessionWhenActive(string root, bool forceDiskReload = false)
+        {
+            if (librarySession != null && librarySession.HasLibraryRoot
+                && !string.IsNullOrWhiteSpace(root)
+                && string.Equals(root, librarySession.LibraryRoot, StringComparison.OrdinalIgnoreCase))
+                return librarySession.LoadLibraryMetadataIndex(forceDiskReload);
+            return LoadLibraryMetadataIndex(root, forceDiskReload);
+        }
+
+        /// <summary>Pair with <see cref="LoadLibraryMetadataIndexViaSessionWhenActive"/> for writes on the active library.</summary>
+        void SaveLibraryMetadataIndexViaSessionWhenActive(string root, Dictionary<string, LibraryMetadataIndexEntry> index)
+        {
+            if (librarySession != null && librarySession.HasLibraryRoot
+                && !string.IsNullOrWhiteSpace(root)
+                && string.Equals(root, librarySession.LibraryRoot, StringComparison.OrdinalIgnoreCase))
+                librarySession.SaveLibraryMetadataIndex(index);
+            else
+                SaveLibraryMetadataIndex(root, index);
+        }
+
     }
 }

@@ -82,7 +82,7 @@ namespace PixelVaultNative
             if (!string.Equals(lines[2], expectedRev, StringComparison.Ordinal)) return false;
 
             var files = new List<string>();
-            foreach (var kv in LoadLibraryMetadataIndex(root, true))
+            foreach (var kv in LoadLibraryMetadataIndexViaSessionWhenActive(root, true))
             {
                 var p = kv.Key;
                 if (string.IsNullOrWhiteSpace(p) || !IsMedia(p) || !File.Exists(p)) continue;
