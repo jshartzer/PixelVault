@@ -1,3 +1,6 @@
+## 0.075.006
+- **Release:** Version **0.075.006** — **Library 100% completion badge** polish (see **`docs/pixelvault_badge_feedback.txt`**): stronger directional **drop shadow** (blur, depth, upper-left light); **subtle light rim** on a rounded capsule around the medal art; slightly **smaller** default size and **inset** margins so it reads as a status glyph; **`IsHitTestVisible = false`** on the shell so folder tiles still receive clicks. Text **100%** fallback uses the same chrome.
+
 ## 0.075.005
 - **Release:** Version **0.075.005** — **Slice F** (**PV-PLN-V1POL-001**): **curated folder filters** documented in **`docs/SMART_VIEWS_LIBRARY.md`**; two new persisted filter modes — **`needssteam`** (Steam-tagged folders with blank **Steam App ID**) and **`nocover`** (blank **PreviewImagePath**); shared predicate **`LibraryBrowserFolderViewMatchesFilter`**; **Filter** menu + command palette entries + settings aliases; tests for normalize, predicates, and full palette registry binding.
 

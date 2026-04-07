@@ -51,7 +51,7 @@ namespace PixelVaultNative
 
     public sealed partial class MainWindow : Window
     {
-        const string AppVersion = "0.075.005";
+        const string AppVersion = "0.075.006";
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
         const string ClearedExternalIdSentinel = "__PV_CLEARED__";
@@ -847,10 +847,44 @@ namespace PixelVaultNative
             }
             return badge;
         }
-        FrameworkElement BuildLibraryTileCompletionBadge(double targetHeight = 78, Thickness? margin = null)
+        FrameworkElement BuildLibraryTileCompletionBadge(double targetHeight = 66, Thickness? margin = null)
         {
             var badgeBitmap = LoadCompletionBadgeBitmap();
-            var resolvedMargin = margin ?? new Thickness(0, 10, 10, 0);
+            var resolvedMargin = margin ?? new Thickness(0, 14, 14, 0);
+            var shadow = new DropShadowEffect
+            {
+                Color = Colors.Black,
+                BlurRadius = 18,
+                ShadowDepth = 6,
+                Direction = 315,
+                Opacity = 0.55
+            };
+            var rimBrush = new SolidColorBrush(Color.FromArgb(60, 255, 255, 255));
+            if (rimBrush.CanFreeze) rimBrush.Freeze();
+
+            Border WrapWithRimAndShadow(FrameworkElement inner)
+            {
+                var rim = new Border
+                {
+                    CornerRadius = new CornerRadius(999),
+                    BorderBrush = rimBrush,
+                    BorderThickness = new Thickness(1),
+                    Background = Brushes.Transparent,
+                    ClipToBounds = true,
+                    Child = inner
+                };
+                return new Border
+                {
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    VerticalAlignment = VerticalAlignment.Top,
+                    Margin = resolvedMargin,
+                    Background = Brushes.Transparent,
+                    Child = rim,
+                    Effect = shadow,
+                    IsHitTestVisible = false
+                };
+            }
+
             if (badgeBitmap != null)
             {
                 var targetWidth = targetHeight;
@@ -858,44 +892,28 @@ namespace PixelVaultNative
                 {
                     targetWidth = Math.Max(44, Math.Min(92, targetHeight * badgeBitmap.PixelWidth / (double)badgeBitmap.PixelHeight));
                 }
-                return new Image
+                var image = new Image
                 {
                     Source = badgeBitmap,
                     Width = targetWidth,
                     Height = targetHeight,
                     Stretch = Stretch.Uniform,
-                    HorizontalAlignment = HorizontalAlignment.Right,
-                    VerticalAlignment = VerticalAlignment.Top,
-                    Margin = resolvedMargin,
-                    SnapsToDevicePixels = true,
-                    Effect = new DropShadowEffect
-                    {
-                        Color = Colors.Black,
-                        BlurRadius = 14,
-                        Direction = 270,
-                        ShadowDepth = 4,
-                        Opacity = 0.42
-                    }
+                    SnapsToDevicePixels = true
                 };
+                return WrapWithRimAndShadow(image);
             }
-            return new TextBlock
+
+            var text = new TextBlock
             {
                 Text = "100%",
-                FontSize = 22,
+                FontSize = 20,
                 FontWeight = FontWeights.Bold,
                 Foreground = Brushes.White,
-                HorizontalAlignment = HorizontalAlignment.Right,
-                VerticalAlignment = VerticalAlignment.Top,
-                Margin = resolvedMargin,
-                Effect = new DropShadowEffect
-                {
-                    Color = Colors.Black,
-                    BlurRadius = 6,
-                    Direction = 270,
-                    ShadowDepth = 1,
-                    Opacity = 0.75
-                }
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(10, 4, 10, 4)
             };
+            return WrapWithRimAndShadow(text);
         }
         FrameworkElement BuildLibrarySectionHeader(string platformLabel, int folderCount, bool sectionCollapsed, Action toggleSectionCollapse)
         {

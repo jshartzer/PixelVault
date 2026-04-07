@@ -56,11 +56,11 @@ Then use these based on the task:
 
 Current live build:
 
-- `0.075.000`
+- `0.075.006`
 
 Current executable:
 
-- `C:\Codex\dist\PixelVault-0.998.000\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.075.006\PixelVault.exe`
 
 Current build pointer:
 
@@ -94,7 +94,7 @@ Practical current focus:
 
 ## Current Stop Point
 
-The app is currently published at `0.075.000`.
+The app is currently published at `0.075.006`.
 
 **Notion:** [MainWindow extraction roadmap](https://www.notion.so/33573adc59b681d88b7dcd88cad53cb6) updated for Phase **E** capstone (**`ILibraryBrowserShell`**). If release rows in Notion lag `docs/CURRENT_BUILD.txt`, re-sync per `docs/DOC_SYNC_POLICY.md`.
 
