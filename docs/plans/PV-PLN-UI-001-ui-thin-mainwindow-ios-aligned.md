@@ -173,5 +173,6 @@ Before merging a slice, ask:
 | Date | Change |
 |------|--------|
 | 2026-04-06 | Initial plan: post–A–F UI thin-out; iOS foundation alignment; staged Steps 1–7. |
+| 2026-04-06 | **Step 1 done:** `LibraryDetailRenderSnapshot`, `LibraryDetailRenderGroup`, `LibraryTimelineCaptureContext` → `src/PixelVault.Native/UI/Library/LibraryDetailRenderModels.cs` (registered in `.csproj`). |
 
 When execution starts, reference **`PV-PLN-UI-001`** in commits; Notion per **`docs/DOC_SYNC_POLICY.md`** if milestones are tracked there.

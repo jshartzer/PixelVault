@@ -96,6 +96,7 @@
     <Compile Include="UI\Library\MainWindow.LibraryBrowserWorkspaceMode.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserLayout.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserViewModel.cs" />
+    <Compile Include="UI\Library\LibraryDetailRenderModels.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryPhotoMasonryLayout.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserRender.FolderList.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserFolderFilter.cs" />
