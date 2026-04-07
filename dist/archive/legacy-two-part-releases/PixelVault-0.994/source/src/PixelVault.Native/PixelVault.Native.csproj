@@ -1,0 +1,138 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyName>PixelVault</AssemblyName>
+    <RootNamespace>PixelVaultNative</RootNamespace>
+    <ApplicationIcon>..\..\assets\PixelVault.ico</ApplicationIcon>
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>false</SelfContained>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Infrastructure\TimeoutWebClient.cs" />
+    <Compile Include="Indexing\GameIndexCore.cs" />
+    <Compile Include="Indexing\GameIndexEditorOperations.cs" />
+    <Compile Include="Indexing\GameIndexFolderAlignment.cs" />
+    <Compile Include="Indexing\LibraryFolderIndexing.cs" />
+    <Compile Include="Indexing\LibraryMetadataIndexing.cs" />
+    <Compile Include="Import\ImportWorkflow.cs" />
+    <Compile Include="Import\MainWindow.ImportWorkflow.Progress.cs" />
+    <Compile Include="Import\MainWindow.ImportWorkflow.Steps.cs" />
+    <Compile Include="Import\MainWindow.ImportSummaryDialogs.cs" />
+    <Compile Include="MediaTools\MediaToolHelpers.cs" />
+    <Compile Include="Metadata\LibraryMetadataEditing.cs" />
+    <Compile Include="Metadata\MetadataHelpers.cs" />
+    <Compile Include="Models\FilenameParsingModels.cs" />
+    <Compile Include="Models\ImportModels.cs" />
+    <Compile Include="Models\IndexModels.cs" />
+    <Compile Include="Services\Config\AppSettings.cs" />
+    <Compile Include="Services\Config\ISettingsService.cs" />
+    <Compile Include="Services\Config\SettingsService.cs" />
+    <Compile Include="Services\Library\ILibraryScanHost.cs" />
+    <Compile Include="Services\Library\ILibraryScanner.cs" />
+    <Compile Include="Services\Library\LibraryScanner.cs" />
+    <Compile Include="Services\Covers\CoverService.cs" />
+    <Compile Include="Services\FilenameParsing\FilenameParserService.cs" />
+    <Compile Include="Services\FilenameRules\FilenameRulesService.cs" />
+    <Compile Include="Services\IO\FileSystemService.cs" />
+    <Compile Include="Services\IO\IFileSystemService.cs" />
+    <Compile Include="Services\Import\ImportService.cs" />
+    <Compile Include="Services\Import\SteamImportRename.cs" />
+    <Compile Include="Services\Indexing\GameIndexEditorAssignmentService.cs" />
+    <Compile Include="Services\Indexing\GameIndexService.cs" />
+    <Compile Include="Services\Indexing\GameIndexServiceDependencies.cs" />
+    <Compile Include="Services\Indexing\IGameIndexService.cs" />
+    <Compile Include="Services\Indexing\IndexPersistenceService.cs" />
+    <Compile Include="Services\Metadata\MetadataService.cs" />
+    <Compile Include="Storage\IndexDatabaseStorage.cs" />
+    <Compile Include="UI\ChangelogWindow.cs" />
+    <Compile Include="UI\Intake\IntakePreviewWindow.cs" />
+    <Compile Include="UI\Intake\MainWindow.IntakePreview.cs" />
+    <Compile Include="UI\Intake\MetadataReviewWindow.cs" />
+    <Compile Include="UI\Intake\MainWindow.MetadataReview.cs" />
+    <Compile Include="UI\Intake\MainWindow.ManualMetadata.cs" />
+    <Compile Include="UI\Intake\MainWindow.ManualMetadata.Helpers.cs" />
+    <Compile Include="UI\Intake\MainWindow.ManualMetadata.Layout.cs" />
+    <Compile Include="UI\Intake\MainWindow.ManualMetadata.SteamSearch.cs" />
+    <Compile Include="UI\Intake\MainWindow.ManualMetadata.Finish.cs" />
+    <Compile Include="UI\UiBrushHelper.cs" />
+    <Compile Include="UI\Progress\WorkflowProgressWindow.cs" />
+    <Compile Include="UI\Editors\FilenameConventionEditorWindow.cs" />
+    <Compile Include="UI\Editors\GameIndexEditorHost.cs" />
+    <Compile Include="UI\Editors\PhotoIndexEditorHost.cs" />
+    <Compile Include="UI\FilenameConventionEditor.cs" />
+    <Compile Include="UI\Photography\MainWindow.PhotographyAndSteam.cs" />
+    <Compile Include="UI\Photography\PhotographyGalleryTypes.cs" />
+    <Compile Include="UI\Photography\PhotographyGalleryWindow.xaml.cs">
+      <DependentUpon>PhotographyGalleryWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="UI\Settings\MainWindow.SettingsShell.cs" />
+    <Compile Include="UI\Settings\SettingsShellDependencies.cs" />
+    <Compile Include="UI\Settings\SettingsShellHost.cs" />
+    <Compile Include="UI\Settings\MainWindow.SettingsPersistence.cs" />
+    <Compile Include="UI\Library\LibraryWorkspaceContext.cs" />
+    <Compile Include="UI\Library\ILibraryBrowserShell.cs" />
+    <Compile Include="UI\Library\ILibrarySession.cs" />
+    <Compile Include="UI\Library\LibrarySession.cs" />
+    <Compile Include="UI\Library\LibraryBrowserHost.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryBrowserChrome.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryBrowserWorkingSet.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryBrowserLayout.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryBrowserViewModel.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryPhotoMasonryLayout.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryBrowserRender.FolderList.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryBrowserSessionPersistence.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryBrowserSplitLayout.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryBrowserRender.DetailPane.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryBrowserShowOrchestration.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryBrowserShellBridge.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryBrowserOrchestrator.Selection.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryMetadataScan.cs" />
+    <Compile Include="UI\Library\LibraryBitmapLruCache.cs" />
+    <Compile Include="UI\Library\LibraryThumbnailPipeline.cs" />
+    <Compile Include="UI\Library\LibraryImageLoadCoordinator.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryImageLoading.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryBrowserOrchestrator.PaneEvents.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryBrowserOrchestrator.NavChromeAndToolbar.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryBrowserInstrumentation.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryBrowserOrchestrator.CoverRefresh.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryBrowserOrchestrator.DetailCommands.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryBrowserOrchestrator.FolderData.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryBrowserOrchestrator.IntakeBadge.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryBrowserOrchestrator.FolderTile.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryBrowserToastAndShortcuts.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryScannerBridge.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryFolderCacheIo.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryFolderIdEditor.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryCaptureQuickActions.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryStarredExport.cs" />
+    <Compile Include="UI\LibraryVirtualization.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="MainWindow.IndexServicesWiring.cs" />
+    <Compile Include="PixelVault.Native.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.8" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.6" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\assets\Xbox PC Library Icon.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>assets\Xbox PC Library Icon.png</Link>
+    </None>
+    <None Include="..\..\assets\IntakeReviewQueue.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>assets\IntakeReviewQueue.png</Link>
+    </None>
+  </ItemGroup>
+</Project>

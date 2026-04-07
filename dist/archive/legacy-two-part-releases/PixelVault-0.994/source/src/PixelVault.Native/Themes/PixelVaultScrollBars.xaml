@@ -1,0 +1,87 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!-- App-wide: thin (6–8px), opaque dark track + rounded thumb. Arrows hidden; drag thumb and track page still work. -->
+
+  <ControlTemplate x:Key="PixelVaultVerticalScrollBar" TargetType="{x:Type ScrollBar}">
+    <Grid SnapsToDevicePixels="True">
+      <Border Background="#FF131A20" CornerRadius="4" Width="6" Margin="1,4,1,4" HorizontalAlignment="Center"/>
+      <Track x:Name="PART_Track" IsDirectionReversed="True" Focusable="False">
+        <Track.DecreaseRepeatButton>
+          <RepeatButton Command="{x:Static ScrollBar.LineUpCommand}"
+                        Opacity="0" Focusable="False" IsTabStop="False" Height="0"/>
+        </Track.DecreaseRepeatButton>
+        <Track.Thumb>
+          <Thumb>
+            <Thumb.Template>
+              <ControlTemplate TargetType="Thumb">
+                <Border x:Name="ThumbBorder" Background="#FF485A66" CornerRadius="3" Margin="1,0"/>
+                <ControlTemplate.Triggers>
+                  <Trigger Property="IsMouseOver" Value="True">
+                    <Setter TargetName="ThumbBorder" Property="Background" Value="#FF5C6F7C"/>
+                  </Trigger>
+                  <Trigger Property="IsDragging" Value="True">
+                    <Setter TargetName="ThumbBorder" Property="Background" Value="#FF708896"/>
+                  </Trigger>
+                </ControlTemplate.Triggers>
+              </ControlTemplate>
+            </Thumb.Template>
+          </Thumb>
+        </Track.Thumb>
+        <Track.IncreaseRepeatButton>
+          <RepeatButton Command="{x:Static ScrollBar.LineDownCommand}"
+                        Opacity="0" Focusable="False" IsTabStop="False" Height="0"/>
+        </Track.IncreaseRepeatButton>
+      </Track>
+    </Grid>
+  </ControlTemplate>
+
+  <ControlTemplate x:Key="PixelVaultHorizontalScrollBar" TargetType="{x:Type ScrollBar}">
+    <Grid SnapsToDevicePixels="True">
+      <Border Background="#FF131A20" CornerRadius="4" Height="6" Margin="4,1,4,1" VerticalAlignment="Center"/>
+      <Track x:Name="PART_Track" IsDirectionReversed="False" Focusable="False">
+        <Track.DecreaseRepeatButton>
+          <RepeatButton Command="{x:Static ScrollBar.LineLeftCommand}"
+                        Opacity="0" Focusable="False" IsTabStop="False" Width="0"/>
+        </Track.DecreaseRepeatButton>
+        <Track.Thumb>
+          <Thumb>
+            <Thumb.Template>
+              <ControlTemplate TargetType="Thumb">
+                <Border x:Name="ThumbBorder" Background="#FF485A66" CornerRadius="3" Margin="0,1"/>
+                <ControlTemplate.Triggers>
+                  <Trigger Property="IsMouseOver" Value="True">
+                    <Setter TargetName="ThumbBorder" Property="Background" Value="#FF5C6F7C"/>
+                  </Trigger>
+                  <Trigger Property="IsDragging" Value="True">
+                    <Setter TargetName="ThumbBorder" Property="Background" Value="#FF7D8896"/>
+                  </Trigger>
+                </ControlTemplate.Triggers>
+              </ControlTemplate>
+            </Thumb.Template>
+          </Thumb>
+        </Track.Thumb>
+        <Track.IncreaseRepeatButton>
+          <RepeatButton Command="{x:Static ScrollBar.LineRightCommand}"
+                        Opacity="0" Focusable="False" IsTabStop="False" Width="0"/>
+        </Track.IncreaseRepeatButton>
+      </Track>
+    </Grid>
+  </ControlTemplate>
+
+  <Style TargetType="{x:Type ScrollBar}">
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="Stylus.IsFlicksEnabled" Value="False"/>
+    <Setter Property="Width" Value="8"/>
+    <Setter Property="MinWidth" Value="8"/>
+    <Setter Property="Template" Value="{StaticResource PixelVaultVerticalScrollBar}"/>
+    <Style.Triggers>
+      <Trigger Property="Orientation" Value="Horizontal">
+        <Setter Property="Width" Value="Auto"/>
+        <Setter Property="MinWidth" Value="0"/>
+        <Setter Property="Height" Value="8"/>
+        <Setter Property="MinHeight" Value="8"/>
+        <Setter Property="Template" Value="{StaticResource PixelVaultHorizontalScrollBar}"/>
+      </Trigger>
+    </Style.Triggers>
+  </Style>
+</ResourceDictionary>

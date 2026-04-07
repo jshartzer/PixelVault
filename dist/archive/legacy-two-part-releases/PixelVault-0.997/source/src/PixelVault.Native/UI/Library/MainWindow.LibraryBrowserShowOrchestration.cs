@@ -1,0 +1,447 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+
+namespace PixelVaultNative
+{
+    public sealed partial class MainWindow
+    {
+        /// <summary>
+        /// Imperative Library browser open/show wiring (folder grid, detail pane, toolbar delegates). Invoked from <see cref="LibraryBrowserHost.Show"/>.
+        /// </summary>
+        internal sealed class LibraryBrowserShowOrchestration
+        {
+            readonly ILibraryBrowserShell _shell;
+
+            internal LibraryBrowserShowOrchestration(ILibraryBrowserShell shell)
+            {
+                _shell = shell ?? throw new ArgumentNullException(nameof(shell));
+            }
+
+            internal void Run(bool reuseMainWindow)
+            {
+                if (reuseMainWindow) _shell.PrepareLibraryBrowserSessionForRebuild();
+                _shell.MarkLibraryBrowserSessionFirstPaintTracking();
+                _shell.LibrarySession.EnsureLibraryRootAccessible("Library folder");
+                Action refreshIntakeReviewBadge = null;
+                var libraryWindow = _shell.GetOrCreateLibraryBrowserWindow(reuseMainWindow);
+                var root = new Grid { Background = _shell.BrushFromHex("#0F1519") };
+                root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+
+                var navChrome = _shell.BuildLibraryBrowserNavChrome();
+                root.Children.Add(navChrome.NavBar);
+
+                var contentGrid = new Grid();
+                // ~1/4 folder pane, ~3/4 detail by default (user-adjustable splitter); narrower than 1:2 so more room for captures.
+                contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = 300 });
+                contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(3, GridUnitType.Star), MinWidth = 260 });
+                Grid.SetRow(contentGrid, 1);
+                root.Children.Add(contentGrid);
+
+                var panes = _shell.BuildLibraryBrowserContentPanes(contentGrid);
+                var ws = new LibraryBrowserWorkingSet { Panes = panes };
+                _shell.LibraryBrowserMountToastHost(root, ws);
+                libraryWindow.Content = root;
+                ws.AppliedLibrarySearchText = _shell.LibraryBrowserPersistedSearch;
+                ws.PendingLibrarySearchText = ws.AppliedLibrarySearchText;
+                panes.SearchBox.Text = ws.AppliedLibrarySearchText;
+                if (_shell.LibraryBrowserPersistedFolderScroll > 0.1d)
+                {
+                    ws.PreserveFolderScrollOnNextRender = true;
+                    ws.PreservedFolderScrollOffset = _shell.LibraryBrowserPersistedFolderScroll;
+                }
+                if (!string.IsNullOrWhiteSpace(_shell.LibraryBrowserPersistedLastViewKey))
+                {
+                    ws.PendingSessionRestore = true;
+                    ws.PendingRestoreViewKey = _shell.LibraryBrowserPersistedLastViewKey;
+                    ws.PendingRestoreDetailScrollAfterShow = Math.Max(0, _shell.LibraryBrowserPersistedDetailScroll);
+                }
+                if (ws.TimelineStartDate <= DateTime.MinValue || ws.TimelineEndDate <= DateTime.MinValue)
+                {
+                    MainWindow.BuildLibraryTimelinePresetDateRange("30d", DateTime.Today, out ws.TimelineStartDate, out ws.TimelineEndDate);
+                    ws.TimelineDatePresetKey = "30d";
+                }
+
+                Action<string, bool> runLibraryScan = null;
+                Action<bool> setLibraryBusyState = null;
+                Action<LibraryBrowserFolderView> openLibraryMetadataEditor = null;
+                Action<string> openSingleFileMetadataEditor = null;
+                Action renderTiles = null;
+                Action renderSelectedFolder = null;
+                Action<bool> refreshLibraryFoldersAsync = null;
+                Action prefillLibraryFoldersFromSnapshotAsync = null;
+                Action applySearchFilter = null;
+                Action refreshSortButtons = null;
+                Action refreshGroupingButtons = null;
+                Action<string> setLibrarySortMode = null;
+                Action<string> setLibraryFilterMode = null;
+                Action<string> setLibraryGroupingMode = null;
+                Action<LibraryBrowserFolderView> showFolder = null;
+                Action<List<LibraryFolderInfo>, string, bool, bool, bool> runScopedCoverRefresh = null;
+                Action refreshDetailSelectionUi = null;
+                Action deleteSelectedLibraryFiles = null;
+                Action openSelectedLibraryMetadataEditor = null;
+                Action refreshTimelineRangeUi = null;
+                Action<string> applyTimelinePreset = null;
+                Action applyTimelineDatePickerRange = null;
+                var lastFolderGroupingMode = _shell.NormalizeLibraryGroupingMode(_shell.LibraryGroupingMode);
+                if (string.Equals(lastFolderGroupingMode, "timeline", StringComparison.OrdinalIgnoreCase)) lastFolderGroupingMode = "all";
+                Func<LibraryBrowserFolderView, LibraryFolderInfo> getDisplayFolder = delegate(LibraryBrowserFolderView view)
+                {
+                    return _shell.BuildLibraryBrowserDisplayFolder(view);
+                };
+                Func<LibraryBrowserFolderView, LibraryFolderInfo> getActionFolder = delegate(LibraryBrowserFolderView view)
+                {
+                    return _shell.GetLibraryBrowserPrimaryFolder(view) ?? _shell.BuildLibraryBrowserDisplayFolder(view);
+                };
+
+                Func<List<string>> getVisibleDetailFilesOrdered =
+                    _shell.LibraryBrowserCreateVisibleDetailFilesOrdered(ws, getDisplayFolder);
+
+                Func<List<string>> getSelectedDetailFiles =
+                    _shell.LibraryBrowserCreateSelectedDetailFiles(ws, getVisibleDetailFilesOrdered);
+
+                Action<string, ModifierKeys> updateDetailSelection = _shell.LibraryBrowserCreateUpdateDetailSelection(
+                    ws,
+                    getVisibleDetailFilesOrdered,
+                    delegate { if (refreshDetailSelectionUi != null) refreshDetailSelectionUi(); });
+
+                refreshDetailSelectionUi = _shell.LibraryBrowserCreateRefreshDetailSelectionUi(ws, panes, getSelectedDetailFiles);
+                panes.DetailRows.BeforeVisibleRowsRebuilt = delegate
+                {
+                    ws.DetailTiles.Clear();
+                };
+                panes.DetailRows.AfterVisibleRowsRebuilt = delegate
+                {
+                    if (refreshDetailSelectionUi != null) refreshDetailSelectionUi();
+                };
+
+                refreshIntakeReviewBadge = delegate { _shell.LibraryBrowserScheduleIntakeReviewBadgeRefresh(libraryWindow, ws, navChrome); };
+
+                refreshSortButtons = delegate
+                {
+                    var timelineMode = string.Equals(_shell.NormalizeLibraryGroupingMode(_shell.LibraryGroupingMode), "timeline", StringComparison.OrdinalIgnoreCase);
+                    var sortMode = _shell.NormalizeLibraryFolderSortMode(_shell.LibraryFolderSortMode);
+                    var filterMode = _shell.NormalizeLibraryFolderFilterMode(_shell.LibraryFolderFilterMode);
+                    _shell.LibraryBrowserApplySortGroupPillState(panes.SortMenuButton, !timelineMode && !string.Equals(sortMode, "alpha", StringComparison.OrdinalIgnoreCase));
+                    _shell.LibraryBrowserApplySortGroupPillState(panes.FilterMenuButton, !string.Equals(filterMode, "all", StringComparison.OrdinalIgnoreCase));
+                    panes.SortMenuButton.IsEnabled = !timelineMode;
+                    panes.FilterMenuButton.IsEnabled = true;
+                    var sortLabel =
+                        string.Equals(sortMode, "captured", StringComparison.OrdinalIgnoreCase) ? "Date Captured" :
+                        string.Equals(sortMode, "added", StringComparison.OrdinalIgnoreCase) ? "Date Added" :
+                        string.Equals(sortMode, "photos", StringComparison.OrdinalIgnoreCase) ? "Most Photos" :
+                        "Alphabetical";
+                    var filterLabel =
+                        string.Equals(filterMode, "completed", StringComparison.OrdinalIgnoreCase) ? "100% Achievements" :
+                        string.Equals(filterMode, "crossplatform", StringComparison.OrdinalIgnoreCase) ? "Cross-Platform" :
+                        string.Equals(filterMode, "large", StringComparison.OrdinalIgnoreCase) ? "25+ Captures" :
+                        "All Games";
+                    panes.SortMenuButton.ToolTip = timelineMode
+                        ? "Sort is fixed to capture time in Timeline view"
+                        : "Sort: " + sortLabel;
+                    panes.FilterMenuButton.ToolTip = "Filter: " + filterLabel;
+                };
+
+                refreshGroupingButtons = delegate
+                {
+                    var normalized = _shell.NormalizeLibraryGroupingMode(_shell.LibraryGroupingMode);
+                    _shell.LibraryBrowserApplySortGroupPillState(panes.GroupAllButton, string.Equals(normalized, "all", StringComparison.OrdinalIgnoreCase));
+                    _shell.LibraryBrowserApplySortGroupPillState(panes.GroupConsoleButton, string.Equals(normalized, "console", StringComparison.OrdinalIgnoreCase));
+                    _shell.LibraryBrowserApplySortGroupPillState(panes.GroupTimelineButton, string.Equals(normalized, "timeline", StringComparison.OrdinalIgnoreCase));
+                    refreshTimelineRangeUi?.Invoke();
+                };
+
+                var suppressTimelineRangeSync = false;
+                refreshTimelineRangeUi = delegate
+                {
+                    if (panes.TimelineFilterPanel == null) return;
+                    var timelineMode = string.Equals(_shell.NormalizeLibraryGroupingMode(_shell.LibraryGroupingMode), "timeline", StringComparison.OrdinalIgnoreCase);
+                    panes.TimelineFilterPanel.Visibility = timelineMode ? Visibility.Visible : Visibility.Collapsed;
+                    var rangeStart = ws.TimelineStartDate;
+                    var rangeEnd = ws.TimelineEndDate;
+                    MainWindow.NormalizeLibraryTimelineDateRange(ref rangeStart, ref rangeEnd);
+                    ws.TimelineStartDate = rangeStart;
+                    ws.TimelineEndDate = rangeEnd;
+                    ws.TimelineDatePresetKey = MainWindow.DetectLibraryTimelinePresetKey(rangeStart, rangeEnd, DateTime.Today);
+                    _shell.LibraryBrowserApplySortGroupPillState(panes.TimelinePresetTodayButton, string.Equals(ws.TimelineDatePresetKey, "today", StringComparison.OrdinalIgnoreCase));
+                    _shell.LibraryBrowserApplySortGroupPillState(panes.TimelinePresetMonthButton, string.Equals(ws.TimelineDatePresetKey, "month", StringComparison.OrdinalIgnoreCase));
+                    _shell.LibraryBrowserApplySortGroupPillState(panes.TimelinePresetThirtyDaysButton, string.Equals(ws.TimelineDatePresetKey, "30d", StringComparison.OrdinalIgnoreCase));
+                    suppressTimelineRangeSync = true;
+                    if (panes.TimelineStartDatePicker != null) panes.TimelineStartDatePicker.SelectedDate = rangeStart;
+                    if (panes.TimelineEndDatePicker != null) panes.TimelineEndDatePicker.SelectedDate = rangeEnd;
+                    suppressTimelineRangeSync = false;
+                };
+                Action<DateTime, DateTime, bool> applyTimelineDateRange = delegate(DateTime startDate, DateTime endDate, bool rerender)
+                {
+                    MainWindow.NormalizeLibraryTimelineDateRange(ref startDate, ref endDate);
+                    ws.TimelineStartDate = startDate;
+                    ws.TimelineEndDate = endDate;
+                    ws.TimelineDatePresetKey = MainWindow.DetectLibraryTimelinePresetKey(startDate, endDate, DateTime.Today);
+                    refreshTimelineRangeUi?.Invoke();
+                    if (!rerender) return;
+                    if (!string.Equals(_shell.NormalizeLibraryGroupingMode(_shell.LibraryGroupingMode), "timeline", StringComparison.OrdinalIgnoreCase)) return;
+                    if (ws.Current == null || renderSelectedFolder == null) return;
+                    ws.PreserveDetailScrollOnNextRender = false;
+                    ws.PreservedDetailScrollOffset = 0;
+                    renderSelectedFolder();
+                };
+                applyTimelinePreset = delegate(string presetKey)
+                {
+                    DateTime startDate;
+                    DateTime endDate;
+                    MainWindow.BuildLibraryTimelinePresetDateRange(presetKey, DateTime.Today, out startDate, out endDate);
+                    applyTimelineDateRange(startDate, endDate, true);
+                };
+                applyTimelineDatePickerRange = delegate
+                {
+                    if (suppressTimelineRangeSync) return;
+                    if (panes.TimelineStartDatePicker == null || panes.TimelineEndDatePicker == null) return;
+                    if (!panes.TimelineStartDatePicker.SelectedDate.HasValue || !panes.TimelineEndDatePicker.SelectedDate.HasValue) return;
+                    applyTimelineDateRange(panes.TimelineStartDatePicker.SelectedDate.Value, panes.TimelineEndDatePicker.SelectedDate.Value, true);
+                };
+
+                setLibrarySortMode = delegate(string mode)
+                {
+                    var normalized = _shell.NormalizeLibraryFolderSortMode(mode);
+                    if (!string.Equals(normalized, _shell.NormalizeLibraryFolderSortMode(_shell.LibraryFolderSortMode), StringComparison.OrdinalIgnoreCase))
+                    {
+                        _shell.LibraryFolderSortMode = normalized;
+                        _shell.SaveSettings();
+                        if (renderTiles != null) renderTiles();
+                    }
+                    refreshSortButtons();
+                };
+
+                setLibraryFilterMode = delegate(string mode)
+                {
+                    var normalized = _shell.NormalizeLibraryFolderFilterMode(mode);
+                    if (!string.Equals(normalized, _shell.NormalizeLibraryFolderFilterMode(_shell.LibraryFolderFilterMode), StringComparison.OrdinalIgnoreCase))
+                    {
+                        _shell.LibraryFolderFilterMode = normalized;
+                        _shell.SaveSettings();
+                        if (renderTiles != null) renderTiles();
+                    }
+                    refreshSortButtons();
+                };
+
+                setLibraryGroupingMode = delegate(string mode)
+                {
+                    var normalized = string.Equals((mode ?? string.Empty).Trim(), "folders", StringComparison.OrdinalIgnoreCase)
+                        ? lastFolderGroupingMode
+                        : _shell.NormalizeLibraryGroupingMode(mode);
+                    if (!string.Equals(normalized, "timeline", StringComparison.OrdinalIgnoreCase))
+                    {
+                        lastFolderGroupingMode = normalized;
+                    }
+                    if (!string.Equals(normalized, _shell.NormalizeLibraryGroupingMode(_shell.LibraryGroupingMode), StringComparison.OrdinalIgnoreCase))
+                    {
+                        _shell.LibraryGroupingMode = normalized;
+                        _shell.SaveSettings();
+                        if (renderTiles != null) renderTiles();
+                    }
+                    refreshSortButtons?.Invoke();
+                    refreshGroupingButtons();
+                };
+
+                openSingleFileMetadataEditor = delegate(string filePath)
+                {
+                    _shell.LibraryBrowserOpenSingleFileMetadataEditor(ws, filePath, getVisibleDetailFilesOrdered, getSelectedDetailFiles, getDisplayFolder, getActionFolder, refreshLibraryFoldersAsync);
+                };
+
+                openSelectedLibraryMetadataEditor = delegate
+                {
+                    _shell.LibraryBrowserOpenSingleFileMetadataEditor(ws, null, getVisibleDetailFilesOrdered, getSelectedDetailFiles, getDisplayFolder, getActionFolder, refreshLibraryFoldersAsync);
+                };
+
+                deleteSelectedLibraryFiles = delegate
+                {
+                    _shell.LibraryBrowserDeleteSelectedCaptures(ws, getSelectedDetailFiles, renderTiles, renderSelectedFolder, refreshLibraryFoldersAsync);
+                };
+
+                renderSelectedFolder = delegate
+                {
+                    _shell.LibraryBrowserRenderSelectedFolderDetail(ws, libraryWindow, openSingleFileMetadataEditor, updateDetailSelection, refreshDetailSelectionUi, renderSelectedFolder, renderTiles);
+                    if (ws.Current == null) ws.DetailSelectionAnchorIndex = -1;
+                };
+
+                Func<LibraryBrowserFolderView, int, int, bool, Button> buildFolderTile = delegate(LibraryBrowserFolderView folder, int tileWidth, int tileHeight, bool showPlatformBadge)
+                {
+                    return _shell.LibraryBrowserBuildFolderTile(
+                        folder,
+                        tileWidth,
+                        tileHeight,
+                        showPlatformBadge,
+                        showFolder,
+                        renderTiles,
+                        refreshLibraryFoldersAsync,
+                        runScopedCoverRefresh,
+                        openLibraryMetadataEditor,
+                        msg => _shell.LibraryBrowserShowToast(ws, msg));
+                };
+
+                showFolder = delegate(LibraryBrowserFolderView info)
+                {
+                    _shell.LibraryBrowserShowSelectedFolder(ws, panes, libraryWindow, info, renderSelectedFolder);
+                };
+
+                Action renderFolderTilesCore = null;
+                renderFolderTilesCore = delegate
+                {
+                    _shell.LibraryBrowserRenderFolderList(ws, buildFolderTile, showFolder, renderSelectedFolder, renderFolderTilesCore);
+                };
+                renderTiles = renderFolderTilesCore;
+
+                refreshLibraryFoldersAsync = delegate(bool forceRefresh)
+                {
+                    _shell.LibraryBrowserRefreshFoldersAsync(libraryWindow, ws, forceRefresh, renderTiles);
+                };
+                _shell.ActiveLibraryFolderRefresh = refreshLibraryFoldersAsync;
+                if (!reuseMainWindow)
+                {
+                    libraryWindow.Closed += delegate
+                    {
+                        if (_shell.ActiveLibraryFolderRefresh == refreshLibraryFoldersAsync) _shell.ActiveLibraryFolderRefresh = null;
+                        _shell.ActiveSelectedLibraryFolder = null;
+                    };
+                }
+
+                prefillLibraryFoldersFromSnapshotAsync = delegate
+                {
+                    _shell.LibraryBrowserPrefillFoldersFromSnapshot(libraryWindow, ws, renderTiles);
+                };
+                setLibraryBusyState = delegate(bool isBusy)
+                {
+                    navChrome.RefreshButton.IsEnabled = !isBusy;
+                    panes.EditMetadataButton.IsEnabled = !isBusy;
+                    panes.RefreshThisFolderButton.IsEnabled = !isBusy && ws.Current != null;
+                    panes.FolderTileSmallerButton.IsEnabled = !isBusy;
+                    panes.FolderTileLargerButton.IsEnabled = !isBusy;
+                    panes.ShortcutsHelpButton.IsEnabled = !isBusy;
+                    navChrome.FetchButton.IsEnabled = !isBusy;
+                    navChrome.ExportStarredButton.IsEnabled = !isBusy;
+                    navChrome.ImportButton.IsEnabled = !isBusy;
+                    navChrome.ImportCommentsButton.IsEnabled = !isBusy;
+                    navChrome.ManualImportButton.IsEnabled = !isBusy;
+                    if (navChrome.IntakeReviewButton != null) navChrome.IntakeReviewButton.IsEnabled = !isBusy;
+                    if (!isBusy && refreshDetailSelectionUi != null) refreshDetailSelectionUi();
+                };
+
+                runLibraryScan = delegate(string folderPath, bool forceRescan)
+                {
+                    _shell.LibraryBrowserRunFolderMetadataScan(libraryWindow, ws, folderPath, forceRescan, setLibraryBusyState, refreshLibraryFoldersAsync);
+                };
+
+                Action repaintLibraryChromeAfterScopedCover = delegate
+                {
+                    if (renderTiles != null) renderTiles();
+                    if (renderSelectedFolder != null) renderSelectedFolder();
+                };
+                runScopedCoverRefresh = delegate(List<LibraryFolderInfo> requestedFolders, string scopeLabel, bool forceRefreshExistingCovers, bool rebuildFullCacheAfterRefresh, bool reloadLibraryFolderListAfter)
+                {
+                    _shell.RunLibraryBrowserScopedCoverRefresh(
+                        libraryWindow,
+                        ws,
+                        requestedFolders,
+                        scopeLabel,
+                        forceRefreshExistingCovers,
+                        rebuildFullCacheAfterRefresh,
+                        reloadLibraryFolderListAfter,
+                        repaintLibraryChromeAfterScopedCover,
+                        refreshLibraryFoldersAsync,
+                        setLibraryBusyState);
+                };
+
+                Action runCoverRefresh = delegate
+                {
+                    runScopedCoverRefresh(ws.Folders, "library", false, false, true);
+                };
+                applySearchFilter = delegate
+                {
+                    panes.SearchDebounceTimer.Stop();
+                    if (string.Equals(ws.AppliedLibrarySearchText, ws.PendingLibrarySearchText, StringComparison.OrdinalIgnoreCase)) return;
+                    ws.AppliedLibrarySearchText = ws.PendingLibrarySearchText;
+                    _shell.PersistLibraryBrowserCommittedSearch(ws.AppliedLibrarySearchText);
+                    if (renderTiles != null) renderTiles();
+                };
+                _shell.LibraryBrowserWirePaneEvents(libraryWindow, ws, panes, renderTiles, renderSelectedFolder, applySearchFilter);
+
+                openLibraryMetadataEditor = delegate(LibraryBrowserFolderView focusFolder)
+                {
+                    _shell.LibraryBrowserOpenLibraryMetadataForFolder(ws, focusFolder, showFolder, refreshDetailSelectionUi, delegate
+                    {
+                        _shell.LibraryBrowserOpenSingleFileMetadataEditor(ws, null, getVisibleDetailFilesOrdered, getSelectedDetailFiles, getDisplayFolder, getActionFolder, refreshLibraryFoldersAsync);
+                    });
+                };
+                _shell.LibraryBrowserWireNavChromeAndToolbar(
+                    libraryWindow,
+                    ws,
+                    panes,
+                    navChrome,
+                    refreshIntakeReviewBadge,
+                    refreshLibraryFoldersAsync,
+                    runCoverRefresh,
+                    openSelectedLibraryMetadataEditor,
+                    deleteSelectedLibraryFiles,
+                    setLibraryGroupingMode,
+                    setLibrarySortMode,
+                    setLibraryFilterMode);
+                panes.ShortcutsHelpButton.Click += delegate { _shell.ShowLibraryBrowserKeyboardShortcutsHelp(libraryWindow); };
+                libraryWindow.PreviewKeyDown += delegate(object _, KeyEventArgs e)
+                {
+                    if (e.Key != Key.F1) return;
+                    e.Handled = true;
+                    _shell.ShowLibraryBrowserKeyboardShortcutsHelp(libraryWindow);
+                };
+                panes.FolderTileSmallerButton.Click += delegate
+                {
+                    _shell.LibraryFolderTileSize = _shell.NormalizeLibraryFolderTileSizeValue(_shell.LibraryFolderTileSize - 20);
+                    _shell.SaveSettings();
+                    if (renderTiles != null) renderTiles();
+                    _shell.LibraryBrowserShowToast(ws, "Folder tiles: " + _shell.LibraryFolderTileSize);
+                };
+                panes.FolderTileLargerButton.Click += delegate
+                {
+                    _shell.LibraryFolderTileSize = _shell.NormalizeLibraryFolderTileSizeValue(_shell.LibraryFolderTileSize + 20);
+                    _shell.SaveSettings();
+                    if (renderTiles != null) renderTiles();
+                    _shell.LibraryBrowserShowToast(ws, "Folder tiles: " + _shell.LibraryFolderTileSize);
+                };
+                panes.TimelinePresetTodayButton.Click += delegate { applyTimelinePreset("today"); };
+                panes.TimelinePresetMonthButton.Click += delegate { applyTimelinePreset("month"); };
+                panes.TimelinePresetThirtyDaysButton.Click += delegate { applyTimelinePreset("30d"); };
+                panes.TimelineStartDatePicker.SelectedDateChanged += delegate { applyTimelineDatePickerRange(); };
+                panes.TimelineEndDatePicker.SelectedDateChanged += delegate { applyTimelineDatePickerRange(); };
+                panes.RefreshThisFolderButton.Click += delegate
+                {
+                    if (ws.Current == null) return;
+                    var scopeFolders = _shell.GetLibraryBrowserActionFolders(ws.Current);
+                    if (scopeFolders.Count == 0) return;
+                    showFolder(ws.Current);
+                    runScopedCoverRefresh(scopeFolders, _shell.BuildLibraryBrowserActionScopeLabel(ws.Current), true, false, false);
+                };
+                libraryWindow.Activated += delegate
+                {
+                    if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge();
+                };
+
+                refreshSortButtons();
+                refreshGroupingButtons();
+                refreshTimelineRangeUi();
+                if (reuseMainWindow) _shell.RegisterLibraryBrowserLiveWorkingSet(ws);
+                if (!reuseMainWindow) libraryWindow.Show();
+                if (renderTiles != null) renderTiles();
+                if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge();
+                var autoRefreshLibraryFoldersOnStartup = !_shell.LibrarySession.HasLibraryFolderCacheSnapshot();
+                if (!autoRefreshLibraryFoldersOnStartup && _shell.StatusLine != null) _shell.StatusLine.Text = "Loading cached library folders...";
+                if (prefillLibraryFoldersFromSnapshotAsync != null) prefillLibraryFoldersFromSnapshotAsync();
+                if (refreshLibraryFoldersAsync != null && autoRefreshLibraryFoldersOnStartup) refreshLibraryFoldersAsync(false);
+            }
+        }
+    }
+}
