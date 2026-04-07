@@ -274,25 +274,8 @@ namespace PixelVaultNative
                 librarySession,
                 indexPersistenceService,
                 gameIndexEditorAssignmentService);
-            CreateStartupDirectories();
-            EnsureSavedCoversReadme();
-            if (!File.Exists(changelogPath)) File.WriteAllText(changelogPath, "# PixelVault Changelog\r\n\r\n## 0.530\r\n- Replaced the broken library separator glyph with a plain pipe so folder details read cleanly.\r\n- Grouped the Game Library folders into collapsible Steam, PS5, Xbox, Multiple Tags, and Other sections.\r\n- Increased the library folder art size a bit and tightened the caption text underneath for a cleaner browse view.\r\n");
-            MigratePersistentDataFromLegacyVersions();
-            InitializeDefaultWorkspaceRootsAndTools();
-            LoadSettings();
-
-            Title = "PixelVault " + AppVersion;
-            Width = PreferredLibraryWindowWidth();
-            Height = PreferredLibraryWindowHeight();
-            MinWidth = 720;
-            MinHeight = 520;
-            WindowStartupLocation = WindowStartupLocation.CenterScreen;
-            Background = Brush("#0F1519");
-            var iconPath = Path.Combine(appRoot, "assets", "PixelVault.ico");
-            if (File.Exists(iconPath)) Icon = BitmapFrame.Create(new Uri(iconPath));
-            Content = new Grid();
-            ShowLibraryBrowser(true);
-            Log("PixelVault " + AppVersion + " ready.");
+            RunPostServiceStartup();
+            ApplyMainWindowChromeAndShell();
         }
 
         SolidColorBrush Brush(string hex) { return UiBrushHelper.FromHex(hex); }

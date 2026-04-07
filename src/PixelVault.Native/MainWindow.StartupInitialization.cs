@@ -4,11 +4,17 @@ using System.Diagnostics;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media.Imaging;
 
 namespace PixelVaultNative
 {
     public sealed partial class MainWindow
     {
+        const string DefaultChangelogFileIfMissing =
+            "# PixelVault Changelog\r\n\r\n## 0.530\r\n- Replaced the broken library separator glyph with a plain pipe so folder details read cleanly.\r\n- Grouped the Game Library folders into collapsible Steam, PS5, Xbox, Multiple Tags, and Other sections.\r\n- Increased the library folder art size a bit and tightened the caption text underneath for a cleaner browse view.\r\n";
+
         internal static (
             string DataRoot,
             string LogsRoot,
@@ -206,6 +212,32 @@ namespace PixelVaultNative
             libraryRoot = destinationRoot;
             exifToolPath = Path.Combine(appRoot, "tools", "exiftool.exe");
             ffmpegPath = Path.Combine(appRoot, "tools", "ffmpeg.exe");
+        }
+
+        void RunPostServiceStartup()
+        {
+            CreateStartupDirectories();
+            EnsureSavedCoversReadme();
+            if (!File.Exists(changelogPath)) File.WriteAllText(changelogPath, DefaultChangelogFileIfMissing);
+            MigratePersistentDataFromLegacyVersions();
+            InitializeDefaultWorkspaceRootsAndTools();
+            LoadSettings();
+        }
+
+        void ApplyMainWindowChromeAndShell()
+        {
+            Title = "PixelVault " + AppVersion;
+            Width = PreferredLibraryWindowWidth();
+            Height = PreferredLibraryWindowHeight();
+            MinWidth = 720;
+            MinHeight = 520;
+            WindowStartupLocation = WindowStartupLocation.CenterScreen;
+            Background = Brush("#0F1519");
+            var iconPath = Path.Combine(appRoot, "assets", "PixelVault.ico");
+            if (File.Exists(iconPath)) Icon = BitmapFrame.Create(new Uri(iconPath));
+            Content = new Grid();
+            ShowLibraryBrowser(true);
+            Log("PixelVault " + AppVersion + " ready.");
         }
     }
 }

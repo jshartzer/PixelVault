@@ -143,7 +143,7 @@ Implement as **small vertical slices**. After each slice: **`dotnet test`** (`Pi
 
 **TEST GATE:** Cold start, settings load, library open.
 
-**Progress (2026-04-06):** **`MainWindow.StartupInitialization.cs`** — `ComputePersistentStorageLayout` (static, supports `readonly` path fields), `CreateStartupDirectories`, `InitializeDefaultWorkspaceRootsAndTools`; ctor in **`PixelVault.Native.cs`** delegates to these. **Follow-on:** static factories for settings/file IO, cover + metadata services, library scanner, import dependencies, library session, game index service — ctor assigns `readonly` fields from return values only.
+**Progress (2026-04-06):** **`MainWindow.StartupInitialization.cs`** — `ComputePersistentStorageLayout` (static, supports `readonly` path fields), `CreateStartupDirectories`, `InitializeDefaultWorkspaceRootsAndTools`; ctor in **`PixelVault.Native.cs`** delegates to these. **Follow-on:** static factories for settings/file IO, cover + metadata services, library scanner, import dependencies, library session, game index service — ctor assigns `readonly` fields from return values only. **`RunPostServiceStartup`** (directories, readme, changelog seed, migrate, default roots, **`LoadSettings`**) and **`ApplyMainWindowChromeAndShell`** (window metrics, icon, content, **`ShowLibraryBrowser`**) complete the ctor diet.
 
 ---
 
@@ -188,7 +188,7 @@ Before merging a slice, ask:
 | 2026-04-06 | **Step 4 (initial):** **`LibraryBrowseFolderSummary`**, **`SMART_VIEWS_LIBRARY.md`** browse appendix, tests. |
 | 2026-04-06 | **Step 5 (initial):** Session **`RequestToggleCaptureStarred`** / **`RequestSaveCaptureComment`**; library detail + quick-comment path routable for future non-WPF callers. |
 | 2026-04-06 | **Step 5 (complete slice):** Star toggle bool completion callback; photography gallery uses session; **Step 6 (initial):** **`MainWindow.StartupInitialization.cs`** + ctor diet. |
-| 2026-04-06 | **Step 6 (follow-on):** Service wiring factories in **`MainWindow.StartupInitialization.cs`**; **`MainWindow` ctor** slimmed (cover, metadata, scanner, import deps, session, game index). |
+| 2026-04-06 | **Step 6 (follow-on):** Service wiring factories in **`MainWindow.StartupInitialization.cs`**; ctor slimmed. **Step 6 (shell):** **`RunPostServiceStartup`**, **`ApplyMainWindowChromeAndShell`**. |
 | 2026-04-06 | **Perf note** recorded in **`docs/PERFORMANCE_TODO.md`** (landed table): star lookup cache, folder enum + index batch, detail masonry off-UI, repair cap + deferred queue. |
 
 When execution starts, reference **`PV-PLN-UI-001`** in commits; Notion per **`docs/DOC_SYNC_POLICY.md`** if milestones are tracked there.
