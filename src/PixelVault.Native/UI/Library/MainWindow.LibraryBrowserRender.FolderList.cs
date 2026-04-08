@@ -58,7 +58,11 @@ namespace PixelVaultNative
                     && folder.SearchBlob.IndexOf(searchNormalized, StringComparison.Ordinal) >= 0)
                 .ToList();
             visibleFolders = visibleFolders
-                .Where(folder => LibraryBrowserFolderViewMatchesFilter(filterMode, folder, NormalizeConsoleLabel))
+                .Where(folder =>
+                    LibraryBrowseFolderSummary.MatchesFilter(
+                        filterMode,
+                        LibraryBrowseFolderSummary.FromFolderView(folder),
+                        NormalizeConsoleLabel))
                 .ToList();
             filterSortStopwatch.Stop();
             if (timelineMode)

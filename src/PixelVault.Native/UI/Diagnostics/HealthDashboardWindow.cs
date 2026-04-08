@@ -80,6 +80,8 @@ namespace PixelVaultNative
             stack.Children.Add(SectionCard(d, "Paths", pathLines.ToArray()));
 
             var hasToken = d.HasSteamGridDbApiToken?.Invoke() ?? false;
+            var hasSteamWeb = d.HasSteamWebApiKey?.Invoke() ?? false;
+            var hasRa = d.HasRetroAchievementsApiKey?.Invoke() ?? false;
             stack.Children.Add(SectionCard(d, "External tools",
                 Row(d, "ExifTool", string.IsNullOrWhiteSpace(exif) ? "(not set)" : exif, FileOk(exif), DescribeFile(exif)),
                 Row(d, "FFmpeg", string.IsNullOrWhiteSpace(ffmpeg) ? "(optional, not set)" : ffmpeg,
@@ -87,7 +89,13 @@ namespace PixelVaultNative
                     string.IsNullOrWhiteSpace(ffmpeg) ? "Optional for some video workflows." : DescribeFile(ffmpeg)),
                 Row(d, "SteamGridDB", hasToken ? "API token on file" : "(optional, not set)",
                     hasToken ? DesignTokens.StatusOk : DesignTokens.StatusNeutral,
-                    hasToken ? "Used for cover downloads." : "Optional unless you fetch covers from SteamGridDB.")));
+                    hasToken ? "Used for cover downloads." : "Optional unless you fetch covers from SteamGridDB."),
+                Row(d, "Steam Web API", hasSteamWeb ? "API key configured" : "(optional, not set)",
+                    hasSteamWeb ? DesignTokens.StatusOk : DesignTokens.StatusNeutral,
+                    hasSteamWeb ? "Reserved for future Steam Web API features." : "Set in Path Settings or PIXELVAULT_STEAM_WEB_API_KEY when needed."),
+                Row(d, "RetroAchievements", hasRa ? "API key configured" : "(optional, not set)",
+                    hasRa ? DesignTokens.StatusOk : DesignTokens.StatusNeutral,
+                    hasRa ? "Used for Edit IDs: RA game search against the live game database (API key only)." : "Set in Path Settings or PIXELVAULT_RETROACHIEVEMENTS_API_KEY when needed.")));
 
             string indexDetail;
             if (string.IsNullOrWhiteSpace(indexPath))

@@ -102,6 +102,26 @@ namespace PixelVaultNative
             return string.Empty;
         }
 
+        public static string FindSteamWebApiKeyInEnvironment()
+        {
+            foreach (var key in new[] { "PIXELVAULT_STEAM_WEB_API_KEY", "STEAM_WEB_API_KEY", "STEAM_API_KEY" })
+            {
+                var value = Environment.GetEnvironmentVariable(key);
+                if (!string.IsNullOrWhiteSpace(value)) return value.Trim();
+            }
+            return string.Empty;
+        }
+
+        public static string FindRetroAchievementsApiKeyInEnvironment()
+        {
+            foreach (var key in new[] { "PIXELVAULT_RETROACHIEVEMENTS_API_KEY", "RETROACHIEVEMENTS_API_KEY", "RA_API_KEY" })
+            {
+                var value = Environment.GetEnvironmentVariable(key);
+                if (!string.IsNullOrWhiteSpace(value)) return value.Trim();
+            }
+            return string.Empty;
+        }
+
         public AppSettings LoadFromIni(
             string path,
             AppSettings initialState,
@@ -126,6 +146,8 @@ namespace PixelVaultNative
                 else if (key == "exiftool" && !string.IsNullOrWhiteSpace(value)) s.ExifToolPath = value;
                 else if (key == "ffmpeg" && !string.IsNullOrWhiteSpace(value)) s.FfmpegPath = value;
                 else if (key == "steamgriddb_token") s.SteamGridDbApiToken = value ?? string.Empty;
+                else if (key == "steam_web_api_key") s.SteamWebApiKey = value ?? string.Empty;
+                else if (key == "retroachievements_api_key") s.RetroAchievementsApiKey = value ?? string.Empty;
                 else if (key == "library_folder_tile_size")
                 {
                     if (int.TryParse(value, out var parsedSize)) s.LibraryFolderTileSize = NormalizeLibraryFolderTileSize(parsedSize);
@@ -215,6 +237,11 @@ namespace PixelVaultNative
             var envSteamGridDbToken = readSteamGridDbTokenFromEnvironment != null ? readSteamGridDbTokenFromEnvironment() : string.Empty;
             if (!string.IsNullOrWhiteSpace(envSteamGridDbToken)) s.SteamGridDbApiToken = envSteamGridDbToken;
 
+            var envSteamWeb = FindSteamWebApiKeyInEnvironment();
+            if (!string.IsNullOrWhiteSpace(envSteamWeb)) s.SteamWebApiKey = envSteamWeb;
+            var envRa = FindRetroAchievementsApiKeyInEnvironment();
+            if (!string.IsNullOrWhiteSpace(envRa)) s.RetroAchievementsApiKey = envRa;
+
             return s;
         }
 
@@ -256,6 +283,8 @@ namespace PixelVaultNative
                 "exiftool=" + (state.ExifToolPath ?? string.Empty),
                 "ffmpeg=" + (state.FfmpegPath ?? string.Empty),
                 "steamgriddb_token=" + (state.SteamGridDbApiToken ?? string.Empty),
+                "steam_web_api_key=" + (state.SteamWebApiKey ?? string.Empty),
+                "retroachievements_api_key=" + (state.RetroAchievementsApiKey ?? string.Empty),
                 "library_folder_tile_size=" + NormalizeLibraryFolderTileSize(state.LibraryFolderTileSize),
                 "library_photo_tile_size=" + NormalizeLibraryPhotoTileSize(state.LibraryPhotoTileSize),
                 "library_folder_grid_columns=" + NormalizeLibraryFolderGridColumnCount(state.LibraryFolderGridColumnCount),

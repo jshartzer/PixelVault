@@ -375,5 +375,120 @@ namespace PixelVaultNative
             pickerWindow.Content = root;
             return pickerWindow.ShowDialog() == true ? selected : null;
         }
+
+        Tuple<string, string> ShowRetroAchievementsGameMatchWindow(Window owner, string query, List<Tuple<string, string>> matches)
+        {
+            var candidates = (matches ?? new List<Tuple<string, string>>()).Where(match => match != null && !string.IsNullOrWhiteSpace(match.Item1) && !string.IsNullOrWhiteSpace(match.Item2)).Take(24).ToList();
+            if (candidates.Count == 0) return null;
+
+            Tuple<string, string> selected = null;
+            var wanted = NormalizeTitle(query);
+            var pickerWindow = new Window
+            {
+                Title = "PixelVault " + AppVersion + " RetroAchievements Matches",
+                Width = 760,
+                Height = 720,
+                MinWidth = 680,
+                MinHeight = 560,
+                Owner = owner ?? this,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Background = Brush("#0F1519")
+            };
+
+            var root = new Grid { Margin = new Thickness(18) };
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+            var header = new Border { Background = Brush("#161C20"), CornerRadius = new CornerRadius(18), Padding = new Thickness(18), Margin = new Thickness(0, 0, 0, 14) };
+            var headerStack = new StackPanel();
+            headerStack.Children.Add(new TextBlock { Text = "Choose the RetroAchievements game", FontSize = 24, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White });
+            headerStack.Children.Add(new TextBlock { Text = "Results for \"" + query + "\" (from the RetroAchievements API). Pick the row that matches this folder.", Margin = new Thickness(0, 8, 0, 0), Foreground = Brush("#B7C6C0"), FontSize = 14, TextWrapping = TextWrapping.Wrap });
+            header.Child = headerStack;
+            root.Children.Add(header);
+
+            var list = new ListBox
+            {
+                Background = Brush("#12191E"),
+                BorderBrush = Brush("#243139"),
+                BorderThickness = new Thickness(1),
+                Foreground = Brushes.White,
+                Padding = new Thickness(12),
+                HorizontalContentAlignment = HorizontalAlignment.Stretch
+            };
+            Grid.SetRow(list, 1);
+            root.Children.Add(list);
+
+            var selectedIndex = 0;
+            for (int i = 0; i < candidates.Count; i++)
+            {
+                var match = candidates[i];
+                var titleOnly = match.Item2;
+                var sep = titleOnly.IndexOf('·');
+                if (sep > 0) titleOnly = titleOnly.Substring(0, sep).Trim();
+                var isExact = NormalizeTitle(titleOnly) == wanted;
+                if (isExact) selectedIndex = i;
+                var item = new ListBoxItem { Tag = match, Padding = new Thickness(0), Margin = new Thickness(0, 0, 0, 10), BorderThickness = new Thickness(0), Background = Brushes.Transparent };
+                var border = new Border
+                {
+                    Background = isExact ? Brush("#183A30") : Brush("#1A2329"),
+                    BorderBrush = isExact ? Brush("#3FAE7C") : Brush("#243139"),
+                    BorderThickness = new Thickness(1),
+                    CornerRadius = new CornerRadius(12),
+                    Padding = new Thickness(14, 12, 14, 12)
+                };
+                var stack = new StackPanel();
+                stack.Children.Add(new TextBlock { Text = match.Item2, Foreground = Brushes.White, FontSize = 16, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap });
+                stack.Children.Add(new TextBlock { Text = "RA game ID " + match.Item1 + (isExact ? " | exact title match" : string.Empty), Foreground = isExact ? Brush("#BEE8D3") : Brush("#9FB0BA"), Margin = new Thickness(0, 6, 0, 0), TextWrapping = TextWrapping.Wrap });
+                border.Child = stack;
+                item.Content = border;
+                list.Items.Add(item);
+            }
+
+            var buttons = new Grid { HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 14, 0, 0) };
+            buttons.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            buttons.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            var cancelButton = Btn("Cancel", null, "#334249", Brushes.White);
+            cancelButton.Margin = new Thickness(0);
+            var selectButton = Btn("Use Match", null, "#275D47", Brushes.White);
+            selectButton.Margin = new Thickness(12, 0, 0, 0);
+            selectButton.IsEnabled = candidates.Count > 0;
+            buttons.Children.Add(cancelButton);
+            Grid.SetColumn(selectButton, 1);
+            buttons.Children.Add(selectButton);
+            Grid.SetRow(buttons, 2);
+            root.Children.Add(buttons);
+
+            Action<bool> closeWindow = delegate(bool accept)
+            {
+                if (accept)
+                {
+                    var selectedItem = list.SelectedItem as ListBoxItem;
+                    if (selectedItem == null || !(selectedItem.Tag is Tuple<string, string>)) return;
+                    selected = (Tuple<string, string>)selectedItem.Tag;
+                    pickerWindow.DialogResult = true;
+                }
+                else
+                {
+                    pickerWindow.DialogResult = false;
+                }
+                pickerWindow.Close();
+            };
+
+            list.SelectionChanged += delegate
+            {
+                selectButton.IsEnabled = list.SelectedItem is ListBoxItem;
+            };
+            list.MouseDoubleClick += delegate
+            {
+                if (list.SelectedItem is ListBoxItem) closeWindow(true);
+            };
+            cancelButton.Click += delegate { closeWindow(false); };
+            selectButton.Click += delegate { closeWindow(true); };
+            if (list.Items.Count > 0) list.SelectedIndex = selectedIndex;
+
+            pickerWindow.Content = root;
+            return pickerWindow.ShowDialog() == true ? selected : null;
+        }
     }
 }

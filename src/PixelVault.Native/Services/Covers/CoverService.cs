@@ -1,18 +1,20 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace PixelVaultNative
 {
-    /// <summary>Steam / SteamGridDB HTTP helpers; network entry points are <c>*Async</c> only.</summary>
+    /// <summary>Steam, SteamGridDB, and RetroAchievements HTTP helpers; network entry points are <c>*Async</c> only.</summary>
     interface ICoverService
     {
         Task<string> TryResolveSteamGridDbIdBySteamAppIdAsync(string steamAppId, CancellationToken cancellationToken = default(CancellationToken));
@@ -34,6 +36,8 @@ namespace PixelVaultNative
         string CachedHeroPath(string title);
         Task<string> TryDownloadSteamGridDbHeroAsync(string title, string steamGridDbId, CancellationToken cancellationToken = default(CancellationToken));
         Task<string> TryDownloadSteamStoreHeaderHeroAsync(string title, string appId, CancellationToken cancellationToken = default(CancellationToken));
+        /// <summary>Search RetroAchievements games by title for consoles that best match <paramref name="platformLabel"/>. Requires a web API key from Path Settings.</summary>
+        Task<List<Tuple<string, string>>> SearchRetroAchievementsGameMatchesAsync(string title, string platformLabel, CancellationToken cancellationToken = default(CancellationToken));
     }
 
     sealed class CoverServiceDependencies
@@ -44,6 +48,7 @@ namespace PixelVaultNative
         public string CoversRoot;
         public int RequestTimeoutMilliseconds;
         public Func<string> GetSteamGridDbApiToken;
+        public Func<string> GetRetroAchievementsWebApiKey;
         public Func<string, string> NormalizeTitle;
         public Func<string, string> NormalizeConsoleLabel;
         public Func<string, string> SafeCacheName;
@@ -70,6 +75,10 @@ namespace PixelVaultNative
         readonly object _steamSearchIdCacheLock = new object();
         readonly object _steamSearchResultsCacheLock = new object();
         readonly object _steamGridDbResponseCacheLock = new object();
+        readonly object _retroAchievementsSearchLock = new object();
+        readonly Dictionary<string, List<Tuple<string, string>>> _retroAchievementsSearchCache = new Dictionary<string, List<Tuple<string, string>>>(StringComparer.OrdinalIgnoreCase);
+        List<Tuple<int, string>> _retroAchievementsConsolesCache;
+        string _retroAchievementsConsolesCacheKey;
 
         public CoverService(CoverServiceDependencies dependencies)
         {
@@ -84,6 +93,280 @@ namespace PixelVaultNative
         string CurrentSteamGridDbApiToken()
         {
             return dependencies.GetSteamGridDbApiToken == null ? string.Empty : (dependencies.GetSteamGridDbApiToken() ?? string.Empty).Trim();
+        }
+
+        string CurrentRetroAchievementsWebApiKey()
+        {
+            return dependencies.GetRetroAchievementsWebApiKey == null ? string.Empty : (dependencies.GetRetroAchievementsWebApiKey() ?? string.Empty).Trim();
+        }
+
+        TimeoutWebClient CreateRetroAchievementsWebClient(bool allowLargeJson, int timeoutMs)
+        {
+            var client = new TimeoutWebClient
+            {
+                Encoding = Encoding.UTF8,
+                TimeoutMilliseconds = timeoutMs > 0 ? timeoutMs : dependencies.RequestTimeoutMilliseconds,
+                MaxStringResponseBytes = allowLargeJson ? 0L : TimeoutWebClient.DefaultMaxStringResponseBytes
+            };
+            try
+            {
+                client.Headers[HttpRequestHeader.UserAgent] = "PixelVault/" + (dependencies.AppVersion ?? "1.0");
+            }
+            catch
+            {
+            }
+            return client;
+        }
+
+        static int RetroAchievementsConsoleScoreForPlatform(string platformNormalized, string consoleName)
+        {
+            if (string.IsNullOrWhiteSpace(consoleName)) return 0;
+            var p = (platformNormalized ?? string.Empty).Trim().ToLowerInvariant();
+            var c = consoleName.ToLowerInvariant();
+            if (c.IndexOf("event", StringComparison.Ordinal) >= 0) return 0;
+            if (string.IsNullOrWhiteSpace(p) || string.Equals(p, "other", StringComparison.OrdinalIgnoreCase))
+            {
+                if (c.Contains("windows") && c.Contains("pc")) return 100;
+                if (c.Contains("ms-dos") || c.Contains("dos")) return 80;
+                return 0;
+            }
+            if (c.Contains(p) || p.Contains(c)) return 95;
+            var score = 0;
+            foreach (var token in Regex.Split(p, @"[^a-z0-9]+"))
+            {
+                if (token.Length < 2) continue;
+                if (c.Contains(token)) score += 22;
+            }
+            if (score > 100) score = 100;
+            var steamBoost = (p.Contains("steam") || p == "pc" || p.Contains("windows"))
+                && (c.Contains("windows") || c.Contains("dos") || c.Contains("linux") || (c.Contains("pc") && c.Contains("win")));
+            if (steamBoost) score = Math.Max(score, 88);
+            return score;
+        }
+
+        IReadOnlyList<int> PickRetroAchievementsConsoleIds(IReadOnlyList<Tuple<int, string>> consoles, string platformLabel)
+        {
+            var normPlatform = NormalizeConsoleLabel(platformLabel);
+            var ranked = (consoles ?? Array.Empty<Tuple<int, string>>())
+                .Select(pair => new { Id = pair.Item1, Name = pair.Item2 ?? string.Empty, Score = RetroAchievementsConsoleScoreForPlatform(normPlatform, pair.Item2) })
+                .Where(x => x.Score > 0)
+                .OrderByDescending(x => x.Score)
+                .ThenBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (ranked.Count > 0) return ranked.Take(6).Select(x => x.Id).ToList();
+            var windows = (consoles ?? Array.Empty<Tuple<int, string>>()).FirstOrDefault(t =>
+                (t.Item2 ?? string.Empty).IndexOf("windows", StringComparison.OrdinalIgnoreCase) >= 0
+                && (t.Item2 ?? string.Empty).IndexOf("pc", StringComparison.OrdinalIgnoreCase) >= 0);
+            if (windows != null) return new[] { windows.Item1 };
+            return Array.Empty<int>();
+        }
+
+        async Task<List<Tuple<int, string>>> LoadRetroAchievementsConsolesAsync(string apiKey, CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrWhiteSpace(apiKey)) return new List<Tuple<int, string>>();
+            lock (_retroAchievementsSearchLock)
+            {
+                if (_retroAchievementsConsolesCache != null && string.Equals(_retroAchievementsConsolesCacheKey, apiKey, StringComparison.Ordinal))
+                    return _retroAchievementsConsolesCache;
+            }
+            var list = new List<Tuple<int, string>>();
+            using (var wc = CreateRetroAchievementsWebClient(false, Math.Max(dependencies.RequestTimeoutMilliseconds, 45000)))
+            {
+                var url = "https://retroachievements.org/API/API_GetConsoleIDs.php?y=" + Uri.EscapeDataString(apiKey) + "&g=1";
+                var json = await wc.DownloadStringAsync(url, cancellationToken).ConfigureAwait(false);
+                using (var doc = JsonDocument.Parse(json))
+                {
+                    if (doc.RootElement.ValueKind != JsonValueKind.Array) return list;
+                    foreach (var row in doc.RootElement.EnumerateArray())
+                    {
+                        if (!TryGetJsonIntProperty(row, "ID", "id", out var id) || id <= 0) continue;
+                        var name = TryGetJsonStringProperty(row, "Name", "name");
+                        if (!string.IsNullOrWhiteSpace(name)) list.Add(Tuple.Create(id, name));
+                    }
+                }
+            }
+            lock (_retroAchievementsSearchLock)
+            {
+                _retroAchievementsConsolesCache = list;
+                _retroAchievementsConsolesCacheKey = apiKey;
+            }
+            return list;
+        }
+
+        static bool RetroAchievementsTitleLooksLikeMatch(string queryNormalized, string gameTitle)
+        {
+            if (string.IsNullOrWhiteSpace(gameTitle)) return false;
+            var q = queryNormalized ?? string.Empty;
+            var t = gameTitle.Trim();
+            if (q.Length == 0) return false;
+            var tn = t.ToLowerInvariant();
+            var qn = q.ToLowerInvariant();
+            if (string.Equals(tn, qn, StringComparison.Ordinal)) return true;
+            if (tn.IndexOf(qn, StringComparison.Ordinal) >= 0) return true;
+            if (qn.IndexOf(tn, StringComparison.Ordinal) >= 0) return true;
+            return false;
+        }
+
+        static void TryAddRetroAchievementsSearchHit(
+            int gameId,
+            string title,
+            string consoleName,
+            string queryNormalized,
+            List<RankedRaHit> scratch,
+            ISet<string> seenIds)
+        {
+            if (gameId <= 0 || string.IsNullOrWhiteSpace(title)) return;
+            var idText = gameId.ToString(CultureInfo.InvariantCulture);
+            if (!seenIds.Add(idText)) return;
+            if (!RetroAchievementsTitleLooksLikeMatch(queryNormalized, title)) return;
+            var qn = (queryNormalized ?? string.Empty).Trim().ToLowerInvariant();
+            var tn = title.Trim().ToLowerInvariant();
+            var rank = 0;
+            if (string.Equals(tn, qn, StringComparison.Ordinal)) rank = 1000;
+            else if (tn.StartsWith(qn + " ", StringComparison.Ordinal) || tn.StartsWith(qn + ":", StringComparison.Ordinal)) rank = 800;
+            else if (tn.IndexOf(qn, StringComparison.Ordinal) >= 0) rank = 500;
+            else rank = 200;
+            var label = title.Trim();
+            if (!string.IsNullOrWhiteSpace(consoleName)) label = label + " · " + consoleName.Trim();
+            scratch.Add(new RankedRaHit { GameId = idText, Label = label, Rank = rank });
+        }
+
+        sealed class RankedRaHit
+        {
+            public string GameId;
+            public string Label;
+            public int Rank;
+        }
+
+        static bool TryGetJsonIntProperty(JsonElement obj, string a, string b, out int value)
+        {
+            value = 0;
+            JsonElement el;
+            if (!obj.TryGetProperty(a, out el) && !obj.TryGetProperty(b, out el)) return false;
+            if (el.ValueKind == JsonValueKind.Number) { value = el.GetInt32(); return true; }
+            if (el.ValueKind == JsonValueKind.String) return int.TryParse(el.GetString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out value);
+            return false;
+        }
+
+        static string TryGetJsonStringProperty(JsonElement obj, string a, string b)
+        {
+            JsonElement el;
+            if (!obj.TryGetProperty(a, out el) && !obj.TryGetProperty(b, out el)) return string.Empty;
+            return el.ValueKind == JsonValueKind.String ? el.GetString() : string.Empty;
+        }
+
+        static void ParseRetroAchievementsGameListPage(string json, string queryNormalized, string defaultConsoleName, List<RankedRaHit> scratch, ISet<string> seenIds)
+        {
+            if (string.IsNullOrWhiteSpace(json)) return;
+            using (var doc = JsonDocument.Parse(json))
+            {
+                if (doc.RootElement.ValueKind != JsonValueKind.Array) return;
+                foreach (var row in doc.RootElement.EnumerateArray())
+                {
+                    if (!TryGetJsonIntProperty(row, "ID", "id", out var gid) || gid <= 0) continue;
+                    var title = TryGetJsonStringProperty(row, "Title", "title");
+                    var consoleName = TryGetJsonStringProperty(row, "ConsoleName", "consoleName");
+                    if (string.IsNullOrWhiteSpace(consoleName)) consoleName = TryGetJsonStringProperty(row, "Console", "console");
+                    if (string.IsNullOrWhiteSpace(consoleName)) consoleName = defaultConsoleName;
+                    TryAddRetroAchievementsSearchHit(gid, title, consoleName, queryNormalized, scratch, seenIds);
+                }
+            }
+        }
+
+        public async Task<List<Tuple<string, string>>> SearchRetroAchievementsGameMatchesAsync(string title, string platformLabel, CancellationToken cancellationToken = default(CancellationToken))
+        {
+            var query = (title ?? string.Empty).Trim();
+            var results = new List<Tuple<string, string>>();
+            if (string.IsNullOrWhiteSpace(query)) return results;
+            var apiKey = CurrentRetroAchievementsWebApiKey();
+            if (string.IsNullOrWhiteSpace(apiKey)) return results;
+
+            cancellationToken.ThrowIfCancellationRequested();
+            var cacheKey = query + "\n" + NormalizeConsoleLabel(platformLabel ?? string.Empty);
+            lock (_retroAchievementsSearchLock)
+            {
+                List<Tuple<string, string>> cached;
+                if (_retroAchievementsSearchCache.TryGetValue(cacheKey, out cached))
+                    return cached == null ? new List<Tuple<string, string>>() : new List<Tuple<string, string>>(cached);
+            }
+
+            var queryNorm = NormalizeTitle(query);
+            const int pageSize = 2000;
+            const int maxPagesPerConsole = 12;
+            const int maxHits = 24;
+            var stopwatch = Stopwatch.StartNew();
+            try
+            {
+                var consoles = await LoadRetroAchievementsConsolesAsync(apiKey, cancellationToken).ConfigureAwait(false);
+                var consoleIds = PickRetroAchievementsConsoleIds(consoles, platformLabel ?? string.Empty);
+                if (consoleIds.Count == 0)
+                {
+                    Log("RetroAchievements search: no console matched platform \"" + (platformLabel ?? string.Empty) + "\".");
+                    lock (_retroAchievementsSearchLock)
+                    {
+                        _retroAchievementsSearchCache[cacheKey] = results;
+                    }
+                    return results;
+                }
+                var consoleNameById = consoles.ToDictionary(t => t.Item1, t => t.Item2 ?? string.Empty);
+                var scratch = new List<RankedRaHit>();
+                var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                using (var wc = CreateRetroAchievementsWebClient(true, Math.Max(dependencies.RequestTimeoutMilliseconds, 180000)))
+                {
+                    foreach (var consoleId in consoleIds)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        var defaultName = string.Empty;
+                        string mapName;
+                        if (consoleNameById.TryGetValue(consoleId, out mapName)) defaultName = mapName;
+                        for (var page = 0; page < maxPagesPerConsole && scratch.Count < maxHits * 4; page++)
+                        {
+                            cancellationToken.ThrowIfCancellationRequested();
+                            var offset = page * pageSize;
+                            var url = "https://retroachievements.org/API/API_GetGameList.php?y=" + Uri.EscapeDataString(apiKey)
+                                + "&i=" + consoleId.ToString(CultureInfo.InvariantCulture)
+                                + "&f=1&c=" + pageSize.ToString(CultureInfo.InvariantCulture)
+                                + "&o=" + offset.ToString(CultureInfo.InvariantCulture);
+                            string json;
+                            try
+                            {
+                                json = await wc.DownloadStringAsync(url, cancellationToken).ConfigureAwait(false);
+                            }
+                            catch (Exception ex)
+                            {
+                                Log("RetroAchievements game list failed for console " + consoleId + " offset " + offset + ". " + ex.Message);
+                                break;
+                            }
+                            var trimmed = json == null ? string.Empty : json.Trim();
+                            if (trimmed.Length == 0 || trimmed == "[]" || trimmed == "{\"success\":false}")
+                                break;
+                            ParseRetroAchievementsGameListPage(json, queryNorm, defaultName, scratch, seen);
+                        }
+                    }
+                }
+                foreach (var hit in scratch.OrderByDescending(h => h.Rank).ThenBy(h => h.Label, StringComparer.OrdinalIgnoreCase).Take(maxHits))
+                {
+                    results.Add(Tuple.Create(hit.GameId, hit.Label));
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                Log("RetroAchievements search failed for \"" + query + "\". " + ex.Message);
+            }
+            finally
+            {
+                stopwatch.Stop();
+                LogPerformanceSample("RetroAchievementsSearch", stopwatch, "title=" + query + "; platform=" + (platformLabel ?? string.Empty), 300);
+                lock (_retroAchievementsSearchLock)
+                {
+                    _retroAchievementsSearchCache[cacheKey] = results;
+                }
+            }
+            return results;
         }
 
         TimeoutWebClient CreateSteamWebClient()

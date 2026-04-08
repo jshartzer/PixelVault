@@ -116,6 +116,8 @@ public sealed class SettingsServiceTests
                 "exiftool=C:\\tools\\exiftool.exe",
                 "ffmpeg=",
                 "steamgriddb_token=secret",
+                "steam_web_api_key=steamkey",
+                "retroachievements_api_key=rakey",
                 "library_folder_tile_size=200",
                 "library_photo_tile_size=410",
                 "library_folder_grid_columns=3",
@@ -153,6 +155,8 @@ public sealed class SettingsServiceTests
             Assert.Equal(@"C:\lib", loaded.LibraryRoot, ignoreCase: true);
             Assert.Equal(@"C:\tools\exiftool.exe", loaded.ExifToolPath, ignoreCase: true);
             Assert.Equal("secret", loaded.SteamGridDbApiToken);
+            Assert.Equal("steamkey", loaded.SteamWebApiKey);
+            Assert.Equal("rakey", loaded.RetroAchievementsApiKey);
             Assert.Equal(200, loaded.LibraryFolderTileSize);
             Assert.Equal(410, loaded.LibraryPhotoTileSize);
             Assert.Equal(3, loaded.LibraryFolderGridColumnCount);
@@ -213,6 +217,8 @@ public sealed class SettingsServiceTests
                 ExifToolPath = exifStub,
                 FfmpegPath = ffmpegStub,
                 SteamGridDbApiToken = "tok",
+                SteamWebApiKey = "sw",
+                RetroAchievementsApiKey = "ra",
                 LibraryFolderTileSize = 180,
                 LibraryPhotoTileSize = 310,
                 LibraryFolderGridColumnCount = 2,
@@ -242,6 +248,8 @@ public sealed class SettingsServiceTests
             Assert.Equal(original.ExifToolPath, loaded.ExifToolPath, ignoreCase: true);
             Assert.Equal(original.FfmpegPath, loaded.FfmpegPath, ignoreCase: true);
             Assert.Equal(original.SteamGridDbApiToken, loaded.SteamGridDbApiToken);
+            Assert.Equal(original.SteamWebApiKey, loaded.SteamWebApiKey);
+            Assert.Equal(original.RetroAchievementsApiKey, loaded.RetroAchievementsApiKey);
             Assert.Equal(SettingsService.NormalizeLibraryFolderTileSize(original.LibraryFolderTileSize), loaded.LibraryFolderTileSize);
             Assert.Equal(SettingsService.NormalizeLibraryPhotoTileSize(original.LibraryPhotoTileSize), loaded.LibraryPhotoTileSize);
             Assert.Equal(SettingsService.NormalizeLibraryFolderGridColumnCount(original.LibraryFolderGridColumnCount), loaded.LibraryFolderGridColumnCount);

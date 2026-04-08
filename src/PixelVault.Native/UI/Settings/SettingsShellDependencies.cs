@@ -36,6 +36,10 @@ namespace PixelVaultNative
         public Func<string> GetFfmpegPath { get; set; }
         public Func<string> GetSteamGridDbApiToken { get; set; }
         public Func<bool> HasSteamGridDbApiToken { get; set; }
+        public Func<string> GetSteamWebApiKey { get; set; }
+        public Func<bool> HasSteamWebApiKey { get; set; }
+        public Func<string> GetRetroAchievementsApiKey { get; set; }
+        public Func<bool> HasRetroAchievementsApiKey { get; set; }
 
         public Func<bool> GetTroubleshootingLoggingEnabled { get; set; }
         public Action<bool> SetTroubleshootingLoggingEnabled { get; set; }
@@ -64,6 +68,8 @@ namespace PixelVaultNative
         public Action<string> SetExifToolPath { get; set; }
         public Action<string> SetFfmpegPath { get; set; }
         public Action<string> SetSteamGridDbApiToken { get; set; }
+        public Action<string> SetSteamWebApiKey { get; set; }
+        public Action<string> SetRetroAchievementsApiKey { get; set; }
         public Action ClearFailedFfmpegPosterKeys { get; set; }
 
         public Action RefreshMainUi { get; set; }

@@ -17,6 +17,8 @@ namespace PixelVaultNative
                 ExifToolPath = exifToolPath ?? string.Empty,
                 FfmpegPath = ffmpegPath ?? string.Empty,
                 SteamGridDbApiToken = steamGridDbApiToken ?? string.Empty,
+                SteamWebApiKey = steamWebApiKey ?? string.Empty,
+                RetroAchievementsApiKey = retroAchievementsApiKey ?? string.Empty,
                 LibraryFolderTileSize = libraryFolderTileSize,
                 LibraryPhotoTileSize = libraryPhotoTileSize,
                 LibraryFolderGridColumnCount = libraryFolderGridColumnCount,
@@ -51,6 +53,8 @@ namespace PixelVaultNative
             exifToolPath = s.ExifToolPath ?? string.Empty;
             ffmpegPath = s.FfmpegPath ?? string.Empty;
             steamGridDbApiToken = s.SteamGridDbApiToken ?? string.Empty;
+            steamWebApiKey = s.SteamWebApiKey ?? string.Empty;
+            retroAchievementsApiKey = s.RetroAchievementsApiKey ?? string.Empty;
             libraryFolderTileSize = s.LibraryFolderTileSize;
             libraryPhotoTileSize = s.LibraryPhotoTileSize;
             libraryFolderGridColumnCount = s.LibraryFolderGridColumnCount;

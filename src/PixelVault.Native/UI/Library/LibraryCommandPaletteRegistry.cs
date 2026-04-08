@@ -37,7 +37,7 @@ namespace PixelVaultNative
             new("filter_completed", "Filter · 100% achievements", "Completed games only", "medal 100 percent"),
             new("filter_crossplatform", "Filter · Cross-platform", "Multi-platform folders", "cross play"),
             new("filter_large", "Filter · 25+ captures", "Folders with many screenshots", "large library"),
-            new("filter_missing_id", "Filter · Missing ID", "No game-index id, or Steam-tagged with missing App ID or Grid ID", "steam appid stid game row"),
+            new("filter_missing_id", "Filter · Missing ID", "No game-index id, missing STID (Grid ID), or context gaps: Steam-tagged without App ID, Emulation-tagged without RA game ID", "steam appid stid ra retro game row"),
             new("filter_no_cover", "Filter · No cover path", "Folders without a saved cover path", "missing cover art"),
             new("group_all", "Group · All games", "Single folder list", "grouping flat"),
             new("group_console", "Group · By console", "Platform sections", "grouping xbox playstation"),

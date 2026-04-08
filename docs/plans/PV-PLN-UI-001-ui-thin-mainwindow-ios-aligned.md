@@ -119,7 +119,7 @@ Implement as **small vertical slices**. After each slice: **`dotnet test`** (`Pi
 
 **TEST GATE:** Folder list, search, filters, grouping unchanged.
 
-**Progress (2026-04-06):** **`LibraryBrowseFolderSummary`** + **`FromFolderView`** in `UI/Library/LibraryBrowseFolderSummary.cs`; field mapping documented in **`docs/SMART_VIEWS_LIBRARY.md`** (appendix). Unit tests in **`LibraryBrowseFolderSummaryTests`**. No change to folder-list projection order yet — map at API/export boundaries as needed.
+**Progress (2026-04-06):** **`LibraryBrowseFolderSummary`** + **`FromFolderView`** in `UI/Library/LibraryBrowseFolderSummary.cs`; field mapping documented in **`docs/SMART_VIEWS_LIBRARY.md`** (appendix). Unit tests in **`LibraryBrowseFolderSummaryTests`**. **Follow-on:** smart-view predicates **`MatchesFilter`** / **`IsSteamTagged`** live on the DTO; **`MainWindow.LibraryBrowserFolderFilter`** delegates from **`LibraryBrowserFolderView`** via **`FromFolderView`** (folder list behavior unchanged).
 
 ---
 
@@ -147,11 +147,15 @@ Implement as **small vertical slices**. After each slice: **`dotnet test`** (`Pi
 
 ---
 
-### Step 7 — Ongoing opportunistic (document only here)
+### Step 7 — Ongoing opportunistic
 
 - **`ImportWorkflow` → `IImportService`:** move more orchestration when touching imports (`NEXT_TRIM_PLAN.md` Tier 1b follow-on).
 - **Steam / cover workflows:** dedicated service when editing that area (`ROADMAP.md` Phase 3 candidates).
 - **Nullable:** new extracted files first (`ROADMAP.md` Phase 4).
+
+**Progress (2026-04-06):** **`ImportWorkflowOrchestration`** (`Services/Import/ImportWorkflowOrchestration.cs`) — **`GetMetadataWorkerCount`**, **`ThrowIfCancellationRequested`**. Import progress lambdas and **MetadataService** worker cap use the shared helpers; **Game index resolve** cancellation uses the same static (no longer an instance method on **`MainWindow`**).
+
+**Progress (2026-04-06, follow-on):** **Import prep on `IImportService`** — **`ComputeStandardImportWorkTotals`**, **`ComputeUnifiedImportProgressPlan`**, **`ComputeManualIntakeProgressPlan`** (implemented via **`ImportWorkflowOrchestration`**; **`ImportWorkflow`** / **`MainWindow`** uses them for **`totalWork`** and progress offsets). **Steam store title helper** — **`CoverWorkflowHelpers.ResolveSteamStoreTitleForAppIdAsync`** (**`RunSteamRenameAsync`**, **`ApplyImportAndEditSteamStoreTitlesWhenGameNameUnchangedAsync`**); preserves “sync resolver only, no async fallback when injected” semantics. **Nullable** — **`#nullable enable`** on **`ImportWorkflowOrchestration`**, **`CoverWorkflowHelpers`**, **`LibraryBrowseFolderSummary`**. Tests: **`ImportWorkflowOrchestrationProgressTests`**.
 
 ---
 
@@ -190,5 +194,8 @@ Before merging a slice, ask:
 | 2026-04-06 | **Step 5 (complete slice):** Star toggle bool completion callback; photography gallery uses session; **Step 6 (initial):** **`MainWindow.StartupInitialization.cs`** + ctor diet. |
 | 2026-04-06 | **Step 6 (follow-on):** Service wiring factories in **`MainWindow.StartupInitialization.cs`**; ctor slimmed. **Step 6 (shell):** **`RunPostServiceStartup`**, **`ApplyMainWindowChromeAndShell`**. |
 | 2026-04-06 | **Perf note** recorded in **`docs/PERFORMANCE_TODO.md`** (landed table): star lookup cache, folder enum + index batch, detail masonry off-UI, repair cap + deferred queue. |
+| 2026-04-06 | **Step 4 (follow-on):** **`LibraryBrowseFolderSummary.MatchesFilter`** / **`IsSteamTagged`**; **`MainWindow.LibraryBrowserFolderFilter`** delegates; folder list render filters via summary (**`MainWindow.LibraryBrowserRender.FolderList`**). |
+| 2026-04-06 | **Step 7 (initial):** **`ImportWorkflowOrchestration`** — metadata worker count + cancellation throw shared by import workflow, **MetadataService** deps, and **GameIndexEditorHost** services. |
+| 2026-04-06 | **Step 7 (follow-on):** import progress totals on **`IImportService`** + **`ImportWorkflowOrchestration`**; **`CoverWorkflowHelpers`** for Steam display name; **`#nullable enable`** on new/chosen files; **`ImportWorkflowOrchestrationProgressTests`**. |
 
 When execution starts, reference **`PV-PLN-UI-001`** in commits; Notion per **`docs/DOC_SYNC_POLICY.md`** if milestones are tracked there.

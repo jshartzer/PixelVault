@@ -259,7 +259,8 @@ namespace PixelVaultNative
                         Starred = priorEntry != null && priorEntry.Starred,
                         IndexAddedUtcTicks = priorEntry != null && priorEntry.IndexAddedUtcTicks > 0
                             ? priorEntry.IndexAddedUtcTicks
-                            : DateTime.UtcNow.Ticks
+                            : DateTime.UtcNow.Ticks,
+                        RetroAchievementsGameId = priorEntry != null ? (priorEntry.RetroAchievementsGameId ?? string.Empty) : string.Empty
                     };
                     host.SetCachedFileTagsForLibraryScan(item.FilePath, tags, host.MetadataCacheStamp(item.FilePath));
                 }
@@ -353,7 +354,11 @@ namespace PixelVaultNative
                         ConsoleLabel = normalizedConsole,
                         TagText = normalizedTags,
                         CaptureUtcTicks = host.ResolveLibraryMetadataCaptureUtcTicks(row.FilePath, stamp, null, existingEntry),
-                        Starred = row.Starred
+                        Starred = row.Starred,
+                        IndexAddedUtcTicks = existingEntry != null && existingEntry.IndexAddedUtcTicks > 0
+                            ? existingEntry.IndexAddedUtcTicks
+                            : DateTime.UtcNow.Ticks,
+                        RetroAchievementsGameId = MainWindow.CleanTag(row.RetroAchievementsGameId ?? string.Empty)
                     };
                 }
 
@@ -407,6 +412,7 @@ namespace PixelVaultNative
                     FilePath = entry.FilePath ?? string.Empty,
                     Stamp = entry.Stamp ?? string.Empty,
                     GameId = host.NormalizeGameId(entry.GameId),
+                    RetroAchievementsGameId = MainWindow.CleanTag(entry.RetroAchievementsGameId ?? string.Empty),
                     ConsoleLabel = host.NormalizeConsoleLabel(entry.ConsoleLabel),
                     TagText = entry.TagText ?? string.Empty,
                     Starred = entry.Starred,
@@ -547,6 +553,7 @@ namespace PixelVaultNative
                         ? (saved.SteamAppId ?? string.Empty)
                         : host.ResolveLibraryFolderSteamAppId(platformLabel, groupFiles),
                     SteamGridDbId = saved == null ? string.Empty : (saved.SteamGridDbId ?? string.Empty),
+                    RetroAchievementsGameId = saved == null ? string.Empty : (saved.RetroAchievementsGameId ?? string.Empty),
                     SuppressSteamAppIdAutoResolve = saved != null && saved.SuppressSteamAppIdAutoResolve,
                     SuppressSteamGridDbIdAutoResolve = saved != null && saved.SuppressSteamGridDbIdAutoResolve
                 });

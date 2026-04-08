@@ -158,6 +158,7 @@ namespace PixelVaultNative
             grid.Columns.Add(new DataGridCheckBoxColumn { Header = "\u2605", Binding = new System.Windows.Data.Binding("Starred") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.PropertyChanged }, Width = 46 });
             grid.Columns.Add(new DataGridTextColumn { Header = "Added", Binding = new System.Windows.Data.Binding("IndexAddedAtLocal"), IsReadOnly = true, Width = 120 });
             grid.Columns.Add(new DataGridTextColumn { Header = "Game ID", Binding = new System.Windows.Data.Binding("GameId") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus }, Width = 110 });
+            grid.Columns.Add(new DataGridTextColumn { Header = "RA Game ID", Binding = new System.Windows.Data.Binding("RetroAchievementsGameId") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus }, Width = 100 });
             grid.Columns.Add(new DataGridTextColumn { Header = "Console", Binding = new System.Windows.Data.Binding("ConsoleLabel") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus }, Width = 120 });
             grid.Columns.Add(new DataGridTextColumn { Header = "Tags", Binding = new System.Windows.Data.Binding("TagText") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus }, Width = new DataGridLength(1.05, DataGridLengthUnitType.Star) });
             grid.Columns.Add(new DataGridTextColumn { Header = "File", Binding = new System.Windows.Data.Binding("FilePath"), IsReadOnly = true, Width = new DataGridLength(1.8, DataGridLengthUnitType.Star) });
@@ -225,6 +226,7 @@ namespace PixelVaultNative
                 {
                     rows = rows.Where(row =>
                         (!string.IsNullOrWhiteSpace(row.GameId) && row.GameId.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0) ||
+                        (!string.IsNullOrWhiteSpace(row.RetroAchievementsGameId) && row.RetroAchievementsGameId.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0) ||
                         (!string.IsNullOrWhiteSpace(row.ConsoleLabel) && row.ConsoleLabel.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0) ||
                         (!string.IsNullOrWhiteSpace(row.TagText) && row.TagText.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0) ||
                         (!string.IsNullOrWhiteSpace(row.FilePath) && row.FilePath.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0));
@@ -364,6 +366,7 @@ namespace PixelVaultNative
                     foreach (var row in allRows)
                     {
                         row.GameId = services.NormalizeGameId(row.GameId);
+                        row.RetroAchievementsGameId = services.CleanTag(row.RetroAchievementsGameId ?? string.Empty);
                         row.ConsoleLabel = services.CleanTag(row.ConsoleLabel);
                         row.TagText = string.Join(", ", services.ParseTagText(row.TagText));
                     }

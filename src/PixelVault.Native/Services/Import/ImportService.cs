@@ -436,6 +436,7 @@ namespace PixelVaultNative
             var libraryRoot = d.GetLibraryRoot == null ? string.Empty : d.GetLibraryRoot() ?? string.Empty;
             var files = (sourceFiles ?? Enumerable.Empty<string>()).Where(fs.FileExists).ToList();
             var total = files.Count;
+            Dictionary<string, string> nonSteamIdToDisplayName = null;
             if (progress != null) progress(0, total, "Starting rename step for " + total + " file(s).");
             for (int i = 0; i < total; i++)
             {
@@ -454,8 +455,17 @@ namespace PixelVaultNative
                 }
                 else if (!string.IsNullOrWhiteSpace(nonSteamId))
                 {
+                    var idKey = CleanNumericIdForImport(nonSteamId);
+                    idForRename = string.IsNullOrWhiteSpace(idKey) ? nonSteamId.Trim() : idKey;
                     canonicalGame = parsed == null ? string.Empty : parsed.GameTitleHint ?? string.Empty;
-                    idForRename = nonSteamId;
+                    if (string.IsNullOrWhiteSpace(canonicalGame) && !string.IsNullOrWhiteSpace(idKey))
+                    {
+                        if (nonSteamIdToDisplayName == null)
+                            nonSteamIdToDisplayName = await BuildNonSteamIdDisplayNameLookupAsync(libraryRoot, cancellationToken).ConfigureAwait(false);
+                        string fromIndex;
+                        if (nonSteamIdToDisplayName.TryGetValue(idKey, out fromIndex) && !string.IsNullOrWhiteSpace(fromIndex))
+                            canonicalGame = fromIndex;
+                    }
                 }
                 else
                 {
@@ -557,15 +567,35 @@ namespace PixelVaultNative
                 var currentBase = Path.GetFileNameWithoutExtension(item.FilePath);
                 var normalizedCurrent = normalize(currentBase);
                 var normalizedGame = normalize(gameName);
+                var oldName = item.FileName;
+                var dir = Path.GetDirectoryName(item.FilePath) ?? string.Empty;
+                var ext = Path.GetExtension(item.FilePath);
+                var idKey = CleanNumericIdForImport(item.NonSteamId ?? string.Empty);
+                string newBaseFromShortcutId;
+                if (!string.IsNullOrWhiteSpace(idKey)
+                    && SteamImportRename.TryBuildSteamRenameBase(currentBase, idKey, gameName, gameName, out newBaseFromShortcutId)
+                    && !string.Equals(newBaseFromShortcutId, currentBase, StringComparison.OrdinalIgnoreCase))
+                {
+                    var shortcutCombined = Path.Combine(dir, newBaseFromShortcutId + ext);
+                    var shortcutTarget = d.UniquePath == null ? shortcutCombined : d.UniquePath(shortcutCombined);
+                    var originalPathShortcut = item.FilePath;
+                    fs.MoveFile(item.FilePath, shortcutTarget);
+                    d.MoveMetadataSidecarIfPresent?.Invoke(originalPathShortcut, shortcutTarget);
+                    d.Log?.Invoke("Manual rename (non-Steam ID): " + oldName + " -> " + Path.GetFileName(shortcutTarget));
+                    item.FilePath = shortcutTarget;
+                    item.FileName = Path.GetFileName(shortcutTarget);
+                    renamed++;
+                    if (progress != null) progress(i + 1, total, "Renamed " + (i + 1) + " of " + total + " | " + remaining + " remaining | " + item.FileName);
+                    continue;
+                }
+
                 if (currentBase.StartsWith(gameName + "_", StringComparison.OrdinalIgnoreCase) || normalizedCurrent == normalizedGame || normalizedCurrent.StartsWith(normalizedGame + " "))
                 {
                     skipped++;
                     if (progress != null) progress(i + 1, total, "Skipped rename " + (i + 1) + " of " + total + " | " + remaining + " remaining | " + item.FileName);
                     continue;
                 }
-                var oldName = item.FileName;
-                var dir = Path.GetDirectoryName(item.FilePath) ?? string.Empty;
-                var combined = Path.Combine(dir, gameName + "_" + currentBase + Path.GetExtension(item.FilePath));
+                var combined = Path.Combine(dir, gameName + "_" + currentBase + ext);
                 var target = d.UniquePath == null ? combined : d.UniquePath(combined);
                 var originalPath = item.FilePath;
                 fs.MoveFile(item.FilePath, target);
@@ -912,5 +942,27 @@ namespace PixelVaultNative
             }
             return null;
         }
+
+        async Task<Dictionary<string, string>> BuildNonSteamIdDisplayNameLookupAsync(string libraryRoot, CancellationToken cancellationToken)
+        {
+            var map = new Dictionary<string, string>(StringComparer.Ordinal);
+            if (string.IsNullOrWhiteSpace(libraryRoot)) return map;
+            var rows = await LoadManualMetadataGameTitleRowsAsync(libraryRoot, cancellationToken).ConfigureAwait(false);
+            if (rows == null || rows.Count == 0) return map;
+            var normalize = d.NormalizeGameIndexName ?? (s => s ?? string.Empty);
+            foreach (var row in rows)
+            {
+                if (row == null) continue;
+                var key = CleanNumericIdForImport(row.NonSteamId ?? string.Empty);
+                if (string.IsNullOrWhiteSpace(key) || map.ContainsKey(key)) continue;
+                var display = normalize(row.Name ?? string.Empty);
+                if (string.IsNullOrWhiteSpace(display)) continue;
+                map[key] = display.Trim();
+            }
+            return map;
+        }
+
+        static string CleanNumericIdForImport(string value) =>
+            value == null ? string.Empty : new string(value.Where(char.IsDigit).ToArray());
     }
 }

@@ -14,6 +14,10 @@ namespace PixelVaultNative
         public string ExifToolPath = string.Empty;
         public string FfmpegPath = string.Empty;
         public string SteamGridDbApiToken = string.Empty;
+        /// <summary>Valve Steam Web API key (optional; for future Steam Web API features).</summary>
+        public string SteamWebApiKey = string.Empty;
+        /// <summary>RetroAchievements.org API key (optional; for future integration).</summary>
+        public string RetroAchievementsApiKey = string.Empty;
         public int LibraryFolderTileSize = 300;
         /// <summary>Preferred capture tile width (px) for non-timeline library detail grids; clamped to the viewport (<c>PV-PLN-LIBWS-001</c> Step 6).</summary>
         public int LibraryPhotoTileSize = 340;
@@ -59,6 +63,8 @@ namespace PixelVaultNative
                 ExifToolPath = s.ExifToolPath ?? string.Empty,
                 FfmpegPath = s.FfmpegPath ?? string.Empty,
                 SteamGridDbApiToken = s.SteamGridDbApiToken ?? string.Empty,
+                SteamWebApiKey = s.SteamWebApiKey ?? string.Empty,
+                RetroAchievementsApiKey = s.RetroAchievementsApiKey ?? string.Empty,
                 LibraryFolderTileSize = s.LibraryFolderTileSize,
                 LibraryPhotoTileSize = s.LibraryPhotoTileSize,
                 LibraryFolderGridColumnCount = s.LibraryFolderGridColumnCount,

@@ -41,6 +41,7 @@ namespace PixelVaultNative
                         PlatformLabel = folder.PlatformLabel ?? string.Empty,
                         SteamAppId = folder.SteamAppId ?? string.Empty,
                         SteamGridDbId = folder.SteamGridDbId ?? string.Empty,
+                        RetroAchievementsGameId = folder.RetroAchievementsGameId ?? string.Empty,
                         SuppressSteamAppIdAutoResolve = folder.SuppressSteamAppIdAutoResolve,
                         SuppressSteamGridDbIdAutoResolve = folder.SuppressSteamGridDbIdAutoResolve,
                         FileCount = folder.FileCount,

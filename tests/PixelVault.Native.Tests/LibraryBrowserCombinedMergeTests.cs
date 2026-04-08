@@ -80,4 +80,20 @@ public sealed class LibraryBrowserCombinedMergeTests
         };
         Assert.True(MainWindow.LibraryBrowserFolderViewMatchesFilter("missingid", merged, Norm));
     }
+
+    [Fact]
+    public void MissingId_FilterTrue_OnMergedRow_WhenEmulationTagged_AndRetroAchievementsMissing()
+    {
+        var merged = new MainWindow.LibraryBrowserFolderView
+        {
+            PrimaryPlatformLabel = "Emulation",
+            SteamAppId = "",
+            SteamGridDbId = "5528",
+            RetroAchievementsGameId = "",
+            GameId = "game-row",
+            PlatformLabels = new[] { "Emulation" },
+            IsMergedAcrossPlatforms = true
+        };
+        Assert.True(MainWindow.LibraryBrowserFolderViewMatchesFilter("missingid", merged, Norm));
+    }
 }

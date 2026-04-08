@@ -133,7 +133,8 @@ namespace PixelVaultNative
                 Starred = ResolveLibraryMetadataStarred(snapshot, existingEntry),
                 IndexAddedUtcTicks = existingEntry != null && existingEntry.IndexAddedUtcTicks > 0
                     ? existingEntry.IndexAddedUtcTicks
-                    : DateTime.UtcNow.Ticks
+                    : DateTime.UtcNow.Ticks,
+                RetroAchievementsGameId = existingEntry != null ? CleanTag(existingEntry.RetroAchievementsGameId ?? string.Empty) : string.Empty
             };
         }
 

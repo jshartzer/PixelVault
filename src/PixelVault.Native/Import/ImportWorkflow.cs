@@ -30,12 +30,6 @@ namespace PixelVaultNative
             public SortStepResult SortResult;
         }
 
-        int GetMetadataWorkerCount(int workItems)
-        {
-            if (workItems <= 1) return 1;
-            return Math.Max(1, Math.Min(Math.Min(Environment.ProcessorCount, 4), workItems));
-        }
-
         void RunWorkflow(bool withReview)
         {
             try
@@ -132,41 +126,12 @@ namespace PixelVaultNative
             }
         }
 
-        void ThrowIfWorkflowCancellationRequested(CancellationToken cancellationToken, string operationLabel)
-        {
-            if (cancellationToken.IsCancellationRequested)
-            {
-                throw new OperationCanceledException((operationLabel ?? "Workflow") + " cancelled.", cancellationToken);
-            }
-        }
-
         void RunImportWorkflowWithProgress(bool withReview, bool useUnifiedManualImportBatch, SourceInventory renameInventory, SourceInventory inventory, List<ReviewItem> reviewItems, List<ManualMetadataItem> manualItems, HashSet<string> manualPaths, int? manualItemsLeftOverride = null)
         {
             var batch = manualItems ?? new List<ManualMetadataItem>();
-            int renameTotal;
-            int deleteTotal;
-            int metadataTotal;
-            int moveTotal;
-            int totalWork;
-            if (useUnifiedManualImportBatch)
-            {
-                renameTotal = batch.Count;
-                var manualRenameTotal = batch.Count;
-                deleteTotal = batch.Count(item => item != null && item.DeleteBeforeProcessing);
-                metadataTotal = batch.Count;
-                moveTotal = batch.Count(item => item != null && !string.IsNullOrWhiteSpace(item.FilePath) && File.Exists(item.FilePath));
-                totalWork = renameTotal + manualRenameTotal + deleteTotal + metadataTotal + moveTotal + 1;
-            }
-            else
-            {
-                renameTotal = renameInventory == null || renameInventory.RenameScopeFiles == null ? 0 : renameInventory.RenameScopeFiles.Count;
-                deleteTotal = reviewItems == null ? 0 : reviewItems.Count(item => item != null && item.DeleteBeforeProcessing);
-                metadataTotal = reviewItems == null ? 0 : reviewItems.Count;
-                moveTotal = inventory == null || inventory.TopLevelMediaFiles == null
-                    ? 0
-                    : inventory.TopLevelMediaFiles.Count(file => !string.IsNullOrWhiteSpace(file) && File.Exists(file) && (manualPaths == null || !manualPaths.Contains(file)));
-                totalWork = renameTotal + deleteTotal + metadataTotal + moveTotal + 1;
-            }
+            var unifiedPlan = importService.ComputeUnifiedImportProgressPlan(batch);
+            var standardTotals = importService.ComputeStandardImportWorkTotals(renameInventory, reviewItems, inventory, manualPaths);
+            var totalWork = useUnifiedManualImportBatch ? unifiedPlan.TotalWork : standardTotals.TotalWork;
             var workflowLabel = withReview ? "import and comment" : "import";
 
             RunBackgroundWorkflowWithProgress(
@@ -182,54 +147,42 @@ namespace PixelVaultNative
                 {
                     if (useUnifiedManualImportBatch)
                     {
-                        var steamRenameTotal = batch.Count;
-                        var manualRenameTotal = batch.Count;
-                        var delTotal = batch.Count(item => item != null && item.DeleteBeforeProcessing);
-                        var metaTotal = batch.Count;
-                        var mvTotal = batch.Count(item => item != null && !string.IsNullOrWhiteSpace(item.FilePath) && File.Exists(item.FilePath));
-                        var steamOff = 0;
-                        var manualRenameOff = steamOff + steamRenameTotal;
-                        var deleteOff = manualRenameOff + manualRenameTotal;
-                        var metadataOff = deleteOff + delTotal;
-                        var moveOff = metadataOff + metaTotal;
-                        var sortOff = moveOff + mvTotal;
-
-                        ThrowIfWorkflowCancellationRequested(cancellationToken, "Import workflow");
+                        ImportWorkflowOrchestration.ThrowIfCancellationRequested(cancellationToken, "Import workflow");
                         var steamRenameResult = await importService.RunSteamRenameAsync(batch.Select(item => item.FilePath), delegate(int current, int total, string detail)
                         {
-                            reportProgress(steamOff + current, detail);
+                            reportProgress(unifiedPlan.SteamOff + current, detail);
                         }, cancellationToken).ConfigureAwait(false);
                         var steamMap = steamRenameResult == null ? null : steamRenameResult.OldPathToNewPath;
                         if (steamMap != null && steamMap.Count > 0) SteamImportRename.ApplySteamRenameMapToManualMetadataItems(batch, steamMap);
-                        ThrowIfWorkflowCancellationRequested(cancellationToken, "Import workflow");
+                        ImportWorkflowOrchestration.ThrowIfCancellationRequested(cancellationToken, "Import workflow");
                         var manualRenameResult = RunManualRename(batch, delegate(int current, int total, string detail)
                         {
-                            reportProgress(manualRenameOff + current, detail);
+                            reportProgress(unifiedPlan.ManualRenameOff + current, detail);
                         }, cancellationToken);
-                        ThrowIfWorkflowCancellationRequested(cancellationToken, "Import workflow");
+                        ImportWorkflowOrchestration.ThrowIfCancellationRequested(cancellationToken, "Import workflow");
                         var uniDeleteResult = RunDeleteManualMetadata(batch, delegate(int current, int total, string detail)
                         {
-                            reportProgress(deleteOff + current, detail);
+                            reportProgress(unifiedPlan.DeleteOff + current, detail);
                         }, cancellationToken);
-                        ThrowIfWorkflowCancellationRequested(cancellationToken, "Import workflow");
+                        ImportWorkflowOrchestration.ThrowIfCancellationRequested(cancellationToken, "Import workflow");
                         var uniMetadataResult = RunManualMetadata(batch, delegate(int current, int total, string detail)
                         {
-                            reportProgress(metadataOff + current, detail);
+                            reportProgress(unifiedPlan.MetadataOff + current, detail);
                         }, cancellationToken);
-                        ThrowIfWorkflowCancellationRequested(cancellationToken, "Import workflow");
+                        ImportWorkflowOrchestration.ThrowIfCancellationRequested(cancellationToken, "Import workflow");
                         var uniMoveResult = RunMoveFiles(batch.Select(item => item.FilePath).Where(File.Exists), "Import move summary", delegate(int current, int total, string detail)
                         {
-                            reportProgress(moveOff + current, detail);
+                            reportProgress(unifiedPlan.MoveOff + current, detail);
                         }, cancellationToken);
                         SortStepResult uniSortResult = null;
                         if (uniMoveResult != null && uniMoveResult.Moved > 0)
                         {
-                            ThrowIfWorkflowCancellationRequested(cancellationToken, "Import workflow");
+                            ImportWorkflowOrchestration.ThrowIfCancellationRequested(cancellationToken, "Import workflow");
                             importService.SaveUndoManifest(uniMoveResult.Entries);
-                            reportProgress(sortOff, "Sorting imported captures into game folders...");
+                            reportProgress(unifiedPlan.SortOff, "Sorting imported captures into game folders...");
                             uniSortResult = SortDestinationFoldersCore(false, false, cancellationToken);
                         }
-                        ThrowIfWorkflowCancellationRequested(cancellationToken, "Import workflow");
+                        ImportWorkflowOrchestration.ThrowIfCancellationRequested(cancellationToken, "Import workflow");
                         reportProgress(totalWork, "Import workflow complete.");
                         var combinedRename = new RenameStepResult
                         {
@@ -248,13 +201,13 @@ namespace PixelVaultNative
                         };
                     }
 
-                    var renameOffset = 0;
-                    var deleteOffset = renameOffset + renameTotal;
-                    var metadataOffset = deleteOffset + deleteTotal;
-                    var moveOffset = metadataOffset + metadataTotal;
-                    var sortOffset = moveOffset + moveTotal;
+                    var renameOffset = standardTotals.RenameOffset;
+                    var deleteOffset = standardTotals.DeleteOffset;
+                    var metadataOffset = standardTotals.MetadataOffset;
+                    var moveOffset = standardTotals.MoveOffset;
+                    var sortOffset = standardTotals.SortOffset;
 
-                    ThrowIfWorkflowCancellationRequested(cancellationToken, "Import workflow");
+                    ImportWorkflowOrchestration.ThrowIfCancellationRequested(cancellationToken, "Import workflow");
                     var renameResult = await importService.RunSteamRenameAsync(renameInventory == null ? new List<string>() : renameInventory.RenameScopeFiles, delegate(int current, int total, string detail)
                     {
                         reportProgress(renameOffset + current, detail);
@@ -262,17 +215,17 @@ namespace PixelVaultNative
                     var steamRenameMap = renameResult == null ? null : renameResult.OldPathToNewPath;
                     if (steamRenameMap != null && steamRenameMap.Count > 0) SteamImportRename.ApplySteamRenameMapToReviewItems(reviewItems, steamRenameMap);
                     var moveSourcePathsAfterRename = SteamImportRename.ResolveTopLevelPathsAfterSteamRename(inventory == null ? null : inventory.TopLevelMediaFiles, steamRenameMap);
-                    ThrowIfWorkflowCancellationRequested(cancellationToken, "Import workflow");
+                    ImportWorkflowOrchestration.ThrowIfCancellationRequested(cancellationToken, "Import workflow");
                     var deleteResult = RunDelete(reviewItems, delegate(int current, int total, string detail)
                     {
                         reportProgress(deleteOffset + current, detail);
                     }, cancellationToken);
-                    ThrowIfWorkflowCancellationRequested(cancellationToken, "Import workflow");
+                    ImportWorkflowOrchestration.ThrowIfCancellationRequested(cancellationToken, "Import workflow");
                     var metadataResult = RunMetadata(reviewItems, delegate(int current, int total, string detail)
                     {
                         reportProgress(metadataOffset + current, detail);
                     }, cancellationToken);
-                    ThrowIfWorkflowCancellationRequested(cancellationToken, "Import workflow");
+                    ImportWorkflowOrchestration.ThrowIfCancellationRequested(cancellationToken, "Import workflow");
                     var moveResult = RunMove(moveSourcePathsAfterRename, manualPaths, delegate(int current, int total, string detail)
                     {
                         reportProgress(moveOffset + current, detail);
@@ -280,12 +233,12 @@ namespace PixelVaultNative
                     SortStepResult sortResult = null;
                     if (moveResult != null && moveResult.Moved > 0)
                     {
-                        ThrowIfWorkflowCancellationRequested(cancellationToken, "Import workflow");
+                        ImportWorkflowOrchestration.ThrowIfCancellationRequested(cancellationToken, "Import workflow");
                         importService.SaveUndoManifest(moveResult.Entries);
                         reportProgress(sortOffset, "Sorting imported captures into game folders...");
                         sortResult = SortDestinationFoldersCore(false, false, cancellationToken);
                     }
-                    ThrowIfWorkflowCancellationRequested(cancellationToken, "Import workflow");
+                    ImportWorkflowOrchestration.ThrowIfCancellationRequested(cancellationToken, "Import workflow");
                     reportProgress(totalWork, "Import workflow complete.");
                     return new ImportWorkflowExecutionResult
                     {
@@ -327,10 +280,8 @@ namespace PixelVaultNative
 
         void RunManualIntakeWorkflowWithProgress(List<ManualMetadataItem> manualItems)
         {
-            var renameTotal = manualItems == null ? 0 : manualItems.Count;
-            var metadataTotal = manualItems == null ? 0 : manualItems.Count;
-            var moveTotal = manualItems == null ? 0 : manualItems.Count(item => item != null && !string.IsNullOrWhiteSpace(item.FilePath) && File.Exists(item.FilePath));
-            var totalWork = renameTotal + metadataTotal + moveTotal + 1;
+            var intakePlan = importService.ComputeManualIntakeProgressPlan(manualItems);
+            var totalWork = intakePlan.TotalWork;
 
             RunBackgroundWorkflowWithProgress(
                 "PixelVault " + AppVersion + " Manual Intake Progress",
@@ -343,35 +294,30 @@ namespace PixelVaultNative
                 totalWork,
                 async (reportProgress, cancellationToken) =>
                 {
-                    var renameOffset = 0;
-                    var metadataOffset = renameOffset + renameTotal;
-                    var moveOffset = metadataOffset + metadataTotal;
-                    var sortOffset = moveOffset + moveTotal;
-
-                    ThrowIfWorkflowCancellationRequested(cancellationToken, "Manual intake workflow");
+                    ImportWorkflowOrchestration.ThrowIfCancellationRequested(cancellationToken, "Manual intake workflow");
                     var renameResult = RunManualRename(manualItems, delegate(int current, int total, string detail)
                     {
-                        reportProgress(renameOffset + current, detail);
+                        reportProgress(intakePlan.RenameOffset + current, detail);
                     }, cancellationToken);
-                    ThrowIfWorkflowCancellationRequested(cancellationToken, "Manual intake workflow");
+                    ImportWorkflowOrchestration.ThrowIfCancellationRequested(cancellationToken, "Manual intake workflow");
                     var metadataResult = RunManualMetadata(manualItems, delegate(int current, int total, string detail)
                     {
-                        reportProgress(metadataOffset + current, detail);
+                        reportProgress(intakePlan.MetadataOffset + current, detail);
                     }, cancellationToken);
-                    ThrowIfWorkflowCancellationRequested(cancellationToken, "Manual intake workflow");
+                    ImportWorkflowOrchestration.ThrowIfCancellationRequested(cancellationToken, "Manual intake workflow");
                     var moveResult = RunMoveFiles(manualItems.Select(item => item.FilePath), "Manual move summary", delegate(int current, int total, string detail)
                     {
-                        reportProgress(moveOffset + current, detail);
+                        reportProgress(intakePlan.MoveOffset + current, detail);
                     }, cancellationToken);
                     SortStepResult sortResult = null;
                     if (moveResult != null && moveResult.Moved > 0)
                     {
-                        ThrowIfWorkflowCancellationRequested(cancellationToken, "Manual intake workflow");
+                        ImportWorkflowOrchestration.ThrowIfCancellationRequested(cancellationToken, "Manual intake workflow");
                         importService.SaveUndoManifest(moveResult.Entries);
-                        reportProgress(sortOffset, "Sorting imported captures into game folders...");
+                        reportProgress(intakePlan.SortOffset, "Sorting imported captures into game folders...");
                         sortResult = SortDestinationFoldersCore(false, false, cancellationToken);
                     }
-                    ThrowIfWorkflowCancellationRequested(cancellationToken, "Manual intake workflow");
+                    ImportWorkflowOrchestration.ThrowIfCancellationRequested(cancellationToken, "Manual intake workflow");
                     reportProgress(totalWork, "Manual intake workflow complete.");
                     return new ManualIntakeExecutionResult
                     {

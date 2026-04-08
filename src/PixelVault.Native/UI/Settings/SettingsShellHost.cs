@@ -89,7 +89,11 @@ namespace PixelVaultNative
             var ffmpegBox = SettingsTextBox(panel, 4, "FFmpeg path", d.GetFfmpegPath(), labelFg, boxBg, boxFg, borderBrush, boxFg);
             var steamGridDbTokenBox = SettingsTextBox(panel, 5, "SteamGridDB token", d.GetSteamGridDbApiToken(), labelFg, boxBg, boxFg, borderBrush, boxFg);
             steamGridDbTokenBox.ToolTip = "Stored locally in PixelVault.settings.ini. Environment variables can also override it.";
-            var starredExportBox = SettingsTextBox(panel, 6, "Starred export folder (optional)", d.GetStarredExportFolder(), labelFg, boxBg, boxFg, borderBrush, boxFg);
+            var steamWebApiKeyBox = SettingsTextBox(panel, 6, "Steam Web API key (optional)", d.GetSteamWebApiKey(), labelFg, boxBg, boxFg, borderBrush, boxFg);
+            steamWebApiKeyBox.ToolTip = "Valve Steam Web API key (steam_web_api_key in settings.ini). Optional PIXELVAULT_STEAM_WEB_API_KEY / STEAM_WEB_API_KEY env vars override the file.";
+            var retroAchievementsKeyBox = SettingsTextBox(panel, 7, "RetroAchievements API key (optional)", d.GetRetroAchievementsApiKey(), labelFg, boxBg, boxFg, borderBrush, boxFg);
+            retroAchievementsKeyBox.ToolTip = "RetroAchievements.org API key (retroachievements_api_key). Optional PIXELVAULT_RETROACHIEVEMENTS_API_KEY / RETROACHIEVEMENTS_API_KEY env vars override the file.";
+            var starredExportBox = SettingsTextBox(panel, 8, "Starred export folder (optional)", d.GetStarredExportFolder(), labelFg, boxBg, boxFg, borderBrush, boxFg);
             starredExportBox.ToolTip = "Library → Export Starred copies starred files here (mirrored paths under the library root). Only files that are new to the export or whose metadata/file stamp changed are copied again; tracking lives in that library’s SQLite index. Replaces existing files when needed.";
 
             SettingsBrowseButton(panel, 0, delegate { var picked = d.PickFolder(d.PrimarySourceRoot()); if (!string.IsNullOrWhiteSpace(picked)) sourceBox.Text = d.AppendSourceRoot(sourceBox.Text, picked); }, "Add Folder");
@@ -97,7 +101,7 @@ namespace PixelVaultNative
             SettingsBrowseButton(panel, 2, delegate { var picked = d.PickFolder(libraryBox.Text); if (!string.IsNullOrWhiteSpace(picked)) libraryBox.Text = picked; });
             SettingsBrowseButton(panel, 3, delegate { var picked = d.PickFile(exifBox.Text, "Executable (*.exe)|*.exe|All files (*.*)|*.*", null); if (!string.IsNullOrWhiteSpace(picked)) exifBox.Text = picked; });
             SettingsBrowseButton(panel, 4, delegate { var picked = d.PickFile(ffmpegBox.Text, "Executable (*.exe)|*.exe|All files (*.*)|*.*", null); if (!string.IsNullOrWhiteSpace(picked)) ffmpegBox.Text = picked; });
-            SettingsBrowseButton(panel, 6, delegate { var picked = d.PickFolder(starredExportBox.Text); if (!string.IsNullOrWhiteSpace(picked)) starredExportBox.Text = picked; });
+            SettingsBrowseButton(panel, 8, delegate { var picked = d.PickFolder(starredExportBox.Text); if (!string.IsNullOrWhiteSpace(picked)) starredExportBox.Text = picked; });
 
             var pathScroll = new ScrollViewer
             {
@@ -127,6 +131,8 @@ namespace PixelVaultNative
                 d.SetFfmpegPath(ffmpegBox.Text);
                 d.ClearFailedFfmpegPosterKeys();
                 d.SetSteamGridDbApiToken((steamGridDbTokenBox.Text ?? string.Empty).Trim());
+                d.SetSteamWebApiKey((steamWebApiKeyBox.Text ?? string.Empty).Trim());
+                d.SetRetroAchievementsApiKey((retroAchievementsKeyBox.Text ?? string.Empty).Trim());
                 d.SaveSettings();
                 d.RefreshMainUi();
                 window.Close();
@@ -332,6 +338,8 @@ namespace PixelVaultNative
             stack.Children.Add(new TextBlock { Text = "ExifTool: " + d.GetExifToolPath(), TextWrapping = TextWrapping.Wrap, Foreground = textMuted, Margin = new Thickness(0, 0, 0, 4) });
             stack.Children.Add(new TextBlock { Text = "FFmpeg: " + (string.IsNullOrWhiteSpace(d.GetFfmpegPath()) ? "(not configured)" : d.GetFfmpegPath()), TextWrapping = TextWrapping.Wrap, Foreground = textMuted, Margin = new Thickness(0, 0, 0, 4) });
             stack.Children.Add(new TextBlock { Text = "SteamGridDB: " + (d.HasSteamGridDbApiToken() ? "token configured" : "(token not configured)"), TextWrapping = TextWrapping.Wrap, Foreground = textMuted });
+            stack.Children.Add(new TextBlock { Text = "Steam Web API: " + ((d.HasSteamWebApiKey?.Invoke() ?? false) ? "key configured" : "(not configured)"), TextWrapping = TextWrapping.Wrap, Foreground = textMuted, Margin = new Thickness(0, 4, 0, 0) });
+            stack.Children.Add(new TextBlock { Text = "RetroAchievements: " + ((d.HasRetroAchievementsApiKey?.Invoke() ?? false) ? "API key configured" : "(not configured)"), TextWrapping = TextWrapping.Wrap, Foreground = textMuted, Margin = new Thickness(0, 4, 0, 0) });
             border.Child = stack;
             return border;
         }

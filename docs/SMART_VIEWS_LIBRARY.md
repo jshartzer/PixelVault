@@ -10,12 +10,13 @@ Canonical mode strings are normalized by `SettingsService.NormalizeLibraryFolder
 | `completed` | 100% Achievements | `folder.IsCompleted100Percent` is true. |
 | `crossplatform` | Cross-Platform | More than one distinct normalized platform label **or** `folder.IsMergedAcrossPlatforms`. |
 | `large` | 25+ Captures | `folder.FileCount >= 25`. |
-| `missingid` | Missing ID | **Any of:** `GameId` is blank (no game-index id), **or** the folder is **Steam-tagged** (see note) **and** (`SteamAppId` is blank **or** `SteamGridDbId` is blank). |
+| `missingid` | Missing ID | **Any of:** `GameId` is blank (no game-index id), **or** `SteamGridDbId` (STID) is blank — required for every row — **or** the folder is **Steam-tagged** (see note) **and** `SteamAppId` is blank, **or** the folder is **Emulation-tagged** (see note) **and** `RetroAchievementsGameId` is blank. |
 | `nocover` | No cover path | `PreviewImagePath` is null or whitespace (no on-disk existence check). |
 
 **Notes**
 
 - **Steam-tagged folder:** normalized `PrimaryPlatformLabel` is Steam **or** any entry in `PlatformLabels` normalizes to Steam (same rules as `LibraryBrowserFolderViewIsSteamTagged` / the Filter menu).
+- **Emulation-tagged folder:** same pattern for the Emulation console — `LibraryBrowseFolderSummary.IsEmulationTagged` / `LibraryBrowserFolderViewIsEmulationTagged`. RetroAchievements game ID is only required when this applies.
 - **Legacy persisted values** `needssteam`, `needssteamgrid`, and `missinggameid` (and their text aliases) normalize to **`missingid`**.
 - **Timeline** grouping builds a synthetic view; filters still apply to the underlying folder rows that feed the timeline.
 - **Search** (search box) further narrows rows using `SearchBlob` (lowercased name, paths, ids, platforms).
@@ -37,7 +38,7 @@ Library folder rows in the browser are materialized as **`MainWindow.LibraryBrow
 | Console context | `PrimaryPlatformLabel`, `PlatformLabels`, `PlatformSummaryText` | Normalized labels drive filters, badges, grouping. |
 | Library stats | `FileCount`, `PreviewImagePath` | `nocover` filter uses `PreviewImagePath` only (no existence check). |
 | Recency | `NewestCaptureUtcTicks`, `NewestRecentSortUtcTicks` | Sort modes (`captured`, `added`, `photos`). |
-| External ids | `SteamAppId`, `SteamGridDbId` | `missingid` filter when Steam-tagged. |
+| External ids | `SteamAppId`, `SteamGridDbId`, `RetroAchievementsGameId` | `missingid`: STID always; App ID when Steam-tagged; RA id when Emulation-tagged. |
 | Collection | `IsCompleted100Percent`, `CompletedUtcTicks` | `completed` filter. |
 | Merge | `IsMergedAcrossPlatforms` | `crossplatform` filter. |
 | Synthetic row | `IsTimelineProjection` | Timeline synthetic views; not a disk folder. |

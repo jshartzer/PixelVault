@@ -442,4 +442,56 @@ public sealed class ImportServiceManualMetadataTests
         var svc = CreateServiceWithManualMetadataDeps(new StubCoverService(), s => s);
         Assert.Throws<ArgumentException>(() => svc.BuildManualMetadataAddNewGamePrompt(Array.Empty<string>()));
     }
+
+    [Fact]
+    public void RunManualRename_ReplacesLeadingNonSteamIdWithGameTitle()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), "pv-test-" + Guid.NewGuid().ToString("n"));
+        Directory.CreateDirectory(tempDir);
+        try
+        {
+            const string id = "14365183643867938816";
+            var originalName = id + "_20260407182717_1.png";
+            var path = Path.Combine(tempDir, originalName);
+            File.WriteAllText(path, "x");
+            var item = new ManualMetadataItem
+            {
+                FilePath = path,
+                FileName = originalName,
+                GameName = "Eternal Darkness- Sanity's Requiem",
+                NonSteamId = id
+            };
+            var svc = new ImportService(new ImportServiceDependencies
+            {
+                FileSystem = new FileSystemService(),
+                MetadataService = new StubMetadataService(),
+                GetFileCreationTime = _ => DateTime.MinValue,
+                GetFileLastWriteTime = _ => DateTime.MinValue,
+                CoverService = new StubCoverService(),
+                NormalizeGameIndexName = s => s.Trim(),
+                SanitizeManualRenameGameTitle = s => (s ?? string.Empty).Trim(),
+                NormalizeTitleForManualRename = s => (s ?? string.Empty).Trim().ToLowerInvariant(),
+                GetGameNameFromFileName = fn => Path.GetFileNameWithoutExtension(fn ?? string.Empty),
+                GameIndexEditorAssignment = new StubGameIndexEditorAssignmentService(),
+                BuildManualMetadataGameTitleChoiceLabel = (a, b) => "",
+                ParseManualMetadataTagText = _ => Array.Empty<string>(),
+                CleanTag = s => string.IsNullOrWhiteSpace(s) ? string.Empty : s.Trim()
+            });
+            var result = svc.RunManualRename(new List<ManualMetadataItem> { item });
+            Assert.Equal(1, result.Renamed);
+            Assert.True(File.Exists(item.FilePath));
+            Assert.Equal("Eternal Darkness- Sanity's Requiem_20260407182717_1.png", item.FileName);
+        }
+        finally
+        {
+            try
+            {
+                if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
+            }
+            catch
+            {
+                // best-effort cleanup of temp dir
+            }
+        }
+    }
 }
