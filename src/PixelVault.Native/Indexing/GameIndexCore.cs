@@ -58,9 +58,12 @@ namespace PixelVaultNative
             }
         }
 
+        string FoldGameTitleForIdentityMatch(string normalizedName) =>
+            GameIndexIdentityMatch.FoldNormalizedTitle(normalizedName, MainWindow.Sanitize);
+
         string BuildGameIndexIdentity(string name, string platformLabel)
         {
-            return NormalizeGameIndexName(name) + "|" + NormalizeConsoleLabel(platformLabel);
+            return FoldGameTitleForIdentityMatch(NormalizeGameIndexName(name)) + "|" + NormalizeConsoleLabel(platformLabel);
         }
 
         string BuildGameTitleChoiceLabel(string name, string platformLabel)

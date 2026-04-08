@@ -43,7 +43,8 @@ namespace PixelVaultNative
                 value => MainWindow.NormalizeConsoleLabel(value ?? string.Empty),
                 value => mw.NormalizeGameId(value ?? string.Empty),
                 value => MainWindow.CleanTag(value ?? string.Empty),
-                ids => mw.CreateGameId(ids));
+                ids => mw.CreateGameId(ids),
+                normalized => GameIndexIdentityMatch.FoldNormalizedTitle(normalized, MainWindow.Sanitize));
             var filenameRulesService = new FilenameRulesService(new FilenameRulesServiceDependencies
             {
                 GetConventionRules = delegate(string root) { return filenameParserService.GetConventionRules(root); },

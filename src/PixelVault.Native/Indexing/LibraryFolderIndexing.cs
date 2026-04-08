@@ -139,8 +139,13 @@ namespace PixelVaultNative
                 {
                     if (!string.Equals(row.Name ?? string.Empty, folder.Name ?? string.Empty, StringComparison.Ordinal))
                     {
-                        row.Name = folder.Name ?? string.Empty;
-                        changed = true;
+                        var rowNorm = NormalizeGameIndexName(row.Name, row.FolderPath);
+                        var folderNorm = NormalizeGameIndexName(folder.Name, folder.FolderPath);
+                        if (!string.Equals(FoldGameTitleForIdentityMatch(rowNorm), FoldGameTitleForIdentityMatch(folderNorm), StringComparison.OrdinalIgnoreCase))
+                        {
+                            row.Name = folder.Name ?? string.Empty;
+                            changed = true;
+                        }
                     }
                     if (!string.Equals(row.PlatformLabel ?? string.Empty, folder.PlatformLabel ?? string.Empty, StringComparison.Ordinal))
                     {

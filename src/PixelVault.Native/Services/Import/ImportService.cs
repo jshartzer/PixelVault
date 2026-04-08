@@ -484,6 +484,16 @@ namespace PixelVaultNative
                     continue;
                 }
 
+                var fileBaseTitle = d.SanitizeManualRenameGameTitle != null
+                    ? d.SanitizeManualRenameGameTitle(canonicalGame)
+                    : canonicalGame;
+                if (string.IsNullOrWhiteSpace(fileBaseTitle))
+                {
+                    skipped++;
+                    if (progress != null) progress(i + 1, total, "Skipped rename " + (i + 1) + " of " + total + " | " + remaining + " remaining | title unusable after sanitization | " + Path.GetFileName(file));
+                    continue;
+                }
+
                 if (!string.IsNullOrWhiteSpace(appId) && recordedSteamAppIds.Add(appId))
                 {
                     var session = _getLibrarySession?.Invoke();
@@ -500,7 +510,7 @@ namespace PixelVaultNative
                 var baseName = Path.GetFileNameWithoutExtension(file);
                 string newBase;
                 var titleHint = parsed == null ? null : parsed.GameTitleHint;
-                if (!SteamImportRename.TryBuildSteamRenameBase(baseName, idForRename, canonicalGame, titleHint, out newBase))
+                if (!SteamImportRename.TryBuildSteamRenameBase(baseName, idForRename, fileBaseTitle, titleHint, out newBase))
                 {
                     skipped++;
                     if (progress != null) progress(i + 1, total, "Skipped rename " + (i + 1) + " of " + total + " | " + remaining + " remaining | not AppID-prefixed or title_timestamp form | " + Path.GetFileName(file));
@@ -514,7 +524,17 @@ namespace PixelVaultNative
                 }
                 var combined = Path.Combine(Path.GetDirectoryName(file) ?? string.Empty, newBase + Path.GetExtension(file));
                 var target = d.UniquePath == null ? combined : d.UniquePath(combined);
-                fs.MoveFile(file, target);
+                try
+                {
+                    fs.MoveFile(file, target);
+                }
+                catch (Exception ex)
+                {
+                    skipped++;
+                    d.Log?.Invoke("ERROR: Import rename failed | " + Path.GetFileName(file) + " -> " + Path.GetFileName(target) + " | " + ex.Message);
+                    if (progress != null) progress(i + 1, total, "Skipped rename " + (i + 1) + " of " + total + " | " + remaining + " remaining | " + ex.Message + " | " + Path.GetFileName(file));
+                    continue;
+                }
                 pathMap[file] = target;
                 d.MoveMetadataSidecarIfPresent?.Invoke(file, target);
                 renamed++;

@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
@@ -493,5 +494,80 @@ public sealed class ImportServiceManualMetadataTests
                 // best-effort cleanup of temp dir
             }
         }
+    }
+
+    [Fact]
+    public async Task RunSteamRenameAsync_SanitizesNonSteamIndexTitle_ForInvalidWindowsFilenameChars()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), "pv-steam-rn-" + Guid.NewGuid().ToString("n"));
+        Directory.CreateDirectory(tempDir);
+        const string id = "14365183643867938816";
+        var originalName = id + "_20260407182717_1.png";
+        var path = Path.Combine(tempDir, originalName);
+        File.WriteAllText(path, "x");
+        try
+        {
+            var svc = new ImportService(new ImportServiceDependencies
+            {
+                FileSystem = new FileSystemService(),
+                MetadataService = new StubMetadataService(),
+                GetFileCreationTime = _ => DateTime.MinValue,
+                GetFileLastWriteTime = _ => DateTime.MinValue,
+                CoverService = new StubCoverService(),
+                NormalizeGameIndexName = s => s.Trim(),
+                GetLibraryRoot = () => tempDir,
+                ParseFilenameForImport = _ => new FilenameParseResult
+                {
+                    MatchedConvention = true,
+                    ConventionId = "steam_screenshot_appid",
+                    SteamAppId = string.Empty,
+                    NonSteamId = id,
+                    GameTitleHint = string.Empty
+                },
+                LoadManualMetadataGameTitleRowsAsync = (_, _) => Task.FromResult(new List<GameIndexEditorRow>
+                {
+                    new()
+                    {
+                        GameId = "G1",
+                        Name = "Alien: Isolation",
+                        NonSteamId = id,
+                        PlatformLabel = "Emulation"
+                    }
+                }),
+                SanitizeManualRenameGameTitle = SanitizeLikeMainWindowForTests,
+                EnsureNonSteamIdInGameIndex = delegate { },
+                EnsureSteamAppIdInGameIndex = delegate { },
+                GetGameNameFromFileName = fn => Path.GetFileNameWithoutExtension(fn ?? string.Empty),
+                GameIndexEditorAssignment = new StubGameIndexEditorAssignmentService(),
+                BuildManualMetadataGameTitleChoiceLabel = (a, b) => "",
+                ParseManualMetadataTagText = _ => Array.Empty<string>(),
+                CleanTag = s => string.IsNullOrWhiteSpace(s) ? string.Empty : s.Trim()
+            });
+            var result = await svc.RunSteamRenameAsync(new[] { path }, null, CancellationToken.None);
+            Assert.Equal(1, result.Renamed);
+            Assert.False(File.Exists(path));
+            var files = Directory.GetFiles(tempDir);
+            Assert.Single(files);
+            Assert.Equal("Alien- Isolation_20260407182717_1.png", Path.GetFileName(files[0]));
+        }
+        finally
+        {
+            try
+            {
+                if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
+            }
+            catch
+            {
+                // best-effort cleanup
+            }
+        }
+    }
+
+    static string SanitizeLikeMainWindowForTests(string s)
+    {
+        if (string.IsNullOrEmpty(s)) return s ?? string.Empty;
+        foreach (var c in Path.GetInvalidFileNameChars())
+            s = s.Replace(c, '-');
+        return Regex.Replace(s, "\\s+", " ").Trim();
     }
 }

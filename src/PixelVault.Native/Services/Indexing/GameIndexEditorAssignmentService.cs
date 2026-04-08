@@ -29,6 +29,7 @@ namespace PixelVaultNative
         readonly Func<string, string> normalizeGameId;
         readonly Func<string, string> cleanTag;
         readonly Func<IEnumerable<string>, string> createGameId;
+        readonly Func<string, string> foldNormalizedGameTitleForIdentity;
 
         public GameIndexEditorAssignmentService(
             IIndexPersistenceService persistence,
@@ -37,7 +38,8 @@ namespace PixelVaultNative
             Func<string, string> normalizeConsoleLabel,
             Func<string, string> normalizeGameId,
             Func<string, string> cleanTag,
-            Func<IEnumerable<string>, string> createGameId)
+            Func<IEnumerable<string>, string> createGameId,
+            Func<string, string> foldNormalizedGameTitleForIdentity)
         {
             this.persistence = persistence ?? throw new ArgumentNullException(nameof(persistence));
             this.filenameParser = filenameParser;
@@ -46,6 +48,7 @@ namespace PixelVaultNative
             this.normalizeGameId = normalizeGameId ?? throw new ArgumentNullException(nameof(normalizeGameId));
             this.cleanTag = cleanTag ?? throw new ArgumentNullException(nameof(cleanTag));
             this.createGameId = createGameId ?? throw new ArgumentNullException(nameof(createGameId));
+            this.foldNormalizedGameTitleForIdentity = foldNormalizedGameTitleForIdentity ?? throw new ArgumentNullException(nameof(foldNormalizedGameTitleForIdentity));
         }
 
         public GameIndexEditorRow ResolveExistingGameIndexRowForAssignment(IEnumerable<GameIndexEditorRow> rows, string name, string platformLabel, string preferredGameId)
@@ -116,7 +119,8 @@ namespace PixelVaultNative
 
         string BuildGameIndexIdentity(string name, string platformLabel)
         {
-            return normalizeGameIndexName(name ?? string.Empty, null) + "|" + normalizeConsoleLabel(platformLabel ?? string.Empty);
+            var normalized = normalizeGameIndexName(name ?? string.Empty, null);
+            return foldNormalizedGameTitleForIdentity(normalized) + "|" + normalizeConsoleLabel(platformLabel ?? string.Empty);
         }
 
         GameIndexEditorRow FindSavedGameIndexRowById(IEnumerable<GameIndexEditorRow> rows, string gameId)
