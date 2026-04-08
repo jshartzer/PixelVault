@@ -194,6 +194,7 @@ Use the docs by role:
 - `C:\Codex\docs\NEXT_TRIM_PLAN.md`: ranked next steps to shrink/optimize after current publish (horizon doc; avoid duplicating `PERFORMANCE_TODO.md` long-term)
 - `C:\Codex\docs\archive\README.md`: frozen snapshots of older perf / service-split plans (not a live backlog)
 - `C:\Codex\docs\MANUAL_GOLDEN_PATH_CHECKLIST.md`: short manual verification path for risky changes
+- `C:\Codex\docs\XBOX_ACHIEVEMENTS_API_READINESS_CHECKLIST.md`: parking-lot checklist for future Microsoft Xbox achievements integration readiness
 - `C:\Codex\docs\SERVICE_OWNERSHIP_AND_PARALLEL_WORK_MAP.md`: service boundaries and safe parallel-work lanes
 
 ## Current Direction

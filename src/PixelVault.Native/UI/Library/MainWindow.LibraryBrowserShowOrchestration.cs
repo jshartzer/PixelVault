@@ -355,6 +355,7 @@ namespace PixelVaultNative
                     if (panes.PhotoWorkspaceDividerToggleButton != null) panes.PhotoWorkspaceDividerToggleButton.IsEnabled = !isBusy;
                     panes.FolderCoverLayoutButton.IsEnabled = !isBusy;
                     if (panes.PhotoCaptureLayoutButton != null) panes.PhotoCaptureLayoutButton.IsEnabled = !isBusy;
+                    if (panes.PhotoAchievementsButton != null) panes.PhotoAchievementsButton.IsEnabled = !isBusy && ws.Current != null;
                     if (panes.PhotoRailColumnOneButton != null) panes.PhotoRailColumnOneButton.IsEnabled = !isBusy;
                     if (panes.PhotoRailColumnTwoButton != null) panes.PhotoRailColumnTwoButton.IsEnabled = !isBusy;
                     panes.ShortcutsHelpButton.IsEnabled = !isBusy;
@@ -680,6 +681,14 @@ namespace PixelVaultNative
                     showFolder(ws.Current);
                     runScopedCoverRefresh(scopeFolders, _shell.BuildLibraryBrowserActionScopeLabel(ws.Current), true, false, false);
                 };
+                if (panes.PhotoAchievementsButton != null)
+                {
+                    panes.PhotoAchievementsButton.Click += delegate
+                    {
+                        if (ws.Current == null) return;
+                        _shell.LibraryBrowserShowAchievementsInfo(libraryWindow, ws.Current);
+                    };
+                }
                 libraryWindow.Activated += delegate
                 {
                     if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge();

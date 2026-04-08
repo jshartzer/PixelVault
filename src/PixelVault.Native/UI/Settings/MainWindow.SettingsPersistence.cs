@@ -19,6 +19,8 @@ namespace PixelVaultNative
                 SteamGridDbApiToken = steamGridDbApiToken ?? string.Empty,
                 SteamWebApiKey = steamWebApiKey ?? string.Empty,
                 RetroAchievementsApiKey = retroAchievementsApiKey ?? string.Empty,
+                SteamUserId64 = steamUserId64 ?? string.Empty,
+                RetroAchievementsUsername = retroAchievementsUsername ?? string.Empty,
                 LibraryFolderTileSize = libraryFolderTileSize,
                 LibraryPhotoTileSize = libraryPhotoTileSize,
                 LibraryFolderGridColumnCount = libraryFolderGridColumnCount,
@@ -38,7 +40,8 @@ namespace PixelVaultNative
                 ManualMetadataRecentTitleLabels = _manualMetadataRecentTitleLabelsSerialized ?? string.Empty,
                 TroubleshootingLoggingEnabled = troubleshootingLoggingEnabled,
                 TroubleshootingLogRedactPaths = troubleshootingLogRedactPaths,
-                LibraryDoubleClickSetsFolderCover = libraryDoubleClickSetsFolderCover
+                LibraryDoubleClickSetsFolderCover = libraryDoubleClickSetsFolderCover,
+                LibraryRefreshHeroBannerCacheOnNextLibraryOpen = libraryRefreshHeroBannerCacheOnNextLibraryOpen
             };
         }
 
@@ -55,6 +58,8 @@ namespace PixelVaultNative
             steamGridDbApiToken = s.SteamGridDbApiToken ?? string.Empty;
             steamWebApiKey = s.SteamWebApiKey ?? string.Empty;
             retroAchievementsApiKey = s.RetroAchievementsApiKey ?? string.Empty;
+            steamUserId64 = s.SteamUserId64 ?? string.Empty;
+            retroAchievementsUsername = s.RetroAchievementsUsername ?? string.Empty;
             libraryFolderTileSize = s.LibraryFolderTileSize;
             libraryPhotoTileSize = s.LibraryPhotoTileSize;
             libraryFolderGridColumnCount = s.LibraryFolderGridColumnCount;
@@ -75,6 +80,7 @@ namespace PixelVaultNative
             troubleshootingLoggingEnabled = s.TroubleshootingLoggingEnabled;
             troubleshootingLogRedactPaths = s.TroubleshootingLogRedactPaths;
             libraryDoubleClickSetsFolderCover = s.LibraryDoubleClickSetsFolderCover;
+            libraryRefreshHeroBannerCacheOnNextLibraryOpen = s.LibraryRefreshHeroBannerCacheOnNextLibraryOpen;
         }
 
         void LoadSettings()

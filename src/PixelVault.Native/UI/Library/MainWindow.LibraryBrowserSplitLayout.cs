@@ -39,6 +39,8 @@ namespace PixelVaultNative
             if (panes.PreviewFrame != null) panes.PreviewFrame.Visibility = hideDetailCoverPreview ? Visibility.Collapsed : Visibility.Visible;
             if (panes.OpenFolderButton != null) panes.OpenFolderButton.Visibility = hideGameChrome ? Visibility.Collapsed : Visibility.Visible;
             if (panes.RefreshThisFolderButton != null) panes.RefreshThisFolderButton.Visibility = hideGameChrome ? Visibility.Collapsed : Visibility.Visible;
+            if (panes.PhotoAchievementsButton != null)
+                panes.PhotoAchievementsButton.Visibility = hideGameChrome ? Visibility.Collapsed : (isPhoto ? Visibility.Visible : Visibility.Collapsed);
             if (panes.ExitTimelineButton != null) panes.ExitTimelineButton.Visibility = isTimeline ? Visibility.Visible : Visibility.Collapsed;
             if (panes.TimelineFilterPanel != null) panes.TimelineFilterPanel.Visibility = isTimeline ? Visibility.Visible : Visibility.Collapsed;
             if (panes.GroupAllButton != null) panes.GroupAllButton.Visibility = isPhoto ? Visibility.Collapsed : Visibility.Visible;

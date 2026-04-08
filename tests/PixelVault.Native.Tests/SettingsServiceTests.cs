@@ -126,7 +126,8 @@ public sealed class SettingsServiceTests
                 "library_folder_filter_mode=100%",
                 "library_grouping_mode=console",
                 "troubleshooting_logging_enabled=1",
-                "library_double_click_set_folder_cover=1"
+                "library_double_click_set_folder_cover=1",
+                "library_refresh_hero_banner_cache_on_next_open=1"
             });
 
             var initial = new AppSettings
@@ -166,6 +167,7 @@ public sealed class SettingsServiceTests
             Assert.Equal("console", loaded.LibraryGroupingMode);
             Assert.True(loaded.TroubleshootingLoggingEnabled);
             Assert.True(loaded.LibraryDoubleClickSetsFolderCover);
+            Assert.True(loaded.LibraryRefreshHeroBannerCacheOnNextLibraryOpen);
             Assert.Empty(loaded.LibraryIndexAnchor ?? string.Empty);
         }
         finally
@@ -219,6 +221,8 @@ public sealed class SettingsServiceTests
                 SteamGridDbApiToken = "tok",
                 SteamWebApiKey = "sw",
                 RetroAchievementsApiKey = "ra",
+                SteamUserId64 = "76561198000000000",
+                RetroAchievementsUsername = "pvuser",
                 LibraryFolderTileSize = 180,
                 LibraryPhotoTileSize = 310,
                 LibraryFolderGridColumnCount = 2,
@@ -232,6 +236,7 @@ public sealed class SettingsServiceTests
                 LibraryPhotoRailFolderGridColumnCount = 2,
                 TroubleshootingLoggingEnabled = true,
                 LibraryDoubleClickSetsFolderCover = true,
+                LibraryRefreshHeroBannerCacheOnNextLibraryOpen = true,
                 LibraryBrowserFolderPaneWidth = 542.25,
                 StarredExportFolder = @"D:\immich-drop"
             };
@@ -250,6 +255,8 @@ public sealed class SettingsServiceTests
             Assert.Equal(original.SteamGridDbApiToken, loaded.SteamGridDbApiToken);
             Assert.Equal(original.SteamWebApiKey, loaded.SteamWebApiKey);
             Assert.Equal(original.RetroAchievementsApiKey, loaded.RetroAchievementsApiKey);
+            Assert.Equal(original.SteamUserId64, loaded.SteamUserId64);
+            Assert.Equal(original.RetroAchievementsUsername, loaded.RetroAchievementsUsername);
             Assert.Equal(SettingsService.NormalizeLibraryFolderTileSize(original.LibraryFolderTileSize), loaded.LibraryFolderTileSize);
             Assert.Equal(SettingsService.NormalizeLibraryPhotoTileSize(original.LibraryPhotoTileSize), loaded.LibraryPhotoTileSize);
             Assert.Equal(SettingsService.NormalizeLibraryFolderGridColumnCount(original.LibraryFolderGridColumnCount), loaded.LibraryFolderGridColumnCount);
@@ -263,6 +270,7 @@ public sealed class SettingsServiceTests
             Assert.Equal(2, loaded.LibraryPhotoRailFolderGridColumnCount);
             Assert.True(loaded.TroubleshootingLoggingEnabled);
             Assert.True(loaded.LibraryDoubleClickSetsFolderCover);
+            Assert.True(loaded.LibraryRefreshHeroBannerCacheOnNextLibraryOpen);
             Assert.Equal(542.25, loaded.LibraryBrowserFolderPaneWidth, 5);
             Assert.Equal(@"D:\immich-drop", loaded.StarredExportFolder, ignoreCase: true);
             Assert.Equal(loaded.LibraryRoot ?? string.Empty, loaded.LibraryIndexAnchor ?? string.Empty, ignoreCase: true);

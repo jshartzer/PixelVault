@@ -161,7 +161,8 @@ namespace PixelVaultNative
                 IsFavorite = row.IsFavorite,
                 IsShowcase = row.IsShowcase,
                 CollectionNotes = row.CollectionNotes ?? string.Empty,
-                IndexAddedUtcTicks = row.IndexAddedUtcTicks
+                IndexAddedUtcTicks = row.IndexAddedUtcTicks,
+                StorageGroupId = row.StorageGroupId ?? string.Empty
             };
         }
     }

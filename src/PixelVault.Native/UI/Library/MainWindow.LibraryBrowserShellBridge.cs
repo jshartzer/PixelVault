@@ -195,6 +195,9 @@ namespace PixelVaultNative
             public void ShowLibraryCommandPalette(Window owner, LibraryBrowserPaletteContext context, string initialSearch) =>
                 LibraryCommandPaletteWindow.Show(owner, context, initialSearch);
 
+            public void LibraryBrowserShowAchievementsInfo(Window owner, LibraryBrowserFolderView view) =>
+                _m.LibraryBrowserShowAchievementsInfo(owner, view);
+
             public void LibraryBrowserPaletteOpenSettings() => _m.LibraryBrowserPaletteOpenSettings();
 
             public void LibraryBrowserPaletteOpenHealthDashboard(Window owner) => _m.LibraryBrowserPaletteOpenHealthDashboard(owner);

@@ -2,57 +2,28 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text.RegularExpressions;
 
 namespace PixelVaultNative
 {
     public sealed partial class MainWindow
     {
+        /// <summary>
+        /// Title hint for indexing when photo metadata does not already pin <c>GameId</c>.
+        /// Per <c>PV-PLN-LIBST-001</c> Step 1, parent folder names are not used as identity — only filename parse / stem heuristics.
+        /// </summary>
         string GuessGameIndexNameForFile(string file)
         {
             if (string.IsNullOrWhiteSpace(file)) return string.Empty;
-            var folderName = Path.GetFileName(Path.GetDirectoryName(file) ?? string.Empty);
             var displayFileName = Path.GetFileName(file);
             var parsed = ParseFilename(displayFileName, libraryRoot);
             var hint = parsed.GameTitleHint ?? string.Empty;
-            var normFolder = string.IsNullOrWhiteSpace(folderName)
-                ? string.Empty
-                : NormalizeGameIndexName(CleanTag(folderName));
-            var normHint = string.IsNullOrWhiteSpace(hint)
-                ? string.Empty
-                : NormalizeGameIndexName(CleanTag(hint));
-
-            if (!string.IsNullOrWhiteSpace(normFolder) && !string.IsNullOrWhiteSpace(normHint)
-                && !string.Equals(normFolder, normHint, StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrWhiteSpace(hint))
             {
-                if (ShouldTrustFilenameTitleOverFolder(parsed, hint, displayFileName))
-                    return normHint;
+                var normHint = NormalizeGameIndexName(CleanTag(hint));
+                if (!string.IsNullOrWhiteSpace(normHint)) return normHint;
             }
 
-            if (!string.IsNullOrWhiteSpace(folderName)) return CleanTag(folderName);
-
-            return string.IsNullOrWhiteSpace(normHint)
-                ? NormalizeGameIndexName(GetGameNameFromFileName(displayFileName))
-                : normHint;
-        }
-
-        /// <summary>
-        /// When a file sits under a game folder on disk but its name encodes a different title (mis-sort or manual drop),
-        /// prefer the filename for identity. Skip generic camera roll stems so a catch-all folder still works.
-        /// </summary>
-        bool ShouldTrustFilenameTitleOverFolder(FilenameParseResult parsed, string hint, string displayFileName)
-        {
-            if (string.IsNullOrWhiteSpace(hint)) return false;
-            var cid = parsed.ConventionId ?? string.Empty;
-            if (parsed.MatchedConvention
-                && !string.Equals(cid, "generic-date-match", StringComparison.OrdinalIgnoreCase)
-                && !string.Equals(cid, "unknown", StringComparison.OrdinalIgnoreCase))
-                return true;
-            var stem = Path.GetFileNameWithoutExtension(displayFileName ?? string.Empty).Trim();
-            if (stem.Length < 3) return false;
-            if (Regex.IsMatch(stem, @"^(IMG|DSC|PXL_|MOV|VID)[_\-]?\d", RegexOptions.IgnoreCase))
-                return false;
-            return true;
+            return NormalizeGameIndexName(GetGameNameFromFileName(displayFileName));
         }
 
         GameIndexEditorRow EnsureGameIndexRowForAssignment(List<GameIndexEditorRow> rows, string name, string platformLabel, string preferredGameId = null)

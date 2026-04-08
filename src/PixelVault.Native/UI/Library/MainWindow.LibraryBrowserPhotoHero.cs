@@ -231,5 +231,24 @@ namespace PixelVaultNative
                 }
             });
         }
+
+        /// <summary>When <see cref="libraryRefreshHeroBannerCacheOnNextLibraryOpen"/> is set, purges auto-cached hero files for loaded library titles (custom heroes preserved).</summary>
+        internal void TryRunPendingLibraryHeroBannerCacheRefresh(IReadOnlyList<LibraryFolderInfo> folders)
+        {
+            if (!libraryRefreshHeroBannerCacheOnNextLibraryOpen) return;
+            if (folders == null || folders.Count == 0) return;
+
+            libraryRefreshHeroBannerCacheOnNextLibraryOpen = false;
+            SaveSettings();
+
+            var titles = folders
+                .Where(f => f != null && !string.IsNullOrWhiteSpace(f.Name))
+                .Select(f => f.Name.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            foreach (var t in titles)
+                coverService.PurgeCachedHeroDownloads(t);
+            Log("Cleared auto-cached hero banners for " + titles.Count + " library titles. Custom banners unchanged; open captures or Fetch Banner Art to re-download.");
+        }
     }
 }

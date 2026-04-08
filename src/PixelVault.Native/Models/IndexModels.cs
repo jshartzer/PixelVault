@@ -70,6 +70,8 @@ namespace PixelVaultNative
         /// <summary>UTC ticks when this game row was first added to the index (0 = unknown / predates field).</summary>
         public long IndexAddedUtcTicks { get; set; }
         public string IndexAddedAtLocal => LibraryIndexRecordDisplay.FormatIndexAddedUtcLocal(IndexAddedUtcTicks);
+        /// <summary>Stable cross-platform storage bucket id (shared folder target); see PV-PLN-LIBST-001.</summary>
+        public string StorageGroupId { get; set; }
     }
 
     sealed class PhotoIndexEditorRow

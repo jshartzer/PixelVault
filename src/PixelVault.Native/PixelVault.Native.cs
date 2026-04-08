@@ -98,6 +98,8 @@ namespace PixelVaultNative
         string steamGridDbApiToken;
         string steamWebApiKey;
         string retroAchievementsApiKey;
+        string steamUserId64;
+        string retroAchievementsUsername;
         int libraryFolderTileSize = 300;
         int libraryPhotoTileSize = 340;
         int libraryFolderGridColumnCount;
@@ -112,6 +114,7 @@ namespace PixelVaultNative
         bool troubleshootingLoggingEnabled;
         bool troubleshootingLogRedactPaths;
         bool libraryDoubleClickSetsFolderCover;
+        bool libraryRefreshHeroBannerCacheOnNextLibraryOpen;
         readonly string _diagnosticsSessionId;
         const long TroubleshootingLogMaxBytes = 5_000_000L;
         string _libraryBrowserPersistedSearch = string.Empty;
@@ -1020,6 +1023,16 @@ namespace PixelVaultNative
             return !string.IsNullOrWhiteSpace(env) ? env : (retroAchievementsApiKey ?? string.Empty).Trim();
         }
         bool HasRetroAchievementsApiKey() => !string.IsNullOrWhiteSpace(CurrentRetroAchievementsApiKey());
+        string CurrentSteamUserId64()
+        {
+            var env = SettingsService.FindSteamUserId64InEnvironment();
+            return !string.IsNullOrWhiteSpace(env) ? env : (steamUserId64 ?? string.Empty).Trim();
+        }
+        string CurrentRetroAchievementsUsername()
+        {
+            var env = SettingsService.FindRetroAchievementsUsernameInEnvironment();
+            return !string.IsNullOrWhiteSpace(env) ? env : (retroAchievementsUsername ?? string.Empty).Trim();
+        }
         bool IsClearedExternalIdValue(string value)
         {
             return string.Equals((value ?? string.Empty).Trim(), ClearedExternalIdSentinel, StringComparison.Ordinal);
@@ -2301,20 +2314,21 @@ namespace PixelVaultNative
             return false;
         }
 
-        /// <summary>Photo-workspace banner: custom or downloaded hero/header cache only — not library cover or folder preview.</summary>
+        /// <summary>Photo-workspace banner: custom or cached wide art only — prefers SteamGridDB Heroes (same asset class as https://www.steamgriddb.com/hero/…), not library cover.</summary>
         internal string GetLibraryHeroBannerPathForDisplayOnly(LibraryFolderInfo folder)
         {
             return TryGetCustomOrCachedHeroPath(folder, out var p) ? p : null;
         }
 
+        /// <summary>Resolves banner art: custom → <b>SteamGridDB Heroes</b> → Valve library_hero / store header fallback.</summary>
         async Task<string> ResolveLibraryHeroBannerWithDownloadAsync(LibraryFolderInfo folder, CancellationToken cancellationToken = default(CancellationToken))
         {
             if (folder == null) return null;
             if (TryGetCustomOrCachedHeroPath(folder, out var early)) return early;
-            var grid = await TryDownloadSteamGridDbHeroAsync(folder, cancellationToken).ConfigureAwait(false);
-            if (!string.IsNullOrWhiteSpace(grid) && File.Exists(grid)) return grid;
-            var header = await TryDownloadSteamStoreHeaderHeroAsync(folder, cancellationToken).ConfigureAwait(false);
-            if (!string.IsNullOrWhiteSpace(header) && File.Exists(header)) return header;
+            var steamGridDbHero = await TryDownloadSteamGridDbHeroAsync(folder, cancellationToken).ConfigureAwait(false);
+            if (!string.IsNullOrWhiteSpace(steamGridDbHero) && File.Exists(steamGridDbHero)) return steamGridDbHero;
+            var steamFallback = await TryDownloadSteamStoreHeaderHeroAsync(folder, cancellationToken).ConfigureAwait(false);
+            if (!string.IsNullOrWhiteSpace(steamFallback) && File.Exists(steamFallback)) return steamFallback;
             return null;
         }
 

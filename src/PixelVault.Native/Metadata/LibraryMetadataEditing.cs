@@ -95,8 +95,9 @@ namespace PixelVaultNative
                 gameName = guessedFromPathAndName;
             else
             {
-                gameName = Path.GetFileName(Path.GetDirectoryName(file)) ?? string.Empty;
-                if (string.IsNullOrWhiteSpace(gameName)) gameName = NormalizeGameIndexName(GetGameNameFromFileName(Path.GetFileName(file)));
+                gameName = guessedFromPathAndName;
+                if (string.IsNullOrWhiteSpace(gameName))
+                    gameName = NormalizeGameIndexName(GetGameNameFromFileName(Path.GetFileName(file)));
             }
             var steamAppId = folderPathUsable ? (folder.SteamAppId ?? string.Empty) : string.Empty;
             if (savedGameRow != null && !string.IsNullOrWhiteSpace(savedGameRow.SteamAppId))

@@ -3,7 +3,7 @@
 | Field | Value |
 |-------|--------|
 | **Plan ID** | `PV-PLN-LIBST-001` |
-| **Status** | Draft |
+| **Status** | In progress (Slice A / Step 1 started) |
 | **Owner** | PixelVault / Codex |
 | **Source brief** | User request (2026-04-07): keep unique Game Index rows per console, but store all captures for a game in one app-owned folder and stop inferring identity from folder structure |
 | **Related** | `docs/PROJECT_CONTEXT.md`, `docs/POLICY.md`, `docs/DOC_SYNC_POLICY.md`, `docs/plans/PV-PLN-UI-001-ui-thin-mainwindow-ios-aligned.md` |
@@ -398,6 +398,26 @@ Start with **Step 0**, then **Step 1** and **Step 2**. That is the real architec
 - add an explicit storage-group concept
 
 Without **this foundation** (preflight + Steps 1–2), removing ` - Platform` from folder naming would only hide the current coupling instead of fixing it.
+
+## Execution log
+
+| Date | Slice / step | Notes |
+|------|----------------|------|
+| 2026-04-08 | **Slice A (partial Step 1)** | Removed **parent folder name** as a source for `GuessGameIndexNameForFile` (hints + filename stem only). Removed **`NormalizeGameIndexName(name, folderPath)`** basename fallback when `name` is empty. Fixed **library metadata edit** path that used parent folder for `GameName` when `folderPathUsable` was false — now uses parser/filename guess only. Deleted **`ShouldTrustFilenameTitleOverFolder`** (only served folder-vs-hint arbitration). |
+
+### Initial leak spike (read-only, 2026-04-08)
+
+Call sites to re-verify as Step 1 continues:
+
+| Area | Symbol / pattern |
+|------|------------------|
+| Indexing | `GuessGameIndexNameForFile` (host), `EnsureGameIndexRowForAssignment` + guess in `LibraryScanner` photo sync |
+| Indexing | `NormalizeGameIndexName(..., row.FolderPath)` on **rows** — still passes `FolderPath`; no longer substitutes basename when `Name` empty |
+| Metadata | `LibraryMetadataEditing` manual item `GameName` |
+| UI | `MainWindow.LibraryBrowserViewModel` (`BuildLibraryBrowserViewKey`, merge keys), `LibraryFolderIdEditor`, `GameIndexEditorHost` |
+| Alignment | `GameIndexFolderAlignment.BuildCanonicalGameIndexFolderName` — empty name → `Unknown Game` until row name is fixed |
+
+**Still to do for Step 1:** audit remaining scanner/rebuild paths for implicit folder identity; add explicit **unresolved** UX if not already surfaced when guess is empty and `GameId` missing.
 
 ## Notes for execution
 

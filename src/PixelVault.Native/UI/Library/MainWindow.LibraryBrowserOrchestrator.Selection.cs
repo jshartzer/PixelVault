@@ -169,6 +169,10 @@ namespace PixelVaultNative
                 {
                     panes.RefreshThisFolderButton.IsEnabled = !timelineMode && ws.Current != null && !ws.LibraryFoldersLoading;
                 }
+                if (panes.PhotoAchievementsButton != null)
+                {
+                    panes.PhotoAchievementsButton.IsEnabled = !timelineMode && ws.Current != null && !ws.LibraryFoldersLoading;
+                }
                 if (panes.ExitTimelineButton != null)
                 {
                     panes.ExitTimelineButton.IsEnabled = !ws.LibraryFoldersLoading;

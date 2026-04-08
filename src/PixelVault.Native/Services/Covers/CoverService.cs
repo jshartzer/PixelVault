@@ -34,6 +34,8 @@ namespace PixelVaultNative
         void SaveCustomHero(LibraryFolderInfo folder, string sourcePath);
         void ClearCustomHero(LibraryFolderInfo folder);
         string CachedHeroPath(string title);
+        /// <summary>Deletes downloaded <c>hero-*</c> cache files for <paramref name="title"/>; does not remove <c>custom-hero-*</c>.</summary>
+        void PurgeCachedHeroDownloads(string title);
         Task<string> TryDownloadSteamGridDbHeroAsync(string title, string steamGridDbId, CancellationToken cancellationToken = default(CancellationToken));
         Task<string> TryDownloadSteamStoreHeaderHeroAsync(string title, string appId, CancellationToken cancellationToken = default(CancellationToken));
         /// <summary>Search RetroAchievements games by title for consoles that best match <paramref name="platformLabel"/>. Requires a web API key from Path Settings.</summary>
@@ -816,7 +818,7 @@ namespace PixelVaultNative
             return null;
         }
 
-        void PurgeCachedHeroDownloads(string title)
+        public void PurgeCachedHeroDownloads(string title)
         {
             var safe = HeroCacheFileBaseFromTitle(title);
             var invalidated = new List<string>();
@@ -1008,6 +1010,9 @@ namespace PixelVaultNative
             return null;
         }
 
+        /// <summary>
+        /// SteamGridDB <b>Heroes</b> (wide banner art — same category as <c>https://www.steamgriddb.com/hero/</c>… on the site), not portrait grids or Steam store capsules.
+        /// </summary>
         public async Task<string> TryDownloadSteamGridDbHeroAsync(string title, string steamGridDbId, CancellationToken cancellationToken = default(CancellationToken))
         {
             if (string.IsNullOrWhiteSpace(title) || string.IsNullOrWhiteSpace(steamGridDbId) || !HasSteamGridDbApiToken()) return null;
@@ -1020,7 +1025,7 @@ namespace PixelVaultNative
                 {
                     if (wc == null) return null;
                     var json = await wc.DownloadStringAsync(
-                        "https://www.steamgriddb.com/api/v2/heroes/game/" + Uri.EscapeDataString(steamGridDbId) + "?dimensions=3840x1240,1920x620,1600x650,930x310&types=static&nsfw=false&humor=false&limit=1",
+                        "https://www.steamgriddb.com/api/v2/heroes/game/" + Uri.EscapeDataString(steamGridDbId) + "?dimensions=3840x1240,1920x620,1600x650,930x310&types=static,alternate&nsfw=false&humor=false&limit=1",
                         cancellationToken).ConfigureAwait(false);
                     var match = Regex.Match(json, "\"url\"\\s*:\\s*\"(?<u>(?:\\\\.|[^\"])*)\"");
                     if (!match.Success) return null;
@@ -1049,6 +1054,9 @@ namespace PixelVaultNative
             return null;
         }
 
+        /// <summary>
+        /// Valve CDN / store fallback when <see cref="TryDownloadSteamGridDbHeroAsync"/> is unavailable — not the SteamGridDB Heroes category.
+        /// </summary>
         public async Task<string> TryDownloadSteamStoreHeaderHeroAsync(string title, string appId, CancellationToken cancellationToken = default(CancellationToken))
         {
             if (string.IsNullOrWhiteSpace(title) || string.IsNullOrWhiteSpace(appId)) return null;
@@ -1059,16 +1067,46 @@ namespace PixelVaultNative
                 Directory.CreateDirectory(dependencies.CoversRoot);
                 using (var wc = CreateSteamWebClient())
                 {
+                    PurgeCachedHeroDownloads(title);
+
+                    // Steam library_hero JPGs, then store header_image — runs only after SteamGridDB Heroes in the photo-banner resolver.
+                    var libraryHeroUrls = new[]
+                    {
+                        "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/" + appId + "/library_hero_2x.jpg",
+                        "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/" + appId + "/library_hero.jpg",
+                        "https://cdn.cloudflare.steamstatic.com/steam/apps/" + appId + "/library_hero_2x.jpg",
+                        "https://cdn.cloudflare.steamstatic.com/steam/apps/" + appId + "/library_hero.jpg"
+                    };
+                    foreach (var heroUrl in libraryHeroUrls)
+                    {
+                        try
+                        {
+                            cancellationToken.ThrowIfCancellationRequested();
+                            var ext = Path.GetExtension(new Uri(heroUrl).AbsolutePath);
+                            if (string.IsNullOrWhiteSpace(ext)) ext = ".jpg";
+                            var target = Path.Combine(dependencies.CoversRoot, HeroCacheFileBaseFromTitle(title) + ext);
+                            await wc.DownloadFileAsync(heroUrl, target, cancellationToken).ConfigureAwait(false);
+                            if (File.Exists(target) && new FileInfo(target).Length > 0) return target;
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            throw;
+                        }
+                        catch
+                        {
+                        }
+                    }
+
                     var json = await wc.DownloadStringAsync("https://store.steampowered.com/api/appdetails?appids=" + appId + "&l=english", cancellationToken).ConfigureAwait(false);
                     var match = Regex.Match(json, "\"header_image\"\\s*:\\s*\"(?<u>(?:\\\\.|[^\"])*)\"");
                     if (!match.Success) return null;
                     var url = Regex.Unescape(match.Groups["u"].Value).Replace("\\/", "/");
-                    var ext = Path.GetExtension(new Uri(url).AbsolutePath);
-                    if (string.IsNullOrWhiteSpace(ext)) ext = ".jpg";
+                    var headerExt = Path.GetExtension(new Uri(url).AbsolutePath);
+                    if (string.IsNullOrWhiteSpace(headerExt)) headerExt = ".jpg";
                     PurgeCachedHeroDownloads(title);
-                    var target = Path.Combine(dependencies.CoversRoot, HeroCacheFileBaseFromTitle(title) + ext);
-                    await wc.DownloadFileAsync(url, target, cancellationToken).ConfigureAwait(false);
-                    return File.Exists(target) && new FileInfo(target).Length > 0 ? target : null;
+                    var headerTarget = Path.Combine(dependencies.CoversRoot, HeroCacheFileBaseFromTitle(title) + headerExt);
+                    await wc.DownloadFileAsync(url, headerTarget, cancellationToken).ConfigureAwait(false);
+                    return File.Exists(headerTarget) && new FileInfo(headerTarget).Length > 0 ? headerTarget : null;
                 }
             }
             catch (OperationCanceledException)
@@ -1077,7 +1115,7 @@ namespace PixelVaultNative
             }
             catch (Exception ex)
             {
-                Log("Steam store header (hero) download failed for " + title + ". " + ex.Message);
+                Log("Steam store library hero / header download failed for " + title + ". " + ex.Message);
             }
             finally
             {

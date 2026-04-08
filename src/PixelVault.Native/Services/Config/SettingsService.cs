@@ -122,6 +122,26 @@ namespace PixelVaultNative
             return string.Empty;
         }
 
+        public static string FindSteamUserId64InEnvironment()
+        {
+            foreach (var key in new[] { "PIXELVAULT_STEAM_USER_ID", "STEAM_USER_ID_64", "STEAMID64" })
+            {
+                var value = Environment.GetEnvironmentVariable(key);
+                if (!string.IsNullOrWhiteSpace(value)) return value.Trim();
+            }
+            return string.Empty;
+        }
+
+        public static string FindRetroAchievementsUsernameInEnvironment()
+        {
+            foreach (var key in new[] { "PIXELVAULT_RETROACHIEVEMENTS_USERNAME", "RETROACHIEVEMENTS_USERNAME", "RA_USERNAME" })
+            {
+                var value = Environment.GetEnvironmentVariable(key);
+                if (!string.IsNullOrWhiteSpace(value)) return value.Trim();
+            }
+            return string.Empty;
+        }
+
         public AppSettings LoadFromIni(
             string path,
             AppSettings initialState,
@@ -148,6 +168,8 @@ namespace PixelVaultNative
                 else if (key == "steamgriddb_token") s.SteamGridDbApiToken = value ?? string.Empty;
                 else if (key == "steam_web_api_key") s.SteamWebApiKey = value ?? string.Empty;
                 else if (key == "retroachievements_api_key") s.RetroAchievementsApiKey = value ?? string.Empty;
+                else if (key == "steam_user_id_64") s.SteamUserId64 = value ?? string.Empty;
+                else if (key == "retroachievements_username") s.RetroAchievementsUsername = value ?? string.Empty;
                 else if (key == "library_folder_tile_size")
                 {
                     if (int.TryParse(value, out var parsedSize)) s.LibraryFolderTileSize = NormalizeLibraryFolderTileSize(parsedSize);
@@ -221,6 +243,15 @@ namespace PixelVaultNative
                         || string.Equals(normalizedValue, "yes", StringComparison.OrdinalIgnoreCase)
                         || string.Equals(normalizedValue, "on", StringComparison.OrdinalIgnoreCase);
                 }
+                else if (key == "library_refresh_hero_banner_cache_on_next_open")
+                {
+                    var normalizedValue = (value ?? string.Empty).Trim();
+                    s.LibraryRefreshHeroBannerCacheOnNextLibraryOpen =
+                        string.Equals(normalizedValue, "1", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(normalizedValue, "true", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(normalizedValue, "yes", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(normalizedValue, "on", StringComparison.OrdinalIgnoreCase);
+                }
             }
 
             var bundledExifTool = Path.Combine(appRoot ?? string.Empty, "tools", "exiftool.exe");
@@ -241,6 +272,10 @@ namespace PixelVaultNative
             if (!string.IsNullOrWhiteSpace(envSteamWeb)) s.SteamWebApiKey = envSteamWeb;
             var envRa = FindRetroAchievementsApiKeyInEnvironment();
             if (!string.IsNullOrWhiteSpace(envRa)) s.RetroAchievementsApiKey = envRa;
+            var envSid = FindSteamUserId64InEnvironment();
+            if (!string.IsNullOrWhiteSpace(envSid)) s.SteamUserId64 = envSid.Trim();
+            var envRaUser = FindRetroAchievementsUsernameInEnvironment();
+            if (!string.IsNullOrWhiteSpace(envRaUser)) s.RetroAchievementsUsername = envRaUser.Trim();
 
             return s;
         }
@@ -285,6 +320,8 @@ namespace PixelVaultNative
                 "steamgriddb_token=" + (state.SteamGridDbApiToken ?? string.Empty),
                 "steam_web_api_key=" + (state.SteamWebApiKey ?? string.Empty),
                 "retroachievements_api_key=" + (state.RetroAchievementsApiKey ?? string.Empty),
+                "steam_user_id_64=" + (state.SteamUserId64 ?? string.Empty),
+                "retroachievements_username=" + (state.RetroAchievementsUsername ?? string.Empty),
                 "library_folder_tile_size=" + NormalizeLibraryFolderTileSize(state.LibraryFolderTileSize),
                 "library_photo_tile_size=" + NormalizeLibraryPhotoTileSize(state.LibraryPhotoTileSize),
                 "library_folder_grid_columns=" + NormalizeLibraryFolderGridColumnCount(state.LibraryFolderGridColumnCount),
@@ -304,7 +341,8 @@ namespace PixelVaultNative
                 "manual_metadata_recent_titles=" + (state.ManualMetadataRecentTitleLabels ?? string.Empty).Replace("\r", " ").Replace("\n", " "),
                 "troubleshooting_logging_enabled=" + (state.TroubleshootingLoggingEnabled ? "1" : "0"),
                 "troubleshooting_log_redact_paths=" + (state.TroubleshootingLogRedactPaths ? "1" : "0"),
-                "library_double_click_set_folder_cover=" + (state.LibraryDoubleClickSetsFolderCover ? "1" : "0")
+                "library_double_click_set_folder_cover=" + (state.LibraryDoubleClickSetsFolderCover ? "1" : "0"),
+                "library_refresh_hero_banner_cache_on_next_open=" + (state.LibraryRefreshHeroBannerCacheOnNextLibraryOpen ? "1" : "0")
             });
         }
 

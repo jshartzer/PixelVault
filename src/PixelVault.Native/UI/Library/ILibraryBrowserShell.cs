@@ -92,6 +92,8 @@ namespace PixelVaultNative
         void ShowLibraryBrowserKeyboardShortcutsHelp(Window owner);
         void ShowLibraryCommandPalette(Window owner, LibraryBrowserPaletteContext context, string initialSearch);
 
+        void LibraryBrowserShowAchievementsInfo(Window owner, MainWindow.LibraryBrowserFolderView view);
+
         void LibraryBrowserPaletteOpenSettings();
         void LibraryBrowserPaletteOpenHealthDashboard(Window owner);
         void LibraryBrowserPaletteOpenGameIndex();

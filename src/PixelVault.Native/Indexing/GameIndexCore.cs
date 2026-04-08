@@ -34,13 +34,10 @@ namespace PixelVaultNative
             return FormatGameId(nextNumber);
         }
 
+        /// <summary>Normalize a game title for indexing/display. Per <c>PV-PLN-LIBST-001</c> Step 1, empty <paramref name="name"/> does not fall back to <paramref name="folderPath"/> basename.</summary>
         string NormalizeGameIndexName(string name, string folderPath = null)
         {
             var normalized = CleanTag(name);
-            if (string.IsNullOrWhiteSpace(normalized) && !string.IsNullOrWhiteSpace(folderPath))
-            {
-                normalized = CleanTag(Path.GetFileName(folderPath.TrimEnd(Path.DirectorySeparatorChar)));
-            }
             normalized = FilenameParserService.NormalizeColonStandinUnderscoresForGameTitle(normalized);
             return StripKnownPlatformSuffixes(normalized);
         }
@@ -124,7 +121,8 @@ namespace PixelVaultNative
                 IsFavorite = row.IsFavorite,
                 IsShowcase = row.IsShowcase,
                 CollectionNotes = row.CollectionNotes ?? string.Empty,
-                IndexAddedUtcTicks = row.IndexAddedUtcTicks
+                IndexAddedUtcTicks = row.IndexAddedUtcTicks,
+                StorageGroupId = row.StorageGroupId ?? string.Empty
             };
         }
 
@@ -258,7 +256,8 @@ namespace PixelVaultNative
                     IsFavorite = groupRows.Any(row => row.IsFavorite),
                     IsShowcase = groupRows.Any(row => row.IsShowcase),
                     CollectionNotes = groupRows.Select(row => row.CollectionNotes ?? string.Empty).FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty,
-                    IndexAddedUtcTicks = mergedIndexAddedTicks
+                    IndexAddedUtcTicks = mergedIndexAddedTicks,
+                    StorageGroupId = groupRows.Select(row => row.StorageGroupId).FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty
                 });
             }
             var activeRowsByName = mergedRows
@@ -460,7 +459,8 @@ namespace PixelVaultNative
                     CompletedUtcTicks = folder.CompletedUtcTicks,
                     IsFavorite = folder.IsFavorite,
                     IsShowcase = folder.IsShowcase,
-                    CollectionNotes = folder.CollectionNotes ?? string.Empty
+                    CollectionNotes = folder.CollectionNotes ?? string.Empty,
+                    StorageGroupId = string.Empty
                 })
                 .ToList();
         }

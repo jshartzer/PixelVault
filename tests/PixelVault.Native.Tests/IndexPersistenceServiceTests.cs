@@ -54,6 +54,47 @@ public sealed class IndexPersistenceServiceTests
     }
 
     [Fact]
+    public void SaveAndLoad_AssignsSharedStorageGroupId_ForSameTitleDifferentPlatform()
+    {
+        using var harness = new IndexPersistenceHarness();
+        var f = harness.CreateFile("library\\tile.png");
+        harness.Service.SaveSavedGameIndexRows(
+            harness.LibraryRoot,
+            new[]
+            {
+                new GameIndexEditorRow
+                {
+                    GameId = "G00001",
+                    Name = "Cyberpunk 2077",
+                    PlatformLabel = "Steam",
+                    SteamAppId = string.Empty,
+                    SteamGridDbId = string.Empty,
+                    FileCount = 1,
+                    FolderPath = harness.LibraryRoot,
+                    PreviewImagePath = f,
+                    FilePaths = new[] { f }
+                },
+                new GameIndexEditorRow
+                {
+                    GameId = "G00002",
+                    Name = "Cyberpunk 2077",
+                    PlatformLabel = "PS5",
+                    SteamAppId = string.Empty,
+                    SteamGridDbId = string.Empty,
+                    FileCount = 1,
+                    FolderPath = harness.LibraryRoot,
+                    PreviewImagePath = f,
+                    FilePaths = new[] { f }
+                }
+            });
+
+        var rows = harness.Service.LoadSavedGameIndexRows(harness.LibraryRoot);
+        Assert.Equal(2, rows.Count);
+        Assert.False(string.IsNullOrWhiteSpace(rows[0].StorageGroupId));
+        Assert.Equal(rows[0].StorageGroupId, rows[1].StorageGroupId, ignoreCase: true);
+    }
+
+    [Fact]
     public void SaveAndLoadSavedGameIndexRows_RoundTripsIndexAddedUtcTicks()
     {
         using var harness = new IndexPersistenceHarness();

@@ -65,6 +65,7 @@ namespace PixelVaultNative
                         "version=" + refreshVersion
                         + "; forceRefresh=" + forceRefresh
                         + "; folders=" + ws.Folders.Count);
+                    TryRunPendingLibraryHeroBannerCacheRefresh(ws.Folders);
                     if (renderTiles != null) renderTiles();
                 }));
             }, TaskScheduler.Default);

@@ -47,6 +47,8 @@ namespace PixelVaultNative
         public Action<bool> SetTroubleshootingLogRedactPaths { get; set; }
         public Func<bool> GetLibraryDoubleClickSetsFolderCover { get; set; }
         public Action<bool> SetLibraryDoubleClickSetsFolderCover { get; set; }
+        public Func<bool> GetLibraryRefreshHeroBannerCacheOnNextLibraryOpen { get; set; }
+        public Action<bool> SetLibraryRefreshHeroBannerCacheOnNextLibraryOpen { get; set; }
 
         public Action SaveSettings { get; set; }
         public Action<string> Log { get; set; }
@@ -70,6 +72,10 @@ namespace PixelVaultNative
         public Action<string> SetSteamGridDbApiToken { get; set; }
         public Action<string> SetSteamWebApiKey { get; set; }
         public Action<string> SetRetroAchievementsApiKey { get; set; }
+        public Func<string> GetSteamUserId64 { get; set; }
+        public Action<string> SetSteamUserId64 { get; set; }
+        public Func<string> GetRetroAchievementsUsername { get; set; }
+        public Action<string> SetRetroAchievementsUsername { get; set; }
         public Action ClearFailedFfmpegPosterKeys { get; set; }
 
         public Action RefreshMainUi { get; set; }

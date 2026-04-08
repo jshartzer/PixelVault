@@ -36,6 +36,10 @@ namespace PixelVaultNative
         public Func<string, string> SafeCacheName;
         public Func<string, string> NormalizeGameId;
         public Func<string, string> NormalizeGameIndexName;
+        /// <summary>Optional; used for storage-group backfill. Falls back to <see cref="NormalizeGameIndexName"/> with name only.</summary>
+        public Func<string, string, string> NormalizeGameIndexNameWithFolder;
+        public Func<string, string> FoldNormalizedGameTitleForIdentity;
+        public Func<string, string> CleanTag;
         public Func<string, string> NormalizeConsoleLabel;
         public Func<string, string> DisplayExternalIdValue;
         public Func<string, bool> IsClearedExternalIdValue;
@@ -77,6 +81,36 @@ namespace PixelVaultNative
         string NormalizeGameIndexName(string value)
         {
             return dependencies.NormalizeGameIndexName == null ? (value ?? string.Empty).Trim() : dependencies.NormalizeGameIndexName(value ?? string.Empty);
+        }
+
+        string NormalizeGameIndexNameWithFolder(string name, string folderPath)
+        {
+            return dependencies.NormalizeGameIndexNameWithFolder != null
+                ? dependencies.NormalizeGameIndexNameWithFolder(name ?? string.Empty, folderPath ?? string.Empty)
+                : NormalizeGameIndexName(name ?? string.Empty);
+        }
+
+        string FoldNormalizedGameTitleForIdentity(string normalizedName)
+        {
+            return dependencies.FoldNormalizedGameTitleForIdentity == null
+                ? (normalizedName ?? string.Empty).Trim()
+                : dependencies.FoldNormalizedGameTitleForIdentity(normalizedName ?? string.Empty);
+        }
+
+        string CleanTagForStorage(string value)
+        {
+            return dependencies.CleanTag == null ? (value ?? string.Empty).Trim() : dependencies.CleanTag(value ?? string.Empty);
+        }
+
+        bool AssignDeterministicStorageGroupIds(List<GameIndexEditorRow> rows)
+        {
+            return GameIndexStorageGroupBackfill.AssignDeterministicStorageGroupIds(
+                rows,
+                NormalizeGameIndexNameWithFolder,
+                FoldNormalizedGameTitleForIdentity,
+                NormalizeConsoleLabel,
+                CleanTagForStorage,
+                NormalizeGameId);
         }
 
         string NormalizeConsoleLabel(string value)
@@ -350,6 +384,7 @@ CREATE INDEX IF NOT EXISTS idx_starred_export_root_dest ON starred_export_state(
             EnsureGameIndexCollectionMetadataColumns(connection);
             EnsureGameIndexRetroAchievementsGameIdColumn(connection);
             EnsureGameIndexNonSteamIdColumn(connection);
+            EnsureGameIndexStorageGroupIdColumn(connection);
             EnsurePhotoIndexIndexAddedUtcTicksColumn(connection);
             EnsurePhotoIndexRetroAchievementsGameIdColumn(connection);
         }
@@ -371,6 +406,11 @@ CREATE INDEX IF NOT EXISTS idx_starred_export_root_dest ON starred_export_state(
         void EnsureGameIndexNonSteamIdColumn(SqliteConnection connection)
         {
             EnsureDatabaseColumn(connection, "game_index", "non_steam_id", "TEXT NOT NULL DEFAULT ''");
+        }
+
+        void EnsureGameIndexStorageGroupIdColumn(SqliteConnection connection)
+        {
+            EnsureDatabaseColumn(connection, "game_index", "storage_group_id", "TEXT NOT NULL DEFAULT ''");
         }
 
         void EnsureGameIndexIndexAddedUtcTicksColumn(SqliteConnection connection)
@@ -446,7 +486,7 @@ CREATE INDEX IF NOT EXISTS idx_starred_export_root_dest ON starred_export_state(
             {
                 command.CommandText = @"
 SELECT game_id, folder_path, name, platform_label, steam_app_id, non_steam_id, steam_grid_db_id, file_count, preview_image_path, file_paths, index_added_utc_ticks,
-       is_completed_100_percent, completed_utc_ticks, is_favorite, is_showcase, collection_notes, retro_achievements_game_id
+       is_completed_100_percent, completed_utc_ticks, is_favorite, is_showcase, collection_notes, retro_achievements_game_id, storage_group_id
 FROM game_index
 WHERE root = $root
 ORDER BY name COLLATE NOCASE, platform_label COLLATE NOCASE, game_id COLLATE NOCASE;";
@@ -478,7 +518,8 @@ ORDER BY name COLLATE NOCASE, platform_label COLLATE NOCASE, game_id COLLATE NOC
                             IsFavorite = ReadSqliteBoolLoose(reader, 13),
                             IsShowcase = ReadSqliteBoolLoose(reader, 14),
                             CollectionNotes = reader.IsDBNull(15) ? string.Empty : reader.GetString(15),
-                            RetroAchievementsGameId = DisplayExternalIdValue(reader.IsDBNull(16) ? string.Empty : reader.GetString(16))
+                            RetroAchievementsGameId = DisplayExternalIdValue(reader.IsDBNull(16) ? string.Empty : reader.GetString(16)),
+                            StorageGroupId = reader.IsDBNull(17) ? string.Empty : reader.GetString(17)
                         });
                     }
                 }
@@ -494,7 +535,7 @@ ORDER BY name COLLATE NOCASE, platform_label COLLATE NOCASE, game_id COLLATE NOC
             {
                 command.CommandText = @"
 SELECT game_id, folder_path, name, platform_label, steam_app_id, non_steam_id, steam_grid_db_id, file_count, preview_image_path, file_paths, index_added_utc_ticks,
-       is_completed_100_percent, completed_utc_ticks, is_favorite, is_showcase, collection_notes, retro_achievements_game_id
+       is_completed_100_percent, completed_utc_ticks, is_favorite, is_showcase, collection_notes, retro_achievements_game_id, storage_group_id
 FROM game_index
 ORDER BY name COLLATE NOCASE, platform_label COLLATE NOCASE, game_id COLLATE NOCASE;";
                 using (var reader = command.ExecuteReader())
@@ -524,7 +565,8 @@ ORDER BY name COLLATE NOCASE, platform_label COLLATE NOCASE, game_id COLLATE NOC
                             IsFavorite = ReadSqliteBoolLoose(reader, 13),
                             IsShowcase = ReadSqliteBoolLoose(reader, 14),
                             CollectionNotes = reader.IsDBNull(15) ? string.Empty : reader.GetString(15),
-                            RetroAchievementsGameId = DisplayExternalIdValue(reader.IsDBNull(16) ? string.Empty : reader.GetString(16))
+                            RetroAchievementsGameId = DisplayExternalIdValue(reader.IsDBNull(16) ? string.Empty : reader.GetString(16)),
+                            StorageGroupId = reader.IsDBNull(17) ? string.Empty : reader.GetString(17)
                         });
                     }
                 }
@@ -551,8 +593,8 @@ ORDER BY name COLLATE NOCASE, platform_label COLLATE NOCASE, game_id COLLATE NOC
                     {
                         insert.Transaction = transaction;
                         insert.CommandText = @"
-INSERT INTO game_index (root, game_id, folder_path, name, platform_label, steam_app_id, non_steam_id, steam_grid_db_id, file_count, preview_image_path, file_paths, index_added_utc_ticks, is_completed_100_percent, completed_utc_ticks, is_favorite, is_showcase, collection_notes, retro_achievements_game_id)
-VALUES ($root, $gameId, $folderPath, $name, $platformLabel, $steamAppId, $nonSteamId, $steamGridDbId, $fileCount, $previewImagePath, $filePaths, $indexAddedUtcTicks, $isCompleted100Percent, $completedUtcTicks, $isFavorite, $isShowcase, $collectionNotes, $retroAchievementsGameId);";
+INSERT INTO game_index (root, game_id, folder_path, name, platform_label, steam_app_id, non_steam_id, steam_grid_db_id, file_count, preview_image_path, file_paths, index_added_utc_ticks, is_completed_100_percent, completed_utc_ticks, is_favorite, is_showcase, collection_notes, retro_achievements_game_id, storage_group_id)
+VALUES ($root, $gameId, $folderPath, $name, $platformLabel, $steamAppId, $nonSteamId, $steamGridDbId, $fileCount, $previewImagePath, $filePaths, $indexAddedUtcTicks, $isCompleted100Percent, $completedUtcTicks, $isFavorite, $isShowcase, $collectionNotes, $retroAchievementsGameId, $storageGroupId);";
                         insert.Parameters.AddWithValue("$root", root ?? string.Empty);
                         insert.Parameters.AddWithValue("$gameId", NormalizeGameId(row.GameId));
                         insert.Parameters.AddWithValue("$folderPath", row.FolderPath ?? string.Empty);
@@ -571,6 +613,7 @@ VALUES ($root, $gameId, $folderPath, $name, $platformLabel, $steamAppId, $nonSte
                         insert.Parameters.AddWithValue("$isShowcase", row.IsShowcase ? 1L : 0L);
                         insert.Parameters.AddWithValue("$collectionNotes", row.CollectionNotes ?? string.Empty);
                         insert.Parameters.AddWithValue("$retroAchievementsGameId", SerializeExternalIdValue(row.RetroAchievementsGameId, false));
+                        insert.Parameters.AddWithValue("$storageGroupId", row.StorageGroupId ?? string.Empty);
                         insert.ExecuteNonQuery();
                     }
                 }
@@ -1397,8 +1440,9 @@ WHERE root = $root AND game_id = $oldGameId;";
                 BackfillMissingGameIndexExternalIdsFromOtherDatabases(root, connection);
                 var rawRows = ReadSavedGameIndexRowsFromDatabase(root, connection);
                 var normalizedRows = MergeGameIndexRows(rawRows);
+                var storageGroupsAssigned = AssignDeterministicStorageGroupIds(normalizedRows);
                 var aliasMap = BuildGameIdAliasMap(rawRows, normalizedRows);
-                if (rawRows.Count > 0 && (HasGameIdAliasChanges(aliasMap) || normalizedRows.Count != rawRows.Count || rawRows.Any(row => string.IsNullOrWhiteSpace(row.GameId))))
+                if (rawRows.Count > 0 && (HasGameIdAliasChanges(aliasMap) || normalizedRows.Count != rawRows.Count || rawRows.Any(row => string.IsNullOrWhiteSpace(row.GameId)) || storageGroupsAssigned))
                 {
                     TryRollingBackupIndexDatabase(root, connection);
                     WriteSavedGameIndexRowsToDatabase(root, normalizedRows, connection);
@@ -1433,6 +1477,7 @@ WHERE root = $root AND game_id = $oldGameId;";
         {
             var sourceRows = (rows ?? Enumerable.Empty<GameIndexEditorRow>()).Where(row => row != null).ToList();
             var mergedRows = MergeGameIndexRows(sourceRows);
+            AssignDeterministicStorageGroupIds(mergedRows);
             var aliasMap = BuildGameIdAliasMap(sourceRows, mergedRows);
             TryRollingBackupIndexDatabase(root);
             using (var connection = OpenIndexDatabase(root))

@@ -62,7 +62,7 @@ namespace PixelVaultNative
             {
                 Title = "PixelVault " + d.AppVersion + " Path Settings",
                 Width = 780,
-                Height = 660,
+                Height = 740,
                 MinWidth = 640,
                 MinHeight = 520,
                 Owner = d.OwnerWindow,
@@ -93,7 +93,11 @@ namespace PixelVaultNative
             steamWebApiKeyBox.ToolTip = "Valve Steam Web API key (steam_web_api_key in settings.ini). Optional PIXELVAULT_STEAM_WEB_API_KEY / STEAM_WEB_API_KEY env vars override the file.";
             var retroAchievementsKeyBox = SettingsTextBox(panel, 7, "RetroAchievements API key (optional)", d.GetRetroAchievementsApiKey(), labelFg, boxBg, boxFg, borderBrush, boxFg);
             retroAchievementsKeyBox.ToolTip = "RetroAchievements.org API key (retroachievements_api_key). Optional PIXELVAULT_RETROACHIEVEMENTS_API_KEY / RETROACHIEVEMENTS_API_KEY env vars override the file.";
-            var starredExportBox = SettingsTextBox(panel, 8, "Starred export folder (optional)", d.GetStarredExportFolder(), labelFg, boxBg, boxFg, borderBrush, boxFg);
+            var steamUserIdBox = SettingsTextBox(panel, 8, "Your SteamID64 (optional)", d.GetSteamUserId64?.Invoke() ?? string.Empty, labelFg, boxBg, boxFg, borderBrush, boxFg);
+            steamUserIdBox.ToolTip = "Steam Web API: used with GetPlayerAchievements so the library can show which Steam achievements you unlocked (steam_user_id_64). Env: PIXELVAULT_STEAM_USER_ID / STEAMID64.";
+            var retroUserBox = SettingsTextBox(panel, 9, "RetroAchievements username (optional)", d.GetRetroAchievementsUsername?.Invoke() ?? string.Empty, labelFg, boxBg, boxFg, borderBrush, boxFg);
+            retroUserBox.ToolTip = "retro_user on RetroAchievements.org — required for unlock/progress in the achievements viewer (retroachievements_username). Env: PIXELVAULT_RETROACHIEVEMENTS_USERNAME / RA_USERNAME.";
+            var starredExportBox = SettingsTextBox(panel, 10, "Starred export folder (optional)", d.GetStarredExportFolder(), labelFg, boxBg, boxFg, borderBrush, boxFg);
             starredExportBox.ToolTip = "Library → Export Starred copies starred files here (mirrored paths under the library root). Only files that are new to the export or whose metadata/file stamp changed are copied again; tracking lives in that library’s SQLite index. Replaces existing files when needed.";
 
             SettingsBrowseButton(panel, 0, delegate { var picked = d.PickFolder(d.PrimarySourceRoot()); if (!string.IsNullOrWhiteSpace(picked)) sourceBox.Text = d.AppendSourceRoot(sourceBox.Text, picked); }, "Add Folder");
@@ -101,7 +105,7 @@ namespace PixelVaultNative
             SettingsBrowseButton(panel, 2, delegate { var picked = d.PickFolder(libraryBox.Text); if (!string.IsNullOrWhiteSpace(picked)) libraryBox.Text = picked; });
             SettingsBrowseButton(panel, 3, delegate { var picked = d.PickFile(exifBox.Text, "Executable (*.exe)|*.exe|All files (*.*)|*.*", null); if (!string.IsNullOrWhiteSpace(picked)) exifBox.Text = picked; });
             SettingsBrowseButton(panel, 4, delegate { var picked = d.PickFile(ffmpegBox.Text, "Executable (*.exe)|*.exe|All files (*.*)|*.*", null); if (!string.IsNullOrWhiteSpace(picked)) ffmpegBox.Text = picked; });
-            SettingsBrowseButton(panel, 8, delegate { var picked = d.PickFolder(starredExportBox.Text); if (!string.IsNullOrWhiteSpace(picked)) starredExportBox.Text = picked; });
+            SettingsBrowseButton(panel, 10, delegate { var picked = d.PickFolder(starredExportBox.Text); if (!string.IsNullOrWhiteSpace(picked)) starredExportBox.Text = picked; });
 
             var pathScroll = new ScrollViewer
             {
@@ -133,6 +137,8 @@ namespace PixelVaultNative
                 d.SetSteamGridDbApiToken((steamGridDbTokenBox.Text ?? string.Empty).Trim());
                 d.SetSteamWebApiKey((steamWebApiKeyBox.Text ?? string.Empty).Trim());
                 d.SetRetroAchievementsApiKey((retroAchievementsKeyBox.Text ?? string.Empty).Trim());
+                d.SetSteamUserId64((steamUserIdBox.Text ?? string.Empty).Trim());
+                d.SetRetroAchievementsUsername((retroUserBox.Text ?? string.Empty).Trim());
                 d.SaveSettings();
                 d.RefreshMainUi();
                 window.Close();
@@ -340,6 +346,8 @@ namespace PixelVaultNative
             stack.Children.Add(new TextBlock { Text = "SteamGridDB: " + (d.HasSteamGridDbApiToken() ? "token configured" : "(token not configured)"), TextWrapping = TextWrapping.Wrap, Foreground = textMuted });
             stack.Children.Add(new TextBlock { Text = "Steam Web API: " + ((d.HasSteamWebApiKey?.Invoke() ?? false) ? "key configured" : "(not configured)"), TextWrapping = TextWrapping.Wrap, Foreground = textMuted, Margin = new Thickness(0, 4, 0, 0) });
             stack.Children.Add(new TextBlock { Text = "RetroAchievements: " + ((d.HasRetroAchievementsApiKey?.Invoke() ?? false) ? "API key configured" : "(not configured)"), TextWrapping = TextWrapping.Wrap, Foreground = textMuted, Margin = new Thickness(0, 4, 0, 0) });
+            stack.Children.Add(new TextBlock { Text = "Steam user (achievements): " + (string.IsNullOrWhiteSpace(d.GetSteamUserId64?.Invoke()) ? "(not set)" : "SteamID64 set"), TextWrapping = TextWrapping.Wrap, Foreground = textMuted, Margin = new Thickness(0, 4, 0, 0) });
+            stack.Children.Add(new TextBlock { Text = "RetroAchievements user: " + (string.IsNullOrWhiteSpace(d.GetRetroAchievementsUsername?.Invoke()) ? "(not set)" : "username set"), TextWrapping = TextWrapping.Wrap, Foreground = textMuted, Margin = new Thickness(0, 4, 0, 0) });
             border.Child = stack;
             return border;
         }
@@ -376,6 +384,29 @@ namespace PixelVaultNative
                 d.Log("Library: double-click opens files (folder cover gesture off).");
             };
             stack.Children.Add(doubleClickCoverBox);
+            var refreshHeroBannerCacheBox = new CheckBox
+            {
+                Content = "On next Library load: clear cached capture hero banners (re-download with current sources)",
+                IsChecked = d.GetLibraryRefreshHeroBannerCacheOnNextLibraryOpen?.Invoke() ?? false,
+                Margin = new Thickness(0, 10, 0, 0),
+                Foreground = textPrimary
+            };
+            refreshHeroBannerCacheBox.ToolTip =
+                "Removes auto-downloaded wide banner files under My Covers (hero-*). Custom banners you set are not deleted. "
+                + "After the library reloads, open captures for a game or use Fetch Banner Art to pull SteamGridDB Heroes / Steam library hero again.";
+            refreshHeroBannerCacheBox.Checked += delegate
+            {
+                if (d.SetLibraryRefreshHeroBannerCacheOnNextLibraryOpen != null) d.SetLibraryRefreshHeroBannerCacheOnNextLibraryOpen(true);
+                d.SaveSettings();
+                d.Log("Library: scheduled cached hero banner clear on next folder load.");
+            };
+            refreshHeroBannerCacheBox.Unchecked += delegate
+            {
+                if (d.SetLibraryRefreshHeroBannerCacheOnNextLibraryOpen != null) d.SetLibraryRefreshHeroBannerCacheOnNextLibraryOpen(false);
+                d.SaveSettings();
+                d.Log("Library: cancelled scheduled hero banner cache clear.");
+            };
+            stack.Children.Add(refreshHeroBannerCacheBox);
             border.Child = stack;
             return border;
         }

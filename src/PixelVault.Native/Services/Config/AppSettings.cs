@@ -18,6 +18,10 @@ namespace PixelVaultNative
         public string SteamWebApiKey = string.Empty;
         /// <summary>RetroAchievements.org API key (optional; for future integration).</summary>
         public string RetroAchievementsApiKey = string.Empty;
+        /// <summary>Your SteamID64 for Steam Web API calls that need a profile (e.g. achievement unlocks). Optional.</summary>
+        public string SteamUserId64 = string.Empty;
+        /// <summary>RetroAchievements site username for per-game unlock progress. Optional.</summary>
+        public string RetroAchievementsUsername = string.Empty;
         public int LibraryFolderTileSize = 300;
         /// <summary>Preferred capture tile width (px) for non-timeline library detail grids; clamped to the viewport (<c>PV-PLN-LIBWS-001</c> Step 6).</summary>
         public int LibraryPhotoTileSize = 340;
@@ -49,6 +53,8 @@ namespace PixelVaultNative
         public bool TroubleshootingLogRedactPaths;
         /// <summary>When true, double-click a still image in the library detail grid (or use its context menu) to set that file as the folder custom cover.</summary>
         public bool LibraryDoubleClickSetsFolderCover;
+        /// <summary>When true, the next successful library folder load clears auto-cached hero banner files (<c>hero-*</c>) for loaded titles so captures view can re-download with the current SteamGridDB/Steam pipeline. Custom banners are untouched.</summary>
+        public bool LibraryRefreshHeroBannerCacheOnNextLibraryOpen;
 
         public static AppSettings Clone(AppSettings s)
         {
@@ -65,6 +71,8 @@ namespace PixelVaultNative
                 SteamGridDbApiToken = s.SteamGridDbApiToken ?? string.Empty,
                 SteamWebApiKey = s.SteamWebApiKey ?? string.Empty,
                 RetroAchievementsApiKey = s.RetroAchievementsApiKey ?? string.Empty,
+                SteamUserId64 = s.SteamUserId64 ?? string.Empty,
+                RetroAchievementsUsername = s.RetroAchievementsUsername ?? string.Empty,
                 LibraryFolderTileSize = s.LibraryFolderTileSize,
                 LibraryPhotoTileSize = s.LibraryPhotoTileSize,
                 LibraryFolderGridColumnCount = s.LibraryFolderGridColumnCount,
@@ -84,7 +92,8 @@ namespace PixelVaultNative
                 ManualMetadataRecentTitleLabels = s.ManualMetadataRecentTitleLabels ?? string.Empty,
                 TroubleshootingLoggingEnabled = s.TroubleshootingLoggingEnabled,
                 TroubleshootingLogRedactPaths = s.TroubleshootingLogRedactPaths,
-                LibraryDoubleClickSetsFolderCover = s.LibraryDoubleClickSetsFolderCover
+                LibraryDoubleClickSetsFolderCover = s.LibraryDoubleClickSetsFolderCover,
+                LibraryRefreshHeroBannerCacheOnNextLibraryOpen = s.LibraryRefreshHeroBannerCacheOnNextLibraryOpen
             };
         }
     }
