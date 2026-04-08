@@ -94,6 +94,7 @@ namespace PixelVaultNative
                             FilePath = targetPath,
                             Stamp = targetStamp,
                             GameId = NormalizeGameId(row.GameId),
+                            RetroAchievementsGameId = CleanTag(row.RetroAchievementsGameId),
                             ConsoleLabel = NormalizeConsoleLabel(row.PlatformLabel),
                             TagText = string.Join(", ", fallbackTags),
                             CaptureUtcTicks = ResolveLibraryMetadataCaptureUtcTicks(targetPath, targetStamp, null, null),
@@ -104,6 +105,7 @@ namespace PixelVaultNative
                     entry.FilePath = targetPath;
                     entry.Stamp = BuildLibraryMetadataStamp(targetPath);
                     entry.GameId = NormalizeGameId(row.GameId);
+                    entry.RetroAchievementsGameId = CleanTag(row.RetroAchievementsGameId);
                     entry.ConsoleLabel = NormalizeConsoleLabel(row.PlatformLabel);
                     if (entry.CaptureUtcTicks <= 0)
                     {
@@ -248,6 +250,11 @@ namespace PixelVaultNative
                     folder.SuppressSteamAppIdAutoResolve = false;
                     changed = true;
                 }
+                if (!string.Equals(folder.NonSteamId ?? string.Empty, saved.NonSteamId ?? string.Empty, StringComparison.Ordinal))
+                {
+                    folder.NonSteamId = saved.NonSteamId ?? string.Empty;
+                    changed = true;
+                }
                 if (saved.SuppressSteamGridDbIdAutoResolve)
                 {
                     if (!folder.SuppressSteamGridDbIdAutoResolve || !string.IsNullOrWhiteSpace(folder.SteamGridDbId))
@@ -261,6 +268,11 @@ namespace PixelVaultNative
                 {
                     folder.SteamGridDbId = saved.SteamGridDbId;
                     folder.SuppressSteamGridDbIdAutoResolve = false;
+                    changed = true;
+                }
+                if (!string.Equals(folder.RetroAchievementsGameId ?? string.Empty, saved.RetroAchievementsGameId ?? string.Empty, StringComparison.Ordinal))
+                {
+                    folder.RetroAchievementsGameId = saved.RetroAchievementsGameId ?? string.Empty;
                     changed = true;
                 }
                 if (!string.IsNullOrWhiteSpace(saved.PreviewImagePath) && File.Exists(saved.PreviewImagePath) && !string.Equals(folder.PreviewImagePath ?? string.Empty, saved.PreviewImagePath ?? string.Empty, StringComparison.Ordinal))
@@ -317,7 +329,9 @@ namespace PixelVaultNative
                     Name = folder.Name ?? string.Empty,
                     PlatformLabel = folder.PlatformLabel ?? string.Empty,
                     SteamAppId = folder.SteamAppId ?? string.Empty,
+                    NonSteamId = folder.NonSteamId ?? string.Empty,
                     SteamGridDbId = folder.SteamGridDbId ?? string.Empty,
+                    RetroAchievementsGameId = folder.RetroAchievementsGameId ?? string.Empty,
                     SuppressSteamAppIdAutoResolve = folder.SuppressSteamAppIdAutoResolve,
                     SuppressSteamGridDbIdAutoResolve = folder.SuppressSteamGridDbIdAutoResolve,
                     FileCount = folder.FileCount,
@@ -340,11 +354,13 @@ namespace PixelVaultNative
                     saved.SteamAppId = folder.SteamAppId ?? string.Empty;
                     saved.SuppressSteamAppIdAutoResolve = folder.SuppressSteamAppIdAutoResolve;
                 }
+                saved.NonSteamId = folder.NonSteamId ?? string.Empty;
                 if (!string.IsNullOrWhiteSpace(folder.SteamGridDbId) || folder.SuppressSteamGridDbIdAutoResolve)
                 {
                     saved.SteamGridDbId = folder.SteamGridDbId ?? string.Empty;
                     saved.SuppressSteamGridDbIdAutoResolve = folder.SuppressSteamGridDbIdAutoResolve;
                 }
+                saved.RetroAchievementsGameId = folder.RetroAchievementsGameId ?? string.Empty;
                 saved.FileCount = folder.FileCount;
                 saved.PreviewImagePath = folder.PreviewImagePath ?? string.Empty;
                 saved.FilePaths = folder.FilePaths ?? new string[0];

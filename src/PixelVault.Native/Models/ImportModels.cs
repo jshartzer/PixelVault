@@ -23,6 +23,7 @@ namespace PixelVaultNative
     {
         public string GameId;
         public string SteamAppId;
+        public string NonSteamId;
         public string FilePath;
         public string FileName;
         public string OriginalFileName;
@@ -35,12 +36,14 @@ namespace PixelVaultNative
         public bool ForceTagMetadataWrite;
         public bool TagSteam;
         public bool TagPc;
+        public bool TagEmulation;
         public bool TagPs5;
         public bool TagXbox;
         public bool TagOther;
         public string CustomPlatformTag;
         public string OriginalGameId;
         public string OriginalSteamAppId;
+        public string OriginalNonSteamId;
         public DateTime OriginalCaptureTime;
         public bool OriginalUseCustomCaptureTime;
         public string OriginalGameName;
@@ -49,6 +52,7 @@ namespace PixelVaultNative
         public bool OriginalAddPhotographyTag;
         public bool OriginalTagSteam;
         public bool OriginalTagPc;
+        public bool OriginalTagEmulation;
         public bool OriginalTagPs5;
         public bool OriginalTagXbox;
         public bool OriginalTagOther;

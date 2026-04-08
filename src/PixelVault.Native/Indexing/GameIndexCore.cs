@@ -51,7 +51,7 @@ namespace PixelVaultNative
             if (string.IsNullOrWhiteSpace(cleaned)) return string.Empty;
             while (true)
             {
-                var updated = Regex.Replace(cleaned, @"\s*-\s*(Steam|PS5|PlayStation|Xbox PC|Xbox\/Windows|Xbox Windows|Xbox|PC)\s*$", string.Empty, RegexOptions.IgnoreCase);
+                var updated = Regex.Replace(cleaned, @"\s*-\s*(Steam|Emulation|PS5|PlayStation|Xbox PC|Xbox\/Windows|Xbox Windows|Xbox|PC)\s*$", string.Empty, RegexOptions.IgnoreCase);
                 updated = CleanTag(updated);
                 if (string.Equals(updated, cleaned, StringComparison.Ordinal)) return cleaned;
                 cleaned = updated;
@@ -107,7 +107,9 @@ namespace PixelVaultNative
                 Name = NormalizeGameIndexName(row.Name, row.FolderPath),
                 PlatformLabel = NormalizeConsoleLabel(row.PlatformLabel),
                 SteamAppId = CleanTag(row.SteamAppId),
+                NonSteamId = CleanTag(row.NonSteamId),
                 SteamGridDbId = CleanTag(row.SteamGridDbId),
+                RetroAchievementsGameId = CleanTag(row.RetroAchievementsGameId),
                 SuppressSteamAppIdAutoResolve = row.SuppressSteamAppIdAutoResolve,
                 SuppressSteamGridDbIdAutoResolve = row.SuppressSteamGridDbIdAutoResolve,
                 FileCount = Math.Max(0, row.FileCount),
@@ -239,7 +241,9 @@ namespace PixelVaultNative
                     Name = preferredName ?? NormalizeGameIndexName(representative.Name, folderPath),
                     PlatformLabel = NormalizeConsoleLabel(representative.PlatformLabel),
                     SteamAppId = groupRows.Select(row => row.SteamAppId ?? string.Empty).FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty,
+                    NonSteamId = groupRows.Select(row => row.NonSteamId ?? string.Empty).FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty,
                     SteamGridDbId = groupRows.Select(row => row.SteamGridDbId ?? string.Empty).FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty,
+                    RetroAchievementsGameId = groupRows.Select(row => row.RetroAchievementsGameId ?? string.Empty).FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty,
                     SuppressSteamAppIdAutoResolve = !groupRows.Any(row => !string.IsNullOrWhiteSpace(row.SteamAppId)) && groupRows.Any(row => row.SuppressSteamAppIdAutoResolve),
                     SuppressSteamGridDbIdAutoResolve = !groupRows.Any(row => !string.IsNullOrWhiteSpace(row.SteamGridDbId)) && groupRows.Any(row => row.SuppressSteamGridDbIdAutoResolve),
                     FileCount = mergedFilePaths.Length > 0 ? mergedFilePaths.Length : groupRows.Max(row => row.FileCount),
@@ -336,6 +340,7 @@ namespace PixelVaultNative
                     else if (previous == null) row.IndexAddedUtcTicks = nowTicks;
                 }
                 var cleanedSteamAppId = CleanTag(row.SteamAppId);
+                var cleanedNonSteamId = CleanTag(row.NonSteamId);
                 var cleanedSteamGridDbId = CleanTag(row.SteamGridDbId);
                 row.SuppressSteamAppIdAutoResolve = ShouldSuppressExternalIdAutoResolve(
                     cleanedSteamAppId,
@@ -346,7 +351,9 @@ namespace PixelVaultNative
                     previous == null ? string.Empty : previous.SteamGridDbId,
                     (previous != null && previous.SuppressSteamGridDbIdAutoResolve) || row.SuppressSteamGridDbIdAutoResolve);
                 row.SteamAppId = cleanedSteamAppId;
+                row.NonSteamId = cleanedNonSteamId;
                 row.SteamGridDbId = cleanedSteamGridDbId;
+                row.RetroAchievementsGameId = CleanTag(row.RetroAchievementsGameId);
                 row.CompletedUtcTicks = row.CompletedUtcTicks > 0 ? row.CompletedUtcTicks : 0L;
                 row.CollectionNotes = row.CollectionNotes ?? string.Empty;
             }
@@ -437,7 +444,9 @@ namespace PixelVaultNative
                     Name = folder.Name ?? string.Empty,
                     PlatformLabel = folder.PlatformLabel ?? string.Empty,
                     SteamAppId = folder.SteamAppId ?? string.Empty,
+                    NonSteamId = folder.NonSteamId ?? string.Empty,
                     SteamGridDbId = folder.SteamGridDbId ?? string.Empty,
+                    RetroAchievementsGameId = folder.RetroAchievementsGameId ?? string.Empty,
                     SuppressSteamAppIdAutoResolve = folder.SuppressSteamAppIdAutoResolve,
                     SuppressSteamGridDbIdAutoResolve = folder.SuppressSteamGridDbIdAutoResolve,
                     FileCount = folder.FileCount,

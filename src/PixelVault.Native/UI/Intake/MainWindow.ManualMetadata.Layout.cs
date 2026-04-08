@@ -40,6 +40,7 @@ namespace PixelVaultNative
             public CheckBox PhotographyBox;
             public CheckBox SteamBox;
             public CheckBox PcBox;
+            public CheckBox EmulationBox;
             public CheckBox Ps5Box;
             public CheckBox XboxBox;
             public CheckBox OtherBox;
@@ -166,6 +167,7 @@ namespace PixelVaultNative
             var tagSeparator = new Border { Width = 1, Height = 20, Background = Brush("#D7E1E8"), Margin = new Thickness(2, 2, 16, 10), VerticalAlignment = VerticalAlignment.Center };
             h.SteamBox = new CheckBox { Content = "Steam", Foreground = Brush("#1F2A30"), Margin = new Thickness(0, 0, 18, 10), IsThreeState = true };
             h.PcBox = new CheckBox { Content = "PC", Foreground = Brush("#1F2A30"), Margin = new Thickness(0, 0, 18, 10), IsThreeState = true };
+            h.EmulationBox = new CheckBox { Content = "Emulation", Foreground = Brush("#1F2A30"), Margin = new Thickness(0, 0, 18, 10), IsThreeState = true };
             h.Ps5Box = new CheckBox { Content = "PS5", Foreground = Brush("#1F2A30"), Margin = new Thickness(0, 0, 18, 10), IsThreeState = true };
             h.XboxBox = new CheckBox { Content = "Xbox", Foreground = Brush("#1F2A30"), Margin = new Thickness(0, 0, 18, 10), IsThreeState = true };
             h.OtherBox = new CheckBox { Content = "Other", Foreground = Brush("#1F2A30"), Margin = new Thickness(0, 0, 12, 10), IsThreeState = true };
@@ -175,6 +177,7 @@ namespace PixelVaultNative
             tagToggleRow.Children.Add(tagSeparator);
             tagToggleRow.Children.Add(h.SteamBox);
             tagToggleRow.Children.Add(h.PcBox);
+            tagToggleRow.Children.Add(h.EmulationBox);
             tagToggleRow.Children.Add(h.Ps5Box);
             tagToggleRow.Children.Add(h.XboxBox);
             tagToggleRow.Children.Add(h.OtherBox);

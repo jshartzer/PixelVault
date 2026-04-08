@@ -46,6 +46,7 @@ namespace PixelVaultNative
             var useCustomPlatform = !string.IsNullOrWhiteSpace(customPlatformName)
                 && !string.Equals(normalizedCustomPlatform, "Steam", StringComparison.OrdinalIgnoreCase)
                 && !string.Equals(normalizedCustomPlatform, "PC", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(normalizedCustomPlatform, "Emulation", StringComparison.OrdinalIgnoreCase)
                 && !string.Equals(normalizedCustomPlatform, "PS5", StringComparison.OrdinalIgnoreCase)
                 && !string.Equals(normalizedCustomPlatform, "Xbox", StringComparison.OrdinalIgnoreCase)
                 && !string.Equals(normalizedCustomPlatform, "Other", StringComparison.OrdinalIgnoreCase)
@@ -58,6 +59,7 @@ namespace PixelVaultNative
                 !string.Equals(tag, "Photography", StringComparison.OrdinalIgnoreCase) &&
                 !string.Equals(tag, "Steam", StringComparison.OrdinalIgnoreCase) &&
                 !string.Equals(tag, "PC", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(tag, "Emulation", StringComparison.OrdinalIgnoreCase) &&
                 !string.Equals(tag, "PS5", StringComparison.OrdinalIgnoreCase) &&
                 !string.Equals(tag, "PlayStation", StringComparison.OrdinalIgnoreCase) &&
                 !string.Equals(tag, "Xbox", StringComparison.OrdinalIgnoreCase) &&
@@ -65,6 +67,7 @@ namespace PixelVaultNative
             var addPhotographyTag = tags.Any(tag => string.Equals(tag, GamePhotographyTag, StringComparison.OrdinalIgnoreCase) || string.Equals(tag, "Photography", StringComparison.OrdinalIgnoreCase));
             var tagSteam = consoleTags.Contains("Steam");
             var tagPc = !consoleTags.Contains("Steam") && consoleTags.Contains("PC");
+            var tagEmulation = consoleTags.Contains("Emulation");
             var tagPs5 = consoleTags.Contains("PS5");
             var tagXbox = consoleTags.Contains("Xbox");
             var customPlatformValue = useCustomPlatform ? customPlatformName : string.Empty;
@@ -98,10 +101,14 @@ namespace PixelVaultNative
             var steamAppId = folderPathUsable ? (folder.SteamAppId ?? string.Empty) : string.Empty;
             if (savedGameRow != null && !string.IsNullOrWhiteSpace(savedGameRow.SteamAppId))
                 steamAppId = savedGameRow.SteamAppId;
+            var nonSteamId = folderPathUsable ? (folder.NonSteamId ?? string.Empty) : string.Empty;
+            if (savedGameRow != null && !string.IsNullOrWhiteSpace(savedGameRow.NonSteamId))
+                nonSteamId = savedGameRow.NonSteamId;
             return new ManualMetadataItem
             {
                 GameId = indexEntry == null ? (folder == null || !folderPathUsable ? string.Empty : folder.GameId) : indexEntry.GameId,
                 SteamAppId = steamAppId,
+                NonSteamId = nonSteamId,
                 FilePath = file,
                 FileName = fileName,
                 OriginalFileName = fileName,
@@ -113,12 +120,14 @@ namespace PixelVaultNative
                 AddPhotographyTag = addPhotographyTag,
                 TagSteam = tagSteam,
                 TagPc = tagPc,
+                TagEmulation = tagEmulation,
                 TagPs5 = tagPs5,
                 TagXbox = tagXbox,
                 TagOther = useCustomPlatform,
                 CustomPlatformTag = customPlatformValue,
                 OriginalGameId = indexEntry == null ? (folder == null || !folderPathUsable ? string.Empty : folder.GameId) : indexEntry.GameId,
                 OriginalSteamAppId = steamAppId,
+                OriginalNonSteamId = nonSteamId,
                 OriginalCaptureTime = captureTime,
                 OriginalUseCustomCaptureTime = false,
                 OriginalGameName = gameName,
@@ -127,6 +136,7 @@ namespace PixelVaultNative
                 OriginalAddPhotographyTag = addPhotographyTag,
                 OriginalTagSteam = tagSteam,
                 OriginalTagPc = tagPc,
+                OriginalTagEmulation = tagEmulation,
                 OriginalTagPs5 = tagPs5,
                 OriginalTagXbox = tagXbox,
                 OriginalTagOther = useCustomPlatform,
@@ -201,10 +211,13 @@ namespace PixelVaultNative
             var preservedAppId = !string.IsNullOrWhiteSpace(originalSavedRow == null ? string.Empty : originalSavedRow.SteamAppId)
                 ? originalSavedRow.SteamAppId
                 : (originalFolder == null ? string.Empty : (originalFolder.SteamAppId ?? string.Empty));
+            var preservedNonSteamId = !string.IsNullOrWhiteSpace(originalSavedRow == null ? string.Empty : originalSavedRow.NonSteamId)
+                ? originalSavedRow.NonSteamId
+                : (originalFolder == null ? string.Empty : (originalFolder.NonSteamId ?? string.Empty));
             var preservedSteamGridDbId = !string.IsNullOrWhiteSpace(originalSavedRow == null ? string.Empty : originalSavedRow.SteamGridDbId)
                 ? originalSavedRow.SteamGridDbId
                 : (originalFolder == null ? string.Empty : (originalFolder.SteamGridDbId ?? string.Empty));
-            if (string.IsNullOrWhiteSpace(preservedAppId) && string.IsNullOrWhiteSpace(preservedSteamGridDbId)) return;
+            if (string.IsNullOrWhiteSpace(preservedAppId) && string.IsNullOrWhiteSpace(preservedNonSteamId) && string.IsNullOrWhiteSpace(preservedSteamGridDbId)) return;
             var rows = GetSavedGameIndexRowsForRoot(root);
             var sourceGameId = NormalizeGameId(originalSavedRow == null ? (originalFolder == null ? string.Empty : originalFolder.GameId) : originalSavedRow.GameId);
             var sourceName = NormalizeGameIndexName(originalSavedRow == null ? (originalFolder == null ? string.Empty : originalFolder.Name) : originalSavedRow.Name);
@@ -224,6 +237,7 @@ namespace PixelVaultNative
                     Name = sourceName,
                     PlatformLabel = sourcePlatform,
                     SteamAppId = string.Empty,
+                    NonSteamId = string.Empty,
                     SteamGridDbId = string.Empty,
                     FileCount = 0,
                     FolderPath = originalSavedRow == null ? (originalFolder == null ? string.Empty : originalFolder.FolderPath ?? string.Empty) : originalSavedRow.FolderPath ?? string.Empty,
@@ -238,6 +252,7 @@ namespace PixelVaultNative
             if (string.IsNullOrWhiteSpace(existing.Name)) existing.Name = sourceName;
             if (string.IsNullOrWhiteSpace(existing.PlatformLabel)) existing.PlatformLabel = sourcePlatform;
             if (string.IsNullOrWhiteSpace(existing.SteamAppId)) existing.SteamAppId = preservedAppId;
+            if (string.IsNullOrWhiteSpace(existing.NonSteamId)) existing.NonSteamId = preservedNonSteamId;
             if (string.IsNullOrWhiteSpace(existing.SteamGridDbId)) existing.SteamGridDbId = preservedSteamGridDbId;
             SaveSavedGameIndexRows(root, rows);
         }

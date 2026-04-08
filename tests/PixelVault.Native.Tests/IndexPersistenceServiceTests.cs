@@ -298,6 +298,125 @@ VALUES ($root, 'G00045', 'E:/Game Captures/Control', 'Control', 'Steam', '', '',
         Assert.Equal(1, Convert.ToInt32(verifyCommand.ExecuteScalar()));
         verifyCommand.CommandText = "SELECT COUNT(1) FROM pragma_table_info('game_index') WHERE name = 'collection_notes';";
         Assert.Equal(1, Convert.ToInt32(verifyCommand.ExecuteScalar()));
+        verifyCommand.CommandText = "SELECT COUNT(1) FROM pragma_table_info('game_index') WHERE name = 'retro_achievements_game_id';";
+        Assert.Equal(1, Convert.ToInt32(verifyCommand.ExecuteScalar()));
+    }
+
+    [Fact]
+    public void SaveAndLoadSavedGameIndexRows_RoundTripsRetroAchievementsGameId()
+    {
+        using var harness = new IndexPersistenceHarness();
+        var existingFile = harness.CreateFile("library\\ra-cover.png");
+
+        harness.Service.SaveSavedGameIndexRows(
+            harness.LibraryRoot,
+            new[]
+            {
+                new GameIndexEditorRow
+                {
+                    GameId = "G00777",
+                    Name = "Sonic CD",
+                    PlatformLabel = "Steam",
+                    SteamAppId = string.Empty,
+                    SteamGridDbId = string.Empty,
+                    RetroAchievementsGameId = " 258 ",
+                    FileCount = 1,
+                    FolderPath = Path.Combine(harness.RootPath, "library"),
+                    PreviewImagePath = existingFile,
+                    FilePaths = new[] { existingFile }
+                }
+            });
+
+        var rows = harness.Service.LoadSavedGameIndexRows(harness.LibraryRoot);
+        var row = Assert.Single(rows);
+        Assert.Equal("258", row.RetroAchievementsGameId);
+    }
+
+    [Fact]
+    public void SaveAndLoadSavedGameIndexRows_RoundTripsNonSteamId()
+    {
+        using var harness = new IndexPersistenceHarness();
+        var existingFile = harness.CreateFile("library\\emu-cover.png");
+
+        harness.Service.SaveSavedGameIndexRows(
+            harness.LibraryRoot,
+            new[]
+            {
+                new GameIndexEditorRow
+                {
+                    GameId = "G00888",
+                    Name = "Sonic Adventure DX",
+                    PlatformLabel = "Emulation",
+                    NonSteamId = "16245548604121415680",
+                    SteamGridDbId = "100",
+                    FileCount = 1,
+                    FolderPath = Path.Combine(harness.RootPath, "library"),
+                    PreviewImagePath = existingFile,
+                    FilePaths = new[] { existingFile }
+                }
+            });
+
+        var rows = harness.Service.LoadSavedGameIndexRows(harness.LibraryRoot);
+
+        var row = Assert.Single(rows);
+        Assert.Equal("16245548604121415680", row.NonSteamId);
+    }
+
+    [Fact]
+    public void LoadSavedGameIndexRows_UpgradesExistingDatabaseWithNonSteamIdColumn()
+    {
+        using var harness = new IndexPersistenceHarness();
+        var existingFile = harness.CreateFile("library\\upgrade-emu-cover.png");
+
+        var builder = new SqliteConnectionStringBuilder
+        {
+            DataSource = harness.IndexDatabasePath,
+            Mode = SqliteOpenMode.ReadWriteCreate
+        };
+        using (var connection = new SqliteConnection(builder.ToString()))
+        {
+            connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = @"
+CREATE TABLE game_index (
+    root TEXT NOT NULL,
+    game_id TEXT NOT NULL,
+    folder_path TEXT NOT NULL DEFAULT '',
+    name TEXT NOT NULL DEFAULT '',
+    platform_label TEXT NOT NULL DEFAULT '',
+    steam_app_id TEXT NOT NULL DEFAULT '',
+    steam_grid_db_id TEXT NOT NULL DEFAULT '',
+    file_count INTEGER NOT NULL DEFAULT 0,
+    preview_image_path TEXT NOT NULL DEFAULT '',
+    file_paths TEXT NOT NULL DEFAULT '',
+    index_added_utc_ticks INTEGER NOT NULL DEFAULT 0,
+    is_completed_100_percent INTEGER NOT NULL DEFAULT 0,
+    completed_utc_ticks INTEGER NOT NULL DEFAULT 0,
+    is_favorite INTEGER NOT NULL DEFAULT 0,
+    is_showcase INTEGER NOT NULL DEFAULT 0,
+    collection_notes TEXT NOT NULL DEFAULT '',
+    retro_achievements_game_id TEXT NOT NULL DEFAULT '',
+    PRIMARY KEY (root, game_id)
+);
+INSERT INTO game_index (root, game_id, folder_path, name, platform_label, steam_app_id, steam_grid_db_id, file_count, preview_image_path, file_paths, index_added_utc_ticks, is_completed_100_percent, completed_utc_ticks, is_favorite, is_showcase, collection_notes, retro_achievements_game_id)
+VALUES ($root, 'G00045', 'E:/Game Captures/Sonic Adventure DX', 'Sonic Adventure DX', 'Emulation', '', '100', 1, $previewImagePath, $filePaths, 0, 0, 0, 0, 0, '', '258');";
+            command.Parameters.AddWithValue("$root", harness.LibraryRoot);
+            command.Parameters.AddWithValue("$previewImagePath", existingFile);
+            command.Parameters.AddWithValue("$filePaths", existingFile);
+            command.ExecuteNonQuery();
+        }
+
+        var loaded = harness.Service.LoadSavedGameIndexRows(harness.LibraryRoot);
+
+        var row = Assert.Single(loaded);
+        Assert.Equal("G00045", row.GameId);
+        Assert.Equal(string.Empty, row.NonSteamId);
+
+        using var verifyConnection = new SqliteConnection(builder.ToString());
+        verifyConnection.Open();
+        using var verifyCommand = verifyConnection.CreateCommand();
+        verifyCommand.CommandText = "SELECT COUNT(1) FROM pragma_table_info('game_index') WHERE name = 'non_steam_id';";
+        Assert.Equal(1, Convert.ToInt32(verifyCommand.ExecuteScalar()));
     }
 
     [Fact]
@@ -568,6 +687,35 @@ VALUES ($root, $filePath, $stamp, $gameId, $consoleLabel, $tagText);";
         Assert.Equal(1, columnCount);
         verifyCommand.CommandText = "SELECT COUNT(1) FROM pragma_table_info('photo_index') WHERE name = 'index_added_utc_ticks';";
         Assert.Equal(1, Convert.ToInt32(verifyCommand.ExecuteScalar()));
+        verifyCommand.CommandText = "SELECT COUNT(1) FROM pragma_table_info('photo_index') WHERE name = 'retro_achievements_game_id';";
+        Assert.Equal(1, Convert.ToInt32(verifyCommand.ExecuteScalar()));
+    }
+
+    [Fact]
+    public void SaveLibraryMetadataIndexEntries_RoundTripsRetroAchievementsGameId()
+    {
+        using var harness = new IndexPersistenceHarness();
+        var file = harness.CreateFile("metadata\\ra-shot.png");
+
+        harness.Service.SaveLibraryMetadataIndexEntries(
+            harness.LibraryRoot,
+            new Dictionary<string, LibraryMetadataIndexEntry>(StringComparer.OrdinalIgnoreCase)
+            {
+                [file] = new LibraryMetadataIndexEntry
+                {
+                    FilePath = file,
+                    Stamp = "stamp-ra",
+                    GameId = "G00001",
+                    RetroAchievementsGameId = "258",
+                    ConsoleLabel = "Steam",
+                    TagText = "Steam;Action",
+                    CaptureUtcTicks = 0
+                }
+            });
+
+        var loaded = harness.Service.LoadLibraryMetadataIndexEntries(harness.LibraryRoot);
+        var entry = Assert.Single(loaded.Values);
+        Assert.Equal("258", entry.RetroAchievementsGameId);
     }
 
     [Fact]

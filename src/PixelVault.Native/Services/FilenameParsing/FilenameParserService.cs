@@ -31,6 +31,7 @@ namespace PixelVaultNative
         readonly FilenameParserServiceDependencies dependencies;
         readonly Dictionary<string, List<FilenameConventionRule>> ruleCache = new Dictionary<string, List<FilenameConventionRule>>(StringComparer.OrdinalIgnoreCase);
         readonly Dictionary<string, Dictionary<string, KnownSteamRenameLookupEntry>> knownSteamRenameCache = new Dictionary<string, Dictionary<string, KnownSteamRenameLookupEntry>>(StringComparer.OrdinalIgnoreCase);
+        readonly Dictionary<string, Dictionary<string, KnownNonSteamLookupEntry>> knownNonSteamIdCache = new Dictionary<string, Dictionary<string, KnownNonSteamLookupEntry>>(StringComparer.OrdinalIgnoreCase);
         readonly Dictionary<string, Regex> regexCache = new Dictionary<string, Regex>(StringComparer.Ordinal);
         readonly object sync = new object();
 
@@ -77,6 +78,7 @@ namespace PixelVaultNative
             }
 
             ApplyKnownSteamRenameFallback(result, fileName, root);
+            ApplyNonSteamShortcutFallback(result, fileName, root);
 
             if (string.IsNullOrWhiteSpace(result.PlatformLabel) || string.Equals(result.PlatformLabel, "Other", StringComparison.OrdinalIgnoreCase))
             {
@@ -158,6 +160,7 @@ namespace PixelVaultNative
             {
                 ruleCache.Remove(cacheKey);
                 knownSteamRenameCache.Remove(cacheKey);
+                knownNonSteamIdCache.Remove(cacheKey);
             }
         }
 
@@ -449,6 +452,7 @@ namespace PixelVaultNative
                 if (string.Equals(normalized, "Xbox PC", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(normalized, "Xbox", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(normalized, "Steam", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(normalized, "Emulation", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(normalized, "PS5", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(normalized, "PlayStation", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(normalized, "PC", StringComparison.OrdinalIgnoreCase))
@@ -494,6 +498,43 @@ namespace PixelVaultNative
             }
         }
 
+        void ApplyNonSteamShortcutFallback(FilenameParseResult result, string fileName, string root)
+        {
+            if (result == null) return;
+            if (!string.Equals(result.ConventionId, "steam_screenshot_appid", StringComparison.OrdinalIgnoreCase)) return;
+
+            var candidateId = CleanNumericId(result.SteamAppId);
+            if (!LooksLikeNonSteamShortcutId(candidateId)) return;
+
+            result.NonSteamId = candidateId;
+            result.SteamAppId = string.Empty;
+            result.PlatformLabel = "Emulation";
+            result.PlatformTags = new[] { "Emulation" };
+            result.ConventionId = "steam_screenshot_nonsteam_id";
+            result.ConventionName = "Steam Screenshot (Non-Steam Shortcut)";
+            result.ConfidenceLabel = "Heuristic";
+
+            if (!string.IsNullOrWhiteSpace(root))
+            {
+                KnownNonSteamLookupEntry lookupEntry;
+                if (GetKnownNonSteamLookup(root).TryGetValue(candidateId, out lookupEntry) && !string.IsNullOrWhiteSpace(lookupEntry.Name))
+                {
+                    result.GameTitleHint = lookupEntry.Name ?? string.Empty;
+                    result.RoutesToManualWhenMissingSteamAppId = false;
+                    return;
+                }
+            }
+
+            if (string.Equals(CleanTag(result.GameTitleHint), candidateId, StringComparison.Ordinal))
+            {
+                result.GameTitleHint = string.Empty;
+            }
+
+            // Keep unknown shortcut IDs in the manual flow so the user can name the game once,
+            // while we still preserve the shortcut ID for the new master row.
+            result.RoutesToManualWhenMissingSteamAppId = true;
+        }
+
         Dictionary<string, KnownSteamRenameLookupEntry> GetKnownSteamRenameLookup(string root)
         {
             var cacheKey = root ?? string.Empty;
@@ -534,6 +575,35 @@ namespace PixelVaultNative
             }
         }
 
+        Dictionary<string, KnownNonSteamLookupEntry> GetKnownNonSteamLookup(string root)
+        {
+            var cacheKey = root ?? string.Empty;
+            lock (sync)
+            {
+                Dictionary<string, KnownNonSteamLookupEntry> cached;
+                if (knownNonSteamIdCache.TryGetValue(cacheKey, out cached)) return cached;
+            }
+
+            var lookup = new Dictionary<string, KnownNonSteamLookupEntry>(StringComparer.OrdinalIgnoreCase);
+            foreach (var row in LoadSavedGameIndexRows(root).Where(row => row != null && !string.IsNullOrWhiteSpace(row.NonSteamId)))
+            {
+                var nonSteamId = CleanNumericId(row.NonSteamId);
+                if (string.IsNullOrWhiteSpace(nonSteamId)) continue;
+                if (lookup.ContainsKey(nonSteamId)) continue;
+
+                lookup[nonSteamId] = new KnownNonSteamLookupEntry
+                {
+                    Name = NormalizeGameIndexName(row.Name)
+                };
+            }
+
+            lock (sync)
+            {
+                knownNonSteamIdCache[cacheKey] = lookup;
+                return lookup;
+            }
+        }
+
         List<GameIndexEditorRow> LoadSavedGameIndexRows(string root)
         {
             if (dependencies.LoadSavedGameIndexRows == null) return new List<GameIndexEditorRow>();
@@ -551,6 +621,23 @@ namespace PixelVaultNative
             if (row == null) return false;
             return string.Equals(NormalizeConsoleLabel(row.PlatformLabel), "Steam", StringComparison.OrdinalIgnoreCase)
                 || !string.IsNullOrWhiteSpace(row.SteamAppId);
+        }
+
+        static bool LooksLikeNonSteamShortcutId(string value)
+        {
+            return !string.IsNullOrWhiteSpace(value)
+                && value.Length >= 16
+                && value.All(char.IsDigit);
+        }
+
+        static string CleanNumericId(string value)
+        {
+            return new string((value ?? string.Empty).Where(char.IsDigit).ToArray());
+        }
+
+        static string CleanTag(string value)
+        {
+            return (value ?? string.Empty).Trim();
         }
 
         static bool LooksLikeRenamedSteamScreenshot(string fileName)
@@ -949,6 +1036,11 @@ namespace PixelVaultNative
             public bool HasSteamMatch;
             public bool HasConflictingPlatform;
             public string SteamAppId;
+        }
+
+        struct KnownNonSteamLookupEntry
+        {
+            public string Name;
         }
     }
 }

@@ -273,6 +273,7 @@ CREATE TABLE IF NOT EXISTS game_index (
     name TEXT NOT NULL DEFAULT '',
     platform_label TEXT NOT NULL DEFAULT '',
     steam_app_id TEXT NOT NULL DEFAULT '',
+    non_steam_id TEXT NOT NULL DEFAULT '',
     steam_grid_db_id TEXT NOT NULL DEFAULT '',
     file_count INTEGER NOT NULL DEFAULT 0,
     preview_image_path TEXT NOT NULL DEFAULT '',
@@ -283,6 +284,7 @@ CREATE TABLE IF NOT EXISTS game_index (
     is_favorite INTEGER NOT NULL DEFAULT 0,
     is_showcase INTEGER NOT NULL DEFAULT 0,
     collection_notes TEXT NOT NULL DEFAULT '',
+    retro_achievements_game_id TEXT NOT NULL DEFAULT '',
     PRIMARY KEY (root, game_id)
 );
 CREATE INDEX IF NOT EXISTS idx_game_index_root_identity ON game_index(root, name, platform_label);
@@ -296,6 +298,7 @@ CREATE TABLE IF NOT EXISTS photo_index (
     capture_utc_ticks INTEGER NOT NULL DEFAULT 0,
     starred INTEGER NOT NULL DEFAULT 0,
     index_added_utc_ticks INTEGER NOT NULL DEFAULT 0,
+    retro_achievements_game_id TEXT NOT NULL DEFAULT '',
     PRIMARY KEY (root, file_path)
 );
 CREATE INDEX IF NOT EXISTS idx_photo_index_root_game ON photo_index(root, game_id);
@@ -345,7 +348,10 @@ CREATE INDEX IF NOT EXISTS idx_starred_export_root_dest ON starred_export_state(
             EnsurePhotoIndexStarredColumn(connection);
             EnsureGameIndexIndexAddedUtcTicksColumn(connection);
             EnsureGameIndexCollectionMetadataColumns(connection);
+            EnsureGameIndexRetroAchievementsGameIdColumn(connection);
+            EnsureGameIndexNonSteamIdColumn(connection);
             EnsurePhotoIndexIndexAddedUtcTicksColumn(connection);
+            EnsurePhotoIndexRetroAchievementsGameIdColumn(connection);
         }
 
         void EnsureGameIndexCollectionMetadataColumns(SqliteConnection connection)
@@ -355,6 +361,16 @@ CREATE INDEX IF NOT EXISTS idx_starred_export_root_dest ON starred_export_state(
             EnsureDatabaseColumn(connection, "game_index", "is_favorite", "INTEGER NOT NULL DEFAULT 0");
             EnsureDatabaseColumn(connection, "game_index", "is_showcase", "INTEGER NOT NULL DEFAULT 0");
             EnsureDatabaseColumn(connection, "game_index", "collection_notes", "TEXT NOT NULL DEFAULT ''");
+        }
+
+        void EnsureGameIndexRetroAchievementsGameIdColumn(SqliteConnection connection)
+        {
+            EnsureDatabaseColumn(connection, "game_index", "retro_achievements_game_id", "TEXT NOT NULL DEFAULT ''");
+        }
+
+        void EnsureGameIndexNonSteamIdColumn(SqliteConnection connection)
+        {
+            EnsureDatabaseColumn(connection, "game_index", "non_steam_id", "TEXT NOT NULL DEFAULT ''");
         }
 
         void EnsureGameIndexIndexAddedUtcTicksColumn(SqliteConnection connection)
@@ -375,6 +391,11 @@ CREATE INDEX IF NOT EXISTS idx_starred_export_root_dest ON starred_export_state(
         void EnsurePhotoIndexStarredColumn(SqliteConnection connection)
         {
             EnsureDatabaseColumn(connection, "photo_index", "starred", "INTEGER NOT NULL DEFAULT 0");
+        }
+
+        void EnsurePhotoIndexRetroAchievementsGameIdColumn(SqliteConnection connection)
+        {
+            EnsureDatabaseColumn(connection, "photo_index", "retro_achievements_game_id", "TEXT NOT NULL DEFAULT ''");
         }
 
         void EnsureDatabaseColumn(SqliteConnection connection, string tableName, string columnName, string columnDefinition)
@@ -424,8 +445,8 @@ CREATE INDEX IF NOT EXISTS idx_starred_export_root_dest ON starred_export_state(
             using (var command = connection.CreateCommand())
             {
                 command.CommandText = @"
-SELECT game_id, folder_path, name, platform_label, steam_app_id, steam_grid_db_id, file_count, preview_image_path, file_paths, index_added_utc_ticks,
-       is_completed_100_percent, completed_utc_ticks, is_favorite, is_showcase, collection_notes
+SELECT game_id, folder_path, name, platform_label, steam_app_id, non_steam_id, steam_grid_db_id, file_count, preview_image_path, file_paths, index_added_utc_ticks,
+       is_completed_100_percent, completed_utc_ticks, is_favorite, is_showcase, collection_notes, retro_achievements_game_id
 FROM game_index
 WHERE root = $root
 ORDER BY name COLLATE NOCASE, platform_label COLLATE NOCASE, game_id COLLATE NOCASE;";
@@ -434,7 +455,7 @@ ORDER BY name COLLATE NOCASE, platform_label COLLATE NOCASE, game_id COLLATE NOC
                 {
                     while (reader.Read())
                     {
-                        var filePathsText = reader.IsDBNull(8) ? string.Empty : reader.GetString(8);
+                        var filePathsText = reader.IsDBNull(9) ? string.Empty : reader.GetString(9);
                         rows.Add(new GameIndexEditorRow
                         {
                             GameId = reader.IsDBNull(0) ? string.Empty : reader.GetString(0),
@@ -442,20 +463,22 @@ ORDER BY name COLLATE NOCASE, platform_label COLLATE NOCASE, game_id COLLATE NOC
                             Name = reader.IsDBNull(2) ? string.Empty : reader.GetString(2),
                             PlatformLabel = reader.IsDBNull(3) ? string.Empty : reader.GetString(3),
                             SteamAppId = DisplayExternalIdValue(reader.IsDBNull(4) ? string.Empty : reader.GetString(4)),
-                            SteamGridDbId = DisplayExternalIdValue(reader.IsDBNull(5) ? string.Empty : reader.GetString(5)),
+                            NonSteamId = DisplayExternalIdValue(reader.IsDBNull(5) ? string.Empty : reader.GetString(5)),
+                            SteamGridDbId = DisplayExternalIdValue(reader.IsDBNull(6) ? string.Empty : reader.GetString(6)),
                             SuppressSteamAppIdAutoResolve = IsClearedExternalIdValue(reader.IsDBNull(4) ? string.Empty : reader.GetString(4)),
-                            SuppressSteamGridDbIdAutoResolve = IsClearedExternalIdValue(reader.IsDBNull(5) ? string.Empty : reader.GetString(5)),
-                            FileCount = reader.IsDBNull(6) ? 0 : reader.GetInt32(6),
-                            PreviewImagePath = reader.IsDBNull(7) ? string.Empty : reader.GetString(7),
+                            SuppressSteamGridDbIdAutoResolve = IsClearedExternalIdValue(reader.IsDBNull(6) ? string.Empty : reader.GetString(6)),
+                            FileCount = reader.IsDBNull(7) ? 0 : reader.GetInt32(7),
+                            PreviewImagePath = reader.IsDBNull(8) ? string.Empty : reader.GetString(8),
                             FilePaths = string.IsNullOrWhiteSpace(filePathsText)
                                 ? new string[0]
                                 : filePathsText.Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries).Where(File.Exists).ToArray(),
-                            IndexAddedUtcTicks = reader.IsDBNull(9) ? 0L : reader.GetInt64(9),
-                            IsCompleted100Percent = ReadSqliteBoolLoose(reader, 10),
-                            CompletedUtcTicks = reader.IsDBNull(11) ? 0L : reader.GetInt64(11),
-                            IsFavorite = ReadSqliteBoolLoose(reader, 12),
-                            IsShowcase = ReadSqliteBoolLoose(reader, 13),
-                            CollectionNotes = reader.IsDBNull(14) ? string.Empty : reader.GetString(14)
+                            IndexAddedUtcTicks = reader.IsDBNull(10) ? 0L : reader.GetInt64(10),
+                            IsCompleted100Percent = ReadSqliteBoolLoose(reader, 11),
+                            CompletedUtcTicks = reader.IsDBNull(12) ? 0L : reader.GetInt64(12),
+                            IsFavorite = ReadSqliteBoolLoose(reader, 13),
+                            IsShowcase = ReadSqliteBoolLoose(reader, 14),
+                            CollectionNotes = reader.IsDBNull(15) ? string.Empty : reader.GetString(15),
+                            RetroAchievementsGameId = DisplayExternalIdValue(reader.IsDBNull(16) ? string.Empty : reader.GetString(16))
                         });
                     }
                 }
@@ -470,15 +493,15 @@ ORDER BY name COLLATE NOCASE, platform_label COLLATE NOCASE, game_id COLLATE NOC
             using (var command = connection.CreateCommand())
             {
                 command.CommandText = @"
-SELECT game_id, folder_path, name, platform_label, steam_app_id, steam_grid_db_id, file_count, preview_image_path, file_paths, index_added_utc_ticks,
-       is_completed_100_percent, completed_utc_ticks, is_favorite, is_showcase, collection_notes
+SELECT game_id, folder_path, name, platform_label, steam_app_id, non_steam_id, steam_grid_db_id, file_count, preview_image_path, file_paths, index_added_utc_ticks,
+       is_completed_100_percent, completed_utc_ticks, is_favorite, is_showcase, collection_notes, retro_achievements_game_id
 FROM game_index
 ORDER BY name COLLATE NOCASE, platform_label COLLATE NOCASE, game_id COLLATE NOCASE;";
                 using (var reader = command.ExecuteReader())
                 {
                     while (reader.Read())
                     {
-                        var filePathsText = reader.IsDBNull(8) ? string.Empty : reader.GetString(8);
+                        var filePathsText = reader.IsDBNull(9) ? string.Empty : reader.GetString(9);
                         rows.Add(new GameIndexEditorRow
                         {
                             GameId = reader.IsDBNull(0) ? string.Empty : reader.GetString(0),
@@ -486,20 +509,22 @@ ORDER BY name COLLATE NOCASE, platform_label COLLATE NOCASE, game_id COLLATE NOC
                             Name = reader.IsDBNull(2) ? string.Empty : reader.GetString(2),
                             PlatformLabel = reader.IsDBNull(3) ? string.Empty : reader.GetString(3),
                             SteamAppId = DisplayExternalIdValue(reader.IsDBNull(4) ? string.Empty : reader.GetString(4)),
-                            SteamGridDbId = DisplayExternalIdValue(reader.IsDBNull(5) ? string.Empty : reader.GetString(5)),
+                            NonSteamId = DisplayExternalIdValue(reader.IsDBNull(5) ? string.Empty : reader.GetString(5)),
+                            SteamGridDbId = DisplayExternalIdValue(reader.IsDBNull(6) ? string.Empty : reader.GetString(6)),
                             SuppressSteamAppIdAutoResolve = IsClearedExternalIdValue(reader.IsDBNull(4) ? string.Empty : reader.GetString(4)),
-                            SuppressSteamGridDbIdAutoResolve = IsClearedExternalIdValue(reader.IsDBNull(5) ? string.Empty : reader.GetString(5)),
-                            FileCount = reader.IsDBNull(6) ? 0 : reader.GetInt32(6),
-                            PreviewImagePath = reader.IsDBNull(7) ? string.Empty : reader.GetString(7),
+                            SuppressSteamGridDbIdAutoResolve = IsClearedExternalIdValue(reader.IsDBNull(6) ? string.Empty : reader.GetString(6)),
+                            FileCount = reader.IsDBNull(7) ? 0 : reader.GetInt32(7),
+                            PreviewImagePath = reader.IsDBNull(8) ? string.Empty : reader.GetString(8),
                             FilePaths = string.IsNullOrWhiteSpace(filePathsText)
                                 ? new string[0]
                                 : filePathsText.Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries).Where(File.Exists).ToArray(),
-                            IndexAddedUtcTicks = reader.IsDBNull(9) ? 0L : reader.GetInt64(9),
-                            IsCompleted100Percent = ReadSqliteBoolLoose(reader, 10),
-                            CompletedUtcTicks = reader.IsDBNull(11) ? 0L : reader.GetInt64(11),
-                            IsFavorite = ReadSqliteBoolLoose(reader, 12),
-                            IsShowcase = ReadSqliteBoolLoose(reader, 13),
-                            CollectionNotes = reader.IsDBNull(14) ? string.Empty : reader.GetString(14)
+                            IndexAddedUtcTicks = reader.IsDBNull(10) ? 0L : reader.GetInt64(10),
+                            IsCompleted100Percent = ReadSqliteBoolLoose(reader, 11),
+                            CompletedUtcTicks = reader.IsDBNull(12) ? 0L : reader.GetInt64(12),
+                            IsFavorite = ReadSqliteBoolLoose(reader, 13),
+                            IsShowcase = ReadSqliteBoolLoose(reader, 14),
+                            CollectionNotes = reader.IsDBNull(15) ? string.Empty : reader.GetString(15),
+                            RetroAchievementsGameId = DisplayExternalIdValue(reader.IsDBNull(16) ? string.Empty : reader.GetString(16))
                         });
                     }
                 }
@@ -526,14 +551,15 @@ ORDER BY name COLLATE NOCASE, platform_label COLLATE NOCASE, game_id COLLATE NOC
                     {
                         insert.Transaction = transaction;
                         insert.CommandText = @"
-INSERT INTO game_index (root, game_id, folder_path, name, platform_label, steam_app_id, steam_grid_db_id, file_count, preview_image_path, file_paths, index_added_utc_ticks, is_completed_100_percent, completed_utc_ticks, is_favorite, is_showcase, collection_notes)
-VALUES ($root, $gameId, $folderPath, $name, $platformLabel, $steamAppId, $steamGridDbId, $fileCount, $previewImagePath, $filePaths, $indexAddedUtcTicks, $isCompleted100Percent, $completedUtcTicks, $isFavorite, $isShowcase, $collectionNotes);";
+INSERT INTO game_index (root, game_id, folder_path, name, platform_label, steam_app_id, non_steam_id, steam_grid_db_id, file_count, preview_image_path, file_paths, index_added_utc_ticks, is_completed_100_percent, completed_utc_ticks, is_favorite, is_showcase, collection_notes, retro_achievements_game_id)
+VALUES ($root, $gameId, $folderPath, $name, $platformLabel, $steamAppId, $nonSteamId, $steamGridDbId, $fileCount, $previewImagePath, $filePaths, $indexAddedUtcTicks, $isCompleted100Percent, $completedUtcTicks, $isFavorite, $isShowcase, $collectionNotes, $retroAchievementsGameId);";
                         insert.Parameters.AddWithValue("$root", root ?? string.Empty);
                         insert.Parameters.AddWithValue("$gameId", NormalizeGameId(row.GameId));
                         insert.Parameters.AddWithValue("$folderPath", row.FolderPath ?? string.Empty);
                         insert.Parameters.AddWithValue("$name", row.Name ?? string.Empty);
                         insert.Parameters.AddWithValue("$platformLabel", row.PlatformLabel ?? string.Empty);
                         insert.Parameters.AddWithValue("$steamAppId", SerializeExternalIdValue(row.SteamAppId, row.SuppressSteamAppIdAutoResolve));
+                        insert.Parameters.AddWithValue("$nonSteamId", SerializeExternalIdValue(row.NonSteamId, false));
                         insert.Parameters.AddWithValue("$steamGridDbId", SerializeExternalIdValue(row.SteamGridDbId, row.SuppressSteamGridDbIdAutoResolve));
                         insert.Parameters.AddWithValue("$fileCount", Math.Max(0, row.FileCount));
                         insert.Parameters.AddWithValue("$previewImagePath", row.PreviewImagePath ?? string.Empty);
@@ -544,6 +570,7 @@ VALUES ($root, $gameId, $folderPath, $name, $platformLabel, $steamAppId, $steamG
                         insert.Parameters.AddWithValue("$isFavorite", row.IsFavorite ? 1L : 0L);
                         insert.Parameters.AddWithValue("$isShowcase", row.IsShowcase ? 1L : 0L);
                         insert.Parameters.AddWithValue("$collectionNotes", row.CollectionNotes ?? string.Empty);
+                        insert.Parameters.AddWithValue("$retroAchievementsGameId", SerializeExternalIdValue(row.RetroAchievementsGameId, false));
                         insert.ExecuteNonQuery();
                     }
                 }
@@ -572,7 +599,8 @@ VALUES ($root, $gameId, $folderPath, $name, $platformLabel, $steamAppId, $steamG
                 TagText = tagText,
                 CaptureUtcTicks = reader.IsDBNull(5) ? 0L : reader.GetInt64(5),
                 Starred = ReadSqliteBoolLoose(reader, 6),
-                IndexAddedUtcTicks = reader.IsDBNull(7) ? 0L : reader.GetInt64(7)
+                IndexAddedUtcTicks = reader.IsDBNull(7) ? 0L : reader.GetInt64(7),
+                RetroAchievementsGameId = DisplayExternalIdValue(reader.IsDBNull(8) ? string.Empty : reader.GetString(8))
             };
         }
 
@@ -582,7 +610,7 @@ VALUES ($root, $gameId, $folderPath, $name, $platformLabel, $steamAppId, $steamG
             using (var command = connection.CreateCommand())
             {
                 command.CommandText = @"
-SELECT file_path, stamp, game_id, console_label, tag_text, capture_utc_ticks, starred, index_added_utc_ticks
+SELECT file_path, stamp, game_id, console_label, tag_text, capture_utc_ticks, starred, index_added_utc_ticks, retro_achievements_game_id
 FROM photo_index
 WHERE root = $root
 ORDER BY file_path COLLATE NOCASE;";
@@ -632,7 +660,7 @@ ORDER BY file_path COLLATE NOCASE;";
                         }
 
                         command.CommandText = @"
-SELECT file_path, stamp, game_id, console_label, tag_text, capture_utc_ticks, starred, index_added_utc_ticks
+SELECT file_path, stamp, game_id, console_label, tag_text, capture_utc_ticks, starred, index_added_utc_ticks, retro_achievements_game_id
 FROM photo_index
 WHERE root = $root AND file_path IN (" + string.Join(", ", inParams) + @")
 ORDER BY file_path COLLATE NOCASE;";
@@ -667,8 +695,8 @@ ORDER BY file_path COLLATE NOCASE;";
                     {
                         cmd.Transaction = transaction;
                         cmd.CommandText = @"
-INSERT INTO photo_index (root, file_path, stamp, game_id, console_label, tag_text, capture_utc_ticks, starred, index_added_utc_ticks)
-VALUES ($root, $filePath, $stamp, $gameId, $consoleLabel, $tagText, $captureUtcTicks, $starred, $indexAddedUtcTicks)
+INSERT INTO photo_index (root, file_path, stamp, game_id, console_label, tag_text, capture_utc_ticks, starred, index_added_utc_ticks, retro_achievements_game_id)
+VALUES ($root, $filePath, $stamp, $gameId, $consoleLabel, $tagText, $captureUtcTicks, $starred, $indexAddedUtcTicks, $retroAchievementsGameId)
 ON CONFLICT(root, file_path) DO UPDATE SET
     stamp = excluded.stamp,
     game_id = excluded.game_id,
@@ -676,7 +704,8 @@ ON CONFLICT(root, file_path) DO UPDATE SET
     tag_text = excluded.tag_text,
     capture_utc_ticks = excluded.capture_utc_ticks,
     starred = excluded.starred,
-    index_added_utc_ticks = excluded.index_added_utc_ticks;";
+    index_added_utc_ticks = excluded.index_added_utc_ticks,
+    retro_achievements_game_id = excluded.retro_achievements_game_id;";
                         cmd.Parameters.AddWithValue("$root", root ?? string.Empty);
                         cmd.Parameters.AddWithValue("$filePath", entry.FilePath ?? string.Empty);
                         cmd.Parameters.AddWithValue("$stamp", entry.Stamp ?? string.Empty);
@@ -686,6 +715,7 @@ ON CONFLICT(root, file_path) DO UPDATE SET
                         cmd.Parameters.AddWithValue("$captureUtcTicks", entry.CaptureUtcTicks > 0 ? entry.CaptureUtcTicks : 0L);
                         cmd.Parameters.AddWithValue("$starred", entry.Starred ? 1L : 0L);
                         cmd.Parameters.AddWithValue("$indexAddedUtcTicks", entry.IndexAddedUtcTicks > 0 ? entry.IndexAddedUtcTicks : 0L);
+                        cmd.Parameters.AddWithValue("$retroAchievementsGameId", SerializeExternalIdValue(entry.RetroAchievementsGameId, false));
                         cmd.ExecuteNonQuery();
                     }
                 }
@@ -731,8 +761,8 @@ ON CONFLICT(root, file_path) DO UPDATE SET
                     {
                         insert.Transaction = transaction;
                         insert.CommandText = @"
-INSERT INTO photo_index (root, file_path, stamp, game_id, console_label, tag_text, capture_utc_ticks, starred, index_added_utc_ticks)
-VALUES ($root, $filePath, $stamp, $gameId, $consoleLabel, $tagText, $captureUtcTicks, $starred, $indexAddedUtcTicks);";
+INSERT INTO photo_index (root, file_path, stamp, game_id, console_label, tag_text, capture_utc_ticks, starred, index_added_utc_ticks, retro_achievements_game_id)
+VALUES ($root, $filePath, $stamp, $gameId, $consoleLabel, $tagText, $captureUtcTicks, $starred, $indexAddedUtcTicks, $retroAchievementsGameId);";
                         insert.Parameters.AddWithValue("$root", root ?? string.Empty);
                         insert.Parameters.AddWithValue("$filePath", entry.FilePath ?? string.Empty);
                         insert.Parameters.AddWithValue("$stamp", entry.Stamp ?? string.Empty);
@@ -742,6 +772,7 @@ VALUES ($root, $filePath, $stamp, $gameId, $consoleLabel, $tagText, $captureUtcT
                         insert.Parameters.AddWithValue("$captureUtcTicks", entry.CaptureUtcTicks > 0 ? entry.CaptureUtcTicks : 0L);
                         insert.Parameters.AddWithValue("$starred", entry.Starred ? 1L : 0L);
                         insert.Parameters.AddWithValue("$indexAddedUtcTicks", entry.IndexAddedUtcTicks > 0 ? entry.IndexAddedUtcTicks : 0L);
+                        insert.Parameters.AddWithValue("$retroAchievementsGameId", SerializeExternalIdValue(entry.RetroAchievementsGameId, false));
                         insert.ExecuteNonQuery();
                     }
                 }
@@ -923,6 +954,7 @@ VALUES ($root, $fileName, $platformLabel, $conventionId, $firstSeenUtcTicks, $la
                         Name = parts[2],
                         PlatformLabel = parts[3],
                         SteamAppId = parts[4],
+                        NonSteamId = parts.Length > 9 ? parts[9] : string.Empty,
                         SteamGridDbId = parts[5],
                         FileCount = parts.Length > 6 ? ParseInt(parts[6]) : 0,
                         PreviewImagePath = parts.Length > 7 ? parts[7] : string.Empty,
@@ -941,6 +973,7 @@ VALUES ($root, $fileName, $platformLabel, $conventionId, $firstSeenUtcTicks, $la
                         Name = parts[2],
                         PlatformLabel = parts[3],
                         SteamAppId = parts[4],
+                        NonSteamId = string.Empty,
                         SteamGridDbId = string.Empty,
                         FileCount = parts.Length > 5 ? ParseInt(parts[5]) : 0,
                         PreviewImagePath = parts.Length > 6 ? parts[6] : string.Empty,
@@ -959,6 +992,7 @@ VALUES ($root, $fileName, $platformLabel, $conventionId, $firstSeenUtcTicks, $la
                         Name = parts[1],
                         PlatformLabel = parts[2],
                         SteamAppId = parts[3],
+                        NonSteamId = string.Empty,
                         SteamGridDbId = string.Empty,
                         FileCount = parts.Length > 4 ? ParseInt(parts[4]) : 0,
                         PreviewImagePath = parts.Length > 5 ? parts[5] : string.Empty,
@@ -1132,6 +1166,7 @@ WHERE root = $root AND game_id = $oldGameId;";
             if (row == null) return 0;
             int count = 0;
             if (!string.IsNullOrWhiteSpace(row.SteamAppId)) count++;
+            if (!string.IsNullOrWhiteSpace(row.NonSteamId)) count++;
             if (!string.IsNullOrWhiteSpace(row.SteamGridDbId)) count++;
             return count;
         }
@@ -1140,6 +1175,7 @@ WHERE root = $root AND game_id = $oldGameId;";
         {
             if (row == null) return false;
             return (!row.SuppressSteamAppIdAutoResolve && string.IsNullOrWhiteSpace(row.SteamAppId))
+                || (string.Equals(NormalizeConsoleLabel(row.PlatformLabel), "Emulation", StringComparison.OrdinalIgnoreCase) && string.IsNullOrWhiteSpace(row.NonSteamId))
                 || (!row.SuppressSteamGridDbIdAutoResolve && string.IsNullOrWhiteSpace(row.SteamGridDbId));
         }
 
@@ -1206,6 +1242,14 @@ WHERE root = $root AND game_id = $oldGameId;";
                     }
                 }
 
+                if (string.IsNullOrWhiteSpace(row.NonSteamId)
+                    && string.Equals(NormalizeConsoleLabel(row.PlatformLabel), "Emulation", StringComparison.OrdinalIgnoreCase)
+                    && !string.IsNullOrWhiteSpace(donor.NonSteamId))
+                {
+                    row.NonSteamId = donor.NonSteamId;
+                    changed = true;
+                }
+
                 if (string.IsNullOrWhiteSpace(row.SteamGridDbId) && !row.SuppressSteamGridDbIdAutoResolve)
                 {
                     if (!string.IsNullOrWhiteSpace(donor.SteamGridDbId))
@@ -1253,6 +1297,7 @@ WHERE root = $root AND game_id = $oldGameId;";
                 if (legacyByKey.TryGetValue(key, out existing))
                 {
                     if (string.IsNullOrWhiteSpace(existing.SteamAppId) && !string.IsNullOrWhiteSpace(legacyRow.SteamAppId)) existing.SteamAppId = legacyRow.SteamAppId;
+                    if (string.IsNullOrWhiteSpace(existing.NonSteamId) && !string.IsNullOrWhiteSpace(legacyRow.NonSteamId)) existing.NonSteamId = legacyRow.NonSteamId;
                     if (string.IsNullOrWhiteSpace(existing.SteamGridDbId) && !string.IsNullOrWhiteSpace(legacyRow.SteamGridDbId)) existing.SteamGridDbId = legacyRow.SteamGridDbId;
                 }
                 else
@@ -1264,6 +1309,7 @@ WHERE root = $root AND game_id = $oldGameId;";
                         Name = legacyRow.Name,
                         PlatformLabel = legacyRow.PlatformLabel,
                         SteamAppId = legacyRow.SteamAppId,
+                        NonSteamId = legacyRow.NonSteamId,
                         SteamGridDbId = legacyRow.SteamGridDbId,
                         SuppressSteamAppIdAutoResolve = legacyRow.SuppressSteamAppIdAutoResolve,
                         SuppressSteamGridDbIdAutoResolve = legacyRow.SuppressSteamGridDbIdAutoResolve,
@@ -1284,6 +1330,7 @@ WHERE root = $root AND game_id = $oldGameId;";
             {
                 if (row == null) continue;
                 if ((!string.IsNullOrWhiteSpace(row.SteamAppId) || row.SuppressSteamAppIdAutoResolve)
+                    && (!string.Equals(NormalizeConsoleLabel(row.PlatformLabel), "Emulation", StringComparison.OrdinalIgnoreCase) || !string.IsNullOrWhiteSpace(row.NonSteamId))
                     && (!string.IsNullOrWhiteSpace(row.SteamGridDbId) || row.SuppressSteamGridDbIdAutoResolve))
                 {
                     continue;
@@ -1295,6 +1342,14 @@ WHERE root = $root AND game_id = $oldGameId;";
                 if (string.IsNullOrWhiteSpace(row.SteamAppId) && !row.SuppressSteamAppIdAutoResolve && !string.IsNullOrWhiteSpace(legacy.SteamAppId))
                 {
                     row.SteamAppId = legacy.SteamAppId;
+                    changed = true;
+                }
+
+                if (string.IsNullOrWhiteSpace(row.NonSteamId)
+                    && string.Equals(NormalizeConsoleLabel(row.PlatformLabel), "Emulation", StringComparison.OrdinalIgnoreCase)
+                    && !string.IsNullOrWhiteSpace(legacy.NonSteamId))
+                {
+                    row.NonSteamId = legacy.NonSteamId;
                     changed = true;
                 }
 

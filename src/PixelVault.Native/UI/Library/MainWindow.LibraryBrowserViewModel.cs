@@ -27,7 +27,9 @@ namespace PixelVaultNative
             internal long NewestCaptureUtcTicks;
             internal long NewestRecentSortUtcTicks;
             internal string SteamAppId;
+            internal string NonSteamId;
             internal string SteamGridDbId;
+            internal string RetroAchievementsGameId;
             internal bool SuppressSteamAppIdAutoResolve;
             internal bool SuppressSteamGridDbIdAutoResolve;
             internal bool IsCompleted100Percent;
@@ -57,7 +59,9 @@ namespace PixelVaultNative
                 NewestCaptureUtcTicks = view.NewestCaptureUtcTicks,
                 NewestRecentSortUtcTicks = view.NewestRecentSortUtcTicks,
                 SteamAppId = view.SteamAppId,
+                NonSteamId = view.NonSteamId,
                 SteamGridDbId = view.SteamGridDbId,
+                RetroAchievementsGameId = view.RetroAchievementsGameId,
                 SuppressSteamAppIdAutoResolve = view.SuppressSteamAppIdAutoResolve,
                 SuppressSteamGridDbIdAutoResolve = view.SuppressSteamGridDbIdAutoResolve,
                 IsCompleted100Percent = view.IsCompleted100Percent,
@@ -79,7 +83,9 @@ namespace PixelVaultNative
             if (!string.IsNullOrWhiteSpace(view.PrimaryFolderPath)) parts.Add(view.PrimaryFolderPath.Trim());
             if (!string.IsNullOrWhiteSpace(view.GameId)) parts.Add(view.GameId.Trim());
             if (!string.IsNullOrWhiteSpace(view.SteamAppId)) parts.Add(view.SteamAppId.Trim());
+            if (!string.IsNullOrWhiteSpace(view.NonSteamId)) parts.Add(view.NonSteamId.Trim());
             if (!string.IsNullOrWhiteSpace(view.SteamGridDbId)) parts.Add(view.SteamGridDbId.Trim());
+            if (!string.IsNullOrWhiteSpace(view.RetroAchievementsGameId)) parts.Add(view.RetroAchievementsGameId.Trim());
             foreach (var source in view.SourceFolders)
             {
                 if (source == null) continue;
@@ -111,7 +117,9 @@ namespace PixelVaultNative
             folder.NewestCaptureUtcTicks = view.NewestCaptureUtcTicks;
             folder.NewestRecentSortUtcTicks = view.NewestRecentSortUtcTicks;
             folder.SteamAppId = view.SteamAppId ?? string.Empty;
+            folder.NonSteamId = view.NonSteamId ?? string.Empty;
             folder.SteamGridDbId = view.SteamGridDbId ?? string.Empty;
+            folder.RetroAchievementsGameId = view.RetroAchievementsGameId ?? string.Empty;
             folder.SuppressSteamAppIdAutoResolve = view.SuppressSteamAppIdAutoResolve;
             folder.SuppressSteamGridDbIdAutoResolve = view.SuppressSteamGridDbIdAutoResolve;
             folder.IsCompleted100Percent = view.IsCompleted100Percent;
@@ -672,7 +680,9 @@ namespace PixelVaultNative
                 NewestCaptureUtcTicks = newest <= DateTime.MinValue ? 0 : newest.ToUniversalTime().Ticks,
                 NewestRecentSortUtcTicks = newest <= DateTime.MinValue ? 0 : newest.ToUniversalTime().Ticks,
                 SteamAppId = string.Empty,
+                NonSteamId = string.Empty,
                 SteamGridDbId = string.Empty,
+                RetroAchievementsGameId = string.Empty,
                 SuppressSteamAppIdAutoResolve = true,
                 SuppressSteamGridDbIdAutoResolve = true,
                 IsMergedAcrossPlatforms = true,
@@ -808,7 +818,9 @@ namespace PixelVaultNative
                     h = h * 397 ^ folder.NewestRecentSortUtcTicks;
                     h = h * 397 ^ (folder.PreviewImagePath ?? string.Empty).GetHashCode(StringComparison.OrdinalIgnoreCase);
                     h = h * 397 ^ (folder.SteamAppId ?? string.Empty).GetHashCode(StringComparison.OrdinalIgnoreCase);
+                    h = h * 397 ^ (folder.NonSteamId ?? string.Empty).GetHashCode(StringComparison.OrdinalIgnoreCase);
                     h = h * 397 ^ (folder.SteamGridDbId ?? string.Empty).GetHashCode(StringComparison.OrdinalIgnoreCase);
+                    h = h * 397 ^ (folder.RetroAchievementsGameId ?? string.Empty).GetHashCode(StringComparison.OrdinalIgnoreCase);
                     h = h * 397 ^ (folder.SuppressSteamAppIdAutoResolve ? 1 : 0);
                     h = h * 397 ^ (folder.SuppressSteamGridDbIdAutoResolve ? 1 : 0);
                     var paths = folder.FilePaths;
@@ -867,6 +879,43 @@ namespace PixelVaultNative
             if (all.Count == 1) return all[0];
 
             return string.Empty;
+        }
+
+        internal static string MergeLibraryBrowserNonSteamIdForCombinedView(
+            IReadOnlyList<LibraryFolderInfo> sourceFolders,
+            Func<string, string> normalizeConsoleLabel)
+        {
+            if (sourceFolders == null || sourceFolders.Count == 0) return string.Empty;
+            var normConsole = normalizeConsoleLabel ?? (s => s ?? string.Empty);
+            var normEmulation = normConsole("Emulation");
+            var emulationScoped = sourceFolders
+                .Where(folder => folder != null && string.Equals(normConsole(folder.PlatformLabel ?? string.Empty), normEmulation, StringComparison.OrdinalIgnoreCase))
+                .Select(folder => CleanTag(folder.NonSteamId ?? string.Empty))
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (emulationScoped.Count == 1) return emulationScoped[0];
+
+            var all = sourceFolders
+                .Where(folder => folder != null)
+                .Select(folder => CleanTag(folder.NonSteamId ?? string.Empty))
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            return all.Count == 1 ? all[0] : string.Empty;
+        }
+
+        /// <summary>Merged "All" folder row: show RetroAchievements game ID only when every non-empty source agrees.</summary>
+        internal static string MergeLibraryBrowserRetroAchievementsGameIdForCombinedView(IReadOnlyList<LibraryFolderInfo> sourceFolders)
+        {
+            if (sourceFolders == null || sourceFolders.Count == 0) return string.Empty;
+            var ids = sourceFolders
+                .Where(folder => folder != null)
+                .Select(folder => CleanTag(folder.RetroAchievementsGameId ?? string.Empty))
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            return ids.Count == 1 ? ids[0] : string.Empty;
         }
 
         /// <summary>Returns cached merged rows for "All" grouping when folder data unchanged; console mode is always rebuilt and clears the cache.</summary>
@@ -952,7 +1001,9 @@ namespace PixelVaultNative
                         NewestCaptureUtcTicks = folder.NewestCaptureUtcTicks,
                         NewestRecentSortUtcTicks = folder.NewestRecentSortUtcTicks,
                         SteamAppId = folder.SteamAppId ?? string.Empty,
+                        NonSteamId = folder.NonSteamId ?? string.Empty,
                         SteamGridDbId = folder.SteamGridDbId ?? string.Empty,
+                        RetroAchievementsGameId = folder.RetroAchievementsGameId ?? string.Empty,
                         SuppressSteamAppIdAutoResolve = folder.SuppressSteamAppIdAutoResolve,
                         SuppressSteamGridDbIdAutoResolve = folder.SuppressSteamGridDbIdAutoResolve,
                         IsCompleted100Percent = folder.IsCompleted100Percent,
@@ -1037,7 +1088,9 @@ namespace PixelVaultNative
                         NewestCaptureUtcTicks = tickMax,
                         NewestRecentSortUtcTicks = tickMaxRecent,
                         SteamAppId = MergeLibraryBrowserExternalIdsForCombinedView(sourceFolders, f => f.SteamAppId, NormalizeConsoleLabel),
+                        NonSteamId = MergeLibraryBrowserNonSteamIdForCombinedView(sourceFolders, NormalizeConsoleLabel),
                         SteamGridDbId = MergeLibraryBrowserExternalIdsForCombinedView(sourceFolders, f => f.SteamGridDbId, NormalizeConsoleLabel),
+                        RetroAchievementsGameId = MergeLibraryBrowserRetroAchievementsGameIdForCombinedView(sourceFolders),
                         SuppressSteamAppIdAutoResolve = sourceFolders.All(folder => folder != null && folder.SuppressSteamAppIdAutoResolve),
                         SuppressSteamGridDbIdAutoResolve = sourceFolders.All(folder => folder != null && folder.SuppressSteamGridDbIdAutoResolve),
                         IsCompleted100Percent = sourceFolders.Any(folder => folder != null && folder.IsCompleted100Percent),

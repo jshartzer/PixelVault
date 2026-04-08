@@ -293,6 +293,50 @@ public sealed class FilenameParserServiceTests
     }
 
     [Fact]
+    public void Parse_SteamScreenshotWithKnownNonSteamId_MapsToEmulationAndUsesKnownName()
+    {
+        var parser = CreateParser(
+            loadSavedGameIndexRows: _ => new List<GameIndexEditorRow>
+            {
+                new()
+                {
+                    GameId = "G00002",
+                    Name = "Sonic Adventure DX",
+                    PlatformLabel = "Emulation",
+                    NonSteamId = "16245548604121415680"
+                }
+            });
+
+        var parsed = parser.Parse("16245548604121415680_20260407183242_1.png", "library-root");
+
+        Assert.Equal("Emulation", parsed.PlatformLabel);
+        Assert.Equal(new[] { "Emulation" }, parsed.PlatformTags);
+        Assert.Equal(string.Empty, parsed.SteamAppId);
+        Assert.Equal("16245548604121415680", parsed.NonSteamId);
+        Assert.Equal("Sonic Adventure DX", parsed.GameTitleHint);
+        Assert.False(parsed.RoutesToManualWhenMissingSteamAppId);
+        Assert.Equal("steam_screenshot_nonsteam_id", parsed.ConventionId);
+        Assert.Equal("Heuristic", parsed.ConfidenceLabel);
+    }
+
+    [Fact]
+    public void Parse_SteamScreenshotWithUnknownNonSteamId_RoutesToManualAndClearsNumericTitleHint()
+    {
+        var parser = CreateParser();
+
+        var parsed = parser.Parse("16245548604121415680_20260407183242_1.png", "library-root");
+
+        Assert.Equal("Emulation", parsed.PlatformLabel);
+        Assert.Equal(new[] { "Emulation" }, parsed.PlatformTags);
+        Assert.Equal(string.Empty, parsed.SteamAppId);
+        Assert.Equal("16245548604121415680", parsed.NonSteamId);
+        Assert.Equal(string.Empty, parsed.GameTitleHint);
+        Assert.True(parsed.RoutesToManualWhenMissingSteamAppId);
+        Assert.Equal("steam_screenshot_nonsteam_id", parsed.ConventionId);
+        Assert.Equal("Heuristic", parsed.ConfidenceLabel);
+    }
+
+    [Fact]
     public void InvalidateRules_ClearsKnownSteamLookupCache()
     {
         var loadCount = 0;
@@ -355,6 +399,7 @@ public sealed class FilenameParserServiceTests
                 if (string.Equals(normalized, "PS5", StringComparison.OrdinalIgnoreCase)) return "PS5";
                 if (string.Equals(normalized, "PlayStation", StringComparison.OrdinalIgnoreCase)) return "PlayStation";
                 if (string.Equals(normalized, "Steam", StringComparison.OrdinalIgnoreCase)) return "Steam";
+                if (string.Equals(normalized, "Emulation", StringComparison.OrdinalIgnoreCase)) return "Emulation";
                 if (string.Equals(normalized, "Xbox PC", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(normalized, "Xbox/Windows", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(normalized, "Xbox Windows", StringComparison.OrdinalIgnoreCase)

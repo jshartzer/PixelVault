@@ -55,7 +55,7 @@ namespace PixelVaultNative
 
     public sealed partial class MainWindow : Window
     {
-        const string AppVersion = "0.075.007";
+        const string AppVersion = "0.075.008";
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
         const string ClearedExternalIdSentinel = "__PV_CLEARED__";
@@ -96,6 +96,8 @@ namespace PixelVaultNative
         string exifToolPath;
         string ffmpegPath;
         string steamGridDbApiToken;
+        string steamWebApiKey;
+        string retroAchievementsApiKey;
         int libraryFolderTileSize = 300;
         int libraryPhotoTileSize = 340;
         int libraryFolderGridColumnCount;
@@ -162,7 +164,8 @@ namespace PixelVaultNative
                 TagText = entry.TagText,
                 CaptureUtcTicks = entry.CaptureUtcTicks,
                 Starred = entry.Starred,
-                IndexAddedUtcTicks = entry.IndexAddedUtcTicks
+                IndexAddedUtcTicks = entry.IndexAddedUtcTicks,
+                RetroAchievementsGameId = entry.RetroAchievementsGameId ?? string.Empty
             };
         }
 
@@ -212,7 +215,9 @@ namespace PixelVaultNative
                 NewestCaptureUtcTicks = folder.NewestCaptureUtcTicks,
                 NewestRecentSortUtcTicks = folder.NewestRecentSortUtcTicks,
                 SteamAppId = folder.SteamAppId,
+                NonSteamId = folder.NonSteamId,
                 SteamGridDbId = folder.SteamGridDbId,
+                RetroAchievementsGameId = folder.RetroAchievementsGameId,
                 SuppressSteamAppIdAutoResolve = folder.SuppressSteamAppIdAutoResolve,
                 SuppressSteamGridDbIdAutoResolve = folder.SuppressSteamGridDbIdAutoResolve,
                 IsCompleted100Percent = folder.IsCompleted100Percent,
@@ -1003,6 +1008,18 @@ namespace PixelVaultNative
         {
             return !string.IsNullOrWhiteSpace(CurrentSteamGridDbApiToken());
         }
+        string CurrentSteamWebApiKey()
+        {
+            var env = SettingsService.FindSteamWebApiKeyInEnvironment();
+            return !string.IsNullOrWhiteSpace(env) ? env : (steamWebApiKey ?? string.Empty).Trim();
+        }
+        bool HasSteamWebApiKey() => !string.IsNullOrWhiteSpace(CurrentSteamWebApiKey());
+        string CurrentRetroAchievementsApiKey()
+        {
+            var env = SettingsService.FindRetroAchievementsApiKeyInEnvironment();
+            return !string.IsNullOrWhiteSpace(env) ? env : (retroAchievementsApiKey ?? string.Empty).Trim();
+        }
+        bool HasRetroAchievementsApiKey() => !string.IsNullOrWhiteSpace(CurrentRetroAchievementsApiKey());
         bool IsClearedExternalIdValue(string value)
         {
             return string.Equals((value ?? string.Empty).Trim(), ClearedExternalIdSentinel, StringComparison.Ordinal);
@@ -2430,6 +2447,8 @@ namespace PixelVaultNative
             var parsed = ParseFilename(file);
             var appId = parsed.SteamAppId;
             if (!string.IsNullOrWhiteSpace(appId)) return "Steam AppID " + appId;
+            var nonSteamId = parsed.NonSteamId;
+            if (!string.IsNullOrWhiteSpace(nonSteamId)) return "Non-Steam ID " + nonSteamId;
             if (parsed.RoutesToManualWhenMissingSteamAppId) return "Steam export | AppID needed";
             var label = parsed.PlatformLabel;
             return string.Equals(label, "Other", StringComparison.OrdinalIgnoreCase) ? "No confident match" : label;
@@ -2438,7 +2457,9 @@ namespace PixelVaultNative
         bool IsSteamManualExportWithoutAppId(string file)
         {
             var parsed = ParseFilename(file);
-            return parsed.RoutesToManualWhenMissingSteamAppId && string.IsNullOrWhiteSpace(parsed.SteamAppId);
+            return parsed.RoutesToManualWhenMissingSteamAppId
+                && string.IsNullOrWhiteSpace(parsed.SteamAppId)
+                && string.IsNullOrWhiteSpace(parsed.NonSteamId);
         }
 
         DateTime? ParseSteamManualExportCaptureDate(string file)
@@ -2451,13 +2472,14 @@ namespace PixelVaultNative
             switch (label)
             {
                 case "Steam": return 0;
-                case "PS5": return 1;
-                case "Xbox": return 2;
-                case "Xbox PC": return 3;
-                case "PC": return 4;
-                case "Multiple Tags": return 5;
-                case "Other": return 6;
-                default: return 7;
+                case "Emulation": return 1;
+                case "PS5": return 2;
+                case "Xbox": return 3;
+                case "Xbox PC": return 4;
+                case "PC": return 5;
+                case "Multiple Tags": return 6;
+                case "Other": return 7;
+                default: return 8;
             }
         }
 
@@ -2468,6 +2490,7 @@ namespace PixelVaultNative
                 case "Xbox": return Brush("#2E8B57");
                 case "Xbox PC": return Brush("#4D8F68");
                 case "Steam": return Brush("#2F6FDB");
+                case "Emulation": return Brush("#B26A3C");
                 case "PC": return Brush("#4F6D7A");
                 case "PS5": return Brush("#2563EB");
                 case "PlayStation": return Brush("#2563EB");
@@ -2801,7 +2824,7 @@ namespace PixelVaultNative
                                 MergeRows = delegate(List<GameIndexEditorRow> rows) { return MergeGameIndexRows(rows); },
                                 BuildMergeKey = BuildGameIndexMergeKey,
                                 RunBackgroundWorkflowIntArray = RunBackgroundWorkflowWithProgress<int[]>,
-                                ThrowIfWorkflowCancellationRequested = ThrowIfWorkflowCancellationRequested,
+                                ThrowIfWorkflowCancellationRequested = ImportWorkflowOrchestration.ThrowIfCancellationRequested,
                                 ResolveMissingSteamAppIdsAsync = ResolveMissingGameIndexSteamAppIdsAsync,
                                 ResolveMissingSteamGridDbIdsAsync = ResolveMissingGameIndexSteamGridDbIdsAsync,
                                 OpenFolder = OpenFolder
@@ -3083,8 +3106,6 @@ namespace PixelVaultNative
         }
     }
 }
-
-
 
 
 

@@ -88,6 +88,7 @@ namespace PixelVaultNative
         {
             var normalized = NormalizeConsoleLabel(platformLabel);
             if (string.Equals(normalized, "Steam", StringComparison.OrdinalIgnoreCase)) return "Steam";
+            if (string.Equals(normalized, "Emulation", StringComparison.OrdinalIgnoreCase)) return "Emulation";
             if (string.Equals(normalized, "Xbox", StringComparison.OrdinalIgnoreCase)) return "Xbox";
             if (string.Equals(normalized, "Xbox PC", StringComparison.OrdinalIgnoreCase)) return "Platform:Xbox PC";
             if (string.Equals(normalized, "PS5", StringComparison.OrdinalIgnoreCase)) return "PS5;PlayStation";

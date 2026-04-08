@@ -56,6 +56,8 @@ sealed class StubCoverService : ICoverService
 
     public Task<List<Tuple<string, string>>> SearchSteamAppMatchesAsync(string title, CancellationToken cancellationToken = default) => Task.FromResult(new List<Tuple<string, string>>());
 
+    public Task<List<Tuple<string, string>>> SearchRetroAchievementsGameMatchesAsync(string title, string platformLabel, CancellationToken cancellationToken = default) => Task.FromResult(new List<Tuple<string, string>>());
+
     public Task<string> TryResolveSteamAppIdAsync(string title, CancellationToken cancellationToken = default) => Task.FromResult<string>(null);
 
     public string CustomCoverPath(LibraryFolderInfo folder) => null;
@@ -217,6 +219,66 @@ public sealed class ImportServiceManualMetadataTests
         Assert.Equal("Canonical Name", item.GameName);
         Assert.Equal("999", row.SteamAppId);
         Assert.False(row.SuppressSteamAppIdAutoResolve);
+    }
+
+    [Fact]
+    public void FinalizeManualMetadataItemsAgainstGameIndex_Pushes_NonSteamId_To_Row()
+    {
+        var row = new GameIndexEditorRow
+        {
+            GameId = "G2",
+            Name = "Sonic Adventure DX",
+            PlatformLabel = "Emulation",
+            NonSteamId = string.Empty
+        };
+        var rows = new List<GameIndexEditorRow> { row };
+
+        var assignmentStub = new StubGameIndexEditorAssignmentService
+        {
+            Resolve = (all, name, platform, pref) => row
+        };
+        var svc = CreateServiceWithManualMetadataDeps(
+            new StubCoverService(),
+            s => s.Trim(),
+            assignmentStub,
+            _ => "Emulation",
+            _ => false);
+
+        var item = new ManualMetadataItem
+        {
+            GameName = "Sonic Adventure DX",
+            FilePath = @"D:\captures\shot.png",
+            NonSteamId = "16245548604121415680",
+            GameId = string.Empty,
+            DeleteBeforeProcessing = false
+        };
+
+        svc.FinalizeManualMetadataItemsAgainstGameIndex(@"D:\lib", rows, new[] { item });
+
+        Assert.Equal("G2", item.GameId);
+        Assert.Equal("16245548604121415680", row.NonSteamId);
+    }
+
+    [Fact]
+    public void ApplyManualMetadataTagTextToPlatformFlags_MapsEmulationTag()
+    {
+        var svc = CreateServiceWithManualMetadataDeps(new StubCoverService(), s => s.Trim());
+        var item = new ManualMetadataItem
+        {
+            TagText = "Portrait; Emulation",
+            TagOther = true,
+            CustomPlatformTag = "Switch"
+        };
+
+        svc.ApplyManualMetadataTagTextToPlatformFlags(new[] { item });
+
+        Assert.False(item.TagSteam);
+        Assert.False(item.TagPc);
+        Assert.True(item.TagEmulation);
+        Assert.False(item.TagPs5);
+        Assert.False(item.TagXbox);
+        Assert.False(item.TagOther);
+        Assert.Equal(string.Empty, item.CustomPlatformTag);
     }
 
     [Fact]

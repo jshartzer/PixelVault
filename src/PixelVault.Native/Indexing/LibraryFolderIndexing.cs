@@ -70,6 +70,16 @@ namespace PixelVaultNative
             SaveSavedGameIndexRows(root, rows);
         }
 
+        void EnsureNonSteamIdInGameIndex(string root, string name, string nonSteamId)
+        {
+            if (string.IsNullOrWhiteSpace(root) || string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(nonSteamId)) return;
+            var rows = GetSavedGameIndexRowsForRoot(root);
+            var row = EnsureGameIndexRowForAssignment(rows, name, "Emulation");
+            if (string.Equals(row.NonSteamId ?? string.Empty, nonSteamId, StringComparison.Ordinal)) return;
+            row.NonSteamId = nonSteamId;
+            SaveSavedGameIndexRows(root, rows);
+        }
+
         GameIndexEditorRow ResolveExistingGameIndexRowForAssignment(IEnumerable<GameIndexEditorRow> rows, string name, string platformLabel, string preferredGameId = null)
         {
             return gameIndexEditorAssignmentService.ResolveExistingGameIndexRowForAssignment(rows, name, platformLabel, preferredGameId);
@@ -142,9 +152,19 @@ namespace PixelVaultNative
                         row.SteamAppId = folder.SteamAppId ?? string.Empty;
                         changed = true;
                     }
+                    if (!string.IsNullOrWhiteSpace(folder.NonSteamId) && !string.Equals(row.NonSteamId ?? string.Empty, folder.NonSteamId ?? string.Empty, StringComparison.Ordinal))
+                    {
+                        row.NonSteamId = folder.NonSteamId ?? string.Empty;
+                        changed = true;
+                    }
                     if (!string.IsNullOrWhiteSpace(folder.SteamGridDbId) && !string.Equals(row.SteamGridDbId ?? string.Empty, folder.SteamGridDbId ?? string.Empty, StringComparison.Ordinal))
                     {
                         row.SteamGridDbId = folder.SteamGridDbId ?? string.Empty;
+                        changed = true;
+                    }
+                    if (!string.IsNullOrWhiteSpace(folder.RetroAchievementsGameId) && !string.Equals(row.RetroAchievementsGameId ?? string.Empty, folder.RetroAchievementsGameId ?? string.Empty, StringComparison.Ordinal))
+                    {
+                        row.RetroAchievementsGameId = folder.RetroAchievementsGameId ?? string.Empty;
                         changed = true;
                     }
                     if (row.FileCount != folder.FileCount)

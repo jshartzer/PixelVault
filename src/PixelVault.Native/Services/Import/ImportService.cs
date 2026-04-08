@@ -27,6 +27,13 @@ namespace PixelVaultNative
         /// <summary>Top-level and optional recursive media file lists from configured source roots.</summary>
         SourceInventory BuildSourceInventory(bool recurseRename);
 
+        /// <summary>Standard import progress totals (Steam rename scope + review steps).</summary>
+        ImportWorkflowStandardWorkTotals ComputeStandardImportWorkTotals(SourceInventory renameInventory, IReadOnlyList<ReviewItem> reviewItems, SourceInventory inventory, HashSet<string> manualPaths);
+
+        ImportWorkflowUnifiedProgressPlan ComputeUnifiedImportProgressPlan(IReadOnlyList<ManualMetadataItem> batch);
+
+        ImportManualIntakeProgressPlan ComputeManualIntakeProgressPlan(IReadOnlyList<ManualMetadataItem> manualItems);
+
         /// <summary>Deletes each path that exists (e.g. import “delete before processing”). Skips missing files.</summary>
         DeleteStepResult DeleteSourceFiles(IEnumerable<string> filePaths, Action<int, int, string> progress = null, CancellationToken cancellationToken = default);
 
@@ -124,6 +131,9 @@ namespace PixelVaultNative
 
         /// <summary>Record Steam AppID on the saved game index when first seen during rename.</summary>
         public Action<string, string, string> EnsureSteamAppIdInGameIndex;
+
+        /// <summary>Record Steam shortcut / non-Steam ID on the saved game index when first seen during rename.</summary>
+        public Action<string, string, string> EnsureNonSteamIdInGameIndex;
 
         /// <summary>Sanitize user-entered game title for use in filenames.</summary>
         public Func<string, string> SanitizeManualRenameGameTitle;
@@ -369,6 +379,15 @@ namespace PixelVaultNative
             };
         }
 
+        public ImportWorkflowStandardWorkTotals ComputeStandardImportWorkTotals(SourceInventory renameInventory, IReadOnlyList<ReviewItem> reviewItems, SourceInventory inventory, HashSet<string> manualPaths) =>
+            ImportWorkflowOrchestration.ComputeStandardImportWorkTotals(renameInventory, reviewItems, inventory, manualPaths);
+
+        public ImportWorkflowUnifiedProgressPlan ComputeUnifiedImportProgressPlan(IReadOnlyList<ManualMetadataItem> batch) =>
+            ImportWorkflowOrchestration.ComputeUnifiedImportProgressPlan(batch);
+
+        public ImportManualIntakeProgressPlan ComputeManualIntakeProgressPlan(IReadOnlyList<ManualMetadataItem> manualItems) =>
+            ImportWorkflowOrchestration.ComputeManualIntakeProgressPlan(manualItems);
+
         public DeleteStepResult DeleteSourceFiles(IEnumerable<string> filePaths, Action<int, int, string> progress = null, CancellationToken cancellationToken = default)
         {
             int deleted = 0, skipped = 0;
@@ -425,34 +444,53 @@ namespace PixelVaultNative
                 var remaining = total - (i + 1);
                 var parsed = parse(file);
                 var appId = parsed == null ? null : parsed.SteamAppId;
-                if (string.IsNullOrWhiteSpace(appId))
+                var nonSteamId = parsed == null ? null : parsed.NonSteamId;
+                var canonicalGame = string.Empty;
+                var idForRename = string.Empty;
+                if (!string.IsNullOrWhiteSpace(appId))
+                {
+                    canonicalGame = await CoverWorkflowHelpers.ResolveSteamStoreTitleForAppIdAsync(appId, d.ResolveSteamStoreTitle, d.CoverService, cancellationToken).ConfigureAwait(false);
+                    idForRename = appId;
+                }
+                else if (!string.IsNullOrWhiteSpace(nonSteamId))
+                {
+                    canonicalGame = parsed == null ? string.Empty : parsed.GameTitleHint ?? string.Empty;
+                    idForRename = nonSteamId;
+                }
+                else
                 {
                     skipped++;
-                    if (progress != null) progress(i + 1, total, "Skipped rename " + (i + 1) + " of " + total + " | " + remaining + " remaining | no Steam AppID in filename");
+                    if (progress != null) progress(i + 1, total, "Skipped rename " + (i + 1) + " of " + total + " | " + remaining + " remaining | no external game ID in filename");
                     continue;
                 }
-                string game = null;
-                if (d.ResolveSteamStoreTitle != null) game = d.ResolveSteamStoreTitle(appId);
-                else game = await d.CoverService.SteamNameAsync(appId, cancellationToken).ConfigureAwait(false);
-                if (string.IsNullOrWhiteSpace(game))
+
+                if (string.IsNullOrWhiteSpace(canonicalGame))
                 {
                     skipped++;
-                    if (progress != null) progress(i + 1, total, "Skipped rename " + (i + 1) + " of " + total + " | " + remaining + " remaining | no Steam title match");
+                    var missingReason = !string.IsNullOrWhiteSpace(appId)
+                        ? "no Steam title match"
+                        : "non-Steam ID not found in game index";
+                    if (progress != null) progress(i + 1, total, "Skipped rename " + (i + 1) + " of " + total + " | " + remaining + " remaining | " + missingReason);
                     continue;
                 }
-                if (recordedSteamAppIds.Add(appId))
+
+                if (!string.IsNullOrWhiteSpace(appId) && recordedSteamAppIds.Add(appId))
                 {
                     var session = _getLibrarySession?.Invoke();
                     if (session != null && session.HasLibraryRoot
                         && string.Equals(libraryRoot, session.LibraryRoot, StringComparison.OrdinalIgnoreCase))
-                        session.EnsureSteamAppIdInActiveLibrary(game, appId);
+                        session.EnsureSteamAppIdInActiveLibrary(canonicalGame, appId);
                     else
-                        d.EnsureSteamAppIdInGameIndex?.Invoke(libraryRoot, game, appId);
+                        d.EnsureSteamAppIdInGameIndex?.Invoke(libraryRoot, canonicalGame, appId);
+                }
+                if (!string.IsNullOrWhiteSpace(nonSteamId))
+                {
+                    d.EnsureNonSteamIdInGameIndex?.Invoke(libraryRoot, canonicalGame, nonSteamId);
                 }
                 var baseName = Path.GetFileNameWithoutExtension(file);
                 string newBase;
                 var titleHint = parsed == null ? null : parsed.GameTitleHint;
-                if (!SteamImportRename.TryBuildSteamRenameBase(baseName, appId, game, titleHint, out newBase))
+                if (!SteamImportRename.TryBuildSteamRenameBase(baseName, idForRename, canonicalGame, titleHint, out newBase))
                 {
                     skipped++;
                     if (progress != null) progress(i + 1, total, "Skipped rename " + (i + 1) + " of " + total + " | " + remaining + " remaining | not AppID-prefixed or title_timestamp form | " + Path.GetFileName(file));
@@ -659,7 +697,7 @@ namespace PixelVaultNative
                 cancellationToken.ThrowIfCancellationRequested();
                 // This path is called from the live manual metadata window, so keep row mutation
                 // on the captured context instead of continuing on a thread-pool thread.
-                var storeTitle = await cover.SteamNameAsync(appId, cancellationToken);
+                var storeTitle = await CoverWorkflowHelpers.ResolveSteamStoreTitleForAppIdAsync(appId, null, cover, cancellationToken).ConfigureAwait(false);
                 if (string.IsNullOrWhiteSpace(storeTitle)) continue;
                 item.GameName = storeTitle;
             }
@@ -696,6 +734,10 @@ namespace PixelVaultNative
                     {
                         resolvedRow.SteamAppId = item.SteamAppId;
                         resolvedRow.SuppressSteamAppIdAutoResolve = false;
+                    }
+                    if (!string.IsNullOrWhiteSpace(item.NonSteamId))
+                    {
+                        resolvedRow.NonSteamId = item.NonSteamId;
                     }
                 }
             }
@@ -781,12 +823,14 @@ namespace PixelVaultNative
                 string platform = null;
                 if (tagNames.Contains("Steam")) platform = "Steam";
                 else if (tagNames.Contains("PC")) platform = "PC";
+                else if (tagNames.Contains("Emulation")) platform = "Emulation";
                 else if (tagNames.Contains("PS5") || tagNames.Contains("PlayStation")) platform = "PS5";
                 else if (tagNames.Contains("Xbox")) platform = "Xbox";
                 if (platform == null) continue;
 
                 item.TagSteam = string.Equals(platform, "Steam", StringComparison.OrdinalIgnoreCase);
                 item.TagPc = string.Equals(platform, "PC", StringComparison.OrdinalIgnoreCase);
+                item.TagEmulation = string.Equals(platform, "Emulation", StringComparison.OrdinalIgnoreCase);
                 item.TagPs5 = string.Equals(platform, "PS5", StringComparison.OrdinalIgnoreCase);
                 item.TagXbox = string.Equals(platform, "Xbox", StringComparison.OrdinalIgnoreCase);
                 item.TagOther = false;

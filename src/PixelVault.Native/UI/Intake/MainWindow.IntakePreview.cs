@@ -209,13 +209,14 @@ namespace PixelVaultNative
                     indexPersistenceService.RecordFilenameConventionSample(libraryRoot, fileAnalysis.FileName, parsed);
                 }
                 var titleHint = parsed.GameTitleHint ?? string.Empty;
-                bool tagSteam, tagPc, tagPs5, tagXbox, tagOther;
+                bool tagSteam, tagPc, tagEmulation, tagPs5, tagXbox, tagOther;
                 string customPlatformTag;
-                ApplyFilenameParseResultToManualPlatformFlags(parsed, out tagSteam, out tagPc, out tagPs5, out tagXbox, out tagOther, out customPlatformTag);
+                ApplyFilenameParseResultToManualPlatformFlags(parsed, out tagSteam, out tagPc, out tagEmulation, out tagPs5, out tagXbox, out tagOther, out customPlatformTag);
                 items.Add(new ManualMetadataItem
                 {
                     GameId = string.Empty,
                     SteamAppId = parsed.SteamAppId,
+                    NonSteamId = parsed.NonSteamId,
                     FilePath = file,
                     FileName = fileAnalysis.FileName,
                     OriginalFileName = fileAnalysis.FileName,
@@ -229,10 +230,12 @@ namespace PixelVaultNative
                     TagPs5 = tagPs5,
                     TagXbox = tagXbox,
                     TagPc = tagPc,
+                    TagEmulation = tagEmulation,
                     TagOther = tagOther,
                     CustomPlatformTag = customPlatformTag,
                     OriginalGameId = string.Empty,
                     OriginalSteamAppId = parsed.SteamAppId,
+                    OriginalNonSteamId = parsed.NonSteamId,
                     OriginalCaptureTime = captureTime,
                     OriginalUseCustomCaptureTime = false,
                     OriginalGameName = titleHint,
@@ -243,6 +246,7 @@ namespace PixelVaultNative
                     OriginalTagPc = tagPc,
                     OriginalTagPs5 = tagPs5,
                     OriginalTagXbox = tagXbox,
+                    OriginalTagEmulation = tagEmulation,
                     OriginalTagOther = tagOther,
                     OriginalCustomPlatformTag = customPlatformTag
                 });
@@ -266,14 +270,15 @@ namespace PixelVaultNative
                     indexPersistenceService.RecordFilenameConventionSample(libraryRoot, fileAnalysis.FileName, parsed);
                 }
                 var titleHint = parsed.GameTitleHint ?? string.Empty;
-                bool tagSteam, tagPc, tagPs5, tagXbox, tagOther;
+                bool tagSteam, tagPc, tagEmulation, tagPs5, tagXbox, tagOther;
                 string customPlatformTag;
-                ApplyFilenameParseResultToManualPlatformFlags(parsed, out tagSteam, out tagPc, out tagPs5, out tagXbox, out tagOther, out customPlatformTag);
+                ApplyFilenameParseResultToManualPlatformFlags(parsed, out tagSteam, out tagPc, out tagEmulation, out tagPs5, out tagXbox, out tagOther, out customPlatformTag);
                 var ruleMatched = fileAnalysis.CanUpdateMetadata;
                 items.Add(new ManualMetadataItem
                 {
                     GameId = string.Empty,
                     SteamAppId = parsed.SteamAppId,
+                    NonSteamId = parsed.NonSteamId,
                     FilePath = file,
                     FileName = fileAnalysis.FileName,
                     OriginalFileName = fileAnalysis.FileName,
@@ -287,10 +292,12 @@ namespace PixelVaultNative
                     TagPs5 = tagPs5,
                     TagXbox = tagXbox,
                     TagPc = tagPc,
+                    TagEmulation = tagEmulation,
                     TagOther = tagOther,
                     CustomPlatformTag = customPlatformTag,
                     OriginalGameId = string.Empty,
                     OriginalSteamAppId = parsed.SteamAppId,
+                    OriginalNonSteamId = parsed.NonSteamId,
                     OriginalCaptureTime = captureTime,
                     OriginalUseCustomCaptureTime = false,
                     OriginalGameName = titleHint,
@@ -301,6 +308,7 @@ namespace PixelVaultNative
                     OriginalTagPc = tagPc,
                     OriginalTagPs5 = tagPs5,
                     OriginalTagXbox = tagXbox,
+                    OriginalTagEmulation = tagEmulation,
                     OriginalTagOther = tagOther,
                     OriginalCustomPlatformTag = customPlatformTag,
                     IntakeRuleMatched = ruleMatched,

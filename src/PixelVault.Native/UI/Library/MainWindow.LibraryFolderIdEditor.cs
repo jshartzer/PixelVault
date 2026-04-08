@@ -44,14 +44,32 @@ namespace PixelVaultNative
                 BorderThickness = new Thickness(1),
                 FontSize = 14
             };
+            var nonSteamIdBox = new TextBox
+            {
+                Text = savedRow == null ? DisplayExternalIdValue(folder.NonSteamId ?? string.Empty) : DisplayExternalIdValue(savedRow.NonSteamId ?? string.Empty),
+                Padding = new Thickness(10, 7, 10, 7),
+                Background = Brushes.White,
+                BorderBrush = Brush("#D7E1E8"),
+                BorderThickness = new Thickness(1),
+                FontSize = 14
+            };
+            var retroAchievementsGameIdBox = new TextBox
+            {
+                Text = savedRow == null ? DisplayExternalIdValue(folder.RetroAchievementsGameId ?? string.Empty) : DisplayExternalIdValue(savedRow.RetroAchievementsGameId ?? string.Empty),
+                Padding = new Thickness(10, 7, 10, 7),
+                Background = Brushes.White,
+                BorderBrush = Brush("#D7E1E8"),
+                BorderThickness = new Thickness(1),
+                FontSize = 14
+            };
 
             var editorWindow = new Window
             {
                 Title = "PixelVault " + AppVersion + " Edit IDs",
                 Width = 560,
-                Height = 430,
+                Height = 590,
                 MinWidth = 540,
-                MinHeight = 410,
+                MinHeight = 560,
                 Owner = this,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
                 Background = Brush("#F3EEE4"),
@@ -66,10 +84,12 @@ namespace PixelVaultNative
             var header = new StackPanel { Margin = new Thickness(0, 0, 0, 18) };
             header.Children.Add(new TextBlock { Text = folder.Name ?? "Selected Folder", FontSize = 24, FontWeight = FontWeights.SemiBold, Foreground = Brush("#1F2A30"), TextWrapping = TextWrapping.Wrap });
             header.Children.Add(new TextBlock { Text = NormalizeConsoleLabel(folder.PlatformLabel), Margin = new Thickness(0, 6, 0, 0), Foreground = Brush("#5F6970"), FontSize = 13 });
-            header.Children.Add(new TextBlock { Text = "Update the saved Steam App ID and SteamGridDB ID for this game record without leaving the Library view.", Margin = new Thickness(0, 10, 0, 0), Foreground = Brush("#5F6970"), FontSize = 13, TextWrapping = TextWrapping.Wrap });
+            header.Children.Add(new TextBlock { Text = "Update the saved Steam App ID, SteamGridDB ID, and RetroAchievements game ID for this game record without leaving the Library view.", Margin = new Thickness(0, 10, 0, 0), Foreground = Brush("#5F6970"), FontSize = 13, TextWrapping = TextWrapping.Wrap });
             root.Children.Add(header);
 
             var form = new Grid { Margin = new Thickness(0, 0, 0, 12) };
+            form.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            form.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             form.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             form.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             form.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -87,15 +107,29 @@ namespace PixelVaultNative
             Grid.SetRow(steamGridDbIdStack, 1);
             form.Children.Add(steamGridDbIdStack);
 
+            var nonSteamIdStack = new StackPanel { Margin = new Thickness(0, 0, 0, 14) };
+            nonSteamIdStack.Children.Add(new TextBlock { Text = "Non-Steam ID", FontWeight = FontWeights.SemiBold, Foreground = Brush("#1F2A30"), Margin = new Thickness(0, 0, 0, 6) });
+            nonSteamIdStack.Children.Add(new TextBlock { Text = "Steam shortcut ID for imported non-Steam and emulator entries.", Foreground = Brush("#5F6970"), FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 6) });
+            nonSteamIdStack.Children.Add(nonSteamIdBox);
+            Grid.SetRow(nonSteamIdStack, 2);
+            form.Children.Add(nonSteamIdStack);
+
+            var retroStack = new StackPanel { Margin = new Thickness(0, 0, 0, 14) };
+            retroStack.Children.Add(new TextBlock { Text = "RetroAchievements game ID", FontWeight = FontWeights.SemiBold, Foreground = Brush("#1F2A30"), Margin = new Thickness(0, 0, 0, 6) });
+            retroStack.Children.Add(new TextBlock { Text = "Numeric game id from retroachievements.org (same id their API uses).", Foreground = Brush("#5F6970"), FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 6) });
+            retroStack.Children.Add(retroAchievementsGameIdBox);
+            Grid.SetRow(retroStack, 3);
+            form.Children.Add(retroStack);
+
             var helperText = new TextBlock
             {
-                Text = "Leave a field blank if you want to clear the saved value.",
+                Text = "Leave a field blank if you want to clear the saved value. Look up IDs fills empty Steam, SteamGridDB, and RetroAchievements fields when those services are configured.",
                 Foreground = Brush("#5F6970"),
                 FontSize = 12.5,
                 TextWrapping = TextWrapping.Wrap,
                 Margin = new Thickness(0, 4, 0, 0)
             };
-            Grid.SetRow(helperText, 2);
+            Grid.SetRow(helperText, 4);
             form.Children.Add(helperText);
 
             var actions = new Grid { HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 8, 0, 0) };
@@ -112,7 +146,7 @@ namespace PixelVaultNative
             lookupButton.Height = 44;
             lookupButton.Margin = new Thickness(0, 0, 10, 0);
             lookupButton.VerticalAlignment = VerticalAlignment.Top;
-            lookupButton.ToolTip = "Search Steam (pick from the match list when several games match) and SteamGridDB using the folder name above, then fill any empty ID fields (won’t replace text you already typed).";
+            lookupButton.ToolTip = "Fill empty ID fields using the folder name: Steam store search, SteamGridDB (needs token in Settings), and RetroAchievements game list search (needs API key in Settings). Won’t replace text you already typed. You may get a picker when multiple sites return several matches.";
             var saveButton = Btn("Save", null, "#275D47", Brushes.White);
             saveButton.Width = 122;
             saveButton.Height = 44;
@@ -140,14 +174,20 @@ namespace PixelVaultNative
                 saveButton.IsEnabled = false;
                 appIdBox.IsEnabled = false;
                 steamGridDbIdBox.IsEnabled = false;
+                nonSteamIdBox.IsEnabled = false;
+                retroAchievementsGameIdBox.IsEnabled = false;
                 try
                 {
                     var existingApp = CleanTag(appIdBox.Text);
                     var existingGrid = CleanTag(steamGridDbIdBox.Text);
+                    var existingRa = CleanTag(retroAchievementsGameIdBox.Text);
                     string resolvedApp = null;
                     string resolvedGrid = null;
+                    string resolvedRa = null;
                     var steamReturnedMatches = false;
                     var steamUserSelected = false;
+                    var raReturnedMatches = false;
+                    var raUserSelected = false;
                     if (string.IsNullOrWhiteSpace(existingApp))
                     {
                         var matches = await coverService.SearchSteamAppMatchesAsync(queryTitle, CancellationToken.None).ConfigureAwait(true);
@@ -170,15 +210,33 @@ namespace PixelVaultNative
                         if (string.IsNullOrWhiteSpace(resolvedGrid))
                             resolvedGrid = await coverService.TryResolveSteamGridDbIdByNameAsync(queryTitle, CancellationToken.None).ConfigureAwait(true);
                     }
+                    if (string.IsNullOrWhiteSpace(existingRa) && HasRetroAchievementsApiKey())
+                    {
+                        var raMatches = await coverService.SearchRetroAchievementsGameMatchesAsync(queryTitle, folder.PlatformLabel ?? string.Empty, CancellationToken.None).ConfigureAwait(true);
+                        if (raMatches != null && raMatches.Count > 0)
+                        {
+                            raReturnedMatches = true;
+                            var chosenRa = raMatches.Count == 1 ? raMatches[0] : ShowRetroAchievementsGameMatchWindow(editorWindow, queryTitle, raMatches);
+                            if (chosenRa != null)
+                            {
+                                resolvedRa = chosenRa.Item1;
+                                raUserSelected = true;
+                            }
+                        }
+                    }
                     if (!string.IsNullOrWhiteSpace(resolvedApp)) appIdBox.Text = resolvedApp;
                     if (!string.IsNullOrWhiteSpace(resolvedGrid)) steamGridDbIdBox.Text = resolvedGrid;
+                    if (!string.IsNullOrWhiteSpace(resolvedRa)) retroAchievementsGameIdBox.Text = resolvedRa;
                     var filledApp = !string.IsNullOrWhiteSpace(resolvedApp);
                     var filledGrid = !string.IsNullOrWhiteSpace(resolvedGrid);
-                    if (!filledApp && !filledGrid)
+                    var filledRa = !string.IsNullOrWhiteSpace(resolvedRa);
+                    if (!filledApp && !filledGrid && !filledRa)
                     {
                         string hint;
                         if (steamReturnedMatches && !steamUserSelected)
                             hint = "Steam lookup canceled. ID fields were not changed.";
+                        else if (raReturnedMatches && !raUserSelected)
+                            hint = "RetroAchievements lookup canceled. ID fields were not changed.";
                         else if (string.IsNullOrWhiteSpace(existingApp) && !steamReturnedMatches)
                             hint = "No Steam store results for \"" + queryTitle + "\".";
                         else
@@ -187,6 +245,10 @@ namespace PixelVaultNative
                             hint += Environment.NewLine + Environment.NewLine + "Add a SteamGridDB API token in Settings to enable SteamGridDB ID lookup.";
                         else if (string.IsNullOrWhiteSpace(existingGrid) && HasSteamGridDbApiToken() && !string.IsNullOrWhiteSpace(appForGrid))
                             hint += Environment.NewLine + Environment.NewLine + "SteamGridDB did not return a single confident match for that title.";
+                        if (string.IsNullOrWhiteSpace(existingRa) && !HasRetroAchievementsApiKey())
+                            hint += Environment.NewLine + Environment.NewLine + "Add a RetroAchievements API key in Settings to enable RA game ID lookup.";
+                        else if (string.IsNullOrWhiteSpace(existingRa) && HasRetroAchievementsApiKey() && !raReturnedMatches)
+                            hint += Environment.NewLine + Environment.NewLine + "RetroAchievements had no title matches for \"" + queryTitle + "\" on consoles guessed from platform \"" + (folder.PlatformLabel ?? string.Empty) + "\".";
                         TryLibraryToast(hint.Replace(Environment.NewLine, " "));
                     }
                     else
@@ -200,6 +262,13 @@ namespace PixelVaultNative
                             else if (string.IsNullOrWhiteSpace(existingGrid)) lines.Add("SteamGridDB ID: no confident match (you can search the site manually).");
                         }
                         else if (string.IsNullOrWhiteSpace(existingGrid)) lines.Add("SteamGridDB ID: skipped (no API token in Settings).");
+                        if (HasRetroAchievementsApiKey())
+                        {
+                            if (filledRa) lines.Add("Filled RetroAchievements game ID: " + resolvedRa);
+                            else if (string.IsNullOrWhiteSpace(existingRa) && !raReturnedMatches) lines.Add("RetroAchievements: no matches for this title/platform.");
+                            else if (string.IsNullOrWhiteSpace(existingRa) && raReturnedMatches && !raUserSelected) lines.Add("RetroAchievements: picker canceled.");
+                        }
+                        else if (string.IsNullOrWhiteSpace(existingRa)) lines.Add("RetroAchievements ID: skipped (no API key in Settings).");
                         TryLibraryToast(string.Join(" · ", lines));
                     }
                 }
@@ -215,6 +284,8 @@ namespace PixelVaultNative
                     saveButton.IsEnabled = true;
                     appIdBox.IsEnabled = true;
                     steamGridDbIdBox.IsEnabled = true;
+                    nonSteamIdBox.IsEnabled = true;
+                    retroAchievementsGameIdBox.IsEnabled = true;
                 }
             };
             saveButton.Click += delegate
@@ -222,12 +293,14 @@ namespace PixelVaultNative
                 try
                 {
                     var steamAppId = CleanTag(appIdBox.Text);
+                    var nonSteamId = CleanTag(nonSteamIdBox.Text);
                     var steamGridDbId = CleanTag(steamGridDbIdBox.Text);
+                    var retroAchievementsGameId = CleanTag(retroAchievementsGameIdBox.Text);
                     var rows = librarySession.LoadSavedGameIndexRows();
                     var row = FindSavedGameIndexRow(rows, folder);
                     if (row == null)
                     {
-                        if (string.IsNullOrWhiteSpace(steamAppId) && string.IsNullOrWhiteSpace(steamGridDbId))
+                        if (string.IsNullOrWhiteSpace(steamAppId) && string.IsNullOrWhiteSpace(nonSteamId) && string.IsNullOrWhiteSpace(steamGridDbId) && string.IsNullOrWhiteSpace(retroAchievementsGameId))
                         {
                             editorWindow.Close();
                             return;
@@ -245,16 +318,20 @@ namespace PixelVaultNative
                     var previousSuppressSteamAppId = row.SuppressSteamAppIdAutoResolve;
                     var previousSuppressSteamGridDbId = row.SuppressSteamGridDbIdAutoResolve;
                     row.SteamAppId = steamAppId;
+                    row.NonSteamId = nonSteamId;
                     row.SteamGridDbId = steamGridDbId;
                     row.SuppressSteamAppIdAutoResolve = ShouldSuppressExternalIdAutoResolve(steamAppId, previousSteamAppId, previousSuppressSteamAppId);
                     row.SuppressSteamGridDbIdAutoResolve = ShouldSuppressExternalIdAutoResolve(steamGridDbId, previousSteamGridDbId, previousSuppressSteamGridDbId);
+                    row.RetroAchievementsGameId = retroAchievementsGameId;
                     SaveGameIndexEditorRows(libraryRoot, rows);
                     folder.SteamAppId = steamAppId;
+                    folder.NonSteamId = nonSteamId;
                     folder.SteamGridDbId = steamGridDbId;
+                    folder.RetroAchievementsGameId = retroAchievementsGameId;
                     folder.SuppressSteamAppIdAutoResolve = row.SuppressSteamAppIdAutoResolve;
                     folder.SuppressSteamGridDbIdAutoResolve = row.SuppressSteamGridDbIdAutoResolve;
                     status.Text = "Folder IDs saved";
-                    Log("Updated IDs for " + (folder.Name ?? "folder") + " | " + NormalizeConsoleLabel(folder.PlatformLabel) + " | AppID=" + (string.IsNullOrWhiteSpace(steamAppId) ? "(blank)" : steamAppId) + (row.SuppressSteamAppIdAutoResolve ? " [manual clear]" : string.Empty) + " | STID=" + (string.IsNullOrWhiteSpace(steamGridDbId) ? "(blank)" : steamGridDbId) + (row.SuppressSteamGridDbIdAutoResolve ? " [manual clear]" : string.Empty));
+                    Log("Updated IDs for " + (folder.Name ?? "folder") + " | " + NormalizeConsoleLabel(folder.PlatformLabel) + " | AppID=" + (string.IsNullOrWhiteSpace(steamAppId) ? "(blank)" : steamAppId) + (row.SuppressSteamAppIdAutoResolve ? " [manual clear]" : string.Empty) + " | Non-Steam=" + (string.IsNullOrWhiteSpace(nonSteamId) ? "(blank)" : nonSteamId) + " | STID=" + (string.IsNullOrWhiteSpace(steamGridDbId) ? "(blank)" : steamGridDbId) + (row.SuppressSteamGridDbIdAutoResolve ? " [manual clear]" : string.Empty) + " | RA=" + (string.IsNullOrWhiteSpace(retroAchievementsGameId) ? "(blank)" : retroAchievementsGameId));
                     if (refreshLibrary != null) refreshLibrary();
                     editorWindow.Close();
                 }

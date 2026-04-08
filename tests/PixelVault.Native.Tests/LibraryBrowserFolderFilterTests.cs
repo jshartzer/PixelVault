@@ -20,8 +20,11 @@ public sealed class LibraryBrowserFolderFilterTests
         var noId = new MainWindow.LibraryBrowserFolderView { GameId = "", FileCount = 1 };
         Assert.True(MainWindow.LibraryBrowserFolderViewMatchesFilter("missingid", noId, Norm));
 
-        var hasId = new MainWindow.LibraryBrowserFolderView { GameId = "abc-123", FileCount = 1 };
-        Assert.False(MainWindow.LibraryBrowserFolderViewMatchesFilter("missingid", hasId, Norm));
+        var hasIdNoStid = new MainWindow.LibraryBrowserFolderView { GameId = "abc-123", FileCount = 1 };
+        Assert.True(MainWindow.LibraryBrowserFolderViewMatchesFilter("missingid", hasIdNoStid, Norm));
+
+        var hasIdWithStid = new MainWindow.LibraryBrowserFolderView { GameId = "abc-123", SteamGridDbId = "5528", FileCount = 1 };
+        Assert.False(MainWindow.LibraryBrowserFolderViewMatchesFilter("missingid", hasIdWithStid, Norm));
     }
 
     [Fact]
@@ -73,9 +76,9 @@ public sealed class LibraryBrowserFolderFilterTests
     }
 
     [Fact]
-    public void MatchesFilter_MissingId_NonSteam_IgnoresSteamFields_WhenGameIdPresent()
+    public void MatchesFilter_MissingId_NonSteam_RequiresStid_NotSteamAppId()
     {
-        var xbox = new MainWindow.LibraryBrowserFolderView
+        var xboxMissingStid = new MainWindow.LibraryBrowserFolderView
         {
             PrimaryPlatformLabel = "Xbox",
             SteamAppId = "",
@@ -83,7 +86,69 @@ public sealed class LibraryBrowserFolderFilterTests
             GameId = "g1",
             PlatformLabels = new[] { "Xbox" }
         };
-        Assert.False(MainWindow.LibraryBrowserFolderViewMatchesFilter("missingid", xbox, Norm));
+        Assert.True(MainWindow.LibraryBrowserFolderViewMatchesFilter("missingid", xboxMissingStid, Norm));
+
+        var xboxComplete = new MainWindow.LibraryBrowserFolderView
+        {
+            PrimaryPlatformLabel = "Xbox",
+            SteamAppId = "",
+            SteamGridDbId = "999",
+            GameId = "g1",
+            PlatformLabels = new[] { "Xbox" }
+        };
+        Assert.False(MainWindow.LibraryBrowserFolderViewMatchesFilter("missingid", xboxComplete, Norm));
+    }
+
+    [Fact]
+    public void MatchesFilter_MissingId_WhenEmulationTagged_AndRetroAchievementsBlank()
+    {
+        var emuNoRa = new MainWindow.LibraryBrowserFolderView
+        {
+            PrimaryPlatformLabel = "Emulation",
+            SteamAppId = "",
+            SteamGridDbId = "100",
+            GameId = "gEmu",
+            RetroAchievementsGameId = "",
+            PlatformLabels = new[] { "Emulation" }
+        };
+        Assert.True(MainWindow.LibraryBrowserFolderViewMatchesFilter("missingid", emuNoRa, Norm));
+
+        var emuWithRa = new MainWindow.LibraryBrowserFolderView
+        {
+            PrimaryPlatformLabel = "Emulation",
+            SteamAppId = "",
+            SteamGridDbId = "100",
+            GameId = "gEmu",
+            RetroAchievementsGameId = "12345",
+            PlatformLabels = new[] { "Emulation" }
+        };
+        Assert.False(MainWindow.LibraryBrowserFolderViewMatchesFilter("missingid", emuWithRa, Norm));
+    }
+
+    [Fact]
+    public void MatchesFilter_MissingNonSteamId_WhenEmulationTagged_AndShortcutIdBlank()
+    {
+        var emuNoShortcutId = new MainWindow.LibraryBrowserFolderView
+        {
+            PrimaryPlatformLabel = "Emulation",
+            NonSteamId = "",
+            SteamGridDbId = "100",
+            GameId = "gEmu",
+            RetroAchievementsGameId = "12345",
+            PlatformLabels = new[] { "Emulation" }
+        };
+        Assert.True(MainWindow.LibraryBrowserFolderViewMatchesFilter("missingnonsteamid", emuNoShortcutId, Norm));
+
+        var emuWithShortcutId = new MainWindow.LibraryBrowserFolderView
+        {
+            PrimaryPlatformLabel = "Emulation",
+            NonSteamId = "16245548604121415680",
+            SteamGridDbId = "100",
+            GameId = "gEmu",
+            RetroAchievementsGameId = "12345",
+            PlatformLabels = new[] { "Emulation" }
+        };
+        Assert.False(MainWindow.LibraryBrowserFolderViewMatchesFilter("missingnonsteamid", emuWithShortcutId, Norm));
     }
 
     [Fact]

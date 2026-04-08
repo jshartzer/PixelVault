@@ -50,7 +50,9 @@ public sealed class LibraryFolderCacheIoTests
                 SteamAppId = "999",
                 SteamGridDbId = "abc",
                 IsCompleted100Percent = true,
-                CompletedUtcTicks = 777L
+                CompletedUtcTicks = 777L,
+                RetroAchievementsGameId = "258",
+                NonSteamId = "16245548604121415680"
             };
 
             var line = MainWindow.SerializeLibraryFolderCacheRecordLine(folder);
@@ -63,6 +65,8 @@ public sealed class LibraryFolderCacheIoTests
             Assert.Equal(12345L, parsed.NewestCaptureUtcTicks);
             Assert.Equal(67890L, parsed.NewestRecentSortUtcTicks);
             Assert.Single(parsed.FilePaths);
+            Assert.Equal("258", parsed.RetroAchievementsGameId);
+            Assert.Equal("16245548604121415680", parsed.NonSteamId);
         }
         finally
         {
@@ -101,5 +105,6 @@ public sealed class LibraryFolderCacheIoTests
         Assert.Equal(0L, parsed.CompletedUtcTicks);
         Assert.Equal(12345L, parsed.NewestCaptureUtcTicks);
         Assert.Equal(67890L, parsed.NewestRecentSortUtcTicks);
+        Assert.Equal(string.Empty, parsed.NonSteamId);
     }
 }

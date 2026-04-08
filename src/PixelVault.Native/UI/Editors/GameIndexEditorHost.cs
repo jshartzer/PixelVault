@@ -129,7 +129,7 @@ namespace PixelVaultNative
             var searchBox = new TextBox { Padding = new Thickness(10, 6, 10, 6), BorderBrush = B("#D7E1E8"), BorderThickness = new Thickness(1), Background = Brushes.White, Margin = new Thickness(0, 0, 14, 0) };
             Grid.SetColumn(searchBox, 1);
             controlGrid.Children.Add(searchBox);
-            var helperText = new TextBlock { Text = "Edit the master Game, Platform, Steam AppID, and STID fields. Game ID stays stable, and folder/file details stay read-only so photo-level assignments drive grouping.", VerticalAlignment = VerticalAlignment.Center, Foreground = B("#5F6970"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 14, 0) };
+            var helperText = new TextBlock { Text = "Edit the master Game, Platform, Steam AppID, Non-Steam ID, and STID fields. Game ID stays stable, and folder/file details stay read-only so photo-level assignments drive grouping.", VerticalAlignment = VerticalAlignment.Center, Foreground = B("#5F6970"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 14, 0) };
             Grid.SetColumn(helperText, 2);
             controlGrid.Children.Add(helperText);
             var addRowButton = services.CreateButton("Add Game", null, "#8A5A17", Brushes.White);
@@ -188,7 +188,9 @@ namespace PixelVaultNative
             grid.Columns.Add(new DataGridTextColumn { Header = "Game", Binding = new System.Windows.Data.Binding("Name") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus }, Width = new DataGridLength(1.15, DataGridLengthUnitType.Star) });
             grid.Columns.Add(new DataGridTextColumn { Header = "Platform", Binding = new System.Windows.Data.Binding("PlatformLabel") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus }, Width = 130 });
             grid.Columns.Add(new DataGridTextColumn { Header = "Steam AppID", Binding = new System.Windows.Data.Binding("SteamAppId") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus }, Width = 130 });
+            grid.Columns.Add(new DataGridTextColumn { Header = "Non-Steam ID", Binding = new System.Windows.Data.Binding("NonSteamId") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus }, Width = 170 });
             grid.Columns.Add(new DataGridTextColumn { Header = "STID", Binding = new System.Windows.Data.Binding("SteamGridDbId") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus }, Width = 120 });
+            grid.Columns.Add(new DataGridTextColumn { Header = "RA Game ID", Binding = new System.Windows.Data.Binding("RetroAchievementsGameId") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus }, Width = 110 });
             grid.Columns.Add(new DataGridTextColumn { Header = "Files", Binding = new System.Windows.Data.Binding("FileCount"), IsReadOnly = true, Width = 74 });
             grid.Columns.Add(new DataGridTextColumn { Header = "Folder", Binding = new System.Windows.Data.Binding("FolderPath"), IsReadOnly = true, Width = new DataGridLength(1.85, DataGridLengthUnitType.Star) });
             Grid.SetRow(grid, 1);
@@ -243,7 +245,9 @@ namespace PixelVaultNative
                         (!string.IsNullOrWhiteSpace(row.Name) && row.Name.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0) ||
                         (!string.IsNullOrWhiteSpace(row.PlatformLabel) && row.PlatformLabel.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0) ||
                         (!string.IsNullOrWhiteSpace(row.SteamAppId) && row.SteamAppId.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0) ||
+                        (!string.IsNullOrWhiteSpace(row.NonSteamId) && row.NonSteamId.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0) ||
                         (!string.IsNullOrWhiteSpace(row.SteamGridDbId) && row.SteamGridDbId.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0) ||
+                        (!string.IsNullOrWhiteSpace(row.RetroAchievementsGameId) && row.RetroAchievementsGameId.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0) ||
                         (!string.IsNullOrWhiteSpace(row.FolderPath) && row.FolderPath.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0));
                 }
                 grid.ItemsSource = rows
@@ -314,7 +318,9 @@ namespace PixelVaultNative
                     Name = string.Empty,
                     PlatformLabel = "Other",
                     SteamAppId = string.Empty,
+                    NonSteamId = string.Empty,
                     SteamGridDbId = string.Empty,
+                    RetroAchievementsGameId = string.Empty,
                     FileCount = 0,
                     FolderPath = string.Empty,
                     PreviewImagePath = string.Empty,
@@ -439,6 +445,7 @@ namespace PixelVaultNative
                         row.PlatformLabel = services.NormalizeConsoleLabel(string.IsNullOrWhiteSpace(row.PlatformLabel) ? "Other" : row.PlatformLabel.Trim());
                         row.SteamAppId = (row.SteamAppId ?? string.Empty).Trim();
                         row.SteamGridDbId = (row.SteamGridDbId ?? string.Empty).Trim();
+                        row.RetroAchievementsGameId = (row.RetroAchievementsGameId ?? string.Empty).Trim();
                     }
                     allRows = services.MergeRows(allRows);
                     services.SaveRows(libraryRoot, allRows);

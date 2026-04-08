@@ -53,6 +53,7 @@ namespace PixelVaultNative
             if (item == null) return extraTags;
             if (item.TagSteam) extraTags.Add("Steam");
             if (item.TagPc) extraTags.Add("PC");
+            if (item.TagEmulation) extraTags.Add("Emulation");
             if (item.TagPs5) { extraTags.Add("PS5"); extraTags.Add("PlayStation"); }
             if (item.TagXbox) extraTags.Add("Xbox");
             if (item.TagOther && !string.IsNullOrWhiteSpace(item.CustomPlatformTag)) extraTags.Add(CustomPlatformPrefix + CleanTag(item.CustomPlatformTag));
@@ -107,6 +108,7 @@ namespace PixelVaultNative
             if (string.IsNullOrWhiteSpace(label)) return "Other";
             if (string.Equals(label, "Steam", StringComparison.OrdinalIgnoreCase)) return "Steam";
             if (string.Equals(label, "PC", StringComparison.OrdinalIgnoreCase)) return "PC";
+            if (string.Equals(label, "Emulation", StringComparison.OrdinalIgnoreCase)) return "Emulation";
             if (string.Equals(label, "Xbox PC", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(label, "Xbox/Windows", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(label, "Xbox Windows", StringComparison.OrdinalIgnoreCase)
@@ -131,6 +133,7 @@ namespace PixelVaultNative
                     .Any(tag => string.Equals(NormalizeConsoleLabel(tag), "Xbox PC", StringComparison.OrdinalIgnoreCase));
             if (tagList.Any(tag => string.Equals(tag, "Steam", StringComparison.OrdinalIgnoreCase))) labels.Add("Steam");
             else if (!hasXboxPcTag && tagList.Any(tag => string.Equals(tag, "PC", StringComparison.OrdinalIgnoreCase))) labels.Add("PC");
+            if (tagList.Any(tag => string.Equals(tag, "Emulation", StringComparison.OrdinalIgnoreCase))) labels.Add("Emulation");
             if (tagList.Any(tag => string.Equals(tag, "PS5", StringComparison.OrdinalIgnoreCase) || string.Equals(tag, "PlayStation", StringComparison.OrdinalIgnoreCase))) labels.Add("PS5");
             if (hasXboxPcTag) labels.Add("Xbox PC");
             else if (tagList.Any(tag => string.Equals(tag, "Xbox", StringComparison.OrdinalIgnoreCase))) labels.Add("Xbox");
@@ -169,6 +172,7 @@ namespace PixelVaultNative
             var normalizedPlatform = NormalizeConsoleLabel(parsed == null ? string.Empty : parsed.PlatformLabel);
             if (string.Equals(normalizedPlatform, "Steam", StringComparison.OrdinalIgnoreCase)) extras.Add("Steam");
             else if (string.Equals(normalizedPlatform, "PC", StringComparison.OrdinalIgnoreCase)) extras.Add("PC");
+            else if (string.Equals(normalizedPlatform, "Emulation", StringComparison.OrdinalIgnoreCase)) extras.Add("Emulation");
             else if (string.Equals(normalizedPlatform, "PS5", StringComparison.OrdinalIgnoreCase) || string.Equals(normalizedPlatform, "PlayStation", StringComparison.OrdinalIgnoreCase))
             {
                 extras.Add("PS5");
@@ -212,6 +216,7 @@ namespace PixelVaultNative
             FilenameParseResult parsed,
             out bool tagSteam,
             out bool tagPc,
+            out bool tagEmulation,
             out bool tagPs5,
             out bool tagXbox,
             out bool tagOther,
@@ -219,6 +224,7 @@ namespace PixelVaultNative
         {
             tagSteam = false;
             tagPc = false;
+            tagEmulation = false;
             tagPs5 = false;
             tagXbox = false;
             tagOther = false;
@@ -243,6 +249,11 @@ namespace PixelVaultNative
             if (string.Equals(resolvedPlatform, "PC", StringComparison.OrdinalIgnoreCase))
             {
                 tagPc = true;
+                return;
+            }
+            if (string.Equals(resolvedPlatform, "Emulation", StringComparison.OrdinalIgnoreCase))
+            {
+                tagEmulation = true;
                 return;
             }
             if (string.Equals(resolvedPlatform, "PS5", StringComparison.OrdinalIgnoreCase) || string.Equals(resolvedPlatform, "PlayStation", StringComparison.OrdinalIgnoreCase))
@@ -309,6 +320,7 @@ namespace PixelVaultNative
             if (item == null) return "Other";
             if (item.TagSteam) return "Steam";
             if (item.TagPc) return "PC";
+            if (item.TagEmulation) return "Emulation";
             if (item.TagPs5) return "PS5";
             if (item.TagXbox) return "Xbox";
             if (item.TagOther && !string.IsNullOrWhiteSpace(item.CustomPlatformTag)) return NormalizeConsoleLabel(item.CustomPlatformTag);
@@ -320,6 +332,7 @@ namespace PixelVaultNative
             if (item == null) return "Other";
             if (item.OriginalTagSteam) return "Steam";
             if (item.OriginalTagPc) return "PC";
+            if (item.OriginalTagEmulation) return "Emulation";
             if (item.OriginalTagPs5) return "PS5";
             if (item.OriginalTagXbox) return "Xbox";
             if (item.OriginalTagOther && !string.IsNullOrWhiteSpace(item.OriginalCustomPlatformTag)) return NormalizeConsoleLabel(item.OriginalCustomPlatformTag);
@@ -351,6 +364,7 @@ namespace PixelVaultNative
                 || item.AddPhotographyTag != item.OriginalAddPhotographyTag
                 || item.TagSteam != item.OriginalTagSteam
                 || item.TagPc != item.OriginalTagPc
+                || item.TagEmulation != item.OriginalTagEmulation
                 || item.TagPs5 != item.OriginalTagPs5
                 || item.TagXbox != item.OriginalTagXbox
                 || item.TagOther != item.OriginalTagOther

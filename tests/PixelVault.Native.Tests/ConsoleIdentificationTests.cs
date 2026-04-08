@@ -74,6 +74,7 @@ public sealed class ConsoleIdentificationTests
             new FilenameParseResult { PlatformLabel = "PlayStation", PlatformTags = new[] { "PlayStation" } },
             out var tagSteam,
             out var tagPc,
+            out var tagEmulation,
             out var tagPs5,
             out var tagXbox,
             out var tagOther,
@@ -81,6 +82,7 @@ public sealed class ConsoleIdentificationTests
 
         Assert.False(tagSteam);
         Assert.False(tagPc);
+        Assert.False(tagEmulation);
         Assert.True(tagPs5);
         Assert.False(tagXbox);
         Assert.False(tagOther);
@@ -94,6 +96,7 @@ public sealed class ConsoleIdentificationTests
             new FilenameParseResult { PlatformLabel = "Switch", PlatformTags = Array.Empty<string>() },
             out var tagSteam,
             out var tagPc,
+            out var tagEmulation,
             out var tagPs5,
             out var tagXbox,
             out var tagOther,
@@ -101,6 +104,7 @@ public sealed class ConsoleIdentificationTests
 
         Assert.False(tagSteam);
         Assert.False(tagPc);
+        Assert.False(tagEmulation);
         Assert.False(tagPs5);
         Assert.False(tagXbox);
         Assert.True(tagOther);
@@ -129,6 +133,7 @@ public sealed class ConsoleIdentificationTests
             new FilenameParseResult { PlatformLabel = "Other", PlatformTags = Array.Empty<string>() },
             out var tagSteam,
             out var tagPc,
+            out var tagEmulation,
             out var tagPs5,
             out var tagXbox,
             out var tagOther,
@@ -136,6 +141,7 @@ public sealed class ConsoleIdentificationTests
 
         Assert.False(tagSteam);
         Assert.False(tagPc);
+        Assert.False(tagEmulation);
         Assert.False(tagPs5);
         Assert.False(tagXbox);
         Assert.False(tagOther);

@@ -186,6 +186,7 @@ namespace PixelVaultNative
                     {
                         item.TagSteam = true;
                         item.TagPc = false;
+                        item.TagEmulation = false;
                         item.TagPs5 = false;
                         item.TagXbox = false;
                         item.TagOther = false;
@@ -259,6 +260,7 @@ namespace PixelVaultNative
                 if (h.PhotographyBox.IsChecked == true) notes.Add(GamePhotographyTag + " tag enabled");
                 if (h.SteamBox.IsChecked == true) notes.Add("platform tag: Steam");
                 else if (h.PcBox.IsChecked == true) notes.Add("platform tag: PC");
+                else if (h.EmulationBox.IsChecked == true) notes.Add("platform tag: Emulation");
                 else if (h.Ps5Box.IsChecked == true) notes.Add("platform tag: PS5");
                 else if (h.XboxBox.IsChecked == true) notes.Add("platform tag: Xbox");
                 else if (h.OtherBox.IsChecked == true) notes.Add("platform tag: " + CleanTag(h.OtherPlatformBox.Text));
@@ -291,6 +293,7 @@ namespace PixelVaultNative
                     h.Ps5Box.IsChecked = false;
                     h.XboxBox.IsChecked = false;
                     h.PcBox.IsChecked = false;
+                    h.EmulationBox.IsChecked = false;
                     h.OtherBox.IsChecked = false;
                     h.OtherPlatformBox.Text = string.Empty;
                     h.UseCustomTimeBox.IsChecked = false;
@@ -313,9 +316,11 @@ namespace PixelVaultNative
                     h.SelectedTitle.Text = item.FileName;
                     h.SelectedMeta.Text = h.SingleSelectionMetaPrefix + FormatFriendlyTimestamp(GetLibraryDate(item.FilePath));
                     h.GuessText.Text = GetManualMetadataFilenameGuessSummary(h.SelectedItems);
-                    h.SteamLookupStatus.Text = string.IsNullOrWhiteSpace(item.SteamAppId)
-                        ? (IsSteamManualExportWithoutAppId(item.FileName) ? "Steam-style export detected. Search the game name to attach its AppID before import." : "Search by game name to fetch a Steam AppID, or paste one directly.")
-                        : "Steam AppID " + item.SteamAppId + " will be saved with this import.";
+                    h.SteamLookupStatus.Text = !string.IsNullOrWhiteSpace(item.NonSteamId)
+                        ? "Non-Steam ID " + item.NonSteamId + " will be saved with this game record."
+                        : string.IsNullOrWhiteSpace(item.SteamAppId)
+                            ? (IsSteamManualExportWithoutAppId(item.FileName) ? "Steam-style export detected. Search the game name to attach its AppID before import." : "Search by game name to fetch a Steam AppID, or paste one directly.")
+                            : "Steam AppID " + item.SteamAppId + " will be saved with this import.";
                     h.PreviewBorder.Child = h.PreviewImage;
                     h.PreviewImage.Source = null;
                     QueueImageLoad(
@@ -357,6 +362,7 @@ namespace PixelVaultNative
                 h.UseCustomTimeBox.IsChecked = GetSharedManualMetadataFieldBool(h.SelectedItems, delegate(ManualMetadataItem item) { return item.UseCustomCaptureTime; });
                 h.SteamBox.IsChecked = GetSharedManualMetadataFieldBool(h.SelectedItems, delegate(ManualMetadataItem item) { return item.TagSteam; });
                 h.PcBox.IsChecked = GetSharedManualMetadataFieldBool(h.SelectedItems, delegate(ManualMetadataItem item) { return item.TagPc; });
+                h.EmulationBox.IsChecked = GetSharedManualMetadataFieldBool(h.SelectedItems, delegate(ManualMetadataItem item) { return item.TagEmulation; });
                 h.Ps5Box.IsChecked = GetSharedManualMetadataFieldBool(h.SelectedItems, delegate(ManualMetadataItem item) { return item.TagPs5; });
                 h.XboxBox.IsChecked = GetSharedManualMetadataFieldBool(h.SelectedItems, delegate(ManualMetadataItem item) { return item.TagXbox; });
                 h.OtherBox.IsChecked = GetSharedManualMetadataFieldBool(h.SelectedItems, delegate(ManualMetadataItem item) { return item.TagOther; });
@@ -516,6 +522,25 @@ namespace PixelVaultNative
                 foreach (var item in h.SelectedItems)
                 {
                     item.TagPc = false;
+                    item.ForceTagMetadataWrite = true;
+                }
+                refreshTileBadges();
+                refreshSelectionUi();
+            };
+            h.EmulationBox.Checked += delegate
+            {
+                if (h.SuppressSync || h.SelectedItems.Count == 0) return;
+                ApplyConsolePlatformToManualMetadataItems(h.SelectedItems, "Emulation");
+                refreshTileBadges();
+                refreshSelectionUi();
+            };
+            h.EmulationBox.Unchecked += delegate
+            {
+                if (h.SuppressSync || h.SelectedItems.Count == 0) return;
+                if (h.EmulationBox.IsChecked != false) return;
+                foreach (var item in h.SelectedItems)
+                {
+                    item.TagEmulation = false;
                     item.ForceTagMetadataWrite = true;
                 }
                 refreshTileBadges();

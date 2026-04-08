@@ -32,7 +32,10 @@ namespace PixelVaultNative
         /// <summary>Max over files of (index date added if set, else capture/reindexed date ticks); used for Recently Added folder sort.</summary>
         public long NewestRecentSortUtcTicks;
         public string SteamAppId;
+        public string NonSteamId;
         public string SteamGridDbId;
+        /// <summary>RetroAchievements.org game ID (numeric in their API; stored as text).</summary>
+        public string RetroAchievementsGameId;
         public bool SuppressSteamAppIdAutoResolve;
         public bool SuppressSteamGridDbIdAutoResolve;
         public bool IsCompleted100Percent;
@@ -48,7 +51,10 @@ namespace PixelVaultNative
         public string Name { get; set; }
         public string PlatformLabel { get; set; }
         public string SteamAppId { get; set; }
+        public string NonSteamId { get; set; }
         public string SteamGridDbId { get; set; }
+        /// <summary>RetroAchievements.org game ID.</summary>
+        public string RetroAchievementsGameId { get; set; }
         public bool SuppressSteamAppIdAutoResolve { get; set; }
         public bool SuppressSteamGridDbIdAutoResolve { get; set; }
         public int FileCount { get; set; }
@@ -71,6 +77,8 @@ namespace PixelVaultNative
         public string FilePath { get; set; }
         public string Stamp { get; set; }
         public string GameId { get; set; }
+        /// <summary>Optional per-file RetroAchievements game ID (denormalized; game index is authoritative for the title).</summary>
+        public string RetroAchievementsGameId { get; set; }
         public string ConsoleLabel { get; set; }
         public string TagText { get; set; }
         public bool Starred { get; set; }
@@ -84,6 +92,7 @@ namespace PixelVaultNative
         public string FilePath;
         public string Stamp;
         public string GameId;
+        public string RetroAchievementsGameId;
         public string ConsoleLabel;
         public string TagText;
         public long CaptureUtcTicks;
