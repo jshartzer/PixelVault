@@ -3,7 +3,7 @@
 | Field | Value |
 |-------|--------|
 | **Plan ID** | `PV-PLN-LIBST-001` |
-| **Status** | In progress — Slices 0–E shipped; **Slice F:** Step 6 complete (editors + health: rows + photo-index file placement) |
+| **Status** | **Complete (2026-04-08)** — Slices **0–G** (Steps **0–9**) delivered per this plan. Optional product QA from the Step 8 manual checklist and Step 9 follow-ups in-doc remain non-blocking. |
 | **Owner** | PixelVault / Codex |
 | **Source brief** | User request (2026-04-07): keep unique Game Index rows per console, but store all captures for a game in one app-owned folder and stop inferring identity from folder structure |
 | **Related** | `docs/PROJECT_CONTEXT.md`, `docs/POLICY.md`, `docs/DOC_SYNC_POLICY.md`, `docs/plans/PV-PLN-UI-001-ui-thin-mainwindow-ios-aligned.md` |
@@ -338,6 +338,8 @@ Examples:
 
 This step is where the app fully owns folder structure as a projection from the model.
 
+**Implementation (v1):** **`OrganizeLibraryItems`** skips moves when the file already sits **under** the canonical game folder (subfolders allowed; **`IsDirectoryWithinCanonicalStorage`**), so platform-only / tag churn with the same `GameId` does not flatten layout. **`RehomeLibraryCapturesTowardCanonicalFolders`** runs after **Photo Index** save for paths whose **`GameId`** changed, reusing organize + **`LibraryPlacementService`** (same behavior as library metadata apply). Library metadata finish workflow already ran organize after finalize; unchanged apart from subfolder rule.
+
 ### Step 8 — Verification and rollout
 
 Add explicit automated and manual verification before treating the model as complete.
@@ -349,6 +351,8 @@ Automated coverage should include:
 - placement planning for multi-platform same-title rows
 - scanner rebuild against mixed-platform single folders
 - metadata edit -> file re-home behavior
+- **Photo index save → re-home:** unit tests for **`LibraryRehomeRules.PhotoIndexGameIdChangedForRehome`** (when `GameId` changes vs first assign vs unchanged) and for **`LibraryPlacementService.IsCaptureAlreadyUnderCanonicalOrganizeTarget`** (exact dir, subfolder under canonical with game row, no false positives when not from game row). **Integration:** **`PhotoIndexSaveRehomeIntegrationTests`** — temp library, fake **`ILibraryScanHost`**, **`SavePhotoIndexEditorRows`** + **`LibraryScanner`** hook to skip folder-cache rebuild; asserts capture moves under canonical folder after `GameId` change.
+- **Other index paths:** audit any code that mutates `photo_index` **`GameId`** or assignment without going through library metadata finish or photo index save; extend **`RehomeLibraryCapturesTowardCanonicalFolders`** (or equivalent) so small saves don’t leave disk and index inconsistent—verify with tests or a checklist before closing Step 8.
 
 Manual checks should include:
 
@@ -357,6 +361,25 @@ Manual checks should include:
 - `All` vs `By Console` browse after files share one folder
 - merge/re-home dry run and apply
 - undo/conflict behavior
+- **photo index:** change a file’s `GameId`, save, confirm capture moves (or stays) per **`OrganizeLibraryItems`** / subfolder rules
+
+**After Step 8:** use **Step 9** for production-faithful tests and hardening that are not blockers for first rollout but reduce regression risk on real libraries.
+
+### Step 9 — SQLite-faithful integration tests and re-home persistence hardening
+
+Step 9 is the **last numbered step** in this plan. It targets two things: (1) tests that hit **real `IndexPersistenceService` SQLite** (not only an in-memory host), and (2) **production correctness** so re-home does not leave `photo_index` pointing at pre-move paths after files move.
+
+**Done (2026-04-08)**
+
+- **`PhotoIndexSaveRehomeSqliteIntegrationTests`:** temp library + **`IndexPersistenceHarness`** + **`LibraryScanner.SavePhotoIndexEditorRows`**; asserts disk layout **and** `photo_index` row (`file_path`, `game_id`) after **`GameId`** reassignment and re-home.
+- **Shared `IndexPersistenceHarness`:** moved out of **`IndexPersistenceServiceTests`** into `tests/PixelVault.Native.Tests/IndexPersistenceHarness.cs` for reuse.
+- **Re-home → SQLite consistency:** **`RehomeLibraryCapturesTowardCanonicalFolders`** (in **`LibraryMetadataEditing`**) after a successful **`OrganizeLibraryItems`** pass now **removes stale index keys** for the pre-move paths and **`UpsertLibraryMetadataIndexEntries`** for the **`ManualMetadataItem`** list (same idea as the library metadata apply workflow). Fake test host **`PhotoSaveTestHost`** re-saves the metadata index after **`MoveTowardCanonicalForIntegrationTest`** so host doubles stay coherent.
+
+**Optional follow-ups (not blocking)**
+
+- **Re-home failures:** richer UX when a move fails (locked file, collision); today logging covers the organize summary.
+- **Performance:** document or profile folder-cache rebuild + large-batch re-home if users report slowdowns.
+- **Step 8 “other index paths”:** deeper audit if you need a written matrix of every `photo_index` / assignment mutation outside editor save and manual metadata apply.
 
 ## Suggested delivery slices
 
@@ -368,7 +391,8 @@ Manual checks should include:
 | **C** | Step 3 — centralize placement into a service |
 | **D** | Step 4 — scanner/folder-cache path-agnostic rebuild |
 | **E** | Step 5 — migration / merge preview tool (release-gating) |
-| **F** | Steps 6–8 — editor polish, diagnostics, hardening, verification |
+| **F** | Steps 6–8 — editor polish, diagnostics, verification, rollout |
+| **G** | Step 9 — SQLite integration tests + re-home index persistence hardening (final step) |
 
 ## Early test matrix
 
@@ -379,6 +403,8 @@ Add or extend these tests before the larger refactors land:
 - SQLite migration round-trip for new storage-group columns
 - move + sidecar + index updates in at least one integration-style test
 - scanner rebuild against a mixed-platform single-folder fixture
+- **LIBST Step 8:** **`LibraryRehomeRules`**, **`IsCaptureAlreadyUnderCanonicalOrganizeTarget`**, **`PhotoIndexSaveRehomeIntegrationTests`** (temp disk + fake host; not full SQLite pipeline).
+- **LIBST Step 9:** **`PhotoIndexSaveRehomeSqliteIntegrationTests`** + **`IndexPersistenceHarness`**; production re-home updates **`photo_index`** after moves via remove + upsert.
 
 ## Operational safeguards
 
@@ -390,6 +416,12 @@ Before broad re-home moves ship:
   - destination path
   - `GameId`
   - `StorageGroupId`
+
+### Step 9 — ops checklist (release / support)
+
+- **Backup** library folder (and PixelVault cache / index DB under the configured cache root) before running **merge**, mass **organize**, or storage migration tooling.
+- After **photo index** edits that change **`GameId`**, confirm captures appear under the expected game folder and that **photo index** reload shows **current file paths** (re-home now refreshes SQLite when moves occur).
+- If **`photo_index`** and disk disagree after a crash or interrupted save, use **reload from disk** / **repair** flows documented in product help rather than hand-editing SQLite.
 
 ## Decision lock items
 
@@ -444,6 +476,12 @@ Without **this foundation** (preflight + Steps 1–2), removing ` - Platform` fr
 | 2026-04-08 | **Slice D (Step 4 — partial)** | Documented **`LibraryFolderInfo`** as per-**`GameId`** projection with optional shared **`FolderPath`**. **`LoadLibraryFoldersCore`** summary: group by photo-index **`GameId`**; placement is observed, not title identity. **`NonSteamId`** copied onto scan-built folder rows when a saved game-index row exists (parity with other IDs). Further Step 4 work: broader repair/merge QA, mixed-folder fixtures in tests. |
 | 2026-04-08 | **Slice E (Step 5 — v1)** | **`LibraryStorageMergePlanner` / dry-run models** + tests. **UI:** **Merge folders** next to Game Index; preview lists groups, target dir, move counts, optional empty-folder hints, rename-on-clash count. **Apply** persists index + runs **`AlignLibraryFoldersToGameIndex`**. **`BuildGameIndexRowsFromFolders`** now copies **`StorageGroupId`**. |
 | 2026-04-08 | **Slice F (Step 6)** | **Game Index:** **Target storage folder** + **Placement**; **`FormatCanonicalStorageFolderAbsolutePath`**. **Health:** **`LibraryStoragePlacementHealthSnapshot`** — row paths + full **photo index** scan vs canonical folders (misplaced / orphan GameId / unassigned). **Folder ID editor** copy. **`PathsEqualNormalized`**, **`IsDirectoryWithinCanonicalStorage`**, tests. |
+| 2026-04-08 | **Slice F (Step 7)** | **`OrganizeLibraryItems`:** skip move when already under canonical folder (subfolders). **`RehomeLibraryCapturesTowardCanonicalFolders`** + **`ILibraryScanHost`**: after **Photo Index** save, re-home files whose **`GameId`** changed. Shared placement rules; same-storage-group rows still target one folder. |
+| 2026-04-08 | **Slice F (Step 8 — started)** | Plan: **photo index re-home** tests + **other index paths** audit. Code: **`IsCaptureAlreadyUnderCanonicalOrganizeTarget`**, **`LibraryRehomeRules`**, **`LibraryRehomeRulesTests`** + organize-target tests. |
+| 2026-04-08 | **Slice F (Step 8 — integration)** | **`PhotoIndexSaveRehomeIntegrationTests`**: `GameId` edit in photo index save moves file from wrong folder to canonical **`Portal`** dir; **`LibraryScanner`** optional **`folderCacheRebuildHook`** for tests only. |
+| 2026-04-08 | **Slice G (Step 9 — defined)** | Added Step 9 scope: SQLite integration + hardening checklist. |
+| 2026-04-08 | **Slice G (Step 9 — shipped)** | **`PhotoIndexSaveRehomeSqliteIntegrationTests`**, shared **`IndexPersistenceHarness`**. **`RehomeLibraryCapturesTowardCanonicalFolders`**: after moves, **`RemoveLibraryMetadataIndexEntries`** (pre-move paths) + **`UpsertLibraryMetadataIndexEntries`** (`ManualMetadataItem` list). Fake **`PhotoSaveTestHost`** re-saves metadata index after integration re-home. Step 9 ops checklist added under **Operational safeguards**. |
+| 2026-04-08 | **Plan closure** | **`PV-PLN-LIBST-001`** marked **complete** in the header table; numbered Steps 0–9 and slices 0–G are shipped as documented. |
 
 ### Step 1 scanner / rebuild audit (2026-04-08)
 

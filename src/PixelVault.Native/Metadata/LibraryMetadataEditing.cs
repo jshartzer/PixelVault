@@ -191,7 +191,11 @@ namespace PixelVaultNative
                     created++;
                 }
                 var currentDirectory = Path.GetDirectoryName(item.FilePath) ?? string.Empty;
-                if (string.Equals(currentDirectory.TrimEnd(Path.DirectorySeparatorChar), targetDirectory.TrimEnd(Path.DirectorySeparatorChar), StringComparison.OrdinalIgnoreCase))
+                var inPlace = LibraryPlacementService.IsCaptureAlreadyUnderCanonicalOrganizeTarget(
+                    currentDirectory,
+                    targetDirectory,
+                    gameRow != null);
+                if (inPlace)
                 {
                     skipped++;
                     if (progress != null) progress(i + 1, total, "Already organized " + (i + 1) + " of " + total + " | " + remaining + " remaining | " + item.FileName);
@@ -222,6 +226,45 @@ namespace PixelVaultNative
             RemoveCachedFolderListings(touchedDirectories);
             RemoveCachedFileTagEntries(affectedFiles);
             Log("Library organize summary: moved " + moved + ", folders created " + created + ", renamed-on-conflict " + renamedConflict + ", already-in-place " + skipped + ".");
+            return moved;
+        }
+
+        /// <summary>
+        /// LIBST Step 7: after photo index (or similar) updates <see cref="ManualMetadataItem.GameId"/>, move files toward the canonical folder for that row when needed.
+        /// </summary>
+        int RehomeLibraryCapturesTowardCanonicalFolders(string root, IEnumerable<string> filePaths)
+        {
+            if (string.IsNullOrWhiteSpace(root)
+                || !string.Equals(root, libraryRoot, StringComparison.OrdinalIgnoreCase)
+                || string.IsNullOrWhiteSpace(libraryRoot)
+                || !Directory.Exists(libraryRoot)) return 0;
+            var paths = (filePaths ?? Enumerable.Empty<string>())
+                .Where(p => !string.IsNullOrWhiteSpace(p) && File.Exists(p))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (paths.Count == 0) return 0;
+            var items = new List<ManualMetadataItem>(paths.Count);
+            foreach (var path in paths)
+            {
+                var item = BuildLibraryMetadataItemForPath(path, null);
+                if (item != null) items.Add(item);
+            }
+            if (items.Count == 0) return 0;
+            var moved = OrganizeLibraryItems(items, null);
+            if (moved > 0)
+            {
+                if (librarySession != null && string.Equals(libraryRoot, librarySession.LibraryRoot, StringComparison.OrdinalIgnoreCase))
+                {
+                    librarySession.RemoveLibraryMetadataIndexEntries(paths);
+                    librarySession.UpsertLibraryMetadataIndexEntries(items);
+                }
+                else
+                {
+                    libraryScanner.RemoveLibraryMetadataIndexEntries(paths, libraryRoot);
+                    libraryScanner.UpsertLibraryMetadataIndexEntries(items, libraryRoot);
+                }
+                Log("Re-home after assignment: moved " + moved + " capture(s) toward canonical storage folders.");
+            }
             return moved;
         }
 

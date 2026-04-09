@@ -206,6 +206,24 @@ public sealed class LibraryPlacementServiceTests
     }
 
     [Fact]
+    public void IsCaptureAlreadyUnderCanonicalOrganizeTarget_SubfolderSkipsMove_WhenGameRowResolved()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "pv-org-target-" + Guid.NewGuid().ToString("N"));
+        var sub = Path.Combine(root, "depth", "shots");
+        Directory.CreateDirectory(sub);
+        try
+        {
+            Assert.True(LibraryPlacementService.IsCaptureAlreadyUnderCanonicalOrganizeTarget(sub, root, resolvedFromGameIndexRow: true));
+            Assert.False(LibraryPlacementService.IsCaptureAlreadyUnderCanonicalOrganizeTarget(Path.GetTempPath(), root, resolvedFromGameIndexRow: true));
+            Assert.False(LibraryPlacementService.IsCaptureAlreadyUnderCanonicalOrganizeTarget(sub, root, resolvedFromGameIndexRow: false));
+        }
+        finally
+        {
+            try { Directory.Delete(root, recursive: true); } catch { /* best-effort */ }
+        }
+    }
+
+    [Fact]
     public void IsDirectoryWithinCanonicalStorage_AllowsSubfolders()
     {
         var root = Path.Combine(Path.GetTempPath(), "pv-canonical-" + Guid.NewGuid().ToString("N"));

@@ -14,12 +14,19 @@ namespace PixelVaultNative
         readonly ILibraryScanHost host;
         readonly IMetadataService metadataService;
         readonly IFileSystemService fileSystem;
+        readonly Action<string, Dictionary<string, LibraryMetadataIndexEntry>> folderCacheRebuildHook;
 
-        public LibraryScanner(ILibraryScanHost host, IMetadataService metadataService, IFileSystemService fileSystem)
+        /// <param name="folderCacheRebuildHook">Optional test hook; when set, replaces full folder cache rebuild (avoids heavy host dependencies).</param>
+        public LibraryScanner(
+            ILibraryScanHost host,
+            IMetadataService metadataService,
+            IFileSystemService fileSystem,
+            Action<string, Dictionary<string, LibraryMetadataIndexEntry>> folderCacheRebuildHook = null)
         {
             this.host = host ?? throw new ArgumentNullException(nameof(host));
             this.metadataService = metadataService ?? throw new ArgumentNullException(nameof(metadataService));
             this.fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
+            this.folderCacheRebuildHook = folderCacheRebuildHook;
         }
 
         public int ScanLibraryMetadataIndex(
@@ -307,6 +314,7 @@ namespace PixelVaultNative
 
         public void SavePhotoIndexEditorRows(string root, IEnumerable<PhotoIndexEditorRow> rows)
         {
+            List<string> rehomeAfterGameIdChange = null;
             lock (host.LibraryMaintenanceSync)
             {
                 if (string.IsNullOrWhiteSpace(root) || !fileSystem.DirectoryExists(root)) return;
@@ -321,6 +329,7 @@ namespace PixelVaultNative
                 var existingIndex = host.LoadLibraryMetadataIndex(root, true);
                 var index = new Dictionary<string, LibraryMetadataIndexEntry>(StringComparer.OrdinalIgnoreCase);
                 var ratingWrites = new List<ExifWriteRequest>();
+                rehomeAfterGameIdChange = new List<string>();
                 foreach (var row in rowList)
                 {
                     var normalizedTags = string.Join(", ", host.ParseTagText(row.TagText));
@@ -328,6 +337,9 @@ namespace PixelVaultNative
                     var stamp = host.BuildLibraryMetadataStamp(row.FilePath);
                     LibraryMetadataIndexEntry existingEntry;
                     if (!existingIndex.TryGetValue(row.FilePath, out existingEntry)) existingEntry = null;
+                    var oldGid = existingEntry == null ? string.Empty : host.NormalizeGameId(existingEntry.GameId);
+                    var newGid = host.NormalizeGameId(row.GameId);
+                    if (LibraryRehomeRules.PhotoIndexGameIdChangedForRehome(oldGid, newGid)) rehomeAfterGameIdChange.Add(row.FilePath);
                     var hadStarred = existingEntry != null && existingEntry.Starred;
                     if (row.Starred != hadStarred && fileSystem.FileExists(row.FilePath))
                     {
@@ -400,6 +412,11 @@ namespace PixelVaultNative
             }
 
             RebuildLibraryFolderCache(root, null);
+            if (rehomeAfterGameIdChange != null && rehomeAfterGameIdChange.Count > 0)
+            {
+                var moved = host.RehomeLibraryCapturesTowardCanonicalFolders(root, rehomeAfterGameIdChange);
+                if (moved > 0) RebuildLibraryFolderCache(root, null);
+            }
         }
 
         public List<PhotoIndexEditorRow> LoadPhotoIndexEditorRows(string root)
@@ -576,6 +593,11 @@ namespace PixelVaultNative
 
         public void RebuildLibraryFolderCache(string root, Dictionary<string, LibraryMetadataIndexEntry> index)
         {
+            if (folderCacheRebuildHook != null)
+            {
+                folderCacheRebuildHook(root, index);
+                return;
+            }
             host.LibraryFolderCacheRwLock.EnterWriteLock();
             try
             {
@@ -759,6 +781,18 @@ namespace PixelVaultNative
                     StorageGroupId = string.Empty
                 });
             }
+        }
+    }
+
+    /// <summary>Pure rules for Step 7–8 re-home triggers (unit-tested).</summary>
+    internal static class LibraryRehomeRules
+    {
+        internal static bool PhotoIndexGameIdChangedForRehome(string previousNormalizedGameId, string nextNormalizedGameId)
+        {
+            return !string.Equals(
+                previousNormalizedGameId ?? string.Empty,
+                nextNormalizedGameId ?? string.Empty,
+                StringComparison.OrdinalIgnoreCase);
         }
     }
 }

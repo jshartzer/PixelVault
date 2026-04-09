@@ -97,6 +97,9 @@ namespace PixelVaultNative
                 string preferredGameId) =>
                 window.ResolveExistingGameIndexRowForAssignment(rows, name, platformLabel, preferredGameId);
 
+            public int RehomeLibraryCapturesTowardCanonicalFolders(string root, IEnumerable<string> filePaths) =>
+                window.RehomeLibraryCapturesTowardCanonicalFolders(root, filePaths);
+
             public long ToCaptureUtcTicks(DateTime captureTime) => window.ToCaptureUtcTicks(captureTime);
 
             public string NormalizeGameId(string value) => window.NormalizeGameId(value);

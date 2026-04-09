@@ -77,6 +77,9 @@ namespace PixelVaultNative
 
         GameIndexEditorRow ResolveExistingGameIndexRowForAssignment(IEnumerable<GameIndexEditorRow> rows, string name, string platformLabel, string preferredGameId);
 
+        /// <summary>When <see cref="ManualMetadataItem.GameId"/> changes (e.g. photo index save), move files under canonical folders (LIBST Step 7).</summary>
+        int RehomeLibraryCapturesTowardCanonicalFolders(string root, IEnumerable<string> filePaths);
+
         long ToCaptureUtcTicks(DateTime captureTime);
 
         string NormalizeGameId(string value);

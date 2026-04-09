@@ -267,6 +267,23 @@ namespace PixelVaultNative
         }
 
         /// <summary>
+        /// Organize/re-home: skip moving when the file’s directory equals the canonical target or lies under it (Step 7–8 / LIBST).
+        /// </summary>
+        internal static bool IsCaptureAlreadyUnderCanonicalOrganizeTarget(
+            string fileDirectoryPath,
+            string canonicalTargetDirectory,
+            bool resolvedFromGameIndexRow)
+        {
+            if (string.IsNullOrWhiteSpace(canonicalTargetDirectory)) return false;
+            var cur = fileDirectoryPath ?? string.Empty;
+            var tgt = canonicalTargetDirectory;
+            var curTrim = cur.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            var tgtTrim = tgt.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            if (string.Equals(curTrim, tgtTrim, StringComparison.OrdinalIgnoreCase)) return true;
+            return resolvedFromGameIndexRow && IsDirectoryWithinCanonicalStorage(cur, tgt);
+        }
+
+        /// <summary>
         /// True when <paramref name="directoryPath"/> is the canonical game folder or a subdirectory of it
         /// (normalized paths; case-insensitive).
         /// </summary>
