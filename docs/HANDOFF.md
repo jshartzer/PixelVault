@@ -50,6 +50,7 @@ Then use these based on the task:
 - `C:\Codex\docs\PERFORMANCE_TODO.md` for responsiveness/scalability follow-up
 - `C:\Codex\docs\CODE_QUALITY_IMPROVEMENT_PLAN.md` for hardening / edge-case backlog
 - `C:\Codex\docs\MANUAL_GOLDEN_PATH_CHECKLIST.md` for risky manual verification
+- `C:\Codex\docs\archive\PV-PLN-LIBWS-001-library-workspace-modes.md` — **done** plan: library **Folder / Photo / Timeline** modes; **Photo workspace: exit & restoration** spells out what exits clear vs. what scroll state is not restored
 - `C:\Codex\docs\SERVICE_OWNERSHIP_AND_PARALLEL_WORK_MAP.md` for service boundaries and parallel lanes
 
 ## Current Published Build
@@ -101,7 +102,7 @@ The app is currently published at `0.075.008`.
 Recent extraction progress (repo):
 
 - **Steam non-Steam shortcut IDs (0.075.008):** Steam-style numeric shortcut screenshots for non-Steam games now resolve as **`Emulation`** instead of bad Steam AppIDs. The parser recognizes long numeric shortcut IDs, uses the **Game Index** `Non-Steam ID` field to recover known game names, preserves unknown IDs through manual intake, and saves them back onto new master rows. `Emulation` is treated as a built-in/default console in manual metadata, game-index editing, folder ID editing, and filename-rule defaults.
-- **Library photo workspace — console capture filter (0.075.007):** In **Photo** mode, title **platform badges** (per game) filter which consoles’ captures appear in the **main photo pane**; the **cover rail** stays complete. Badges use non-button hit targets; switching games resets toggles. Plan: **`docs/plans/PV-PLN-LIBWS-001-library-workspace-modes.md`**.
+- **Library photo workspace — console capture filter (0.075.007):** In **Photo** mode, title **platform badges** (per game) filter which consoles’ captures appear in the **main photo pane**; the **cover rail** stays complete. Badges use non-button hit targets; switching games resets toggles. Archived plan: **`docs/archive/PV-PLN-LIBWS-001-library-workspace-modes.md`**.
 - **Pre-V1 polish Slice C (0.075.000):** Library folder and detail **empty/loading** states with CTAs; version **renumber** to **`0.075.xxx`** for runway to 1.0. See **`docs/plans/PV-PLN-V1POL-001-pre-v1-polish-program.md`**.
 - **Library perf Steps 4–5 (0.999.000):** SQLite pragmas and sliced metadata reads/upserts for the library detail pane; deferred game-index warmup after the library window is shown (**`ApplicationIdle`**) instead of constructor preload. See **`docs/LIBRARY_PERFORMANCE_PLAN.md`**.
 - **Library detail pane Step 3 (0.998.000):** Viewport-aware decode scheduling (visible virtual rows use the priority image-load lane; overscan-only rows use the normal lane). Detail `VirtualizedRowHost` now recycles row elements like folder tiles; selection chrome stays correct via repopulating **`DetailTiles`** from the visible visual tree after each virtual pass. See **`docs/LIBRARY_PERFORMANCE_PLAN.md`** Step 3.

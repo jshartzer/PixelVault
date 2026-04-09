@@ -524,6 +524,7 @@ namespace PixelVaultNative
             {
                 panes.PreviewImage.Source = null;
                 panes.PreviewImage.Visibility = Visibility.Collapsed;
+                LibraryBrowserClearAchievementsSummary(panes);
                 PersistLibraryBrowserLastSelection(info);
                 renderSelectedFolder();
                 return;
@@ -534,6 +535,7 @@ namespace PixelVaultNative
                 panes.PreviewImage.Visibility = Visibility.Collapsed;
                 PersistLibraryBrowserLastSelection(info);
                 RefreshPhotoWorkspacePlatformFilterBadges(ws, panes, info);
+                LibraryBrowserScheduleAchievementsSummaryRefresh(ws, panes, libraryWindow, info);
                 renderSelectedFolder();
                 return;
             }

@@ -35,6 +35,7 @@ namespace PixelVaultNative
             internal bool LibraryFoldersLoading;
             internal int LibraryFolderRefreshVersion;
             internal int DetailRenderSequence;
+            internal int AchievementsSummaryFetchGeneration;
             internal bool ResetDetailRowsToLoadingOnNextRender;
             internal int EstimatedDetailRowHeight = 420;
             internal int DetailSelectionAnchorIndex = -1;

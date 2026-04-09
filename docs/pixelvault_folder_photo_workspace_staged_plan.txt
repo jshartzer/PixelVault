@@ -2,7 +2,7 @@ PixelVault Folder / Photo Workspace Shift — Staged Plan for Cursor
 ==================================================================
 
 Codified plan ID (canonical for execution, including **Timeline as third mode**):
-  docs/plans/PV-PLN-LIBWS-001-library-workspace-modes.md  (PV-PLN-LIBWS-001)
+  docs/archive/PV-PLN-LIBWS-001-library-workspace-modes.md  (PV-PLN-LIBWS-001, archived done)
 
 Date: 2026-04-06
 Workspace: C:\Codex
@@ -541,4 +541,4 @@ Only after that is stable should header/banner treatment be treated as a polish 
 11. Progress log (repo)
 -----------------------
 
-2026-04-06 — Published **0.075.007** (see **docs/CHANGELOG.md**). Photo workspace: detail header shows **per-game** console badges to the **right** of the title; clicking a badge **filters captures in the main photo pane** by platform (dimmed = hidden). The **mini cover rail** is **not** filtered. Canonical plan updates: **docs/plans/PV-PLN-LIBWS-001-library-workspace-modes.md**.
+2026-04-06 — Published **0.075.007** (see **docs/CHANGELOG.md**). Photo workspace: detail header shows **per-game** console badges to the **right** of the title; clicking a badge **filters captures in the main photo pane** by platform (dimmed = hidden). The **mini cover rail** is **not** filtered. Canonical plan (archived): **docs/archive/PV-PLN-LIBWS-001-library-workspace-modes.md**.

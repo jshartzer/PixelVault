@@ -37,6 +37,7 @@ namespace PixelVaultNative
             internal Button EditMetadataButton;
             internal Button RefreshThisFolderButton;
             internal Button PhotoAchievementsButton;
+            internal TextBlock PhotoAchievementsSummary;
             internal Button ExitTimelineButton;
             internal WrapPanel TimelineFilterPanel;
             internal Button TimelinePresetTodayButton;
@@ -473,16 +474,33 @@ namespace PixelVaultNative
             panes.EditMetadataButton.Margin = new Thickness(0, 0, 12, 0);
             panes.RefreshThisFolderButton.Margin = new Thickness(0, 0, 12, 0);
             panes.PhotoAchievementsButton = Btn("", null, "#20343A", Brushes.White);
-            panes.PhotoAchievementsButton.Content = BuildSymbolIcon("\uED34", "#D8E4EA", 15);
+            panes.PhotoAchievementsButton.Content = new TextBlock
+            {
+                Text = "\U0001F3C6",
+                FontFamily = new FontFamily("Segoe UI Emoji"),
+                FontSize = 17,
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
             panes.PhotoAchievementsButton.ToolTip = "Achievements (Steam or RetroAchievements, based on platform tag)";
             ApplyLibraryPillChrome(panes.PhotoAchievementsButton, "#1C2A32", "#2A3C46", "#22323C", "#141E24");
             panes.PhotoAchievementsButton.Width = 42;
             panes.PhotoAchievementsButton.MinWidth = 42;
             panes.PhotoAchievementsButton.Height = 38;
             panes.PhotoAchievementsButton.Padding = new Thickness(0);
-            panes.PhotoAchievementsButton.Margin = new Thickness(0, 0, 12, 0);
+            panes.PhotoAchievementsButton.Margin = new Thickness(0, 0, 0, 0);
             panes.PhotoAchievementsButton.Visibility = Visibility.Collapsed;
             AutomationProperties.SetName(panes.PhotoAchievementsButton, "Achievements");
+            panes.PhotoAchievementsSummary = new TextBlock
+            {
+                Text = string.Empty,
+                Visibility = Visibility.Collapsed,
+                VerticalAlignment = VerticalAlignment.Center,
+                Foreground = Brush("#9CB1BC"),
+                FontSize = 12.5,
+                Margin = new Thickness(10, 0, 12, 0),
+                TextTrimming = TextTrimming.CharacterEllipsis
+            };
             panes.ExitTimelineButton.Margin = new Thickness(0);
             panes.ExitTimelineButton.Visibility = Visibility.Collapsed;
             panes.PhotoCaptureLayoutButton = Btn("Photo size ▾", null, "#20343A", Brushes.White);
@@ -496,11 +514,14 @@ namespace PixelVaultNative
             var bannerButtonRow = new Grid { Margin = new Thickness(0, 8, 0, 0) };
             bannerButtonRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             bannerButtonRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            var bannerActionsLeft = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Left };
+            var bannerActionsLeft = new WrapPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Left };
             bannerActionsLeft.Children.Add(panes.OpenFolderButton);
             bannerActionsLeft.Children.Add(panes.EditMetadataButton);
             bannerActionsLeft.Children.Add(panes.RefreshThisFolderButton);
-            bannerActionsLeft.Children.Add(panes.PhotoAchievementsButton);
+            var photoAchievementsGroup = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            photoAchievementsGroup.Children.Add(panes.PhotoAchievementsButton);
+            photoAchievementsGroup.Children.Add(panes.PhotoAchievementsSummary);
+            bannerActionsLeft.Children.Add(photoAchievementsGroup);
             bannerActionsLeft.Children.Add(panes.ExitTimelineButton);
             Grid.SetColumn(bannerActionsLeft, 0);
             bannerButtonRow.Children.Add(bannerActionsLeft);

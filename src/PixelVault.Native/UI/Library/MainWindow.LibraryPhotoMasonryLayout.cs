@@ -181,7 +181,10 @@ namespace PixelVaultNative
             return Math.Max(1, h);
         }
 
-        /// <summary>Column-based masonry with occasional 2-column &quot;hero&quot; spans when there are at least two columns.</summary>
+        /// <summary>
+        /// Justified rows: every row uses one shared height so tile bottoms align — no dead space beside a shorter neighbor
+        /// (unlike column-based masonry + hero spans). Widths split proportionally to aspect ratio within each row.
+        /// </summary>
         internal static List<LibraryDetailMasonryChunk> BuildLibraryDetailMasonryChunks(
             IReadOnlyList<string> files,
             double availableWidth,
@@ -198,25 +201,6 @@ namespace PixelVaultNative
             var gap = Math.Max(0, gapPx);
             var avail = Math.Max(120d, availableWidth);
             var minColW = Math.Max(minWidth, 240);
-            var maxColW = Math.Max(minColW, Math.Min(maxWidth, Math.Max(minWidth, baseWidth)));
-
-            var cols = Math.Max(1, (int)Math.Floor((avail + gap) / (minColW + gap)));
-            cols = Math.Min(cols, Math.Max(1, files.Count));
-            while (cols > 1)
-            {
-                var testColW = (avail - (cols - 1) * gap) / cols;
-                if (testColW + 0.5 >= minColW) break;
-                cols--;
-            }
-
-            var columnWidthF = (avail - (cols - 1) * gap) / Math.Max(1, cols);
-            var columnWidth = (int)Math.Floor(columnWidthF);
-            columnWidth = Math.Max(minWidth, Math.Min(maxColW, columnWidth));
-            if (columnWidth > (int)Math.Floor(avail))
-                columnWidth = (int)Math.Floor(avail);
-
-            const int maxItemsPerChunk = 42;
-            const double maxChunkPaintHeight = 3400d;
 
             var filtered = new List<string>();
             foreach (var f in files)
@@ -225,18 +209,26 @@ namespace PixelVaultNative
             }
             if (filtered.Count == 0) return chunks;
 
-            var colHeights = new double[cols];
+            var cols = Math.Max(1, (int)Math.Floor((avail + gap) / (minColW + gap)));
+            cols = Math.Min(cols, Math.Max(1, filtered.Count));
+            while (cols > 1)
+            {
+                var testColW = (avail - (cols - 1) * gap) / cols;
+                if (testColW + 0.5 >= minColW) break;
+                cols--;
+            }
+
+            const int maxItemsPerChunk = 42;
+            const double maxChunkPaintHeight = 3400d;
+
             var placements = new List<LibraryDetailMasonryPlacement>();
-            var lastHeroIndex = -100;
-            var ordinal = 0;
+            var yInChunk = 0d;
+            var index = 0;
 
             void FlushChunk()
             {
                 if (placements.Count == 0) return;
-                var h = 0d;
-                for (var c = 0; c < cols; c++)
-                    if (colHeights[c] > h) h = colHeights[c];
-                if (h > gap && placements.Count > 0) h = Math.Max(0, h - gap);
+                var h = yInChunk > gap ? yInChunk - gap : yInChunk;
                 chunks.Add(new LibraryDetailMasonryChunk
                 {
                     CanvasWidth = avail,
@@ -244,88 +236,95 @@ namespace PixelVaultNative
                     Placements = placements
                 });
                 placements = new List<LibraryDetailMasonryPlacement>();
-                for (var c = 0; c < cols; c++) colHeights[c] = 0;
+                yInChunk = 0d;
             }
 
-            foreach (var file in filtered)
+            while (index < filtered.Count)
             {
-                var chunkTop = 0d;
-                for (var c = 0; c < cols; c++)
-                    if (colHeights[c] > chunkTop) chunkTop = colHeights[c];
-                if (placements.Count > 0 && (placements.Count >= maxItemsPerChunk || chunkTop >= maxChunkPaintHeight))
+                if (placements.Count >= maxItemsPerChunk || (placements.Count > 0 && yInChunk >= maxChunkPaintHeight))
                     FlushChunk();
 
-                var aspectRatio = ResolveLibraryDetailAspectRatio(file, mediaLayoutByFile);
-                var allowHero = cols >= 2 && filtered.Count >= Math.Max(4, cols + 1);
-                var isWideEnoughForHero = aspectRatio >= 1.55d;
-                var useHero = cols >= 2
-                    && allowHero
-                    && isWideEnoughForHero
-                    && (
-                        ordinal == 0
-                        || (ordinal - lastHeroIndex >= 6 && ordinal < filtered.Count - 2));
+                var rowCount = Math.Min(cols, filtered.Count - index);
+                var innerW = avail - (rowCount - 1) * gap;
+                if (innerW < 1) innerW = 1;
 
-                if (useHero)
+                var aspects = new double[rowCount];
+                double sumA = 0;
+                for (var i = 0; i < rowCount; i++)
                 {
-                    var heroW = (int)Math.Min(Math.Floor(avail), 2 * columnWidth + gap);
-                    var heroH = EstimateLibraryDetailSingleTileHeight(file, heroW, includeTimelineFooter, mediaLayoutByFile);
-                    var bestJ = 0;
-                    var bestTop = double.MaxValue;
-                    for (var j = 0; j <= cols - 2; j++)
-                    {
-                        var top = Math.Max(colHeights[j], colHeights[j + 1]);
-                        if (top < bestTop)
-                        {
-                            bestTop = top;
-                            bestJ = j;
-                        }
-                    }
-                    var x = bestJ * (columnWidth + gap);
+                    var a = ResolveLibraryDetailAspectRatio(filtered[index + i], mediaLayoutByFile);
+                    aspects[i] = Math.Max(0.25, a);
+                    sumA += aspects[i];
+                }
+                if (sumA <= 1e-9) sumA = rowCount;
+
+                var rowH = innerW / sumA;
+                var hInt = Math.Max(1, (int)Math.Ceiling(rowH));
+                var widths = JustifiedRowWidthsInt(innerW, aspects);
+
+                double x = 0;
+                for (var i = 0; i < rowCount; i++)
+                {
                     placements.Add(new LibraryDetailMasonryPlacement
                     {
-                        File = file,
+                        File = filtered[index + i],
                         X = x,
-                        Y = bestTop,
-                        Width = heroW,
-                        Height = heroH
+                        Y = yInChunk,
+                        Width = widths[i],
+                        Height = hInt
                     });
-                    var newTop = bestTop + heroH + gap;
-                    colHeights[bestJ] = newTop;
-                    colHeights[bestJ + 1] = newTop;
-                    lastHeroIndex = ordinal;
-                }
-                else
-                {
-                    var j = 0;
-                    for (var c = 1; c < cols; c++)
-                        if (colHeights[c] < colHeights[j]) j = c;
-                    var y = colHeights[j];
-                    var w = columnWidth;
-                    if (aspectRatio < 0.9d && cols >= 3)
-                    {
-                        w = Math.Max(minWidth, (int)Math.Round(columnWidth * 0.9d / 12d) * 12);
-                    }
-                    w = Math.Min(w, (int)Math.Floor(avail));
-                    var h = EstimateLibraryDetailSingleTileHeight(file, w, includeTimelineFooter, mediaLayoutByFile);
-                    var x = j * (columnWidth + gap);
-                    if (w < columnWidth && cols > 1)
-                        x += Math.Max(0, (columnWidth - w) / 2);
-                    placements.Add(new LibraryDetailMasonryPlacement
-                    {
-                        File = file,
-                        X = x,
-                        Y = y,
-                        Width = w,
-                        Height = h
-                    });
-                    colHeights[j] = y + h + gap;
+                    x += widths[i] + gap;
                 }
 
-                ordinal++;
+                yInChunk += hInt + gap;
+                index += rowCount;
             }
 
             FlushChunk();
             return chunks;
+        }
+
+        /// <summary>Integer tile widths for one row that sum to <paramref name="innerWidth"/> (tile area only, not gaps).</summary>
+        static int[] JustifiedRowWidthsInt(double innerWidth, double[] aspects)
+        {
+            var n = aspects.Length;
+            if (n == 0) return Array.Empty<int>();
+            var target = Math.Max(n, (int)Math.Floor(innerWidth + 1e-9));
+            if (n == 1) return new[] { target };
+
+            var sum = 0d;
+            for (var i = 0; i < n; i++) sum += Math.Max(0.25, aspects[i]);
+            if (sum <= 1e-9)
+            {
+                var eq = Math.Max(1, target / n);
+                var w = new int[n];
+                var u = 0;
+                for (var i = 0; i < n - 1; i++)
+                {
+                    w[i] = eq;
+                    u += eq;
+                }
+                w[n - 1] = Math.Max(1, target - u);
+                return w;
+            }
+
+            var weights = new double[n];
+            for (var i = 0; i < n; i++) weights[i] = Math.Max(0.25, aspects[i]) / sum;
+
+            var result = new int[n];
+            var remaining = target;
+            var weightLeft = 1d;
+            for (var i = 0; i < n - 1; i++)
+            {
+                var wi = (int)Math.Floor(remaining * (weights[i] / weightLeft) + 1e-9);
+                wi = Math.Max(1, wi);
+                if (wi > remaining - (n - 1 - 1)) wi = Math.Max(1, remaining - (n - 1 - i));
+                result[i] = wi;
+                remaining -= wi;
+                weightLeft -= weights[i];
+            }
+            result[n - 1] = Math.Max(1, remaining);
+            return result;
         }
     }
 }

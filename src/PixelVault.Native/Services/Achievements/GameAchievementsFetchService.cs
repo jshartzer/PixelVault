@@ -50,15 +50,79 @@ namespace PixelVaultNative
         {
             var folderName = folder == null ? string.Empty : (folder.Name ?? string.Empty).Trim();
             var norm = (normalizedPlatform ?? string.Empty).Trim();
-            if (string.Equals(norm, "Steam", StringComparison.OrdinalIgnoreCase))
-                return await FetchSteamAsync(folder, folderName, steamWebApiKey, steamUserId64, userAgent, cancellationToken).ConfigureAwait(false);
-            if (string.Equals(norm, "Emulation", StringComparison.OrdinalIgnoreCase))
-                return await FetchRetroAsync(folder, folderName, retroAchievementsApiKey, retroAchievementsUsername, userAgent, cancellationToken).ConfigureAwait(false);
-
-            return new FetchResult
+            if (!TryPickAchievementsBackend(norm, folder, out var useSteam))
             {
-                ErrorMessage = "Achievements load for games tagged Steam (Steam Community schema) or Emulation (RetroAchievements). Use Edit Metadata to set the platform and the matching id."
-            };
+                return new FetchResult
+                {
+                    ErrorMessage = "Achievements need a Steam App ID (Steam) or a RetroAchievements game id (Emulation). For games with multiple platform tags, set at least one of those ids in Edit Metadata."
+                };
+            }
+
+            if (useSteam)
+                return await FetchSteamAsync(folder, folderName, steamWebApiKey, steamUserId64, userAgent, cancellationToken).ConfigureAwait(false);
+            return await FetchRetroAsync(folder, folderName, retroAchievementsApiKey, retroAchievementsUsername, userAgent, cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Picks Steam vs RetroAchievements using the normalized platform label when unambiguous, then falls back to
+        /// which external ids are present so <c>Multiple Tags</c> / merged-console rows still load achievements.
+        /// When both ids exist, Steam is preferred (common for PC + emulation library entries).
+        /// </summary>
+        static bool TryPickAchievementsBackend(string normalizedPlatform, LibraryFolderInfo folder, out bool useSteam)
+        {
+            useSteam = true;
+            var norm = (normalizedPlatform ?? string.Empty).Trim();
+            var steamReady = folder != null && TryParsePositiveInt(folder.SteamAppId, out _);
+            var retroReady = folder != null && TryParsePositiveInt(folder.RetroAchievementsGameId, out _);
+
+            if (string.Equals(norm, "Steam", StringComparison.OrdinalIgnoreCase))
+            {
+                if (steamReady)
+                {
+                    useSteam = true;
+                    return true;
+                }
+                if (retroReady)
+                {
+                    useSteam = false;
+                    return true;
+                }
+                return false;
+            }
+
+            if (string.Equals(norm, "Emulation", StringComparison.OrdinalIgnoreCase))
+            {
+                if (retroReady)
+                {
+                    useSteam = false;
+                    return true;
+                }
+                if (steamReady)
+                {
+                    useSteam = true;
+                    return true;
+                }
+                return false;
+            }
+
+            // "Multiple Tags", PC, Other, PS5, etc.: infer from ids
+            if (steamReady && retroReady)
+            {
+                useSteam = true;
+                return true;
+            }
+            if (steamReady)
+            {
+                useSteam = true;
+                return true;
+            }
+            if (retroReady)
+            {
+                useSteam = false;
+                return true;
+            }
+
+            return false;
         }
 
         static FetchResult Err(string msg) => new FetchResult { ErrorMessage = msg };
@@ -88,12 +152,30 @@ namespace PixelVaultNative
             return ulong.TryParse(raw.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out id) && id > 0UL;
         }
 
-        static string BuildSteamAchievementIconUrl(int appId, string hash)
+        /// <summary>Steam may return a bare filename/hash, a path-relative URL, or a full https URL. WPF <see cref="System.Windows.Media.Imaging.BitmapImage"/> CDN loads work reliably when using the normalized CDN form.</summary>
+        internal static string ResolveSteamAchievementIconUrl(int appId, string raw)
         {
+            if (string.IsNullOrWhiteSpace(raw)) return null;
+            var t = raw.Trim();
+            if (t.StartsWith("https://", StringComparison.OrdinalIgnoreCase) || t.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
+                return t;
+            if (t.StartsWith("//", StringComparison.Ordinal))
+                return "https:" + t;
+
+            var hash = t.Replace('\\', '/');
+            var slash = hash.LastIndexOf('/');
+            if (slash >= 0 && slash < hash.Length - 1)
+                hash = hash.Substring(slash + 1);
+
+            if (hash.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase)
+                || hash.EndsWith(".jpeg", StringComparison.OrdinalIgnoreCase))
+                hash = hash.Substring(0, hash.Length - 4);
+            else if (hash.EndsWith(".png", StringComparison.OrdinalIgnoreCase))
+                hash = hash.Substring(0, hash.Length - 4);
+
             if (string.IsNullOrWhiteSpace(hash)) return null;
-            var h = hash.Trim();
             return "https://cdn.akamai.steamstatic.com/steamcommunity/public/images/apps/"
-                + appId.ToString(CultureInfo.InvariantCulture) + "/" + Uri.EscapeDataString(h) + ".jpg";
+                + appId.ToString(CultureInfo.InvariantCulture) + "/" + hash + ".jpg";
         }
 
         static async Task<Dictionary<string, (int achieved, int unlocktime)>> TryLoadSteamPlayerAchievementsAsync(
@@ -257,10 +339,10 @@ namespace PixelVaultNative
                                 else if (h.ValueKind == JsonValueKind.True) hidden = true;
                             }
 
-                            var icon = ReadString(a, "icon") ?? string.Empty;
-                            var iconGray = ReadString(a, "icongray") ?? string.Empty;
-                            var colorUrl = BuildSteamAchievementIconUrl(appId, icon);
-                            var grayUrl = BuildSteamAchievementIconUrl(appId, iconGray);
+                            var icon = ReadString(a, "icon", "Icon") ?? string.Empty;
+                            var iconGray = ReadString(a, "icongray", "iconGray", "IconGray", "icongrey") ?? string.Empty;
+                            var colorUrl = ResolveSteamAchievementIconUrl(appId, icon);
+                            var grayUrl = ResolveSteamAchievementIconUrl(appId, iconGray);
 
                             var progressKnown = progress != null;
                             var unlocked = false;
@@ -546,7 +628,7 @@ namespace PixelVaultNative
             return null;
         }
 
-        static void TrySetUa(TimeoutWebClient wc, string userAgent)
+        internal static void TrySetUa(TimeoutWebClient wc, string userAgent)
         {
             try
             {

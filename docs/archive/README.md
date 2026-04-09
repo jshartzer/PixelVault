@@ -4,6 +4,7 @@ This folder keeps **full snapshots** of planning documents that were mostly exec
 
 | Archive file | Replaced / narrowed by (active) |
 |--------------|-----------------------------------|
+| `PV-PLN-LIBWS-001-library-workspace-modes.md` | Initiative **done**; library workspace behavior lives in code under `src/PixelVault.Native/UI/Library/`; regression matrix remains in the archived doc |
 | `PERFORMANCE_FIX_PLAN_HISTORICAL_2026-03.txt` | `PERFORMANCE_TODO.md`, slim `PERFORMANCE_FIX_PLAN.txt` |
 | `pixelvault_service_split_plan_HISTORICAL.txt` | Slim `pixelvault_service_split_plan.txt` + `HANDOFF.md` |
 | `CODE_QUALITY_IMPROVEMENT_PLAN_HISTORICAL.md` | Slim `CODE_QUALITY_IMPROVEMENT_PLAN.md` |

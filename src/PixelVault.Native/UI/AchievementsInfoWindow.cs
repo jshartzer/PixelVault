@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Automation;
@@ -13,6 +15,7 @@ namespace PixelVaultNative
     sealed class AchievementsInfoWindow : Window
     {
         readonly TextBlock _heading;
+        readonly TextBlock _earnedSummary;
         readonly TextBlock _detail;
         readonly TextBlock _error;
         readonly ListBox _list;
@@ -34,6 +37,7 @@ namespace PixelVaultNative
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
@@ -47,6 +51,18 @@ namespace PixelVaultNative
             };
             root.Children.Add(_heading);
 
+            _earnedSummary = new TextBlock
+            {
+                Margin = new Thickness(0, 6, 0, 0),
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = UiBrushHelper.FromHex("#C8D8E2"),
+                TextWrapping = TextWrapping.Wrap,
+                Visibility = Visibility.Collapsed
+            };
+            Grid.SetRow(_earnedSummary, 1);
+            root.Children.Add(_earnedSummary);
+
             _detail = new TextBlock
             {
                 Margin = new Thickness(0, 8, 0, 0),
@@ -54,7 +70,7 @@ namespace PixelVaultNative
                 Foreground = UiBrushHelper.FromHex("#9CB1BC"),
                 TextWrapping = TextWrapping.Wrap
             };
-            Grid.SetRow(_detail, 1);
+            Grid.SetRow(_detail, 2);
             root.Children.Add(_detail);
 
             _error = new TextBlock
@@ -65,7 +81,7 @@ namespace PixelVaultNative
                 TextWrapping = TextWrapping.Wrap,
                 Visibility = Visibility.Collapsed
             };
-            Grid.SetRow(_error, 2);
+            Grid.SetRow(_error, 3);
             root.Children.Add(_error);
 
             _empty = new TextBlock
@@ -76,7 +92,7 @@ namespace PixelVaultNative
                 Text = "No achievement definitions were returned for this game.",
                 Visibility = Visibility.Collapsed
             };
-            Grid.SetRow(_empty, 3);
+            Grid.SetRow(_empty, 4);
             root.Children.Add(_empty);
 
             _list = new ListBox
@@ -88,9 +104,13 @@ namespace PixelVaultNative
                 Foreground = Brushes.White,
                 HorizontalContentAlignment = HorizontalAlignment.Stretch
             };
+            ScrollViewer.SetHorizontalScrollBarVisibility(_list, ScrollBarVisibility.Disabled);
+            var listItemStyle = new Style(typeof(ListBoxItem));
+            listItemStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Stretch));
+            _list.ItemContainerStyle = listItemStyle;
             VirtualizingPanel.SetIsVirtualizing(_list, true);
             VirtualizingPanel.SetVirtualizationMode(_list, VirtualizationMode.Recycling);
-            Grid.SetRow(_list, 4);
+            Grid.SetRow(_list, 5);
             root.Children.Add(_list);
 
             var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 4, 0, 0) };
@@ -109,7 +129,7 @@ namespace PixelVaultNative
             close.Click += delegate { Close(); };
             AccessibilityUi.TryApplyFocusVisualStyle(close);
             buttons.Children.Add(close);
-            Grid.SetRow(buttons, 5);
+            Grid.SetRow(buttons, 6);
             root.Children.Add(buttons);
 
             Content = root;
@@ -171,6 +191,7 @@ namespace PixelVaultNative
                 displayTitle = folder.Name ?? string.Empty;
             _heading.Text = string.IsNullOrWhiteSpace(displayTitle) ? "Achievements" : displayTitle;
             _detail.Text = result.IsError ? string.Empty : (result.DetailLine ?? string.Empty);
+            _earnedSummary.Visibility = Visibility.Collapsed;
 
             if (result.IsError)
             {
@@ -190,6 +211,11 @@ namespace PixelVaultNative
                 _empty.Visibility = Visibility.Visible;
                 return;
             }
+
+            var total = rows.Count;
+            var earned = rows.Count(r => r.ProgressKnown && r.Unlocked);
+            _earnedSummary.Text = "\U0001F3C6 " + earned + " of " + total + " Achievements earned";
+            _earnedSummary.Visibility = Visibility.Visible;
 
             _empty.Visibility = Visibility.Collapsed;
             _list.Visibility = Visibility.Visible;
@@ -216,7 +242,7 @@ namespace PixelVaultNative
                     });
                 }
 
-                _list.Items.Add(BuildAchievementRowCard(row));
+                _list.Items.Add(BuildAchievementRowCard(row, userAgent));
             }
         }
 
@@ -229,7 +255,7 @@ namespace PixelVaultNative
             return "Progress unknown";
         }
 
-        static Border BuildAchievementRowCard(GameAchievementsFetchService.AchievementRow row)
+        Border BuildAchievementRowCard(GameAchievementsFetchService.AchievementRow row, string userAgent)
         {
             var card = new Border
             {
@@ -240,7 +266,7 @@ namespace PixelVaultNative
             };
             var grid = new Grid { MinHeight = 52 };
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = 0 });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
             var badgeHost = new Border
@@ -257,11 +283,11 @@ namespace PixelVaultNative
             };
             var img = new Image { Stretch = Stretch.UniformToFill, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
             badgeHost.Child = img;
-            ApplyAchievementBadgeArt(img, row);
+            BeginAchievementBadgeDownload(img, row, userAgent);
             Grid.SetColumn(badgeHost, 0);
             grid.Children.Add(badgeHost);
 
-            var stack = new StackPanel();
+            var stack = new StackPanel { MinWidth = 0 };
             stack.Children.Add(new TextBlock
             {
                 Text = row.Title ?? string.Empty,
@@ -291,7 +317,9 @@ namespace PixelVaultNative
                     Foreground = UiBrushHelper.FromHex("#B8C9D4"),
                     FontSize = 11,
                     Margin = new Thickness(14, 0, 0, 0),
-                    VerticalAlignment = VerticalAlignment.Top
+                    VerticalAlignment = VerticalAlignment.Top,
+                    TextWrapping = TextWrapping.Wrap,
+                    MaxWidth = 132
                 };
                 Grid.SetColumn(meta, 2);
                 grid.Children.Add(meta);
@@ -301,15 +329,23 @@ namespace PixelVaultNative
             return card;
         }
 
-        /// <summary>Unlocked or unknown progress: full color. Locked: Steam <see cref="GameAchievementsFetchService.AchievementRow.IconUrlGray"/> when set, else grayscale the color badge.</summary>
-        static void ApplyAchievementBadgeArt(Image img, GameAchievementsFetchService.AchievementRow row)
+        /// <summary>Steam CDN and similar hosts often reject anonymous <see cref="BitmapImage"/> URI downloads; use HttpClient with the same User-Agent as API fetches.</summary>
+        const int AchievementIconDownloadMaxBytes = 786432;
+
+        void BeginAchievementBadgeDownload(Image img, GameAchievementsFetchService.AchievementRow row, string userAgent)
         {
             var grayOut = row.ProgressKnown && !row.Unlocked;
-            string url;
+            string primary;
+            string fallback = null;
             if (grayOut && !string.IsNullOrWhiteSpace(row.IconUrlGray))
-                url = row.IconUrlGray;
+            {
+                primary = row.IconUrlGray;
+                if (!string.IsNullOrWhiteSpace(row.IconUrlColor)
+                    && !string.Equals(row.IconUrlGray, row.IconUrlColor, StringComparison.OrdinalIgnoreCase))
+                    fallback = row.IconUrlColor;
+            }
             else if (!string.IsNullOrWhiteSpace(row.IconUrlColor))
-                url = row.IconUrlColor;
+                primary = row.IconUrlColor;
             else
             {
                 img.Visibility = Visibility.Collapsed;
@@ -317,22 +353,75 @@ namespace PixelVaultNative
             }
 
             img.Visibility = Visibility.Visible;
-            var bmp = new BitmapImage();
-            bmp.BeginInit();
-            bmp.UriSource = new Uri(url, UriKind.Absolute);
-            bmp.DecodePixelWidth = 108;
-            bmp.CacheOption = BitmapCacheOption.OnLoad;
-            bmp.CreateOptions = BitmapCreateOptions.IgnoreImageCache;
-            bmp.EndInit();
+            var ua = string.IsNullOrWhiteSpace(userAgent) ? "PixelVault" : userAgent.Trim();
+            _ = LoadAchievementBadgeIntoImageAsync(img, row, primary, fallback, grayOut, ua);
+        }
 
-            if (grayOut && string.IsNullOrWhiteSpace(row.IconUrlGray))
+        async Task LoadAchievementBadgeIntoImageAsync(
+            Image img,
+            GameAchievementsFetchService.AchievementRow row,
+            string primaryUrl,
+            string fallbackUrl,
+            bool grayOut,
+            string userAgent)
+        {
+            var bytes = await DownloadAchievementIconBytesAsync(primaryUrl, userAgent).ConfigureAwait(false);
+            var usedFallback = false;
+            if ((bytes == null || bytes.Length == 0) && !string.IsNullOrWhiteSpace(fallbackUrl))
             {
-                bmp.DownloadCompleted += delegate { ApplyGrayscaleSource(img, bmp); };
-                img.Source = bmp;
+                bytes = await DownloadAchievementIconBytesAsync(fallbackUrl, userAgent).ConfigureAwait(false);
+                usedFallback = bytes != null && bytes.Length > 0;
+            }
+
+            var fakeGrayscale = grayOut && (string.IsNullOrWhiteSpace(row.IconUrlGray) || usedFallback);
+
+            if (bytes == null || bytes.Length == 0)
+            {
+                await Dispatcher.InvokeAsync(() => { img.Visibility = Visibility.Collapsed; });
                 return;
             }
 
-            img.Source = bmp;
+            var copy = bytes;
+            await Dispatcher.InvokeAsync(() =>
+            {
+                try
+                {
+                    using (var ms = new MemoryStream(copy))
+                    {
+                        var bmp = new BitmapImage();
+                        bmp.BeginInit();
+                        bmp.StreamSource = ms;
+                        bmp.DecodePixelWidth = 108;
+                        bmp.CacheOption = BitmapCacheOption.OnLoad;
+                        bmp.EndInit();
+                        bmp.Freeze();
+                        if (fakeGrayscale) ApplyGrayscaleSource(img, bmp);
+                        else img.Source = bmp;
+                    }
+                }
+                catch
+                {
+                    img.Visibility = Visibility.Collapsed;
+                }
+            });
+        }
+
+        static async Task<byte[]> DownloadAchievementIconBytesAsync(string url, string userAgent)
+        {
+            if (string.IsNullOrWhiteSpace(url)) return null;
+            try
+            {
+                using (var wc = new TimeoutWebClient())
+                {
+                    GameAchievementsFetchService.TrySetUa(wc, userAgent);
+                    wc.TimeoutMilliseconds = 20000;
+                    return await wc.DownloadBytesAsync(url.Trim(), AchievementIconDownloadMaxBytes, default).ConfigureAwait(false);
+                }
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         static void ApplyGrayscaleSource(Image img, BitmapSource colorSource)

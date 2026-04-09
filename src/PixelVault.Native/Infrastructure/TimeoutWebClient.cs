@@ -157,6 +157,25 @@ namespace PixelVaultNative
             }
         }
 
+        /// <summary>GET response body bytes with a caller-supplied size cap (e.g. small images).</summary>
+        public async Task<byte[]> DownloadBytesAsync(string address, long maxResponseBytes, CancellationToken cancellationToken = default(CancellationToken))
+        {
+            if (maxResponseBytes <= 0) maxResponseBytes = MaxFileDownloadBytes;
+            using (var request = BuildRequest(HttpMethod.Get, address))
+            using (var requestCancellation = CreateRequestCancellation(cancellationToken))
+            {
+                var token = ResolveRequestToken(requestCancellation, cancellationToken);
+                using (var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token).ConfigureAwait(false))
+                {
+                    response.EnsureSuccessStatusCode();
+                    using (var stream = await response.Content.ReadAsStreamAsync(token).ConfigureAwait(false))
+                    {
+                        return await ReadStreamWithByteLimitAsync(stream, maxResponseBytes, token).ConfigureAwait(false);
+                    }
+                }
+            }
+        }
+
         public async Task DownloadFileAsync(string address, string filePath, CancellationToken cancellationToken = default(CancellationToken))
         {
             using (var request = BuildRequest(HttpMethod.Get, address))

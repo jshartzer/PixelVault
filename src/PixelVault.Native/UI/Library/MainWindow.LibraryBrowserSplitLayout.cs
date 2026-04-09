@@ -41,6 +41,13 @@ namespace PixelVaultNative
             if (panes.RefreshThisFolderButton != null) panes.RefreshThisFolderButton.Visibility = hideGameChrome ? Visibility.Collapsed : Visibility.Visible;
             if (panes.PhotoAchievementsButton != null)
                 panes.PhotoAchievementsButton.Visibility = hideGameChrome ? Visibility.Collapsed : (isPhoto ? Visibility.Visible : Visibility.Collapsed);
+            if (panes.PhotoAchievementsSummary != null)
+            {
+                if (!isPhoto || hideGameChrome)
+                    LibraryBrowserClearAchievementsSummary(panes);
+                else if (panes.PhotoAchievementsButton != null && panes.PhotoAchievementsButton.Visibility != Visibility.Visible)
+                    panes.PhotoAchievementsSummary.Visibility = Visibility.Collapsed;
+            }
             if (panes.ExitTimelineButton != null) panes.ExitTimelineButton.Visibility = isTimeline ? Visibility.Visible : Visibility.Collapsed;
             if (panes.TimelineFilterPanel != null) panes.TimelineFilterPanel.Visibility = isTimeline ? Visibility.Visible : Visibility.Collapsed;
             if (panes.GroupAllButton != null) panes.GroupAllButton.Visibility = isPhoto ? Visibility.Collapsed : Visibility.Visible;
@@ -134,10 +141,23 @@ namespace PixelVaultNative
 
             if (photoWorkspaceCompact)
             {
-                panes.RightPane.Padding = new Thickness(26, 10, 26, 12);
+                panes.RightPane.Padding = new Thickness(16, 10, 16, 12);
                 if (panes.LibraryDetailBanner != null) panes.LibraryDetailBanner.Margin = new Thickness(0, 0, 0, 4);
                 if (panes.LibraryDetailControlsDock != null) panes.LibraryDetailControlsDock.Margin = new Thickness(0, 2, 0, 6);
                 if (panes.DetailMeta != null) panes.DetailMeta.Margin = new Thickness(0, 4, 0, 6);
+                if (panes.DetailTitle != null) panes.DetailTitle.FontSize = 22;
+                if (panes.PhotoCaptureLayoutButton != null)
+                {
+                    panes.PhotoCaptureLayoutButton.MinWidth = 92;
+                    panes.PhotoCaptureLayoutButton.Margin = new Thickness(8, 4, 0, 0);
+                    panes.PhotoCaptureLayoutButton.HorizontalAlignment = HorizontalAlignment.Right;
+                    panes.PhotoCaptureLayoutButton.VerticalAlignment = VerticalAlignment.Top;
+                }
+                if (panes.LibraryDetailBannerGrid != null && panes.LibraryDetailBannerGrid.ColumnDefinitions.Count > 1)
+                {
+                    var chromeCol = panes.LibraryDetailBannerGrid.ColumnDefinitions[1];
+                    chromeCol.MinWidth = 0;
+                }
                 if (panes.PhotoWorkspaceTitleReadabilityBorder != null)
                 {
                     var chrome = panes.PhotoWorkspaceTitleReadabilityBorder;
@@ -171,6 +191,19 @@ namespace PixelVaultNative
                 if (panes.LibraryDetailBanner != null) panes.LibraryDetailBanner.Margin = new Thickness(0, 0, 0, 18);
                 if (panes.LibraryDetailControlsDock != null) panes.LibraryDetailControlsDock.Margin = new Thickness(0, 4, 0, 14);
                 if (panes.DetailMeta != null) panes.DetailMeta.Margin = new Thickness(0, 8, 0, 14);
+                if (panes.DetailTitle != null) panes.DetailTitle.FontSize = 28;
+                if (panes.PhotoCaptureLayoutButton != null)
+                {
+                    panes.PhotoCaptureLayoutButton.MinWidth = 108;
+                    panes.PhotoCaptureLayoutButton.Margin = new Thickness(12, 0, 0, 0);
+                    panes.PhotoCaptureLayoutButton.HorizontalAlignment = HorizontalAlignment.Right;
+                    panes.PhotoCaptureLayoutButton.VerticalAlignment = VerticalAlignment.Center;
+                }
+                if (panes.LibraryDetailBannerGrid != null && panes.LibraryDetailBannerGrid.ColumnDefinitions.Count > 1)
+                {
+                    var chromeCol = panes.LibraryDetailBannerGrid.ColumnDefinitions[1];
+                    chromeCol.MinWidth = 140;
+                }
                 if (panes.PhotoWorkspaceTitleReadabilityBorder != null)
                 {
                     var chrome = panes.PhotoWorkspaceTitleReadabilityBorder;

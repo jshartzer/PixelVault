@@ -89,9 +89,11 @@ public sealed class LibraryPhotoMasonryLayoutTests
             ["portrait.png"] = new LibraryDetailMediaLayoutInfo { PixelWidth = 1080, PixelHeight = 1920 }
         };
 
+        // Narrow enough for one tile per row: justified rows share height within a row, so aspect-driven
+        // height differences appear across separate rows (not when both sit on the same row).
         var chunks = MainWindow.BuildLibraryDetailMasonryChunks(
             files,
-            availableWidth: 540,
+            availableWidth: 400,
             gapPx: 8,
             baseWidth: 280,
             minWidth: 200,
@@ -100,6 +102,6 @@ public sealed class LibraryPhotoMasonryLayoutTests
             mediaLayoutByFile: media);
 
         var placements = chunks.SelectMany(chunk => chunk.Placements).ToDictionary(p => p.File, System.StringComparer.OrdinalIgnoreCase);
-        Assert.True(placements["portrait.png"].Height > placements["wide.png"].Height, "portrait media should occupy more vertical space than wide media at comparable widths");
+        Assert.True(placements["portrait.png"].Height > placements["wide.png"].Height, "portrait media should get a taller row than wide media when each occupies its own row");
     }
 }
