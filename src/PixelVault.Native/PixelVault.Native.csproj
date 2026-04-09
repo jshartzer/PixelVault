@@ -41,6 +41,8 @@
     <Compile Include="Services\Library\ILibraryScanner.cs" />
     <Compile Include="Services\Library\LibraryScanner.cs" />
     <Compile Include="Services\Library\LibraryPlacementService.cs" />
+    <Compile Include="Services\Library\LibraryStorageMergeModels.cs" />
+    <Compile Include="Services\Library\LibraryStorageMergePlanner.cs" />
     <Compile Include="Services\Achievements\GameAchievementsFetchService.cs" />
     <Compile Include="Services\Covers\CoverService.cs" />
     <Compile Include="Services\Covers\CoverWorkflowHelpers.cs" />
