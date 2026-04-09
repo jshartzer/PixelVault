@@ -3,7 +3,7 @@
 | Field | Value |
 |-------|--------|
 | **Plan ID** | `PV-PLN-LIBST-001` |
-| **Status** | In progress — Slices 0–D started: scanner/folder cache documented as per-`GameId` projections (shared `FolderPath` supported); Step 5+ remain |
+| **Status** | In progress — Slices 0–E started: Step 5 merge workflow (dry-run + apply) ships from Library **Merge folders**; polish/undo later |
 | **Owner** | PixelVault / Codex |
 | **Source brief** | User request (2026-04-07): keep unique Game Index rows per console, but store all captures for a game in one app-owned folder and stop inferring identity from folder structure |
 | **Related** | `docs/PROJECT_CONTEXT.md`, `docs/POLICY.md`, `docs/DOC_SYNC_POLICY.md`, `docs/plans/PV-PLN-UI-001-ui-thin-mainwindow-ios-aligned.md` |
@@ -285,6 +285,8 @@ Important behavior change:
 
 Do not force a one-shot hidden migration. Provide an app-owned re-home workflow.
 
+**Implementation (v1):** Library toolbar **Merge folders** → `OpenLibraryStorageMergeTool`: `BuildStorageMergeWorkingSet`, `LibraryStorageMergePlanner.PlanDryRun`, summary window, **Apply** runs `SaveSavedGameIndexRows` + `AlignLibraryFoldersToGameIndex` + save + `RefreshCachedLibraryFoldersFromGameIndex`. `BuildGameIndexRowsFromFolders` preserves **`StorageGroupId`** from the folder cache. See **`LibraryStorageMergePlannerTests`**. Not yet: dedicated undo manifest, empty-folder auto-delete.
+
 This is a release milestone, not cleanup polish. Real libraries with years of `Game - Platform` folders will need a dry-run before defaults change.
 
 Suggested user-facing tool:
@@ -438,6 +440,7 @@ Without **this foundation** (preflight + Steps 1–2), removing ` - Platform` fr
 | 2026-04-08 | **Slice B (Step 2 — `StorageGroupId`)** | **`GameIndexEditorRow.StorageGroupId`**, SQLite `game_index.storage_group_id` (`EnsureGameIndexStorageGroupIdColumn`), read/write in `IndexPersistenceService`, **`GameIndexStorageGroupBackfill.AssignDeterministicStorageGroupIds`** on load/save merge. **`LibraryFolderInfo.StorageGroupId`** filled from saved rows in **`LibraryScanner`**; synced in **`ApplySavedGameIndexRows`** / conservative **`UpsertSavedGameIndexRow`**; **`CloneLibraryFolderInfo`** copies it. **Merge rule:** two **Steam** rows with differing non-empty **`SteamGridDbId`** do not share a storage group. **Game Index editor:** read-only **Storage group** column + search hits **`StorageGroupId`**. Tests: **`GameIndexStorageGroupBackfillTests`**. Legacy tab-separated game index files still omit `StorageGroupId`; SQLite + backfill is the source of truth. |
 | 2026-04-08 | **Slice C (Step 3)** | **`LibraryPlacementService`**: shared **`StorageGroupId`** → one folder name; legacy empty group → title-count + ` - Platform` suffix. **`AlignLibraryFoldersToGameIndex`**, **`OrganizeLibraryItems`**, and **`ImportService.SortDestinationRootIntoGameFolders`** use placement. Import sort: **`TryResolveGameIndexRowForImportSort`** (Steam AppID / non-Steam ID / **`BuildGameIndexIdentity`** title+platform), then **`PlanImportRootSort`** / **`LibraryFileMovePlan`**. Sidecars still moved by existing **`MoveMetadataSidecarIfPresent`** per move (not a unified sidecar list yet). **`LibraryPlacementServiceTests`**. |
 | 2026-04-08 | **Slice D (Step 4 — partial)** | Documented **`LibraryFolderInfo`** as per-**`GameId`** projection with optional shared **`FolderPath`**. **`LoadLibraryFoldersCore`** summary: group by photo-index **`GameId`**; placement is observed, not title identity. **`NonSteamId`** copied onto scan-built folder rows when a saved game-index row exists (parity with other IDs). Further Step 4 work: broader repair/merge QA, mixed-folder fixtures in tests. |
+| 2026-04-08 | **Slice E (Step 5 — v1)** | **`LibraryStorageMergePlanner` / dry-run models** + tests. **UI:** **Merge folders** next to Game Index; preview lists groups, target dir, move counts, optional empty-folder hints, rename-on-clash count. **Apply** persists index + runs **`AlignLibraryFoldersToGameIndex`**. **`BuildGameIndexRowsFromFolders`** now copies **`StorageGroupId`**. |
 
 ### Step 1 scanner / rebuild audit (2026-04-08)
 
