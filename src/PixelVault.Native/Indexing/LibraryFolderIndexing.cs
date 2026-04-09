@@ -89,6 +89,7 @@ namespace PixelVaultNative
             }
             var resolvedByIdentity = FindSavedGameIndexRowByIdentity(gameRows, guessedName, normalizedPlatform);
             if (resolvedByIdentity != null) return resolvedByIdentity.GameId;
+            if (string.IsNullOrWhiteSpace(guessedName)) return string.Empty;
             var resolvedRow = EnsureGameIndexRowForAssignment(gameRows, guessedName, normalizedPlatform);
             return resolvedRow == null ? string.Empty : resolvedRow.GameId;
         }

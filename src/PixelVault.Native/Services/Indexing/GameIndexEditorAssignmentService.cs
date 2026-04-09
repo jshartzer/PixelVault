@@ -16,7 +16,7 @@ namespace PixelVaultNative
         /// <summary>True when the manual-metadata finish flow should treat this name/platform/id triple as not yet represented in <paramref name="rows"/> (prompt to add master records).</summary>
         bool ManualMetadataMasterRecordNeedsNewPlaceholder(IEnumerable<GameIndexEditorRow> rows, string normalizedName, string platformLabel, string preferredGameId);
 
-        /// <summary>Create or return an existing row for manual metadata / Steam intake (mutates <paramref name="rows"/> when creating).</summary>
+        /// <summary>Create or return an existing row for manual metadata / Steam intake (mutates <paramref name="rows"/> when creating). Returns null when there is no title hint and no <paramref name="preferredGameId"/> — per <c>PV-PLN-LIBST-001</c> avoid inventing identity.</summary>
         GameIndexEditorRow EnsureManualMetadataMasterRow(List<GameIndexEditorRow> rows, string name, string platformLabel, string preferredGameId);
     }
 
@@ -91,11 +91,9 @@ namespace PixelVaultNative
             if (!string.IsNullOrWhiteSpace(normalizedGameId))
             {
                 var byId = FindSavedGameIndexRowById(rows, normalizedGameId);
-                if (byId != null && string.Equals(BuildGameIndexIdentity(byId.Name, byId.PlatformLabel), BuildGameIndexIdentity(normalizedName, normalizedPlatform), StringComparison.OrdinalIgnoreCase))
-                {
-                    return byId;
-                }
+                if (byId != null) return byId;
             }
+            if (string.IsNullOrWhiteSpace(normalizedName) && string.IsNullOrWhiteSpace(normalizedGameId)) return null;
             var byIdentity = FindSavedGameIndexRowByIdentity(rows, normalizedName, normalizedPlatform);
             if (byIdentity != null) return byIdentity;
             var created = new GameIndexEditorRow

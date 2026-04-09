@@ -404,6 +404,7 @@ Without **this foundation** (preflight + Steps 1–2), removing ` - Platform` fr
 | Date | Slice / step | Notes |
 |------|----------------|------|
 | 2026-04-08 | **Slice A (partial Step 1)** | Removed **parent folder name** as a source for `GuessGameIndexNameForFile` (hints + filename stem only). Removed **`NormalizeGameIndexName(name, folderPath)`** basename fallback when `name` is empty. Fixed **library metadata edit** path that used parent folder for `GameName` when `folderPathUsable` was false — now uses parser/filename guess only. Deleted **`ShouldTrustFilenameTitleOverFolder`** (only served folder-vs-hint arbitration). |
+| 2026-04-08 | **Slice A (Step 1 continued)** | **`GameIndexEditorAssignmentService.EnsureManualMetadataMasterRow`**: return **`null`** when there is no title and no `preferredGameId` (no blank-title placeholder rows); when **`preferredGameId`** is set, **resolve by id first** (scan/sync no longer requires filename identity to match saved row). **`ResolveGameIdForIndexedFile`**: if filename parser yields no title, **leave `GameId` empty** instead of creating a row. **`PreserveLibraryMetadataEditGameIndex`**: derive **`sourceName`** from **saved row → first item filename guess → folder display name** (not folder-as-path). **Folder ID editor** guard if ensure returns null. Tests: `GameIndexEditorAssignmentServiceTests`. |
 
 ### Initial leak spike (read-only, 2026-04-08)
 
