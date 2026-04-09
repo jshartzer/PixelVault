@@ -19,6 +19,11 @@ namespace PixelVaultNative
         }
     }
 
+    /// <summary>
+    /// One library browser/cache row per resolved <see cref="GameId"/> (PV-PLN-LIBST-001 Step 4).
+    /// Multiple rows may share the same <see cref="FolderPath"/> when distinct games/platforms use one disk folder;
+    /// <see cref="FilePaths"/> are the projection for this row only. Title/console come from the game index / photo index, not from the folder name.
+    /// </summary>
     sealed class LibraryFolderInfo
     {
         public string GameId;

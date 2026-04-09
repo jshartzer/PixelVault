@@ -427,6 +427,10 @@ namespace PixelVaultNative
             return LoadLibraryFoldersCore(root, index, null);
         }
 
+        /// <summary>
+        /// Builds folder-cache rows grouped by photo-index <c>GameId</c> (not by directory). <see cref="LibraryFolderInfo.FolderPath"/> is observed placement
+        /// (majority parent of assigned files, or game-index path when set)—never used here to infer game title (LIBST Step 4).
+        /// </summary>
         List<LibraryFolderInfo> LoadLibraryFoldersCore(string root, Dictionary<string, LibraryMetadataIndexEntry> index, List<string> precomputedOneLevelMediaFilesOrNull)
         {
             var list = new List<LibraryFolderInfo>();
@@ -552,6 +556,7 @@ namespace PixelVaultNative
                     SteamAppId = saved != null && (saved.SuppressSteamAppIdAutoResolve || !string.IsNullOrWhiteSpace(saved.SteamAppId))
                         ? (saved.SteamAppId ?? string.Empty)
                         : host.ResolveLibraryFolderSteamAppId(platformLabel, groupFiles),
+                    NonSteamId = saved == null ? string.Empty : (saved.NonSteamId ?? string.Empty),
                     SteamGridDbId = saved == null ? string.Empty : (saved.SteamGridDbId ?? string.Empty),
                     RetroAchievementsGameId = saved == null ? string.Empty : (saved.RetroAchievementsGameId ?? string.Empty),
                     SuppressSteamAppIdAutoResolve = saved != null && saved.SuppressSteamAppIdAutoResolve,

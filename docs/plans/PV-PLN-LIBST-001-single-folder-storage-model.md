@@ -3,7 +3,7 @@
 | Field | Value |
 |-------|--------|
 | **Plan ID** | `PV-PLN-LIBST-001` |
-| **Status** | In progress — Slices 0–C materially complete: placement service drives alignment, organize, and import destination sort; Step 4+ remain |
+| **Status** | In progress — Slices 0–D started: scanner/folder cache documented as per-`GameId` projections (shared `FolderPath` supported); Step 5+ remain |
 | **Owner** | PixelVault / Codex |
 | **Source brief** | User request (2026-04-07): keep unique Game Index rows per console, but store all captures for a game in one app-owned folder and stop inferring identity from folder structure |
 | **Related** | `docs/PROJECT_CONTEXT.md`, `docs/POLICY.md`, `docs/DOC_SYNC_POLICY.md`, `docs/plans/PV-PLN-UI-001-ui-thin-mainwindow-ios-aligned.md` |
@@ -274,6 +274,8 @@ Primary work:
 - rebuild/repair flows should tolerate mixed-platform files in one physical directory
 - **Implementation note:** specify how **`LibraryFolderInfo` / folder cache** represent **one disk path** that may back **multiple `GameId`s** (e.g. shared `FolderPath` keyed by `GameId`, or a storage-group row plus per-console projections). Console-specific browse rows remain **projections** over file assignments, not separate required directories.
 
+**Implementation (v1):** `LibraryScanner.LoadLibraryFoldersCore` groups indexed files by **`GameId`**; each `LibraryFolderInfo` is one browse/cache row; **`FolderPath`** is current placement (saved row path or majority directory of that row’s **`FilePaths`**). Same path may appear on multiple rows. Platform/titles come from the game index and photo metadata (`DetermineFolderPlatform` uses index/tags, not folder names). See XML on **`LibraryFolderInfo`**.
+
 Important behavior change:
 
 - one real folder may contain Steam, Xbox, PS5, and Emulation captures
@@ -435,6 +437,7 @@ Without **this foundation** (preflight + Steps 1–2), removing ` - Platform` fr
 | 2026-04-08 | **Slice 0 (Step 0 — preflight)** | **§0.1** filled in under [Decision lock — resolved answers](#decision-lock--resolved-answers-2026-04-08). **§0.2** treated as done via existing Step 1 audit + leak tables in this doc. **§0.3** pointed at unresolved/pending-assignment behavior logged under Slice A. |
 | 2026-04-08 | **Slice B (Step 2 — `StorageGroupId`)** | **`GameIndexEditorRow.StorageGroupId`**, SQLite `game_index.storage_group_id` (`EnsureGameIndexStorageGroupIdColumn`), read/write in `IndexPersistenceService`, **`GameIndexStorageGroupBackfill.AssignDeterministicStorageGroupIds`** on load/save merge. **`LibraryFolderInfo.StorageGroupId`** filled from saved rows in **`LibraryScanner`**; synced in **`ApplySavedGameIndexRows`** / conservative **`UpsertSavedGameIndexRow`**; **`CloneLibraryFolderInfo`** copies it. **Merge rule:** two **Steam** rows with differing non-empty **`SteamGridDbId`** do not share a storage group. **Game Index editor:** read-only **Storage group** column + search hits **`StorageGroupId`**. Tests: **`GameIndexStorageGroupBackfillTests`**. Legacy tab-separated game index files still omit `StorageGroupId`; SQLite + backfill is the source of truth. |
 | 2026-04-08 | **Slice C (Step 3)** | **`LibraryPlacementService`**: shared **`StorageGroupId`** → one folder name; legacy empty group → title-count + ` - Platform` suffix. **`AlignLibraryFoldersToGameIndex`**, **`OrganizeLibraryItems`**, and **`ImportService.SortDestinationRootIntoGameFolders`** use placement. Import sort: **`TryResolveGameIndexRowForImportSort`** (Steam AppID / non-Steam ID / **`BuildGameIndexIdentity`** title+platform), then **`PlanImportRootSort`** / **`LibraryFileMovePlan`**. Sidecars still moved by existing **`MoveMetadataSidecarIfPresent`** per move (not a unified sidecar list yet). **`LibraryPlacementServiceTests`**. |
+| 2026-04-08 | **Slice D (Step 4 — partial)** | Documented **`LibraryFolderInfo`** as per-**`GameId`** projection with optional shared **`FolderPath`**. **`LoadLibraryFoldersCore`** summary: group by photo-index **`GameId`**; placement is observed, not title identity. **`NonSteamId`** copied onto scan-built folder rows when a saved game-index row exists (parity with other IDs). Further Step 4 work: broader repair/merge QA, mixed-folder fixtures in tests. |
 
 ### Step 1 scanner / rebuild audit (2026-04-08)
 
