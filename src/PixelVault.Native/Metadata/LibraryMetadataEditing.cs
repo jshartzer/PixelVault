@@ -152,6 +152,8 @@ namespace PixelVaultNative
             var affectedFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var touchedDirectories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             if (progress != null) progress(0, total, "Starting organize step for " + total + " image(s).");
+            var indexRows = GetSavedGameIndexRowsForRoot(libraryRoot) ?? new List<GameIndexEditorRow>();
+            var titleCounts = BuildGameIndexTitleCounts(indexRows);
             for (int i = 0; i < total; i++)
             {
                 var item = items[i];
@@ -162,10 +164,26 @@ namespace PixelVaultNative
                     if (progress != null) progress(i + 1, total, "Skipped organize " + (i + 1) + " of " + total + " | " + remaining + " remaining | file missing");
                     continue;
                 }
-                var gameName = string.IsNullOrWhiteSpace(item.GameName)
-                    ? GetGameNameFromFileName(Path.GetFileName(item.FilePath))
-                    : item.GameName;
-                var targetDirectory = Path.Combine(libraryRoot, GetSafeGameFolderName(gameName));
+                string folderLeaf;
+                var gameRow = string.IsNullOrWhiteSpace(item.GameId) ? null : FindSavedGameIndexRowById(indexRows, item.GameId);
+                if (gameRow != null)
+                {
+                    folderLeaf = LibraryPlacementService.BuildCanonicalStorageFolderName(
+                        gameRow,
+                        indexRows,
+                        NormalizeGameIndexName,
+                        GetSafeGameFolderName,
+                        NormalizeConsoleLabel,
+                        titleCounts);
+                }
+                else
+                {
+                    var gameName = string.IsNullOrWhiteSpace(item.GameName)
+                        ? GetGameNameFromFileName(Path.GetFileName(item.FilePath))
+                        : item.GameName;
+                    folderLeaf = GetSafeGameFolderName(gameName);
+                }
+                var targetDirectory = Path.Combine(libraryRoot, folderLeaf);
                 if (!Directory.Exists(targetDirectory))
                 {
                     Directory.CreateDirectory(targetDirectory);

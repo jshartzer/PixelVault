@@ -7,25 +7,27 @@ namespace PixelVaultNative
 {
     public sealed partial class MainWindow
     {
-        string BuildCanonicalGameIndexFolderName(GameIndexEditorRow row, Dictionary<string, int> titleCounts)
+        string BuildCanonicalGameIndexFolderName(GameIndexEditorRow row, List<GameIndexEditorRow> allRows, Dictionary<string, int> titleCounts)
         {
-            var normalizedName = NormalizeGameIndexName(row == null ? string.Empty : row.Name, row == null ? null : row.FolderPath);
-            if (string.IsNullOrWhiteSpace(normalizedName)) normalizedName = "Unknown Game";
-            var safeName = GetSafeGameFolderName(normalizedName);
-            var key = NormalizeGameIndexName(normalizedName);
-            int count;
-            if (titleCounts != null && titleCounts.TryGetValue(key, out count) && count > 1)
-            {
-                var platform = NormalizeConsoleLabel(row == null ? string.Empty : row.PlatformLabel);
-                return GetSafeGameFolderName(safeName + " - " + platform);
-            }
-            return safeName;
+            return LibraryPlacementService.BuildCanonicalStorageFolderName(
+                row,
+                allRows,
+                NormalizeGameIndexName,
+                GetSafeGameFolderName,
+                NormalizeConsoleLabel,
+                titleCounts);
         }
 
-        string BuildCanonicalGameIndexFolderPath(string root, GameIndexEditorRow row, Dictionary<string, int> titleCounts)
+        string BuildCanonicalGameIndexFolderPath(string root, GameIndexEditorRow row, List<GameIndexEditorRow> allRows, Dictionary<string, int> titleCounts)
         {
-            if (string.IsNullOrWhiteSpace(root)) return string.Empty;
-            return Path.Combine(root, BuildCanonicalGameIndexFolderName(row, titleCounts));
+            return LibraryPlacementService.BuildCanonicalStorageFolderPath(
+                root,
+                row,
+                allRows,
+                NormalizeGameIndexName,
+                GetSafeGameFolderName,
+                NormalizeConsoleLabel,
+                titleCounts);
         }
 
         void TryDeleteEmptyDirectory(string path)
@@ -53,7 +55,7 @@ namespace PixelVaultNative
 
             foreach (var row in rows.Where(entry => entry != null))
             {
-                var desiredDirectory = BuildCanonicalGameIndexFolderPath(root, row, titleCounts);
+                var desiredDirectory = BuildCanonicalGameIndexFolderPath(root, row, rows, titleCounts);
                 if (string.IsNullOrWhiteSpace(desiredDirectory))
                 {
                     row.FolderPath = string.Empty;
