@@ -559,6 +559,8 @@ namespace PixelVaultNative
                 });
             }
 
+            AppendUnassignedGameIdLibraryFolders(root, allFiles, index, list);
+
             gameRowsChanged = host.SyncGameIndexRowsFromLibraryFolders(gameRows, list) || gameRowsChanged;
             gameRowsChanged = host.PruneObsoleteMultipleTagsRows(gameRows) || gameRowsChanged;
             if (gameRowsChanged) host.SaveSavedGameIndexRows(root, gameRows);
@@ -686,6 +688,70 @@ namespace PixelVaultNative
                 folders = LoadLibraryFoldersCached(root, true);
             }
             return folders;
+        }
+
+        /// <summary>One browse row per directory that has indexed media but no resolved <c>GameId</c> (LIBST unresolved surface).</summary>
+        void AppendUnassignedGameIdLibraryFolders(
+            string root,
+            IReadOnlyList<string> allFiles,
+            Dictionary<string, LibraryMetadataIndexEntry> index,
+            List<LibraryFolderInfo> list)
+        {
+            if (string.IsNullOrWhiteSpace(root) || allFiles == null || index == null || list == null) return;
+            var orphans = allFiles
+                .Where(file => !string.IsNullOrWhiteSpace(file) && fileSystem.FileExists(file))
+                .Select(file => new { File = file, Entry = index.TryGetValue(file, out var e) ? e : null })
+                .Where(x => x.Entry != null && string.IsNullOrWhiteSpace(host.NormalizeGameId(x.Entry.GameId)))
+                .ToList();
+            if (orphans.Count == 0) return;
+
+            foreach (var g in orphans.GroupBy(x => Path.GetDirectoryName(x.File) ?? string.Empty, StringComparer.OrdinalIgnoreCase))
+            {
+                var dir = g.Key;
+                if (string.IsNullOrWhiteSpace(dir)) continue;
+
+                var groupFiles = g.Select(x => x.File)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderByDescending(file => host.ResolveIndexedLibraryDate(root, file, index))
+                    .ThenBy(f => Path.GetFileName(f), StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
+                if (groupFiles.Length == 0) continue;
+
+                var platformLabel = host.DetermineFolderPlatformForFiles(groupFiles.ToList(), index);
+                long newestCaptureUtcTicks = 0;
+                long newestRecentSortUtcTicks = 0;
+                LibraryMetadataIndexEntry newestEntry;
+                if (index.TryGetValue(groupFiles[0], out newestEntry) && newestEntry != null)
+                    newestCaptureUtcTicks = newestEntry.CaptureUtcTicks;
+                if (newestCaptureUtcTicks <= 0)
+                    newestCaptureUtcTicks = host.ToCaptureUtcTicks(host.ResolveIndexedLibraryDate(root, groupFiles[0], index));
+                foreach (var file in groupFiles)
+                {
+                    var r = host.ResolveLibraryFileRecentSortUtcTicks(root, file, index);
+                    if (r > newestRecentSortUtcTicks) newestRecentSortUtcTicks = r;
+                }
+
+                var leaf = Path.GetFileName(dir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+                if (string.IsNullOrWhiteSpace(leaf)) leaf = "folder";
+
+                list.Add(new LibraryFolderInfo
+                {
+                    GameId = string.Empty,
+                    Name = "Needs assignment · " + leaf,
+                    FolderPath = dir,
+                    FileCount = groupFiles.Length,
+                    PreviewImagePath = groupFiles.FirstOrDefault(host.IsLibraryImageFile) ?? groupFiles.FirstOrDefault(),
+                    PlatformLabel = platformLabel,
+                    FilePaths = groupFiles,
+                    NewestCaptureUtcTicks = newestCaptureUtcTicks,
+                    NewestRecentSortUtcTicks = newestRecentSortUtcTicks,
+                    SteamAppId = string.Empty,
+                    NonSteamId = string.Empty,
+                    SteamGridDbId = string.Empty,
+                    RetroAchievementsGameId = string.Empty,
+                    PendingGameAssignment = true
+                });
+            }
         }
     }
 }

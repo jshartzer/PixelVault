@@ -28,6 +28,7 @@ namespace PixelVaultNative
             var changed = false;
             foreach (var folder in targetFolders.Where(folder => folder != null))
             {
+                if (folder.PendingGameAssignment) return false;
                 var row = FindSavedGameIndexRowById(rows, folder.GameId) ?? FindSavedGameIndexRowByIdentity(rows, folder.Name, folder.PlatformLabel);
                 if (row == null)
                 {

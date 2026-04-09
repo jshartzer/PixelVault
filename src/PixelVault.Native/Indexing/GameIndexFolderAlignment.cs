@@ -218,6 +218,7 @@ namespace PixelVaultNative
             bool changed = false;
             foreach (var folder in folders)
             {
+                if (folder.PendingGameAssignment) continue;
                 var saved = FindSavedGameIndexRow(savedRows, folder);
                 if (saved == null) continue;
                 if (!string.IsNullOrWhiteSpace(saved.GameId) && !string.Equals(folder.GameId ?? string.Empty, saved.GameId ?? string.Empty, StringComparison.Ordinal))

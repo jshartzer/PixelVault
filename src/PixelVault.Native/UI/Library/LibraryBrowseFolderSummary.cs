@@ -30,6 +30,7 @@ namespace PixelVaultNative
         public long CompletedUtcTicks { get; }
         public bool IsMergedAcrossPlatforms { get; }
         public bool IsTimelineProjection { get; }
+        public bool PendingGameAssignment { get; }
 
         LibraryBrowseFolderSummary(
             string? viewKey,
@@ -50,7 +51,8 @@ namespace PixelVaultNative
             bool isCompleted100Percent,
             long completedUtcTicks,
             bool isMergedAcrossPlatforms,
-            bool isTimelineProjection)
+            bool isTimelineProjection,
+            bool pendingGameAssignment)
         {
             ViewKey = viewKey ?? string.Empty;
             GameId = gameId ?? string.Empty;
@@ -71,6 +73,7 @@ namespace PixelVaultNative
             CompletedUtcTicks = completedUtcTicks;
             IsMergedAcrossPlatforms = isMergedAcrossPlatforms;
             IsTimelineProjection = isTimelineProjection;
+            PendingGameAssignment = pendingGameAssignment;
         }
 
         /// <summary>Maps a projected folder row to a portable summary (no <see cref="MainWindow.LibraryBrowserFolderView.SearchBlob"/> — search stays client-side).</summary>
@@ -97,7 +100,8 @@ namespace PixelVaultNative
                 view.IsCompleted100Percent,
                 view.CompletedUtcTicks,
                 view.IsMergedAcrossPlatforms,
-                view.IsTimelineProjection);
+                view.IsTimelineProjection,
+                view.PendingGameAssignment);
         }
 
         /// <summary>True when primary or any platform label normalizes to Steam (same rules as folder-list filters).</summary>
@@ -155,6 +159,7 @@ namespace PixelVaultNative
                     return folder.FileCount >= 25;
                 case "missingid":
                 {
+                    if (folder.PendingGameAssignment) return true;
                     if (string.IsNullOrWhiteSpace(folder.GameId)) return true;
                     if (string.IsNullOrWhiteSpace(folder.SteamGridDbId)) return true;
                     if (IsSteamTagged(folder, normConsole) && string.IsNullOrWhiteSpace(folder.SteamAppId)) return true;

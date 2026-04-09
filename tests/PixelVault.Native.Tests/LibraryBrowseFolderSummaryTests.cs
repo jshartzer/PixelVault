@@ -52,6 +52,25 @@ public sealed class LibraryBrowseFolderSummaryTests
         Assert.Equal(300, s.CompletedUtcTicks);
         Assert.True(s.IsMergedAcrossPlatforms);
         Assert.False(s.IsTimelineProjection);
+        Assert.False(s.PendingGameAssignment);
+    }
+
+    [Fact]
+    public void MatchesFilter_MissingId_Includes_PendingGameAssignment_Even_With_GameId()
+    {
+        var view = new MainWindow.LibraryBrowserFolderView
+        {
+            GameId = "G00001",
+            PrimaryPlatformLabel = "Steam",
+            SteamAppId = "1",
+            SteamGridDbId = "grid",
+            FileCount = 1,
+            PendingGameAssignment = true
+        };
+        var s = LibraryBrowseFolderSummary.FromFolderView(view);
+        Assert.NotNull(s);
+        Assert.True(s.PendingGameAssignment);
+        Assert.True(LibraryBrowseFolderSummary.MatchesFilter("missingid", s, Norm));
     }
 
     [Fact]

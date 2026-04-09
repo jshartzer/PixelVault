@@ -43,6 +43,8 @@ namespace PixelVaultNative
         public bool IsFavorite;
         public bool IsShowcase;
         public string CollectionNotes;
+        /// <summary>Photo index rows under <see cref="FolderPath"/> have no <c>GameId</c> yet (LIBST Step 1 unresolved bucket). Not a game title.</summary>
+        public bool PendingGameAssignment;
     }
 
     sealed class GameIndexEditorRow

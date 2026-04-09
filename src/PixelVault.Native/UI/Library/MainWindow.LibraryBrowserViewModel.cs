@@ -36,6 +36,7 @@ namespace PixelVaultNative
             internal long CompletedUtcTicks;
             internal bool IsMergedAcrossPlatforms;
             internal bool IsTimelineProjection;
+            internal bool PendingGameAssignment;
             /// <summary>Lowercase, newline-separated tokens for library search (name, paths, ids, platforms).</summary>
             internal string SearchBlob;
         }
@@ -68,6 +69,7 @@ namespace PixelVaultNative
                 CompletedUtcTicks = view.CompletedUtcTicks,
                 IsMergedAcrossPlatforms = view.IsMergedAcrossPlatforms,
                 IsTimelineProjection = view.IsTimelineProjection,
+                PendingGameAssignment = view.PendingGameAssignment,
                 SearchBlob = view.SearchBlob
             };
             clone.SourceFolders.AddRange(view.SourceFolders.Where(folder => folder != null));
@@ -125,6 +127,8 @@ namespace PixelVaultNative
             folder.IsCompleted100Percent = view.IsCompleted100Percent;
             folder.CompletedUtcTicks = view.CompletedUtcTicks;
             if (string.IsNullOrWhiteSpace(folder.PlatformLabel)) folder.PlatformLabel = view.PrimaryPlatformLabel ?? string.Empty;
+            folder.PendingGameAssignment = view.PendingGameAssignment
+                || (primary != null && primary.PendingGameAssignment);
             return folder;
         }
 
@@ -509,6 +513,8 @@ namespace PixelVaultNative
         string BuildLibraryBrowserAllMergeKey(LibraryFolderInfo folder)
         {
             if (folder == null) return string.Empty;
+            if (folder.PendingGameAssignment)
+                return "unassigned|" + ((folder.FolderPath ?? string.Empty).Trim());
             var normalizedName = NormalizeGameIndexName(folder.Name, folder.FolderPath);
             if (!string.IsNullOrWhiteSpace(normalizedName)) return "name|" + normalizedName;
             var normalizedGameId = NormalizeGameId(folder.GameId);
@@ -823,6 +829,7 @@ namespace PixelVaultNative
                     h = h * 397 ^ (folder.RetroAchievementsGameId ?? string.Empty).GetHashCode(StringComparison.OrdinalIgnoreCase);
                     h = h * 397 ^ (folder.SuppressSteamAppIdAutoResolve ? 1 : 0);
                     h = h * 397 ^ (folder.SuppressSteamGridDbIdAutoResolve ? 1 : 0);
+                    h = h * 397 ^ (folder.PendingGameAssignment ? 1 : 0);
                     var paths = folder.FilePaths;
                     var len = paths == null ? 0 : paths.Length;
                     h = h * 397 ^ len;
@@ -1008,7 +1015,8 @@ namespace PixelVaultNative
                         SuppressSteamGridDbIdAutoResolve = folder.SuppressSteamGridDbIdAutoResolve,
                         IsCompleted100Percent = folder.IsCompleted100Percent,
                         CompletedUtcTicks = folder.CompletedUtcTicks,
-                        IsMergedAcrossPlatforms = false
+                        IsMergedAcrossPlatforms = false,
+                        PendingGameAssignment = folder.PendingGameAssignment
                     };
                     view.SourceFolders.Add(folder);
                     PopulateLibraryBrowserFolderViewSearchBlob(view);
@@ -1095,7 +1103,8 @@ namespace PixelVaultNative
                         SuppressSteamGridDbIdAutoResolve = sourceFolders.All(folder => folder != null && folder.SuppressSteamGridDbIdAutoResolve),
                         IsCompleted100Percent = sourceFolders.Any(folder => folder != null && folder.IsCompleted100Percent),
                         CompletedUtcTicks = sourceFolders.Select(folder => folder == null ? 0L : folder.CompletedUtcTicks).Where(ticks => ticks > 0).DefaultIfEmpty(0L).Max(),
-                        IsMergedAcrossPlatforms = platformLabels.Length > 1
+                        IsMergedAcrossPlatforms = platformLabels.Length > 1,
+                        PendingGameAssignment = sourceFolders.Any(f => f != null && f.PendingGameAssignment)
                     };
                     view.SourceFolders.AddRange(sourceFolders);
                     PopulateLibraryBrowserFolderViewSearchBlob(view);

@@ -227,7 +227,8 @@ namespace PixelVaultNative
                 CompletedUtcTicks = folder.CompletedUtcTicks,
                 IsFavorite = folder.IsFavorite,
                 IsShowcase = folder.IsShowcase,
-                CollectionNotes = folder.CollectionNotes
+                CollectionNotes = folder.CollectionNotes,
+                PendingGameAssignment = folder.PendingGameAssignment
             };
         }
 
@@ -1271,7 +1272,7 @@ namespace PixelVaultNative
                 case "large":
                     return "25+ Captures";
                 case "missingid":
-                    return "Missing ID";
+                    return "Missing ID / assignment";
                 case "nocover":
                     return "No cover path";
                 default:

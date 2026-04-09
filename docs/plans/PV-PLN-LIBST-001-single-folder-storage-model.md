@@ -405,10 +405,21 @@ Without **this foundation** (preflight + Steps 1–2), removing ` - Platform` fr
 |------|----------------|------|
 | 2026-04-08 | **Slice A (partial Step 1)** | Removed **parent folder name** as a source for `GuessGameIndexNameForFile` (hints + filename stem only). Removed **`NormalizeGameIndexName(name, folderPath)`** basename fallback when `name` is empty. Fixed **library metadata edit** path that used parent folder for `GameName` when `folderPathUsable` was false — now uses parser/filename guess only. Deleted **`ShouldTrustFilenameTitleOverFolder`** (only served folder-vs-hint arbitration). |
 | 2026-04-08 | **Slice A (Step 1 continued)** | **`GameIndexEditorAssignmentService.EnsureManualMetadataMasterRow`**: return **`null`** when there is no title and no `preferredGameId` (no blank-title placeholder rows); when **`preferredGameId`** is set, **resolve by id first** (scan/sync no longer requires filename identity to match saved row). **`ResolveGameIdForIndexedFile`**: if filename parser yields no title, **leave `GameId` empty** instead of creating a row. **`PreserveLibraryMetadataEditGameIndex`**: derive **`sourceName`** from **saved row → first item filename guess → folder display name** (not folder-as-path). **Folder ID editor** guard if ensure returns null. Tests: `GameIndexEditorAssignmentServiceTests`. |
+| 2026-04-08 | **Slice A (Step 1 — audit + unresolved UX)** | **Scanner/rebuild audit** (see subsection below): no remaining **game identity** inference from parent folder basename in index/scan paths; `Path.GetDirectoryName` uses are placement/enumeration. **Unresolved surface**: `LibraryScanner.LoadLibraryFoldersCore` appends **`LibraryFolderInfo`** rows per directory with indexed files but **empty `GameId`** (`PendingGameAssignment`); tile title pattern **`Needs assignment ·`** plus directory leaf name is a **browse label**, not game identity. These rows appear in the library grid, **`missingid`** filter, and folder cache (extra tab column). **`ApplySavedGameIndexRows`** / **100% completion** skip pending buckets so the app does not mint `GameId`s from that label. Filter/menu copy: **Missing ID / assignment**. Tests: `LibraryBrowseFolderSummaryTests`. |
+
+### Step 1 scanner / rebuild audit (2026-04-08)
+
+| Area | Finding |
+|------|--------|
+| **`LibraryScanner.LoadLibraryFoldersCore`** | Builds `FolderPath` / groups from **file paths** (observed placement). **`GuessGameIndexNameForFile`** is filename/parser only. After this slice, **unassigned** files get explicit browse rows. |
+| **`GameIndexFolderAlignment` / `ApplySavedGameIndexRows`** | Matches saved rows to folders by **id / identity**; skips **`PendingGameAssignment`** rows so browse labels are not written back as game titles. |
+| **`MainWindow.LibraryBrowserViewModel`** | **`BuildLibraryBrowserAllMergeKey`** uses a fixed **`unassigned|`** prefix plus **folder path** for pending buckets so **All** grouping does not merge different directories. **`BuildLibraryBrowserViewKey`** still uses `folderPath` only for **key disambiguation**, not title inference. |
+| **`OrganizeLibraryItems` / import** | Target folder names from **user/item game name** or filename stem — not parent directory as game title. |
+| **Photography gallery caption** | **`Path.GetFileName(Path.GetDirectoryName(file))`** — **display caption only**; not indexed `GameId` resolution. |
 
 ### Initial leak spike (read-only, 2026-04-08)
 
-Call sites to re-verify as Step 1 continues:
+Superseded by audit above; kept for history:
 
 | Area | Symbol / pattern |
 |------|------------------|
@@ -417,8 +428,6 @@ Call sites to re-verify as Step 1 continues:
 | Metadata | `LibraryMetadataEditing` manual item `GameName` |
 | UI | `MainWindow.LibraryBrowserViewModel` (`BuildLibraryBrowserViewKey`, merge keys), `LibraryFolderIdEditor`, `GameIndexEditorHost` |
 | Alignment | `GameIndexFolderAlignment.BuildCanonicalGameIndexFolderName` — empty name → `Unknown Game` until row name is fixed |
-
-**Still to do for Step 1:** audit remaining scanner/rebuild paths for implicit folder identity; add explicit **unresolved** UX if not already surfaced when guess is empty and `GameId` missing.
 
 ## Notes for execution
 

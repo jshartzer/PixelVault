@@ -137,7 +137,8 @@ namespace PixelVaultNative
 
                 var missingIdItem = new MenuItem
                 {
-                    Header = "Missing ID",
+                    Header = "Missing ID / assignment",
+                    ToolTip = "Folders missing SteamGrid ID, Steam/Retro IDs when expected, or captures with no game assignment yet.",
                     IsCheckable = true,
                     IsChecked = string.Equals(filterNorm, "missingid", StringComparison.OrdinalIgnoreCase)
                 };

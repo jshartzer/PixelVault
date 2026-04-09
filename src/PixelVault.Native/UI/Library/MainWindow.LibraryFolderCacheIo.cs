@@ -137,7 +137,8 @@ namespace PixelVaultNative
                     SteamAppId = parts.Length > 7 ? parts[7] : string.Empty,
                     SteamGridDbId = parts.Length > 8 ? parts[8] : string.Empty,
                     RetroAchievementsGameId = parts.Length > 13 ? parts[13] : string.Empty,
-                    NonSteamId = parts.Length > 14 ? parts[14] : string.Empty
+                    NonSteamId = parts.Length > 14 ? parts[14] : string.Empty,
+                    PendingGameAssignment = parts.Length > 15 && ParseLibraryFolderCacheBoolean(parts[15])
                 };
             }
 
@@ -201,7 +202,8 @@ namespace PixelVaultNative
                 folder != null && folder.IsCompleted100Percent ? "1" : "0",
                 folder != null && folder.CompletedUtcTicks > 0 ? folder.CompletedUtcTicks.ToString() : string.Empty,
                 folder == null ? string.Empty : CleanTag(folder.RetroAchievementsGameId ?? string.Empty),
-                folder == null ? string.Empty : CleanTag(folder.NonSteamId ?? string.Empty)
+                folder == null ? string.Empty : CleanTag(folder.NonSteamId ?? string.Empty),
+                folder != null && folder.PendingGameAssignment ? "1" : string.Empty
             });
         }
 
