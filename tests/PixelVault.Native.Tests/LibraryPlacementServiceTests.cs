@@ -175,4 +175,51 @@ public sealed class LibraryPlacementServiceTests
         Assert.Equal("capture.png", plan.TargetFileName);
         Assert.Equal(Path.Combine(dest, "Portal", "capture.png"), plan.TargetPath);
     }
+
+    [Fact]
+    public void PathsEqualNormalized_IgnoresTrailingSeparators_AndCasing()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "pv-placement-path-test-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var withSep = dir + Path.DirectorySeparatorChar;
+            Assert.True(LibraryPlacementService.PathsEqualNormalized(dir, withSep));
+            if (dir.Length >= 1)
+            {
+                var toggled = char.IsUpper(dir[0]) ? char.ToLowerInvariant(dir[0]) + dir.Substring(1) : char.ToUpperInvariant(dir[0]) + dir.Substring(1);
+                if (!string.Equals(toggled, dir, StringComparison.Ordinal))
+                    Assert.True(LibraryPlacementService.PathsEqualNormalized(dir, toggled));
+            }
+        }
+        finally
+        {
+            try { Directory.Delete(dir, recursive: false); } catch { /* temp cleanup best-effort */ }
+        }
+    }
+
+    [Fact]
+    public void PathsEqualNormalized_RejectsNullOrEmpty()
+    {
+        Assert.False(LibraryPlacementService.PathsEqualNormalized(null, Path.GetTempPath()));
+        Assert.False(LibraryPlacementService.PathsEqualNormalized(Path.GetTempPath(), ""));
+    }
+
+    [Fact]
+    public void IsDirectoryWithinCanonicalStorage_AllowsSubfolders()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "pv-canonical-" + Guid.NewGuid().ToString("N"));
+        var sub = Path.Combine(root, "screenshots", "2024");
+        Directory.CreateDirectory(sub);
+        try
+        {
+            Assert.True(LibraryPlacementService.IsDirectoryWithinCanonicalStorage(root, root));
+            Assert.True(LibraryPlacementService.IsDirectoryWithinCanonicalStorage(sub, root));
+            Assert.False(LibraryPlacementService.IsDirectoryWithinCanonicalStorage(Path.GetTempPath(), root));
+        }
+        finally
+        {
+            try { Directory.Delete(root, recursive: true); } catch { /* best-effort */ }
+        }
+    }
 }

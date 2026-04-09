@@ -3,7 +3,7 @@
 | Field | Value |
 |-------|--------|
 | **Plan ID** | `PV-PLN-LIBST-001` |
-| **Status** | In progress — Slices 0–E started: Step 5 merge workflow (dry-run + apply) ships from Library **Merge folders**; polish/undo later |
+| **Status** | In progress — Slices 0–E shipped; **Slice F:** Step 6 complete (editors + health: rows + photo-index file placement) |
 | **Owner** | PixelVault / Codex |
 | **Source brief** | User request (2026-04-07): keep unique Game Index rows per console, but store all captures for a game in one app-owned folder and stop inferring identity from folder structure |
 | **Related** | `docs/PROJECT_CONTEXT.md`, `docs/POLICY.md`, `docs/DOC_SYNC_POLICY.md`, `docs/plans/PV-PLN-UI-001-ui-thin-mainwindow-ios-aligned.md` |
@@ -324,6 +324,8 @@ Primary work:
 - browse:
   - keep `By Console` as projection-only behavior
 
+**Implementation (v1):** Game Index grid: read-only **Target storage folder** and **Placement** (`Mismatch` when row `FolderPath` ≠ canonical). Setup & health **Library storage placement**: **Game index rows** (cached folder vs canonical) and **Indexed captures (photo index)** — every assigned file’s directory must fall under that `GameId`’s canonical folder (subfolders allowed); reports **outside** count, **orphan** `GameId`s, and **unassigned** entries skipped. Folder ID editor copy notes **shared disk folder**. Helpers: **`PathsEqualNormalized`**, **`IsDirectoryWithinCanonicalStorage`**.
+
 ### Step 7 — Tighten metadata-driven re-homing
 
 Once placement is centralized, use metadata edits to drive movement more intentionally.
@@ -441,6 +443,7 @@ Without **this foundation** (preflight + Steps 1–2), removing ` - Platform` fr
 | 2026-04-08 | **Slice C (Step 3)** | **`LibraryPlacementService`**: shared **`StorageGroupId`** → one folder name; legacy empty group → title-count + ` - Platform` suffix. **`AlignLibraryFoldersToGameIndex`**, **`OrganizeLibraryItems`**, and **`ImportService.SortDestinationRootIntoGameFolders`** use placement. Import sort: **`TryResolveGameIndexRowForImportSort`** (Steam AppID / non-Steam ID / **`BuildGameIndexIdentity`** title+platform), then **`PlanImportRootSort`** / **`LibraryFileMovePlan`**. Sidecars still moved by existing **`MoveMetadataSidecarIfPresent`** per move (not a unified sidecar list yet). **`LibraryPlacementServiceTests`**. |
 | 2026-04-08 | **Slice D (Step 4 — partial)** | Documented **`LibraryFolderInfo`** as per-**`GameId`** projection with optional shared **`FolderPath`**. **`LoadLibraryFoldersCore`** summary: group by photo-index **`GameId`**; placement is observed, not title identity. **`NonSteamId`** copied onto scan-built folder rows when a saved game-index row exists (parity with other IDs). Further Step 4 work: broader repair/merge QA, mixed-folder fixtures in tests. |
 | 2026-04-08 | **Slice E (Step 5 — v1)** | **`LibraryStorageMergePlanner` / dry-run models** + tests. **UI:** **Merge folders** next to Game Index; preview lists groups, target dir, move counts, optional empty-folder hints, rename-on-clash count. **Apply** persists index + runs **`AlignLibraryFoldersToGameIndex`**. **`BuildGameIndexRowsFromFolders`** now copies **`StorageGroupId`**. |
+| 2026-04-08 | **Slice F (Step 6)** | **Game Index:** **Target storage folder** + **Placement**; **`FormatCanonicalStorageFolderAbsolutePath`**. **Health:** **`LibraryStoragePlacementHealthSnapshot`** — row paths + full **photo index** scan vs canonical folders (misplaced / orphan GameId / unassigned). **Folder ID editor** copy. **`PathsEqualNormalized`**, **`IsDirectoryWithinCanonicalStorage`**, tests. |
 
 ### Step 1 scanner / rebuild audit (2026-04-08)
 

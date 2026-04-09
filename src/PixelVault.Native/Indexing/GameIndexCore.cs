@@ -473,5 +473,158 @@ namespace PixelVaultNative
                 .ToDictionary(group => group.Key, group => group.Count(), StringComparer.OrdinalIgnoreCase);
         }
 
+        /// <summary>Health dashboard: game-index folder paths and photo-index file paths vs canonical placement (LIBST Step 6).</summary>
+        LibraryStoragePlacementHealthSnapshot BuildLibraryStoragePlacementHealthSnapshot()
+        {
+            var snap = new LibraryStoragePlacementHealthSnapshot();
+            var root = libraryRoot;
+            if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root)) return snap;
+
+            snap.IsApplicable = true;
+            List<GameIndexEditorRow> rows;
+            try
+            {
+                rows = MergeGameIndexRows(GetSavedGameIndexRowsForRoot(root) ?? new List<GameIndexEditorRow>());
+            }
+            catch (Exception ex)
+            {
+                Log("Storage placement health: failed to load game index. " + ex.Message);
+                snap.RowSummary = "Could not load game index.";
+                snap.RowNeedsAttention = true;
+                rows = new List<GameIndexEditorRow>();
+            }
+
+            var counts = BuildGameIndexTitleCounts(rows);
+            var readOnly = (IReadOnlyList<GameIndexEditorRow>)rows;
+
+            if (rows.Count == 0)
+            {
+                snap.RowSummary = "Game index is empty.";
+                snap.RowNeedsAttention = true;
+            }
+            else
+            {
+                var mismatch = 0;
+                var withFolder = 0;
+                foreach (var row in rows)
+                {
+                    if (row == null) continue;
+                    var canonical = LibraryPlacementService.BuildCanonicalStorageFolderPath(
+                        root,
+                        row,
+                        readOnly,
+                        NormalizeGameIndexName,
+                        GetSafeGameFolderName,
+                        NormalizeConsoleLabel,
+                        counts);
+                    var fp = (row.FolderPath ?? string.Empty).Trim();
+                    if (string.IsNullOrWhiteSpace(fp)) continue;
+                    withFolder++;
+                    if (string.IsNullOrWhiteSpace(canonical)) continue;
+                    if (!LibraryPlacementService.PathsEqualNormalized(fp, canonical)) mismatch++;
+                }
+                if (withFolder == 0)
+                    snap.RowSummary = "No game rows with a library folder path yet (" + rows.Count + " row(s) in index).";
+                else if (mismatch == 0)
+                    snap.RowSummary = "Storage paths line up: " + withFolder + " row(s) with folders match canonical placement rules.";
+                else
+                {
+                    snap.RowSummary = mismatch + " of " + withFolder + " foldered row(s) differ from the canonical storage path (Game Index → Target storage folder).";
+                    snap.RowNeedsAttention = true;
+                }
+            }
+
+            Dictionary<string, LibraryMetadataIndexEntry> photoIndex;
+            try
+            {
+                if (indexPersistenceService == null)
+                {
+                    snap.IndexedFilesSummary = "Index persistence is not available.";
+                    snap.IndexedFilesNeedAttention = true;
+                    return snap;
+                }
+                photoIndex = indexPersistenceService.LoadLibraryMetadataIndexEntries(root);
+            }
+            catch (Exception ex)
+            {
+                Log("Storage placement health: photo index read failed. " + ex.Message);
+                snap.IndexedFilesSummary = "Could not read photo index.";
+                snap.IndexedFilesNeedAttention = true;
+                return snap;
+            }
+
+            if (photoIndex == null || photoIndex.Count == 0)
+            {
+                snap.IndexedFilesSummary = "Photo index has no entries yet.";
+                return snap;
+            }
+
+            var unassigned = 0;
+            var misplaced = 0;
+            var assignedChecked = 0;
+            var orphan = 0;
+            foreach (var entry in photoIndex.Values)
+            {
+                if (entry == null) continue;
+                var gid = NormalizeGameId(entry.GameId);
+                if (string.IsNullOrWhiteSpace(gid))
+                {
+                    unassigned++;
+                    continue;
+                }
+                var row = FindSavedGameIndexRowById(rows, gid);
+                if (row == null)
+                {
+                    orphan++;
+                    continue;
+                }
+                var canonical = LibraryPlacementService.BuildCanonicalStorageFolderPath(
+                    root,
+                    row,
+                    readOnly,
+                    NormalizeGameIndexName,
+                    GetSafeGameFolderName,
+                    NormalizeConsoleLabel,
+                    counts);
+                if (string.IsNullOrWhiteSpace(canonical)) continue;
+                var fp = entry.FilePath ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(fp)) continue;
+                var dir = Path.GetDirectoryName(fp);
+                if (string.IsNullOrWhiteSpace(dir)) continue;
+                assignedChecked++;
+                if (!LibraryPlacementService.IsDirectoryWithinCanonicalStorage(dir, canonical)) misplaced++;
+            }
+
+            if (unassigned == photoIndex.Count)
+            {
+                snap.IndexedFilesSummary = "All " + photoIndex.Count + " photo index entr" + (photoIndex.Count == 1 ? "y is" : "ies are") + " unassigned (no GameId).";
+                return snap;
+            }
+
+            var fileParts = new List<string>();
+            if (assignedChecked > 0)
+            {
+                if (misplaced == 0)
+                    fileParts.Add("All " + assignedChecked + " assigned indexed capture(s) are under the canonical folder for their GameId (including subfolders).");
+                else
+                {
+                    fileParts.Add(misplaced + " of " + assignedChecked + " assigned indexed capture(s) sit outside the canonical folder for their GameId.");
+                    snap.IndexedFilesNeedAttention = true;
+                }
+            }
+            if (orphan > 0)
+            {
+                fileParts.Add(orphan + " indexed file(s) reference a GameId missing from the game index.");
+                snap.IndexedFilesNeedAttention = true;
+            }
+            if (unassigned > 0) fileParts.Add(unassigned + " entr" + (unassigned == 1 ? "y is" : "ies are") + " still unassigned (skipped for placement compare).");
+
+            if (fileParts.Count == 0)
+                snap.IndexedFilesSummary = "No assigned captures with a resolvable canonical folder path to compare.";
+            else snap.IndexedFilesSummary = string.Join(" ", fileParts);
+
+            return snap;
+        }
+
     }
 }

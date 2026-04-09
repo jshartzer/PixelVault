@@ -120,6 +120,40 @@ namespace PixelVaultNative
                         : File.Exists(indexPath) ? DesignTokens.StatusOk : DesignTokens.StatusNeutral,
                     indexDetail)));
 
+            LibraryStoragePlacementHealthSnapshot placementHealth = null;
+            try
+            {
+                placementHealth = d.GetLibraryStoragePlacementHealth?.Invoke();
+            }
+            catch
+            {
+                placementHealth = null;
+            }
+            if (placementHealth != null && placementHealth.IsApplicable)
+            {
+                var rowText = string.IsNullOrWhiteSpace(placementHealth.RowSummary) ? "—" : placementHealth.RowSummary;
+                var fileText = string.IsNullOrWhiteSpace(placementHealth.IndexedFilesSummary) ? "—" : placementHealth.IndexedFilesSummary;
+                var rowPill = placementHealth.RowNeedsAttention ? DesignTokens.StatusWarn
+                    : rowText.IndexOf("empty", StringComparison.OrdinalIgnoreCase) >= 0
+                      || rowText.IndexOf("No game rows", StringComparison.OrdinalIgnoreCase) >= 0
+                        ? DesignTokens.StatusNeutral
+                        : DesignTokens.StatusOk;
+                var filePill = placementHealth.IndexedFilesNeedAttention ? DesignTokens.StatusWarn
+                    : fileText.IndexOf("not available", StringComparison.OrdinalIgnoreCase) >= 0
+                      || fileText.IndexOf("Could not read", StringComparison.OrdinalIgnoreCase) >= 0
+                        ? DesignTokens.StatusWarn
+                        : fileText.IndexOf("no entries yet", StringComparison.OrdinalIgnoreCase) >= 0
+                          || fileText.IndexOf("unassigned", StringComparison.OrdinalIgnoreCase) >= 0
+                          || fileText.IndexOf("No assigned captures", StringComparison.OrdinalIgnoreCase) >= 0
+                            ? DesignTokens.StatusNeutral
+                            : DesignTokens.StatusOk;
+                stack.Children.Add(SectionCard(d, "Library storage placement",
+                    Row(d, "Game index rows", rowText, rowPill,
+                        "Cached folder path per row vs canonical path from storage group + title rules (Game Index → Target storage folder)."),
+                    Row(d, "Indexed captures (photo index)", fileText, filePill,
+                        "Each assigned file’s directory must lie under that GameId’s canonical folder. Unassigned rows are skipped.")));
+            }
+
             var troubleOn = d.GetTroubleshootingLoggingEnabled?.Invoke() ?? false;
             var redact = d.GetTroubleshootingLogRedactPaths?.Invoke() ?? false;
             stack.Children.Add(SectionCard(d, "Logging",
@@ -129,7 +163,7 @@ namespace PixelVaultNative
                 Row(d, "Main log", d.LogFilePath?.Invoke() ?? "—", DesignTokens.StatusNeutral, "Standard session log."),
                 Row(d, "Troubleshooting file", d.TroubleshootingLogFilePath?.Invoke() ?? "—", DesignTokens.StatusNeutral, troubleOn ? "May rotate when very large." : "—")));
 
-            var summary = BuildSummaryText(d, sources, dest, library, exif, ffmpeg, cacheRoot, indexPath, session, hasToken, troubleOn, starredExport);
+            var summary = BuildSummaryText(d, sources, dest, library, exif, ffmpeg, cacheRoot, indexPath, session, hasToken, troubleOn, starredExport, placementHealth);
 
             var actions = new WrapPanel { Margin = new Thickness(0, 20, 0, 0) };
             void AddAction(string label, string bg, RoutedEventHandler click)
@@ -340,7 +374,8 @@ namespace PixelVaultNative
             string session,
             bool hasSteamToken,
             bool troubleOn,
-            string starredExport)
+            string starredExport,
+            LibraryStoragePlacementHealthSnapshot placementHealth)
         {
             var sb = new StringBuilder();
             sb.AppendLine("PixelVault health summary");
@@ -369,6 +404,13 @@ namespace PixelVaultNative
             sb.AppendLine("Logging: troubleshooting=" + troubleOn);
             sb.AppendLine("Main log: " + (d.LogFilePath?.Invoke() ?? ""));
             sb.AppendLine("Troubleshooting log: " + (d.TroubleshootingLogFilePath?.Invoke() ?? ""));
+            sb.AppendLine();
+            if (placementHealth != null && placementHealth.IsApplicable)
+            {
+                sb.AppendLine("Storage placement (rows): " + (placementHealth.RowSummary ?? ""));
+                sb.AppendLine("Storage placement (indexed files): " + (placementHealth.IndexedFilesSummary ?? ""));
+            }
+            else sb.AppendLine("Storage placement: (n/a)");
             return sb.ToString();
         }
     }

@@ -81,6 +81,10 @@ namespace PixelVaultNative
         public string IndexAddedAtLocal => LibraryIndexRecordDisplay.FormatIndexAddedUtcLocal(IndexAddedUtcTicks);
         /// <summary>Stable cross-platform storage bucket id (shared folder target); see PV-PLN-LIBST-001.</summary>
         public string StorageGroupId { get; set; }
+        /// <summary>Editor-only: full canonical library folder path from placement rules; not persisted.</summary>
+        public string EditorCanonicalStorageFolderDisplay { get; set; }
+        /// <summary>Editor-only: e.g. <c>Mismatch</c> when <see cref="FolderPath"/> disagrees with canonical placement; not persisted.</summary>
+        public string EditorStoragePlacementNote { get; set; }
     }
 
     sealed class PhotoIndexEditorRow

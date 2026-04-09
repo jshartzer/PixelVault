@@ -94,6 +94,7 @@ namespace PixelVaultNative
                 GetCacheRoot = () => cacheRoot,
                 GetActiveLibraryIndexDatabasePath = () => string.IsNullOrWhiteSpace(libraryRoot) ? string.Empty : IndexDatabasePath(libraryRoot),
                 GetDiagnosticsSessionId = () => _diagnosticsSessionId,
+                GetLibraryStoragePlacementHealth = BuildLibraryStoragePlacementHealthSnapshot,
                 PromptFetchCoversForLibrary = PromptFetchCoversForLibraryFromSettings
             };
         }

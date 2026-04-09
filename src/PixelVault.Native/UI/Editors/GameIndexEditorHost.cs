@@ -45,6 +45,8 @@ namespace PixelVaultNative
         public Func<string, List<GameIndexEditorRow>, Action<int, int, string>, CancellationToken, Task<int>> ResolveMissingSteamAppIdsAsync { get; set; }
         public Func<string, List<GameIndexEditorRow>, Action<int, int, string>, CancellationToken, Task<int>> ResolveMissingSteamGridDbIdsAsync { get; set; }
         public Action<string> OpenFolder { get; set; }
+        /// <summary>Optional; canonical game storage directory under <paramref name="libraryRoot"/> for editor preview (LIBST).</summary>
+        public Func<string, GameIndexEditorRow, IReadOnlyList<GameIndexEditorRow>, string> FormatCanonicalStorageFolderAbsolutePath { get; set; }
     }
 
     internal static class GameIndexEditorHost
@@ -129,7 +131,7 @@ namespace PixelVaultNative
             var searchBox = new TextBox { Padding = new Thickness(10, 6, 10, 6), BorderBrush = B("#D7E1E8"), BorderThickness = new Thickness(1), Background = Brushes.White, Margin = new Thickness(0, 0, 14, 0) };
             Grid.SetColumn(searchBox, 1);
             controlGrid.Children.Add(searchBox);
-            var helperText = new TextBlock { Text = "Edit the master Game, Platform, Steam AppID, Non-Steam ID, and STID fields. Game ID and Storage group stay read-only; folder/file details stay read-only so photo-level assignments drive grouping.", VerticalAlignment = VerticalAlignment.Center, Foreground = B("#5F6970"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 14, 0) };
+            var helperText = new TextBlock { Text = "Edit the master Game, Platform, Steam AppID, Non-Steam ID, and STID fields. Game ID and Storage group stay read-only; Target storage folder shows the canonical disk folder from placement rules (shared when the storage group matches). Setup & health scans photo-index file paths vs those folders too. Folder/File columns stay read-only.", VerticalAlignment = VerticalAlignment.Center, Foreground = B("#5F6970"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 14, 0) };
             Grid.SetColumn(helperText, 2);
             controlGrid.Children.Add(helperText);
             var addRowButton = services.CreateButton("Add Game", null, "#8A5A17", Brushes.White);
@@ -185,6 +187,8 @@ namespace PixelVaultNative
             };
             grid.Columns.Add(new DataGridTextColumn { Header = "Game ID", Binding = new System.Windows.Data.Binding("GameId"), IsReadOnly = true, Width = 180 });
             grid.Columns.Add(new DataGridTextColumn { Header = "Storage group", Binding = new System.Windows.Data.Binding("StorageGroupId"), IsReadOnly = true, Width = 130 });
+            grid.Columns.Add(new DataGridTextColumn { Header = "Target storage folder", Binding = new System.Windows.Data.Binding("EditorCanonicalStorageFolderDisplay"), IsReadOnly = true, Width = new DataGridLength(1.2, DataGridLengthUnitType.Star) });
+            grid.Columns.Add(new DataGridTextColumn { Header = "Placement", Binding = new System.Windows.Data.Binding("EditorStoragePlacementNote"), IsReadOnly = true, Width = 92 });
             grid.Columns.Add(new DataGridTextColumn { Header = "Added", Binding = new System.Windows.Data.Binding("IndexAddedAtLocal"), IsReadOnly = true, Width = 130 });
             grid.Columns.Add(new DataGridTextColumn { Header = "Game", Binding = new System.Windows.Data.Binding("Name") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus }, Width = new DataGridLength(1.15, DataGridLengthUnitType.Star) });
             grid.Columns.Add(new DataGridTextColumn { Header = "Platform", Binding = new System.Windows.Data.Binding("PlatformLabel") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus }, Width = 130 });
@@ -225,6 +229,56 @@ namespace PixelVaultNative
             Action refreshStatus = null;
             Action refreshGrid = null;
 
+            void RecomputeEditorPlacementColumns()
+            {
+                var snapshot = allRows.Where(row => row != null).ToList();
+                var readOnlySnapshot = (IReadOnlyList<GameIndexEditorRow>)snapshot;
+                if (services.FormatCanonicalStorageFolderAbsolutePath == null)
+                {
+                    foreach (var row in snapshot)
+                    {
+                        row.EditorCanonicalStorageFolderDisplay = string.Empty;
+                        row.EditorStoragePlacementNote = string.Empty;
+                    }
+                    return;
+                }
+                foreach (var row in snapshot)
+                {
+                    string canonical;
+                    try
+                    {
+                        canonical = services.FormatCanonicalStorageFolderAbsolutePath(libraryRoot, row, readOnlySnapshot) ?? string.Empty;
+                    }
+                    catch (Exception ex)
+                    {
+                        services.Log("Game index editor: canonical storage path failed for row " + (row.GameId ?? "?") + ". " + ex.Message);
+                        canonical = string.Empty;
+                    }
+                    if (string.IsNullOrWhiteSpace(canonical))
+                    {
+                        row.EditorCanonicalStorageFolderDisplay = "—";
+                        row.EditorStoragePlacementNote = string.Empty;
+                    }
+                    else
+                    {
+                        row.EditorCanonicalStorageFolderDisplay = canonical;
+                        var fp = (row.FolderPath ?? string.Empty).Trim();
+                        if (string.IsNullOrWhiteSpace(fp))
+                        {
+                            row.EditorStoragePlacementNote = string.Empty;
+                        }
+                        else if (LibraryPlacementService.PathsEqualNormalized(fp, canonical))
+                        {
+                            row.EditorStoragePlacementNote = string.Empty;
+                        }
+                        else
+                        {
+                            row.EditorStoragePlacementNote = "Mismatch";
+                        }
+                    }
+                }
+            }
+
             refreshStatus = delegate
             {
                 var visibleCount = grid.Items.Count;
@@ -237,6 +291,7 @@ namespace PixelVaultNative
 
             refreshGrid = delegate
             {
+                RecomputeEditorPlacementColumns();
                 var query = (searchBox.Text ?? string.Empty).Trim();
                 IEnumerable<GameIndexEditorRow> rows = allRows;
                 if (!string.IsNullOrWhiteSpace(query))
@@ -250,6 +305,8 @@ namespace PixelVaultNative
                         (!string.IsNullOrWhiteSpace(row.SteamGridDbId) && row.SteamGridDbId.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0) ||
                         (!string.IsNullOrWhiteSpace(row.RetroAchievementsGameId) && row.RetroAchievementsGameId.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0) ||
                         (!string.IsNullOrWhiteSpace(row.StorageGroupId) && row.StorageGroupId.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0) ||
+                        (!string.IsNullOrWhiteSpace(row.EditorCanonicalStorageFolderDisplay) && row.EditorCanonicalStorageFolderDisplay.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0) ||
+                        (!string.IsNullOrWhiteSpace(row.EditorStoragePlacementNote) && row.EditorStoragePlacementNote.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0) ||
                         (!string.IsNullOrWhiteSpace(row.FolderPath) && row.FolderPath.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0));
                 }
                 grid.ItemsSource = rows

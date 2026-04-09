@@ -2839,6 +2839,20 @@ namespace PixelVaultNative
                                 NormalizeConsoleLabel = NormalizeConsoleLabel,
                                 MergeRows = delegate(List<GameIndexEditorRow> rows) { return MergeGameIndexRows(rows); },
                                 BuildMergeKey = BuildGameIndexMergeKey,
+                                FormatCanonicalStorageFolderAbsolutePath = delegate(string root, GameIndexEditorRow row, IReadOnlyList<GameIndexEditorRow> all)
+                                {
+                                    if (row == null || string.IsNullOrWhiteSpace(root)) return string.Empty;
+                                    var list = all as List<GameIndexEditorRow> ?? (all != null ? all.ToList() : new List<GameIndexEditorRow>());
+                                    var titleCounts = BuildGameIndexTitleCounts(list);
+                                    return LibraryPlacementService.BuildCanonicalStorageFolderPath(
+                                        root,
+                                        row,
+                                        list,
+                                        NormalizeGameIndexName,
+                                        GetSafeGameFolderName,
+                                        NormalizeConsoleLabel,
+                                        titleCounts);
+                                },
                                 RunBackgroundWorkflowIntArray = RunBackgroundWorkflowWithProgress<int[]>,
                                 ThrowIfWorkflowCancellationRequested = ImportWorkflowOrchestration.ThrowIfCancellationRequested,
                                 ResolveMissingSteamAppIdsAsync = ResolveMissingGameIndexSteamAppIdsAsync,

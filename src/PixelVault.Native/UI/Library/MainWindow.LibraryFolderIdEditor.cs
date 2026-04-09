@@ -84,7 +84,7 @@ namespace PixelVaultNative
             var header = new StackPanel { Margin = new Thickness(0, 0, 0, 18) };
             header.Children.Add(new TextBlock { Text = folder.Name ?? "Selected Folder", FontSize = 24, FontWeight = FontWeights.SemiBold, Foreground = Brush("#1F2A30"), TextWrapping = TextWrapping.Wrap });
             header.Children.Add(new TextBlock { Text = NormalizeConsoleLabel(folder.PlatformLabel), Margin = new Thickness(0, 6, 0, 0), Foreground = Brush("#5F6970"), FontSize = 13 });
-            header.Children.Add(new TextBlock { Text = "Update the saved Steam App ID, SteamGridDB ID, and RetroAchievements game ID for this game record without leaving the Library view.", Margin = new Thickness(0, 10, 0, 0), Foreground = Brush("#5F6970"), FontSize = 13, TextWrapping = TextWrapping.Wrap });
+            header.Children.Add(new TextBlock { Text = "Update the saved Steam App ID, SteamGridDB ID, and RetroAchievements game ID for this game + platform row. Another console is a separate index row; several rows can share one disk folder when their storage group matches (see Game Index).", Margin = new Thickness(0, 10, 0, 0), Foreground = Brush("#5F6970"), FontSize = 13, TextWrapping = TextWrapping.Wrap });
             root.Children.Add(header);
 
             var form = new Grid { Margin = new Thickness(0, 0, 0, 12) };

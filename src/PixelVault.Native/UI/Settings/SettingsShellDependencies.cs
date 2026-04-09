@@ -101,5 +101,19 @@ namespace PixelVaultNative
 
         /// <summary>Fixed troubleshooting session id for this app instance.</summary>
         public Func<string> GetDiagnosticsSessionId { get; set; }
+
+        /// <summary>Optional; game index rows + photo-index file paths vs canonical placement (LIBST Step 6).</summary>
+        public Func<LibraryStoragePlacementHealthSnapshot> GetLibraryStoragePlacementHealth { get; set; }
+    }
+
+    /// <summary>Row-level and per-file (photo index) placement diagnostics for the active library.</summary>
+    public sealed class LibraryStoragePlacementHealthSnapshot
+    {
+        /// <summary>When false, library root is unset or missing — UI hides the storage placement card.</summary>
+        public bool IsApplicable { get; set; }
+        public string RowSummary { get; set; }
+        public string IndexedFilesSummary { get; set; }
+        public bool RowNeedsAttention { get; set; }
+        public bool IndexedFilesNeedAttention { get; set; }
     }
 }

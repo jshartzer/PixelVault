@@ -246,5 +246,50 @@ namespace PixelVaultNative
                 : Path.GetFileNameWithoutExtension(fileName);
             return getSafeGameFolderName(stem);
         }
+
+        /// <summary>True when both paths refer to the same directory (trim, full path, case-insensitive).</summary>
+        internal static bool PathsEqualNormalized(string pathA, string pathB)
+        {
+            if (string.IsNullOrWhiteSpace(pathA) || string.IsNullOrWhiteSpace(pathB)) return false;
+            try
+            {
+                var a = pathA.Trim().TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                var b = pathB.Trim().TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                return string.Equals(Path.GetFullPath(a), Path.GetFullPath(b), StringComparison.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                return string.Equals(
+                    pathA.Trim().TrimEnd('\\', '/'),
+                    pathB.Trim().TrimEnd('\\', '/'),
+                    StringComparison.OrdinalIgnoreCase);
+            }
+        }
+
+        /// <summary>
+        /// True when <paramref name="directoryPath"/> is the canonical game folder or a subdirectory of it
+        /// (normalized paths; case-insensitive).
+        /// </summary>
+        internal static bool IsDirectoryWithinCanonicalStorage(string directoryPath, string canonicalGameFolderPath)
+        {
+            if (string.IsNullOrWhiteSpace(directoryPath) || string.IsNullOrWhiteSpace(canonicalGameFolderPath)) return false;
+            if (PathsEqualNormalized(directoryPath, canonicalGameFolderPath)) return true;
+            try
+            {
+                var dir = Path.GetFullPath(directoryPath.Trim().TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+                var root = Path.GetFullPath(canonicalGameFolderPath.Trim().TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+                if (dir.Length <= root.Length) return false;
+                if (dir[root.Length] != Path.DirectorySeparatorChar && dir[root.Length] != Path.AltDirectorySeparatorChar) return false;
+                return dir.StartsWith(root, StringComparison.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                var dir = directoryPath.Trim().TrimEnd('\\', '/');
+                var root = canonicalGameFolderPath.Trim().TrimEnd('\\', '/');
+                if (dir.Length <= root.Length) return string.Equals(dir, root, StringComparison.OrdinalIgnoreCase);
+                var sep = root.EndsWith("\\", StringComparison.Ordinal) || root.StartsWith("\\\\", StringComparison.Ordinal) ? "\\" : "/";
+                return dir.StartsWith(root + sep, StringComparison.OrdinalIgnoreCase);
+            }
+        }
     }
 }
