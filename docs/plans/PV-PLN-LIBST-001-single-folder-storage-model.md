@@ -3,7 +3,7 @@
 | Field | Value |
 |-------|--------|
 | **Plan ID** | `PV-PLN-LIBST-001` |
-| **Status** | In progress (Slice A / Step 1 started) |
+| **Status** | In progress — Slice 0 complete; Slice A (Step 1) materially in flight; Slice B (Step 2) implemented for persistence + projections |
 | **Owner** | PixelVault / Codex |
 | **Source brief** | User request (2026-04-07): keep unique Game Index rows per console, but store all captures for a game in one app-owned folder and stop inferring identity from folder structure |
 | **Related** | `docs/PROJECT_CONTEXT.md`, `docs/POLICY.md`, `docs/DOC_SYNC_POLICY.md`, `docs/plans/PV-PLN-UI-001-ui-thin-mainwindow-ios-aligned.md` |
@@ -130,6 +130,8 @@ Before implementation, answer every item in **[Decision lock items](#decision-lo
 
 Do not leave these as chat-only decisions.
 
+**Locked in this doc — 2026-04-08:** see **[§ Decision lock — resolved answers](#decision-lock--resolved-answers-2026-04-08)** below.
+
 ### 0.2 Read-only leak spike before Slice A
 
 Do one short read-only spike before implementation begins:
@@ -143,6 +145,8 @@ Expected output:
 
 - a small leak list that can be checked off during Step 1
 
+**Status (2026-04-08):** Satisfied by the Step 1 audit and leak tables in **[Execution log](#execution-log)** — see *Step 1 scanner / rebuild audit* and *Initial leak spike*.
+
 ### 0.3 Unresolved-file contract
 
 Step 1 removes folder-as-title fallback, so the plan needs an explicit no-`GameId` / no-hint story.
@@ -153,6 +157,8 @@ Recommended default:
 - unresolved files keep their current physical path until assignment is known
 - organize / merge flows should skip unresolved files rather than inventing a title from the folder
 - manual assignment must attach through `GameId` or parser-backed selection, never by trusting the parent folder name
+
+**Status (2026-04-08):** Satisfied by the documented unresolved / pending-assignment behavior in the execution log (*Slice A — unresolved UX*): `PendingGameAssignment` rows, **`missingid`** visibility, and organize flows that must not mint `GameId` from the parent folder name.
 
 ## Staged implementation plan
 
@@ -389,6 +395,24 @@ Canonical checklist for **§0.1** — answer in writing (in this doc or a linked
 6. How much of the migration should be automatic vs opt-in?
 7. Under what exact conditions is same-title cross-platform auto-merge forbidden during backfill?
 
+## Decision lock — resolved answers (2026-04-08)
+
+Canonical answers for **§0.1** (product defaults for this plan; revise here if strategy changes):
+
+1. **`StorageGroupId` in v1** — **App-managed and read-only in the Game Index editor.** Values come from deterministic backfill / future tooling; manual split/merge remains a later step (plan Step 6+).
+
+2. **`StorageFolderName`** — **Not persisted in v1.** Folder labeling continues to follow existing placement / title rules until **Step 3** (`LibraryPlacementService`); add an explicit persisted label only if placement needs it independently of row titles.
+
+3. **Default cover / thumbnail when one storage group has multiple platform rows** — **Deterministic:** prefer a row with a usable `PreviewImagePath` in ascending `GameId` order within the group; if none, fall back to existing per-row / empty behavior until placement consolidates assets.
+
+4. **Re-homing timing** — **Not on every metadata save in v1.** Bulk or implicit moves belong behind explicit organize/repair/import flows now; **Step 7** tightens metadata-driven re-homing after placement is centralized.
+
+5. **Unresolved-file UX** — **As in Step 1:** files without a trusted `GameId` stay visible on **`PendingGameAssignment`** / **Missing ID** surfaces; they keep their paths until assignment via photo index, parser, or explicit manual flows — **not** from parent folder name.
+
+6. **Migration automatic vs opt-in** — **`StorageGroupId` SQLite column + deterministic backfill runs automatically** (non-destructive, no mass moves). **Physical re-home / folder merge stays opt-in** with preview (**Step 5**).
+
+7. **When same-title storage merge is forbidden (backfill)** — Rows **must not** union into one `StorageGroupId` when both are **Steam** and have conflicting non-empty **`SteamAppId`** or conflicting non-empty **`SteamGridDbId`**; when both are **Emulation** and have conflicting non-empty **`NonSteamId`** or **`RetroAchievementsGameId`**; or when both already carry **non-empty, differing `StorageGroupId`**. A future explicit “different game” marker would also block merge (reserved).
+
 ## Recommendation
 
 Start with **Step 0**, then **Step 1** and **Step 2**. That is the real architectural turn:
@@ -406,6 +430,8 @@ Without **this foundation** (preflight + Steps 1–2), removing ` - Platform` fr
 | 2026-04-08 | **Slice A (partial Step 1)** | Removed **parent folder name** as a source for `GuessGameIndexNameForFile` (hints + filename stem only). Removed **`NormalizeGameIndexName(name, folderPath)`** basename fallback when `name` is empty. Fixed **library metadata edit** path that used parent folder for `GameName` when `folderPathUsable` was false — now uses parser/filename guess only. Deleted **`ShouldTrustFilenameTitleOverFolder`** (only served folder-vs-hint arbitration). |
 | 2026-04-08 | **Slice A (Step 1 continued)** | **`GameIndexEditorAssignmentService.EnsureManualMetadataMasterRow`**: return **`null`** when there is no title and no `preferredGameId` (no blank-title placeholder rows); when **`preferredGameId`** is set, **resolve by id first** (scan/sync no longer requires filename identity to match saved row). **`ResolveGameIdForIndexedFile`**: if filename parser yields no title, **leave `GameId` empty** instead of creating a row. **`PreserveLibraryMetadataEditGameIndex`**: derive **`sourceName`** from **saved row → first item filename guess → folder display name** (not folder-as-path). **Folder ID editor** guard if ensure returns null. Tests: `GameIndexEditorAssignmentServiceTests`. |
 | 2026-04-08 | **Slice A (Step 1 — audit + unresolved UX)** | **Scanner/rebuild audit** (see subsection below): no remaining **game identity** inference from parent folder basename in index/scan paths; `Path.GetDirectoryName` uses are placement/enumeration. **Unresolved surface**: `LibraryScanner.LoadLibraryFoldersCore` appends **`LibraryFolderInfo`** rows per directory with indexed files but **empty `GameId`** (`PendingGameAssignment`); tile title pattern **`Needs assignment ·`** plus directory leaf name is a **browse label**, not game identity. These rows appear in the library grid, **`missingid`** filter, and folder cache (extra tab column). **`ApplySavedGameIndexRows`** / **100% completion** skip pending buckets so the app does not mint `GameId`s from that label. Filter/menu copy: **Missing ID / assignment**. Tests: `LibraryBrowseFolderSummaryTests`. |
+| 2026-04-08 | **Slice 0 (Step 0 — preflight)** | **§0.1** filled in under [Decision lock — resolved answers](#decision-lock--resolved-answers-2026-04-08). **§0.2** treated as done via existing Step 1 audit + leak tables in this doc. **§0.3** pointed at unresolved/pending-assignment behavior logged under Slice A. |
+| 2026-04-08 | **Slice B (Step 2 — `StorageGroupId`)** | **`GameIndexEditorRow.StorageGroupId`**, SQLite `game_index.storage_group_id` (`EnsureGameIndexStorageGroupIdColumn`), read/write in `IndexPersistenceService`, **`GameIndexStorageGroupBackfill.AssignDeterministicStorageGroupIds`** on load/save merge. **`LibraryFolderInfo.StorageGroupId`** filled from saved rows in **`LibraryScanner`**; synced in **`ApplySavedGameIndexRows`** / conservative **`UpsertSavedGameIndexRow`**; **`CloneLibraryFolderInfo`** copies it. **Merge rule:** two **Steam** rows with differing non-empty **`SteamGridDbId`** do not share a storage group. **Game Index editor:** read-only **Storage group** column + search hits **`StorageGroupId`**. Tests: **`GameIndexStorageGroupBackfillTests`**. Legacy tab-separated game index files still omit `StorageGroupId`; SQLite + backfill is the source of truth. |
 
 ### Step 1 scanner / rebuild audit (2026-04-08)
 

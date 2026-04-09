@@ -228,7 +228,8 @@ namespace PixelVaultNative
                 IsFavorite = folder.IsFavorite,
                 IsShowcase = folder.IsShowcase,
                 CollectionNotes = folder.CollectionNotes,
-                PendingGameAssignment = folder.PendingGameAssignment
+                PendingGameAssignment = folder.PendingGameAssignment,
+                StorageGroupId = folder.StorageGroupId
             };
         }
 

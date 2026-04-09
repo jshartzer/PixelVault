@@ -135,6 +135,10 @@ namespace PixelVaultNative
                 var eb = clean(b.SteamAppId ?? string.Empty);
                 if (!string.IsNullOrWhiteSpace(ea) && !string.IsNullOrWhiteSpace(eb) && !string.Equals(ea, eb, StringComparison.OrdinalIgnoreCase))
                     return true;
+                var ga = clean(a.SteamGridDbId ?? string.Empty);
+                var gb = clean(b.SteamGridDbId ?? string.Empty);
+                if (!string.IsNullOrWhiteSpace(ga) && !string.IsNullOrWhiteSpace(gb) && !string.Equals(ga, gb, StringComparison.OrdinalIgnoreCase))
+                    return true;
             }
 
             if (string.Equals(pa, "Emulation", StringComparison.OrdinalIgnoreCase) && string.Equals(pb, "Emulation", StringComparison.OrdinalIgnoreCase))

@@ -226,6 +226,12 @@ namespace PixelVaultNative
                     folder.GameId = saved.GameId;
                     changed = true;
                 }
+                var storageGroupId = saved.StorageGroupId ?? string.Empty;
+                if (!string.Equals(folder.StorageGroupId ?? string.Empty, storageGroupId, StringComparison.OrdinalIgnoreCase))
+                {
+                    folder.StorageGroupId = storageGroupId;
+                    changed = true;
+                }
                 if (!string.IsNullOrWhiteSpace(saved.Name) && !string.Equals(folder.Name ?? string.Empty, saved.Name ?? string.Empty, StringComparison.Ordinal))
                 {
                     folder.Name = saved.Name;
@@ -342,7 +348,8 @@ namespace PixelVaultNative
                     CompletedUtcTicks = folder.CompletedUtcTicks,
                     IsFavorite = folder.IsFavorite,
                     IsShowcase = folder.IsShowcase,
-                    CollectionNotes = folder.CollectionNotes ?? string.Empty
+                    CollectionNotes = folder.CollectionNotes ?? string.Empty,
+                    StorageGroupId = folder.StorageGroupId ?? string.Empty
                 });
             }
             else
@@ -370,6 +377,8 @@ namespace PixelVaultNative
                 saved.IsFavorite = folder.IsFavorite;
                 saved.IsShowcase = folder.IsShowcase;
                 saved.CollectionNotes = folder.CollectionNotes ?? string.Empty;
+                if (!string.IsNullOrWhiteSpace(folder.StorageGroupId))
+                    saved.StorageGroupId = folder.StorageGroupId;
             }
             SaveSavedGameIndexRows(root, rows);
         }

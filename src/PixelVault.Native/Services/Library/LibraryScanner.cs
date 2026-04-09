@@ -555,7 +555,8 @@ namespace PixelVaultNative
                     SteamGridDbId = saved == null ? string.Empty : (saved.SteamGridDbId ?? string.Empty),
                     RetroAchievementsGameId = saved == null ? string.Empty : (saved.RetroAchievementsGameId ?? string.Empty),
                     SuppressSteamAppIdAutoResolve = saved != null && saved.SuppressSteamAppIdAutoResolve,
-                    SuppressSteamGridDbIdAutoResolve = saved != null && saved.SuppressSteamGridDbIdAutoResolve
+                    SuppressSteamGridDbIdAutoResolve = saved != null && saved.SuppressSteamGridDbIdAutoResolve,
+                    StorageGroupId = saved == null ? string.Empty : (saved.StorageGroupId ?? string.Empty)
                 });
             }
 
@@ -749,7 +750,8 @@ namespace PixelVaultNative
                     NonSteamId = string.Empty,
                     SteamGridDbId = string.Empty,
                     RetroAchievementsGameId = string.Empty,
-                    PendingGameAssignment = true
+                    PendingGameAssignment = true,
+                    StorageGroupId = string.Empty
                 });
             }
         }

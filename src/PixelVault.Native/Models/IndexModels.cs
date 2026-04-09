@@ -45,6 +45,8 @@ namespace PixelVaultNative
         public string CollectionNotes;
         /// <summary>Photo index rows under <see cref="FolderPath"/> have no <c>GameId</c> yet (LIBST Step 1 unresolved bucket). Not a game title.</summary>
         public bool PendingGameAssignment;
+        /// <summary>Shared storage bucket from game index (<c>PV-PLN-LIBST-001</c>); informational on browse rows until placement consumes it.</summary>
+        public string StorageGroupId;
     }
 
     sealed class GameIndexEditorRow
