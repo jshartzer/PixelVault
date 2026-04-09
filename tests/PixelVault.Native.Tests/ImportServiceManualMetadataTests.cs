@@ -263,6 +263,52 @@ public sealed class ImportServiceManualMetadataTests
     }
 
     [Fact]
+    public void FinalizeManualMetadataItemsAgainstGameIndex_Preserves_UserTypedTitle_And_Updates_StorageRepresentative()
+    {
+        var representative = new GameIndexEditorRow
+        {
+            GameId = "G00042",
+            Name = "Hellblade- Senua's Sacrifice",
+            PlatformLabel = "Steam",
+            StorageGroupId = "SG1"
+        };
+        var resolvedRow = new GameIndexEditorRow
+        {
+            GameId = "G00192",
+            Name = "Hellblade Senua's Sacrifice",
+            PlatformLabel = "Xbox",
+            StorageGroupId = "SG1"
+        };
+        var rows = new List<GameIndexEditorRow> { representative, resolvedRow };
+
+        var assignmentStub = new StubGameIndexEditorAssignmentService
+        {
+            Resolve = (_, _, _, _) => resolvedRow
+        };
+        var svc = CreateServiceWithManualMetadataDeps(
+            new StubCoverService(),
+            s => s.Trim(),
+            assignmentStub,
+            _ => "Xbox",
+            _ => false);
+
+        var item = new ManualMetadataItem
+        {
+            GameName = "Hellblade: Senua's Sacrifice",
+            FilePath = @"D:\captures\shot.png",
+            GameId = string.Empty,
+            DeleteBeforeProcessing = false
+        };
+
+        svc.FinalizeManualMetadataItemsAgainstGameIndex(@"D:\lib", rows, new[] { item });
+
+        Assert.Equal("G00192", item.GameId);
+        Assert.Equal("Hellblade: Senua's Sacrifice", item.GameName);
+        Assert.Equal("Hellblade: Senua's Sacrifice", resolvedRow.Name);
+        Assert.Equal("Hellblade: Senua's Sacrifice", representative.Name);
+    }
+
+    [Fact]
     public void ApplyManualMetadataTagTextToPlatformFlags_MapsEmulationTag()
     {
         var svc = CreateServiceWithManualMetadataDeps(new StubCoverService(), s => s.Trim());

@@ -174,7 +174,8 @@ namespace PixelVaultNative
                         NormalizeGameIndexName,
                         GetSafeGameFolderName,
                         NormalizeConsoleLabel,
-                        titleCounts);
+                        titleCounts,
+                        item.GameName);
                 }
                 else
                 {

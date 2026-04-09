@@ -84,4 +84,19 @@ public sealed class LibraryPlacementServiceTests
         var leaf = LibraryPlacementService.BuildCanonicalStorageFolderName(rows[0], rows, Norm, Safe, Plat, titleCounts);
         Assert.Equal("Hades", leaf);
     }
+
+    [Fact]
+    public void SharedStorageGroup_UsesPreferredFolderName_WhenProvided()
+    {
+        var rows = new List<GameIndexEditorRow>
+        {
+            new() { GameId = "A", Name = "Hellblade- Senua's Sacrifice", PlatformLabel = "Steam", StorageGroupId = "SG1", FolderPath = string.Empty },
+            new() { GameId = "B", Name = "Hellblade Senua's Sacrifice", PlatformLabel = "Xbox", StorageGroupId = "SG1", FolderPath = string.Empty }
+        };
+        var titleCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+        var leaf = LibraryPlacementService.BuildCanonicalStorageFolderName(rows[1], rows, Norm, Safe, Plat, titleCounts, "Hellblade: Senua's Sacrifice");
+
+        Assert.Equal("Hellblade: Senua's Sacrifice", leaf);
+    }
 }

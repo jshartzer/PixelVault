@@ -779,7 +779,16 @@ namespace PixelVaultNative
                 item.GameId = resolvedRow == null ? string.Empty : resolvedRow.GameId;
                 if (resolvedRow != null)
                 {
-                    if (!string.IsNullOrWhiteSpace(resolvedRow.Name)) item.GameName = resolvedRow.Name;
+                    if (!string.IsNullOrWhiteSpace(item.GameName))
+                    {
+                        resolvedRow.Name = item.GameName;
+                        var storageRepresentative = LibraryPlacementService.FindStorageGroupRepresentativeRow(
+                            resolvedRow,
+                            gameRows,
+                            (name, _) => normalize(name ?? string.Empty));
+                        if (storageRepresentative != null && !ReferenceEquals(storageRepresentative, resolvedRow))
+                            storageRepresentative.Name = item.GameName;
+                    }
                     if (!string.IsNullOrWhiteSpace(item.SteamAppId))
                     {
                         resolvedRow.SteamAppId = item.SteamAppId;
