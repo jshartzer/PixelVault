@@ -101,6 +101,7 @@
     <Compile Include="UI\Library\LibrarySession.cs" />
     <Compile Include="UI\Library\LibraryBrowserHost.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserChrome.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryStorageMerge.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserWorkingSet.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserWorkspaceMode.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserAchievements.cs" />

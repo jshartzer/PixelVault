@@ -460,7 +460,7 @@ namespace PixelVaultNative
                     IsFavorite = folder.IsFavorite,
                     IsShowcase = folder.IsShowcase,
                     CollectionNotes = folder.CollectionNotes ?? string.Empty,
-                    StorageGroupId = string.Empty
+                    StorageGroupId = folder.StorageGroupId ?? string.Empty
                 })
                 .ToList();
         }
