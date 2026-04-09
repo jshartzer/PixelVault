@@ -6,10 +6,61 @@ using System.Linq;
 namespace PixelVaultNative
 {
     /// <summary>
+    /// Single-file move target derived by placement rules (media path + sidecar handled by caller).
+    /// </summary>
+    internal readonly struct LibraryFileMovePlan
+    {
+        public LibraryFileMovePlan(string sourcePath, string targetDirectory, string targetFileName, bool resolvedFromGameIndex)
+        {
+            SourcePath = sourcePath ?? string.Empty;
+            TargetDirectory = targetDirectory ?? string.Empty;
+            TargetFileName = targetFileName ?? string.Empty;
+            ResolvedFromGameIndex = resolvedFromGameIndex;
+        }
+
+        public string SourcePath { get; }
+        public string TargetDirectory { get; }
+        public string TargetFileName { get; }
+        public bool ResolvedFromGameIndex { get; }
+
+        public string TargetPath =>
+            string.IsNullOrWhiteSpace(TargetDirectory)
+                ? TargetFileName
+                : Path.Combine(TargetDirectory, TargetFileName);
+    }
+
+    /// <summary>
     /// Central place for computing library storage folder labels/paths (PV-PLN-LIBST-001 Step 3).
     /// </summary>
     internal static class LibraryPlacementService
     {
+        internal static LibraryFileMovePlan PlanImportRootSort(
+            string sourceFilePath,
+            string destinationRoot,
+            GameIndexEditorRow resolvedRow,
+            IReadOnlyList<GameIndexEditorRow> indexRows,
+            Func<string, string> getSafeGameFolderName,
+            Func<string, string> getGameNameFromFileName,
+            Func<string, string, string> normalizeGameIndexNameWithFolder,
+            Func<string, string> normalizeConsoleLabel,
+            IReadOnlyDictionary<string, int> titleCounts)
+        {
+            var fileName = Path.GetFileName(sourceFilePath ?? string.Empty);
+            var leaf = ResolveImportSortFolderLeaf(
+                resolvedRow,
+                indexRows,
+                fileName,
+                getSafeGameFolderName,
+                getGameNameFromFileName,
+                normalizeGameIndexNameWithFolder,
+                normalizeConsoleLabel,
+                titleCounts);
+            var dir = string.IsNullOrWhiteSpace(leaf)
+                ? (destinationRoot ?? string.Empty)
+                : Path.Combine(destinationRoot ?? string.Empty, leaf);
+            return new LibraryFileMovePlan(sourceFilePath, dir, fileName, resolvedRow != null);
+        }
+
         internal static string BuildCanonicalStorageFolderPath(
             string libraryRoot,
             GameIndexEditorRow row,
@@ -106,6 +157,94 @@ namespace PixelVaultNative
             }
 
             return members.FirstOrDefault() ?? row;
+        }
+
+        /// <summary>
+        /// Map a parsed import filename to a game index row when Steam / non-Steam IDs or title+platform identity match.
+        /// </summary>
+        internal static GameIndexEditorRow TryResolveGameIndexRowForImportSort(
+            FilenameParseResult parse,
+            IReadOnlyList<GameIndexEditorRow> rows,
+            Func<string, string> normalizeConsoleLabel,
+            Func<string, string> cleanTag,
+            Func<string, string, string> buildGameIndexIdentity)
+        {
+            if (parse == null || rows == null || rows.Count == 0) return null;
+            if (normalizeConsoleLabel == null || cleanTag == null || buildGameIndexIdentity == null) return null;
+
+            var list = rows.Where(r => r != null).ToList();
+            var plat = normalizeConsoleLabel(parse.PlatformLabel ?? "Other");
+
+            var steamApp = cleanTag(parse.SteamAppId ?? string.Empty);
+            if (!string.IsNullOrWhiteSpace(steamApp) && string.Equals(plat, "Steam", StringComparison.OrdinalIgnoreCase))
+            {
+                foreach (var r in list)
+                {
+                    if (!string.Equals(normalizeConsoleLabel(r.PlatformLabel ?? string.Empty), "Steam", StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    if (string.Equals(cleanTag(r.SteamAppId ?? string.Empty), steamApp, StringComparison.OrdinalIgnoreCase))
+                        return r;
+                }
+            }
+
+            var nonSteam = cleanTag(parse.NonSteamId ?? string.Empty);
+            if (!string.IsNullOrWhiteSpace(nonSteam) && string.Equals(plat, "Emulation", StringComparison.OrdinalIgnoreCase))
+            {
+                foreach (var r in list)
+                {
+                    if (!string.Equals(normalizeConsoleLabel(r.PlatformLabel ?? string.Empty), "Emulation", StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    if (string.Equals(cleanTag(r.NonSteamId ?? string.Empty), nonSteam, StringComparison.OrdinalIgnoreCase))
+                        return r;
+                }
+            }
+
+            var hint = parse.GameTitleHint ?? string.Empty;
+            if (!string.IsNullOrWhiteSpace(hint))
+            {
+                var wanted = buildGameIndexIdentity(hint, parse.PlatformLabel ?? "Other");
+                foreach (var r in list)
+                {
+                    if (string.Equals(buildGameIndexIdentity(r.Name ?? string.Empty, r.PlatformLabel ?? "Other"), wanted, StringComparison.OrdinalIgnoreCase))
+                        return r;
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Folder segment under the import destination (or library organize root): game index placement when <paramref name="resolvedRow"/> is set, else filename stem rules.
+        /// </summary>
+        internal static string ResolveImportSortFolderLeaf(
+            GameIndexEditorRow resolvedRow,
+            IReadOnlyList<GameIndexEditorRow> indexRows,
+            string fileName,
+            Func<string, string> getSafeGameFolderName,
+            Func<string, string> getGameNameFromFileName,
+            Func<string, string, string> normalizeGameIndexNameWithFolder,
+            Func<string, string> normalizeConsoleLabel,
+            IReadOnlyDictionary<string, int> titleCounts)
+        {
+            if (resolvedRow != null
+                && getSafeGameFolderName != null
+                && normalizeGameIndexNameWithFolder != null
+                && normalizeConsoleLabel != null)
+            {
+                return BuildCanonicalStorageFolderName(
+                    resolvedRow,
+                    indexRows,
+                    normalizeGameIndexNameWithFolder,
+                    getSafeGameFolderName,
+                    normalizeConsoleLabel,
+                    titleCounts);
+            }
+
+            if (getSafeGameFolderName == null) return string.Empty;
+            var stem = getGameNameFromFileName != null
+                ? getGameNameFromFileName(fileName)
+                : Path.GetFileNameWithoutExtension(fileName);
+            return getSafeGameFolderName(stem);
         }
     }
 }

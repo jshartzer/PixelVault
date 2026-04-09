@@ -164,6 +164,21 @@ namespace PixelVaultNative
         /// <summary>Same normalization as game-index manual metadata (single-argument form: title only).</summary>
         public Func<string, string> NormalizeGameIndexName;
 
+        /// <summary>Optional; <c>(name, folderPath)</c> form for placement (game index rows). When null, import sort uses <see cref="NormalizeGameIndexName"/> with empty folder path.</summary>
+        public Func<string, string, string> NormalizeGameIndexNameWithFolder;
+
+        /// <summary>Load persisted game index rows for placement during import sort.</summary>
+        public Func<string, List<GameIndexEditorRow>> LoadSavedGameIndexRows;
+
+        /// <summary>Duplicate-title counts for legacy per-platform folder suffixes when <see cref="GameIndexEditorRow.StorageGroupId"/> is empty.</summary>
+        public Func<IEnumerable<GameIndexEditorRow>, Dictionary<string, int>> BuildGameIndexTitleCounts;
+
+        /// <summary>Same as main-window <c>BuildGameIndexIdentity</c> (folded title + platform).</summary>
+        public Func<string, string, string> BuildGameIndexIdentity;
+
+        /// <summary>Console labels for import-sort resolution (e.g. Steam vs Emulation).</summary>
+        public Func<string, string> NormalizeConsoleLabel;
+
         /// <summary>Platform label for a manual metadata row (checkboxes + tags).</summary>
         public Func<ManualMetadataItem, string> DetermineManualMetadataPlatformLabel;
 
@@ -298,24 +313,54 @@ namespace PixelVaultNative
                 return new SortStepResult();
             }
 
+            var indexRows = d.LoadSavedGameIndexRows != null
+                ? d.LoadSavedGameIndexRows(libraryRoot ?? string.Empty) ?? new List<GameIndexEditorRow>()
+                : new List<GameIndexEditorRow>();
+            var titleCounts = d.BuildGameIndexTitleCounts != null
+                ? d.BuildGameIndexTitleCounts(indexRows)
+                : new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var normWithFolder = d.NormalizeGameIndexNameWithFolder
+                ?? ((name, _) => d.NormalizeGameIndexName != null ? d.NormalizeGameIndexName(name ?? string.Empty) : (name ?? string.Empty).Trim());
+
             int moved = 0, created = 0, renamedConflict = 0;
             var indexedTargets = new List<string>();
             foreach (var file in files)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var folderName = d.GetSafeGameFolderName == null
-                    ? string.Empty
-                    : d.GetSafeGameFolderName(d.GetGameNameFromFileName == null
-                        ? Path.GetFileNameWithoutExtension(file)
-                        : d.GetGameNameFromFileName(Path.GetFileName(file)));
-                var targetDirectory = Path.Combine(destinationRoot, folderName);
+                GameIndexEditorRow resolved = null;
+                if (indexRows.Count > 0
+                    && d.ParseFilenameForImport != null
+                    && d.BuildGameIndexIdentity != null
+                    && d.NormalizeConsoleLabel != null
+                    && d.CleanTag != null)
+                {
+                    var parse = d.ParseFilenameForImport(file) ?? new FilenameParseResult();
+                    resolved = LibraryPlacementService.TryResolveGameIndexRowForImportSort(
+                        parse,
+                        indexRows,
+                        d.NormalizeConsoleLabel,
+                        d.CleanTag,
+                        d.BuildGameIndexIdentity);
+                }
+
+                var plan = LibraryPlacementService.PlanImportRootSort(
+                    file,
+                    destinationRoot,
+                    resolved,
+                    indexRows,
+                    d.GetSafeGameFolderName,
+                    d.GetGameNameFromFileName,
+                    normWithFolder,
+                    d.NormalizeConsoleLabel,
+                    titleCounts);
+                var targetDirectory = plan.TargetDirectory;
                 if (!fs.DirectoryExists(targetDirectory))
                 {
                     fs.CreateDirectory(targetDirectory);
                     created++;
                 }
 
-                var target = Path.Combine(targetDirectory, Path.GetFileName(file));
+                var target = plan.TargetPath;
                 if (fs.FileExists(target))
                 {
                     target = d.UniquePath == null ? target : d.UniquePath(target);

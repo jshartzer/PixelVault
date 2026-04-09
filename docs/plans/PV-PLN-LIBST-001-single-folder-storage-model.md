@@ -3,7 +3,7 @@
 | Field | Value |
 |-------|--------|
 | **Plan ID** | `PV-PLN-LIBST-001` |
-| **Status** | In progress — Slices 0–B done; Slice C (Step 3) started: `LibraryPlacementService` + alignment/organize wiring; import sort still filename-based until a follow-up |
+| **Status** | In progress — Slices 0–C materially complete: placement service drives alignment, organize, and import destination sort; Step 4+ remain |
 | **Owner** | PixelVault / Codex |
 | **Source brief** | User request (2026-04-07): keep unique Game Index rows per console, but store all captures for a game in one app-owned folder and stop inferring identity from folder structure |
 | **Related** | `docs/PROJECT_CONTEXT.md`, `docs/POLICY.md`, `docs/DOC_SYNC_POLICY.md`, `docs/plans/PV-PLN-UI-001-ui-thin-mainwindow-ios-aligned.md` |
@@ -257,6 +257,8 @@ Result:
 - the app owns one path computation model
 - storage no longer depends on each caller re-implementing folder rules
 
+**Implementation (v1):** `LibraryPlacementService`, `LibraryFileMovePlan`, import dependencies in `ImportServiceDependencies` (see execution log, Slice C).
+
 ### Step 4 — Make scanner and repair paths path-agnostic
 
 Update library scan/rebuild logic so folder layout is never used as the source of truth.
@@ -432,7 +434,7 @@ Without **this foundation** (preflight + Steps 1–2), removing ` - Platform` fr
 | 2026-04-08 | **Slice A (Step 1 — audit + unresolved UX)** | **Scanner/rebuild audit** (see subsection below): no remaining **game identity** inference from parent folder basename in index/scan paths; `Path.GetDirectoryName` uses are placement/enumeration. **Unresolved surface**: `LibraryScanner.LoadLibraryFoldersCore` appends **`LibraryFolderInfo`** rows per directory with indexed files but **empty `GameId`** (`PendingGameAssignment`); tile title pattern **`Needs assignment ·`** plus directory leaf name is a **browse label**, not game identity. These rows appear in the library grid, **`missingid`** filter, and folder cache (extra tab column). **`ApplySavedGameIndexRows`** / **100% completion** skip pending buckets so the app does not mint `GameId`s from that label. Filter/menu copy: **Missing ID / assignment**. Tests: `LibraryBrowseFolderSummaryTests`. |
 | 2026-04-08 | **Slice 0 (Step 0 — preflight)** | **§0.1** filled in under [Decision lock — resolved answers](#decision-lock--resolved-answers-2026-04-08). **§0.2** treated as done via existing Step 1 audit + leak tables in this doc. **§0.3** pointed at unresolved/pending-assignment behavior logged under Slice A. |
 | 2026-04-08 | **Slice B (Step 2 — `StorageGroupId`)** | **`GameIndexEditorRow.StorageGroupId`**, SQLite `game_index.storage_group_id` (`EnsureGameIndexStorageGroupIdColumn`), read/write in `IndexPersistenceService`, **`GameIndexStorageGroupBackfill.AssignDeterministicStorageGroupIds`** on load/save merge. **`LibraryFolderInfo.StorageGroupId`** filled from saved rows in **`LibraryScanner`**; synced in **`ApplySavedGameIndexRows`** / conservative **`UpsertSavedGameIndexRow`**; **`CloneLibraryFolderInfo`** copies it. **Merge rule:** two **Steam** rows with differing non-empty **`SteamGridDbId`** do not share a storage group. **Game Index editor:** read-only **Storage group** column + search hits **`StorageGroupId`**. Tests: **`GameIndexStorageGroupBackfillTests`**. Legacy tab-separated game index files still omit `StorageGroupId`; SQLite + backfill is the source of truth. |
-| 2026-04-08 | **Slice C (Step 3 — partial)** | Introduced **`LibraryPlacementService`** (`BuildCanonicalStorageFolderName` / `BuildCanonicalStorageFolderPath`). Rows sharing a non-empty **`StorageGroupId`** resolve a **single** safe folder label (representative row: lowest **`GameId`** with a non-empty normalized name); **no** ` - Platform` suffix for those groups. Legacy **empty** storage group keeps previous title-count disambiguation. **`AlignLibraryFoldersToGameIndex`** and **manual organize** (`OrganizeLibraryItems`) use the service when aligning from game index rows. **Not yet:** explicit move-plan objects, sidecar enumeration in placement, **ImportService** sort-into-folders (still filename hint only). Tests: **`LibraryPlacementServiceTests`**. |
+| 2026-04-08 | **Slice C (Step 3)** | **`LibraryPlacementService`**: shared **`StorageGroupId`** → one folder name; legacy empty group → title-count + ` - Platform` suffix. **`AlignLibraryFoldersToGameIndex`**, **`OrganizeLibraryItems`**, and **`ImportService.SortDestinationRootIntoGameFolders`** use placement. Import sort: **`TryResolveGameIndexRowForImportSort`** (Steam AppID / non-Steam ID / **`BuildGameIndexIdentity`** title+platform), then **`PlanImportRootSort`** / **`LibraryFileMovePlan`**. Sidecars still moved by existing **`MoveMetadataSidecarIfPresent`** per move (not a unified sidecar list yet). **`LibraryPlacementServiceTests`**. |
 
 ### Step 1 scanner / rebuild audit (2026-04-08)
 
