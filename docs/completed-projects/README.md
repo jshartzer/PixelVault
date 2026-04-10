@@ -23,6 +23,7 @@ This folder indexes **finished initiatives** in the **C:\Codex** repo: enough co
 |------------|------------------|------------------|---------|
 | **MainWindow extraction (Phases A–F)** | Apr 2026 | `C:\Codex\docs\MAINWINDOW_EXTRACTION_ROADMAP.md` | Library host + `ILibraryBrowserShell`, settings `SettingsShellHost`, photography partial, settings persistence partial; Phases A–F bars done. |
 | | | `C:\Codex\docs\completed-projects\MAINWINDOW_EXTRACTION_PHASES_A-F.md` | Short completion record + changelog pointer. |
+| **Single-folder storage model (LIBST)** | Apr 2026 | `C:\Codex\docs\completed-projects\PV-PLN-LIBST-001-single-folder-storage-model.md` | PV-PLN-LIBST-001: storage-group / placement, photo index re-home, SQLite integration tests; Steps 0–9 shipped. |
 
 ---
 

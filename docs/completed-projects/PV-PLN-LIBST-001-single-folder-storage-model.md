@@ -6,7 +6,7 @@
 | **Status** | **Complete (2026-04-08)** — Slices **0–G** (Steps **0–9**) delivered per this plan. Optional product QA from the Step 8 manual checklist and Step 9 follow-ups in-doc remain non-blocking. |
 | **Owner** | PixelVault / Codex |
 | **Source brief** | User request (2026-04-07): keep unique Game Index rows per console, but store all captures for a game in one app-owned folder and stop inferring identity from folder structure |
-| **Related** | `docs/PROJECT_CONTEXT.md`, `docs/POLICY.md`, `docs/DOC_SYNC_POLICY.md`, `docs/plans/PV-PLN-UI-001-ui-thin-mainwindow-ios-aligned.md` |
+| **Related** | `docs/PROJECT_CONTEXT.md`, `docs/POLICY.md`, `docs/DOC_SYNC_POLICY.md`, `docs/plans/PV-PLN-UI-001-ui-thin-mainwindow-ios-aligned.md` (active plan index: `docs/plans/README.md`) |
 
 ## Purpose
 
