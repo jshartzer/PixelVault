@@ -11,6 +11,19 @@ namespace PixelVaultNative
     {
         void RunBackgroundWorkflowWithProgress<TResult>(string windowTitle, string progressTitleText, string initialMetaText, string startStatusText, string canceledStatusText, string startLogLine, string failureStatusText, int totalWork, Func<Action<int, string>, CancellationToken, Task<TResult>> backgroundWork, Action<TResult> onSuccess, Action onCanceled = null)
         {
+            BeginForegroundIntakeBusy();
+            try
+            {
+                RunBackgroundWorkflowWithProgressCore(windowTitle, progressTitleText, initialMetaText, startStatusText, canceledStatusText, startLogLine, failureStatusText, totalWork, backgroundWork, onSuccess, onCanceled);
+            }
+            finally
+            {
+                EndForegroundIntakeBusy();
+            }
+        }
+
+        void RunBackgroundWorkflowWithProgressCore<TResult>(string windowTitle, string progressTitleText, string initialMetaText, string startStatusText, string canceledStatusText, string startLogLine, string failureStatusText, int totalWork, Func<Action<int, string>, CancellationToken, Task<TResult>> backgroundWork, Action<TResult> onSuccess, Action onCanceled = null)
+        {
             var effectiveTotalWork = Math.Max(totalWork, 1);
             var closeButton = Btn("Cancel", null, "#334249", Brushes.White);
             var view = WorkflowProgressWindow.Create(

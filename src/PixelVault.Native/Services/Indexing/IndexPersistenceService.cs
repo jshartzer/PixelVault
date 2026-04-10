@@ -387,6 +387,12 @@ CREATE INDEX IF NOT EXISTS idx_starred_export_root_dest ON starred_export_state(
             EnsureGameIndexStorageGroupIdColumn(connection);
             EnsurePhotoIndexIndexAddedUtcTicksColumn(connection);
             EnsurePhotoIndexRetroAchievementsGameIdColumn(connection);
+            EnsureFilenameConventionAutoIntakeModeColumn(connection);
+        }
+
+        void EnsureFilenameConventionAutoIntakeModeColumn(SqliteConnection connection)
+        {
+            EnsureDatabaseColumn(connection, "filename_convention", "auto_intake_mode", "TEXT NOT NULL DEFAULT 'ManualOnly'");
         }
 
         void EnsureGameIndexCollectionMetadataColumns(SqliteConnection connection)
@@ -830,7 +836,7 @@ VALUES ($root, $filePath, $stamp, $gameId, $consoleLabel, $tagText, $captureUtcT
             using (var command = connection.CreateCommand())
             {
                 command.CommandText = @"
-SELECT convention_id, name, enabled, priority, pattern, platform_label, platform_tags_text, steam_app_id_group, title_group, timestamp_group, timestamp_format, preserve_file_times, routes_to_manual_when_missing_steam_app_id, confidence_label
+SELECT convention_id, name, enabled, priority, pattern, platform_label, platform_tags_text, steam_app_id_group, title_group, timestamp_group, timestamp_format, preserve_file_times, routes_to_manual_when_missing_steam_app_id, confidence_label, auto_intake_mode
 FROM filename_convention
 WHERE root = $root
 ORDER BY priority DESC, convention_id COLLATE NOCASE;";
@@ -856,6 +862,7 @@ ORDER BY priority DESC, convention_id COLLATE NOCASE;";
                             PreserveFileTimes = !reader.IsDBNull(11) && reader.GetInt32(11) != 0,
                             RoutesToManualWhenMissingSteamAppId = !reader.IsDBNull(12) && reader.GetInt32(12) != 0,
                             ConfidenceLabel = reader.IsDBNull(13) ? string.Empty : reader.GetString(13),
+                            AutoIntakeMode = FilenameAutoIntakeModes.Normalize(reader.IsDBNull(14) ? string.Empty : reader.GetString(14)),
                             IsBuiltIn = false
                         });
                     }
@@ -882,8 +889,8 @@ ORDER BY priority DESC, convention_id COLLATE NOCASE;";
                     {
                         insert.Transaction = transaction;
                         insert.CommandText = @"
-INSERT INTO filename_convention (root, convention_id, name, enabled, priority, pattern, platform_label, platform_tags_text, steam_app_id_group, title_group, timestamp_group, timestamp_format, preserve_file_times, routes_to_manual_when_missing_steam_app_id, confidence_label)
-VALUES ($root, $conventionId, $name, $enabled, $priority, $pattern, $platformLabel, $platformTagsText, $steamAppIdGroup, $titleGroup, $timestampGroup, $timestampFormat, $preserveFileTimes, $routesToManualWhenMissingSteamAppId, $confidenceLabel);";
+INSERT INTO filename_convention (root, convention_id, name, enabled, priority, pattern, platform_label, platform_tags_text, steam_app_id_group, title_group, timestamp_group, timestamp_format, preserve_file_times, routes_to_manual_when_missing_steam_app_id, confidence_label, auto_intake_mode)
+VALUES ($root, $conventionId, $name, $enabled, $priority, $pattern, $platformLabel, $platformTagsText, $steamAppIdGroup, $titleGroup, $timestampGroup, $timestampFormat, $preserveFileTimes, $routesToManualWhenMissingSteamAppId, $confidenceLabel, $autoIntakeMode);";
                         insert.Parameters.AddWithValue("$root", root ?? string.Empty);
                         insert.Parameters.AddWithValue("$conventionId", rule.ConventionId ?? string.Empty);
                         insert.Parameters.AddWithValue("$name", rule.Name ?? string.Empty);
@@ -899,6 +906,7 @@ VALUES ($root, $conventionId, $name, $enabled, $priority, $pattern, $platformLab
                         insert.Parameters.AddWithValue("$preserveFileTimes", rule.PreserveFileTimes ? 1 : 0);
                         insert.Parameters.AddWithValue("$routesToManualWhenMissingSteamAppId", rule.RoutesToManualWhenMissingSteamAppId ? 1 : 0);
                         insert.Parameters.AddWithValue("$confidenceLabel", rule.ConfidenceLabel ?? string.Empty);
+                        insert.Parameters.AddWithValue("$autoIntakeMode", FilenameAutoIntakeModes.Normalize(rule.AutoIntakeMode));
                         insert.ExecuteNonQuery();
                     }
                 }

@@ -21,6 +21,7 @@ namespace PixelVaultNative
         public Action RunImportWithReview { get; init; }
         public Action OpenManualIntake { get; init; }
         public Action OpenIntakePreview { get; init; }
+        public Action OpenBackgroundImports { get; init; }
         public Action ExportStarred { get; init; }
         public Action RefreshAllCovers { get; init; }
         public Action ShowKeyboardShortcuts { get; init; }

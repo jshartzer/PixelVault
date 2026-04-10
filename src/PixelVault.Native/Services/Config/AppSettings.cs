@@ -58,6 +58,16 @@ namespace PixelVaultNative
         /// <summary>When true, the next successful library folder load clears auto-cached hero banner files (<c>hero-*</c>) for loaded titles so captures view can re-download with the current SteamGridDB/Steam pipeline. Custom banners are untouched.</summary>
         public bool LibraryRefreshHeroBannerCacheOnNextLibraryOpen;
 
+        /// <summary>Watch configured source folders and run background import for eligible files (custom rules with trusted match, or built-ins when full auto metadata applies).</summary>
+        public bool BackgroundAutoIntakeEnabled;
+        /// <summary>Seconds a file must stay unchanged (size + write time) before background import runs; clamped by <see cref="SettingsService.NormalizeBackgroundAutoIntakeQuietSeconds"/>.</summary>
+        public int BackgroundAutoIntakeQuietSeconds = 3;
+        public bool BackgroundAutoIntakeToastsEnabled = true;
+        /// <summary>After a background batch, show a short summary (toast when <see cref="BackgroundAutoIntakeToastsEnabled"/>).</summary>
+        public bool BackgroundAutoIntakeShowSummary = true;
+        /// <summary>Extra <c>[BGINT]</c> lines in the main PixelVault log for background intake (watchers, batches, eligibility).</summary>
+        public bool BackgroundAutoIntakeVerboseLogging;
+
         public static AppSettings Clone(AppSettings s)
         {
             if (s == null) return new AppSettings();
@@ -96,7 +106,12 @@ namespace PixelVaultNative
                 TroubleshootingLoggingEnabled = s.TroubleshootingLoggingEnabled,
                 TroubleshootingLogRedactPaths = s.TroubleshootingLogRedactPaths,
                 LibraryDoubleClickSetsFolderCover = s.LibraryDoubleClickSetsFolderCover,
-                LibraryRefreshHeroBannerCacheOnNextLibraryOpen = s.LibraryRefreshHeroBannerCacheOnNextLibraryOpen
+                LibraryRefreshHeroBannerCacheOnNextLibraryOpen = s.LibraryRefreshHeroBannerCacheOnNextLibraryOpen,
+                BackgroundAutoIntakeEnabled = s.BackgroundAutoIntakeEnabled,
+                BackgroundAutoIntakeQuietSeconds = s.BackgroundAutoIntakeQuietSeconds,
+                BackgroundAutoIntakeToastsEnabled = s.BackgroundAutoIntakeToastsEnabled,
+                BackgroundAutoIntakeShowSummary = s.BackgroundAutoIntakeShowSummary,
+                BackgroundAutoIntakeVerboseLogging = s.BackgroundAutoIntakeVerboseLogging
             };
         }
     }

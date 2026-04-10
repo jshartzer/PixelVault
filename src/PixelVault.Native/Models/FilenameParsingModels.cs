@@ -3,6 +3,19 @@ using System.Collections.Generic;
 
 namespace PixelVaultNative
 {
+    /// <summary>Persisted <see cref="FilenameConventionRule.AutoIntakeMode"/> values (custom rules; built-ins use capability gates only).</summary>
+    static class FilenameAutoIntakeModes
+    {
+        public const string ManualOnly = "ManualOnly";
+        public const string TrustedExactMatch = "TrustedExactMatch";
+
+        public static string Normalize(string value)
+        {
+            if (string.Equals(value, TrustedExactMatch, StringComparison.OrdinalIgnoreCase)) return TrustedExactMatch;
+            return ManualOnly;
+        }
+    }
+
     sealed class FilenameConventionRule
     {
         public string ConventionId { get; set; }
@@ -21,6 +34,16 @@ namespace PixelVaultNative
         public bool RoutesToManualWhenMissingSteamAppId { get; set; }
         public string ConfidenceLabel { get; set; }
         public bool IsBuiltIn { get; set; }
+        /// <summary>Background auto-intake trust for <b>custom</b> rules only (<see cref="FilenameAutoIntakeModes"/>).</summary>
+        public string AutoIntakeMode { get; set; } = FilenameAutoIntakeModes.ManualOnly;
+
+        /// <summary>Short label for convention grids (built-ins use capability-only policy in background intake).</summary>
+        public string AutoIntakeGridLabel =>
+            IsBuiltIn
+                ? "Built-in"
+                : (string.Equals(FilenameAutoIntakeModes.Normalize(AutoIntakeMode), FilenameAutoIntakeModes.TrustedExactMatch, StringComparison.Ordinal)
+                    ? "Trusted"
+                    : "Manual");
     }
 
     sealed class FilenameParseResult

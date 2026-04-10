@@ -52,6 +52,17 @@ namespace PixelVaultNative
         public Func<bool> GetLibraryRefreshHeroBannerCacheOnNextLibraryOpen { get; set; }
         public Action<bool> SetLibraryRefreshHeroBannerCacheOnNextLibraryOpen { get; set; }
 
+        public Func<bool> GetBackgroundAutoIntakeEnabled { get; set; }
+        public Action<bool> SetBackgroundAutoIntakeEnabled { get; set; }
+        public Func<int> GetBackgroundAutoIntakeQuietSeconds { get; set; }
+        public Action<int> SetBackgroundAutoIntakeQuietSeconds { get; set; }
+        public Func<bool> GetBackgroundAutoIntakeToastsEnabled { get; set; }
+        public Action<bool> SetBackgroundAutoIntakeToastsEnabled { get; set; }
+        public Func<bool> GetBackgroundAutoIntakeShowSummary { get; set; }
+        public Action<bool> SetBackgroundAutoIntakeShowSummary { get; set; }
+        public Func<bool> GetBackgroundAutoIntakeVerboseLogging { get; set; }
+        public Action<bool> SetBackgroundAutoIntakeVerboseLogging { get; set; }
+
         public Action SaveSettings { get; set; }
         public Action<string> Log { get; set; }
         public Action<string, string> LogTroubleshooting { get; set; }

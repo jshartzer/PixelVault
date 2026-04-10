@@ -116,6 +116,12 @@ namespace PixelVaultNative
         bool troubleshootingLogRedactPaths;
         bool libraryDoubleClickSetsFolderCover;
         bool libraryRefreshHeroBannerCacheOnNextLibraryOpen;
+        bool backgroundAutoIntakeEnabled;
+        int backgroundAutoIntakeQuietSeconds = 3;
+        bool backgroundAutoIntakeToastsEnabled = true;
+        bool backgroundAutoIntakeShowSummary = true;
+        bool backgroundAutoIntakeVerboseLogging;
+        readonly ForegroundIntakeBusyGate _foregroundIntakeBusyGate = new ForegroundIntakeBusyGate();
         readonly string _diagnosticsSessionId;
         const long TroubleshootingLogMaxBytes = 5_000_000L;
         string _libraryBrowserPersistedSearch = string.Empty;
@@ -153,6 +159,8 @@ namespace PixelVaultNative
         readonly ILibraryScanner libraryScanner;
         readonly ILibrarySession librarySession;
         readonly IImportService importService;
+        readonly IntakeAnalysisService intakeAnalysisService;
+        readonly BackgroundIntakeActivitySession _backgroundIntakeActivitySession = new BackgroundIntakeActivitySession();
         readonly IGameIndexEditorAssignmentService gameIndexEditorAssignmentService;
         readonly IGameIndexService gameIndexService;
 
@@ -182,6 +190,7 @@ namespace PixelVaultNative
                 metadataService,
                 coverService,
                 gameIndexEditorAssignmentService));
+            intakeAnalysisService = new IntakeAnalysisService(ParseFilename, IsVideo, GetLibraryDate);
             libraryWorkspace = new LibraryWorkspaceContext(this);
             librarySession = CreateLibrarySessionForStartup(
                 this,

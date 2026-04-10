@@ -48,6 +48,8 @@ namespace PixelVaultNative
             internal DateTime TimelineEndDate = DateTime.MinValue;
             internal Border LibraryToastBorder;
             internal TextBlock LibraryToastLabel;
+            internal StackPanel LibraryToastActionsPanel;
+            internal Button LibraryToastReviewButton;
             internal DispatcherTimer LibraryToastTimer;
             internal Grid QuickEditDrawerHost;
             internal bool QuickEditDrawerOpen;

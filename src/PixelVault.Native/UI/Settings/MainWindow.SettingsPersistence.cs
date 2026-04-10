@@ -42,7 +42,12 @@ namespace PixelVaultNative
                 TroubleshootingLoggingEnabled = troubleshootingLoggingEnabled,
                 TroubleshootingLogRedactPaths = troubleshootingLogRedactPaths,
                 LibraryDoubleClickSetsFolderCover = libraryDoubleClickSetsFolderCover,
-                LibraryRefreshHeroBannerCacheOnNextLibraryOpen = libraryRefreshHeroBannerCacheOnNextLibraryOpen
+                LibraryRefreshHeroBannerCacheOnNextLibraryOpen = libraryRefreshHeroBannerCacheOnNextLibraryOpen,
+                BackgroundAutoIntakeEnabled = backgroundAutoIntakeEnabled,
+                BackgroundAutoIntakeQuietSeconds = backgroundAutoIntakeQuietSeconds,
+                BackgroundAutoIntakeToastsEnabled = backgroundAutoIntakeToastsEnabled,
+                BackgroundAutoIntakeShowSummary = backgroundAutoIntakeShowSummary,
+                BackgroundAutoIntakeVerboseLogging = backgroundAutoIntakeVerboseLogging
             };
         }
 
@@ -83,6 +88,11 @@ namespace PixelVaultNative
             troubleshootingLogRedactPaths = s.TroubleshootingLogRedactPaths;
             libraryDoubleClickSetsFolderCover = s.LibraryDoubleClickSetsFolderCover;
             libraryRefreshHeroBannerCacheOnNextLibraryOpen = s.LibraryRefreshHeroBannerCacheOnNextLibraryOpen;
+            backgroundAutoIntakeEnabled = s.BackgroundAutoIntakeEnabled;
+            backgroundAutoIntakeQuietSeconds = SettingsService.NormalizeBackgroundAutoIntakeQuietSeconds(s.BackgroundAutoIntakeQuietSeconds);
+            backgroundAutoIntakeToastsEnabled = s.BackgroundAutoIntakeToastsEnabled;
+            backgroundAutoIntakeShowSummary = s.BackgroundAutoIntakeShowSummary;
+            backgroundAutoIntakeVerboseLogging = s.BackgroundAutoIntakeVerboseLogging;
         }
 
         void LoadSettings()
@@ -136,6 +146,7 @@ namespace PixelVaultNative
         void SaveSettings()
         {
             settingsService.SaveToIni(settingsPath, CaptureAppSettings());
+            _backgroundIntakeAgent?.ApplySettingsAndStart();
         }
     }
 }

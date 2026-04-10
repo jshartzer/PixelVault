@@ -63,6 +63,14 @@ namespace PixelVaultNative
             return value;
         }
 
+        /// <summary>Background intake: minimum quiet period before treating a file as stable (seconds).</summary>
+        public static int NormalizeBackgroundAutoIntakeQuietSeconds(int value)
+        {
+            if (value < 1) return 1;
+            if (value > 120) return 120;
+            return value;
+        }
+
         public static string NormalizeLibraryFolderSortMode(string value)
         {
             var normalized = (value ?? string.Empty).Trim().ToLowerInvariant();
@@ -266,6 +274,47 @@ namespace PixelVaultNative
                         || string.Equals(normalizedValue, "yes", StringComparison.OrdinalIgnoreCase)
                         || string.Equals(normalizedValue, "on", StringComparison.OrdinalIgnoreCase);
                 }
+                else if (key == "background_auto_intake_enabled")
+                {
+                    var normalizedValue = (value ?? string.Empty).Trim();
+                    s.BackgroundAutoIntakeEnabled =
+                        string.Equals(normalizedValue, "1", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(normalizedValue, "true", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(normalizedValue, "yes", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(normalizedValue, "on", StringComparison.OrdinalIgnoreCase);
+                }
+                else if (key == "background_auto_intake_quiet_seconds")
+                {
+                    if (int.TryParse((value ?? string.Empty).Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var q))
+                        s.BackgroundAutoIntakeQuietSeconds = NormalizeBackgroundAutoIntakeQuietSeconds(q);
+                }
+                else if (key == "background_auto_intake_toasts_enabled")
+                {
+                    var normalizedValue = (value ?? string.Empty).Trim();
+                    s.BackgroundAutoIntakeToastsEnabled =
+                        string.Equals(normalizedValue, "1", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(normalizedValue, "true", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(normalizedValue, "yes", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(normalizedValue, "on", StringComparison.OrdinalIgnoreCase);
+                }
+                else if (key == "background_auto_intake_show_summary")
+                {
+                    var normalizedValue = (value ?? string.Empty).Trim();
+                    s.BackgroundAutoIntakeShowSummary =
+                        string.Equals(normalizedValue, "1", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(normalizedValue, "true", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(normalizedValue, "yes", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(normalizedValue, "on", StringComparison.OrdinalIgnoreCase);
+                }
+                else if (key == "background_auto_intake_verbose_logging")
+                {
+                    var normalizedValue = (value ?? string.Empty).Trim();
+                    s.BackgroundAutoIntakeVerboseLogging =
+                        string.Equals(normalizedValue, "1", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(normalizedValue, "true", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(normalizedValue, "yes", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(normalizedValue, "on", StringComparison.OrdinalIgnoreCase);
+                }
             }
 
             var bundledExifTool = Path.Combine(appRoot ?? string.Empty, "tools", "exiftool.exe");
@@ -357,7 +406,12 @@ namespace PixelVaultNative
                 "troubleshooting_logging_enabled=" + (state.TroubleshootingLoggingEnabled ? "1" : "0"),
                 "troubleshooting_log_redact_paths=" + (state.TroubleshootingLogRedactPaths ? "1" : "0"),
                 "library_double_click_set_folder_cover=" + (state.LibraryDoubleClickSetsFolderCover ? "1" : "0"),
-                "library_refresh_hero_banner_cache_on_next_open=" + (state.LibraryRefreshHeroBannerCacheOnNextLibraryOpen ? "1" : "0")
+                "library_refresh_hero_banner_cache_on_next_open=" + (state.LibraryRefreshHeroBannerCacheOnNextLibraryOpen ? "1" : "0"),
+                "background_auto_intake_enabled=" + (state.BackgroundAutoIntakeEnabled ? "1" : "0"),
+                "background_auto_intake_quiet_seconds=" + NormalizeBackgroundAutoIntakeQuietSeconds(state.BackgroundAutoIntakeQuietSeconds).ToString(CultureInfo.InvariantCulture),
+                "background_auto_intake_toasts_enabled=" + (state.BackgroundAutoIntakeToastsEnabled ? "1" : "0"),
+                "background_auto_intake_show_summary=" + (state.BackgroundAutoIntakeShowSummary ? "1" : "0"),
+                "background_auto_intake_verbose_logging=" + (state.BackgroundAutoIntakeVerboseLogging ? "1" : "0")
             });
         }
 

@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -62,9 +63,9 @@ namespace PixelVaultNative
             {
                 Title = "PixelVault " + d.AppVersion + " Path Settings",
                 Width = 780,
-                Height = 740,
+                Height = 860,
                 MinWidth = 640,
-                MinHeight = 520,
+                MinHeight = 560,
                 Owner = d.OwnerWindow,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
                 Background = pageBg
@@ -107,6 +108,73 @@ namespace PixelVaultNative
             SettingsBrowseButton(panel, 4, delegate { var picked = d.PickFile(ffmpegBox.Text, "Executable (*.exe)|*.exe|All files (*.*)|*.*", null); if (!string.IsNullOrWhiteSpace(picked)) ffmpegBox.Text = picked; });
             SettingsBrowseButton(panel, 10, delegate { var picked = d.PickFolder(starredExportBox.Text); if (!string.IsNullOrWhiteSpace(picked)) starredExportBox.Text = picked; });
 
+            var intakeHeader = new TextBlock
+            {
+                Text = "Background auto-intake",
+                FontWeight = FontWeights.SemiBold,
+                Foreground = labelFg,
+                Margin = new Thickness(0, 18, 0, 6)
+            };
+            Grid.SetRow(intakeHeader, 11);
+            Grid.SetColumnSpan(intakeHeader, 3);
+            while (panel.RowDefinitions.Count <= 11) panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            panel.Children.Add(intakeHeader);
+
+            var autoIntakeEnableBox = new CheckBox
+            {
+                Content = "Watch source folders and auto-import eligible files (rules + metadata)",
+                IsChecked = d.GetBackgroundAutoIntakeEnabled?.Invoke() ?? false,
+                Margin = new Thickness(0, 0, 0, 4),
+                Foreground = boxFg
+            };
+            autoIntakeEnableBox.ToolTip =
+                "Runs the same standard import pipeline as the Library for matching top-level files. Custom rules need 'Trusted exact match' in Filename Conventions; built-ins import when automatic metadata is fully possible. "
+                + "Review and undo: Library command palette → Background imports.";
+            Grid.SetRow(autoIntakeEnableBox, 12);
+            Grid.SetColumnSpan(autoIntakeEnableBox, 3);
+            while (panel.RowDefinitions.Count <= 12) panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            panel.Children.Add(autoIntakeEnableBox);
+
+            var quietSecondsBox = SettingsTextBox(panel, 13, "Stability quiet period (seconds)", (d.GetBackgroundAutoIntakeQuietSeconds?.Invoke() ?? 3).ToString(CultureInfo.InvariantCulture), labelFg, boxBg, boxFg, borderBrush, boxFg);
+            quietSecondsBox.ToolTip = "The file must stay unchanged (size and write time) for this long after activity stops. Allowed range: 1–120 seconds.";
+
+            var toastBox = new CheckBox
+            {
+                Content = "Show toasts for background import",
+                IsChecked = d.GetBackgroundAutoIntakeToastsEnabled?.Invoke() ?? true,
+                Margin = new Thickness(0, 0, 0, 4),
+                Foreground = boxFg
+            };
+            Grid.SetRow(toastBox, 14);
+            Grid.SetColumnSpan(toastBox, 3);
+            while (panel.RowDefinitions.Count <= 14) panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            panel.Children.Add(toastBox);
+
+            var summaryBox = new CheckBox
+            {
+                Content = "Include a short summary in notifications (e.g. files moved)",
+                IsChecked = d.GetBackgroundAutoIntakeShowSummary?.Invoke() ?? true,
+                Margin = new Thickness(0, 0, 0, 4),
+                Foreground = boxFg
+            };
+            Grid.SetRow(summaryBox, 15);
+            Grid.SetColumnSpan(summaryBox, 3);
+            while (panel.RowDefinitions.Count <= 15) panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            panel.Children.Add(summaryBox);
+
+            var verboseIntakeBox = new CheckBox
+            {
+                Content = "Verbose background intake log ([BGINT] in main log)",
+                IsChecked = d.GetBackgroundAutoIntakeVerboseLogging?.Invoke() ?? false,
+                Margin = new Thickness(0, 0, 0, 4),
+                Foreground = boxFg
+            };
+            verboseIntakeBox.ToolTip = "Writes detailed lines prefixed with [BGINT] to the normal PixelVault log (watchers, queue, stability, eligibility). Turn off after diagnosing.";
+            Grid.SetRow(verboseIntakeBox, 16);
+            Grid.SetColumnSpan(verboseIntakeBox, 3);
+            while (panel.RowDefinitions.Count <= 16) panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            panel.Children.Add(verboseIntakeBox);
+
             var pathScroll = new ScrollViewer
             {
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
@@ -139,6 +207,14 @@ namespace PixelVaultNative
                 d.SetRetroAchievementsApiKey((retroAchievementsKeyBox.Text ?? string.Empty).Trim());
                 d.SetSteamUserId64((steamUserIdBox.Text ?? string.Empty).Trim());
                 d.SetRetroAchievementsUsername((retroUserBox.Text ?? string.Empty).Trim());
+                d.SetBackgroundAutoIntakeEnabled(autoIntakeEnableBox.IsChecked == true);
+                if (int.TryParse((quietSecondsBox.Text ?? string.Empty).Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var quietParsed))
+                    d.SetBackgroundAutoIntakeQuietSeconds(quietParsed);
+                else
+                    d.SetBackgroundAutoIntakeQuietSeconds(3);
+                d.SetBackgroundAutoIntakeToastsEnabled(toastBox.IsChecked == true);
+                d.SetBackgroundAutoIntakeShowSummary(summaryBox.IsChecked == true);
+                d.SetBackgroundAutoIntakeVerboseLogging(verboseIntakeBox.IsChecked == true);
                 d.SaveSettings();
                 d.RefreshMainUi();
                 window.Close();

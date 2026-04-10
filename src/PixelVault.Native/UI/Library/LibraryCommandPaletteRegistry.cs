@@ -27,6 +27,7 @@ namespace PixelVaultNative
             new("import_comment", "Import and comment", "Review then import", "intake preview workflow"),
             new("manual_intake", "Manual intake", "Unmatched files metadata", "manual metadata"),
             new("intake_preview", "Intake queue preview", "Upload queue summary", "queue badge"),
+            new("background_imports", "Background imports", "Auto-intake activity and selective undo", "auto intake undo review aint"),
             new("export_starred", "Export Starred", "Copy starred to export folder", "star export"),
             new("refresh_covers", "Refresh all covers", "Re-fetch art for whole library", "grid steam fetch"),
             new("shortcuts", "Keyboard shortcuts", "Same as F1", "keys help"),
@@ -88,6 +89,7 @@ namespace PixelVaultNative
             Bind("import_comment", ctx.RunImportWithReview);
             Bind("manual_intake", ctx.OpenManualIntake);
             Bind("intake_preview", ctx.OpenIntakePreview);
+            Bind("background_imports", ctx.OpenBackgroundImports);
             Bind("export_starred", ctx.ExportStarred);
             Bind("refresh_covers", ctx.RefreshAllCovers);
             Bind("shortcuts", ctx.ShowKeyboardShortcuts);

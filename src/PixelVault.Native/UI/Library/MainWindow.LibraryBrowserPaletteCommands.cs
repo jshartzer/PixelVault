@@ -25,6 +25,8 @@ namespace PixelVaultNative
 
         internal void LibraryBrowserPaletteShowIntakePreview() => ShowIntakePreviewWindow(false);
 
+        internal void LibraryBrowserPaletteOpenBackgroundImports() => BackgroundIntakeActivityWindow.ShowOrBringToFront(this);
+
         internal void LibraryBrowserPaletteExportStarred(Window owner) => ExportStarredLibraryCapturesToFolder(owner);
     }
 }

@@ -421,6 +421,25 @@ namespace PixelVaultNative
             var preserveFileTimesBox = new CheckBox { Content = "Preserve file time", Foreground = B("#1B232B"), Margin = new Thickness(0, 8, 0, 0) };
             editorFields.Children.Add(Labeled("File Time Behavior", preserveFileTimesBox));
 
+            var autoIntakeHost = new Grid();
+            autoIntakeHost.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            var autoIntakeCombo = MakeCombo();
+            autoIntakeCombo.Items.Add(new ComboBoxItem { Content = "Manual only (no background auto-import)", Tag = FilenameAutoIntakeModes.ManualOnly });
+            autoIntakeCombo.Items.Add(new ComboBoxItem { Content = "Trusted exact match (background import when stable)", Tag = FilenameAutoIntakeModes.TrustedExactMatch });
+            var autoIntakeBuiltInNote = new TextBlock
+            {
+                Text = "Built-in rules do not use per-rule trust. Background auto-intake runs only when automatic metadata and import are fully possible for the file (same bar as standard import review items).",
+                TextWrapping = TextWrapping.Wrap,
+                Foreground = B("#5F6970"),
+                Visibility = Visibility.Collapsed,
+                Margin = new Thickness(0, 4, 0, 0)
+            };
+            Grid.SetColumn(autoIntakeCombo, 0);
+            Grid.SetColumn(autoIntakeBuiltInNote, 0);
+            autoIntakeHost.Children.Add(autoIntakeCombo);
+            autoIntakeHost.Children.Add(autoIntakeBuiltInNote);
+            editorFields.Children.Add(Labeled("Background auto-intake (custom rules)", autoIntakeHost, "Path Settings can enable folder watching; this control applies to saved custom rules only."));
+
             var advanced = new Expander { Header = "Advanced Parser Fields", IsExpanded = false, Margin = new Thickness(0, 4, 0, 0) };
             var advancedStack = new StackPanel { Margin = new Thickness(0, 10, 0, 0) };
             advanced.Content = advancedStack;
@@ -490,7 +509,8 @@ namespace PixelVaultNative
             customGrid.Columns.Add(new DataGridCheckBoxColumn { Header = "On", Binding = new Binding("Enabled"), Width = 56 });
             customGrid.Columns.Add(new DataGridTextColumn { Header = "Priority", Binding = new Binding("Priority"), Width = 80 });
             customGrid.Columns.Add(new DataGridTextColumn { Header = "Platform", Binding = new Binding("PlatformLabel"), Width = 110 });
-            customGrid.Columns.Add(new DataGridTextColumn { Header = "Pattern Summary", Binding = new Binding("PatternText"), Width = new DataGridLength(1.8, DataGridLengthUnitType.Star) });
+            customGrid.Columns.Add(new DataGridTextColumn { Header = "Pattern Summary", Binding = new Binding("PatternText"), Width = new DataGridLength(1.5, DataGridLengthUnitType.Star) });
+            customGrid.Columns.Add(new DataGridTextColumn { Header = "Auto-intake", Binding = new Binding("AutoIntakeGridLabel"), Width = 88 });
             customStack.Children.Add(customGrid);
 
             var builtInCard = Card("Built-In Rules", "Shipped defaults. Select one to inspect it, then disable it with a custom override if needed.", new Thickness(8, 0, 0, 0));
@@ -523,7 +543,8 @@ namespace PixelVaultNative
             builtInGrid.Columns.Add(new DataGridCheckBoxColumn { Header = "On", Binding = new Binding("Enabled"), Width = 56 });
             builtInGrid.Columns.Add(new DataGridTextColumn { Header = "Priority", Binding = new Binding("Priority"), Width = 80 });
             builtInGrid.Columns.Add(new DataGridTextColumn { Header = "Platform", Binding = new Binding("PlatformLabel"), Width = 110 });
-            builtInGrid.Columns.Add(new DataGridTextColumn { Header = "Pattern Summary", Binding = new Binding("PatternText"), Width = new DataGridLength(1.8, DataGridLengthUnitType.Star) });
+            builtInGrid.Columns.Add(new DataGridTextColumn { Header = "Pattern Summary", Binding = new Binding("PatternText"), Width = new DataGridLength(1.5, DataGridLengthUnitType.Star) });
+            builtInGrid.Columns.Add(new DataGridTextColumn { Header = "Auto-intake", Binding = new Binding("AutoIntakeGridLabel"), Width = 88 });
             builtInStack.Children.Add(builtInGrid);
 
             var footerGrid = new Grid { Margin = new Thickness(0, 16, 0, 0) };
@@ -593,6 +614,7 @@ namespace PixelVaultNative
                 missingAppIdCombo.IsEnabled = editable;
                 enabledBox.IsEnabled = editable;
                 preserveFileTimesBox.IsEnabled = editable;
+                autoIntakeCombo.IsEnabled = editable;
 
                 var background = editable ? Brushes.White : B("#EEF2F5");
                 nameBox.Background = background;
@@ -730,6 +752,21 @@ namespace PixelVaultNative
                 UpdateRegexPreview();
             }
 
+            void SelectAutoIntakeCombo(string mode)
+            {
+                var normalized = FilenameAutoIntakeModes.Normalize(mode);
+                ComboBoxItem pick = null;
+                foreach (var item in autoIntakeCombo.Items.OfType<ComboBoxItem>())
+                {
+                    if (item?.Tag is string tag && string.Equals(tag, normalized, StringComparison.Ordinal))
+                    {
+                        pick = item;
+                        break;
+                    }
+                }
+                autoIntakeCombo.SelectedItem = pick ?? autoIntakeCombo.Items.OfType<ComboBoxItem>().FirstOrDefault();
+            }
+
             void LoadRuleIntoEditor(FilenameConventionRule rule, bool readOnly)
             {
                 syncingEditor = true;
@@ -755,6 +792,9 @@ namespace PixelVaultNative
                         missingAppIdCombo.SelectedIndex = 0;
                         enabledBox.IsChecked = true;
                         preserveFileTimesBox.IsChecked = false;
+                        SelectAutoIntakeCombo(FilenameAutoIntakeModes.ManualOnly);
+                        autoIntakeCombo.Visibility = Visibility.Collapsed;
+                        autoIntakeBuiltInNote.Visibility = Visibility.Collapsed;
                         SetEditorEnabled(false);
                         RenderBuilderDraft();
                         return;
@@ -776,6 +816,9 @@ namespace PixelVaultNative
                     missingAppIdCombo.SelectedIndex = rule.RoutesToManualWhenMissingSteamAppId ? 1 : 0;
                     enabledBox.IsChecked = rule.Enabled;
                     preserveFileTimesBox.IsChecked = rule.PreserveFileTimes;
+                    SelectAutoIntakeCombo(rule.AutoIntakeMode);
+                    autoIntakeCombo.Visibility = readOnly ? Visibility.Collapsed : Visibility.Visible;
+                    autoIntakeBuiltInNote.Visibility = readOnly ? Visibility.Visible : Visibility.Collapsed;
                     SetEditorEnabled(!readOnly);
                 }
                 finally
@@ -905,6 +948,10 @@ namespace PixelVaultNative
                 editingRule.TimestampFormat = services.CleanTag(timestampFormatBox.Text);
                 editingRule.PreserveFileTimes = preserveFileTimesBox.IsChecked == true;
                 editingRule.RoutesToManualWhenMissingSteamAppId = missingAppIdCombo.SelectedIndex == 1;
+                if (autoIntakeCombo.SelectedItem is ComboBoxItem autoItem && autoItem.Tag is string autoTag)
+                    editingRule.AutoIntakeMode = FilenameAutoIntakeModes.Normalize(autoTag);
+                else
+                    editingRule.AutoIntakeMode = FilenameAutoIntakeModes.ManualOnly;
                 editingRule.ConfidenceLabel = services.CleanTag(string.IsNullOrWhiteSpace(editingRule.ConfidenceLabel) ? "CustomRule" : editingRule.ConfidenceLabel);
                 editingRule.IsBuiltIn = false;
                 if (editingDraft != null)
@@ -1308,6 +1355,7 @@ namespace PixelVaultNative
             }
             platformCombo.SelectionChanged += delegate { PushEditorToRule(); };
             missingAppIdCombo.SelectionChanged += delegate { PushEditorToRule(); };
+            autoIntakeCombo.SelectionChanged += delegate { PushEditorToRule(); };
             enabledBox.Checked += delegate { PushEditorToRule(); };
             enabledBox.Unchecked += delegate { PushEditorToRule(); };
             preserveFileTimesBox.Checked += delegate { PushEditorToRule(); };

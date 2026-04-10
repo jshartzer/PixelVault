@@ -229,6 +229,7 @@ namespace PixelVaultNative
             MigratePersistentDataFromLegacyVersions();
             InitializeDefaultWorkspaceRootsAndTools();
             LoadSettings();
+            InitializeBackgroundIntakeAgent();
         }
 
         void ApplyMainWindowChromeAndShell()

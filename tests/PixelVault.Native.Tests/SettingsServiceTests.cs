@@ -308,4 +308,52 @@ public sealed class SettingsServiceTests
             try { if (File.Exists(path)) File.Delete(path); } catch { /* ignore */ }
         }
     }
+
+    [Theory]
+    [InlineData(0, 1)]
+    [InlineData(1, 1)]
+    [InlineData(3, 3)]
+    [InlineData(200, 120)]
+    public void NormalizeBackgroundAutoIntakeQuietSeconds_Clamps(int input, int expected)
+    {
+        Assert.Equal(expected, SettingsService.NormalizeBackgroundAutoIntakeQuietSeconds(input));
+    }
+
+    [Fact]
+    public void SaveToIni_ThenLoadFromIni_RoundTripsBackgroundAutoIntakeFlags()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "pv-bgintake-" + Guid.NewGuid().ToString("N") + ".ini");
+        try
+        {
+            var svc = new SettingsService();
+            svc.SaveToIni(path, new AppSettings
+            {
+                LibraryRoot = @"D:\lib",
+                LibraryFolderTileSize = 200,
+                BackgroundAutoIntakeEnabled = true,
+                BackgroundAutoIntakeQuietSeconds = 7,
+                BackgroundAutoIntakeToastsEnabled = false,
+                BackgroundAutoIntakeShowSummary = false,
+                BackgroundAutoIntakeVerboseLogging = true
+            });
+
+            var loaded = svc.LoadFromIni(path, new AppSettings(), Path.GetTempPath(), () => string.Empty, () => string.Empty);
+
+            Assert.True(loaded.BackgroundAutoIntakeEnabled);
+            Assert.Equal(7, loaded.BackgroundAutoIntakeQuietSeconds);
+            Assert.False(loaded.BackgroundAutoIntakeToastsEnabled);
+            Assert.False(loaded.BackgroundAutoIntakeShowSummary);
+            Assert.True(loaded.BackgroundAutoIntakeVerboseLogging);
+        }
+        finally
+        {
+            try
+            {
+                if (File.Exists(path)) File.Delete(path);
+            }
+            catch
+            {
+            }
+        }
+    }
 }

@@ -152,7 +152,8 @@ namespace PixelVaultNative
                     PreserveFileTimes = rule.PreserveFileTimes,
                     RoutesToManualWhenMissingSteamAppId = rule.RoutesToManualWhenMissingSteamAppId,
                     ConfidenceLabel = rule.ConfidenceLabel,
-                    IsBuiltIn = rule.IsBuiltIn
+                    IsBuiltIn = rule.IsBuiltIn,
+                    AutoIntakeMode = FilenameAutoIntakeModes.ManualOnly
                 })
                 .ToList();
         }

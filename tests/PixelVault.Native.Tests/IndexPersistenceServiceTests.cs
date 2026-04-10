@@ -823,6 +823,36 @@ VALUES ($root, $filePath, $stamp, $gameId, $consoleLabel, $tagText);";
         Assert.Equal("yyyyMMddHHmmss", rule.TimestampFormat);
         Assert.True(rule.RoutesToManualWhenMissingSteamAppId);
         Assert.Equal("CustomOverride", rule.ConfidenceLabel);
+        Assert.Equal(FilenameAutoIntakeModes.ManualOnly, rule.AutoIntakeMode);
+    }
+
+    [Fact]
+    public void SaveAndLoadFilenameConventions_RoundTripsAutoIntakeMode_TrustedExactMatch()
+    {
+        using var harness = new IndexPersistenceHarness();
+
+        harness.Service.SaveFilenameConventions(
+            harness.LibraryRoot,
+            new[]
+            {
+                new FilenameConventionRule
+                {
+                    ConventionId = "custom_trusted",
+                    Name = "Trusted Rule",
+                    Enabled = true,
+                    Priority = 1200,
+                    Pattern = "[title].[ext:media]",
+                    PatternText = "[title].[ext:media]",
+                    PlatformLabel = "Other",
+                    PlatformTagsText = string.Empty,
+                    TitleGroup = "title",
+                    AutoIntakeMode = FilenameAutoIntakeModes.TrustedExactMatch
+                }
+            });
+
+        var rules = harness.Service.LoadFilenameConventions(harness.LibraryRoot);
+        var rule = Assert.Single(rules);
+        Assert.Equal(FilenameAutoIntakeModes.TrustedExactMatch, rule.AutoIntakeMode);
     }
 
     [Fact]

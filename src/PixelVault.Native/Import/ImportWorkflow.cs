@@ -32,6 +32,7 @@ namespace PixelVaultNative
 
         void RunWorkflow(bool withReview)
         {
+            var importEditModalForegroundBusy = false;
             try
             {
                 EnsureSourceFolders();
@@ -52,6 +53,8 @@ namespace PixelVaultNative
                     var importEditItems = BuildImportAndEditMetadataItems(inventory.TopLevelMediaFiles, analysis);
                     if (importEditItems.Count > 0)
                     {
+                        BeginForegroundIntakeBusy();
+                        importEditModalForegroundBusy = true;
                         status.Text = "Import and edit";
                         Log("Opening import and edit window for " + importEditItems.Count + " upload file(s).");
                         if (!ShowManualMetadataWindow(importEditItems, false, "Import and comment", true))
@@ -82,10 +85,15 @@ namespace PixelVaultNative
                 LogException("Import workflow", ex);
                 TryLibraryToast(ex.Message, MessageBoxImage.Error);
             }
+            finally
+            {
+                if (importEditModalForegroundBusy) EndForegroundIntakeBusy();
+            }
         }
 
         void OpenManualIntakeWindow()
         {
+            var manualIntakeModalForegroundBusy = false;
             try
             {
                 EnsureSourceFolders();
@@ -106,6 +114,8 @@ namespace PixelVaultNative
                     return;
                 }
 
+                BeginForegroundIntakeBusy();
+                manualIntakeModalForegroundBusy = true;
                 status.Text = "Manual intake review";
                 Log("Opening manual intake window for " + manualItems.Count + " unmatched image(s).");
                 if (!ShowManualMetadataWindow(manualItems, false, string.Empty))
@@ -123,6 +133,10 @@ namespace PixelVaultNative
                 status.Text = "Manual intake failed";
                 LogException("Import workflow", ex);
                 TryLibraryToast(ex.Message, MessageBoxImage.Error);
+            }
+            finally
+            {
+                if (manualIntakeModalForegroundBusy) EndForegroundIntakeBusy();
             }
         }
 

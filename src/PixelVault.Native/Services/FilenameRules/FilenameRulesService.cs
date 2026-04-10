@@ -229,6 +229,7 @@ namespace PixelVaultNative
             rule.Pattern = rule.PatternText;
             rule.ConfidenceLabel = CleanTag(string.IsNullOrWhiteSpace(rule.ConfidenceLabel) ? "CustomRule" : rule.ConfidenceLabel);
             rule.IsBuiltIn = false;
+            rule.AutoIntakeMode = FilenameAutoIntakeModes.Normalize(rule.AutoIntakeMode);
 
             _ = new Regex(FilenameParserService.BuildRegexPattern(rule.PatternText, rule.TimestampGroup), RegexOptions.IgnoreCase);
             if (UsesTimestampTokens(rule.PatternText) && string.IsNullOrWhiteSpace(rule.TimestampFormat))
@@ -259,7 +260,8 @@ namespace PixelVaultNative
                 PreserveFileTimes = rule.PreserveFileTimes,
                 RoutesToManualWhenMissingSteamAppId = rule.RoutesToManualWhenMissingSteamAppId,
                 ConfidenceLabel = rule.ConfidenceLabel,
-                IsBuiltIn = rule.IsBuiltIn
+                IsBuiltIn = rule.IsBuiltIn,
+                AutoIntakeMode = FilenameAutoIntakeModes.Normalize(rule.AutoIntakeMode)
             };
         }
 

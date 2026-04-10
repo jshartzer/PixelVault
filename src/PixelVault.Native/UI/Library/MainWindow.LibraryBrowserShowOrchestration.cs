@@ -531,6 +531,7 @@ namespace PixelVaultNative
                         _shell.LibraryBrowserPaletteShowIntakePreview();
                         refreshIntakeReviewBadge?.Invoke();
                     },
+                    OpenBackgroundImports = () => _shell.LibraryBrowserPaletteOpenBackgroundImports(),
                     ExportStarred = () => _shell.LibraryBrowserPaletteExportStarred(libraryWindow),
                     RefreshAllCovers = refreshAllCoversWithConfirm,
                     ShowKeyboardShortcuts = () => _shell.ShowLibraryBrowserKeyboardShortcutsHelp(libraryWindow),

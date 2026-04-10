@@ -103,6 +103,7 @@ namespace PixelVaultNative
         void LibraryBrowserPaletteRunImport(bool withReview);
         void LibraryBrowserPaletteOpenManualIntake();
         void LibraryBrowserPaletteShowIntakePreview();
+        void LibraryBrowserPaletteOpenBackgroundImports();
         void LibraryBrowserPaletteExportStarred(Window owner);
 
         void LibraryBrowserOpenSingleFileMetadataEditor(

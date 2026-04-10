@@ -13,7 +13,7 @@ namespace PixelVaultNative
         void LibraryBrowserMountToastHost(Grid rootGrid, LibraryBrowserWorkingSet ws)
         {
             if (rootGrid == null || ws == null) return;
-            var layer = new Grid { IsHitTestVisible = false, Margin = new Thickness(0, 0, 18, 18) };
+            var layer = new Grid { IsHitTestVisible = true, Margin = new Thickness(0, 0, 18, 18) };
             layer.VerticalAlignment = VerticalAlignment.Bottom;
             layer.HorizontalAlignment = HorizontalAlignment.Right;
             Panel.SetZIndex(layer, 80);
@@ -35,38 +35,92 @@ namespace PixelVaultNative
                 FontSize = 12.5,
                 TextWrapping = TextWrapping.Wrap
             };
-            ws.LibraryToastBorder.Child = ws.LibraryToastLabel;
+            ws.LibraryToastActionsPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Margin = new Thickness(0, 10, 0, 0),
+                Visibility = Visibility.Collapsed
+            };
+            ws.LibraryToastReviewButton = new Button
+            {
+                Content = "Review",
+                Padding = new Thickness(14, 6, 14, 6),
+                FontSize = 12,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = Brush(DesignTokens.TextToast),
+                Background = Brush(DesignTokens.ActionSecondaryFill),
+                BorderBrush = Brush(DesignTokens.BorderDefault),
+                BorderThickness = new Thickness(1),
+                Cursor = System.Windows.Input.Cursors.Hand
+            };
+            AccessibilityUi.TryApplyFocusVisualStyle(ws.LibraryToastReviewButton);
+            ws.LibraryToastReviewButton.Click += (_, __) =>
+            {
+                try
+                {
+                    if (ws.LibraryToastReviewButton?.Tag is Action a) a();
+                }
+                catch
+                {
+                }
+                DismissLibraryBrowserToast(ws);
+            };
+            ws.LibraryToastActionsPanel.Children.Add(ws.LibraryToastReviewButton);
+            var toastStack = new StackPanel();
+            toastStack.Children.Add(ws.LibraryToastLabel);
+            toastStack.Children.Add(ws.LibraryToastActionsPanel);
+            ws.LibraryToastBorder.Child = toastStack;
             layer.Children.Add(ws.LibraryToastBorder);
             rootGrid.Children.Add(layer);
             ws.LibraryToastTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2.35) };
-            ws.LibraryToastTimer.Tick += delegate
-            {
-                ws.LibraryToastTimer.Stop();
-                if (ws.LibraryToastBorder == null) return;
-                if (SystemParameters.ClientAreaAnimation)
-                {
-                    var fade = new DoubleAnimation(ws.LibraryToastBorder.Opacity, 0d, TimeSpan.FromMilliseconds(140));
-                    fade.Completed += delegate
-                    {
-                        ws.LibraryToastBorder.Visibility = Visibility.Collapsed;
-                        ws.LibraryToastBorder.Opacity = 0d;
-                    };
-                    ws.LibraryToastBorder.BeginAnimation(UIElement.OpacityProperty, fade);
-                }
-                else
-                {
-                    ws.LibraryToastBorder.Visibility = Visibility.Collapsed;
-                    ws.LibraryToastBorder.Opacity = 0d;
-                }
-            };
+            ws.LibraryToastTimer.Tick += delegate { DismissLibraryBrowserToast(ws); };
         }
 
-        void ShowLibraryBrowserToast(LibraryBrowserWorkingSet ws, string message)
+        void DismissLibraryBrowserToast(LibraryBrowserWorkingSet ws)
+        {
+            if (ws == null) return;
+            ws.LibraryToastTimer?.Stop();
+            if (ws.LibraryToastBorder == null) return;
+            ws.LibraryToastBorder.BeginAnimation(UIElement.OpacityProperty, null);
+            void FinishHide()
+            {
+                ws.LibraryToastBorder.Visibility = Visibility.Collapsed;
+                ws.LibraryToastBorder.Opacity = 0d;
+                if (ws.LibraryToastActionsPanel != null) ws.LibraryToastActionsPanel.Visibility = Visibility.Collapsed;
+                if (ws.LibraryToastReviewButton != null) ws.LibraryToastReviewButton.Tag = null;
+            }
+            if (SystemParameters.ClientAreaAnimation)
+            {
+                var fade = new DoubleAnimation(ws.LibraryToastBorder.Opacity, 0d, TimeSpan.FromMilliseconds(140));
+                fade.Completed += (_, __) => FinishHide();
+                ws.LibraryToastBorder.BeginAnimation(UIElement.OpacityProperty, fade);
+            }
+            else
+            {
+                FinishHide();
+            }
+        }
+
+        void ShowLibraryBrowserToast(LibraryBrowserWorkingSet ws, string message, Action reviewAction = null, string reviewButtonText = null)
         {
             if (ws == null || ws.LibraryToastBorder == null || ws.LibraryToastLabel == null || string.IsNullOrWhiteSpace(message)) return;
             ws.LibraryToastTimer?.Stop();
             ws.LibraryToastBorder.BeginAnimation(UIElement.OpacityProperty, null);
             ws.LibraryToastLabel.Text = message.Trim();
+            var hasReview = reviewAction != null;
+            if (hasReview && ws.LibraryToastReviewButton != null && ws.LibraryToastActionsPanel != null)
+            {
+                ws.LibraryToastReviewButton.Tag = reviewAction;
+                ws.LibraryToastReviewButton.Content = string.IsNullOrWhiteSpace(reviewButtonText) ? "Review" : reviewButtonText.Trim();
+                ws.LibraryToastActionsPanel.Visibility = Visibility.Visible;
+                ws.LibraryToastTimer.Interval = TimeSpan.FromSeconds(8.5);
+            }
+            else
+            {
+                if (ws.LibraryToastReviewButton != null) ws.LibraryToastReviewButton.Tag = null;
+                if (ws.LibraryToastActionsPanel != null) ws.LibraryToastActionsPanel.Visibility = Visibility.Collapsed;
+                ws.LibraryToastTimer.Interval = TimeSpan.FromSeconds(2.35);
+            }
             ws.LibraryToastBorder.Visibility = Visibility.Visible;
             if (SystemParameters.ClientAreaAnimation)
             {
@@ -105,7 +159,7 @@ namespace PixelVaultNative
         }
 
         /// <summary>Shows a library toast when the browser working set is live; otherwise a non-blocking notice is unavailable so we fall back to <see cref="MessageBox"/>.</summary>
-        internal void TryLibraryToast(string message, MessageBoxImage fallbackIcon = MessageBoxImage.Information)
+        internal void TryLibraryToast(string message, MessageBoxImage fallbackIcon = MessageBoxImage.Information, Action reviewAction = null)
         {
             if (string.IsNullOrWhiteSpace(message)) return;
             var text = NormalizeForLibraryToast(message);
@@ -113,7 +167,7 @@ namespace PixelVaultNative
             var ws = _libraryBrowserLiveWorkingSet;
             if (ws != null && ws.LibraryToastBorder != null)
             {
-                ShowLibraryBrowserToast(ws, text);
+                ShowLibraryBrowserToast(ws, text, reviewAction, reviewAction != null ? "Review" : null);
                 return;
             }
             MessageBox.Show(text, "PixelVault", MessageBoxButton.OK, fallbackIcon);

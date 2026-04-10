@@ -216,6 +216,8 @@ namespace PixelVaultNative
 
             public void LibraryBrowserPaletteShowIntakePreview() => _m.LibraryBrowserPaletteShowIntakePreview();
 
+            public void LibraryBrowserPaletteOpenBackgroundImports() => _m.LibraryBrowserPaletteOpenBackgroundImports();
+
             public void LibraryBrowserPaletteExportStarred(Window owner) => _m.LibraryBrowserPaletteExportStarred(owner);
 
             public void LibraryBrowserOpenSingleFileMetadataEditor(

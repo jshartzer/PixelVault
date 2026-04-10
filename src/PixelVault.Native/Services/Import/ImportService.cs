@@ -14,6 +14,12 @@ namespace PixelVaultNative
 
         void SaveUndoManifest(List<UndoImportEntry> entries);
 
+        /// <summary>
+        /// Appends move entries to the undo manifest (for headless / background batches). Foreground import continues to use
+        /// <see cref="SaveUndoManifest"/> which replaces the file — mixing both means a full UI import can overwrite appended rows.
+        /// </summary>
+        void AppendUndoManifestEntries(IEnumerable<UndoImportEntry> newEntries);
+
         MoveStepResult MoveFilesToLibraryDestination(
             IEnumerable<string> files,
             string summaryLabel,
@@ -23,6 +29,9 @@ namespace PixelVaultNative
         SortStepResult SortDestinationRootIntoGameFolders(string destinationRoot, string libraryRoot, CancellationToken cancellationToken = default);
 
         UndoImportExecutionResult ExecuteUndoImportMoves(IEnumerable<UndoImportEntry> entries);
+
+        /// <summary>Resolves where an imported file ended up after move/sort (same rules as undo). Empty if not found.</summary>
+        string TryResolveUndoEntryCurrentPath(UndoImportEntry entry);
 
         /// <summary>Top-level and optional recursive media file lists from configured source roots.</summary>
         SourceInventory BuildSourceInventory(bool recurseRename);
@@ -255,6 +264,17 @@ namespace PixelVaultNative
             })).ToList());
         }
 
+        public void AppendUndoManifestEntries(IEnumerable<UndoImportEntry> newEntries)
+        {
+            var add = (newEntries ?? Enumerable.Empty<UndoImportEntry>())
+                .Where(e => e != null)
+                .ToList();
+            if (add.Count == 0) return;
+            var merged = LoadUndoManifest();
+            merged.AddRange(add);
+            SaveUndoManifest(merged);
+        }
+
         public MoveStepResult MoveFilesToLibraryDestination(
             IEnumerable<string> files,
             string summaryLabel,
@@ -407,6 +427,14 @@ namespace PixelVaultNative
                 d.Log?.Invoke("Undo move: " + currentPath + " -> " + target);
             }
             return result;
+        }
+
+        public string TryResolveUndoEntryCurrentPath(UndoImportEntry entry)
+        {
+            var destinationRoot = d.GetDestinationRoot == null ? string.Empty : d.GetDestinationRoot() ?? string.Empty;
+            var libraryRoot = d.GetLibraryRoot == null ? string.Empty : d.GetLibraryRoot() ?? string.Empty;
+            var usedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            return ResolveUndoCurrentPath(entry, usedPaths, destinationRoot, libraryRoot) ?? string.Empty;
         }
 
         public SourceInventory BuildSourceInventory(bool recurseRename)

@@ -104,41 +104,9 @@ namespace PixelVaultNative
             });
         }
 
-        sealed class IntakePreviewFileAnalysis
-        {
-            public string FilePath = string.Empty;
-            public string FileName = string.Empty;
-            public FilenameParseResult Parsed = new FilenameParseResult();
-            public bool CanUpdateMetadata;
-            public bool PreserveFileTimes;
-            public DateTime CaptureTime;
-        }
-
         Dictionary<string, IntakePreviewFileAnalysis> AnalyzeIntakePreviewFiles(IEnumerable<string> sourceFiles, CancellationToken cancellationToken = default(CancellationToken))
         {
-            var analysis = new Dictionary<string, IntakePreviewFileAnalysis>(StringComparer.OrdinalIgnoreCase);
-            foreach (var file in (sourceFiles ?? Enumerable.Empty<string>()).Where(File.Exists).Distinct(StringComparer.OrdinalIgnoreCase))
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var fileName = Path.GetFileName(file);
-                var parsed = ParseFilename(fileName);
-                var platformTags = parsed.PlatformTags ?? new string[0];
-                var isVideo = IsVideo(file);
-                // Respect the convention’s PreserveFileTimes (Steam-style: console captures update embedded + file dates from the filename). Do not force Xbox to use filesystem mtime as the capture instant.
-                var preserveFileTimes = parsed.PreserveFileTimes || isVideo;
-                var canUpdateMetadata = !(parsed.RoutesToManualWhenMissingSteamAppId && string.IsNullOrWhiteSpace(parsed.SteamAppId))
-                    && (isVideo || platformTags.Contains("Xbox") || parsed.CaptureTime.HasValue);
-                analysis[file] = new IntakePreviewFileAnalysis
-                {
-                    FilePath = file,
-                    FileName = fileName,
-                    Parsed = parsed,
-                    CanUpdateMetadata = canUpdateMetadata,
-                    PreserveFileTimes = preserveFileTimes,
-                    CaptureTime = parsed.CaptureTime ?? GetLibraryDate(file)
-                };
-            }
-            return analysis;
+            return intakeAnalysisService.AnalyzeFiles(sourceFiles, cancellationToken);
         }
 
         List<ReviewItem> BuildReviewItems()

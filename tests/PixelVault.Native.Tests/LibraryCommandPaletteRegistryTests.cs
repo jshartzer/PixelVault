@@ -41,6 +41,7 @@ public class LibraryCommandPaletteRegistryTests
             RunImportWithReview = () => { },
             OpenManualIntake = () => { },
             OpenIntakePreview = () => { },
+            OpenBackgroundImports = () => { },
             ExportStarred = () => { },
             RefreshAllCovers = () => { },
             ShowKeyboardShortcuts = () => { },

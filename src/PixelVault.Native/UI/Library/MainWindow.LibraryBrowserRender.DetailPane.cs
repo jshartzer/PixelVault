@@ -928,7 +928,10 @@ namespace PixelVaultNative
                 maxTileWidth,
                 timelineView,
                 mediaLayoutByFile);
-            var headerHeight = group.CaptureDate <= DateTime.MinValue ? 0d : 24d;
+            // Timeline day headers use a larger type ramp; keep Height in sync for virtualization row sizing.
+            var headerHeight = group.CaptureDate <= DateTime.MinValue
+                ? 0d
+                : (timelineView ? 36d : 24d);
             var chunkHeights = chunks.Sum(chunk => chunk == null ? 0d : chunk.CanvasHeight);
             var chunkGaps = Math.Max(0, chunks.Count - 1) * masonryTileGap;
             return new LibraryPackedDayCardLayout
@@ -973,10 +976,10 @@ namespace PixelVaultNative
                 stack.Children.Add(new TextBlock
                 {
                     Text = labelText,
-                    Foreground = Brush("#8FA1AD"),
-                    FontSize = timelineView ? 12.5 : 11.5,
-                    FontWeight = FontWeights.Medium,
-                    Margin = new Thickness(2, 0, 0, 6)
+                    Foreground = Brush(timelineView ? DesignTokens.TextLabelMuted : "#8FA1AD"),
+                    FontSize = timelineView ? 15.5 : 11.5,
+                    FontWeight = timelineView ? FontWeights.SemiBold : FontWeights.Medium,
+                    Margin = new Thickness(2, 0, 0, timelineView ? 10 : 6)
                 });
             }
 
