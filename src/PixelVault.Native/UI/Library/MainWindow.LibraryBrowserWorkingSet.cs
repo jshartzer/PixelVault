@@ -55,6 +55,10 @@ namespace PixelVaultNative
             internal TextBlock QuickEditDrawerSubtitleText;
             internal Button QuickEditDrawerMetadataButton;
             internal Button QuickEditDrawerOpenFolderButton;
+            internal TextBox QuickEditSteamAppIdBox;
+            internal TextBox QuickEditCollectionNotesBox;
+            internal Button QuickEditDrawerApplyInlineButton;
+            internal Action QuickEditRefreshLibraryFolders;
             internal Action QuickEditOpenMetadata;
             internal Action QuickEditOpenFolders;
 

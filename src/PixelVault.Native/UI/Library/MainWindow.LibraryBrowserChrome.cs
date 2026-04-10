@@ -160,31 +160,14 @@ namespace PixelVaultNative
             var intakeInnerH = chrome.IntakeReviewButton.Height - 2;
             var intakeReviewContent = new Grid { Width = intakeInnerW, Height = intakeInnerH };
             var inset = new Thickness(2);
-            var intakeQueueIcon = LoadIntakeReviewQueueBitmap();
-            if (intakeQueueIcon != null)
+            intakeReviewContent.Children.Add(new Viewbox
             {
-                var intakeImage = new Image
-                {
-                    Margin = inset,
-                    Stretch = Stretch.Uniform,
-                    HorizontalAlignment = HorizontalAlignment.Stretch,
-                    VerticalAlignment = VerticalAlignment.Stretch,
-                    Source = intakeQueueIcon
-                };
-                RenderOptions.SetBitmapScalingMode(intakeImage, BitmapScalingMode.HighQuality);
-                intakeReviewContent.Children.Add(intakeImage);
-            }
-            else
-            {
-                intakeReviewContent.Children.Add(new Viewbox
-                {
-                    Margin = inset,
-                    Stretch = Stretch.Uniform,
-                    HorizontalAlignment = HorizontalAlignment.Stretch,
-                    VerticalAlignment = VerticalAlignment.Stretch,
-                    Child = BuildGamepadGlyphCanvas(Brush("#F5F7FA"), 2.15)
-                });
-            }
+                Margin = inset,
+                Stretch = Stretch.Uniform,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                VerticalAlignment = VerticalAlignment.Stretch,
+                Child = BuildIntakeDownloadTrayGlyphCanvas(Brush("#F5F7FA"), 2.15)
+            });
             chrome.IntakeReviewBadgeText = new TextBlock
             {
                 Foreground = Brushes.White,
@@ -211,6 +194,7 @@ namespace PixelVaultNative
             };
             intakeReviewContent.Children.Add(chrome.IntakeReviewBadge);
             chrome.IntakeReviewButton.Content = intakeReviewContent;
+            AutomationProperties.SetName(chrome.IntakeReviewButton, "Upload queue preview");
             var headerActions = new StackPanel
             {
                 Orientation = Orientation.Horizontal,

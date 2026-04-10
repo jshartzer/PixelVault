@@ -52,16 +52,16 @@ namespace PixelVaultNative
                 set => _m.libraryFolderTileSize = value;
             }
 
-            public int LibraryPhotoTileSize
-            {
-                get => _m.libraryPhotoTileSize;
-                set => _m.libraryPhotoTileSize = value;
-            }
-
             public int LibraryFolderGridColumnCount
             {
                 get => _m.libraryFolderGridColumnCount;
                 set => _m.libraryFolderGridColumnCount = value;
+            }
+
+            public bool LibraryFolderFillPaneWidth
+            {
+                get => _m.libraryFolderFillPaneWidth;
+                set => _m.libraryFolderFillPaneWidth = value;
             }
 
             public int LibraryPhotoGridColumnCount
@@ -169,8 +169,6 @@ namespace PixelVaultNative
             public void SaveSettings() => _m.SaveSettings();
 
             public int NormalizeLibraryFolderTileSizeValue(int value) => _m.NormalizeLibraryFolderTileSize(value);
-
-            public int NormalizeLibraryPhotoTileSizeValue(int value) => _m.NormalizeLibraryPhotoTileSize(value);
 
             public int NormalizeLibraryFolderGridColumnCountValue(int value) => _m.NormalizeLibraryFolderGridColumnCount(value);
 

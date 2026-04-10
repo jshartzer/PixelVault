@@ -109,11 +109,8 @@ namespace PixelVaultNative
             var o = owner ?? this;
             if (run == null)
             {
-                MessageBox.Show(
-                    o,
+                TryLibraryToast(
                     "Open the Library window first to refresh covers for the whole library.",
-                    "PixelVault",
-                    MessageBoxButton.OK,
                     MessageBoxImage.Information);
                 return;
             }

@@ -1,6 +1,8 @@
+using System;
 using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 
@@ -23,7 +25,7 @@ namespace PixelVaultNative
 
             var panel = new Border
             {
-                Width = 340,
+                Width = 368,
                 HorizontalAlignment = HorizontalAlignment.Right,
                 Background = Brush("#151C22"),
                 BorderBrush = Brush("#27313A"),
@@ -60,6 +62,81 @@ namespace PixelVaultNative
             };
             stack.Children.Add(ws.QuickEditDrawerSubtitleText);
 
+            stack.Children.Add(new TextBlock
+            {
+                Text = "Quick fields",
+                FontSize = 12.5,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = Brush("#C8D8E0"),
+                Margin = new Thickness(0, 0, 0, 6)
+            });
+            stack.Children.Add(new TextBlock
+            {
+                Text = "Steam App ID",
+                Foreground = Brush("#9CB1BC"),
+                FontSize = 12,
+                Margin = new Thickness(0, 0, 0, 4)
+            });
+            ws.QuickEditSteamAppIdBox = new TextBox
+            {
+                Padding = new Thickness(8, 6, 8, 6),
+                Background = Brush("#0E1419"),
+                Foreground = Brush("#E8F0F5"),
+                BorderBrush = Brush("#33424D"),
+                BorderThickness = new Thickness(1),
+                FontSize = 13,
+                CaretBrush = Brushes.White,
+                Margin = new Thickness(0, 0, 0, 10),
+                IsEnabled = false
+            };
+            AccessibilityUi.TryApplyFocusVisualStyle(ws.QuickEditSteamAppIdBox);
+            AccessibilityUi.TrySetAutomationName(ws.QuickEditSteamAppIdBox, "Steam App ID");
+            stack.Children.Add(ws.QuickEditSteamAppIdBox);
+
+            stack.Children.Add(new TextBlock
+            {
+                Text = "Collection notes",
+                Foreground = Brush("#9CB1BC"),
+                FontSize = 12,
+                Margin = new Thickness(0, 0, 0, 4)
+            });
+            ws.QuickEditCollectionNotesBox = new TextBox
+            {
+                Padding = new Thickness(8, 6, 8, 6),
+                Background = Brush("#0E1419"),
+                Foreground = Brush("#E8F0F5"),
+                BorderBrush = Brush("#33424D"),
+                BorderThickness = new Thickness(1),
+                FontSize = 13,
+                CaretBrush = Brushes.White,
+                TextWrapping = TextWrapping.Wrap,
+                AcceptsReturn = true,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                MaxHeight = 72,
+                Margin = new Thickness(0, 0, 0, 8),
+                IsEnabled = false
+            };
+            AccessibilityUi.TryApplyFocusVisualStyle(ws.QuickEditCollectionNotesBox);
+            AccessibilityUi.TrySetAutomationName(ws.QuickEditCollectionNotesBox, "Collection notes");
+            stack.Children.Add(ws.QuickEditCollectionNotesBox);
+
+            ws.QuickEditDrawerApplyInlineButton = new Button
+            {
+                Content = "Apply quick fields",
+                Height = 34,
+                MinWidth = 140,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                Foreground = Brushes.White,
+                Margin = new Thickness(0, 0, 0, 14),
+                IsEnabled = false
+            };
+            ApplyLibraryPillChrome(ws.QuickEditDrawerApplyInlineButton, "#2A4A5E", "#3A5F78", "#355A72", "#243A4A", "#D7E2EA");
+            ws.QuickEditDrawerApplyInlineButton.ToolTip = "Save Steam App ID and collection notes to the game index for this selection";
+            ws.QuickEditDrawerApplyInlineButton.Click += delegate { LibraryBrowserApplyQuickEditDrawerFields(ws); };
+            AccessibilityUi.TryApplyFocusVisualStyle(ws.QuickEditDrawerApplyInlineButton);
+            AccessibilityUi.TrySetAutomationName(ws.QuickEditDrawerApplyInlineButton, "Apply quick fields");
+            stack.Children.Add(ws.QuickEditDrawerApplyInlineButton);
+
             ws.QuickEditDrawerMetadataButton = new Button
             {
                 Content = "Edit metadata",
@@ -81,6 +158,7 @@ namespace PixelVaultNative
                 ws.QuickEditOpenMetadata?.Invoke();
             };
             AccessibilityUi.TryApplyFocusVisualStyle(ws.QuickEditDrawerMetadataButton);
+            AccessibilityUi.TrySetAutomationName(ws.QuickEditDrawerMetadataButton, "Edit metadata");
             stack.Children.Add(ws.QuickEditDrawerMetadataButton);
 
             ws.QuickEditDrawerOpenFolderButton = new Button
@@ -109,6 +187,7 @@ namespace PixelVaultNative
                 ws.QuickEditOpenFolders?.Invoke();
             };
             AccessibilityUi.TryApplyFocusVisualStyle(ws.QuickEditDrawerOpenFolderButton);
+            AccessibilityUi.TrySetAutomationName(ws.QuickEditDrawerOpenFolderButton, "Open folder");
             stack.Children.Add(ws.QuickEditDrawerOpenFolderButton);
 
             stack.Children.Add(new TextBlock
@@ -132,11 +211,69 @@ namespace PixelVaultNative
             close.ToolTip = "Close (Esc)";
             close.Click += delegate { LibraryBrowserSetQuickEditDrawerOpen(ws, false); };
             AccessibilityUi.TryApplyFocusVisualStyle(close);
+            AccessibilityUi.TrySetAutomationName(close, "Close quick edit");
             stack.Children.Add(close);
             panel.Child = stack;
             host.Children.Add(panel);
             root.Children.Add(host);
             ws.QuickEditDrawerHost = host;
+        }
+
+        void LibraryBrowserApplyQuickEditDrawerFields(LibraryBrowserWorkingSet ws)
+        {
+            if (ws?.Current == null || librarySession == null || !librarySession.HasLibraryRoot) return;
+            if (IsLibraryBrowserTimelineView(ws.Current) || ws.IsPhotoWorkspaceMode) return;
+            if (ws.Current.PendingGameAssignment)
+            {
+                TryLibraryToast("Assign a game title first (pending resolution).", MessageBoxImage.Information);
+                return;
+            }
+
+            try
+            {
+                var root = librarySession.LibraryRoot;
+                if (string.IsNullOrWhiteSpace(root)) return;
+                var display = BuildLibraryBrowserDisplayFolder(ws.Current);
+                if (display == null) return;
+                var rows = GetSavedGameIndexRowsForRoot(root);
+                var saved = FindSavedGameIndexRow(rows, display);
+                var prevSteam = saved?.SteamAppId ?? display.SteamAppId ?? string.Empty;
+                var prevSup = saved?.SuppressSteamAppIdAutoResolve ?? display.SuppressSteamAppIdAutoResolve;
+                var steamInput = CleanTag(ws.QuickEditSteamAppIdBox?.Text ?? string.Empty);
+                var notesInput = (ws.QuickEditCollectionNotesBox?.Text ?? string.Empty).Trim();
+                display.SteamAppId = steamInput;
+                display.SuppressSteamAppIdAutoResolve = ShouldSuppressExternalIdAutoResolve(steamInput, prevSteam, prevSup);
+                display.CollectionNotes = notesInput;
+                UpsertSavedGameIndexRow(root, display);
+                librarySession.RefreshFolderCacheAfterGameIndexChange();
+                ws.Current.SteamAppId = display.SteamAppId;
+                ws.Current.SuppressSteamAppIdAutoResolve = display.SuppressSteamAppIdAutoResolve;
+                ws.Current.CollectionNotes = display.CollectionNotes;
+                foreach (var sf in ws.Current.SourceFolders)
+                {
+                    if (sf == null) continue;
+                    sf.SteamAppId = display.SteamAppId;
+                    sf.SuppressSteamAppIdAutoResolve = display.SuppressSteamAppIdAutoResolve;
+                    sf.CollectionNotes = display.CollectionNotes;
+                }
+
+                if (ws.Current.PrimaryFolder != null)
+                {
+                    ws.Current.PrimaryFolder.SteamAppId = display.SteamAppId;
+                    ws.Current.PrimaryFolder.SuppressSteamAppIdAutoResolve = display.SuppressSteamAppIdAutoResolve;
+                    ws.Current.PrimaryFolder.CollectionNotes = display.CollectionNotes;
+                }
+
+                PopulateLibraryBrowserFolderViewSearchBlob(ws.Current);
+                ws.QuickEditRefreshLibraryFolders?.Invoke();
+                TryLibraryToast("Saved quick fields.", MessageBoxImage.Information);
+                LibraryBrowserRefreshQuickEditDrawerContent(ws);
+            }
+            catch (Exception ex)
+            {
+                LogException("Quick edit drawer", ex);
+                TryLibraryToast("Could not save: " + ex.Message, MessageBoxImage.Warning);
+            }
         }
 
         internal void LibraryBrowserOpenSourceFoldersForCurrentSelection(LibraryBrowserWorkingSet ws)
@@ -152,50 +289,87 @@ namespace PixelVaultNative
             if (ws?.QuickEditDrawerTitleText == null || ws.QuickEditDrawerSubtitleText == null) return;
             var metaBtn = ws.QuickEditDrawerMetadataButton;
             var folderBtn = ws.QuickEditDrawerOpenFolderButton;
+            var steamBox = ws.QuickEditSteamAppIdBox;
+            var notesBox = ws.QuickEditCollectionNotesBox;
+            var applyBtn = ws.QuickEditDrawerApplyInlineButton;
+
+            bool showInlineFields;
+            bool inlineEditable;
+
             if (ws.Current == null)
             {
                 ws.QuickEditDrawerTitleText.Text = "No folder selected";
                 ws.QuickEditDrawerSubtitleText.Text = "Select a game folder in the list (not Timeline).";
                 if (metaBtn != null) metaBtn.IsEnabled = false;
                 if (folderBtn != null) folderBtn.IsEnabled = false;
-                return;
+                showInlineFields = false;
+                inlineEditable = false;
             }
-
-            if (IsLibraryBrowserTimelineView(ws.Current))
+            else if (IsLibraryBrowserTimelineView(ws.Current))
             {
                 ws.QuickEditDrawerTitleText.Text = "Timeline";
                 ws.QuickEditDrawerSubtitleText.Text = "Pick a date range in the toolbar. Switch to folder list for per-game quick edits.";
                 if (metaBtn != null) metaBtn.IsEnabled = false;
-                if (folderBtn != null) folderBtn.IsEnabled = GetLibraryBrowserSourceFolderPaths(ws.Current).Count > 0;
-                if (folderBtn != null) folderBtn.Content = BuildLibraryBrowserOpenFoldersLabel(ws.Current);
-                return;
+                if (folderBtn != null)
+                {
+                    folderBtn.IsEnabled = GetLibraryBrowserSourceFolderPaths(ws.Current).Count > 0;
+                    folderBtn.Content = BuildLibraryBrowserOpenFoldersLabel(ws.Current);
+                }
+
+                showInlineFields = false;
+                inlineEditable = false;
             }
-
-            if (folderBtn != null) folderBtn.Content = BuildLibraryBrowserOpenFoldersLabel(ws.Current);
-
-            if (ws.IsPhotoWorkspaceMode)
+            else if (ws.IsPhotoWorkspaceMode)
             {
+                if (folderBtn != null) folderBtn.Content = BuildLibraryBrowserOpenFoldersLabel(ws.Current);
                 ws.QuickEditDrawerTitleText.Text = ws.Current.Name ?? "Photo workspace";
                 ws.QuickEditDrawerSubtitleText.Text = "Capture grid — use the detail toolbar for stars, comments, and batch actions.";
                 if (metaBtn != null) metaBtn.IsEnabled = true;
                 if (folderBtn != null) folderBtn.IsEnabled = GetLibraryBrowserSourceFolderPaths(ws.Current).Count > 0;
-                return;
+                showInlineFields = false;
+                inlineEditable = false;
+            }
+            else
+            {
+                if (folderBtn != null) folderBtn.Content = BuildLibraryBrowserOpenFoldersLabel(ws.Current);
+                ws.QuickEditDrawerTitleText.Text = ws.Current.Name ?? "(untitled)";
+                var platform = CleanTag(ws.Current.PrimaryPlatformLabel ?? string.Empty);
+                var gid = CleanTag(ws.Current.GameId ?? string.Empty);
+                var parts = new List<string>();
+                if (!string.IsNullOrWhiteSpace(platform)) parts.Add(platform);
+                if (!string.IsNullOrWhiteSpace(gid)) parts.Add("Game ID " + gid);
+                var sub = string.Join(" · ", parts);
+                if (string.IsNullOrWhiteSpace(sub))
+                    sub = ws.Current.PrimaryFolderPath ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(sub))
+                    sub = ws.Current.FileCount + " capture" + (ws.Current.FileCount == 1 ? string.Empty : "s");
+                ws.QuickEditDrawerSubtitleText.Text = sub;
+                if (metaBtn != null) metaBtn.IsEnabled = true;
+                if (folderBtn != null) folderBtn.IsEnabled = GetLibraryBrowserSourceFolderPaths(ws.Current).Count > 0;
+                showInlineFields = true;
+                inlineEditable = !ws.Current.PendingGameAssignment;
             }
 
-            ws.QuickEditDrawerTitleText.Text = ws.Current.Name ?? "(untitled)";
-            var platform = CleanTag(ws.Current.PrimaryPlatformLabel ?? string.Empty);
-            var gid = CleanTag(ws.Current.GameId ?? string.Empty);
-            var parts = new List<string>();
-            if (!string.IsNullOrWhiteSpace(platform)) parts.Add(platform);
-            if (!string.IsNullOrWhiteSpace(gid)) parts.Add("Game ID " + gid);
-            var sub = string.Join(" · ", parts);
-            if (string.IsNullOrWhiteSpace(sub))
-                sub = ws.Current.PrimaryFolderPath ?? string.Empty;
-            if (string.IsNullOrWhiteSpace(sub))
-                sub = ws.Current.FileCount + " capture" + (ws.Current.FileCount == 1 ? string.Empty : "s");
-            ws.QuickEditDrawerSubtitleText.Text = sub;
-            if (metaBtn != null) metaBtn.IsEnabled = true;
-            if (folderBtn != null) folderBtn.IsEnabled = GetLibraryBrowserSourceFolderPaths(ws.Current).Count > 0;
+            if (steamBox != null)
+            {
+                steamBox.IsEnabled = showInlineFields && inlineEditable;
+                if (showInlineFields && ws.Current != null)
+                    steamBox.Text = DisplayExternalIdValue(ws.Current.SteamAppId ?? string.Empty);
+                else
+                    steamBox.Text = string.Empty;
+            }
+
+            if (notesBox != null)
+            {
+                notesBox.IsEnabled = showInlineFields && inlineEditable;
+                if (showInlineFields && ws.Current != null)
+                    notesBox.Text = ws.Current.CollectionNotes ?? string.Empty;
+                else
+                    notesBox.Text = string.Empty;
+            }
+
+            if (applyBtn != null)
+                applyBtn.IsEnabled = showInlineFields && inlineEditable;
         }
 
         void LibraryBrowserSetQuickEditDrawerOpen(LibraryBrowserWorkingSet ws, bool open)

@@ -6,8 +6,6 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Effects;
-using System.Windows.Media.Imaging;
-
 namespace PixelVaultNative
 {
     /// <summary>Callbacks supplied by <see cref="MainWindow"/> for the intake preview modal (Phase C1).</summary>
@@ -28,45 +26,12 @@ namespace PixelVaultNative
         public Func<string, int> PlatformOrder { get; set; }
         public Func<DateTime, string> FormatTimestamp { get; set; }
         public Func<string, string> FilenameGuess { get; set; }
-        public BitmapSource IntakeReviewQueueBitmap { get; set; }
     }
 
     /// <summary>Modal upload-queue preview (extracted from MainWindow, Phase C1).</summary>
     static class IntakePreviewWindow
     {
         static SolidColorBrush B(string hex) => UiBrushHelper.FromHex(hex);
-
-        static FrameworkElement BuildGamepadGlyph(Brush stroke, double strokeThickness, double width, double height)
-        {
-            var art = new System.Windows.Controls.Canvas { Width = 108, Height = 48 };
-            art.Children.Add(new System.Windows.Shapes.Path
-            {
-                Data = Geometry.Parse("M 12 42 C 8 42 5 39 4 33 C 1 23 6 15 12 10 C 17 6 25 4 34 4 L 41 4 C 42 4 43 5 44 6 C 45 7 46 8 48 8 L 60 8 C 62 8 63 7 64 6 C 65 5 66 4 67 4 L 74 4 C 83 4 91 6 96 10 C 102 15 107 23 104 33 C 103 39 100 42 96 42 C 90 42 84 39 78 32 L 69 22 C 66 19 64 18 60 18 L 48 18 C 44 18 42 19 39 22 L 30 32 C 24 39 18 42 12 42 Z"),
-                Stroke = stroke,
-                StrokeThickness = strokeThickness,
-                Fill = Brushes.Transparent,
-                StrokeLineJoin = PenLineJoin.Round,
-                StrokeStartLineCap = PenLineCap.Round,
-                StrokeEndLineCap = PenLineCap.Round
-            });
-            art.Children.Add(new System.Windows.Shapes.Path
-            {
-                Data = Geometry.Parse("M 28 40 L 40 28 C 44 24 47 22 52 22 L 56 22 C 61 22 64 24 68 28 L 80 40"),
-                Stroke = stroke,
-                StrokeThickness = strokeThickness,
-                Fill = Brushes.Transparent,
-                StrokeLineJoin = PenLineJoin.Round,
-                StrokeStartLineCap = PenLineCap.Round,
-                StrokeEndLineCap = PenLineCap.Round
-            });
-            return new Viewbox
-            {
-                Width = width,
-                Height = height,
-                Stretch = Stretch.Uniform,
-                Child = art
-            };
-        }
 
         static Border BuildIntakeMetricCard(string label, string value, string detail, string backgroundHex, string borderHex, string valueHex)
         {
@@ -144,16 +109,7 @@ namespace PixelVaultNative
                 headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
                 headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                 headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                FrameworkElement headerGlyph = services.IntakeReviewQueueBitmap != null
-                    ? new Image
-                    {
-                        Source = services.IntakeReviewQueueBitmap,
-                        Stretch = Stretch.Uniform,
-                        HorizontalAlignment = HorizontalAlignment.Center,
-                        VerticalAlignment = VerticalAlignment.Center
-                    }
-                    : BuildGamepadGlyph(B("#F5F7FA"), 2.2, 42, 28);
-                if (headerGlyph is Image hi) RenderOptions.SetBitmapScalingMode(hi, BitmapScalingMode.HighQuality);
+                var headerGlyph = MainWindow.BuildIntakeDownloadTrayGlyph(B("#F5F7FA"), 2.2, 42, 28);
                 var iconShell = new Border
                 {
                     Width = 74,

@@ -226,6 +226,7 @@ public sealed class SettingsServiceTests
                 LibraryFolderTileSize = 180,
                 LibraryPhotoTileSize = 310,
                 LibraryFolderGridColumnCount = 2,
+                LibraryFolderFillPaneWidth = false,
                 LibraryPhotoGridColumnCount = 0,
                 LibraryFolderSortMode = "photos",
                 LibraryFolderFilterMode = "large",
@@ -260,6 +261,7 @@ public sealed class SettingsServiceTests
             Assert.Equal(SettingsService.NormalizeLibraryFolderTileSize(original.LibraryFolderTileSize), loaded.LibraryFolderTileSize);
             Assert.Equal(SettingsService.NormalizeLibraryPhotoTileSize(original.LibraryPhotoTileSize), loaded.LibraryPhotoTileSize);
             Assert.Equal(SettingsService.NormalizeLibraryFolderGridColumnCount(original.LibraryFolderGridColumnCount), loaded.LibraryFolderGridColumnCount);
+            Assert.False(loaded.LibraryFolderFillPaneWidth);
             Assert.Equal(SettingsService.NormalizeLibraryPhotoGridColumnCount(original.LibraryPhotoGridColumnCount), loaded.LibraryPhotoGridColumnCount);
             Assert.Equal("photos", loaded.LibraryFolderSortMode);
             Assert.Equal("large", loaded.LibraryFolderFilterMode);

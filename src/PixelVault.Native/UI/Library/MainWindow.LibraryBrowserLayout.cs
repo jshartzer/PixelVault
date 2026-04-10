@@ -225,7 +225,7 @@ namespace PixelVaultNative
             panes.FolderCoverLayoutButton.FontSize = 11;
             panes.FolderCoverLayoutButton.Padding = new Thickness(10, 0, 10, 0);
             panes.FolderCoverLayoutButton.Margin = new Thickness(0, 0, 6, 0);
-            panes.FolderCoverLayoutButton.ToolTip = "Folder cover density (saved). Ctrl+scroll on the cover list to fine-tune.";
+            panes.FolderCoverLayoutButton.ToolTip = "Folder cover size and layout (saved). Use Fill pane width + Columns → Auto to span wide panes. Ctrl+scroll on the cover list to fine-tune size.";
             ApplyLibraryPillChrome(panes.FolderCoverLayoutButton, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
             panes.FolderCoverLayoutButton.VerticalAlignment = VerticalAlignment.Center;
             footerButtons.Children.Add(panes.CommandPaletteButton);
@@ -503,12 +503,12 @@ namespace PixelVaultNative
             };
             panes.ExitTimelineButton.Margin = new Thickness(0);
             panes.ExitTimelineButton.Visibility = Visibility.Collapsed;
-            panes.PhotoCaptureLayoutButton = Btn("Photo size ▾", null, "#20343A", Brushes.White);
-            panes.PhotoCaptureLayoutButton.MinWidth = 108;
+            panes.PhotoCaptureLayoutButton = Btn("Capture columns ▾", null, "#20343A", Brushes.White);
+            panes.PhotoCaptureLayoutButton.MinWidth = 118;
             panes.PhotoCaptureLayoutButton.Height = 30;
             panes.PhotoCaptureLayoutButton.FontSize = 11;
             panes.PhotoCaptureLayoutButton.Padding = new Thickness(10, 0, 10, 0);
-            panes.PhotoCaptureLayoutButton.ToolTip = "Capture tile density (saved). Ctrl+scroll on the capture grid to fine-tune (beyond menu max).";
+            panes.PhotoCaptureLayoutButton.ToolTip = "How many columns of captures fill the detail pane (saved). Auto sizes tiles to the pane width.";
             ApplyLibraryPillChrome(panes.PhotoCaptureLayoutButton, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
             panes.PhotoCaptureLayoutButton.Visibility = Visibility.Collapsed;
             var bannerButtonRow = new Grid { Margin = new Thickness(0, 8, 0, 0) };

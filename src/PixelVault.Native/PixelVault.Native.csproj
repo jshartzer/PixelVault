@@ -161,9 +161,5 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <Link>assets\Xbox PC Library Icon.png</Link>
     </None>
-    <None Include="..\..\assets\IntakeReviewQueue.png">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <Link>assets\IntakeReviewQueue.png</Link>
-    </None>
   </ItemGroup>
 </Project>

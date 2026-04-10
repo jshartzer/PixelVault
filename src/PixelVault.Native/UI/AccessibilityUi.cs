@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 
 namespace PixelVaultNative
@@ -13,6 +14,12 @@ namespace PixelVaultNative
             if (app == null) return;
             if (app.TryFindResource("PixelVaultFocusVisual") is Style style)
                 control.FocusVisualStyle = style;
+        }
+
+        internal static void TrySetAutomationName(FrameworkElement element, string name)
+        {
+            if (element == null || string.IsNullOrWhiteSpace(name)) return;
+            AutomationProperties.SetName(element, name.Trim());
         }
     }
 }

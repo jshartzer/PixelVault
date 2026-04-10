@@ -103,6 +103,7 @@ namespace PixelVaultNative
         int libraryFolderTileSize = 300;
         int libraryPhotoTileSize = 340;
         int libraryFolderGridColumnCount;
+        bool libraryFolderFillPaneWidth = true;
         int libraryPhotoGridColumnCount;
         int libraryPhotoRailFolderTileSize = 200;
         string libraryPhotoRailFolderSortMode = "alpha";

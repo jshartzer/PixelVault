@@ -27,6 +27,8 @@ namespace PixelVaultNative
         public int LibraryPhotoTileSize = 340;
         /// <summary>0 = auto folder columns; 1–12 = fixed column count (clamped to viewport).</summary>
         public int LibraryFolderGridColumnCount;
+        /// <summary>When true (default), auto column count can go up to 12 so cover rows fill the folder pane width. When false, auto mode keeps at most 4 columns (legacy denser gutters).</summary>
+        public bool LibraryFolderFillPaneWidth = true;
         /// <summary>0 = auto capture columns; 1–8 = fixed (non-timeline).</summary>
         public int LibraryPhotoGridColumnCount;
         /// <summary>Captures (Photo) workspace slim rail: cover tile size, independent from main folder grid.</summary>
@@ -76,6 +78,7 @@ namespace PixelVaultNative
                 LibraryFolderTileSize = s.LibraryFolderTileSize,
                 LibraryPhotoTileSize = s.LibraryPhotoTileSize,
                 LibraryFolderGridColumnCount = s.LibraryFolderGridColumnCount,
+                LibraryFolderFillPaneWidth = s.LibraryFolderFillPaneWidth,
                 LibraryPhotoGridColumnCount = s.LibraryPhotoGridColumnCount,
                 LibraryPhotoRailFolderTileSize = s.LibraryPhotoRailFolderTileSize,
                 LibraryPhotoRailFolderSortMode = s.LibraryPhotoRailFolderSortMode ?? "alpha",

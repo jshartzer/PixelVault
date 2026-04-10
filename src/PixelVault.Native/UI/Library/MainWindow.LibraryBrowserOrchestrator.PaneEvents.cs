@@ -76,16 +76,6 @@ namespace PixelVaultNative
                 if (renderTiles != null) renderTiles();
                 ShowLibraryBrowserToast(ws, "Covers: " + libraryFolderTileSize + " px");
             };
-            panes.ThumbScroll.PreviewMouseWheel += delegate(object _, MouseWheelEventArgs e)
-            {
-                if ((Keyboard.Modifiers & ModifierKeys.Control) == 0) return;
-                if (ws.Current == null || IsLibraryBrowserTimelineView(ws.Current)) return;
-                e.Handled = true;
-                libraryPhotoTileSize = NormalizeLibraryPhotoTileSize(libraryPhotoTileSize + (e.Delta > 0 ? 12 : -12));
-                SaveSettings();
-                if (renderSelectedFolder != null) renderSelectedFolder();
-                ShowLibraryBrowserToast(ws, "Captures: " + libraryPhotoTileSize + " px");
-            };
             if (panes.ScrollPersistDebounceTimer != null)
             {
                 panes.ScrollPersistDebounceTimer.Tick += delegate

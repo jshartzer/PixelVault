@@ -100,7 +100,6 @@ namespace PixelVaultNative
                 PlatformOrder = PlatformGroupOrder,
                 FormatTimestamp = FormatFriendlyTimestamp,
                 FilenameGuess = FilenameGuessLabel,
-                IntakeReviewQueueBitmap = LoadIntakeReviewQueueBitmap(),
                 NotifyUser = (msg, icon) => TryLibraryToast(msg, icon)
             });
         }

@@ -24,6 +24,7 @@ namespace PixelVaultNative
                 LibraryFolderTileSize = libraryFolderTileSize,
                 LibraryPhotoTileSize = libraryPhotoTileSize,
                 LibraryFolderGridColumnCount = libraryFolderGridColumnCount,
+                LibraryFolderFillPaneWidth = libraryFolderFillPaneWidth,
                 LibraryPhotoGridColumnCount = libraryPhotoGridColumnCount,
                 LibraryPhotoRailFolderTileSize = libraryPhotoRailFolderTileSize,
                 LibraryPhotoRailFolderSortMode = libraryPhotoRailFolderSortMode ?? "alpha",
@@ -63,6 +64,7 @@ namespace PixelVaultNative
             libraryFolderTileSize = s.LibraryFolderTileSize;
             libraryPhotoTileSize = s.LibraryPhotoTileSize;
             libraryFolderGridColumnCount = s.LibraryFolderGridColumnCount;
+            libraryFolderFillPaneWidth = s.LibraryFolderFillPaneWidth;
             libraryPhotoGridColumnCount = s.LibraryPhotoGridColumnCount;
             libraryPhotoRailFolderTileSize = s.LibraryPhotoRailFolderTileSize;
             libraryPhotoRailFolderSortMode = s.LibraryPhotoRailFolderSortMode ?? "alpha";

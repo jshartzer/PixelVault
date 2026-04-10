@@ -182,6 +182,20 @@ namespace PixelVaultNative
                 {
                     if (int.TryParse(value, out var fc)) s.LibraryFolderGridColumnCount = NormalizeLibraryFolderGridColumnCount(fc);
                 }
+                else if (key == "library_folder_fill_pane_width")
+                {
+                    var normalizedValue = (value ?? string.Empty).Trim();
+                    if (string.Equals(normalizedValue, "1", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(normalizedValue, "true", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(normalizedValue, "yes", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(normalizedValue, "on", StringComparison.OrdinalIgnoreCase))
+                        s.LibraryFolderFillPaneWidth = true;
+                    else if (string.Equals(normalizedValue, "0", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(normalizedValue, "false", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(normalizedValue, "no", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(normalizedValue, "off", StringComparison.OrdinalIgnoreCase))
+                        s.LibraryFolderFillPaneWidth = false;
+                }
                 else if (key == "library_photo_grid_columns")
                 {
                     if (int.TryParse(value, out var pc)) s.LibraryPhotoGridColumnCount = NormalizeLibraryPhotoGridColumnCount(pc);
@@ -325,6 +339,7 @@ namespace PixelVaultNative
                 "library_folder_tile_size=" + NormalizeLibraryFolderTileSize(state.LibraryFolderTileSize),
                 "library_photo_tile_size=" + NormalizeLibraryPhotoTileSize(state.LibraryPhotoTileSize),
                 "library_folder_grid_columns=" + NormalizeLibraryFolderGridColumnCount(state.LibraryFolderGridColumnCount),
+                "library_folder_fill_pane_width=" + (state.LibraryFolderFillPaneWidth ? "1" : "0"),
                 "library_photo_grid_columns=" + NormalizeLibraryPhotoGridColumnCount(state.LibraryPhotoGridColumnCount),
                 "library_photo_rail_folder_tile_size=" + NormalizeLibraryFolderTileSize(state.LibraryPhotoRailFolderTileSize),
                 "library_photo_rail_folder_sort_mode=" + NormalizeLibraryFolderSortMode(state.LibraryPhotoRailFolderSortMode),

@@ -30,6 +30,7 @@ namespace PixelVaultNative
             internal string NonSteamId;
             internal string SteamGridDbId;
             internal string RetroAchievementsGameId;
+            internal string CollectionNotes;
             internal bool SuppressSteamAppIdAutoResolve;
             internal bool SuppressSteamGridDbIdAutoResolve;
             internal bool IsCompleted100Percent;
@@ -63,6 +64,7 @@ namespace PixelVaultNative
                 NonSteamId = view.NonSteamId,
                 SteamGridDbId = view.SteamGridDbId,
                 RetroAchievementsGameId = view.RetroAchievementsGameId,
+                CollectionNotes = view.CollectionNotes,
                 SuppressSteamAppIdAutoResolve = view.SuppressSteamAppIdAutoResolve,
                 SuppressSteamGridDbIdAutoResolve = view.SuppressSteamGridDbIdAutoResolve,
                 IsCompleted100Percent = view.IsCompleted100Percent,
@@ -88,6 +90,7 @@ namespace PixelVaultNative
             if (!string.IsNullOrWhiteSpace(view.NonSteamId)) parts.Add(view.NonSteamId.Trim());
             if (!string.IsNullOrWhiteSpace(view.SteamGridDbId)) parts.Add(view.SteamGridDbId.Trim());
             if (!string.IsNullOrWhiteSpace(view.RetroAchievementsGameId)) parts.Add(view.RetroAchievementsGameId.Trim());
+            if (!string.IsNullOrWhiteSpace(view.CollectionNotes)) parts.Add(view.CollectionNotes.Trim());
             foreach (var source in view.SourceFolders)
             {
                 if (source == null) continue;
@@ -129,6 +132,9 @@ namespace PixelVaultNative
             if (string.IsNullOrWhiteSpace(folder.PlatformLabel)) folder.PlatformLabel = view.PrimaryPlatformLabel ?? string.Empty;
             folder.PendingGameAssignment = view.PendingGameAssignment
                 || (primary != null && primary.PendingGameAssignment);
+            folder.CollectionNotes = string.IsNullOrWhiteSpace(view.CollectionNotes)
+                ? (primary?.CollectionNotes ?? string.Empty)
+                : view.CollectionNotes;
             return folder;
         }
 
@@ -982,6 +988,18 @@ namespace PixelVaultNative
             return GetLibraryBrowserFolderViewSortNewest(view);
         }
 
+        static string MergeLibraryBrowserCollectionNotesForCombinedView(IEnumerable<LibraryFolderInfo> folders)
+        {
+            if (folders == null) return string.Empty;
+            foreach (var f in folders)
+            {
+                if (f == null) continue;
+                var n = f.CollectionNotes;
+                if (!string.IsNullOrWhiteSpace(n)) return n;
+            }
+            return string.Empty;
+        }
+
         List<LibraryBrowserFolderView> BuildLibraryBrowserFolderViews(IEnumerable<LibraryFolderInfo> folders, string groupingMode)
         {
             var rawFolders = (folders ?? Enumerable.Empty<LibraryFolderInfo>())
@@ -1016,7 +1034,8 @@ namespace PixelVaultNative
                         IsCompleted100Percent = folder.IsCompleted100Percent,
                         CompletedUtcTicks = folder.CompletedUtcTicks,
                         IsMergedAcrossPlatforms = false,
-                        PendingGameAssignment = folder.PendingGameAssignment
+                        PendingGameAssignment = folder.PendingGameAssignment,
+                        CollectionNotes = folder.CollectionNotes ?? string.Empty
                     };
                     view.SourceFolders.Add(folder);
                     PopulateLibraryBrowserFolderViewSearchBlob(view);
@@ -1104,7 +1123,8 @@ namespace PixelVaultNative
                         IsCompleted100Percent = sourceFolders.Any(folder => folder != null && folder.IsCompleted100Percent),
                         CompletedUtcTicks = sourceFolders.Select(folder => folder == null ? 0L : folder.CompletedUtcTicks).Where(ticks => ticks > 0).DefaultIfEmpty(0L).Max(),
                         IsMergedAcrossPlatforms = platformLabels.Length > 1,
-                        PendingGameAssignment = sourceFolders.Any(f => f != null && f.PendingGameAssignment)
+                        PendingGameAssignment = sourceFolders.Any(f => f != null && f.PendingGameAssignment),
+                        CollectionNotes = MergeLibraryBrowserCollectionNotesForCombinedView(sourceFolders)
                     };
                     view.SourceFolders.AddRange(sourceFolders);
                     PopulateLibraryBrowserFolderViewSearchBlob(view);

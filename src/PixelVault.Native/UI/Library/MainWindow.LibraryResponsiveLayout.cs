@@ -24,7 +24,6 @@ namespace PixelVaultNative
             return resolved <= 0d ? Math.Max(0d, fallback) : resolved;
         }
         int NormalizeLibraryFolderTileSize(int value) => SettingsService.NormalizeLibraryFolderTileSize(value);
-        int NormalizeLibraryPhotoTileSize(int value) => SettingsService.NormalizeLibraryPhotoTileSize(value);
         int NormalizeLibraryFolderGridColumnCount(int value) => SettingsService.NormalizeLibraryFolderGridColumnCount(value);
         int NormalizeLibraryPhotoGridColumnCount(int value) => SettingsService.NormalizeLibraryPhotoGridColumnCount(value);
         int NormalizeLibraryPhotoRailFolderGridColumnCount(int value) => SettingsService.NormalizeLibraryPhotoRailFolderGridColumnCount(value);
@@ -32,12 +31,17 @@ namespace PixelVaultNative
         {
             // Match folder cover tile Margin right (horizontal rhythm between columns).
             const int gapPx = 12;
-            var libraryFolderMaxColumnsAuto = photoWorkspaceRail ? 2 : 4;
             const int layoutMinTile = 48;
             const int layoutMaxTile = 1000;
             const double moreColumnsSlackBudgetPx = 8;
             var viewportWidth = ResolveScrollViewerLayoutWidth(scrollViewer);
             viewportWidth = Math.Max(120, viewportWidth - 18);
+            var maxColumnsFitByMinTile = (int)Math.Floor((viewportWidth + gapPx) / (layoutMinTile + gapPx));
+            var libraryFolderMaxColumnsAuto = photoWorkspaceRail
+                ? 2
+                : (libraryFolderFillPaneWidth
+                    ? Math.Min(12, Math.Max(4, maxColumnsFitByMinTile))
+                    : 4);
             var fixedColsRaw = photoWorkspaceRail
                 ? NormalizeLibraryPhotoRailFolderGridColumnCount(libraryPhotoRailFolderGridColumnCount)
                 : NormalizeLibraryFolderGridColumnCount(libraryFolderGridColumnCount);
@@ -136,7 +140,6 @@ namespace PixelVaultNative
 
             if (applySavedPhotoTileSizePreference)
             {
-                var userCap = NormalizeLibraryPhotoTileSize(libraryPhotoTileSize);
                 var fixedPhotoCols = NormalizeLibraryPhotoGridColumnCount(libraryPhotoGridColumnCount);
                 if (fixedPhotoCols > 0)
                 {
@@ -150,7 +153,7 @@ namespace PixelVaultNative
                     c = Math.Max(1, c);
                     bestColumns = c;
                     var rawFillFixed = (int)Math.Floor((viewportWidth - ((bestColumns - 1) * gapPx)) / (double)bestColumns);
-                    var cappedFixed = Math.Max(minTile, Math.Min(userCap, rawFillFixed));
+                    var cappedFixed = Math.Max(minTile, Math.Min(layoutMaxTile, rawFillFixed));
                     bestTileWidth = ClampRoundedTile(cappedFixed);
                 }
                 else
@@ -160,7 +163,7 @@ namespace PixelVaultNative
                     {
                         var rawFill = (int)Math.Floor((viewportWidth - ((columns - 1) * gapPx)) / (double)columns);
                         if (rawFill < minTile) continue;
-                        var capped = Math.Max(minTile, Math.Min(userCap, rawFill));
+                        var capped = Math.Max(minTile, Math.Min(layoutMaxTile, rawFill));
                         var tileW = ClampRoundedTile(capped);
                         if (tileW > bestTileWidth || (tileW == bestTileWidth && columns < bestColumns))
                         {

@@ -337,6 +337,7 @@ namespace PixelVaultNative
                 {
                     _shell.LibraryBrowserRefreshFoldersAsync(libraryWindow, ws, forceRefresh, renderTiles);
                 };
+                ws.QuickEditRefreshLibraryFolders = () => refreshLibraryFoldersAsync(false);
                 _shell.ActiveLibraryFolderRefresh = refreshLibraryFoldersAsync;
                 if (!reuseMainWindow)
                 {
@@ -610,6 +611,25 @@ namespace PixelVaultNative
                     AddFolderCoverPreset("Comfortable", 380);
                     AddFolderCoverPreset("Roomy", 560);
                     AddFolderCoverPreset("Large (max)", 1000);
+                    var fillPaneItem = new MenuItem
+                    {
+                        Header = "Fill pane width (auto columns)",
+                        IsCheckable = true,
+                        ToolTip = "When Columns is Auto, add more columns on wide windows so rows use the full folder pane (still respects Cover size)."
+                    };
+                    fillPaneItem.IsChecked = _shell.LibraryFolderFillPaneWidth;
+                    fillPaneItem.Click += delegate
+                    {
+                        _shell.LibraryFolderFillPaneWidth = fillPaneItem.IsChecked == true;
+                        _shell.SaveSettings();
+                        if (renderTiles != null) renderTiles();
+                        _shell.LibraryBrowserShowToast(
+                            ws,
+                            _shell.LibraryFolderFillPaneWidth
+                                ? "Folder grid fills pane width (auto)"
+                                : "Folder grid: compact auto rows (max 4 columns)");
+                    };
+                    folderCoverLayoutMenu.Items.Add(fillPaneItem);
                     var folderColumnsMenu = new MenuItem { Header = "Columns" };
                     void AddFolderColumnChoice(string label, int cols)
                     {
@@ -624,7 +644,7 @@ namespace PixelVaultNative
                         folderColumnsMenu.Items.Add(colItem);
                     }
                     AddFolderColumnChoice("Auto", 0);
-                    for (var colN = 1; colN <= 8; colN++)
+                    for (var colN = 1; colN <= 12; colN++)
                     {
                         var captured = colN;
                         AddFolderColumnChoice(captured.ToString(), captured);
@@ -657,23 +677,6 @@ namespace PixelVaultNative
                 if (panes.PhotoCaptureLayoutButton != null)
                 {
                     var photoCaptureLayoutMenu = new ContextMenu();
-                    void AddPhotoCapturePreset(string label, int px)
-                    {
-                        var item = new MenuItem { Header = label };
-                        item.Click += delegate
-                        {
-                            _shell.LibraryPhotoTileSize = _shell.NormalizeLibraryPhotoTileSizeValue(px);
-                            _shell.SaveSettings();
-                            if (renderSelectedFolder != null) renderSelectedFolder();
-                            _shell.LibraryBrowserShowToast(ws, "Photo size: " + label);
-                        };
-                        photoCaptureLayoutMenu.Items.Add(item);
-                    }
-                    AddPhotoCapturePreset("Compact", 220);
-                    AddPhotoCapturePreset("Medium", 360);
-                    AddPhotoCapturePreset("Comfortable", 460);
-                    AddPhotoCapturePreset("Large (menu max)", SettingsService.LibraryPhotoTileMenuLargestPreset);
-                    var photoColumnsMenu = new MenuItem { Header = "Columns" };
                     void AddPhotoColumnChoice(string label, int cols)
                     {
                         var colItem = new MenuItem { Header = label };
@@ -684,7 +687,7 @@ namespace PixelVaultNative
                             if (renderSelectedFolder != null) renderSelectedFolder();
                             _shell.LibraryBrowserShowToast(ws, cols <= 0 ? "Capture columns: auto" : "Capture columns: " + cols);
                         };
-                        photoColumnsMenu.Items.Add(colItem);
+                        photoCaptureLayoutMenu.Items.Add(colItem);
                     }
                     AddPhotoColumnChoice("Auto", 0);
                     for (var pc = 1; pc <= 8; pc++)
@@ -692,7 +695,6 @@ namespace PixelVaultNative
                         var captured = pc;
                         AddPhotoColumnChoice(captured.ToString(), captured);
                     }
-                    photoCaptureLayoutMenu.Items.Add(photoColumnsMenu);
                     panes.PhotoCaptureLayoutButton.Click += delegate
                     {
                         photoCaptureLayoutMenu.PlacementTarget = panes.PhotoCaptureLayoutButton;

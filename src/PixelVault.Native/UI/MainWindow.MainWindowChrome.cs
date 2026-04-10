@@ -14,41 +14,39 @@ namespace PixelVaultNative
     public sealed partial class MainWindow
     {
         SolidColorBrush Brush(string hex) { return UiBrushHelper.FromHex(hex); }
-        Canvas BuildGamepadGlyphCanvas(Brush stroke, double strokeThickness)
+        /// <summary>Download-into-inbox style icon (arrow + open tray); used for intake queue toolbar and preview header.</summary>
+        static Canvas BuildIntakeDownloadTrayGlyphCanvas(Brush stroke, double strokeThickness)
         {
-            var art = new Canvas { Width = 108, Height = 48 };
-            art.Children.Add(new System.Windows.Shapes.Path
-            {
-                Data = Geometry.Parse("M 12 42 C 8 42 5 39 4 33 C 1 23 6 15 12 10 C 17 6 25 4 34 4 L 41 4 C 42 4 43 5 44 6 C 45 7 46 8 48 8 L 60 8 C 62 8 63 7 64 6 C 65 5 66 4 67 4 L 74 4 C 83 4 91 6 96 10 C 102 15 107 23 104 33 C 103 39 100 42 96 42 C 90 42 84 39 78 32 L 69 22 C 66 19 64 18 60 18 L 48 18 C 44 18 42 19 39 22 L 30 32 C 24 39 18 42 12 42 Z"),
-                Stroke = stroke,
-                StrokeThickness = strokeThickness,
-                Fill = Brushes.Transparent,
-                StrokeLineJoin = PenLineJoin.Round,
-                StrokeStartLineCap = PenLineCap.Round,
-                StrokeEndLineCap = PenLineCap.Round
-            });
-            art.Children.Add(new System.Windows.Shapes.Path
-            {
-                Data = Geometry.Parse("M 28 40 L 40 28 C 44 24 47 22 52 22 L 56 22 C 61 22 64 24 68 28 L 80 40"),
-                Stroke = stroke,
-                StrokeThickness = strokeThickness,
-                Fill = Brushes.Transparent,
-                StrokeLineJoin = PenLineJoin.Round,
-                StrokeStartLineCap = PenLineCap.Round,
-                StrokeEndLineCap = PenLineCap.Round
-            });
+            var art = new Canvas { Width = 100, Height = 100 };
+            System.Windows.Shapes.Path Path(string data) =>
+                new System.Windows.Shapes.Path
+                {
+                    Data = Geometry.Parse(data),
+                    Stroke = stroke,
+                    StrokeThickness = strokeThickness,
+                    Fill = Brushes.Transparent,
+                    StrokeLineJoin = PenLineJoin.Round,
+                    StrokeStartLineCap = PenLineCap.Round,
+                    StrokeEndLineCap = PenLineCap.Round
+                };
+            art.Children.Add(Path("M 50 8 L 50 34"));
+            art.Children.Add(Path("M 38 34 L 50 46 L 62 34"));
+            art.Children.Add(Path("M 18 58 L 18 82 Q 18 88 24 88 L 76 88 Q 82 88 82 82 L 82 58"));
             return art;
         }
-        FrameworkElement BuildGamepadGlyph(Brush stroke, double strokeThickness, double width, double height)
+
+        /// <summary>Vector intake-queue icon for reuse outside instance chrome (e.g. intake preview dialog).</summary>
+        public static FrameworkElement BuildIntakeDownloadTrayGlyph(Brush stroke, double strokeThickness, double width, double height)
         {
             return new Viewbox
             {
                 Width = width,
                 Height = height,
                 Stretch = Stretch.Uniform,
-                Child = BuildGamepadGlyphCanvas(stroke, strokeThickness)
+                Child = BuildIntakeDownloadTrayGlyphCanvas(stroke, strokeThickness)
             };
         }
+
         FrameworkElement BuildSymbolIcon(string glyph, string foregroundHex, double fontSize)
         {
             return new TextBlock
@@ -119,44 +117,6 @@ namespace PixelVaultNative
                 }
             }
             return string.Empty;
-        }
-        /// <summary>Toolbar / intake header bitmap; knocks out near-white backing so the glyph reads on dark chrome.</summary>
-        BitmapSource LoadIntakeReviewQueueBitmap()
-        {
-            var path = ResolveWorkspaceAssetPath("IntakeReviewQueue.png");
-            if (string.IsNullOrWhiteSpace(path)) return null;
-            try
-            {
-                var bmp = new BitmapImage();
-                bmp.BeginInit();
-                bmp.UriSource = new Uri(path, UriKind.Absolute);
-                bmp.DecodePixelWidth = 192;
-                bmp.CacheOption = BitmapCacheOption.OnLoad;
-                bmp.EndInit();
-                bmp.Freeze();
-                var converted = new FormatConvertedBitmap(bmp, PixelFormats.Pbgra32, null, 0);
-                converted.Freeze();
-                var w = converted.PixelWidth;
-                var h = converted.PixelHeight;
-                var stride = w * 4;
-                var pixels = new byte[stride * h];
-                converted.CopyPixels(pixels, stride, 0);
-                for (var i = 0; i < pixels.Length; i += 4)
-                {
-                    var blue = pixels[i];
-                    var green = pixels[i + 1];
-                    var red = pixels[i + 2];
-                    if (red >= 245 && green >= 245 && blue >= 245) pixels[i + 3] = 0;
-                }
-                var trimmed = new WriteableBitmap(w, h, 96, 96, PixelFormats.Pbgra32, null);
-                trimmed.WritePixels(new Int32Rect(0, 0, w, h), pixels, stride, 0);
-                trimmed.Freeze();
-                return trimmed;
-            }
-            catch
-            {
-                return null;
-            }
         }
         static bool IsNearWhiteBitmapPixel(byte[] pixels, int offset)
         {
