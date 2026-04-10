@@ -51,6 +51,12 @@ namespace PixelVaultNative
             internal DispatcherTimer LibraryToastTimer;
             internal Grid QuickEditDrawerHost;
             internal bool QuickEditDrawerOpen;
+            internal TextBlock QuickEditDrawerTitleText;
+            internal TextBlock QuickEditDrawerSubtitleText;
+            internal Button QuickEditDrawerMetadataButton;
+            internal Button QuickEditDrawerOpenFolderButton;
+            internal Action QuickEditOpenMetadata;
+            internal Action QuickEditOpenFolders;
 
             /// <summary>See <see cref="LibraryWorkspaceMode"/> (<c>PV-PLN-LIBWS-001</c>).</summary>
             internal LibraryWorkspaceMode WorkspaceMode = LibraryWorkspaceMode.Folder;

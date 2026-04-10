@@ -30,7 +30,7 @@ namespace PixelVaultNative
             new("export_starred", "Export Starred", "Copy starred to export folder", "star export"),
             new("refresh_covers", "Refresh all covers", "Re-fetch art for whole library", "grid steam fetch"),
             new("shortcuts", "Keyboard shortcuts", "Same as F1", "keys help"),
-            new("quick_edit_panel", "Quick edit panel", "Side drawer for fast edits (shell)", "drawer sidebar"),
+            new("quick_edit_panel", "Quick edit panel", "Side drawer: selection summary, Edit metadata, Open folder (Ctrl+Shift+E)", "drawer sidebar"),
             new("sort_alpha", "Sort folders · Alphabetical", "Folder list order", "sort a-z name abc"),
             new("sort_captured", "Sort folders · Date captured", "Folder list order", "sort when taken"),
             new("sort_added", "Sort folders · Date added", "Folder list order", "sort recent library"),

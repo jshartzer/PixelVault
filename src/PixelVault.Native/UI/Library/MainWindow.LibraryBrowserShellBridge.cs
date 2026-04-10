@@ -380,6 +380,12 @@ namespace PixelVaultNative
 
             public void LibraryBrowserToggleQuickEditDrawer(LibraryBrowserWorkingSet ws) =>
                 _m.LibraryBrowserToggleQuickEditDrawer(ws);
+
+            public void LibraryBrowserOpenSourceFoldersForCurrentSelection(LibraryBrowserWorkingSet ws) =>
+                _m.LibraryBrowserOpenSourceFoldersForCurrentSelection(ws);
+
+            public void LibraryBrowserRefreshQuickEditDrawerContent(LibraryBrowserWorkingSet ws) =>
+                _m.LibraryBrowserRefreshQuickEditDrawerContent(ws);
         }
     }
 }

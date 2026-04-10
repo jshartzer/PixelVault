@@ -278,6 +278,9 @@ namespace PixelVaultNative
                     _shell.LibraryBrowserOpenSingleFileMetadataEditor(ws, null, getVisibleDetailFilesOrdered, getSelectedDetailFiles, getDisplayFolder, getActionFolder, refreshLibraryFoldersAsync);
                 };
 
+                ws.QuickEditOpenMetadata = openSelectedLibraryMetadataEditor;
+                ws.QuickEditOpenFolders = () => _shell.LibraryBrowserOpenSourceFoldersForCurrentSelection(ws);
+
                 deleteSelectedLibraryFiles = delegate
                 {
                     _shell.LibraryBrowserDeleteSelectedCaptures(libraryWindow, ws, getSelectedDetailFiles, renderTiles, renderSelectedFolder, refreshLibraryFoldersAsync);
@@ -309,6 +312,7 @@ namespace PixelVaultNative
                 showFolder = delegate(LibraryBrowserFolderView info)
                 {
                     _shell.LibraryBrowserShowSelectedFolder(ws, panes, libraryWindow, info, renderSelectedFolder);
+                    if (ws.QuickEditDrawerOpen) _shell.LibraryBrowserRefreshQuickEditDrawerContent(ws);
                 };
 
                 Action renderFolderTilesCore = null;

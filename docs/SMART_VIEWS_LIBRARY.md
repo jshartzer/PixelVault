@@ -46,3 +46,15 @@ Library folder rows in the browser are materialized as **`MainWindow.LibraryBrow
 | Rich refs | `SourceFolders`, `PrimaryFolder`, `FilePaths` | **Not** on summary — use **`LibraryFolderInfo`** / detail APIs when full paths are required (`GameDetail`-shaped work). |
 
 **Plan:** `docs/plans/PV-PLN-UI-001-ui-thin-mainwindow-ios-aligned.md` Step 4.
+
+---
+
+## Manual verification checklist (Slice F)
+
+Use this when changing filter normalization, `LibraryBrowseFolderSummary` predicates, or folder list rendering.
+
+1. **Search then filter:** Type a partial game name; set filter **Missing ID**; confirm rows match `missingid` in the table above (including Steam/Emulation tag rules in the Notes).
+2. **Filter only:** Reset search; toggle **All games** → **No cover path** → **100% Achievements**; confirm counts and rows change without errors.
+3. **Grouping:** With filter **25+ Captures**, switch grouping **By console** and **Timeline**; confirm no crash and filters still apply to underlying folder rows.
+4. **Persistence:** Change filter, close library, reopen; mode matches **Settings** / `library_folder_filter_mode` (see `SettingsService.NormalizeLibraryFolderFilterMode`).
+5. **Legacy settings:** If you still have old `needssteam`-era values in settings JSON, confirm they normalize to **`missingid`** (see Notes above).

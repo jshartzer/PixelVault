@@ -244,5 +244,10 @@ namespace PixelVaultNative
         void LibraryBrowserSetQuickEditDrawerOpen(MainWindow.LibraryBrowserWorkingSet ws, bool open);
 
         void LibraryBrowserToggleQuickEditDrawer(MainWindow.LibraryBrowserWorkingSet ws);
+
+        /// <summary>Opens Explorer for each source folder path of the current library selection (same as detail toolbar Open Folder).</summary>
+        void LibraryBrowserOpenSourceFoldersForCurrentSelection(MainWindow.LibraryBrowserWorkingSet ws);
+
+        void LibraryBrowserRefreshQuickEditDrawerContent(MainWindow.LibraryBrowserWorkingSet ws);
     }
 }

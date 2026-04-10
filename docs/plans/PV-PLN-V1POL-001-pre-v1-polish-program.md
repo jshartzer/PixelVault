@@ -28,7 +28,7 @@ Authoritative complements: **`docs/CHANGELOG.md`** (**`0.075.xxx`**), **`docs/SM
 | **D** | Inline feedback / fewer modals | **Shipped (scoped)** — **`TryLibraryToast`**, **`NotifyOrMessageBox`**, **`NormalizeForLibraryToast`**; many **OK-only** **`MessageBox`** paths use library toasts when the browser is live (**`0.075.001`**–**`0.075.003`**). **OKCancel / YesNoCancel** remains modal; owner-window placement improved for key flows. |
 | **E** | Command palette | **Shipped (library)** — **`LibraryCommandPaletteRegistry`**, **Ctrl+Shift+P**, footer **⋯**, keywords + **Tab** into list; tests (**`0.075.004`**). |
 | **F** | Smart / curated views | **Largely shipped** — **`docs/SMART_VIEWS_LIBRARY.md`**; **`LibraryBrowserFolderViewMatchesFilter`**; **`needssteam`** / **`nocover`**; unified **`missingid`** (**Missing ID**) with legacy aliases via **`SettingsService`** (**`0.075.005`** + plan revs **2026-04-05**). Palette **`quick_edit_panel`** = drawer **shell** only. **Remaining:** any extra presets/chips called out in smart-views doc, deeper “every view defined” checklist. |
-| **G** | Quick-edit drawer (staged) | **Partial** — Shell / palette entry exists; **narrow in-place edits** and full validation of drawer UX **not** closed out in this plan doc. |
+| **G** | Quick-edit drawer (staged) | **Partial → deeper** — Drawer shows **selection title**, platform / Game ID line, **Edit metadata** (same batch path as detail toolbar), **Open folder** (Explorer); **Ctrl+Shift+E** / palette; refreshes when selection changes while open. Full field-level “quick edits” without manual metadata dialog remains future work. |
 | **H** | Motion + accessibility | **Partial** — e.g. **`PixelVaultFocus.xaml`**, toast vs **client-area animation**, nav **tooltips**, control **automation** names (**2026-04-05** rev). No claim of full reduced-motion / focus audit. |
 | **J** | Consistency cleanup | **Partial** — Ongoing; **literal/tooltip/destructive** sweep not finished as a single milestone. |
 
@@ -92,7 +92,7 @@ Recommended order balances **safety**, **reuse of seams** (`ILibraryBrowserShell
 | **D** | Inline feedback / fewer modals | Medium | **Shipped (scoped)**. Remaining **`MessageBox.Show`** audit = incremental **J** / spot fixes. |
 | **E** | Command palette | Medium | **Shipped (library)**. Future: more commands / other surfaces if needed. |
 | **F** | Smart / curated views | Medium–high | **Largely shipped**; **`docs/SMART_VIEWS_LIBRARY.md`** is source of truth for filter semantics. |
-| **G** | Quick-edit drawer (staged) | High | **Partial** — shell only; narrow flows TBD. |
+| **G** | Quick-edit drawer (staged) | High | **Partial** — selection-aware actions + copy; not a full inline editor. |
 | **H** | Motion + accessibility | Low–medium | **Partial** — shared focus + some motion; full checklist open. |
 | **J** | Consistency cleanup | Low | **Partial** — ongoing pass on literals, tooltips, destructive affordances. |
 
@@ -174,3 +174,4 @@ Planning/status for this initiative: **[PV-PLN-V1POL-001 — Pre-V1 polish progr
 | 2026-04-05 | Slice **F** continuation: palette **`quick_edit_panel`** (quick-edit drawer shell). **H/J:** merged **`PixelVaultFocus.xaml`**, toast fade respects **client-area animation**, nav **tooltips**, delete control **automation name**. **Item 7:** starred-export fingerprint I/O via **`ILibrarySession`**. |
 | 2026-04-05 | Slice **F**: single **`missingid`** filter (**Missing ID**) replaces **`needssteam`** / **`needssteamgrid`** / **`missinggameid`**; legacy settings values normalize to **`missingid`**. |
 | 2026-04-08 | **Plan doc** aligned to **shipped** work: header **Status**, new **[Execution status](#execution-status-shipped-vs-remaining)** table, roadmap **Notes** column updated; **Grounded audit** labeled **pre–`0.075` baseline** so it does not override changelog truth. |
+| 2026-04-09 | **Slice G (follow-on):** Quick-edit drawer — **Edit metadata**, **Open folder**, selection summary, timeline/photo workspace copy; **`docs/SMART_VIEWS_LIBRARY.md`** manual verification checklist added (**Slice F**). |
