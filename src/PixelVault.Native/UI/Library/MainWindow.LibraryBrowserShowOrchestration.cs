@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -466,6 +467,33 @@ namespace PixelVaultNative
                 var paletteCtx = new LibraryBrowserPaletteContext
                 {
                     RefreshLibraryFolders = () => refreshLibraryFoldersAsync?.Invoke(false),
+                    RunLibraryMetadataIndexScanSelectedFolder = delegate
+                    {
+                        if (ws.Current == null)
+                        {
+                            _shell.LibraryBrowserShowToast(ws, "Select a game folder first (not Timeline).");
+                            return;
+                        }
+                        var scopeFolders = _shell.GetLibraryBrowserActionFolders(ws.Current);
+                        var path = scopeFolders.FirstOrDefault(f => f != null && !string.IsNullOrWhiteSpace(f.FolderPath) && Directory.Exists(f.FolderPath))?.FolderPath;
+                        if (string.IsNullOrWhiteSpace(path))
+                        {
+                            _shell.LibraryBrowserShowToast(ws, "No on-disk folder path for this selection.");
+                            return;
+                        }
+                        _shell.LibraryBrowserRunFolderMetadataScan(libraryWindow, ws, path, false, setLibraryBusyState, refreshLibraryFoldersAsync);
+                    },
+                    RunLibraryMetadataIndexScanFullLibrary = delegate
+                    {
+                        var choice = MessageBox.Show(
+                            libraryWindow,
+                            "Refresh the metadata index for the entire library?\n\nThis re-reads EXIF for files whose content changed (can take a while). Unchanged files are skipped.",
+                            "PixelVault",
+                            MessageBoxButton.OKCancel,
+                            MessageBoxImage.Question);
+                        if (choice != MessageBoxResult.OK) return;
+                        _shell.LibraryBrowserRunFolderMetadataScan(libraryWindow, ws, string.Empty, false, setLibraryBusyState, refreshLibraryFoldersAsync);
+                    },
                     ClearLibrarySearch = clearLibrarySearchAndRerender,
                     OpenSettings = delegate
                     {

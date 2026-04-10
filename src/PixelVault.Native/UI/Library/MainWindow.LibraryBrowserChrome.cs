@@ -147,7 +147,7 @@ namespace PixelVaultNative
             chrome.RefreshButton.Margin = new Thickness(8, 0, 0, 0);
             ApplyLibraryToolbarChrome(chrome.RefreshButton, "#18242B", "#24353F", "#22323C", "#131D23");
             chrome.RefreshButton.Content = BuildToolbarButtonContent("\uE72C", "Refresh");
-            chrome.RefreshButton.ToolTip = "Rescan library folders from disk";
+            chrome.RefreshButton.ToolTip = "Reload the folder list from cache (fast). Does not re-read EXIF or rebuild the SQLite photo index—open the command palette (Ctrl+Shift+P) and run “Refresh metadata index”.";
             chrome.IntakeReviewButton = Btn(string.Empty, null, "#152028", Brushes.White);
             chrome.IntakeReviewButton.Width = 76;
             chrome.IntakeReviewButton.Height = 56;

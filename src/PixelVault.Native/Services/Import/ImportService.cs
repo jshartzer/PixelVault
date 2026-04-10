@@ -816,7 +816,7 @@ namespace PixelVaultNative
                 if (item == null || item.DeleteBeforeProcessing) continue;
                 var resolvedName = normalize(
                     string.IsNullOrWhiteSpace(item.GameName)
-                        ? nameFromFile(Path.GetFileNameWithoutExtension(item.FilePath))
+                        ? nameFromFile(Path.GetFileName(item.FilePath))
                         : item.GameName);
                 if (!string.IsNullOrWhiteSpace(resolvedName)) item.GameName = resolvedName;
                 var preferredGameId = groupingIdentityFn(item) ? string.Empty : item.GameId;
@@ -868,7 +868,7 @@ namespace PixelVaultNative
                 {
                     var normalizedName = normalize(
                         string.IsNullOrWhiteSpace(item.GameName)
-                            ? nameFromFile(Path.GetFileNameWithoutExtension(item.FilePath))
+                            ? nameFromFile(Path.GetFileName(item.FilePath))
                             : item.GameName);
                     return new
                     {
@@ -903,7 +903,7 @@ namespace PixelVaultNative
                 if (item == null || item.DeleteBeforeProcessing) continue;
                 var resolvedName = normalize(
                     string.IsNullOrWhiteSpace(item.GameName)
-                        ? nameFromFile(Path.GetFileNameWithoutExtension(item.FilePath))
+                        ? nameFromFile(Path.GetFileName(item.FilePath))
                         : item.GameName);
                 var resolvedPlatform = platformFn(item);
                 var preferredGameId = groupingFn(item) ? string.Empty : item.GameId;
@@ -969,7 +969,7 @@ namespace PixelVaultNative
             var n = pendingItemCount;
             if (libraryMode)
             {
-                return n + " selected image(s) will be renamed if needed, updated with metadata, and reorganized in the library if their title changes.\n\nApply changes now?";
+                return n + " selected image(s) will be renamed if needed, reorganized when the title points at a different game folder, and the library index updated. Embedded file tags/comment/capture date are rewritten only when those fields actually change.\n\nApply changes now?";
             }
 
             if (importAndEditMode)

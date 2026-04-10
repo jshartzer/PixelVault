@@ -544,6 +544,14 @@ namespace PixelVaultNative
                         Margin = new Thickness(0, 0, 0, 8),
                         TextWrapping = TextWrapping.Wrap
                     });
+                fileStack.Children.Add(new TextBlock
+                {
+                    Text = "“Outside canonical folder” compares each file’s path stored in the photo index to the single canonical folder name computed for that GameId from the game index. A different folder next to it (even with a similar title) is not “inside” until the file lives under the canonical path or you refresh after moving files.",
+                    Foreground = d.Brush(DesignTokens.TextShortcutMuted),
+                    FontSize = 12,
+                    Margin = new Thickness(0, 0, 0, 8),
+                    TextWrapping = TextWrapping.Wrap
+                });
                 var fileDg = BuildPlacementIndexedFilesDataGrid(d, fileIssues);
                 fileStack.Children.Add(fileDg);
                 fileTab.Content = fileStack;

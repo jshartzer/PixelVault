@@ -351,10 +351,46 @@ namespace PixelVaultNative
                     ? GetGameNameFromFileName(Path.GetFileName(item.FilePath))
                     : item.OriginalGameName);
             if (!string.Equals(currentName, originalName, StringComparison.OrdinalIgnoreCase)) return true;
-            return !string.Equals(
+            if (!string.Equals(
                 NormalizeConsoleLabel(DetermineManualMetadataPlatformLabel(item)),
                 NormalizeConsoleLabel(DetermineOriginalManualMetadataPlatformLabel(item)),
-                StringComparison.OrdinalIgnoreCase);
+                StringComparison.OrdinalIgnoreCase))
+                return true;
+            if (!string.Equals(
+                NormalizeGameId(item.GameId ?? string.Empty),
+                NormalizeGameId(item.OriginalGameId ?? string.Empty),
+                StringComparison.OrdinalIgnoreCase))
+                return true;
+            return false;
+        }
+
+        /// <summary>
+        /// When the edited title + platform match a row in the loaded game index, set <see cref="ManualMetadataItem.GameId"/> to that row
+        /// so library apply does not keep a stale id (identity-first resolution expects consistent id + title).
+        /// </summary>
+        void SyncManualMetadataGameIdsFromGameTitleIndexRows(ManualMetadataDialogHost h, IEnumerable<ManualMetadataItem> items)
+        {
+            if (h == null) return;
+            var rows = h.GameTitleIndexRows;
+            if (rows == null || rows.Count == 0) return;
+            foreach (var item in items ?? Enumerable.Empty<ManualMetadataItem>())
+            {
+                if (item == null) continue;
+                var platform = DetermineManualMetadataPlatformLabel(item);
+                var titleForIdentity = string.IsNullOrWhiteSpace(item.GameName)
+                    ? GetGameNameFromFileName(Path.GetFileName(item.FilePath))
+                    : item.GameName;
+                var wantedIdentity = BuildGameIndexIdentity(titleForIdentity, platform);
+                foreach (var row in rows)
+                {
+                    if (row == null) continue;
+                    if (string.Equals(BuildGameIndexIdentity(row.Name, row.PlatformLabel), wantedIdentity, StringComparison.OrdinalIgnoreCase))
+                    {
+                        item.GameId = NormalizeGameId(row.GameId);
+                        break;
+                    }
+                }
+            }
         }
 
         static bool ManualMetadataTouchesTags(ManualMetadataItem item)

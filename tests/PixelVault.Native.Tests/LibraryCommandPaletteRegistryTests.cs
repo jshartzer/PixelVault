@@ -27,6 +27,8 @@ public class LibraryCommandPaletteRegistryTests
         var ctx = new LibraryBrowserPaletteContext
         {
             RefreshLibraryFolders = () => { },
+            RunLibraryMetadataIndexScanSelectedFolder = () => { },
+            RunLibraryMetadataIndexScanFullLibrary = () => { },
             ClearLibrarySearch = () => { },
             OpenSettings = () => { },
             OpenHealthDashboard = () => { },

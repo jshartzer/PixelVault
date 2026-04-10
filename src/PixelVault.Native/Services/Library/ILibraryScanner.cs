@@ -30,7 +30,8 @@ namespace PixelVaultNative
 
         void RemoveLibraryMetadataIndexEntries(IEnumerable<string> files, string root);
 
-        void SavePhotoIndexEditorRows(string root, IEnumerable<PhotoIndexEditorRow> rows);
+        /// <param name="removedPaths">Paths explicitly removed in the editor (Forget row). Other index entries are merged, not replaced wholesale.</param>
+        void SavePhotoIndexEditorRows(string root, IEnumerable<PhotoIndexEditorRow> rows, IEnumerable<string> removedPaths = null);
 
         List<PhotoIndexEditorRow> LoadPhotoIndexEditorRows(string root);
 

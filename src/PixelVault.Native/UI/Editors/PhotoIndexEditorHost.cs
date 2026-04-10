@@ -17,7 +17,8 @@ namespace PixelVaultNative
         public Action<string> Log { get; set; }
         public Func<string, RoutedEventHandler, string, Brush, Button> CreateButton { get; set; }
         public Func<string, List<PhotoIndexEditorRow>> LoadRows { get; set; }
-        public Action<string, List<PhotoIndexEditorRow>> SaveRows { get; set; }
+        /// <param name="removedPaths">Paths removed via Forget row; null when not applicable (e.g. reload-from-file save).</param>
+        public Action<string, List<PhotoIndexEditorRow>, IEnumerable<string>> SaveRows { get; set; }
         public Func<string, string[]> ReadEmbeddedKeywordTagsDirect { get; set; }
         public Func<IEnumerable<string>, string> DetermineConsoleLabelFromTags { get; set; }
         public Func<string, string> BuildLibraryMetadataStamp { get; set; }
@@ -51,6 +52,7 @@ namespace PixelVaultNative
             if (services.ParseTagText == null) throw new ArgumentNullException(nameof(services) + "." + nameof(services.ParseTagText));
             services.SetStatus("Loading photo index");
             var allRows = services.LoadRows(libraryRoot);
+            var forgottenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var editorWindow = new Window
             {
                 Title = "PixelVault " + appVersion + " Photo Index",
@@ -158,10 +160,11 @@ namespace PixelVaultNative
             grid.Columns.Add(new DataGridCheckBoxColumn { Header = "\u2605", Binding = new System.Windows.Data.Binding("Starred") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.PropertyChanged }, Width = 46 });
             grid.Columns.Add(new DataGridTextColumn { Header = "Added", Binding = new System.Windows.Data.Binding("IndexAddedAtLocal"), IsReadOnly = true, Width = 120 });
             var editTrigger = System.Windows.Data.UpdateSourceTrigger.PropertyChanged;
-            grid.Columns.Add(new DataGridTextColumn { Header = "Game ID", Binding = new System.Windows.Data.Binding("GameId") { UpdateSourceTrigger = editTrigger }, Width = 110 });
-            grid.Columns.Add(new DataGridTextColumn { Header = "RA Game ID", Binding = new System.Windows.Data.Binding("RetroAchievementsGameId") { UpdateSourceTrigger = editTrigger }, Width = 100 });
-            grid.Columns.Add(new DataGridTextColumn { Header = "Console", Binding = new System.Windows.Data.Binding("ConsoleLabel") { UpdateSourceTrigger = editTrigger }, Width = 120 });
-            grid.Columns.Add(new DataGridTextColumn { Header = "Tags", Binding = new System.Windows.Data.Binding("TagText") { UpdateSourceTrigger = editTrigger }, Width = new DataGridLength(1.05, DataGridLengthUnitType.Star) });
+            var twoWay = System.Windows.Data.BindingMode.TwoWay;
+            grid.Columns.Add(new DataGridTextColumn { Header = "Game ID", Binding = new System.Windows.Data.Binding("GameId") { Mode = twoWay, UpdateSourceTrigger = editTrigger }, Width = 110 });
+            grid.Columns.Add(new DataGridTextColumn { Header = "RA Game ID", Binding = new System.Windows.Data.Binding("RetroAchievementsGameId") { Mode = twoWay, UpdateSourceTrigger = editTrigger }, Width = 100 });
+            grid.Columns.Add(new DataGridTextColumn { Header = "Console", Binding = new System.Windows.Data.Binding("ConsoleLabel") { Mode = twoWay, UpdateSourceTrigger = editTrigger }, Width = 120 });
+            grid.Columns.Add(new DataGridTextColumn { Header = "Tags", Binding = new System.Windows.Data.Binding("TagText") { Mode = twoWay, UpdateSourceTrigger = editTrigger }, Width = new DataGridLength(1.05, DataGridLengthUnitType.Star) });
             grid.Columns.Add(new DataGridTextColumn { Header = "File", Binding = new System.Windows.Data.Binding("FilePath"), IsReadOnly = true, Width = new DataGridLength(1.8, DataGridLengthUnitType.Star) });
             grid.Columns.Add(new DataGridTextColumn { Header = "Stamp", Binding = new System.Windows.Data.Binding("Stamp"), IsReadOnly = true, Width = 170 });
             Grid.SetRow(grid, 1);
@@ -252,6 +255,7 @@ namespace PixelVaultNative
             Action reloadRows = delegate
             {
                 allRows = services.LoadRows(libraryRoot);
+                forgottenPaths.Clear();
                 dirty = false;
                 refreshGrid();
                 services.SetStatus("Photo index reloaded");
@@ -289,7 +293,11 @@ namespace PixelVaultNative
                 if (selectedItems.Count == 0) return;
                 var choice = MessageBox.Show("Forget " + selectedItems.Count + " selected row(s) from the photo index?\n\nThis does not delete the file itself. If the file is still in the library, PixelVault can add it back on refresh or rebuild.", "Forget Photo Index Row", MessageBoxButton.OKCancel, MessageBoxImage.Warning);
                 if (choice != MessageBoxResult.OK) return;
-                foreach (var selected in selectedItems) allRows.Remove(selected);
+                foreach (var selected in selectedItems)
+                {
+                    if (!string.IsNullOrWhiteSpace(selected.FilePath)) forgottenPaths.Add(selected.FilePath);
+                    allRows.Remove(selected);
+                }
                 dirty = true;
                 refreshGrid();
                 services.SetStatus("Photo index row(s) forgotten");
@@ -341,8 +349,9 @@ namespace PixelVaultNative
                     target.Stamp = services.BuildLibraryMetadataStamp(path);
                     refreshed++;
                 }
-                services.SaveRows(libraryRoot, diskRows);
+                services.SaveRows(libraryRoot, diskRows, null);
                 allRows = services.LoadRows(libraryRoot);
+                forgottenPaths.Clear();
                 dirty = false;
                 refreshGrid();
                 reselection(selectedPaths);
@@ -362,6 +371,7 @@ namespace PixelVaultNative
             {
                 try
                 {
+                    Keyboard.ClearFocus();
                     grid.CommitEdit(DataGridEditingUnit.Cell, true);
                     grid.CommitEdit(DataGridEditingUnit.Row, true);
                     foreach (var row in allRows)
@@ -371,7 +381,8 @@ namespace PixelVaultNative
                         row.ConsoleLabel = services.CleanTag(row.ConsoleLabel);
                         row.TagText = string.Join(", ", services.ParseTagText(row.TagText));
                     }
-                    services.SaveRows(libraryRoot, allRows);
+                    services.SaveRows(libraryRoot, allRows, forgottenPaths);
+                    forgottenPaths.Clear();
                     allRows = services.LoadRows(libraryRoot);
                     dirty = false;
                     refreshGrid();

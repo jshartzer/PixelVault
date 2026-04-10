@@ -657,7 +657,7 @@ namespace PixelVaultNative
                     fileParts.Add("All " + assignedChecked + " assigned indexed capture(s) are under the canonical folder for their GameId (including subfolders).");
                 else
                 {
-                    fileParts.Add(misplaced + " of " + assignedChecked + " assigned indexed capture(s) sit outside the canonical folder for their GameId.");
+                    fileParts.Add(misplaced + " of " + assignedChecked + " assigned indexed capture(s) sit outside the canonical folder for their GameId. Paths come from the photo index; the canonical folder is one computed name under the library root—parallel folders (different spelling or extra suffixes) count as outside until files are moved or the index is refreshed.");
                     snap.IndexedFilesNeedAttention = true;
                 }
             }

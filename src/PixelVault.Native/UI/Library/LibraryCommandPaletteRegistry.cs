@@ -12,7 +12,9 @@ namespace PixelVaultNative
         /// <summary>Display order defines default ordering in the palette.</summary>
         internal static readonly CommandSpec[] All =
         {
-            new("refresh_folders", "Refresh folders", "Rescan library tree", "reload scan library"),
+            new("refresh_folders", "Refresh folders", "Reload folder list from cache (fast; does not rebuild the photo metadata index)", "reload folder list cache"),
+            new("metadata_scan_folder", "Refresh metadata index · selected folder", "Re-read EXIF and update SQLite photo-index rows for this game’s folder", "exif sqlite index rescan"),
+            new("metadata_scan_library", "Refresh metadata index · entire library", "Re-read EXIF and update photo-index rows for all library files (slow)", "full exif sqlite rebuild"),
             new("clear_search", "Clear folder search", "Reset search and show all folders", "search clear filter"),
             new("settings", "Settings", "App preferences and paths", "preferences options"),
             new("health", "Setup & health", "Paths, tools, diagnostics", "diagnostics troubleshooting"),
@@ -72,6 +74,8 @@ namespace PixelVaultNative
             }
 
             Bind("refresh_folders", ctx.RefreshLibraryFolders);
+            Bind("metadata_scan_folder", ctx.RunLibraryMetadataIndexScanSelectedFolder);
+            Bind("metadata_scan_library", ctx.RunLibraryMetadataIndexScanFullLibrary);
             Bind("clear_search", ctx.ClearLibrarySearch);
             Bind("settings", ctx.OpenSettings);
             Bind("health", ctx.OpenHealthDashboard);

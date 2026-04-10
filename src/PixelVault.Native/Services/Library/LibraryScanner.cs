@@ -314,12 +314,13 @@ namespace PixelVaultNative
             if (rebuildFolderCache) RebuildLibraryFolderCache(root, null);
         }
 
-        public void SavePhotoIndexEditorRows(string root, IEnumerable<PhotoIndexEditorRow> rows)
+        public void SavePhotoIndexEditorRows(string root, IEnumerable<PhotoIndexEditorRow> rows, IEnumerable<string> removedPaths = null)
         {
             List<string> rehomeAfterGameIdChange = null;
             lock (host.LibraryMaintenanceSync)
             {
-                if (string.IsNullOrWhiteSpace(root) || !fileSystem.DirectoryExists(root)) return;
+                if (string.IsNullOrWhiteSpace(root) || !fileSystem.DirectoryExists(root))
+                    throw new InvalidOperationException("Library folder is not set or no longer exists. Check Settings, then try saving the photo index again.");
                 var rowList = (rows ?? Enumerable.Empty<PhotoIndexEditorRow>())
                     .Where(row => row != null && !string.IsNullOrWhiteSpace(row.FilePath))
                     .GroupBy(row => row.FilePath, StringComparer.OrdinalIgnoreCase)
@@ -328,8 +329,18 @@ namespace PixelVaultNative
                 var missingGameId = rowList.FirstOrDefault(row => string.IsNullOrWhiteSpace(host.NormalizeGameId(row.GameId)));
                 if (missingGameId != null) throw new InvalidOperationException("Each photo index row needs a Game ID before saving. Missing: " + Path.GetFileName(missingGameId.FilePath));
 
-                var existingIndex = host.LoadLibraryMetadataIndex(root, true);
+                var existingSnapshot = host.LoadLibraryMetadataIndex(root, true);
                 var index = new Dictionary<string, LibraryMetadataIndexEntry>(StringComparer.OrdinalIgnoreCase);
+                foreach (var kv in existingSnapshot)
+                {
+                    if (kv.Value == null || string.IsNullOrWhiteSpace(kv.Key)) continue;
+                    index[kv.Key] = kv.Value;
+                }
+                foreach (var path in removedPaths ?? Enumerable.Empty<string>())
+                {
+                    if (string.IsNullOrWhiteSpace(path)) continue;
+                    index.Remove(path.Trim());
+                }
                 var ratingWrites = new List<ExifWriteRequest>();
                 rehomeAfterGameIdChange = new List<string>();
                 foreach (var row in rowList)
@@ -338,7 +349,7 @@ namespace PixelVaultNative
                     var normalizedConsole = host.NormalizeConsoleLabel(string.IsNullOrWhiteSpace(row.ConsoleLabel) ? host.DetermineConsoleLabelFromTags(host.ParseTagText(normalizedTags)) : row.ConsoleLabel);
                     var stamp = host.BuildLibraryMetadataStamp(row.FilePath);
                     LibraryMetadataIndexEntry existingEntry;
-                    if (!existingIndex.TryGetValue(row.FilePath, out existingEntry)) existingEntry = null;
+                    if (!existingSnapshot.TryGetValue(row.FilePath, out existingEntry)) existingEntry = null;
                     var oldGid = existingEntry == null ? string.Empty : host.NormalizeGameId(existingEntry.GameId);
                     var newGid = host.NormalizeGameId(row.GameId);
                     if (LibraryRehomeRules.PhotoIndexGameIdChangedForRehome(oldGid, newGid)) rehomeAfterGameIdChange.Add(row.FilePath);

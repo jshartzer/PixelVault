@@ -6,6 +6,10 @@ namespace PixelVaultNative
     internal sealed class LibraryBrowserPaletteContext
     {
         public Action RefreshLibraryFolders { get; init; }
+        /// <summary>Re-read EXIF and update SQLite photo-index rows for the folder under the current selection (or toast if none).</summary>
+        public Action RunLibraryMetadataIndexScanSelectedFolder { get; init; }
+        /// <summary>Re-read EXIF and update SQLite photo-index rows for the whole library (after confirm).</summary>
+        public Action RunLibraryMetadataIndexScanFullLibrary { get; init; }
         public Action OpenSettings { get; init; }
         public Action OpenHealthDashboard { get; init; }
         public Action OpenGameIndex { get; init; }

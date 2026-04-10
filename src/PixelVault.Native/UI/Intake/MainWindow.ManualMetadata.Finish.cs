@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Windows;
@@ -7,7 +8,7 @@ namespace PixelVaultNative
 {
     public sealed partial class MainWindow
     {
-        void AttachManualMetadataFinishHandler(ManualMetadataDialogHost h, Action saveSelectedDateTime, Action refreshGameTitleChoices, Action refreshSelectionUi, Action refreshTileBadges)
+        void AttachManualMetadataFinishHandler(ManualMetadataDialogHost h, Action flushPendingFieldEditsToSelectedItems, Action saveSelectedDateTime, Action refreshGameTitleChoices, Action refreshSelectionUi, Action refreshTileBadges)
         {
             h.FinishButton.Click += async delegate
             {
@@ -18,6 +19,8 @@ namespace PixelVaultNative
                     TryLibraryToast(importService.GetManualMetadataFinishEmptySelectionMessage(h.LibraryMode, h.ImportAndEditMode));
                     return;
                 }
+                // Ensure ComboBox/TextBox edits are copied to ManualMetadataItem before finalize (focus order can skip LostFocus/TextChanged).
+                flushPendingFieldEditsToSelectedItems?.Invoke();
                 if (h.UseCustomTimeBox.IsChecked == true) saveSelectedDateTime();
                 importService.ApplyManualMetadataTagTextToPlatformFlags(pendingItems);
                 if (importService.ManualMetadataItemsMissingOtherPlatformName(pendingItems))
@@ -56,7 +59,12 @@ namespace PixelVaultNative
                 if (h.LibraryMode && !h.ImportAndEditMode)
                 {
                     if (ContinueManualMetadataAfterLibraryApply(h, pendingItems, refreshGameTitleChoices, refreshSelectionUi, refreshTileBadges))
+                    {
+                        // Partial apply: dialog stays open, so the normal post-close RunLibraryMetadataWorkflowWithProgress never runs.
+                        // Persist EXIF, organize, and photo index for this batch now; otherwise GameId/title changes only hit the game index on disk.
+                        RunLibraryMetadataWorkflowWithProgress(null, new List<ManualMetadataItem>(pendingItems), null);
                         return;
+                    }
                 }
                 else
                 {

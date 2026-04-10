@@ -65,6 +65,8 @@ namespace PixelVaultNative
             public List<string> KnownGameChoices = new List<string>();
             public HashSet<string> KnownGameChoiceSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             public Dictionary<string, string> KnownGameChoiceNameMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            /// <summary>Last loaded game index rows for title choices; used to align <see cref="ManualMetadataItem.GameId"/> with edited title + platform.</summary>
+            public List<GameIndexEditorRow> GameTitleIndexRows;
         }
 
         void BuildManualMetadataDialogLayout(ManualMetadataDialogHost h, string windowLabel, string headerTitleText, string headerDescriptionText, string leaveButtonText, string finishButtonText)

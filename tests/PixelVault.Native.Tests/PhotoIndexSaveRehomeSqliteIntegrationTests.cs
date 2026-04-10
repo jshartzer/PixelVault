@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.IO;
 using System.Threading;
 using PixelVaultNative;
 using Xunit;
@@ -263,5 +264,101 @@ public sealed class PhotoIndexSaveRehomeSqliteIntegrationTests
         Assert.Equal("G00002", entry.GameId);
 
         Assert.True(File.Exists(harness.IndexDatabasePath));
+    }
+
+    [Fact]
+    public void SavePhotoIndex_MergesIntoExistingIndex_WithoutDroppingEntriesMissingFromEditorRowList()
+    {
+        using var harness = new IndexPersistenceHarness();
+        var lib = harness.LibraryRoot;
+        var dir1 = Path.Combine(lib, "folder_a");
+        var dir2 = Path.Combine(lib, "folder_b");
+        Directory.CreateDirectory(dir1);
+        Directory.CreateDirectory(dir2);
+        var filePath1 = Path.Combine(dir1, "one.png");
+        var filePath2 = Path.Combine(dir2, "two.png");
+        File.WriteAllBytes(filePath1, new byte[] { 137, 80 });
+        File.WriteAllBytes(filePath2, new byte[] { 137, 80 });
+
+        var gameRows = new List<GameIndexEditorRow>
+        {
+            new()
+            {
+                GameId = "G00001",
+                Name = "Hades",
+                PlatformLabel = "Steam",
+                StorageGroupId = string.Empty,
+                FolderPath = dir1
+            },
+            new()
+            {
+                GameId = "G00002",
+                Name = "Portal",
+                PlatformLabel = "Steam",
+                StorageGroupId = string.Empty,
+                FolderPath = string.Empty
+            }
+        };
+        harness.Service.SaveSavedGameIndexRows(lib, gameRows);
+
+        var ticks = DateTime.UtcNow.Ticks;
+        var meta = new Dictionary<string, LibraryMetadataIndexEntry>(StringComparer.OrdinalIgnoreCase)
+        {
+            [filePath1] = new LibraryMetadataIndexEntry
+            {
+                FilePath = filePath1,
+                Stamp = "a",
+                GameId = "G00001",
+                ConsoleLabel = "Steam",
+                TagText = "Steam",
+                CaptureUtcTicks = 0,
+                Starred = false,
+                IndexAddedUtcTicks = ticks,
+                RetroAchievementsGameId = string.Empty
+            },
+            [filePath2] = new LibraryMetadataIndexEntry
+            {
+                FilePath = filePath2,
+                Stamp = "a",
+                GameId = "G00001",
+                ConsoleLabel = "Steam",
+                TagText = "Steam",
+                CaptureUtcTicks = 0,
+                Starred = false,
+                IndexAddedUtcTicks = ticks,
+                RetroAchievementsGameId = string.Empty
+            }
+        };
+        harness.Service.SaveLibraryMetadataIndexEntries(lib, meta);
+
+        var fs = new FileSystemService();
+        var host = new SqliteBackedPhotoRehomeHost(harness, fs);
+        var scanner = new LibraryScanner(host, new PhotoIndexSaveRehomeIntegrationTests.NoOpMetadataService(), fs,
+            folderCacheRebuildHook: (_, _) => { });
+
+        var editorRowsOnlyFirstFile = new List<PhotoIndexEditorRow>
+        {
+            new()
+            {
+                FilePath = filePath1,
+                Stamp = "b",
+                GameId = "G00002",
+                ConsoleLabel = "Steam",
+                TagText = "Steam",
+                Starred = false,
+                IndexAddedUtcTicks = ticks,
+                RetroAchievementsGameId = string.Empty
+            }
+        };
+
+        scanner.SavePhotoIndexEditorRows(lib, editorRowsOnlyFirstFile);
+
+        var fromDb = harness.Service.LoadLibraryMetadataIndexEntries(lib);
+        Assert.Equal(2, fromDb.Count);
+        var byGid = fromDb.Values.Where(v => v != null).ToLookup(e => Nid(e.GameId));
+        Assert.Single(byGid["G00002"]);
+        Assert.Single(byGid["G00001"]);
+        Assert.Contains("one.png", byGid["G00002"].Single().FilePath ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(filePath2, byGid["G00001"].Single().FilePath, ignoreCase: true);
     }
 }

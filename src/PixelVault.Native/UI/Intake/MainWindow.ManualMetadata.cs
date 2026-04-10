@@ -118,6 +118,7 @@ namespace PixelVaultNative
                         var rows = loadTask.Status == System.Threading.Tasks.TaskStatus.RanToCompletion && loadTask.Result != null
                             ? loadTask.Result
                             : new List<GameIndexEditorRow>();
+                        h.GameTitleIndexRows = rows;
                         var loadedChoices = rows
                             .Where(row => row != null && !string.IsNullOrWhiteSpace(row.Name))
                             .Select(row => NormalizeGameIndexName(row.Name, row.FolderPath))
@@ -155,6 +156,7 @@ namespace PixelVaultNative
                         h.GameNameBox.ItemsSource = null;
                         h.GameNameBox.ItemsSource = h.KnownGameChoices;
                         h.GameNameBox.Text = restoreText;
+                        SyncManualMetadataGameIdsFromGameTitleIndexRows(h, h.SelectedItems);
                     }));
                 }, System.Threading.Tasks.TaskScheduler.Default);
             };
@@ -270,6 +272,8 @@ namespace PixelVaultNative
                     if (del > 0) notes.Add(del + " marked for delete before import");
                 }
                 h.StatusText.Text = notes.Count == 0 ? h.DefaultStatusText : string.Join(" | ", notes.ToArray()) + ".";
+                if (!h.SuppressSync && h.SelectedItems != null && h.SelectedItems.Count > 0)
+                    SyncManualMetadataGameIdsFromGameTitleIndexRows(h, h.SelectedItems);
             };
             refreshGameTitleChoices();
 
@@ -655,7 +659,29 @@ namespace PixelVaultNative
                 refreshSelectionStatus();
             };
 
-            AttachManualMetadataFinishHandler(h, saveSelectedDateTime, refreshGameTitleChoices, refreshSelectionUi, refreshTileBadges);
+            Action flushPendingFieldEditsToSelectedItems = delegate
+            {
+                if (h.SelectedItems == null || h.SelectedItems.Count == 0) return;
+                var wasSuppress = h.SuppressSync;
+                h.SuppressSync = false;
+                try
+                {
+                    syncSelectedGameNames();
+                    syncSelectedSteamAppIds();
+                    foreach (var item in h.SelectedItems)
+                    {
+                        item.TagText = h.TagsBox.Text ?? string.Empty;
+                        item.Comment = h.CommentBox.Text ?? string.Empty;
+                        if (ManualMetadataTouchesTags(item)) item.ForceTagMetadataWrite = true;
+                    }
+                }
+                finally
+                {
+                    h.SuppressSync = wasSuppress;
+                }
+            };
+
+            AttachManualMetadataFinishHandler(h, flushPendingFieldEditsToSelectedItems, saveSelectedDateTime, refreshGameTitleChoices, refreshSelectionUi, refreshTileBadges);
 
             h.LeaveButton.Click += delegate
             {

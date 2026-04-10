@@ -2746,7 +2746,7 @@ namespace PixelVaultNative
                         Log = Log,
                         CreateButton = Btn,
                         LoadRows = libraryScanner.LoadPhotoIndexEditorRows,
-                        SaveRows = libraryScanner.SavePhotoIndexEditorRows,
+                        SaveRows = (root, rows, removed) => libraryScanner.SavePhotoIndexEditorRows(root, rows, removed),
                         ReadEmbeddedKeywordTagsDirect = path => ReadEmbeddedKeywordTagsDirect(path),
                         DetermineConsoleLabelFromTags = DetermineConsoleLabelFromTags,
                         BuildLibraryMetadataStamp = BuildLibraryMetadataStamp,
