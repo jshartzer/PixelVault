@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace PixelVaultNative
 {
@@ -56,5 +57,45 @@ namespace PixelVaultNative
                     : string.Empty;
             }
         }
+    }
+
+    enum FilenameConventionBuilderComponentRole
+    {
+        Literal = 0,
+        Title,
+        Timestamp,
+        SteamAppId,
+        NonSteamId,
+        Counter,
+        Extension
+    }
+
+    sealed class FilenameConventionBuilderSegment
+    {
+        public string Text { get; set; } = string.Empty;
+        public FilenameConventionBuilderComponentRole SuggestedRole { get; set; } = FilenameConventionBuilderComponentRole.Literal;
+        public FilenameConventionBuilderComponentRole AssignedRole { get; set; } = FilenameConventionBuilderComponentRole.Literal;
+        public string Hint { get; set; } = string.Empty;
+        public bool Locked { get; set; }
+    }
+
+    sealed class FilenameConventionBuilderDraft
+    {
+        public string FileName { get; set; } = string.Empty;
+        public string RuleName { get; set; } = string.Empty;
+        public string ConventionId { get; set; } = string.Empty;
+        public bool Enabled { get; set; } = true;
+        public int Priority { get; set; } = 1200;
+        public string PlatformLabel { get; set; } = "Other";
+        public string PlatformTagsText { get; set; } = string.Empty;
+        public string TimestampFormat { get; set; } = string.Empty;
+        public bool PreserveFileTimes { get; set; }
+        public bool RoutesToManualWhenMissingSteamAppId { get; set; }
+        public bool IsBuiltInTemplate { get; set; }
+        public bool CanRoundTripInBuilder { get; set; } = true;
+        public string FallbackReason { get; set; } = string.Empty;
+        public string ShapePreview { get; set; } = string.Empty;
+        public string CrossSampleHintText { get; set; } = string.Empty;
+        public List<FilenameConventionBuilderSegment> Segments { get; set; } = new List<FilenameConventionBuilderSegment>();
     }
 }

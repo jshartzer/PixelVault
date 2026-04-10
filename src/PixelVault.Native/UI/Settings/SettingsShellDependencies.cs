@@ -22,6 +22,8 @@ namespace PixelVaultNative
         public Action OpenGameIndexEditor { get; set; }
         public Action OpenPhotoIndexEditor { get; set; }
         public Action OpenFilenameConventionEditor { get; set; }
+        /// <summary>Preview/apply merging captures into shared storage folders (storage groups). Owner is used for modal dialogs.</summary>
+        public Action<Window> OpenLibraryStorageMergeTool { get; set; }
         public Action<Window> ShowPhotographyGallery { get; set; }
         /// <summary>Library full cover refresh with confirmation; pass the active settings (or other) dialog as owner for modal dialogs.</summary>
         public Action<Window> PromptFetchCoversForLibrary { get; set; }
@@ -104,6 +106,15 @@ namespace PixelVaultNative
 
         /// <summary>Optional; game index rows + photo-index file paths vs canonical placement (LIBST Step 6).</summary>
         public Func<LibraryStoragePlacementHealthSnapshot> GetLibraryStoragePlacementHealth { get; set; }
+
+        /// <summary>Move photo-index captures that sit outside the canonical folder for their GameId. Returns files moved, or -1 on failure.</summary>
+        public Func<int> PlacementMoveMisplacedCapturesToCanonical { get; set; }
+
+        /// <summary>Clear GameId on photo-index entries whose GameId has no game index row. Returns rows updated, or -1 on failure.</summary>
+        public Func<int> PlacementClearOrphanPhotoGameIds { get; set; }
+
+        /// <summary>Move files on each game index row into canonical folders and refresh paths. Returns true if completed.</summary>
+        public Func<bool> PlacementTryAlignGameIndexFoldersToCanonical { get; set; }
     }
 
     /// <summary>Row-level and per-file (photo index) placement diagnostics for the active library.</summary>
@@ -115,5 +126,54 @@ namespace PixelVaultNative
         public string IndexedFilesSummary { get; set; }
         public bool RowNeedsAttention { get; set; }
         public bool IndexedFilesNeedAttention { get; set; }
+
+        /// <summary>Folder path on the row vs canonical target (Game Index → Target storage folder). Empty when none.</summary>
+        public IReadOnlyList<LibraryStoragePlacementGameRowMismatch> GameRowMismatches { get; set; }
+
+        /// <summary>Misplaced captures and orphan GameId references. Empty when none.</summary>
+        public IReadOnlyList<LibraryStoragePlacementIndexedFileIssue> IndexedFileIssues { get; set; }
+
+        /// <summary>Total mismatch count (may exceed <see cref="GameRowMismatches"/> length when capped).</summary>
+        public int GameRowMismatchTotalCount { get; set; }
+
+        /// <summary>Total indexed-file issues recorded (may exceed list length when capped).</summary>
+        public int IndexedFileIssueTotalCount { get; set; }
+
+        /// <summary>Assigned captures outside the canonical folder (subset of indexed-file issues).</summary>
+        public int IndexedFileMisplacedTotalCount { get; set; }
+
+        /// <summary>Assigned captures whose GameId is missing from the game index.</summary>
+        public int IndexedFileOrphanTotalCount { get; set; }
+    }
+
+    /// <summary>One game index row whose cached folder path differs from canonical placement.</summary>
+    public sealed class LibraryStoragePlacementGameRowMismatch
+    {
+        public string GameId { get; set; }
+        public string Name { get; set; }
+        public string CachedFolderPath { get; set; }
+        public string CanonicalFolderPath { get; set; }
+    }
+
+    /// <summary>One photo-index entry that fails placement rules.</summary>
+    public sealed class LibraryStoragePlacementIndexedFileIssue
+    {
+        /// <summary><c>Misplaced</c> or <c>OrphanGameId</c>.</summary>
+        public string IssueKind { get; set; }
+        public string FilePath { get; set; }
+        public string GameId { get; set; }
+        /// <summary>Canonical game folder for misplaced files; empty for orphan GameId.</summary>
+        public string CanonicalFolderPath { get; set; }
+
+        /// <summary>Short label for grids and copy/export.</summary>
+        public string IssueKindDisplay
+        {
+            get
+            {
+                if (string.Equals(IssueKind, "Misplaced", StringComparison.OrdinalIgnoreCase)) return "Outside canonical folder";
+                if (string.Equals(IssueKind, "OrphanGameId", StringComparison.OrdinalIgnoreCase)) return "GameId missing from game index";
+                return IssueKind ?? "";
+            }
+        }
     }
 }

@@ -35,6 +35,7 @@ namespace PixelVaultNative
                 OpenGameIndexEditor = OpenGameIndexEditor,
                 OpenPhotoIndexEditor = OpenPhotoIndexEditor,
                 OpenFilenameConventionEditor = OpenFilenameConventionEditor,
+                OpenLibraryStorageMergeTool = owner => OpenLibraryStorageMergeTool(owner ?? this),
                 ShowPhotographyGallery = ShowPhotographyGallery,
                 SourceRootsSummary = SourceRootsSummary,
                 GetDestinationRoot = () => destinationRoot,
@@ -95,6 +96,9 @@ namespace PixelVaultNative
                 GetActiveLibraryIndexDatabasePath = () => string.IsNullOrWhiteSpace(libraryRoot) ? string.Empty : IndexDatabasePath(libraryRoot),
                 GetDiagnosticsSessionId = () => _diagnosticsSessionId,
                 GetLibraryStoragePlacementHealth = BuildLibraryStoragePlacementHealthSnapshot,
+                PlacementMoveMisplacedCapturesToCanonical = () => PlacementMoveMisplacedCapturesToCanonical(),
+                PlacementClearOrphanPhotoGameIds = () => PlacementClearOrphanPhotoGameIds(),
+                PlacementTryAlignGameIndexFoldersToCanonical = () => PlacementTryAlignGameIndexFoldersToCanonical(),
                 PromptFetchCoversForLibrary = PromptFetchCoversForLibraryFromSettings
             };
         }

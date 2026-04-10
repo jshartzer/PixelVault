@@ -5,6 +5,9 @@ using System.Linq;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Data;
+using System.Windows.Input;
 using System.Windows.Media;
 using PixelVaultNative.UI.Design;
 
@@ -15,6 +18,15 @@ namespace PixelVaultNative
     /// </summary>
     static class HealthDashboardWindow
     {
+        static readonly Style PlacementReportColumnHeaderStyle = CreatePlacementReportColumnHeaderStyle();
+
+        static Style CreatePlacementReportColumnHeaderStyle()
+        {
+            var style = new Style(typeof(DataGridColumnHeader));
+            style.Setters.Add(new Setter(Control.ForegroundProperty, Brushes.Black));
+            return style;
+        }
+
         public static void ShowDialog(Window owner, SettingsShellDependencies d)
         {
             if (d == null) throw new ArgumentNullException(nameof(d));
@@ -147,11 +159,19 @@ namespace PixelVaultNative
                           || fileText.IndexOf("No assigned captures", StringComparison.OrdinalIgnoreCase) >= 0
                             ? DesignTokens.StatusNeutral
                             : DesignTokens.StatusOk;
+                var gameRowDetailsClick = placementHealth.GameRowMismatchTotalCount > 0
+                    ? (Action)delegate { ShowStoragePlacementReportDialog(window, d, placementHealth, 0); }
+                    : null;
+                var fileDetailsClick = placementHealth.IndexedFileIssueTotalCount > 0
+                    ? (Action)delegate { ShowStoragePlacementReportDialog(window, d, placementHealth, 1); }
+                    : null;
                 stack.Children.Add(SectionCard(d, "Library storage placement",
-                    Row(d, "Game index rows", rowText, rowPill,
-                        "Cached folder path per row vs canonical path from storage group + title rules (Game Index → Target storage folder)."),
-                    Row(d, "Indexed captures (photo index)", fileText, filePill,
-                        "Each assigned file’s directory must lie under that GameId’s canonical folder. Unassigned rows are skipped.")));
+                    PlacementDetailRow(d, "Game index rows", rowText, rowPill,
+                        "Compares each game’s saved folder to the folder PixelVault would use from your rules (Game Index → Target storage folder).",
+                        gameRowDetailsClick),
+                    PlacementDetailRow(d, "Indexed captures (photo index)", fileText, filePill,
+                        "Captures with a GameId must live under that game’s library folder. Entries with no GameId are skipped.",
+                        fileDetailsClick)));
             }
 
             var troubleOn = d.GetTroubleshootingLoggingEnabled?.Invoke() ?? false;
@@ -322,6 +342,466 @@ namespace PixelVaultNative
             Grid.SetColumn(pill, 2);
             grid.Children.Add(pill);
             return grid;
+        }
+
+        /// <summary>Same as <see cref="Row"/>, with an optional clickable status pill that opens the placement report.</summary>
+        static Grid PlacementDetailRow(SettingsShellDependencies d, string label, string valueLine, string statusColorHex, string detail, Action openReport)
+        {
+            var grid = new Grid { Margin = new Thickness(0, 0, 0, 12) };
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(140) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var lab = new TextBlock
+            {
+                Text = label,
+                Foreground = d.Brush(DesignTokens.TextLabelMuted),
+                FontSize = 12.5,
+                VerticalAlignment = VerticalAlignment.Top,
+                TextWrapping = TextWrapping.Wrap
+            };
+            var valPanel = new StackPanel();
+            valPanel.Children.Add(new TextBlock
+            {
+                Text = valueLine,
+                Foreground = d.Brush(DesignTokens.TextShortcutBody),
+                FontSize = 12.5,
+                TextWrapping = TextWrapping.Wrap
+            });
+            if (!string.IsNullOrWhiteSpace(detail))
+                valPanel.Children.Add(new TextBlock
+                {
+                    Text = detail,
+                    Foreground = d.Brush(DesignTokens.TextShortcutMuted),
+                    FontSize = 11.5,
+                    TextWrapping = TextWrapping.Wrap,
+                    Margin = new Thickness(0, 4, 0, 0)
+                });
+
+            UIElement pill;
+            if (openReport != null)
+            {
+                var pillBtn = new Button
+                {
+                    Content = StatusWord(statusColorHex),
+                    Foreground = d.Brush(statusColorHex),
+                    Background = d.Brush(DesignTokens.InputBackground),
+                    BorderBrush = d.Brush(DesignTokens.BorderDefault),
+                    BorderThickness = new Thickness(1),
+                    Padding = new Thickness(10, 4, 10, 4),
+                    Margin = new Thickness(10, 0, 0, 0),
+                    MinWidth = 0,
+                    VerticalAlignment = VerticalAlignment.Top,
+                    FontSize = 12,
+                    FontWeight = FontWeights.SemiBold,
+                    Cursor = Cursors.Hand,
+                    VerticalContentAlignment = VerticalAlignment.Center,
+                    HorizontalContentAlignment = HorizontalAlignment.Center
+                };
+                ToolTipService.SetToolTip(pillBtn, "Open report");
+                pillBtn.Click += delegate { openReport(); };
+                pill = pillBtn;
+            }
+            else
+            {
+                pill = new Border
+                {
+                    Background = d.Brush(DesignTokens.InputBackground),
+                    BorderBrush = d.Brush(DesignTokens.BorderDefault),
+                    BorderThickness = new Thickness(1),
+                    CornerRadius = new CornerRadius(8),
+                    Padding = new Thickness(10, 4, 10, 4),
+                    Margin = new Thickness(10, 0, 0, 0),
+                    VerticalAlignment = VerticalAlignment.Top,
+                    Child = new TextBlock
+                    {
+                        Text = StatusWord(statusColorHex),
+                        Foreground = d.Brush(statusColorHex),
+                        FontSize = 12,
+                        FontWeight = FontWeights.SemiBold
+                    }
+                };
+            }
+
+            grid.Children.Add(lab);
+            Grid.SetColumn(valPanel, 1);
+            grid.Children.Add(valPanel);
+            Grid.SetColumn(pill, 2);
+            grid.Children.Add(pill);
+            return grid;
+        }
+
+        const int PlacementDetailCap = 5000;
+
+        static void ShowStoragePlacementReportDialog(Window owner, SettingsShellDependencies d, LibraryStoragePlacementHealthSnapshot snap, int initialTabIndex)
+        {
+            if (d == null || snap == null) return;
+
+            var reportWindow = new Window
+            {
+                Title = "Library storage placement — report",
+                Width = 920,
+                Height = 520,
+                MinWidth = 640,
+                MinHeight = 420,
+                Owner = owner,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Background = d.Brush(DesignTokens.PageBackground),
+                ResizeMode = ResizeMode.CanResize
+            };
+
+            var layout = new Grid();
+            layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            layout.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+            var header = new TextBlock
+            {
+                Text = "Review the grids below. Use Fix actions to correct issues without editing each row in Photo Index, or open the editors from the bottom row.",
+                Foreground = d.Brush(DesignTokens.TextShortcutMuted),
+                FontSize = 12.5,
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 0, 0, 12)
+            };
+            Grid.SetRow(header, 0);
+            layout.Children.Add(header);
+
+            var tabControl = new TabControl
+            {
+                Background = d.Brush(DesignTokens.PanelElevated),
+                BorderBrush = d.Brush(DesignTokens.BorderDefault)
+            };
+            Grid.SetRow(tabControl, 1);
+
+            var gameRows = snap.GameRowMismatches ?? Array.Empty<LibraryStoragePlacementGameRowMismatch>();
+            var fileIssues = snap.IndexedFileIssues ?? Array.Empty<LibraryStoragePlacementIndexedFileIssue>();
+
+            var gameHeaderText = "Game index rows";
+            if (snap.GameRowMismatchTotalCount > gameRows.Count)
+                gameHeaderText += " (" + gameRows.Count + " of " + snap.GameRowMismatchTotalCount + ")";
+            else if (snap.GameRowMismatchTotalCount > 0)
+                gameHeaderText += " (" + snap.GameRowMismatchTotalCount + ")";
+
+            var fileHeaderText = "Indexed captures";
+            if (snap.IndexedFileIssueTotalCount > fileIssues.Count)
+                fileHeaderText += " (" + fileIssues.Count + " of " + snap.IndexedFileIssueTotalCount + ")";
+            else if (snap.IndexedFileIssueTotalCount > 0)
+                fileHeaderText += " (" + snap.IndexedFileIssueTotalCount + ")";
+
+            var gameTab = new TabItem { Header = gameHeaderText };
+            if (gameRows.Count == 0)
+            {
+                gameTab.Content = new TextBlock
+                {
+                    Text = snap.GameRowMismatchTotalCount > 0
+                        ? "Mismatch count is " + snap.GameRowMismatchTotalCount + " but no rows are listed (refresh health or check logs)."
+                        : "No row-level path mismatches.",
+                    Foreground = d.Brush(DesignTokens.TextShortcutMuted),
+                    TextWrapping = TextWrapping.Wrap,
+                    Margin = new Thickness(8)
+                };
+            }
+            else
+            {
+                var gameStack = new StackPanel();
+                if (snap.GameRowMismatchTotalCount > gameRows.Count)
+                    gameStack.Children.Add(new TextBlock
+                    {
+                        Text = "Showing first " + gameRows.Count + " of " + snap.GameRowMismatchTotalCount + " mismatched rows (cap " + PlacementDetailCap + ").",
+                        Foreground = d.Brush(DesignTokens.TextShortcutMuted),
+                        FontSize = 12,
+                        Margin = new Thickness(0, 0, 0, 8),
+                        TextWrapping = TextWrapping.Wrap
+                    });
+                var gameDg = BuildPlacementGameRowsDataGrid(d, gameRows);
+                gameStack.Children.Add(gameDg);
+                gameTab.Content = gameStack;
+            }
+
+            var fileTab = new TabItem { Header = fileHeaderText };
+            if (fileIssues.Count == 0)
+            {
+                fileTab.Content = new TextBlock
+                {
+                    Text = snap.IndexedFileIssueTotalCount > 0
+                        ? "Issues exist but no rows are listed (refresh health or check logs)."
+                        : "No indexed capture placement issues.",
+                    Foreground = d.Brush(DesignTokens.TextShortcutMuted),
+                    TextWrapping = TextWrapping.Wrap,
+                    Margin = new Thickness(8)
+                };
+            }
+            else
+            {
+                var fileStack = new StackPanel();
+                if (snap.IndexedFileIssueTotalCount > fileIssues.Count)
+                    fileStack.Children.Add(new TextBlock
+                    {
+                        Text = "Showing first " + fileIssues.Count + " of " + snap.IndexedFileIssueTotalCount + " issues (cap " + PlacementDetailCap + ").",
+                        Foreground = d.Brush(DesignTokens.TextShortcutMuted),
+                        FontSize = 12,
+                        Margin = new Thickness(0, 0, 0, 8),
+                        TextWrapping = TextWrapping.Wrap
+                    });
+                var fileDg = BuildPlacementIndexedFilesDataGrid(d, fileIssues);
+                fileStack.Children.Add(fileDg);
+                fileTab.Content = fileStack;
+            }
+
+            tabControl.Items.Add(gameTab);
+            tabControl.Items.Add(fileTab);
+            var idx = initialTabIndex <= 0 ? 0 : 1;
+            tabControl.SelectedIndex = idx;
+            layout.Children.Add(tabControl);
+
+            var remediation = new WrapPanel { Margin = new Thickness(0, 10, 0, 0) };
+            void AddFix(string label, string bg, RoutedEventHandler click)
+            {
+                var b = d.Btn(label, click, bg, Brushes.White);
+                b.Margin = new Thickness(0, 0, 10, 8);
+                remediation.Children.Add(b);
+            }
+            if (snap.GameRowMismatchTotalCount > 0 && d.PlacementTryAlignGameIndexFoldersToCanonical != null)
+            {
+                AddFix("Fix game folders…", DesignTokens.ActionPrimaryFill, delegate
+                {
+                    var msg = "Move files on each game index row into the folders PixelVault expects for that title?\n\n"
+                        + "This is the same kind of move as storage merge. A library backup is recommended for large libraries.";
+                    if (MessageBox.Show(reportWindow, msg, "PixelVault", MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK) return;
+                    if (d.PlacementTryAlignGameIndexFoldersToCanonical.Invoke())
+                    {
+                        MessageBox.Show(reportWindow, "Game index folders were aligned. Reopen Setup & health to refresh counts.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
+                        reportWindow.Close();
+                    }
+                    else
+                        MessageBox.Show(reportWindow, "Could not align folders. See the log for details.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Warning);
+                });
+            }
+            if (snap.IndexedFileMisplacedTotalCount > 0 && d.PlacementMoveMisplacedCapturesToCanonical != null)
+            {
+                var m = snap.IndexedFileMisplacedTotalCount;
+                AddFix("Move misplaced captures…", DesignTokens.ActionPrimaryFill, delegate
+                {
+                    var msg = "Move " + m + " misplaced capture(s) into the canonical folders for their GameId?\n\n"
+                        + "If a file already exists at the destination, PixelVault may pick a new file name.";
+                    if (MessageBox.Show(reportWindow, msg, "PixelVault", MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK) return;
+                    var moved = d.PlacementMoveMisplacedCapturesToCanonical.Invoke();
+                    if (moved < 0)
+                        MessageBox.Show(reportWindow, "Could not move captures. See the log for details.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    else if (moved == 0)
+                        MessageBox.Show(
+                            reportWindow,
+                            "No files were moved. If indexed paths no longer exist on disk, use Library → Refresh, then try again. Otherwise the placement check may already match what organize would do.",
+                            "PixelVault",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Information);
+                    else
+                    {
+                        MessageBox.Show(reportWindow, "Moved " + moved + " file(s). Reopen Setup & health to refresh counts.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
+                        reportWindow.Close();
+                    }
+                });
+            }
+            if (snap.IndexedFileOrphanTotalCount > 0 && d.PlacementClearOrphanPhotoGameIds != null)
+            {
+                var o = snap.IndexedFileOrphanTotalCount;
+                AddFix("Clear orphan GameIds…", DesignTokens.ActionPrimaryFill, delegate
+                {
+                    var msg = "Clear GameId on " + o + " capture(s) whose GameId no longer exists in the game index?\n\n"
+                        + "Those captures become unassigned (no GameId). You can assign them again later in Photo Index.";
+                    if (MessageBox.Show(reportWindow, msg, "PixelVault", MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK) return;
+                    var cleared = d.PlacementClearOrphanPhotoGameIds.Invoke();
+                    if (cleared < 0)
+                        MessageBox.Show(reportWindow, "Could not clear GameIds. See the log for details.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    else
+                    {
+                        MessageBox.Show(reportWindow, "Cleared GameId on " + cleared + " capture(s). Reopen Setup & health to refresh counts.", "PixelVault", MessageBoxButton.OK, MessageBoxImage.Information);
+                        reportWindow.Close();
+                    }
+                });
+            }
+            if (remediation.Children.Count > 0)
+            {
+                Grid.SetRow(remediation, 2);
+                layout.Children.Add(remediation);
+            }
+
+            var footer = new WrapPanel { Margin = new Thickness(0, 14, 0, 0) };
+            void AddFooter(string label, string bg, RoutedEventHandler click)
+            {
+                var b = d.Btn(label, click, bg, Brushes.White);
+                b.Margin = new Thickness(0, 0, 10, 0);
+                footer.Children.Add(b);
+            }
+            AddFooter("Copy report", DesignTokens.ActionSecondaryFill, delegate
+            {
+                try
+                {
+                    Clipboard.SetText(BuildStoragePlacementReportText(snap));
+                    d.Log?.Invoke("Storage placement report copied to clipboard.");
+                }
+                catch (Exception ex)
+                {
+                    d.Log?.Invoke("Could not copy report. " + ex.Message);
+                }
+            });
+            AddFooter("Open Game Index", DesignTokens.ActionSecondaryFill, delegate
+            {
+                d.OpenGameIndexEditor?.Invoke();
+            });
+            AddFooter("Open Photo Index", DesignTokens.ActionSecondaryFill, delegate
+            {
+                d.OpenPhotoIndexEditor?.Invoke();
+            });
+            AddFooter("Close", DesignTokens.ActionSecondaryFill, delegate { reportWindow.Close(); });
+            Grid.SetRow(footer, remediation.Children.Count > 0 ? 3 : 2);
+            layout.Children.Add(footer);
+
+            reportWindow.Content = layout;
+            reportWindow.ShowDialog();
+        }
+
+        static DataGrid BuildPlacementGameRowsDataGrid(SettingsShellDependencies d, IReadOnlyList<LibraryStoragePlacementGameRowMismatch> rows)
+        {
+            var gameDg = new DataGrid
+            {
+                AutoGenerateColumns = false,
+                IsReadOnly = true,
+                CanUserAddRows = false,
+                CanUserDeleteRows = false,
+                HeadersVisibility = DataGridHeadersVisibility.Column,
+                SelectionMode = DataGridSelectionMode.Extended,
+                SelectionUnit = DataGridSelectionUnit.FullRow,
+                ItemsSource = rows,
+                Background = d.Brush(DesignTokens.PanelElevated),
+                Foreground = d.Brush(DesignTokens.TextOnInput),
+                BorderBrush = d.Brush(DesignTokens.BorderDefault),
+                VerticalGridLinesBrush = d.Brush(DesignTokens.BorderDefault),
+                HorizontalGridLinesBrush = d.Brush(DesignTokens.BorderDefault),
+                AlternatingRowBackground = d.Brush(DesignTokens.InputBackground),
+                RowBackground = d.Brush(DesignTokens.PanelElevated),
+                MaxHeight = double.PositiveInfinity,
+                ColumnHeaderStyle = PlacementReportColumnHeaderStyle
+            };
+            gameDg.Columns.Add(new DataGridTextColumn
+            {
+                Header = "GameId",
+                Binding = new Binding("GameId"),
+                Width = new DataGridLength(80)
+            });
+            gameDg.Columns.Add(new DataGridTextColumn
+            {
+                Header = "Name",
+                Binding = new Binding("Name"),
+                Width = new DataGridLength(1, DataGridLengthUnitType.Star)
+            });
+            gameDg.Columns.Add(new DataGridTextColumn
+            {
+                Header = "Cached folder",
+                Binding = new Binding("CachedFolderPath"),
+                Width = new DataGridLength(2, DataGridLengthUnitType.Star)
+            });
+            gameDg.Columns.Add(new DataGridTextColumn
+            {
+                Header = "Canonical folder",
+                Binding = new Binding("CanonicalFolderPath"),
+                Width = new DataGridLength(2, DataGridLengthUnitType.Star)
+            });
+            return gameDg;
+        }
+
+        static DataGrid BuildPlacementIndexedFilesDataGrid(SettingsShellDependencies d, IReadOnlyList<LibraryStoragePlacementIndexedFileIssue> issues)
+        {
+            var fileDg = new DataGrid
+            {
+                AutoGenerateColumns = false,
+                IsReadOnly = true,
+                CanUserAddRows = false,
+                CanUserDeleteRows = false,
+                HeadersVisibility = DataGridHeadersVisibility.Column,
+                SelectionMode = DataGridSelectionMode.Extended,
+                SelectionUnit = DataGridSelectionUnit.FullRow,
+                ItemsSource = issues,
+                Background = d.Brush(DesignTokens.PanelElevated),
+                Foreground = d.Brush(DesignTokens.TextOnInput),
+                BorderBrush = d.Brush(DesignTokens.BorderDefault),
+                VerticalGridLinesBrush = d.Brush(DesignTokens.BorderDefault),
+                HorizontalGridLinesBrush = d.Brush(DesignTokens.BorderDefault),
+                AlternatingRowBackground = d.Brush(DesignTokens.InputBackground),
+                RowBackground = d.Brush(DesignTokens.PanelElevated),
+                MaxHeight = double.PositiveInfinity,
+                ColumnHeaderStyle = PlacementReportColumnHeaderStyle
+            };
+            fileDg.Columns.Add(new DataGridTextColumn
+            {
+                Header = "Issue",
+                Binding = new Binding("IssueKindDisplay"),
+                Width = new DataGridLength(200)
+            });
+            fileDg.Columns.Add(new DataGridTextColumn
+            {
+                Header = "GameId",
+                Binding = new Binding("GameId"),
+                Width = new DataGridLength(80)
+            });
+            fileDg.Columns.Add(new DataGridTextColumn
+            {
+                Header = "File",
+                Binding = new Binding("FilePath"),
+                Width = new DataGridLength(2, DataGridLengthUnitType.Star)
+            });
+            fileDg.Columns.Add(new DataGridTextColumn
+            {
+                Header = "Expected folder",
+                Binding = new Binding("CanonicalFolderPath"),
+                Width = new DataGridLength(2, DataGridLengthUnitType.Star)
+            });
+            return fileDg;
+        }
+
+        static string BuildStoragePlacementReportText(LibraryStoragePlacementHealthSnapshot snap)
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("Library storage placement — report");
+            sb.AppendLine();
+            sb.AppendLine("Summary (rows): " + (snap.RowSummary ?? ""));
+            sb.AppendLine("Summary (indexed files): " + (snap.IndexedFilesSummary ?? ""));
+            sb.AppendLine();
+            sb.AppendLine("Game index rows (cached path vs canonical):");
+            var rows = snap.GameRowMismatches;
+            if (rows == null || rows.Count == 0)
+                sb.AppendLine("  (none listed)");
+            else
+            {
+                foreach (var r in rows)
+                {
+                    sb.AppendLine("  GameId: " + (r.GameId ?? ""));
+                    sb.AppendLine("  Name: " + (r.Name ?? ""));
+                    sb.AppendLine("  Cached: " + (r.CachedFolderPath ?? ""));
+                    sb.AppendLine("  Canonical: " + (r.CanonicalFolderPath ?? ""));
+                    sb.AppendLine();
+                }
+            }
+            if (snap.GameRowMismatchTotalCount > (rows?.Count ?? 0))
+                sb.AppendLine("  (" + (snap.GameRowMismatchTotalCount - (rows?.Count ?? 0)) + " more row mismatches not listed; cap " + PlacementDetailCap + ".)");
+            sb.AppendLine();
+            sb.AppendLine("Indexed captures:");
+            var files = snap.IndexedFileIssues;
+            if (files == null || files.Count == 0)
+                sb.AppendLine("  (none listed)");
+            else
+            {
+                foreach (var f in files)
+                {
+                    sb.AppendLine("  " + (f.IssueKindDisplay ?? "") + " | GameId=" + (f.GameId ?? "") + " | File=" + (f.FilePath ?? ""));
+                    if (!string.IsNullOrWhiteSpace(f.CanonicalFolderPath))
+                        sb.AppendLine("    Expected folder: " + f.CanonicalFolderPath);
+                }
+            }
+            if (snap.IndexedFileIssueTotalCount > (files?.Count ?? 0))
+                sb.AppendLine("  (" + (snap.IndexedFileIssueTotalCount - (files?.Count ?? 0)) + " more file issues not listed; cap " + PlacementDetailCap + ".)");
+            return sb.ToString();
         }
 
         static string StatusWord(string colorHex)

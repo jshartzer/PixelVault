@@ -187,17 +187,17 @@ namespace PixelVaultNative
             };
             grid.Columns.Add(new DataGridTextColumn { Header = "Game ID", Binding = new System.Windows.Data.Binding("GameId"), IsReadOnly = true, Width = 180 });
             grid.Columns.Add(new DataGridTextColumn { Header = "Storage group", Binding = new System.Windows.Data.Binding("StorageGroupId"), IsReadOnly = true, Width = 130 });
-            grid.Columns.Add(new DataGridTextColumn { Header = "Target storage folder", Binding = new System.Windows.Data.Binding("EditorCanonicalStorageFolderDisplay"), IsReadOnly = true, Width = new DataGridLength(1.2, DataGridLengthUnitType.Star) });
+            grid.Columns.Add(new DataGridTextColumn { Header = "Target storage folder", Binding = new System.Windows.Data.Binding("EditorCanonicalStorageFolderDisplay"), IsReadOnly = true, Width = new DataGridLength(1.0, DataGridLengthUnitType.Star) });
             grid.Columns.Add(new DataGridTextColumn { Header = "Placement", Binding = new System.Windows.Data.Binding("EditorStoragePlacementNote"), IsReadOnly = true, Width = 92 });
             grid.Columns.Add(new DataGridTextColumn { Header = "Added", Binding = new System.Windows.Data.Binding("IndexAddedAtLocal"), IsReadOnly = true, Width = 130 });
-            grid.Columns.Add(new DataGridTextColumn { Header = "Game", Binding = new System.Windows.Data.Binding("Name") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus }, Width = new DataGridLength(1.15, DataGridLengthUnitType.Star) });
+            grid.Columns.Add(new DataGridTextColumn { Header = "Game", Binding = new System.Windows.Data.Binding("Name") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus }, MinWidth = 280, Width = new DataGridLength(2.5, DataGridLengthUnitType.Star) });
             grid.Columns.Add(new DataGridTextColumn { Header = "Platform", Binding = new System.Windows.Data.Binding("PlatformLabel") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus }, Width = 130 });
             grid.Columns.Add(new DataGridTextColumn { Header = "Steam AppID", Binding = new System.Windows.Data.Binding("SteamAppId") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus }, Width = 130 });
             grid.Columns.Add(new DataGridTextColumn { Header = "Non-Steam ID", Binding = new System.Windows.Data.Binding("NonSteamId") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus }, Width = 170 });
             grid.Columns.Add(new DataGridTextColumn { Header = "STID", Binding = new System.Windows.Data.Binding("SteamGridDbId") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus }, Width = 120 });
             grid.Columns.Add(new DataGridTextColumn { Header = "RA Game ID", Binding = new System.Windows.Data.Binding("RetroAchievementsGameId") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.LostFocus }, Width = 110 });
             grid.Columns.Add(new DataGridTextColumn { Header = "Files", Binding = new System.Windows.Data.Binding("FileCount"), IsReadOnly = true, Width = 74 });
-            grid.Columns.Add(new DataGridTextColumn { Header = "Folder", Binding = new System.Windows.Data.Binding("FolderPath"), IsReadOnly = true, Width = new DataGridLength(1.85, DataGridLengthUnitType.Star) });
+            grid.Columns.Add(new DataGridTextColumn { Header = "Folder", Binding = new System.Windows.Data.Binding("FolderPath"), IsReadOnly = true, Width = new DataGridLength(1.45, DataGridLengthUnitType.Star) });
             Grid.SetRow(grid, 1);
             bodyGrid.Children.Add(grid);
 

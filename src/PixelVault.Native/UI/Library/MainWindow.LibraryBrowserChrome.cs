@@ -17,7 +17,6 @@ namespace PixelVaultNative
             internal Button ManualImportButton;
             internal Button SettingsButton;
             internal Button GameIndexButton;
-            internal Button StorageMergeButton;
             internal Button PhotoIndexButton;
             internal Button PhotographyGalleryButton;
             internal Button MyCoversButton;
@@ -112,13 +111,6 @@ namespace PixelVaultNative
             chrome.GameIndexButton.Margin = new Thickness(0, 0, 12, 0);
             ApplyLibraryToolbarChrome(chrome.GameIndexButton, "#18242B", "#24353F", "#22323C", "#131D23");
             chrome.GameIndexButton.ToolTip = "Edit master game rows (Steam App ID, Grid ID, etc.)";
-            chrome.StorageMergeButton = Btn("Merge folders", null, "#275D47", Brushes.White);
-            chrome.StorageMergeButton.Width = 142;
-            chrome.StorageMergeButton.Height = 42;
-            chrome.StorageMergeButton.FontSize = 13;
-            chrome.StorageMergeButton.Margin = new Thickness(0, 0, 12, 0);
-            ApplyLibraryToolbarChrome(chrome.StorageMergeButton, "#214A3A", "#2D6B55", "#2C6650", "#1A4034");
-            chrome.StorageMergeButton.ToolTip = "Preview and apply moving captures into shared storage folders (same storage group) — PV-PLN-LIBST-001 Step 5.";
             chrome.PhotoIndexButton = Btn("Photo Index", null, "#20343A", Brushes.White);
             chrome.PhotoIndexButton.Width = 122;
             chrome.PhotoIndexButton.Height = 42;
@@ -227,7 +219,6 @@ namespace PixelVaultNative
             };
             headerActions.Children.Add(chrome.SettingsButton);
             headerActions.Children.Add(chrome.GameIndexButton);
-            headerActions.Children.Add(chrome.StorageMergeButton);
             headerActions.Children.Add(chrome.PhotoIndexButton);
             headerActions.Children.Add(chrome.PhotographyGalleryButton);
             headerActions.Children.Add(chrome.MyCoversButton);

@@ -27,6 +27,7 @@ namespace PixelVaultNative
 
             var candidates = new[]
             {
+                new { Pattern = @"\d{1,2}_\d{1,2}_\d{4}\s+\d{1,2}_\d{2}_\d{2}\s+[AP]M", Format = "M_d_yyyy h_mm_ss tt" },
                 new { Pattern = @"\d{14}", Format = "yyyyMMddHHmmss" },
                 new { Pattern = @"\d{4}[-_]\d{2}[-_]\d{2}[ T_-]\d{2}[-_:]\d{2}[-_:]\d{2}\s?[AP]M", Format = "yyyy-MM-dd hh-mm-ss tt" },
                 new { Pattern = @"\d{4}[-_]\d{2}[-_]\d{2}[ T_-]\d{2}[-_:]\d{2}[-_:]\d{2}", Format = "yyyy-MM-dd HH-mm-ss" },
@@ -77,6 +78,8 @@ namespace PixelVaultNative
                     return "[yyyy]-[MM]-[dd]";
                 case "yyyyMMdd":
                     return "[yyyy][MM][dd]";
+                case "M_d_yyyy h_mm_ss tt":
+                    return "[M]_[d]_[yyyy] [h]_[mm]_[ss] [tt]";
                 case "unix-ms":
                     return "[unixms]";
                 default:
@@ -183,7 +186,7 @@ namespace PixelVaultNative
                 rule.Name = "Custom: Xbox PC Capture";
                 rule.PlatformLabel = "Xbox PC";
                 rule.PlatformTagsText = "Platform:Xbox PC";
-                rule.PatternText = @"^(?<title>.+?)\s+(?<stamp>\d{1,2}_\d{1,2}_\d{4}\s+\d{1,2}_\d{2}_\d{2}\s+[AP]M)\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$";
+                rule.PatternText = "[title] [M]_[d]_[yyyy] [h]_[mm]_[ss] [tt].[ext:media]";
                 rule.Pattern = rule.PatternText;
                 rule.TitleGroup = "title";
                 rule.TimestampGroup = "stamp";
@@ -319,6 +322,7 @@ namespace PixelVaultNative
                         Log = Log,
                         RefreshPreviewIfNeeded = delegate { RefreshPreview(); },
                         CreateButton = Btn,
+                        PickFile = PickFile,
                         NormalizeConsoleLabel = NormalizeConsoleLabel,
                         CleanTag = CleanTag
                     });

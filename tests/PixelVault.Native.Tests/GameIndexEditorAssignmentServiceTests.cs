@@ -74,6 +74,29 @@ public sealed class GameIndexEditorAssignmentServiceTests
         Assert.False(string.IsNullOrWhiteSpace(result.GameId));
     }
 
+    [Fact]
+    public void ResolveExistingGameIndexRowForAssignment_MatchingTitleResolvesBeforePreferredGameId()
+    {
+        var svc = CreateService();
+        var rowA = new GameIndexEditorRow { GameId = "G00001", Name = "Game A", PlatformLabel = "Steam" };
+        var rowB = new GameIndexEditorRow { GameId = "G00002", Name = "Game B", PlatformLabel = "Steam" };
+        var rows = new List<GameIndexEditorRow> { rowA, rowB };
+        var resolved = svc.ResolveExistingGameIndexRowForAssignment(rows, "Game B", "Steam", "G00001");
+        Assert.Same(rowB, resolved);
+    }
+
+    [Fact]
+    public void EnsureManualMetadataMasterRow_PreferredGameId_WinsOverConflictingTitleHint()
+    {
+        var svc = CreateService();
+        var rowA = new GameIndexEditorRow { GameId = "G00001", Name = "Game A", PlatformLabel = "Steam" };
+        var rowB = new GameIndexEditorRow { GameId = "G00002", Name = "Game B", PlatformLabel = "Steam" };
+        var rows = new List<GameIndexEditorRow> { rowA, rowB };
+        // Photo index save passes a filename-derived title hint; the grouped GameId must still resolve the intended row.
+        var resolved = svc.EnsureManualMetadataMasterRow(rows, "Game B", "Steam", "G00001");
+        Assert.Same(rowA, resolved);
+    }
+
     sealed class StubIndexPersistence : IIndexPersistenceService
     {
         public void ApplyGameIdAliases(string root, Dictionary<string, string> aliasMap) { }

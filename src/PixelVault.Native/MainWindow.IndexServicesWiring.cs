@@ -56,6 +56,7 @@ namespace PixelVaultNative
                 InvalidateRules = delegate(string root) { filenameParserService.InvalidateRules(root); },
                 DeleteSamples = delegate(string root, IEnumerable<long> sampleIds) { indexPersistenceService.DeleteFilenameConventionSamples(root, sampleIds); },
                 BuildCustomRuleFromSample = delegate(FilenameConventionSample sample) { return mw.BuildCustomFilenameConventionFromSample(sample); },
+                ParseFileName = delegate(string value) { return filenameParserService.Parse(value, string.Empty); },
                 ParseTagText = delegate(string value) { return MainWindow.ParseTagText(value); },
                 NormalizeConsoleLabel = delegate(string value) { return MainWindow.NormalizeConsoleLabel(value); },
                 DefaultPlatformTagsTextForLabel = delegate(string value) { return mw.DefaultPlatformTagsTextForLabel(value); },

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 
@@ -17,6 +18,10 @@ namespace PixelVaultNative
         FilenameRulesEditorState LoadState(string root);
         FilenameConventionRule CreateNewRule();
         FilenameConventionRule CreateRuleFromSample(FilenameConventionSample sample);
+        FilenameConventionBuilderDraft CreateBuilderDraftFromSample(FilenameConventionSample sample);
+        FilenameConventionBuilderDraft CreateBuilderDraftFromFilePath(string filePath);
+        FilenameConventionBuilderDraft CreateBuilderDraftFromRule(FilenameConventionRule rule);
+        FilenameConventionRule ApplyBuilderDraft(FilenameConventionBuilderDraft draft, FilenameConventionRule existingRule);
         FilenameConventionRule EnsureDisabledOverride(FilenameConventionRule builtInRule, IList<FilenameConventionRule> customRules);
         void DismissSamples(string root, IEnumerable<long> sampleIds);
         FilenameRulesEditorState SaveRules(string root, IEnumerable<FilenameConventionRule> customRules);
@@ -30,6 +35,7 @@ namespace PixelVaultNative
         public Action<string> InvalidateRules;
         public Action<string, IEnumerable<long>> DeleteSamples;
         public Func<FilenameConventionSample, FilenameConventionRule> BuildCustomRuleFromSample;
+        public Func<string, FilenameParseResult> ParseFileName;
         public Func<string, IEnumerable<string>> ParseTagText;
         public Func<string, string> NormalizeConsoleLabel;
         public Func<string, string> DefaultPlatformTagsTextForLabel;
@@ -109,6 +115,59 @@ namespace PixelVaultNative
                 candidate.ConventionId = "custom_" + Guid.NewGuid().ToString("N").Substring(0, 10);
             }
             return candidate;
+        }
+
+        public FilenameConventionBuilderDraft CreateBuilderDraftFromSample(FilenameConventionSample sample)
+        {
+            if (sample == null) return null;
+            var fileName = Path.GetFileName(sample.FileName ?? string.Empty);
+            var parsed = ParseFileName(fileName);
+            var candidate = dependencies.BuildCustomRuleFromSample == null ? null : dependencies.BuildCustomRuleFromSample(sample);
+            return FilenameConventionBuilder.CreateDraftFromFileName(
+                fileName,
+                parsed,
+                candidate,
+                sample.SuggestedPlatformLabel,
+                NormalizeConsoleLabel,
+                DefaultPlatformTagsTextForLabel);
+        }
+
+        public FilenameConventionBuilderDraft CreateBuilderDraftFromFilePath(string filePath)
+        {
+            var fileName = Path.GetFileName(filePath ?? string.Empty);
+            if (string.IsNullOrWhiteSpace(fileName)) return null;
+            var parsed = ParseFileName(fileName);
+            var sample = new FilenameConventionSample
+            {
+                FileName = fileName,
+                SuggestedPlatformLabel = parsed.PlatformLabel
+            };
+            var candidate = dependencies.BuildCustomRuleFromSample == null ? null : dependencies.BuildCustomRuleFromSample(sample);
+            return FilenameConventionBuilder.CreateDraftFromFileName(
+                fileName,
+                parsed,
+                candidate,
+                parsed.PlatformLabel,
+                NormalizeConsoleLabel,
+                DefaultPlatformTagsTextForLabel);
+        }
+
+        public FilenameConventionBuilderDraft CreateBuilderDraftFromRule(FilenameConventionRule rule)
+        {
+            return FilenameConventionBuilder.TryCreateDraftFromRule(
+                CloneRule(rule),
+                NormalizeConsoleLabel,
+                DefaultPlatformTagsTextForLabel);
+        }
+
+        public FilenameConventionRule ApplyBuilderDraft(FilenameConventionBuilderDraft draft, FilenameConventionRule existingRule)
+        {
+            return FilenameConventionBuilder.BuildRuleFromDraft(
+                draft,
+                existingRule,
+                CleanTag,
+                NormalizeConsoleLabel,
+                DefaultPlatformTagsTextForLabel);
         }
 
         public FilenameConventionRule EnsureDisabledOverride(FilenameConventionRule builtInRule, IList<FilenameConventionRule> customRules)
@@ -207,12 +266,29 @@ namespace PixelVaultNative
         bool UsesTimestampTokens(string patternText)
         {
             var value = patternText ?? string.Empty;
-            return value.Contains("[yyyy]") || value.Contains("[MM]") || value.Contains("[dd]") || value.Contains("[HH]") || value.Contains("[hh]") || value.Contains("[mm]") || value.Contains("[ss]") || value.Contains("[tt]") || value.Contains("[unixms]");
+            return value.Contains("[M]")
+                || value.Contains("[d]")
+                || value.Contains("[h]")
+                || value.Contains("[yyyy]")
+                || value.Contains("[MM]")
+                || value.Contains("[dd]")
+                || value.Contains("[HH]")
+                || value.Contains("[hh]")
+                || value.Contains("[mm]")
+                || value.Contains("[ss]")
+                || value.Contains("[tt]")
+                || value.Contains("[unixms]");
         }
 
         IEnumerable<string> ParseTagText(string value)
         {
             return dependencies.ParseTagText == null ? Enumerable.Empty<string>() : dependencies.ParseTagText(value ?? string.Empty) ?? Enumerable.Empty<string>();
+        }
+
+        FilenameParseResult ParseFileName(string value)
+        {
+            if (dependencies.ParseFileName == null) return new FilenameParseResult();
+            return dependencies.ParseFileName(value ?? string.Empty) ?? new FilenameParseResult();
         }
 
         string NormalizeConsoleLabel(string value)

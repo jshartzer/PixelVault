@@ -476,7 +476,14 @@ namespace PixelVaultNative
         /// <summary>Health dashboard: game-index folder paths and photo-index file paths vs canonical placement (LIBST Step 6).</summary>
         LibraryStoragePlacementHealthSnapshot BuildLibraryStoragePlacementHealthSnapshot()
         {
-            var snap = new LibraryStoragePlacementHealthSnapshot();
+            const int maxPlacementDetailRows = 5000;
+            var gameRowMismatches = new List<LibraryStoragePlacementGameRowMismatch>();
+            var indexedFileIssues = new List<LibraryStoragePlacementIndexedFileIssue>();
+            var snap = new LibraryStoragePlacementHealthSnapshot
+            {
+                GameRowMismatches = gameRowMismatches,
+                IndexedFileIssues = indexedFileIssues
+            };
             var root = libraryRoot;
             if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root)) return snap;
 
@@ -521,8 +528,22 @@ namespace PixelVaultNative
                     if (string.IsNullOrWhiteSpace(fp)) continue;
                     withFolder++;
                     if (string.IsNullOrWhiteSpace(canonical)) continue;
-                    if (!LibraryPlacementService.PathsEqualNormalized(fp, canonical)) mismatch++;
+                    if (!LibraryPlacementService.PathsEqualNormalized(fp, canonical))
+                    {
+                        mismatch++;
+                        if (gameRowMismatches.Count < maxPlacementDetailRows)
+                        {
+                            gameRowMismatches.Add(new LibraryStoragePlacementGameRowMismatch
+                            {
+                                GameId = row.GameId ?? string.Empty,
+                                Name = row.Name ?? string.Empty,
+                                CachedFolderPath = fp,
+                                CanonicalFolderPath = canonical
+                            });
+                        }
+                    }
                 }
+                snap.GameRowMismatchTotalCount = mismatch;
                 if (withFolder == 0)
                     snap.RowSummary = "No game rows with a library folder path yet (" + rows.Count + " row(s) in index).";
                 else if (mismatch == 0)
@@ -576,6 +597,17 @@ namespace PixelVaultNative
                 if (row == null)
                 {
                     orphan++;
+                    var fpOrphan = entry.FilePath ?? string.Empty;
+                    if (indexedFileIssues.Count < maxPlacementDetailRows)
+                    {
+                        indexedFileIssues.Add(new LibraryStoragePlacementIndexedFileIssue
+                        {
+                            IssueKind = "OrphanGameId",
+                            FilePath = fpOrphan,
+                            GameId = gid,
+                            CanonicalFolderPath = string.Empty
+                        });
+                    }
                     continue;
                 }
                 var canonical = LibraryPlacementService.BuildCanonicalStorageFolderPath(
@@ -592,8 +624,25 @@ namespace PixelVaultNative
                 var dir = Path.GetDirectoryName(fp);
                 if (string.IsNullOrWhiteSpace(dir)) continue;
                 assignedChecked++;
-                if (!LibraryPlacementService.IsDirectoryWithinCanonicalStorage(dir, canonical)) misplaced++;
+                if (!LibraryPlacementService.IsDirectoryWithinCanonicalStorage(dir, canonical))
+                {
+                    misplaced++;
+                    if (indexedFileIssues.Count < maxPlacementDetailRows)
+                    {
+                        indexedFileIssues.Add(new LibraryStoragePlacementIndexedFileIssue
+                        {
+                            IssueKind = "Misplaced",
+                            FilePath = fp,
+                            GameId = gid,
+                            CanonicalFolderPath = canonical
+                        });
+                    }
+                }
             }
+
+            snap.IndexedFileMisplacedTotalCount = misplaced;
+            snap.IndexedFileOrphanTotalCount = orphan;
+            snap.IndexedFileIssueTotalCount = misplaced + orphan;
 
             if (unassigned == photoIndex.Count)
             {
@@ -624,6 +673,137 @@ namespace PixelVaultNative
             else snap.IndexedFilesSummary = string.Join(" ", fileParts);
 
             return snap;
+        }
+
+        /// <summary>LIBST: move captures that sit outside the canonical folder for their GameId (full scan, not capped).</summary>
+        int PlacementMoveMisplacedCapturesToCanonical()
+        {
+            try
+            {
+                var root = libraryRoot;
+                if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root)) return -1;
+                if (indexPersistenceService == null) return -1;
+                List<GameIndexEditorRow> rows;
+                try
+                {
+                    rows = MergeGameIndexRows(GetSavedGameIndexRowsForRoot(root) ?? new List<GameIndexEditorRow>());
+                }
+                catch
+                {
+                    return -1;
+                }
+                var counts = BuildGameIndexTitleCounts(rows);
+                var readOnly = (IReadOnlyList<GameIndexEditorRow>)rows;
+                Dictionary<string, LibraryMetadataIndexEntry> photoIndex;
+                try
+                {
+                    photoIndex = indexPersistenceService.LoadLibraryMetadataIndexEntries(root);
+                }
+                catch
+                {
+                    return -1;
+                }
+                if (photoIndex == null || photoIndex.Count == 0) return 0;
+                var misplacedPaths = new List<string>();
+                foreach (var entry in photoIndex.Values)
+                {
+                    if (entry == null) continue;
+                    var gid = NormalizeGameId(entry.GameId);
+                    if (string.IsNullOrWhiteSpace(gid)) continue;
+                    var row = FindSavedGameIndexRowById(rows, gid);
+                    if (row == null) continue;
+                    var canonical = LibraryPlacementService.BuildCanonicalStorageFolderPath(
+                        root,
+                        row,
+                        readOnly,
+                        NormalizeGameIndexName,
+                        GetSafeGameFolderName,
+                        NormalizeConsoleLabel,
+                        counts);
+                    if (string.IsNullOrWhiteSpace(canonical)) continue;
+                    var fp = entry.FilePath ?? string.Empty;
+                    if (string.IsNullOrWhiteSpace(fp)) continue;
+                    var dir = Path.GetDirectoryName(fp);
+                    if (string.IsNullOrWhiteSpace(dir)) continue;
+                    if (!LibraryPlacementService.IsDirectoryWithinCanonicalStorage(dir, canonical))
+                        misplacedPaths.Add(fp);
+                }
+                if (misplacedPaths.Count == 0) return 0;
+                var moved = RehomeLibraryCapturesTowardCanonicalFolders(root, misplacedPaths);
+                if (moved > 0) RefreshMainUi();
+                return moved;
+            }
+            catch (Exception ex)
+            {
+                Log("Placement move misplaced captures: " + ex.Message);
+                return -1;
+            }
+        }
+
+        /// <summary>LIBST: clear GameId on photo-index rows that reference a missing game index row.</summary>
+        int PlacementClearOrphanPhotoGameIds()
+        {
+            try
+            {
+                var root = libraryRoot;
+                if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root)) return -1;
+                List<GameIndexEditorRow> rows;
+                try
+                {
+                    rows = MergeGameIndexRows(GetSavedGameIndexRowsForRoot(root) ?? new List<GameIndexEditorRow>());
+                }
+                catch
+                {
+                    return -1;
+                }
+                var index = LoadLibraryMetadataIndexViaSessionWhenActive(root, true);
+                if (index == null || index.Count == 0) return 0;
+                var cleared = 0;
+                foreach (var entry in index.Values)
+                {
+                    if (entry == null) continue;
+                    var gid = NormalizeGameId(entry.GameId);
+                    if (string.IsNullOrWhiteSpace(gid)) continue;
+                    if (FindSavedGameIndexRowById(rows, gid) != null) continue;
+                    entry.GameId = string.Empty;
+                    cleared++;
+                }
+                if (cleared == 0) return 0;
+                SaveLibraryMetadataIndexViaSessionWhenActive(root, index);
+                RefreshCachedLibraryFoldersFromGameIndex(root);
+                RefreshMainUi();
+                Log("Placement: cleared orphan GameId on " + cleared + " photo index entr" + (cleared == 1 ? "y." : "ies."));
+                return cleared;
+            }
+            catch (Exception ex)
+            {
+                Log("Placement clear orphan GameIds: " + ex.Message);
+                return -1;
+            }
+        }
+
+        /// <summary>LIBST: move files listed on each game index row into canonical folders (same path as storage merge align).</summary>
+        bool PlacementTryAlignGameIndexFoldersToCanonical()
+        {
+            try
+            {
+                var root = libraryRoot;
+                if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root)) return false;
+                var rows = MergeGameIndexRows(GetSavedGameIndexRowsForRoot(root) ?? new List<GameIndexEditorRow>());
+                if (rows.Count == 0) return false;
+                SaveSavedGameIndexRows(root, rows);
+                AlignLibraryFoldersToGameIndex(root, rows);
+                SaveSavedGameIndexRows(root, rows);
+                RefreshCachedLibraryFoldersFromGameIndex(root);
+                RefreshMainUi();
+                Log("Placement: aligned game index folders to canonical folders.");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Log("Placement align game index folders: " + ex.Message);
+                return false;
+            }
         }
 
     }

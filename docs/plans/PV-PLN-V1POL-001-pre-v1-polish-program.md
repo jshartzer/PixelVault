@@ -3,7 +3,7 @@
 | Field | Value |
 |-------|--------|
 | **Plan ID** | `PV-PLN-V1POL-001` |
-| **Status** | Active (planning / execution) |
+| **Status** | **In progress** — **A–E shipped** on train **`0.075.000`**–**`0.075.005`** (see **`docs/CHANGELOG.md`**); **F** largely shipped with follow-ups possible; **G** / **H/J** partial. Canonical slice detail: [Execution status](#execution-status-shipped-vs-remaining) below. |
 | **Owner** | PixelVault / Codex |
 | **Source brief** | `docs/PRE-V1 POLISH AND FEATURE REVIEW AND UPDATE.txt` |
 | **Related** | `docs/LIBRARY_PERFORMANCE_PLAN.md` (performance, largely complete), `docs/DOC_SYNC_POLICY.md` (repo ↔ Notion) |
@@ -16,7 +16,29 @@ Deliver a **production-ready, cohesive** desktop experience before V1: intention
 
 ---
 
-## Grounded audit (repo snapshot)
+## Execution status (shipped vs remaining)
+
+Authoritative complements: **`docs/CHANGELOG.md`** (**`0.075.xxx`**), **`docs/SMART_VIEWS_LIBRARY.md`** (folder filters), execution notes in the [revision history](#revision-history) below.
+
+| Slice | Intent | Status |
+|-------|--------|--------|
+| **A** | Design token foundation | **Shipped** — **`DesignTokens`** / shared theme direction referenced in **`0.075.000`** (library empty/loading polish train). |
+| **B** | Health / setup “control center” | **Shipped** — **Setup & health** / **`HealthDashboardWindow`** path from Settings in same train (**`0.075.000`**). |
+| **C** | Loading + empty states | **Shipped** — Folder list **skeleton / empty states** with CTAs; detail pane **empty / loading** copy and actions (**`0.075.000`**). |
+| **D** | Inline feedback / fewer modals | **Shipped (scoped)** — **`TryLibraryToast`**, **`NotifyOrMessageBox`**, **`NormalizeForLibraryToast`**; many **OK-only** **`MessageBox`** paths use library toasts when the browser is live (**`0.075.001`**–**`0.075.003`**). **OKCancel / YesNoCancel** remains modal; owner-window placement improved for key flows. |
+| **E** | Command palette | **Shipped (library)** — **`LibraryCommandPaletteRegistry`**, **Ctrl+Shift+P**, footer **⋯**, keywords + **Tab** into list; tests (**`0.075.004`**). |
+| **F** | Smart / curated views | **Largely shipped** — **`docs/SMART_VIEWS_LIBRARY.md`**; **`LibraryBrowserFolderViewMatchesFilter`**; **`needssteam`** / **`nocover`**; unified **`missingid`** (**Missing ID**) with legacy aliases via **`SettingsService`** (**`0.075.005`** + plan revs **2026-04-05**). Palette **`quick_edit_panel`** = drawer **shell** only. **Remaining:** any extra presets/chips called out in smart-views doc, deeper “every view defined” checklist. |
+| **G** | Quick-edit drawer (staged) | **Partial** — Shell / palette entry exists; **narrow in-place edits** and full validation of drawer UX **not** closed out in this plan doc. |
+| **H** | Motion + accessibility | **Partial** — e.g. **`PixelVaultFocus.xaml`**, toast vs **client-area animation**, nav **tooltips**, control **automation** names (**2026-04-05** rev). No claim of full reduced-motion / focus audit. |
+| **J** | Consistency cleanup | **Partial** — Ongoing; **literal/tooltip/destructive** sweep not finished as a single milestone. |
+
+**Adjacent polish (not slice-tagged in changelog):** e.g. **library 100% badge** polish (**`0.075.006`**) — fits program goals but not a slice letter in the table above.
+
+---
+
+## Grounded audit (repo snapshot — **pre–`0.075` baseline**)
+
+*Captured at plan author time; many gaps below are **addressed** in [Execution status](#execution-status-shipped-vs-remaining). Kept for original context and remaining gap-hunt (e.g. stray **`MessageBox`**).*
 
 ### Surfaces
 
@@ -64,15 +86,15 @@ Recommended order balances **safety**, **reuse of seams** (`ILibraryBrowserShell
 
 | Order | Slice | Risk | Notes |
 |------|--------|------|--------|
-| **A** | Design token foundation | Low–medium | Semantic colors/radius/spacing; migrate high-traffic UI first; preserve behavior. |
-| **B** | Health / setup “control center” | Medium | File/tool/token **status rows**; copy diagnostics; links to Path Settings & logs. |
-| **C** | Loading + empty states | Low–medium | Folder grid + detail hero; CTAs (clear search, open Path Settings, refresh). |
-| **D** | Inline feedback / fewer modals | Medium | Audit `MessageBox.Show`; keep true confirms; toasts / inline banners elsewhere. |
-| **E** | Command palette | Medium | Static commands → existing actions; keyboard chord; explicit registry (no fragile reflection). |
-| **F** | Smart / curated views | Medium–high | Extend filters or preset chips; document each view’s definition; start with low-risk views. |
-| **G** | Quick-edit drawer (staged) | High | Shell first; **narrow** flows only; full grid editors stay windows until validated. |
-| **H** | Motion + accessibility | Low–medium | Short transitions; respect reduced motion; shared focus visuals from tokens. |
-| **J** | Consistency cleanup | Low | Remaining literals, tooltips on icon-only controls, destructive styling parity. |
+| **A** | Design token foundation | Low–medium | **Shipped** (baseline). Further migration of hex literals → tokens is optional **J** work. |
+| **B** | Health / setup “control center” | Medium | **Shipped** (dashboard from Settings). Enrichment (e.g. more **`LibraryAssets`** surfaces) can continue. |
+| **C** | Loading + empty states | Low–medium | **Shipped** (folder + detail). Per-view tune-ups pair with **F** follow-ups. |
+| **D** | Inline feedback / fewer modals | Medium | **Shipped (scoped)**. Remaining **`MessageBox.Show`** audit = incremental **J** / spot fixes. |
+| **E** | Command palette | Medium | **Shipped (library)**. Future: more commands / other surfaces if needed. |
+| **F** | Smart / curated views | Medium–high | **Largely shipped**; **`docs/SMART_VIEWS_LIBRARY.md`** is source of truth for filter semantics. |
+| **G** | Quick-edit drawer (staged) | High | **Partial** — shell only; narrow flows TBD. |
+| **H** | Motion + accessibility | Low–medium | **Partial** — shared focus + some motion; full checklist open. |
+| **J** | Consistency cleanup | Low | **Partial** — ongoing pass on literals, tooltips, destructive affordances. |
 
 ### Dependencies
 
@@ -151,3 +173,4 @@ Planning/status for this initiative: **[PV-PLN-V1POL-001 — Pre-V1 polish progr
 | 2026-04-05 | Slice **F**: filter **`missinggameid`** (no saved game index id on folder row); palette **`filter_missing_game_id`**; combined-view note in **`docs/SMART_VIEWS_LIBRARY.md`**. |
 | 2026-04-05 | Slice **F** continuation: palette **`quick_edit_panel`** (quick-edit drawer shell). **H/J:** merged **`PixelVaultFocus.xaml`**, toast fade respects **client-area animation**, nav **tooltips**, delete control **automation name**. **Item 7:** starred-export fingerprint I/O via **`ILibrarySession`**. |
 | 2026-04-05 | Slice **F**: single **`missingid`** filter (**Missing ID**) replaces **`needssteam`** / **`needssteamgrid`** / **`missinggameid`**; legacy settings values normalize to **`missingid`**. |
+| 2026-04-08 | **Plan doc** aligned to **shipped** work: header **Status**, new **[Execution status](#execution-status-shipped-vs-remaining)** table, roadmap **Notes** column updated; **Grounded audit** labeled **pre–`0.075` baseline** so it does not override changelog truth. |

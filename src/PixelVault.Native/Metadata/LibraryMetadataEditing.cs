@@ -83,19 +83,7 @@ namespace PixelVaultNative
                 savedGameRow = FindSavedGameIndexRowById(rows, indexGameIdNorm);
             }
             var guessedFromPathAndName = NormalizeGameIndexName(GuessGameIndexNameForFile(file));
-            string gameName = string.Empty;
-            if (savedGameRow != null && !string.IsNullOrWhiteSpace(NormalizeGameIndexName(savedGameRow.Name, savedGameRow.FolderPath)))
-            {
-                gameName = NormalizeGameIndexName(savedGameRow.Name, savedGameRow.FolderPath);
-            }
-            else if (folderPathUsable)
-                gameName = guessedFromPathAndName;
-            else
-            {
-                gameName = guessedFromPathAndName;
-                if (string.IsNullOrWhiteSpace(gameName))
-                    gameName = NormalizeGameIndexName(GetGameNameFromFileName(Path.GetFileName(file)));
-            }
+            var gameName = ResolveManualMetadataGameName(savedGameRow, guessedFromPathAndName, folderPathUsable, fileName, NormalizeGameIndexName, GetGameNameFromFileName);
             var steamAppId = folderPathUsable ? (folder.SteamAppId ?? string.Empty) : string.Empty;
             if (savedGameRow != null && !string.IsNullOrWhiteSpace(savedGameRow.SteamAppId))
                 steamAppId = savedGameRow.SteamAppId;
@@ -149,7 +137,9 @@ namespace PixelVaultNative
             var affectedFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var touchedDirectories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             if (progress != null) progress(0, total, "Starting organize step for " + total + " image(s).");
-            var indexRows = GetSavedGameIndexRowsForRoot(libraryRoot) ?? new List<GameIndexEditorRow>();
+            // Match health placement + BuildCanonicalStorageFolderPath: merged rows and no preferred folder name from metadata
+            // (ManualMetadataItem.GameName can differ from the game index row and would compute a different “canonical” folder).
+            var indexRows = MergeGameIndexRows(GetSavedGameIndexRowsForRoot(libraryRoot) ?? new List<GameIndexEditorRow>());
             var titleCounts = BuildGameIndexTitleCounts(indexRows);
             for (int i = 0; i < total; i++)
             {
@@ -172,7 +162,7 @@ namespace PixelVaultNative
                         GetSafeGameFolderName,
                         NormalizeConsoleLabel,
                         titleCounts,
-                        item.GameName);
+                        null);
                 }
                 else
                 {
@@ -319,6 +309,29 @@ namespace PixelVaultNative
             if (string.IsNullOrWhiteSpace(existing.NonSteamId)) existing.NonSteamId = preservedNonSteamId;
             if (string.IsNullOrWhiteSpace(existing.SteamGridDbId)) existing.SteamGridDbId = preservedSteamGridDbId;
             SaveSavedGameIndexRows(root, rows);
+        }
+
+        /// <summary>
+        /// <see cref="ManualMetadataItem.GameName"/> for organize/re-home (LIBST: when the index resolves a saved row, use that title—not a conflicting filename stem).
+        /// </summary>
+        internal static string ResolveManualMetadataGameName(
+            GameIndexEditorRow savedGameRow,
+            string guessedFromPathAndName,
+            bool folderPathUsable,
+            string fileName,
+            Func<string, string, string> normalizeGameIndexName,
+            Func<string, string> getGameNameFromFileName)
+        {
+            if (normalizeGameIndexName == null) throw new ArgumentNullException(nameof(normalizeGameIndexName));
+            if (getGameNameFromFileName == null) throw new ArgumentNullException(nameof(getGameNameFromFileName));
+            if (savedGameRow != null && !string.IsNullOrWhiteSpace(normalizeGameIndexName(savedGameRow.Name ?? string.Empty, savedGameRow.FolderPath)))
+                return normalizeGameIndexName(savedGameRow.Name ?? string.Empty, savedGameRow.FolderPath);
+            if (folderPathUsable)
+                return guessedFromPathAndName;
+            var name = guessedFromPathAndName;
+            if (string.IsNullOrWhiteSpace(name))
+                name = normalizeGameIndexName(getGameNameFromFileName(fileName), string.Empty);
+            return name;
         }
     }
 }

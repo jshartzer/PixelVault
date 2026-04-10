@@ -57,7 +57,7 @@ namespace PixelVaultNative
                 result.ConfidenceLabel = string.IsNullOrWhiteSpace(rule.ConfidenceLabel) ? "ExplicitPattern" : rule.ConfidenceLabel;
                 result.PlatformTags = ParseTagText(rule.PlatformTagsText);
                 result.PlatformLabel = ResolvePrimaryPlatformLabel(rule.PlatformLabel, result.PlatformTags);
-                result.SteamAppId = ReadGroup(match, rule.SteamAppIdGroup);
+                ApplyMatchedPrimaryId(result, rule, ReadGroup(match, rule.SteamAppIdGroup));
                 result.GameTitleHint = ReadGroup(match, rule.TitleGroup);
                 result.CaptureTime = ParseTimestamp(ReadGroup(match, rule.TimestampGroup), rule.TimestampFormat);
                 result.PreserveFileTimes = rule.PreserveFileTimes;
@@ -630,6 +630,25 @@ namespace PixelVaultNative
                 && value.All(char.IsDigit);
         }
 
+        void ApplyMatchedPrimaryId(FilenameParseResult result, FilenameConventionRule rule, string rawValue)
+        {
+            if (result == null || string.IsNullOrWhiteSpace(rawValue)) return;
+            var normalizedPlatform = NormalizeConsoleLabel(rule == null ? string.Empty : rule.PlatformLabel);
+            if (string.Equals(normalizedPlatform, "Steam", StringComparison.OrdinalIgnoreCase))
+            {
+                result.SteamAppId = rawValue;
+                return;
+            }
+
+            if (LooksLikeNonSteamShortcutId(rawValue))
+            {
+                result.NonSteamId = rawValue;
+                return;
+            }
+
+            result.SteamAppId = rawValue;
+        }
+
         static string CleanNumericId(string value)
         {
             return new string((value ?? string.Empty).Where(char.IsDigit).ToArray());
@@ -909,6 +928,9 @@ namespace PixelVaultNative
         {
             switch ((token ?? string.Empty).Trim())
             {
+                case "M":
+                case "d":
+                case "h":
                 case "yyyy":
                 case "MM":
                 case "dd":
@@ -961,6 +983,10 @@ namespace PixelVaultNative
                     return @"(?:[_-]\d+)?";
                 case "unixms":
                     return @"[\d,]{13,17}";
+                case "M":
+                case "d":
+                case "h":
+                    return @"\d{1,2}";
                 case "yyyy":
                     return @"\d{4}";
                 case "MM":
@@ -993,6 +1019,9 @@ namespace PixelVaultNative
                 || trimmed == "counter"
                 || trimmed == "opt-counter"
                 || trimmed == "unixms"
+                || trimmed == "M"
+                || trimmed == "d"
+                || trimmed == "h"
                 || trimmed == "yyyy"
                 || trimmed == "MM"
                 || trimmed == "dd"
@@ -1015,6 +1044,7 @@ namespace PixelVaultNative
             { @"^clip_(?<stamp>[\d,]{13,17})\.(mp4|mkv|avi|mov|wmv|webm)$", "clip_[unixms].[ext:video]" },
             { @"^(?<title>.+?)_(?<stamp>\d{14})\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$", "[title]_[yyyy][MM][dd][HH][mm][ss].[ext:media]" },
             { @"^(?<title>.+?)[-–—](?<stamp>\d{4}_\d{2}_\d{2}[-_]\d{2}[-_]\d{2}[-_]\d{2})\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$", "[title]-[yyyy]_[MM]_[dd]-[HH]_[mm]_[ss].[ext:media]" },
+            { @"^(?<title>.+?)\s+(?<stamp>\d{1,2}_\d{1,2}_\d{4}\s+\d{1,2}_\d{2}_\d{2}\s+[AP]M)\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$", "[title] [M]_[d]_[yyyy] [h]_[mm]_[ss] [tt].[ext:media]" },
             { @".*PS5.*", "[contains:PS5]" },
             { @".*PlayStation.*", "[contains:PlayStation]" }
         };

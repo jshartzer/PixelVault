@@ -54,16 +54,21 @@ namespace PixelVaultNative
         public GameIndexEditorRow ResolveExistingGameIndexRowForAssignment(IEnumerable<GameIndexEditorRow> rows, string name, string platformLabel, string preferredGameId)
         {
             var normalizedRows = rows ?? Enumerable.Empty<GameIndexEditorRow>();
+            var normalizedName = normalizeGameIndexName(name ?? string.Empty, null);
+            var normalizedPlatform = normalizeConsoleLabel(platformLabel ?? string.Empty);
+            // Prefer identity (title + platform) so renaming a capture to match another existing game
+            // resolves to that row instead of the prior GameId.
+            var byIdentity = FindSavedGameIndexRowByIdentity(normalizedRows, normalizedName, normalizedPlatform);
+            if (byIdentity != null) return byIdentity;
+
             var normalizedGameId = normalizeGameId(preferredGameId ?? string.Empty);
             if (!string.IsNullOrWhiteSpace(normalizedGameId))
             {
                 var byId = FindSavedGameIndexRowById(normalizedRows, normalizedGameId);
                 if (byId != null) return byId;
             }
-            return FindSavedGameIndexRowByIdentity(
-                normalizedRows,
-                normalizeGameIndexName(name ?? string.Empty, null),
-                normalizeConsoleLabel(platformLabel ?? string.Empty));
+
+            return null;
         }
 
         public void SaveSavedGameIndexRows(string root, IEnumerable<GameIndexEditorRow> rows)
@@ -88,6 +93,8 @@ namespace PixelVaultNative
             var normalizedName = normalizeGameIndexName(name ?? string.Empty, null);
             var normalizedPlatform = normalizeConsoleLabel(platformLabel ?? string.Empty);
             var normalizedGameId = normalizeGameId(preferredGameId ?? string.Empty);
+            // Prefer stable GameId first: photo index save groups files by edited GameId but passes a filename title
+            // hint — identity must not override an explicit id (ResolveExistingGameIndexRowForAssignment is identity-first).
             if (!string.IsNullOrWhiteSpace(normalizedGameId))
             {
                 var byId = FindSavedGameIndexRowById(rows, normalizedGameId);

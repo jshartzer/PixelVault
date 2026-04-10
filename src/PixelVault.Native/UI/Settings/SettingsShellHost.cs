@@ -174,11 +174,12 @@ namespace PixelVaultNative
             var headerGrid = new Grid();
             headerGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             headerGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            headerGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             var hs = new StackPanel();
             hs.Children.Add(new TextBlock { Text = "PixelVault Settings", FontSize = 28, FontWeight = FontWeights.SemiBold, Foreground = textPrimary });
             hs.Children.Add(new TextBlock
             {
-                Text = "Paths, editors, and diagnostics. Import and upload queue tools live on the Library toolbar.",
+                Text = "Paths, health, and logs here; editors and storage merge live in the panel below. Import and queue review stay on the Library toolbar.",
                 Margin = new Thickness(0, 8, 0, 0),
                 Foreground = textSoft,
                 FontSize = 14,
@@ -186,7 +187,7 @@ namespace PixelVaultNative
             });
             var statusLocal = new TextBlock { Text = "Ready", Foreground = textPrimary, VerticalAlignment = VerticalAlignment.Center };
             d.SetStatusLine(statusLocal);
-            var headerActions = new WrapPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 14, 0, 0) };
+            var quickActions = new WrapPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 14, 0, 0) };
             Action<Button> styleHeaderBtn = delegate(Button b) { b.Margin = new Thickness(0, 0, 10, 8); };
             var pathSettingsTopButton = d.Btn("Path Settings", delegate { d.OpenPathSettingsDialog?.Invoke(); }, DesignTokens.ActionPrimaryFill, Brushes.White);
             styleHeaderBtn(pathSettingsTopButton);
@@ -194,28 +195,10 @@ namespace PixelVaultNative
             styleHeaderBtn(healthTopButton);
             var viewLogsTopButton = d.Btn("View Logs", delegate { d.OpenFolder(d.LogsRoot); }, DesignTokens.ActionSecondaryFill, Brushes.White);
             styleHeaderBtn(viewLogsTopButton);
-            var myCoversTopButton = d.Btn("My Covers", delegate { d.OpenSavedCoversFolder(); }, DesignTokens.ActionSecondaryFill, Brushes.White);
-            styleHeaderBtn(myCoversTopButton);
-            var gameIndexTopButton = d.Btn("Game Index", delegate { d.OpenGameIndexEditor(); }, DesignTokens.ActionSecondaryFill, Brushes.White);
-            styleHeaderBtn(gameIndexTopButton);
-            var photoIndexTopButton = d.Btn("Photo Index", delegate { d.OpenPhotoIndexEditor(); }, DesignTokens.ActionSecondaryFill, Brushes.White);
-            styleHeaderBtn(photoIndexTopButton);
-            var photographyTopButton = d.Btn("Photography", delegate { d.ShowPhotographyGallery(Window.GetWindow(statusLocal)); }, DesignTokens.ActionSecondaryFill, Brushes.White);
-            photographyTopButton.ToolTip = "Browse captures tagged for game photography";
-            styleHeaderBtn(photographyTopButton);
-            var filenameRulesTopButton = d.Btn("Renaming rules", delegate { d.OpenFilenameConventionEditor(); }, DesignTokens.ActionSecondaryFill, Brushes.White);
-            filenameRulesTopButton.ToolTip = "How capture filenames are parsed for imports and grouping";
-            styleHeaderBtn(filenameRulesTopButton);
-            var fetchCoversTopButton = d.Btn(
-                "Fetch covers",
-                delegate { d.PromptFetchCoversForLibrary?.Invoke(Window.GetWindow(statusLocal) ?? d.OwnerWindow); },
-                DesignTokens.ActionShortcutDismissFill,
-                Brushes.White);
-            fetchCoversTopButton.ToolTip = "Resolve IDs and download cover art for the whole library (occasional maintenance)";
-            styleHeaderBtn(fetchCoversTopButton);
-            var changelogTopButton = d.Btn("Changelog", delegate { ChangelogWindow.ShowDialog(d.OwnerWindow, d.AppVersion, d.ChangelogPath); }, DesignTokens.ActionSecondaryFill, Brushes.White);
-            styleHeaderBtn(changelogTopButton);
-            var sp = new Border
+            quickActions.Children.Add(pathSettingsTopButton);
+            quickActions.Children.Add(healthTopButton);
+            quickActions.Children.Add(viewLogsTopButton);
+            var statusBar = new Border
             {
                 Child = statusLocal,
                 Background = d.Brush("#1A242C"),
@@ -223,23 +206,15 @@ namespace PixelVaultNative
                 BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(12),
                 Padding = new Thickness(14, 10, 14, 10),
-                Margin = new Thickness(0, 0, 10, 8),
-                VerticalAlignment = VerticalAlignment.Center
+                Margin = new Thickness(0, 10, 0, 0),
+                HorizontalAlignment = HorizontalAlignment.Stretch
             };
-            headerActions.Children.Add(pathSettingsTopButton);
-            headerActions.Children.Add(healthTopButton);
-            headerActions.Children.Add(viewLogsTopButton);
-            headerActions.Children.Add(myCoversTopButton);
-            headerActions.Children.Add(gameIndexTopButton);
-            headerActions.Children.Add(photoIndexTopButton);
-            headerActions.Children.Add(photographyTopButton);
-            headerActions.Children.Add(filenameRulesTopButton);
-            headerActions.Children.Add(fetchCoversTopButton);
-            headerActions.Children.Add(changelogTopButton);
-            headerActions.Children.Add(sp);
+            Grid.SetRow(hs, 0);
             headerGrid.Children.Add(hs);
-            Grid.SetRow(headerActions, 1);
-            headerGrid.Children.Add(headerActions);
+            Grid.SetRow(quickActions, 1);
+            headerGrid.Children.Add(quickActions);
+            Grid.SetRow(statusBar, 2);
+            headerGrid.Children.Add(statusBar);
             header.Child = headerGrid;
             root.Children.Add(header);
 
@@ -261,11 +236,12 @@ namespace PixelVaultNative
             leftStack.Children.Add(TitleBlock("Overview", textPrimary));
             leftStack.Children.Add(new TextBlock
             {
-                Text = "Use Path Settings to change folders and tools. Editors open in their own windows.",
+                Text = "Path Settings (header) opens the full dialog for folders and credentials. Use Library tools for editors, cover fetch, and merging storage folders.",
                 Foreground = textMuted,
                 Margin = new Thickness(0, 0, 0, 12),
                 TextWrapping = TextWrapping.Wrap
             });
+            leftStack.Children.Add(BuildLibraryToolsCard(cardBg, cardBorder, textPrimary, textMuted));
             leftStack.Children.Add(BuildSettingsSummary(cardBg, cardBorder, textPrimary, textMuted));
             leftStack.Children.Add(BuildLibraryBehaviorSummary(cardBg, cardBorder, textPrimary, textMuted));
             leftStack.Children.Add(BuildDiagnosticsSummary(cardBg, cardBorder, textPrimary, textMuted, textSoft));
@@ -332,11 +308,62 @@ namespace PixelVaultNative
             return new TextBlock { Text = title, FontSize = 18, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 10), Foreground = foreground };
         }
 
+        Border BuildLibraryToolsCard(Brush cardBg, Brush cardBorder, Brush textPrimary, Brush textMuted)
+        {
+            var border = new Border { Background = cardBg, CornerRadius = new CornerRadius(14), Padding = new Thickness(14), BorderBrush = cardBorder, BorderThickness = new Thickness(1), Margin = new Thickness(0, 0, 0, 14) };
+            var stack = new StackPanel();
+            stack.Children.Add(new TextBlock { Text = "Library tools", FontWeight = FontWeights.SemiBold, Foreground = textPrimary, Margin = new Thickness(0, 0, 0, 8) });
+            stack.Children.Add(new TextBlock
+            {
+                Text = "Editors and maintenance for the library on disk. Merge folders consolidates captures into shared storage folders when one platform uses multiple disk folders.",
+                Foreground = textMuted,
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 0, 0, 12)
+            });
+            var wrap = new WrapPanel { Orientation = Orientation.Horizontal };
+            Action<Button> styleToolBtn = delegate(Button b) { b.Margin = new Thickness(0, 0, 10, 8); };
+            var gameIndexBtn = d.Btn("Game Index", delegate { d.OpenGameIndexEditor(); }, DesignTokens.ActionSecondaryFill, Brushes.White);
+            styleToolBtn(gameIndexBtn);
+            var photoIndexBtn = d.Btn("Photo Index", delegate { d.OpenPhotoIndexEditor(); }, DesignTokens.ActionSecondaryFill, Brushes.White);
+            styleToolBtn(photoIndexBtn);
+            var mergeBtn = d.Btn("Merge folders", delegate { d.OpenLibraryStorageMergeTool?.Invoke(d.OwnerWindow); }, DesignTokens.ActionShortcutDismissFill, Brushes.White);
+            mergeBtn.ToolTip = "Preview and apply moving captures into shared storage folders (same storage group).";
+            styleToolBtn(mergeBtn);
+            var myCoversBtn = d.Btn("My Covers", delegate { d.OpenSavedCoversFolder(); }, DesignTokens.ActionSecondaryFill, Brushes.White);
+            styleToolBtn(myCoversBtn);
+            var photoGalleryBtn = d.Btn("Photography", delegate { d.ShowPhotographyGallery(d.OwnerWindow); }, DesignTokens.ActionSecondaryFill, Brushes.White);
+            photoGalleryBtn.ToolTip = "Browse captures tagged for game photography";
+            styleToolBtn(photoGalleryBtn);
+            var renameBtn = d.Btn("Renaming rules", delegate { d.OpenFilenameConventionEditor(); }, DesignTokens.ActionSecondaryFill, Brushes.White);
+            renameBtn.ToolTip = "How capture filenames are parsed for imports and grouping";
+            styleToolBtn(renameBtn);
+            var fetchCoversBtn = d.Btn(
+                "Fetch covers",
+                delegate { d.PromptFetchCoversForLibrary?.Invoke(d.OwnerWindow); },
+                DesignTokens.ActionShortcutDismissFill,
+                Brushes.White);
+            fetchCoversBtn.ToolTip = "Resolve IDs and download cover art for the whole library (occasional maintenance)";
+            styleToolBtn(fetchCoversBtn);
+            var changelogBtn = d.Btn("Changelog", delegate { ChangelogWindow.ShowDialog(d.OwnerWindow, d.AppVersion, d.ChangelogPath); }, DesignTokens.ActionSecondaryFill, Brushes.White);
+            styleToolBtn(changelogBtn);
+            wrap.Children.Add(gameIndexBtn);
+            wrap.Children.Add(photoIndexBtn);
+            wrap.Children.Add(mergeBtn);
+            wrap.Children.Add(myCoversBtn);
+            wrap.Children.Add(photoGalleryBtn);
+            wrap.Children.Add(renameBtn);
+            wrap.Children.Add(fetchCoversBtn);
+            wrap.Children.Add(changelogBtn);
+            stack.Children.Add(wrap);
+            border.Child = stack;
+            return border;
+        }
+
         Border BuildSettingsSummary(Brush cardBg, Brush cardBorder, Brush textPrimary, Brush textMuted)
         {
             var border = new Border { Background = cardBg, CornerRadius = new CornerRadius(14), Padding = new Thickness(14), BorderBrush = cardBorder, BorderThickness = new Thickness(1) };
             var stack = new StackPanel();
-            stack.Children.Add(new TextBlock { Text = "Current paths", FontWeight = FontWeights.SemiBold, Foreground = textPrimary, Margin = new Thickness(0, 0, 0, 8) });
+            stack.Children.Add(new TextBlock { Text = "Paths & credentials", FontWeight = FontWeights.SemiBold, Foreground = textPrimary, Margin = new Thickness(0, 0, 0, 8) });
             stack.Children.Add(new TextBlock { Text = "Sources: " + d.SourceRootsSummary(), TextWrapping = TextWrapping.Wrap, Foreground = textMuted, Margin = new Thickness(0, 0, 0, 4) });
             stack.Children.Add(new TextBlock { Text = "Destination: " + d.GetDestinationRoot(), TextWrapping = TextWrapping.Wrap, Foreground = textMuted, Margin = new Thickness(0, 0, 0, 4) });
             stack.Children.Add(new TextBlock { Text = "Library: " + d.GetLibraryWorkspaceRoot(), TextWrapping = TextWrapping.Wrap, Foreground = textMuted, Margin = new Thickness(0, 0, 0, 4) });

@@ -45,7 +45,6 @@ namespace PixelVaultNative
             };
             navChrome.SettingsButton.Click += delegate { ShowSettingsWindow(); if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge(); };
             navChrome.GameIndexButton.Click += delegate { OpenGameIndexEditor(); };
-            navChrome.StorageMergeButton.Click += delegate { OpenLibraryStorageMergeTool(libraryWindow); };
             navChrome.PhotoIndexButton.Click += delegate { OpenPhotoIndexEditor(); };
             navChrome.PhotographyGalleryButton.Click += delegate { ShowPhotographyGallery(libraryWindow); };
             navChrome.MyCoversButton.Click += delegate { OpenSavedCoversFolder(); };

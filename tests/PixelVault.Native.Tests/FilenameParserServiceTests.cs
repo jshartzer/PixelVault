@@ -116,6 +116,43 @@ public sealed class FilenameParserServiceTests
     }
 
     [Fact]
+    public void Parse_CustomReadableXboxPcTokens_SupportsSingleDigitDateParts()
+    {
+        using var harness = new FilenameConventionHarness();
+        harness.IndexPersistence.SaveFilenameConventions(
+            harness.LibraryRoot,
+            new[]
+            {
+                new FilenameConventionRule
+                {
+                    ConventionId = "xbox_pc_custom",
+                    Name = "Xbox PC Custom",
+                    Enabled = true,
+                    Priority = 1400,
+                    Pattern = "[title] [M]_[d]_[yyyy] [h]_[mm]_[ss] [tt].[ext:media]",
+                    PatternText = "[title] [M]_[d]_[yyyy] [h]_[mm]_[ss] [tt].[ext:media]",
+                    PlatformLabel = "Xbox PC",
+                    PlatformTagsText = "Platform:Xbox PC",
+                    TitleGroup = "title",
+                    TimestampGroup = "stamp",
+                    TimestampFormat = "M_d_yyyy h_mm_ss tt",
+                    PreserveFileTimes = true,
+                    ConfidenceLabel = "UserRule"
+                }
+            });
+
+        var parser = CreateParser(root => harness.IndexPersistence.LoadFilenameConventions(root));
+
+        var parsed = parser.Parse("Human Fall Flat 4_4_2026 7_23_36 PM.png", harness.LibraryRoot);
+
+        Assert.Equal("Xbox PC", parsed.PlatformLabel);
+        Assert.Equal("Human Fall Flat", parsed.GameTitleHint);
+        Assert.True(parsed.PreserveFileTimes);
+        Assert.Equal(new DateTime(2026, 4, 4, 19, 23, 36), parsed.CaptureTime);
+        Assert.Equal("xbox_pc_custom", parsed.ConventionId);
+    }
+
+    [Fact]
     public void GetGameTitleHint_XboxPcCaptureBaseName_UsesTrailingTimestampInsteadOfFirstUnderscore()
     {
         var parser = CreateParser();
@@ -373,6 +410,16 @@ public sealed class FilenameParserServiceTests
         var steamRule = parser.GetConventionRules(string.Empty).First(rule => rule.ConventionId == "steam_screenshot_appid");
 
         Assert.Equal("[appid]_[yyyy][MM][dd][HH][mm][ss][opt-counter].[ext:media]", steamRule.PatternText);
+    }
+
+    [Fact]
+    public void GetConventionRules_XboxPcBuiltIn_ExposesReadablePatternText()
+    {
+        var parser = CreateParser();
+
+        var xboxPcRule = parser.GetConventionRules(string.Empty).First(rule => rule.ConventionId == "xbox_pc_capture_ampm");
+
+        Assert.Equal("[title] [M]_[d]_[yyyy] [h]_[mm]_[ss] [tt].[ext:media]", xboxPcRule.PatternText);
     }
 
     static FilenameParserService CreateParser(

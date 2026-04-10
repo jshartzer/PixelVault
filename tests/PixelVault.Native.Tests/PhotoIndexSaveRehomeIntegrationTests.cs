@@ -412,4 +412,64 @@ public sealed class PhotoIndexSaveRehomeIntegrationTests
             }
         }
     }
+
+    [Fact]
+    public void LoadLibraryFolders_IncludesNestedMediaUnderFirstLevelGameFolder()
+    {
+        var lib = Path.Combine(Path.GetTempPath(), "pv-nestedmedia-" + Guid.NewGuid().ToString("N"));
+        var gameLeaf = Path.Combine(lib, "Portal");
+        var nested = Path.Combine(gameLeaf, "deep");
+        Directory.CreateDirectory(nested);
+        var filePath = Path.Combine(nested, "shot.png");
+        File.WriteAllBytes(filePath, new byte[] { 137, 80 });
+        var rows = new List<GameIndexEditorRow>
+        {
+            new()
+            {
+                GameId = "G00001",
+                Name = "Portal",
+                PlatformLabel = "Steam",
+                StorageGroupId = string.Empty,
+                FolderPath = gameLeaf,
+                FilePaths = Array.Empty<string>()
+            }
+        };
+        var index = new Dictionary<string, LibraryMetadataIndexEntry>(StringComparer.OrdinalIgnoreCase)
+        {
+            [filePath] = new LibraryMetadataIndexEntry
+            {
+                FilePath = filePath,
+                Stamp = "1",
+                GameId = "G00001",
+                ConsoleLabel = "Steam",
+                TagText = "Steam",
+                CaptureUtcTicks = 100,
+                Starred = false,
+                IndexAddedUtcTicks = DateTime.UtcNow.Ticks,
+                RetroAchievementsGameId = string.Empty
+            }
+        };
+        var fs = new FileSystemService();
+        var host = new PhotoSaveTestHost(fs, index, rows);
+        var scanner = new LibraryScanner(host, new NoOpMetadataService(), fs,
+            folderCacheRebuildHook: (_, _) => { });
+        try
+        {
+            var folders = scanner.LoadLibraryFolders(lib, host.LoadLibraryMetadataIndex(lib, true));
+            var folder = Assert.Single(folders, x => string.Equals(x.GameId, "G00001", StringComparison.OrdinalIgnoreCase));
+            Assert.Equal(1, folder.FileCount);
+            Assert.Contains(filePath, folder.FilePaths);
+        }
+        finally
+        {
+            try
+            {
+                if (Directory.Exists(lib)) Directory.Delete(lib, true);
+            }
+            catch
+            {
+                /* best-effort */
+            }
+        }
+    }
 }
