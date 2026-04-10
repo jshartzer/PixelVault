@@ -457,6 +457,14 @@ namespace PixelVaultNative
             knownRulesGrid.Children.Add(customCard);
             var customStack = (StackPanel)customCard.Child;
             customCard.MinHeight = 240;
+            var customToolbar = new Grid { Margin = new Thickness(0, 0, 0, 8) };
+            customToolbar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            customToolbar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            var deleteCustomRuleButton = MakeButton("Delete", "#A3473E", Brushes.White, 120);
+            SetButtonToolTip(deleteCustomRuleButton, "Remove the selected custom rule from this list. Click Save Rules to write changes to the library index.");
+            Grid.SetColumn(deleteCustomRuleButton, 1);
+            customToolbar.Children.Add(deleteCustomRuleButton);
+            customStack.Children.Add(customToolbar);
             var customGrid = new DataGrid
             {
                 AutoGenerateColumns = false,
@@ -810,6 +818,7 @@ namespace PixelVaultNative
                 addFromFileButton.IsEnabled = services.PickFile != null;
                 sampleToolbarAddButton.IsEnabled = services.PickFile != null;
                 clearStagedButton.IsEnabled = stagedSamples.Count > 0;
+                deleteCustomRuleButton.IsEnabled = customGrid.SelectedItem is FilenameConventionRule;
                 saveTopButton.IsEnabled = !editingBuiltIn && editingRule != null;
             }
 
@@ -920,6 +929,36 @@ namespace PixelVaultNative
                 UpdateRegexPreview();
                 RenderBuilderDraft();
                 MarkDirty();
+            }
+
+            void DeleteSelectedCustomRule()
+            {
+                var selected = customGrid.SelectedItem as FilenameConventionRule;
+                if (selected == null)
+                {
+                    MainWindow.NotifyOrMessageBox(services.NotifyUser, "Select a custom rule to delete.");
+                    return;
+                }
+
+                var label = selected.Name ?? selected.ConventionId ?? "this rule";
+                var choice = MessageBox.Show(
+                    "Remove \"" + label + "\" from custom rules? Changes are not written to disk until you click Save Rules.",
+                    "Delete custom rule",
+                    MessageBoxButton.OKCancel,
+                    MessageBoxImage.Warning);
+                if (choice != MessageBoxResult.OK) return;
+
+                var wasEditing = ReferenceEquals(editingRule, selected);
+                customRules.Remove(selected);
+                if (wasEditing)
+                {
+                    customGrid.SelectedItem = null;
+                    LoadRuleIntoEditor(null, false);
+                }
+
+                dirty = true;
+                RefreshLists(true);
+                services.SetStatus("Custom rule removed (unsaved until Save Rules)");
             }
 
             void SelectCustomRule(FilenameConventionRule rule, bool focusPattern)
@@ -1274,6 +1313,7 @@ namespace PixelVaultNative
             preserveFileTimesBox.Checked += delegate { PushEditorToRule(); };
             preserveFileTimesBox.Unchecked += delegate { PushEditorToRule(); };
 
+            deleteCustomRuleButton.Click += delegate { DeleteSelectedCustomRule(); };
             newRuleButton.Click += delegate
             {
                 var rule = services.RulesService.CreateNewRule();

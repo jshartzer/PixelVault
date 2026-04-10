@@ -64,6 +64,8 @@ namespace PixelVaultNative
         Literal = 0,
         Title,
         Timestamp,
+        /// <summary>Wall-clock segment only (e.g. <c>09.07.04</c>); pair with <see cref="Timestamp"/> for full date+time.</summary>
+        ClockTime,
         SteamAppId,
         NonSteamId,
         Counter,

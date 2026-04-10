@@ -120,7 +120,7 @@ public sealed class FilenameRulesServiceTests
     }
 
     [Fact]
-    public void CreateBuilderDraftFromFilePath_PhoneYyyyMmDdDotTime_MergesIntoOneTimestamp()
+    public void CreateBuilderDraftFromFilePath_PhoneYyyyMmDdDotTime_SplitsDateAndClockRows()
     {
         var service = CreateService(
             parseFileName: _ => new FilenameParseResult { PlatformLabel = "Other" },
@@ -133,12 +133,39 @@ public sealed class FilenameRulesServiceTests
         Assert.Contains(
             draft.Segments,
             s => s.AssignedRole == FilenameConventionBuilderComponentRole.Timestamp
-                && (s.Text ?? string.Empty).Contains("09.07", StringComparison.Ordinal));
+                && string.Equals(s.Text, "2026-04-02", StringComparison.Ordinal));
+        Assert.Contains(
+            draft.Segments,
+            s => s.AssignedRole == FilenameConventionBuilderComponentRole.ClockTime
+                && string.Equals(s.Text, "09.07.04", StringComparison.Ordinal));
         Assert.DoesNotContain(
             draft.Segments,
             s => s.AssignedRole == FilenameConventionBuilderComponentRole.Literal
                 && (s.Text ?? string.Empty).Contains("09.07", StringComparison.Ordinal));
         Assert.DoesNotContain(draft.Segments, s => s != null && s.Locked);
+    }
+
+    [Fact]
+    public void ApplyBuilderDraft_CompositeDateAndClock_RoundTripsPattern()
+    {
+        var service = CreateService(
+            parseFileName: _ => new FilenameParseResult { PlatformLabel = "Other" },
+            buildRuleFromSample: _ => null!);
+
+        var draft = service.CreateBuilderDraftFromFilePath("2026-04-02 09.07.04.jpg");
+        Assert.NotNull(draft);
+        var rule = service.ApplyBuilderDraft(draft, new FilenameConventionRule());
+
+        Assert.Equal("yyyy-MM-dd HH.mm.ss", rule.TimestampFormat);
+        Assert.Equal("[yyyy]-[MM]-[dd] [HH].[mm].[ss].[ext:image]", rule.PatternText);
+
+        var fromRule = service.CreateBuilderDraftFromRule(rule);
+        Assert.NotNull(fromRule);
+        Assert.Contains(fromRule.Segments, s => s.AssignedRole == FilenameConventionBuilderComponentRole.Timestamp);
+        Assert.Contains(fromRule.Segments, s => s.AssignedRole == FilenameConventionBuilderComponentRole.ClockTime);
+        var rebuilt = service.ApplyBuilderDraft(fromRule, rule);
+        Assert.Equal(rule.PatternText, rebuilt.PatternText);
+        Assert.Equal(rule.TimestampFormat, rebuilt.TimestampFormat);
     }
 
     [Fact]

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -54,6 +55,8 @@ namespace PixelVaultNative
                     return "Title";
                 case FilenameConventionBuilderComponentRole.Timestamp:
                     return "Date / Time";
+                case FilenameConventionBuilderComponentRole.ClockTime:
+                    return "Time";
                 case FilenameConventionBuilderComponentRole.SteamAppId:
                     return "Steam App ID";
                 case FilenameConventionBuilderComponentRole.NonSteamId:
@@ -74,6 +77,7 @@ namespace PixelVaultNative
                 FilenameConventionBuilderComponentRole.Literal,
                 FilenameConventionBuilderComponentRole.Title,
                 FilenameConventionBuilderComponentRole.Timestamp,
+                FilenameConventionBuilderComponentRole.ClockTime,
                 FilenameConventionBuilderComponentRole.SteamAppId,
                 FilenameConventionBuilderComponentRole.NonSteamId,
                 FilenameConventionBuilderComponentRole.Counter,
@@ -224,8 +228,9 @@ namespace PixelVaultNative
             rule.PlatformTagsText = cleanTag(string.IsNullOrWhiteSpace(draft.PlatformTagsText) ? defaultPlatformTagsTextForLabel(rule.PlatformLabel) : draft.PlatformTagsText);
             rule.SteamAppIdGroup = UsesIdSegment(draft) ? "appid" : string.Empty;
             rule.TitleGroup = UsesRole(draft, FilenameConventionBuilderComponentRole.Title) ? "title" : string.Empty;
-            rule.TimestampGroup = UsesRole(draft, FilenameConventionBuilderComponentRole.Timestamp) ? "stamp" : string.Empty;
-            rule.TimestampFormat = UsesRole(draft, FilenameConventionBuilderComponentRole.Timestamp) ? cleanTag(draft.TimestampFormat) : string.Empty;
+            var usesStamp = UsesTimestampOrClock(draft);
+            rule.TimestampGroup = usesStamp ? "stamp" : string.Empty;
+            rule.TimestampFormat = usesStamp ? cleanTag(ResolveTimestampFormatForSave(draft)) : string.Empty;
             rule.PreserveFileTimes = draft.PreserveFileTimes;
             rule.RoutesToManualWhenMissingSteamAppId = draft.RoutesToManualWhenMissingSteamAppId;
             rule.ConfidenceLabel = string.IsNullOrWhiteSpace(rule.ConfidenceLabel) ? "CustomRule" : cleanTag(rule.ConfidenceLabel);
@@ -351,13 +356,40 @@ namespace PixelVaultNative
             if (hasTimestamp)
             {
                 draft.TimestampFormat = string.IsNullOrWhiteSpace(draft.TimestampFormat) ? detection.Format : draft.TimestampFormat;
-                draft.Segments.Add(new FilenameConventionBuilderSegment
+                var splitDateAndClock = false;
+                if (string.Equals(detection.Format, "yyyy-MM-dd HH.mm.ss", StringComparison.Ordinal))
                 {
-                    Text = detection.Value,
-                    SuggestedRole = FilenameConventionBuilderComponentRole.Timestamp,
-                    AssignedRole = FilenameConventionBuilderComponentRole.Timestamp,
-                    Hint = "Looks like " + detection.Format
-                });
+                    var split = Regex.Match(detection.Value ?? string.Empty, @"^(?<d>\d{4}-\d{2}-\d{2})\s+(?<t>\d{2}\.\d{2}\.\d{2})$", RegexOptions.CultureInvariant);
+                    if (split.Success)
+                    {
+                        splitDateAndClock = true;
+                        draft.Segments.Add(new FilenameConventionBuilderSegment
+                        {
+                            Text = split.Groups["d"].Value,
+                            SuggestedRole = FilenameConventionBuilderComponentRole.Timestamp,
+                            AssignedRole = FilenameConventionBuilderComponentRole.Timestamp,
+                            Hint = "Date (calendar)"
+                        });
+                        draft.Segments.Add(new FilenameConventionBuilderSegment
+                        {
+                            Text = split.Groups["t"].Value,
+                            SuggestedRole = FilenameConventionBuilderComponentRole.ClockTime,
+                            AssignedRole = FilenameConventionBuilderComponentRole.ClockTime,
+                            Hint = "Time of day"
+                        });
+                    }
+                }
+
+                if (!splitDateAndClock)
+                {
+                    draft.Segments.Add(new FilenameConventionBuilderSegment
+                    {
+                        Text = detection.Value,
+                        SuggestedRole = FilenameConventionBuilderComponentRole.Timestamp,
+                        AssignedRole = FilenameConventionBuilderComponentRole.Timestamp,
+                        Hint = "Looks like " + detection.Format
+                    });
+                }
 
                 if (Regex.IsMatch(suffix ?? string.Empty, @"^[_-]\d+$", RegexOptions.CultureInvariant))
                 {
@@ -643,13 +675,35 @@ namespace PixelVaultNative
                         break;
                     }
 
-                    yield return new FilenameConventionBuilderSegment
+                    var mergedTimestamp = builder.ToString();
+                    if (TrySplitReadablePatternTimestampBlock(mergedTimestamp, timestampFormat, out var dateBlock, out var clockBlock))
                     {
-                        Text = builder.ToString(),
-                        SuggestedRole = FilenameConventionBuilderComponentRole.Timestamp,
-                        AssignedRole = FilenameConventionBuilderComponentRole.Timestamp,
-                        Hint = string.IsNullOrWhiteSpace(timestampFormat) ? "Timestamp tokens" : timestampFormat
-                    };
+                        yield return new FilenameConventionBuilderSegment
+                        {
+                            Text = dateBlock,
+                            SuggestedRole = FilenameConventionBuilderComponentRole.Timestamp,
+                            AssignedRole = FilenameConventionBuilderComponentRole.Timestamp,
+                            Hint = string.IsNullOrWhiteSpace(timestampFormat) ? "Date" : timestampFormat
+                        };
+                        yield return new FilenameConventionBuilderSegment
+                        {
+                            Text = clockBlock,
+                            SuggestedRole = FilenameConventionBuilderComponentRole.ClockTime,
+                            AssignedRole = FilenameConventionBuilderComponentRole.ClockTime,
+                            Hint = "Time of day"
+                        };
+                    }
+                    else
+                    {
+                        yield return new FilenameConventionBuilderSegment
+                        {
+                            Text = mergedTimestamp,
+                            SuggestedRole = FilenameConventionBuilderComponentRole.Timestamp,
+                            AssignedRole = FilenameConventionBuilderComponentRole.Timestamp,
+                            Hint = string.IsNullOrWhiteSpace(timestampFormat) ? "Timestamp tokens" : timestampFormat
+                        };
+                    }
+
                     continue;
                 }
 
@@ -754,6 +808,16 @@ namespace PixelVaultNative
             var appIdValue = ReadGroup(match, string.IsNullOrWhiteSpace(rule.SteamAppIdGroup) ? "appid" : rule.SteamAppIdGroup);
             var titleValue = ReadGroup(match, string.IsNullOrWhiteSpace(rule.TitleGroup) ? "title" : rule.TitleGroup);
             var stampValue = ReadGroup(match, string.IsNullOrWhiteSpace(rule.TimestampGroup) ? "stamp" : rule.TimestampGroup);
+            var hasDateSeg = UsesRole(draft, FilenameConventionBuilderComponentRole.Timestamp);
+            var hasClockSeg = UsesRole(draft, FilenameConventionBuilderComponentRole.ClockTime);
+            string dateStamp = null;
+            string clockStamp = null;
+            if (hasDateSeg && hasClockSeg && !string.IsNullOrWhiteSpace(stampValue)
+                && TrySplitCompositeStamp(stampValue, rule.TimestampFormat ?? string.Empty, out var dPart, out var cPart))
+            {
+                dateStamp = dPart;
+                clockStamp = cPart;
+            }
 
             foreach (var segment in draft.Segments)
             {
@@ -767,7 +831,12 @@ namespace PixelVaultNative
                         if (!string.IsNullOrWhiteSpace(titleValue)) segment.Text = titleValue;
                         break;
                     case FilenameConventionBuilderComponentRole.Timestamp:
-                        if (!string.IsNullOrWhiteSpace(stampValue)) segment.Text = stampValue;
+                        if (!string.IsNullOrWhiteSpace(dateStamp)) segment.Text = dateStamp;
+                        else if (!string.IsNullOrWhiteSpace(stampValue)) segment.Text = stampValue;
+                        break;
+                    case FilenameConventionBuilderComponentRole.ClockTime:
+                        if (!string.IsNullOrWhiteSpace(clockStamp)) segment.Text = clockStamp;
+                        else if (!string.IsNullOrWhiteSpace(stampValue)) segment.Text = stampValue;
                         break;
                     case FilenameConventionBuilderComponentRole.Counter:
                         if (!string.IsNullOrWhiteSpace(counterValue)) segment.Text = counterValue;
@@ -803,6 +872,173 @@ namespace PixelVaultNative
             return draft != null && draft.Segments.Any(segment => segment != null && segment.AssignedRole == role);
         }
 
+        static bool UsesTimestampOrClock(FilenameConventionBuilderDraft draft)
+        {
+            return UsesRole(draft, FilenameConventionBuilderComponentRole.Timestamp)
+                || UsesRole(draft, FilenameConventionBuilderComponentRole.ClockTime);
+        }
+
+        static string ResolveTimestampFormatForSave(FilenameConventionBuilderDraft draft)
+        {
+            if (draft == null) return string.Empty;
+            var hasDate = UsesRole(draft, FilenameConventionBuilderComponentRole.Timestamp);
+            var hasClock = UsesRole(draft, FilenameConventionBuilderComponentRole.ClockTime);
+            if (hasDate && hasClock)
+            {
+                var existing = (draft.TimestampFormat ?? string.Empty).Trim();
+                if (!string.IsNullOrWhiteSpace(existing)
+                    && existing.IndexOf("HH", StringComparison.OrdinalIgnoreCase) >= 0
+                    && (existing.IndexOf("yyyy", StringComparison.OrdinalIgnoreCase) >= 0
+                        || existing.IndexOf("MM", StringComparison.OrdinalIgnoreCase) >= 0))
+                {
+                    return existing;
+                }
+
+                return InferCompositeTimestampFormat(draft) ?? "yyyy-MM-dd HH.mm.ss";
+            }
+
+            if (hasClock && !hasDate)
+                return InferClockOnlyFormatFromDraft(draft);
+
+            if (hasDate && !hasClock)
+            {
+                var dtf = (draft.TimestampFormat ?? string.Empty).Trim();
+                return string.IsNullOrWhiteSpace(dtf) ? InferDateOnlyFormatFromDraft(draft) : dtf;
+            }
+
+            return string.Empty;
+        }
+
+        static string InferCompositeTimestampFormat(FilenameConventionBuilderDraft draft)
+        {
+            var dateSeg = draft.Segments.FirstOrDefault(s => s != null && s.AssignedRole == FilenameConventionBuilderComponentRole.Timestamp);
+            var clockSeg = draft.Segments.FirstOrDefault(s => s != null && s.AssignedRole == FilenameConventionBuilderComponentRole.ClockTime);
+            var d = (dateSeg?.Text ?? string.Empty).Trim();
+            var c = (clockSeg?.Text ?? string.Empty).Trim();
+            if (Regex.IsMatch(d, @"^\d{4}-\d{2}-\d{2}$", RegexOptions.CultureInvariant)
+                && Regex.IsMatch(c, @"^\d{2}\.\d{2}\.\d{2}$", RegexOptions.CultureInvariant))
+                return "yyyy-MM-dd HH.mm.ss";
+            if (Regex.IsMatch(d, @"^\d{4}-\d{2}-\d{2}$", RegexOptions.CultureInvariant)
+                && Regex.IsMatch(c, @"^\d{2}-\d{2}-\d{2}$", RegexOptions.CultureInvariant))
+                return "yyyy-MM-dd HH-mm-ss";
+            if (Regex.IsMatch(d, @"^\d{4}-\d{2}-\d{2}$", RegexOptions.CultureInvariant)
+                && Regex.IsMatch(c, @"^\d{2}:\d{2}:\d{2}$", RegexOptions.CultureInvariant))
+                return "yyyy-MM-dd HH:mm:ss";
+            return "yyyy-MM-dd HH.mm.ss";
+        }
+
+        static string InferClockOnlyFormatFromDraft(FilenameConventionBuilderDraft draft)
+        {
+            var seg = draft.Segments.FirstOrDefault(s => s != null && s.AssignedRole == FilenameConventionBuilderComponentRole.ClockTime);
+            return InferClockFormatFromSampleText(seg?.Text);
+        }
+
+        static string InferClockFormatFromSampleText(string text)
+        {
+            var t = (text ?? string.Empty).Trim();
+            if (Regex.IsMatch(t, @"^\d{2}\.\d{2}\.\d{2}$", RegexOptions.CultureInvariant)) return "HH.mm.ss";
+            if (Regex.IsMatch(t, @"^\d{2}-\d{2}-\d{2}$", RegexOptions.CultureInvariant)) return "HH-mm-ss";
+            if (Regex.IsMatch(t, @"^\d{2}:\d{2}:\d{2}$", RegexOptions.CultureInvariant)) return "HH:mm:ss";
+            return "HH.mm.ss";
+        }
+
+        static string InferDateOnlyFormatFromDraft(FilenameConventionBuilderDraft draft)
+        {
+            var seg = draft.Segments.FirstOrDefault(s => s != null && s.AssignedRole == FilenameConventionBuilderComponentRole.Timestamp);
+            var t = (seg?.Text ?? string.Empty).Trim();
+            if (Regex.IsMatch(t, @"^\d{4}-\d{2}-\d{2}$", RegexOptions.CultureInvariant)) return "yyyy-MM-dd";
+            if (Regex.IsMatch(t, @"^\d{8}$", RegexOptions.CultureInvariant)) return "yyyyMMdd";
+            return "yyyy-MM-dd";
+        }
+
+        static bool LooksLikeDateOnlySegmentText(string text)
+        {
+            var t = (text ?? string.Empty).Trim();
+            return Regex.IsMatch(t, @"^\d{4}-\d{2}-\d{2}$", RegexOptions.CultureInvariant)
+                || Regex.IsMatch(t, @"^\d{8}$", RegexOptions.CultureInvariant);
+        }
+
+        static string DateOnlyReadablePatternFromSegment(string text)
+        {
+            var t = (text ?? string.Empty).Trim();
+            if (Regex.IsMatch(t, @"^\d{4}-\d{2}-\d{2}$", RegexOptions.CultureInvariant)) return "[yyyy]-[MM]-[dd]";
+            if (Regex.IsMatch(t, @"^\d{8}$", RegexOptions.CultureInvariant)) return "[yyyy][MM][dd]";
+            return TimestampTokenText(t, "yyyy-MM-dd");
+        }
+
+        static string TimeOnlyReadablePatternFromSegment(string text)
+        {
+            var t = (text ?? string.Empty).Trim();
+            if (Regex.IsMatch(t, @"^\d{2}\.\d{2}\.\d{2}$", RegexOptions.CultureInvariant)) return "[HH].[mm].[ss]";
+            if (Regex.IsMatch(t, @"^\d{2}-\d{2}-\d{2}$", RegexOptions.CultureInvariant)) return "[HH]-[mm]-[ss]";
+            if (Regex.IsMatch(t, @"^\d{2}:\d{2}:\d{2}$", RegexOptions.CultureInvariant)) return "[HH]:[mm]:[ss]";
+            TimestampDetection det;
+            if (TryDetectTimestamp(t, out det) && string.Equals(det.Format, "yyyy-MM-dd HH.mm.ss", StringComparison.Ordinal))
+            {
+                var m = Regex.Match(det.Value ?? string.Empty, @"^\d{4}-\d{2}-\d{2}\s+(?<clock>\d{2}\.\d{2}\.\d{2})$", RegexOptions.CultureInvariant);
+                if (m.Success && m.Groups["clock"].Success)
+                    return TimeOnlyReadablePatternFromSegment(m.Groups["clock"].Value);
+            }
+
+            return "[HH].[mm].[ss]";
+        }
+
+        static bool TrySplitReadablePatternTimestampBlock(string mergedPattern, string timestampFormat, out string dateBlock, out string clockBlock)
+        {
+            dateBlock = clockBlock = null;
+            var fmt = (timestampFormat ?? string.Empty).Trim();
+            var merged = mergedPattern ?? string.Empty;
+            switch (fmt)
+            {
+                case "yyyy-MM-dd HH.mm.ss":
+                    if (string.Equals(merged, "[yyyy]-[MM]-[dd] [HH].[mm].[ss]", StringComparison.Ordinal))
+                    {
+                        dateBlock = "[yyyy]-[MM]-[dd]";
+                        clockBlock = "[HH].[mm].[ss]";
+                        return true;
+                    }
+
+                    break;
+                case "yyyy-MM-dd HH-mm-ss":
+                    if (string.Equals(merged, "[yyyy]-[MM]-[dd] [HH]-[mm]-[ss]", StringComparison.Ordinal))
+                    {
+                        dateBlock = "[yyyy]-[MM]-[dd]";
+                        clockBlock = "[HH]-[mm]-[ss]";
+                        return true;
+                    }
+
+                    break;
+                case "yyyy-MM-dd HH:mm:ss":
+                    if (string.Equals(merged, "[yyyy]-[MM]-[dd] [HH]:[mm]:[ss]", StringComparison.Ordinal))
+                    {
+                        dateBlock = "[yyyy]-[MM]-[dd]";
+                        clockBlock = "[HH]:[mm]:[ss]";
+                        return true;
+                    }
+
+                    break;
+            }
+
+            return false;
+        }
+
+        static bool TrySplitCompositeStamp(string stamp, string compositeFormat, out string datePart, out string timePart)
+        {
+            datePart = timePart = null;
+            var raw = (stamp ?? string.Empty).Trim();
+            var fmt = (compositeFormat ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(raw) || string.IsNullOrWhiteSpace(fmt)) return false;
+            var sp = fmt.IndexOf(' ', StringComparison.Ordinal);
+            if (sp < 0) return false;
+            if (!DateTime.TryParseExact(raw, fmt, CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt)) return false;
+            var dateFmt = fmt.Substring(0, sp).Trim();
+            var timeFmt = fmt.Substring(sp + 1).Trim();
+            if (string.IsNullOrWhiteSpace(dateFmt) || string.IsNullOrWhiteSpace(timeFmt)) return false;
+            datePart = dt.ToString(dateFmt, CultureInfo.InvariantCulture);
+            timePart = dt.ToString(timeFmt, CultureInfo.InvariantCulture);
+            return true;
+        }
+
         static bool UsesIdSegment(FilenameConventionBuilderDraft draft)
         {
             return UsesRole(draft, FilenameConventionBuilderComponentRole.SteamAppId)
@@ -824,7 +1060,34 @@ namespace PixelVaultNative
                         builder.Append("[title]");
                         break;
                     case FilenameConventionBuilderComponentRole.Timestamp:
-                        builder.Append(TimestampTokenText(segment.Text, draft.TimestampFormat));
+                        if (UsesRole(draft, FilenameConventionBuilderComponentRole.ClockTime))
+                        {
+                            var tsText = (segment.Text ?? string.Empty).Trim();
+                            builder.Append(tsText.IndexOf('[') >= 0
+                                ? tsText
+                                : DateOnlyReadablePatternFromSegment(tsText));
+                        }
+                        else
+                        {
+                            builder.Append(TimestampTokenText(segment.Text, draft.TimestampFormat));
+                        }
+
+                        if (nextSegment != null && nextSegment.AssignedRole == FilenameConventionBuilderComponentRole.ClockTime)
+                        {
+                            var fmt = (draft.TimestampFormat ?? string.Empty).Trim();
+                            if (fmt.IndexOf(' ', StringComparison.Ordinal) > 0)
+                                builder.Append(' ');
+                        }
+
+                        break;
+                    case FilenameConventionBuilderComponentRole.ClockTime:
+                        {
+                            var ck = (segment.Text ?? string.Empty).Trim();
+                            builder.Append(ck.IndexOf('[') >= 0
+                                ? ck
+                                : TimeOnlyReadablePatternFromSegment(ck));
+                        }
+
                         break;
                     case FilenameConventionBuilderComponentRole.SteamAppId:
                     case FilenameConventionBuilderComponentRole.NonSteamId:
