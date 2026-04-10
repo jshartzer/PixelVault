@@ -50,12 +50,12 @@ namespace PixelVaultNative
                 {
                     foreach (var dir in fileSystem.EnumerateDirectories(root))
                     {
-                        targets.AddRange(fileSystem.EnumerateFiles(dir, "*.*", SearchOption.TopDirectoryOnly).Where(host.IsLibraryMediaFile));
+                        targets.AddRange(fileSystem.EnumerateFiles(dir, "*.*", SearchOption.AllDirectories).Where(host.IsLibraryMediaFile));
                     }
                 }
                 else
                 {
-                    targets.AddRange(fileSystem.EnumerateFiles(folderPath, "*.*", SearchOption.TopDirectoryOnly).Where(host.IsLibraryMediaFile));
+                    targets.AddRange(fileSystem.EnumerateFiles(folderPath, "*.*", SearchOption.AllDirectories).Where(host.IsLibraryMediaFile));
                 }
 
                 var fileList = targets.Where(fileSystem.FileExists).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(p => p, StringComparer.OrdinalIgnoreCase).ToList();
@@ -77,8 +77,10 @@ namespace PixelVaultNative
                     foreach (var stale in index.Keys.Where(key =>
                     {
                         var fileDirectory = Path.GetDirectoryName(key) ?? string.Empty;
-                        return string.Equals(fileDirectory, folderPath, StringComparison.OrdinalIgnoreCase)
-                            && (!targetSet.Contains(key) || !fileSystem.FileExists(key));
+                        var underScope = LibraryPlacementService.PathsEqualNormalized(fileDirectory, folderPath)
+                            || LibraryPlacementService.IsDirectoryWithinCanonicalStorage(fileDirectory, folderPath);
+                        if (!underScope) return false;
+                        return !targetSet.Contains(key) || !fileSystem.FileExists(key);
                     }).ToList())
                     {
                         cancellationToken.ThrowIfCancellationRequested();
@@ -459,7 +461,7 @@ namespace PixelVaultNative
             if (precomputedOneLevelMediaFilesOrNull == null)
             {
                 allFiles = fileSystem.EnumerateDirectories(root)
-                    .SelectMany(dir => fileSystem.EnumerateFiles(dir, "*.*", SearchOption.TopDirectoryOnly).Where(host.IsLibraryMediaFile))
+                    .SelectMany(dir => fileSystem.EnumerateFiles(dir, "*.*", SearchOption.AllDirectories).Where(host.IsLibraryMediaFile))
                     .Where(fileSystem.FileExists)
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)

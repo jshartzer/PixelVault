@@ -86,10 +86,7 @@ namespace PixelVaultNative
             string gameName = string.Empty;
             if (savedGameRow != null && !string.IsNullOrWhiteSpace(NormalizeGameIndexName(savedGameRow.Name, savedGameRow.FolderPath)))
             {
-                var rowName = NormalizeGameIndexName(savedGameRow.Name, savedGameRow.FolderPath);
-                gameName = string.Equals(rowName, guessedFromPathAndName, StringComparison.OrdinalIgnoreCase)
-                    ? rowName
-                    : (string.IsNullOrWhiteSpace(guessedFromPathAndName) ? rowName : guessedFromPathAndName);
+                gameName = NormalizeGameIndexName(savedGameRow.Name, savedGameRow.FolderPath);
             }
             else if (folderPathUsable)
                 gameName = guessedFromPathAndName;
