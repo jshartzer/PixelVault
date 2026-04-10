@@ -98,6 +98,50 @@ public sealed class FilenameRulesServiceTests
     }
 
     [Fact]
+    public void CreateBuilderDraftFromFilePath_WhenSampleRuleIsRegexOnly_UsesGuidedFallback()
+    {
+        var service = CreateService(
+            parseFileName: _ => new FilenameParseResult { PlatformLabel = "Other" },
+            buildRuleFromSample: _ => new FilenameConventionRule
+            {
+                ConventionId = "regex_only",
+                Name = "Regex only",
+                Pattern = "^2026\\-04\\-02 09\\.07\\.04\\.jpg$",
+                PatternText = "^2026\\-04\\-02 09\\.07\\.04\\.jpg$",
+                PlatformLabel = "Other"
+            });
+
+        var draft = service.CreateBuilderDraftFromFilePath("2026-04-02 09.07.04.jpg");
+        var rule = service.ApplyBuilderDraft(draft, new FilenameConventionRule());
+
+        Assert.NotNull(draft);
+        Assert.NotEmpty(draft.Segments);
+        Assert.False(string.IsNullOrWhiteSpace(rule.PatternText));
+    }
+
+    [Fact]
+    public void CreateBuilderDraftFromFilePath_PhoneYyyyMmDdDotTime_MergesIntoOneTimestamp()
+    {
+        var service = CreateService(
+            parseFileName: _ => new FilenameParseResult { PlatformLabel = "Other" },
+            buildRuleFromSample: _ => null!);
+
+        var draft = service.CreateBuilderDraftFromFilePath("2026-04-02 09.07.04.jpg");
+
+        Assert.NotNull(draft);
+        Assert.Equal("yyyy-MM-dd HH.mm.ss", draft.TimestampFormat);
+        Assert.Contains(
+            draft.Segments,
+            s => s.AssignedRole == FilenameConventionBuilderComponentRole.Timestamp
+                && (s.Text ?? string.Empty).Contains("09.07", StringComparison.Ordinal));
+        Assert.DoesNotContain(
+            draft.Segments,
+            s => s.AssignedRole == FilenameConventionBuilderComponentRole.Literal
+                && (s.Text ?? string.Empty).Contains("09.07", StringComparison.Ordinal));
+        Assert.DoesNotContain(draft.Segments, s => s != null && s.Locked);
+    }
+
+    [Fact]
     public void CreateBuilderDraftFromSample_SuggestsNonSteamId_ForLongShortcutPrefix()
     {
         var service = CreateService(

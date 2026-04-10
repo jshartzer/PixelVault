@@ -207,6 +207,38 @@ public sealed class FilenameParserServiceTests
     }
 
     [Fact]
+    public void Parse_PhoneYyyyMmDdDotTime_CustomRule_MatchesEachUniqueTime()
+    {
+        var phoneRule = new FilenameConventionRule
+        {
+            ConventionId = "custom_phone_dot_time",
+            Name = "Phone export",
+            Enabled = true,
+            Priority = 1200,
+            PatternText = "[yyyy]-[MM]-[dd] [HH].[mm].[ss].[ext:image]",
+            Pattern = "[yyyy]-[MM]-[dd] [HH].[mm].[ss].[ext:image]",
+            PlatformLabel = "PC",
+            PlatformTagsText = "PhonePicTest",
+            TimestampGroup = "stamp",
+            TimestampFormat = "yyyy-MM-dd HH.mm.ss",
+            TitleGroup = string.Empty,
+            SteamAppIdGroup = string.Empty,
+            ConfidenceLabel = "CustomRule",
+            IsBuiltIn = false
+        };
+        var parser = CreateParser(_ => new List<FilenameConventionRule> { phoneRule });
+        const string libraryRoot = "library-root";
+
+        foreach (var name in new[] { "2025-11-30 19.51.52.jpg", "2025-11-30 19.53.01.jpg", "2026-04-02 09.07.04.jpg" })
+        {
+            var parsed = parser.Parse(name, libraryRoot);
+            Assert.True(parsed.MatchedConvention, name);
+            Assert.Equal("PC", parsed.PlatformLabel);
+            Assert.True(parsed.CaptureTime.HasValue, name);
+        }
+    }
+
+    [Fact]
     public void Parse_Ps5Share_WithSegmentAndFractionalSeconds_UsesPs5Rule()
     {
         var parser = CreateParser();

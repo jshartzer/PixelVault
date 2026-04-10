@@ -5,10 +5,21 @@ This document describes what the new guided filename-rule experience is supposed
 
 This is the intended behavior for the new guided builder work introduced on the Renaming Rules form. The goal is to validate whether the feature is wired correctly, whether the UI actually responds, and whether the saved rules still behave like normal `FilenameConventionRule` entries.
 
+## Related documentation
+- **Execution order, gates, and product strategy (codified plan):** [`docs/plans/PV-PLN-FNRU-001-guided-builder-verification.md`](./plans/PV-PLN-FNRU-001-guided-builder-verification.md) (`PV-PLN-FNRU-001` — includes **Strategy** for remembering filename shape + platform, and **Stage 6** follow-through)
+- Form behavior and fields: [`FILENAME_RULES_FORM_SPEC.md`](./FILENAME_RULES_FORM_SPEC.md)
+- Parsing architecture and rule engine context: [`FILENAME_PARSING_ARCHITECTURE.txt`](./FILENAME_PARSING_ARCHITECTURE.txt)
+
+## Regression anchor (fill in when testing)
+Record the build under test so results stay comparable across machines:
+- **App version / build:** PixelVault **0.075.008** — git **`6309851`** — published path `C:\Codex\dist\PixelVault-0.075.008\PixelVault.exe` (per [`CURRENT_BUILD.txt`](./CURRENT_BUILD.txt))
+- **Date initiated / anchor set:** **2026-04-09** (PV-PLN-FNRU-001 Stage 0)
+- **Date tested (manual A–G):** _fill when manual checklist completes_
+
 ## Actual Form / Asset Names
-- Window class: `FilenameConventionEditorWindow`
-- Launch surface/wiring: `FilenameConventionEditor`
-- Window title: `PixelVault <version> Renaming Rules`
+- **Window UI host (static):** `FilenameConventionEditorWindow` — `UI/Editors/FilenameConventionEditorWindow.cs` (builds the WPF window and wires controls).
+- **Launch / wiring:** `FilenameConventionEditor` is not a separate public class; it is the **`MainWindow` partial** in `UI/FilenameConventionEditor.cs` (opens the editor, paths, services). When searching the codebase, look for `FilenameConventionEditor.cs` on `MainWindow`.
+- **Window title:** `PixelVault <version> Renaming Rules`
 
 These are the visible or code-level assets Cursor should reference while testing:
 - Card title: `Filename Staging`
@@ -72,7 +83,7 @@ Expected behavior:
   - `Counter`
   - `Extension`
 - The builder should show the active sample filename and a shape preview / readable pattern preview.
-- The builder should also surface a lightweight cross-sample hint when multiple filenames are staged.
+- The builder should also surface a lightweight cross-sample hint when multiple filenames are staged (see **Test G**).
 
 Important expectation:
 - The builder is suggestion-based, not fully automatic.
@@ -151,6 +162,12 @@ Expected mental model:
 - Customization should create a user rule.
 - Shipped defaults remain intact.
 
+### 10. Accessibility (optional but recommended)
+Expected behavior:
+- Tab order reaches `Filename Staging`, staged samples, `Guided Builder` segment controls, primary actions (`Create Rule From Sample`, `Add From File...`, `Clear Staged`), `Open Advanced`, and built-in list without trapping focus.
+- Screen readers get a sensible name for the Renaming Rules window and for key buttons (staging vs builder vs escape hatch).
+- If segment roles are combo boxes or lists, changing a role is keyboard-accessible and updates preview without requiring a mouse.
+
 ## What Cursor Should Specifically Watch For
 
 ### Signs the feature is working
@@ -161,6 +178,7 @@ Expected mental model:
 - `Create Rule From Sample` creates an editable rule draft rather than leaving the form unchanged.
 - Built-ins can be inspected and then customized into a custom rule.
 - Some rules open guided-first, while advanced-only rules clearly tell the user to use `Open Advanced`.
+- With two or more staged samples, the builder still behaves per active selection; any cross-sample hint is coherent (see **Test G**).
 
 ### Signs the feature is broken or partially wired
 - Clicking `Add From File...` appears to do nothing.
@@ -171,6 +189,7 @@ Expected mental model:
 - Built-in rule customization edits the built-in directly instead of cloning.
 - `Clear Staged` removes persisted recent unmatched samples.
 - The UI only shows Advanced behavior and never meaningfully uses the builder.
+- Adding a second staged filename breaks segment display, preview, or selection for the first sample.
 
 ## Suggested Manual Test Checklist
 
@@ -229,21 +248,32 @@ Pass condition:
 Pass condition:
 - Built-ins behave like templates, not editable source records.
 
+### Test G: Cross-sample hint (multiple staged filenames)
+1. In `Filename Staging`, use `Add From File...` twice with two different basenames that share a structural pattern (e.g. same Steam ID + timestamp shape, different titles).
+2. Confirm both appear as session-staged items.
+3. Select each sample in turn and confirm `Guided Builder` updates.
+4. Confirm any **cross-sample** or consistency hint the UI documents (e.g. agreement on ID/timestamp shape) appears when multiple samples are present, without contradicting the active sample’s segments.
+
+Pass condition:
+- Multi-sample staging does not break single-sample editing; any cross-sample hint is visible and helpful, or explicitly absent if not yet implemented (then file a gap—not a silent failure).
+
 ## Notes For Debugging
 These implementation points may help if behavior appears dead:
-- Builder draft model: `FilenameConventionBuilderDraft`
-- Builder segment model: `FilenameConventionBuilderSegment`
-- Builder service helper: `FilenameConventionBuilder`
-- Rule service entry points:
+
+**Data models**
+- Builder draft: `FilenameConventionBuilderDraft`
+- Per-segment row: `FilenameConventionBuilderSegment`
+
+**Two layers (do not confuse them)**
+- **`FilenameRulesService`** (`Services/FilenameRules/FilenameRulesService.cs`) — implements `IFilenameRulesService` and owns the **public** builder API the window calls:
   - `CreateBuilderDraftFromSample`
   - `CreateBuilderDraftFromFilePath`
   - `CreateBuilderDraftFromRule`
   - `ApplyBuilderDraft`
-- Window event points:
-  - sample selection change
-  - `Create Rule From Sample`
-  - `Add From File...`
-  - built-in double-click customize flow
+- **`FilenameConventionBuilder`** (`Services/FilenameRules/FilenameConventionBuilder.cs`) — **static** analysis/helpers used to build and interpret drafts (segment extraction, pattern text, fallbacks). Start here for “why did this filename parse this way?”
+
+**Window wiring**
+- `FilenameConventionEditorWindow` — sample selection change, `Create Rule From Sample`, `Add From File...`, built-in double-click customize flow
 
 ## Bottom Line
 The new filename-rule experience is supposed to feel like:

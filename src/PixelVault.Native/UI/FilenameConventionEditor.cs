@@ -31,6 +31,7 @@ namespace PixelVaultNative
                 new { Pattern = @"\d{14}", Format = "yyyyMMddHHmmss" },
                 new { Pattern = @"\d{4}[-_]\d{2}[-_]\d{2}[ T_-]\d{2}[-_:]\d{2}[-_:]\d{2}\s?[AP]M", Format = "yyyy-MM-dd hh-mm-ss tt" },
                 new { Pattern = @"\d{4}[-_]\d{2}[-_]\d{2}[ T_-]\d{2}[-_:]\d{2}[-_:]\d{2}", Format = "yyyy-MM-dd HH-mm-ss" },
+                new { Pattern = @"\d{4}[-_]\d{2}[-_]\d{2}\s+\d{2}\.\d{2}\.\d{2}", Format = "yyyy-MM-dd HH.mm.ss" },
                 new { Pattern = @"\d{4}[-_]\d{2}[-_]\d{2}", Format = "yyyy-MM-dd" },
                 new { Pattern = @"\d{8}", Format = "yyyyMMdd" }
             };
@@ -74,6 +75,8 @@ namespace PixelVaultNative
                     return "[yyyy]-[MM]-[dd] [hh]-[mm]-[ss] [tt]";
                 case "yyyy-MM-dd HH-mm-ss":
                     return "[yyyy]-[MM]-[dd] [HH]-[mm]-[ss]";
+                case "yyyy-MM-dd HH.mm.ss":
+                    return "[yyyy]-[MM]-[dd] [HH].[mm].[ss]";
                 case "yyyy-MM-dd":
                     return "[yyyy]-[MM]-[dd]";
                 case "yyyyMMdd":

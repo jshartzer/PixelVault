@@ -101,7 +101,11 @@ namespace PixelVaultNative
                     cleanFileName);
             }
 
-            if (draft == null)
+            // `TryCreateDraftFromRule` returns a non-null "advanced only" shell (no segments) when the
+            // candidate pattern is not representable as readable tokens — e.g. regex fallback from
+            // `BuildCustomFilenameConventionFromSample` for filenames like `2026-04-02 09.07.04.jpg`.
+            // In that case we must still build a guided draft from the basename or ApplyBuilderDraft yields an empty pattern.
+            if (draft == null || draft.Segments == null || draft.Segments.Count == 0)
             {
                 draft = CreateFallbackDraft(
                     cleanFileName,
@@ -311,6 +315,11 @@ namespace PixelVaultNative
 
             TimestampDetection detection;
             var hasTimestamp = TryDetectTimestamp(baseName, out detection);
+            if (hasTimestamp)
+            {
+                detection = CoalesceYyyyMmDdWithDotTimeTail(baseName, detection);
+            }
+
             var prefix = hasTimestamp ? baseName.Substring(0, detection.Index) : baseName;
             var suffix = hasTimestamp ? baseName.Substring(detection.Index + detection.Length) : string.Empty;
 
@@ -330,7 +339,7 @@ namespace PixelVaultNative
                     Text = idMatch.Groups["sep"].Value,
                     SuggestedRole = FilenameConventionBuilderComponentRole.Literal,
                     AssignedRole = FilenameConventionBuilderComponentRole.Literal,
-                    Locked = true
+                    Hint = "Separator (change role if this was misread as an ID)"
                 });
                 AppendTitleWithTrailingLiteral(draft.Segments, idMatch.Groups["rest"].Value, hasTimestamp);
             }
@@ -437,7 +446,7 @@ namespace PixelVaultNative
                     Text = trailingLiteral,
                     SuggestedRole = FilenameConventionBuilderComponentRole.Literal,
                     AssignedRole = FilenameConventionBuilderComponentRole.Literal,
-                    Locked = true
+                    Hint = "Trailing separator / space"
                 });
             }
         }
@@ -469,6 +478,28 @@ namespace PixelVaultNative
             return Regex.IsMatch(value ?? string.Empty, @"^\d{8}$", RegexOptions.CultureInvariant);
         }
 
+        /// <summary>
+        /// When <see cref="TryDetectTimestamp"/> returns date-only <c>yyyy-MM-dd</c> but the basename continues with
+        /// phone-style <c> HH.mm.ss</c>, merge into one timestamp so the builder does not leave the time as a locked literal.
+        /// </summary>
+        static TimestampDetection CoalesceYyyyMmDdWithDotTimeTail(string baseName, TimestampDetection detection)
+        {
+            if (detection == null || string.IsNullOrEmpty(baseName)) return detection;
+            if (!string.Equals(detection.Format, "yyyy-MM-dd", StringComparison.Ordinal)) return detection;
+            var tailStart = detection.Index + detection.Length;
+            if (tailStart >= baseName.Length) return detection;
+            var tail = baseName.Substring(tailStart);
+            if (!Regex.IsMatch(tail, @"^\s+\d{2}\.\d{2}\.\d{2}$", RegexOptions.CultureInvariant)) return detection;
+            var combinedLen = detection.Length + tail.Length;
+            return new TimestampDetection
+            {
+                Index = detection.Index,
+                Length = combinedLen,
+                Value = baseName.Substring(detection.Index, combinedLen),
+                Format = "yyyy-MM-dd HH.mm.ss"
+            };
+        }
+
         static bool TryDetectTimestamp(string value, out TimestampDetection detection)
         {
             detection = null;
@@ -478,6 +509,7 @@ namespace PixelVaultNative
                 (Pattern: @"\d{1,2}_\d{1,2}_\d{4}\s+\d{1,2}_\d{2}_\d{2}\s+[AP]M", Format: "M_d_yyyy h_mm_ss tt"),
                 (Pattern: @"\d{4}[-_]\d{2}[-_]\d{2}[ T_-]\d{2}[-_:]\d{2}[-_:]\d{2}\s?[AP]M", Format: "yyyy-MM-dd hh-mm-ss tt"),
                 (Pattern: @"\d{4}[-_]\d{2}[-_]\d{2}[ T_-]\d{2}[-_:]\d{2}[-_:]\d{2}", Format: "yyyy-MM-dd HH-mm-ss"),
+                (Pattern: @"\d{4}[-_]\d{2}[-_]\d{2}\s+\d{2}\.\d{2}\.\d{2}", Format: "yyyy-MM-dd HH.mm.ss"),
                 (Pattern: @"\d{14}", Format: "yyyyMMddHHmmss"),
                 (Pattern: @"\d{8}", Format: "yyyyMMdd"),
                 (Pattern: @"\d{4}[-_]\d{2}[-_]\d{2}", Format: "yyyy-MM-dd")
@@ -575,12 +607,15 @@ namespace PixelVaultNative
                 {
                     if (!string.IsNullOrEmpty(piece.Value))
                     {
+                        // Keep literals editable when they contain digits (e.g. a mistaken fixed time from an old draft).
+                        var v = piece.Value;
+                        var lockOnlyTinySeparator = v.Length <= 2 && v.All(ch => !char.IsDigit(ch));
                         yield return new FilenameConventionBuilderSegment
                         {
                             Text = piece.Value,
                             SuggestedRole = FilenameConventionBuilderComponentRole.Literal,
                             AssignedRole = FilenameConventionBuilderComponentRole.Literal,
-                            Locked = true
+                            Locked = lockOnlyTinySeparator
                         };
                     }
                     index++;
@@ -655,7 +690,7 @@ namespace PixelVaultNative
 
         static bool IsTimestampSeparator(string value)
         {
-            return !string.IsNullOrEmpty(value) && value.All(ch => ch == '-' || ch == '_' || ch == ':' || ch == ' ' || ch == 'T');
+            return !string.IsNullOrEmpty(value) && value.All(ch => ch == '-' || ch == '_' || ch == ':' || ch == ' ' || ch == 'T' || ch == '.');
         }
 
         static FilenameConventionBuilderComponentRole TokenToRole(string token, string platformLabel)
@@ -852,6 +887,8 @@ namespace PixelVaultNative
                     return "[yyyy]-[MM]-[dd] [hh]-[mm]-[ss] [tt]";
                 case "yyyy-MM-dd HH-mm-ss":
                     return "[yyyy]-[MM]-[dd] [HH]-[mm]-[ss]";
+                case "yyyy-MM-dd HH.mm.ss":
+                    return "[yyyy]-[MM]-[dd] [HH].[mm].[ss]";
                 case "yyyy-MM-dd":
                     return "[yyyy]-[MM]-[dd]";
                 case "yyyyMMdd":

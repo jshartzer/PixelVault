@@ -8,6 +8,7 @@ Long-lived execution plans that use a **stable plan ID** for cross-linking (repo
 | **PV-PLN-LIBWS-001** | *Archived —* [PV-PLN-LIBWS-001-library-workspace-modes.md](../archive/PV-PLN-LIBWS-001-library-workspace-modes.md) (**Done**) | Library **workspace modes** (shipped): Folder (default), Photo (focused captures), **Timeline** as distinct mode; shell, density, rail, hero. |
 | **PV-PLN-LIBST-001** | *Completed —* [PV-PLN-LIBST-001-single-folder-storage-model.md](../completed-projects/PV-PLN-LIBST-001-single-folder-storage-model.md) (**Done**) | Single-folder **storage model** per game while preserving **one Game Index row per console**; remove folder-structure inference and introduce explicit storage-group / placement ownership. |
 | **PV-PLN-UI-001** | [PV-PLN-UI-001-ui-thin-mainwindow-ios-aligned.md](PV-PLN-UI-001-ui-thin-mainwindow-ios-aligned.md) | **Post–A–F** MainWindow / `PixelVault.Native.cs` thin-out; extraction stages aligned with **`docs/ios_foundation_guide.md`** (services, plain models, mobile-safe writes). |
+| **PV-PLN-FNRU-001** | [PV-PLN-FNRU-001-guided-builder-verification.md](PV-PLN-FNRU-001-guided-builder-verification.md) | **Guided Builder**: verification (Tests A–G) + **strategy** (save rule = format memory; optional sample→rule; parser ordering). Handoff: **`docs/FILENAME_RULES_GUIDED_BUILDER_TEST_HANDOFF.md`**. |
 
 **ID format:** `PV-PLN-<TOPIC>-<NNN>`  
 - **PV** — PixelVault  

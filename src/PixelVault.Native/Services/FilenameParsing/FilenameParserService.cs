@@ -72,13 +72,17 @@ namespace PixelVaultNative
                 result.CaptureTime = ParseGenericCaptureDate(fileName);
             }
 
+            // Resolve non-Steam shortcut IDs against the game index *before* GetGameTitleHint. Otherwise the stem
+            // heuristic treats the long numeric prefix as a "title" (same as Steam appid position), then we clear
+            // it when it equals the shortcut id — leaving no name even when the index already has Name for that id.
+            ApplyNonSteamShortcutFallback(result, fileName, root);
+
             if (string.IsNullOrWhiteSpace(result.GameTitleHint))
             {
                 result.GameTitleHint = GetGameTitleHint(baseName, root);
             }
 
             ApplyKnownSteamRenameFallback(result, fileName, root);
-            ApplyNonSteamShortcutFallback(result, fileName, root);
 
             if (string.IsNullOrWhiteSpace(result.PlatformLabel) || string.Equals(result.PlatformLabel, "Other", StringComparison.OrdinalIgnoreCase))
             {
@@ -177,15 +181,30 @@ namespace PixelVaultNative
             }
 
             var match = Regex.Match(cleanedBaseName, "^(?<game>.+?)_(?<ts>\\d{14})(?:[_-]\\d+)?$");
-            if (match.Success) return NormalizeColonStandinUnderscoresForGameTitle(match.Groups["game"].Value);
+            if (match.Success)
+            {
+                var game = match.Groups["game"].Value;
+                if (LooksLikeNonSteamShortcutId(CleanNumericId(game))) return string.Empty;
+                return NormalizeColonStandinUnderscoresForGameTitle(game);
+            }
 
             match = Regex.Match(cleanedBaseName, "^(?<game>.+?)_(?<ts>\\d{8,})(?:[_-]\\d+)?$");
-            if (match.Success) return NormalizeColonStandinUnderscoresForGameTitle(match.Groups["game"].Value);
+            if (match.Success)
+            {
+                var game = match.Groups["game"].Value;
+                if (LooksLikeNonSteamShortcutId(CleanNumericId(game))) return string.Empty;
+                return NormalizeColonStandinUnderscoresForGameTitle(game);
+            }
 
             match = Regex.Match(cleanedBaseName, "^(?<game>.+?)-(?<year>20\\d{2})[_-](?<mon>\\d{2})[_-](?<day>\\d{2}).*$");
             if (match.Success) return NormalizeColonStandinUnderscoresForGameTitle(match.Groups["game"].Value);
 
-            if (cleanedBaseName.Contains("_")) return NormalizeColonStandinUnderscoresForGameTitle(cleanedBaseName.Split('_')[0]);
+            if (cleanedBaseName.Contains("_"))
+            {
+                var first = cleanedBaseName.Split('_')[0];
+                if (LooksLikeNonSteamShortcutId(CleanNumericId(first))) return string.Empty;
+                return NormalizeColonStandinUnderscoresForGameTitle(first);
+            }
 
             match = Regex.Match(cleanedBaseName, "^(?<game>.+?)-20\\d{2}.*$");
             if (match.Success) return NormalizeColonStandinUnderscoresForGameTitle(match.Groups["game"].Value);
@@ -798,6 +817,17 @@ namespace PixelVaultNative
                 return ParseTimestamp(steamClipUnix.Groups["stamp"].Value, "unix-ms");
             }
 
+            // Phone / camera exports: "2025-11-30 19.51.52.jpg"
+            var phoneDotTime = Regex.Match(
+                fileName,
+                @"(?<stamp>\d{4}-\d{2}-\d{2}\s+\d{2}\.\d{2}\.\d{2})(?=\.[^.]+$)",
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+            if (phoneDotTime.Success
+                && DateTime.TryParseExact(phoneDotTime.Groups["stamp"].Value, "yyyy-MM-dd HH.mm.ss", CultureInfo.InvariantCulture, DateTimeStyles.None, out parsed))
+            {
+                return DateTime.SpecifyKind(parsed, DateTimeKind.Local);
+            }
+
             return null;
         }
 
@@ -947,7 +977,7 @@ namespace PixelVaultNative
 
         static bool IsTimestampSeparator(string value)
         {
-            return !string.IsNullOrEmpty(value) && value.All(ch => ch == '-' || ch == '_' || ch == ':' || ch == ' ' || ch == 'T');
+            return !string.IsNullOrEmpty(value) && value.All(ch => ch == '-' || ch == '_' || ch == ':' || ch == ' ' || ch == 'T' || ch == '.');
         }
 
         static bool NextSegmentStartsTimestamp(List<ReadablePatternSegment> segments, int startIndex)

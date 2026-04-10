@@ -175,6 +175,7 @@ namespace PixelVaultNative
             var body = new Grid();
             body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             body.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
             body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -185,11 +186,9 @@ namespace PixelVaultNative
                 Content = body
             };
 
-            var controlsRow = new Grid { Margin = new Thickness(0, 0, 0, 14) };
+            var controlsRow = new Grid { Margin = new Thickness(0, 0, 0, 10) };
             for (var i = 0; i < 6; i++) controlsRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             controlsRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            controlsRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            controlsRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             body.Children.Add(controlsRow);
 
             var newRuleButton = MakeButton("New Rule", "#8A5A17", Brushes.White, 140);
@@ -227,24 +226,40 @@ namespace PixelVaultNative
                 VerticalAlignment = VerticalAlignment.Center,
                 Foreground = B("#5F6970"),
                 TextWrapping = TextWrapping.Wrap,
-                Margin = new Thickness(12, 0, 18, 0)
+                Margin = new Thickness(12, 0, 0, 0)
             };
-            Grid.SetColumn(helperText, 5);
+            Grid.SetColumn(helperText, 6);
             controlsRow.Children.Add(helperText);
 
             var saveTopButton = MakeButton("Save Rules", "#275D47", Brushes.White, 170);
-            SetButtonToolTip(saveTopButton, "Validate and save custom renaming rules for this library.");
-            Grid.SetColumn(saveTopButton, 6);
-            controlsRow.Children.Add(saveTopButton);
-
+            SetButtonToolTip(saveTopButton, "Write all custom rules in this window to this library’s index database. Use this after Create Rule From Sample or any edits.");
             var closeTopButton = MakeButton("Close", "#EEF2F5", B("#33424D"), 140);
             SetButtonToolTip(closeTopButton, "Close the renaming rules window.");
-            closeTopButton.Margin = new Thickness(0);
-            Grid.SetColumn(closeTopButton, 7);
-            controlsRow.Children.Add(closeTopButton);
+
+            var persistRow = new Grid { Margin = new Thickness(0, 0, 0, 14) };
+            persistRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            persistRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            persistRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            var persistHint = new TextBlock
+            {
+                Text = "Create Rule From Sample adds a draft to Custom Rules below — it is not saved until you click Save Rules.",
+                VerticalAlignment = VerticalAlignment.Center,
+                Foreground = B("#33424D"),
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 0, 16, 0)
+            };
+            Grid.SetColumn(persistHint, 0);
+            persistRow.Children.Add(persistHint);
+            Grid.SetColumn(saveTopButton, 1);
+            saveTopButton.Margin = new Thickness(0, 0, 10, 0);
+            persistRow.Children.Add(saveTopButton);
+            Grid.SetColumn(closeTopButton, 2);
+            persistRow.Children.Add(closeTopButton);
+            Grid.SetRow(persistRow, 1);
+            body.Children.Add(persistRow);
 
             var sampleCard = Card("Filename Staging", "Stage recent unmatched filenames or add a filename from disk. PixelVault will suggest the shape, then you decide what each part means.", new Thickness(0, 0, 0, 14));
-            Grid.SetRow(sampleCard, 1);
+            Grid.SetRow(sampleCard, 2);
             body.Children.Add(sampleCard);
             var sampleStack = (StackPanel)sampleCard.Child;
 
@@ -320,7 +335,7 @@ namespace PixelVaultNative
             sampleStack.Children.Add(new Border { Background = B("#EEF3F7"), BorderBrush = B("#D7E1E8"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(12), Padding = new Thickness(14), Child = sampleSummaryHost });
 
             var editorCard = Card("Rule Editor", "Edit one draft at a time. Built-ins load here in read-only mode so you can understand them before overriding them.", new Thickness(0, 0, 0, 14));
-            Grid.SetRow(editorCard, 2);
+            Grid.SetRow(editorCard, 3);
             body.Children.Add(editorCard);
             var editorStack = (StackPanel)editorCard.Child;
             editorCard.MinHeight = 360;
@@ -435,7 +450,7 @@ namespace PixelVaultNative
             var knownRulesGrid = new Grid { Margin = new Thickness(0, 0, 0, 8) };
             knownRulesGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             knownRulesGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            Grid.SetRow(knownRulesGrid, 3);
+            Grid.SetRow(knownRulesGrid, 4);
             body.Children.Add(knownRulesGrid);
 
             var customCard = Card("Custom Rules", "Saved for this library. Click one to load it into the editor.", new Thickness(0, 0, 8, 0));
@@ -505,7 +520,7 @@ namespace PixelVaultNative
 
             var footerGrid = new Grid { Margin = new Thickness(0, 16, 0, 0) };
             footerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            Grid.SetRow(footerGrid, 4);
+            Grid.SetRow(footerGrid, 5);
             body.Children.Add(footerGrid);
 
             var statusText = new TextBlock { Foreground = B("#5F6970"), VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap };
