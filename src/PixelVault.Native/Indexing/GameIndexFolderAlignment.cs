@@ -49,7 +49,7 @@ namespace PixelVaultNative
             if (string.IsNullOrWhiteSpace(root) || rows == null) return;
 
             var titleCounts = BuildGameIndexTitleCounts(rows);
-            var index = LoadLibraryMetadataIndex(root, true);
+            var index = LoadLibraryMetadataIndexViaSessionWhenActive(root, true);
             var touchedDirectories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var affectedFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -128,7 +128,7 @@ namespace PixelVaultNative
                 row.PreviewImagePath = row.FilePaths.FirstOrDefault(IsImage) ?? row.FilePaths.FirstOrDefault() ?? string.Empty;
             }
 
-            SaveLibraryMetadataIndex(root, index);
+            SaveLibraryMetadataIndexViaSessionWhenActive(root, index);
             foreach (var directory in touchedDirectories) TryDeleteEmptyDirectory(directory);
             RemoveCachedImageEntries(affectedFiles);
             RemoveCachedFolderListings(touchedDirectories);

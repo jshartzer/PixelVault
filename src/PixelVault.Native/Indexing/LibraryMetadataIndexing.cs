@@ -8,6 +8,54 @@ namespace PixelVaultNative
 {
     public sealed partial class MainWindow
     {
+        LibraryMetadataIndexEntry CloneLibraryMetadataIndexEntry(LibraryMetadataIndexEntry entry)
+        {
+            if (entry == null) return null;
+            return new LibraryMetadataIndexEntry
+            {
+                FilePath = entry.FilePath,
+                Stamp = entry.Stamp,
+                GameId = NormalizeGameId(entry.GameId),
+                ConsoleLabel = entry.ConsoleLabel,
+                TagText = entry.TagText,
+                CaptureUtcTicks = entry.CaptureUtcTicks,
+                Starred = entry.Starred,
+                IndexAddedUtcTicks = entry.IndexAddedUtcTicks,
+                RetroAchievementsGameId = entry.RetroAchievementsGameId ?? string.Empty
+            };
+        }
+
+        Dictionary<string, LibraryMetadataIndexEntry> CloneLibraryMetadataIndexEntries(IEnumerable<KeyValuePair<string, LibraryMetadataIndexEntry>> entries)
+        {
+            var clone = new Dictionary<string, LibraryMetadataIndexEntry>(StringComparer.OrdinalIgnoreCase);
+            foreach (var pair in entries ?? Enumerable.Empty<KeyValuePair<string, LibraryMetadataIndexEntry>>())
+            {
+                if (string.IsNullOrWhiteSpace(pair.Key) || pair.Value == null) continue;
+                clone[pair.Key] = CloneLibraryMetadataIndexEntry(pair.Value);
+            }
+            return clone;
+        }
+
+        Dictionary<string, LibraryMetadataIndexEntry> LoadLibraryMetadataIndexForFilePaths(string root, IEnumerable<string> filePaths)
+        {
+            if (string.IsNullOrWhiteSpace(root)) return new Dictionary<string, LibraryMetadataIndexEntry>(StringComparer.OrdinalIgnoreCase);
+            return indexPersistenceService.LoadLibraryMetadataIndexEntriesForFilePaths(root, filePaths);
+        }
+
+        /// <summary>Persist metadata index rows with SQLite UPSERT and drop the in-memory cache so the next full load reflects disk (avoids treating a partial merge as complete).</summary>
+        void MergePersistLibraryMetadataIndexEntries(string root, IEnumerable<LibraryMetadataIndexEntry> entries)
+        {
+            if (string.IsNullOrWhiteSpace(root) || entries == null) return;
+            var list = entries.Where(e => e != null && !string.IsNullOrWhiteSpace(e.FilePath)).ToList();
+            if (list.Count == 0) return;
+            indexPersistenceService.UpsertLibraryMetadataIndexEntries(root, list);
+            lock (libraryMetadataIndexSync)
+            {
+                libraryMetadataIndex.Clear();
+                libraryMetadataIndexRoot = root;
+            }
+        }
+
         bool IsNetworkPath(string path)
         {
             if (string.IsNullOrWhiteSpace(path)) return false;
@@ -307,6 +355,53 @@ namespace PixelVaultNative
                 librarySession.SaveLibraryMetadataIndex(index);
             else
                 SaveLibraryMetadataIndex(root, index);
+        }
+
+        /// <summary>
+        /// Prefer <see cref="ILibrarySession.LoadLibraryMetadataIndexForFilePaths"/> for the active library (PV-PLN-UI-001 Step 3);
+        /// falls back to persistence when <paramref name="root"/> differs.
+        /// </summary>
+        Dictionary<string, LibraryMetadataIndexEntry> LoadLibraryMetadataIndexForFilePathsViaSessionWhenActive(string root, IEnumerable<string> filePaths)
+        {
+            if (librarySession != null && librarySession.HasLibraryRoot
+                && !string.IsNullOrWhiteSpace(root)
+                && string.Equals(root, librarySession.LibraryRoot, StringComparison.OrdinalIgnoreCase))
+                return librarySession.LoadLibraryMetadataIndexForFilePaths(filePaths);
+            return LoadLibraryMetadataIndexForFilePaths(root, filePaths);
+        }
+
+        string MetadataSidecarPath(string file)
+        {
+            return IsVideo(file) ? file + ".xmp" : null;
+        }
+
+        long MetadataCacheStamp(string file)
+        {
+            if (string.IsNullOrWhiteSpace(file) || !File.Exists(file)) return 0;
+            var info = new FileInfo(file);
+            long stamp = info.LastWriteTimeUtc.Ticks ^ info.Length;
+            var sidecar = MetadataSidecarPath(file);
+            if (!string.IsNullOrWhiteSpace(sidecar) && File.Exists(sidecar))
+            {
+                var sidecarInfo = new FileInfo(sidecar);
+                stamp = stamp ^ sidecarInfo.LastWriteTimeUtc.Ticks ^ sidecarInfo.Length;
+            }
+            return stamp;
+        }
+
+        void DeleteMetadataSidecarIfPresent(string file)
+        {
+            var sidecar = MetadataSidecarPath(file);
+            if (string.IsNullOrWhiteSpace(sidecar) || !File.Exists(sidecar)) return;
+            File.Delete(sidecar);
+            Log("Deleted sidecar: " + sidecar);
+        }
+
+        void AddSidecarUndoEntryIfPresent(string targetFile, string sourceDirectory, List<UndoImportEntry> entries)
+        {
+            var sidecar = MetadataSidecarPath(targetFile);
+            if (string.IsNullOrWhiteSpace(sidecar) || !File.Exists(sidecar) || entries == null) return;
+            entries.Add(new UndoImportEntry { SourceDirectory = sourceDirectory, ImportedFileName = Path.GetFileName(sidecar), CurrentPath = sidecar });
         }
 
     }

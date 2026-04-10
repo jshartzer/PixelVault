@@ -296,5 +296,88 @@ namespace PixelVaultNative
             }
             File.WriteAllLines(path, lines.ToArray());
         }
+
+        LibraryFolderInfo CloneLibraryFolderInfo(LibraryFolderInfo folder)
+        {
+            if (folder == null) return null;
+            return new LibraryFolderInfo
+            {
+                GameId = folder.GameId,
+                Name = folder.Name,
+                FolderPath = folder.FolderPath,
+                FileCount = folder.FileCount,
+                PreviewImagePath = folder.PreviewImagePath,
+                PlatformLabel = folder.PlatformLabel,
+                FilePaths = folder.FilePaths == null ? null : folder.FilePaths.ToArray(),
+                NewestCaptureUtcTicks = folder.NewestCaptureUtcTicks,
+                NewestRecentSortUtcTicks = folder.NewestRecentSortUtcTicks,
+                SteamAppId = folder.SteamAppId,
+                NonSteamId = folder.NonSteamId,
+                SteamGridDbId = folder.SteamGridDbId,
+                RetroAchievementsGameId = folder.RetroAchievementsGameId,
+                SuppressSteamAppIdAutoResolve = folder.SuppressSteamAppIdAutoResolve,
+                SuppressSteamGridDbIdAutoResolve = folder.SuppressSteamGridDbIdAutoResolve,
+                IsCompleted100Percent = folder.IsCompleted100Percent,
+                CompletedUtcTicks = folder.CompletedUtcTicks,
+                IsFavorite = folder.IsFavorite,
+                IsShowcase = folder.IsShowcase,
+                CollectionNotes = folder.CollectionNotes,
+                PendingGameAssignment = folder.PendingGameAssignment,
+                StorageGroupId = folder.StorageGroupId
+            };
+        }
+
+        bool TryGetCachedFileTags(string file, long expectedStamp, out string[] tags)
+        {
+            return libraryWorkspace.TryGetCachedFileTags(file, expectedStamp, out tags);
+        }
+
+        void SetCachedFileTags(string file, IEnumerable<string> tags, long stamp)
+        {
+            libraryWorkspace.SetCachedFileTags(file, tags, stamp);
+        }
+
+        List<string> GetCachedFolderImages(string folderPath)
+        {
+            return libraryWorkspace.GetCachedFolderImages(folderPath);
+        }
+
+        List<string> GetFilesForLibraryFolderEntry(LibraryFolderInfo folder, bool imagesOnly)
+        {
+            if (folder == null) return new List<string>();
+            if (folder.FilePaths != null && folder.FilePaths.Length > 0)
+            {
+                return folder.FilePaths
+                    .Where(File.Exists)
+                    .Where(file => !imagesOnly || IsImage(file))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+            }
+            if (string.IsNullOrWhiteSpace(folder.FolderPath) || !Directory.Exists(folder.FolderPath)) return new List<string>();
+            IEnumerable<string> filesEnumerable = imagesOnly
+                ? GetCachedFolderImages(folder.FolderPath)
+                : Directory.EnumerateFiles(folder.FolderPath, "*.*", SearchOption.TopDirectoryOnly).Where(IsMedia);
+            var candidates = filesEnumerable.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            var desired = NormalizeConsoleLabel(folder.PlatformLabel);
+            if (candidates.Count == 0) return candidates;
+            Dictionary<string, LibraryMetadataIndexEntry> indexForProbe = null;
+            if (!string.IsNullOrWhiteSpace(libraryRoot))
+            {
+                indexForProbe = LoadLibraryMetadataIndexForFilePathsViaSessionWhenActive(libraryRoot, candidates);
+            }
+
+            return candidates
+                .Where(file => NormalizeConsoleLabel(DetermineFolderPlatform(new List<string> { file }, indexForProbe)) == desired)
+                .ToList();
+        }
+
+        bool SameLibraryFolderSelection(LibraryFolderInfo left, LibraryFolderInfo right)
+        {
+            if (ReferenceEquals(left, right)) return true;
+            if (left == null || right == null) return false;
+            return string.Equals(left.FolderPath ?? string.Empty, right.FolderPath ?? string.Empty, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(left.PlatformLabel ?? string.Empty, right.PlatformLabel ?? string.Empty, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(left.Name ?? string.Empty, right.Name ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        }
     }
 }

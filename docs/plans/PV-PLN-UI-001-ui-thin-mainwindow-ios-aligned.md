@@ -106,6 +106,8 @@ Implement as **small vertical slices**. After each slice: **`dotnet test`** (`Pi
 
 **Progress (2026-04-06):** Added **`LoadLibraryMetadataIndexViaSessionWhenActive`** / **`SaveLibraryMetadataIndexViaSessionWhenActive`** on `MainWindow` (`LibraryMetadataIndexing.cs`). Library UI paths (**capture quick actions**, **photography gallery**, **folder cache IO** stamp validation) call through **`ILibrarySession`** when `root` matches the active library; otherwise behavior unchanged.
 
+**Progress (2026-04-09):** Session routing for **`AlignLibraryFoldersToGameIndex`**; **`LoadLibraryMetadataIndexForFilePathsViaSessionWhenActive`**; clone/merge + sidecar/stamp helpers in **`LibraryMetadataIndexing.cs`**; folder row + **`SameLibraryFolderSelection`** in **`MainWindow.LibraryFolderCacheIo.cs`**; large shell split — **`MainWindow.MainWindowChrome.cs`**, **`MainWindow.SteamAndExternalApiCredentials.cs`**, **`MainWindow.LibraryResponsiveLayout.cs`**, **`MainWindow.LibraryFolderSortKeys.cs`**, **`LogPerformanceSample`** in **`MainWindow.LibraryBrowserInstrumentation.cs`** — **`PixelVault.Native.cs` ~2.1k** lines.
+
 ---
 
 ### Step 4 — Library browse projection: document + first DTO seam
@@ -163,9 +165,9 @@ Implement as **small vertical slices**. After each slice: **`dotnet test`** (`Pi
 
 | Metric | Now (approx.) | Direction |
 |--------|----------------|-----------|
-| `PixelVault.Native.cs` lines | ~3.0k | Down over Steps 1–2–6 |
+| `PixelVault.Native.cs` lines | ~2.1k (Apr 2026) | Down over Steps 1–2–6 |
 | New domain logic in `MainWindow` | Discouraged | **Zero** for new features per `ios_foundation_guide` checklist |
-| `MainWindow` partial count | ~47 | May grow slightly if partials **replace** monolith lines |
+| `MainWindow` partial count | ~52 | May grow slightly if partials **replace** monolith lines |
 
 ---
 
@@ -197,5 +199,9 @@ Before merging a slice, ask:
 | 2026-04-06 | **Step 4 (follow-on):** **`LibraryBrowseFolderSummary.MatchesFilter`** / **`IsSteamTagged`**; **`MainWindow.LibraryBrowserFolderFilter`** delegates; folder list render filters via summary (**`MainWindow.LibraryBrowserRender.FolderList`**). |
 | 2026-04-06 | **Step 7 (initial):** **`ImportWorkflowOrchestration`** — metadata worker count + cancellation throw shared by import workflow, **MetadataService** deps, and **GameIndexEditorHost** services. |
 | 2026-04-06 | **Step 7 (follow-on):** import progress totals on **`IImportService`** + **`ImportWorkflowOrchestration`**; **`CoverWorkflowHelpers`** for Steam display name; **`#nullable enable`** on new/chosen files; **`ImportWorkflowOrchestrationProgressTests`**. |
+| 2026-04-09 | **Step 3 + Step 6 (incremental):** game-index **folder alignment** metadata load/save → session when active; **`CloneLibraryMetadataIndexEntry`** / **`MergePersistLibraryMetadataIndexEntries`** (+ related) relocated to **`LibraryMetadataIndexing.cs`**. |
+| 2026-04-09 | **Step 3 + Step 6 (follow-on):** **`LoadLibraryMetadataIndexForFilePathsViaSessionWhenActive`**; folder row helpers + tag cache delegation in **`MainWindow.LibraryFolderCacheIo.cs`**. |
+| 2026-04-09 | **Step 6 (incremental):** **`MetadataSidecarPath`** / **`MetadataCacheStamp`** / sidecar delete + undo entries → **`LibraryMetadataIndexing.cs`**; **`SameLibraryFolderSelection`** → **`MainWindow.LibraryFolderCacheIo.cs`**. |
+| 2026-04-09 | **Step 6 (major):** WPF chrome + assets → **`MainWindow.MainWindowChrome.cs`**; Steam/external API → **`MainWindow.SteamAndExternalApiCredentials.cs`**; responsive layout → **`MainWindow.LibraryResponsiveLayout.cs`**; folder sort keys → **`MainWindow.LibraryFolderSortKeys.cs`**; **`LogPerformanceSample`** → **`MainWindow.LibraryBrowserInstrumentation.cs`**. |
 
 When execution starts, reference **`PV-PLN-UI-001`** in commits; Notion per **`docs/DOC_SYNC_POLICY.md`** if milestones are tracked there.
