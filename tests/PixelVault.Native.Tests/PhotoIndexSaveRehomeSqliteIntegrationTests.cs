@@ -57,6 +57,10 @@ public sealed class PhotoIndexSaveRehomeSqliteIntegrationTests
             Dictionary<string, LibraryMetadataIndexEntry> index, List<GameIndexEditorRow> gameRows) =>
             throw new NotSupportedException();
 
+        public bool IndexEntryShouldReResolveForNonSteamShortcutMislabel(string root, string file, LibraryMetadataIndexEntry entry) => false;
+
+        public bool IndexEntryShouldReResolveSteamPlatformWithoutAppId(string root, string file, LibraryMetadataIndexEntry entry, List<GameIndexEditorRow> gameRows) => false;
+
         public void SetCachedFileTagsForLibraryScan(string file, string[] tags, long stampTicks) { }
 
         public long MetadataCacheStamp(string file) => 0;

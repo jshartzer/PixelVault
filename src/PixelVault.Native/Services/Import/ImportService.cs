@@ -740,6 +740,9 @@ namespace PixelVaultNative
                 if (item.TagXbox) selectedPlatformTags.Add("Xbox");
                 if (selectedPlatformTags.Count == 0 && item.PlatformTags != null) selectedPlatformTags.AddRange(item.PlatformTags);
                 var platformTags = selectedPlatformTags.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+                var importParse = d.ParseFilenameForImport == null ? null : d.ParseFilenameForImport(file);
+                if (importParse != null && FilenameParserService.ParseResultUsesNonSteamShortcutIdentity(importParse))
+                    platformTags = new[] { "Emulation" };
                 var metadataTarget = item.CaptureTime.ToString("yyyy-MM-dd HH:mm:ss") + (item.PreserveFileTimes ? " (preserving file timestamps)" : string.Empty);
                 var notes = new List<string>();
                 if (!string.IsNullOrWhiteSpace(item.Comment)) notes.Add("comment added");

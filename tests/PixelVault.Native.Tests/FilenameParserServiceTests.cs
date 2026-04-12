@@ -1,5 +1,6 @@
 using System.Linq;
 using System.Text.RegularExpressions;
+using PixelVaultNative;
 using SQLitePCL;
 using Xunit;
 
@@ -10,6 +11,20 @@ public sealed class FilenameParserServiceTests
     public FilenameParserServiceTests()
     {
         Batteries_V2.Init();
+    }
+
+    [Fact]
+    public void ParsedResultHasSubstantiveSteamAppId_WithDigits_ReturnsTrue()
+    {
+        Assert.True(FilenameParserService.ParsedResultHasSubstantiveSteamAppId(new FilenameParseResult { SteamAppId = "app_123_x" }));
+    }
+
+    [Fact]
+    public void ParsedResultHasSubstantiveSteamAppId_EmptyOrNoDigits_ReturnsFalse()
+    {
+        Assert.False(FilenameParserService.ParsedResultHasSubstantiveSteamAppId(null));
+        Assert.False(FilenameParserService.ParsedResultHasSubstantiveSteamAppId(new FilenameParseResult { SteamAppId = string.Empty }));
+        Assert.False(FilenameParserService.ParsedResultHasSubstantiveSteamAppId(new FilenameParseResult { SteamAppId = "abc" }));
     }
 
     [Fact]
@@ -294,6 +309,63 @@ public sealed class FilenameParserServiceTests
     }
 
     [Fact]
+    public void Parse_DolphinEmulatorTitleTimestamp_ClearsGameTitleAndRoutesToManual()
+    {
+        var parser = CreateParser();
+
+        var parsed = parser.Parse("Dolphin_20260410120000_1.png", string.Empty);
+
+        Assert.Equal("steam_renamed_title_timestamp", parsed.ConventionId);
+        Assert.Equal("Steam", parsed.PlatformLabel);
+        Assert.Equal(string.Empty, parsed.GameTitleHint);
+        Assert.True(parsed.RoutesToManualWhenMissingSteamAppId);
+        Assert.Equal(new DateTime(2026, 4, 10, 12, 0, 0), parsed.CaptureTime);
+    }
+
+    [Fact]
+    public void GetGameTitleHint_DolphinEmulatorStem_ReturnsEmpty()
+    {
+        var parser = CreateParser();
+
+        Assert.Equal(string.Empty, parser.GetGameTitleHint("Dolphin_20260410120000", string.Empty));
+        Assert.Equal(string.Empty, parser.GetGameTitleHint("Dolphin_screenshot", string.Empty));
+    }
+
+    [Fact]
+    public void GetConventionRules_IncludesEmulationNonSteamShortcutCapture_BuiltIn()
+    {
+        var parser = CreateParser();
+        var rules = parser.GetConventionRules(string.Empty);
+        var row = rules.FirstOrDefault(r => string.Equals(r.ConventionId, "emulation_nonsteam_shortcut_capture", StringComparison.OrdinalIgnoreCase));
+        Assert.NotNull(row);
+        Assert.True(row.IsBuiltIn);
+        Assert.Equal("Emulation", row.PlatformLabel);
+    }
+
+    [Fact]
+    public void GetConventionRules_IncludesSteamScreenshotNonSteamId_FallbackStub_BuiltIn()
+    {
+        var parser = CreateParser();
+        var rules = parser.GetConventionRules(string.Empty);
+        var row = rules.FirstOrDefault(r => string.Equals(r.ConventionId, "steam_screenshot_nonsteam_id", StringComparison.OrdinalIgnoreCase));
+        Assert.NotNull(row);
+        Assert.True(row.IsBuiltIn);
+        Assert.Equal("Emulation", row.PlatformLabel);
+    }
+
+    [Fact]
+    public void Parse_LongNumericSteamStyleId_UsesEmulationConvention_AndPolicyFindsBuiltInRule()
+    {
+        var parser = CreateParser();
+        var parsed = parser.Parse("18032574196931887104_20260410185441_1.png", string.Empty);
+        Assert.Equal("emulation_nonsteam_shortcut_capture", parsed.ConventionId);
+        var rules = parser.GetConventionRules(string.Empty);
+        var rule = AutoIntakePolicy.TryResolveMatchedRule(rules, parsed);
+        Assert.NotNull(rule);
+        Assert.Equal("emulation_nonsteam_shortcut_capture", rule.ConventionId);
+    }
+
+    [Fact]
     public void Parse_RenamedSteamScreenshot_UsesKnownSteamGameIndexRow()
     {
         var parser = CreateParser();
@@ -384,8 +456,8 @@ public sealed class FilenameParserServiceTests
         Assert.Equal("16245548604121415680", parsed.NonSteamId);
         Assert.Equal("Sonic Adventure DX", parsed.GameTitleHint);
         Assert.False(parsed.RoutesToManualWhenMissingSteamAppId);
-        Assert.Equal("steam_screenshot_nonsteam_id", parsed.ConventionId);
-        Assert.Equal("Heuristic", parsed.ConfidenceLabel);
+        Assert.Equal("emulation_nonsteam_shortcut_capture", parsed.ConventionId);
+        Assert.Equal("ExplicitPattern", parsed.ConfidenceLabel);
     }
 
     [Fact]
@@ -401,8 +473,8 @@ public sealed class FilenameParserServiceTests
         Assert.Equal("16245548604121415680", parsed.NonSteamId);
         Assert.Equal(string.Empty, parsed.GameTitleHint);
         Assert.True(parsed.RoutesToManualWhenMissingSteamAppId);
-        Assert.Equal("steam_screenshot_nonsteam_id", parsed.ConventionId);
-        Assert.Equal("Heuristic", parsed.ConfidenceLabel);
+        Assert.Equal("emulation_nonsteam_shortcut_capture", parsed.ConventionId);
+        Assert.Equal("ExplicitPattern", parsed.ConfidenceLabel);
     }
 
     [Fact]
@@ -550,5 +622,15 @@ public sealed class FilenameParserServiceTests
     {
         Assert.Equal("My_Favorite_Game", FilenameParserService.NormalizeColonStandinUnderscoresForGameTitle("My_Favorite_Game"));
         Assert.Equal("Halo Infinite", FilenameParserService.NormalizeColonStandinUnderscoresForGameTitle("Halo Infinite"));
+    }
+
+    [Fact]
+    public void NormalizeColonStandin_SubtitleHyphenSpace_BecomesColonSpace()
+    {
+        Assert.Equal(
+            "Eternal Darkness: Sanity's Requiem",
+            FilenameParserService.NormalizeColonStandinUnderscoresForGameTitle("Eternal Darkness - Sanity's Requiem"));
+        Assert.Equal("Half-Life: Episode Two", FilenameParserService.NormalizeColonStandinUnderscoresForGameTitle("Half-Life - Episode Two"));
+        Assert.Equal("Metroid Prime: Trilogy", FilenameParserService.NormalizeColonStandinUnderscoresForGameTitle("Metroid Prime - Trilogy"));
     }
 }

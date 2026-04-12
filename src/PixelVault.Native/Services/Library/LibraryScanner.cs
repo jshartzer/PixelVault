@@ -497,7 +497,13 @@ namespace PixelVaultNative
             foreach (var file in allFiles)
             {
                 LibraryMetadataIndexEntry entry;
-                if (!index.TryGetValue(file, out entry) || entry == null || entry.CaptureUtcTicks <= 0)
+                index.TryGetValue(file, out entry);
+                var missingOrIncomplete = entry == null || entry.CaptureUtcTicks <= 0;
+                var shortcutMislabeled = !missingOrIncomplete
+                    && host.IndexEntryShouldReResolveForNonSteamShortcutMislabel(root, file, entry);
+                var steamMislabeled = !missingOrIncomplete
+                    && host.IndexEntryShouldReResolveSteamPlatformWithoutAppId(root, file, entry, gameRows);
+                if (missingOrIncomplete || shortcutMislabeled || steamMislabeled)
                 {
                     EmbeddedMetadataSnapshot snapshot;
                     if (!metadataByFile.TryGetValue(file, out snapshot) || snapshot == null) snapshot = new EmbeddedMetadataSnapshot();

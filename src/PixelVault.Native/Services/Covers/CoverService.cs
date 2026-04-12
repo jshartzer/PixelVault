@@ -735,7 +735,7 @@ namespace PixelVaultNative
         {
             var key = CustomCoverKey(folder);
             if (string.IsNullOrWhiteSpace(key)) return null;
-            foreach (var ext in new[] { ".jpg", ".jpeg", ".png", ".bmp", ".gif" })
+            foreach (var ext in new[] { ".jpg", ".jpeg", ".png", ".jxr", ".bmp", ".gif" })
             {
                 var path = Path.Combine(dependencies.CoversRoot, "custom-" + key + ext);
                 if (File.Exists(path)) return path;
@@ -757,7 +757,7 @@ namespace PixelVaultNative
         {
             var key = CustomCoverKey(folder);
             if (string.IsNullOrWhiteSpace(key)) return null;
-            foreach (var ext in new[] { ".jpg", ".jpeg", ".png", ".bmp", ".gif" })
+            foreach (var ext in new[] { ".jpg", ".jpeg", ".png", ".jxr", ".bmp", ".gif" })
             {
                 var path = Path.Combine(dependencies.CoversRoot, "custom-hero-" + key + ext);
                 if (File.Exists(path)) return path;
@@ -772,7 +772,7 @@ namespace PixelVaultNative
             if (string.IsNullOrWhiteSpace(key)) return;
             Directory.CreateDirectory(dependencies.CoversRoot);
             var invalidated = new List<string>();
-            foreach (var ext in new[] { ".jpg", ".jpeg", ".png", ".bmp", ".gif" })
+            foreach (var ext in new[] { ".jpg", ".jpeg", ".png", ".jxr", ".bmp", ".gif" })
             {
                 var existing = Path.Combine(dependencies.CoversRoot, "custom-hero-" + key + ext);
                 if (File.Exists(existing))
@@ -795,7 +795,7 @@ namespace PixelVaultNative
             var key = CustomCoverKey(folder);
             if (string.IsNullOrWhiteSpace(key)) return;
             var invalidated = new List<string>();
-            foreach (var ext in new[] { ".jpg", ".jpeg", ".png", ".bmp", ".gif" })
+            foreach (var ext in new[] { ".jpg", ".jpeg", ".png", ".jxr", ".bmp", ".gif" })
             {
                 var existing = Path.Combine(dependencies.CoversRoot, "custom-hero-" + key + ext);
                 if (File.Exists(existing))
@@ -810,7 +810,7 @@ namespace PixelVaultNative
         public string CachedHeroPath(string title)
         {
             var safe = HeroCacheFileBaseFromTitle(title);
-            foreach (var ext in new[] { ".jpg", ".jpeg", ".png" })
+            foreach (var ext in new[] { ".jpg", ".jpeg", ".png", ".jxr" })
             {
                 var path = Path.Combine(dependencies.CoversRoot, safe + ext);
                 if (File.Exists(path)) return path;
@@ -822,7 +822,7 @@ namespace PixelVaultNative
         {
             var safe = HeroCacheFileBaseFromTitle(title);
             var invalidated = new List<string>();
-            foreach (var ext in new[] { ".jpg", ".jpeg", ".png", ".bmp", ".gif" })
+            foreach (var ext in new[] { ".jpg", ".jpeg", ".png", ".jxr", ".bmp", ".gif" })
             {
                 var path = Path.Combine(dependencies.CoversRoot, safe + ext);
                 if (File.Exists(path))
@@ -841,7 +841,7 @@ namespace PixelVaultNative
             if (string.IsNullOrWhiteSpace(key)) return;
             Directory.CreateDirectory(dependencies.CoversRoot);
             var invalidated = new List<string>();
-            foreach (var ext in new[] { ".jpg", ".jpeg", ".png", ".bmp", ".gif" })
+            foreach (var ext in new[] { ".jpg", ".jpeg", ".png", ".jxr", ".bmp", ".gif" })
             {
                 var existing = Path.Combine(dependencies.CoversRoot, "custom-" + key + ext);
                 if (File.Exists(existing))
@@ -864,7 +864,7 @@ namespace PixelVaultNative
             var key = CustomCoverKey(folder);
             if (string.IsNullOrWhiteSpace(key)) return;
             var invalidated = new List<string>();
-            foreach (var ext in new[] { ".jpg", ".jpeg", ".png", ".bmp", ".gif" })
+            foreach (var ext in new[] { ".jpg", ".jpeg", ".png", ".jxr", ".bmp", ".gif" })
             {
                 var existing = Path.Combine(dependencies.CoversRoot, "custom-" + key + ext);
                 if (File.Exists(existing))
@@ -879,7 +879,7 @@ namespace PixelVaultNative
         public string CachedCoverPath(string title)
         {
             var safe = SafeCacheName(title);
-            foreach (var ext in new[] { ".jpg", ".jpeg", ".png" })
+            foreach (var ext in new[] { ".jpg", ".jpeg", ".png", ".jxr" })
             {
                 var path = Path.Combine(dependencies.CoversRoot, safe + ext);
                 if (File.Exists(path)) return path;
@@ -891,7 +891,7 @@ namespace PixelVaultNative
         {
             var safe = SafeCacheName(title);
             var invalidated = new List<string>();
-            foreach (var ext in new[] { ".jpg", ".jpeg", ".png" })
+            foreach (var ext in new[] { ".jpg", ".jpeg", ".png", ".jxr" })
             {
                 var path = Path.Combine(dependencies.CoversRoot, safe + ext);
                 if (File.Exists(path))

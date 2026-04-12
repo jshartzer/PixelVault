@@ -1276,7 +1276,7 @@ namespace PixelVaultNative
                     return;
                 }
 
-                var picked = services.PickFile(string.Empty, "Media files|*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.mp4;*.mkv;*.avi;*.mov;*.wmv;*.webm|All files (*.*)|*.*", libraryRoot);
+                var picked = services.PickFile(string.Empty, "Media files|*.png;*.jpg;*.jpeg;*.jxr;*.bmp;*.gif;*.mp4;*.mkv;*.avi;*.mov;*.wmv;*.webm|All files (*.*)|*.*", libraryRoot);
                 if (string.IsNullOrWhiteSpace(picked)) return;
 
                 var fileName = Path.GetFileName(picked);

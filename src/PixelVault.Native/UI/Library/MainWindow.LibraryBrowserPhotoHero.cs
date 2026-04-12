@@ -60,7 +60,7 @@ namespace PixelVaultNative
             setCoverItem.Click += delegate
             {
                 Directory.CreateDirectory(savedCoversRoot);
-                var pickedCover = PickFile(string.Empty, "Image Files|*.jpg;*.jpeg;*.png;*.bmp;*.gif|All Files|*.*", savedCoversRoot);
+                var pickedCover = PickFile(string.Empty, "Image Files|*.jpg;*.jpeg;*.png;*.jxr;*.bmp;*.gif|All Files|*.*", savedCoversRoot);
                 if (string.IsNullOrWhiteSpace(pickedCover)) return;
                 foreach (var targetFolder in actionFolders) SaveCustomCover(targetFolder, pickedCover);
                 showFolder(folder);
@@ -94,7 +94,7 @@ namespace PixelVaultNative
             setBannerItem.Click += delegate
             {
                 Directory.CreateDirectory(savedCoversRoot);
-                var picked = PickFile(string.Empty, "Image Files|*.jpg;*.jpeg;*.png;*.bmp;*.gif|All Files|*.*", savedCoversRoot);
+                var picked = PickFile(string.Empty, "Image Files|*.jpg;*.jpeg;*.png;*.jxr;*.bmp;*.gif|All Files|*.*", savedCoversRoot);
                 if (string.IsNullOrWhiteSpace(picked)) return;
                 foreach (var targetFolder in actionFolders) SaveCustomHero(targetFolder, picked);
                 showFolder(folder);

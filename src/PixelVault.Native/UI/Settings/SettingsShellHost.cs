@@ -152,11 +152,12 @@ namespace PixelVaultNative
 
             var summaryBox = new CheckBox
             {
-                Content = "Include a short summary in notifications (e.g. files moved)",
-                IsChecked = d.GetBackgroundAutoIntakeShowSummary?.Invoke() ?? true,
+                Content = "Toast when a background batch finishes (off: only main log + command palette)",
+                IsChecked = d.GetBackgroundAutoIntakeShowSummary?.Invoke() ?? false,
                 Margin = new Thickness(0, 0, 0, 4),
                 Foreground = boxFg
             };
+            summaryBox.ToolTip = "Does not open the Background imports window. Use Library command palette → Background imports anytime. Success toasts include a Review button when the library window is active.";
             Grid.SetRow(summaryBox, 15);
             Grid.SetColumnSpan(summaryBox, 3);
             while (panel.RowDefinitions.Count <= 15) panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });

@@ -64,7 +64,7 @@ namespace PixelVaultNative
         public int BackgroundAutoIntakeQuietSeconds = 3;
         public bool BackgroundAutoIntakeToastsEnabled = true;
         /// <summary>After a background batch, show a short summary (toast when <see cref="BackgroundAutoIntakeToastsEnabled"/>).</summary>
-        public bool BackgroundAutoIntakeShowSummary = true;
+        public bool BackgroundAutoIntakeShowSummary;
         /// <summary>Extra <c>[BGINT]</c> lines in the main PixelVault log for background intake (watchers, batches, eligibility).</summary>
         public bool BackgroundAutoIntakeVerboseLogging;
 

@@ -132,7 +132,7 @@ namespace PixelVaultNative
                 return rule;
             }
 
-            if (Regex.IsMatch(fileName, @"^\d{3,}_\d{14}(?:[_-]\d+)?\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$", RegexOptions.IgnoreCase))
+            if (Regex.IsMatch(fileName, @"^\d{3,}_\d{14}(?:[_-]\d+)?\.(png|jpe?g|jxr|mp4|mkv|avi|mov|wmv|webm)$", RegexOptions.IgnoreCase))
             {
                 rule.Name = "Custom: Steam Screenshot";
                 rule.PlatformLabel = "Steam";
@@ -145,7 +145,7 @@ namespace PixelVaultNative
                 return rule;
             }
 
-            if (Regex.IsMatch(fileName, @"^\d{14}(?:[_-]\d+)?\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$", RegexOptions.IgnoreCase))
+            if (Regex.IsMatch(fileName, @"^\d{14}(?:[_-]\d+)?\.(png|jpe?g|jxr|mp4|mkv|avi|mov|wmv|webm)$", RegexOptions.IgnoreCase))
             {
                 rule.Name = "Custom: Steam Manual Export";
                 rule.PlatformLabel = "Steam";
@@ -170,7 +170,7 @@ namespace PixelVaultNative
                 return rule;
             }
 
-            if (Regex.IsMatch(fileName, @"^.+?\s*-\s*\d{4}-\d{2}-\d{2}\s+\d{2}-\d{2}-\d{2}\s+[AP]M\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$", RegexOptions.IgnoreCase))
+            if (Regex.IsMatch(fileName, @"^.+?\s*-\s*\d{4}-\d{2}-\d{2}\s+\d{2}-\d{2}-\d{2}\s+[AP]M\.(png|jpe?g|jxr|mp4|mkv|avi|mov|wmv|webm)$", RegexOptions.IgnoreCase))
             {
                 rule.Name = "Custom: Xbox Capture";
                 rule.PlatformLabel = "Xbox";
@@ -184,7 +184,7 @@ namespace PixelVaultNative
                 return rule;
             }
 
-            if (Regex.IsMatch(fileName, @"^.+?\s+\d{1,2}_\d{1,2}_\d{4}\s+\d{1,2}_\d{2}_\d{2}\s+[AP]M\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$", RegexOptions.IgnoreCase))
+            if (Regex.IsMatch(fileName, @"^.+?\s+\d{1,2}_\d{1,2}_\d{4}\s+\d{1,2}_\d{2}_\d{2}\s+[AP]M\.(png|jpe?g|jxr|mp4|mkv|avi|mov|wmv|webm)$", RegexOptions.IgnoreCase))
             {
                 rule.Name = "Custom: Xbox PC Capture";
                 rule.PlatformLabel = "Xbox PC";
@@ -198,7 +198,7 @@ namespace PixelVaultNative
                 return rule;
             }
 
-            if (Regex.IsMatch(fileName, @"^.+?_\d{14}\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$", RegexOptions.IgnoreCase))
+            if (Regex.IsMatch(fileName, @"^.+?_\d{14}\.(png|jpe?g|jxr|mp4|mkv|avi|mov|wmv|webm)$", RegexOptions.IgnoreCase))
             {
                 rule.Name = "Custom: Title And Timestamp";
                 rule.PatternText = "[title]_[yyyy][MM][dd][HH][mm][ss].[ext:media]";
@@ -219,7 +219,7 @@ namespace PixelVaultNative
                 var suffix = timestampIndex + timestampLength < baseName.Length ? baseName.Substring(timestampIndex + timestampLength) : string.Empty;
                 var prefixClean = TrimFilenameConventionSeparatorText(prefix);
                 var suffixPattern = BuildFilenameConventionSuffixPattern(suffix);
-                var extPattern = @"\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$";
+                var extPattern = @"\.(png|jpe?g|jxr|mp4|mkv|avi|mov|wmv|webm)$";
 
                 var appIdAndTitlePrefix = Regex.Match(prefixClean, @"^(?<appid>\d{3,})[_\-\s]+(?<title>.+)$", RegexOptions.IgnoreCase);
                 if (appIdAndTitlePrefix.Success)

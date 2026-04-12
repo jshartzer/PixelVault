@@ -1131,7 +1131,7 @@ namespace PixelVaultNative
             if (trimmed.Contains("ext:media", StringComparison.OrdinalIgnoreCase) || trimmed.Contains("ext]", StringComparison.OrdinalIgnoreCase)) return ".[ext:media]";
 
             var extension = trimmed.StartsWith(".", StringComparison.Ordinal) ? trimmed : "." + trimmed.TrimStart('.');
-            if (Regex.IsMatch(extension, @"^\.(png|jpe?g)$", RegexOptions.IgnoreCase)) return ".[ext:image]";
+            if (Regex.IsMatch(extension, @"^\.(png|jpe?g|jxr)$", RegexOptions.IgnoreCase)) return ".[ext:image]";
             if (Regex.IsMatch(extension, @"^\.(mp4|mkv|avi|mov|wmv|webm)$", RegexOptions.IgnoreCase)) return ".[ext:video]";
             return ".[ext:media]";
         }

@@ -57,11 +57,11 @@ Then use these based on the task:
 
 Current live build:
 
-- `0.075.008`
+- `0.075.010`
 
 Current executable:
 
-- `C:\Codex\dist\PixelVault-0.075.008\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.075.010\PixelVault.exe`
 
 Current build pointer:
 
@@ -95,12 +95,13 @@ Practical current focus:
 
 ## Current Stop Point
 
-The app is currently published at `0.075.008`.
+The app is currently published at `0.075.010`.
 
 **Notion:** [MainWindow extraction roadmap](https://www.notion.so/33573adc59b681d88b7dcd88cad53cb6) updated for Phase **E** capstone (**`ILibraryBrowserShell`**). If release rows in Notion lag `docs/CURRENT_BUILD.txt`, re-sync per `docs/DOC_SYNC_POLICY.md`.
 
 Recent extraction progress (repo):
 
+- **Library storage + auto-intake + metadata fixes (0.075.010):** Single-folder **LIBST** behavior (re-home, nested scans, photo index alignment) ships with **background auto-intake** (`PV-PLN-AINT-001` slice 9), **metadata index** re-merge when Steam/non-Steam shortcut labels disagree with filename + game index, **filename** tweaks (emulation shortcut convention, Dolphin placeholder suppression, subtitle ` - ` → `: `), **`.jxr`** as library media, and import **Emulation** tags for shortcut captures. See **`docs/CHANGELOG.md`** for the full list.
 - **Steam non-Steam shortcut IDs (0.075.008):** Steam-style numeric shortcut screenshots for non-Steam games now resolve as **`Emulation`** instead of bad Steam AppIDs. The parser recognizes long numeric shortcut IDs, uses the **Game Index** `Non-Steam ID` field to recover known game names, preserves unknown IDs through manual intake, and saves them back onto new master rows. `Emulation` is treated as a built-in/default console in manual metadata, game-index editing, folder ID editing, and filename-rule defaults.
 - **Library photo workspace — console capture filter (0.075.007):** In **Photo** mode, title **platform badges** (per game) filter which consoles’ captures appear in the **main photo pane**; the **cover rail** stays complete. Badges use non-button hit targets; switching games resets toggles. Archived plan: **`docs/archive/PV-PLN-LIBWS-001-library-workspace-modes.md`**.
 - **Pre-V1 polish Slice C (0.075.000):** Library folder and detail **empty/loading** states with CTAs; version **renumber** to **`0.075.xxx`** for runway to 1.0. See **`docs/plans/PV-PLN-V1POL-001-pre-v1-polish-program.md`**.

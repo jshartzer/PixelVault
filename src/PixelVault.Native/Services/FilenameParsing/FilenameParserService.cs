@@ -72,10 +72,10 @@ namespace PixelVaultNative
                 result.CaptureTime = ParseGenericCaptureDate(fileName);
             }
 
-            // Resolve non-Steam shortcut IDs against the game index *before* GetGameTitleHint. Otherwise the stem
-            // heuristic treats the long numeric prefix as a "title" (same as Steam appid position), then we clear
-            // it when it equals the shortcut id — leaving no name even when the index already has Name for that id.
+            // Long numeric non-Steam shortcut IDs (Steam-shaped filenames from GeForce / overlay tools) are matched
+            // by the built-in emulation rule; this pass still handles steam_screenshot_appid when that rule is disabled.
             ApplyNonSteamShortcutFallback(result, fileName, root);
+            ResolveNonSteamTitleFromGameIndex(result, root);
 
             if (string.IsNullOrWhiteSpace(result.GameTitleHint))
             {
@@ -96,20 +96,44 @@ namespace PixelVaultNative
                 result.ConfidenceLabel = result.CaptureTime.HasValue ? "Heuristic" : string.Empty;
             }
 
+            SuppressCaptureHostPlaceholderTitle(result);
+
             if (!string.IsNullOrWhiteSpace(result.GameTitleHint))
                 result.GameTitleHint = NormalizeColonStandinUnderscoresForGameTitle(result.GameTitleHint);
 
             return result;
         }
 
+        /// <summary>Window titles from capture software (e.g. Dolphin emulator) must not become game index names.</summary>
+        internal static bool IsCaptureHostPlaceholderGameTitle(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return false;
+            var t = value.Trim();
+            if (string.Equals(t, "Dolphin", StringComparison.OrdinalIgnoreCase)) return true;
+            return false;
+        }
+
+        static void SuppressCaptureHostPlaceholderTitle(FilenameParseResult result)
+        {
+            if (result == null || string.IsNullOrWhiteSpace(result.GameTitleHint)) return;
+            if (!IsCaptureHostPlaceholderGameTitle(result.GameTitleHint)) return;
+            result.GameTitleHint = string.Empty;
+            result.RoutesToManualWhenMissingSteamAppId = true;
+        }
+
         /// <summary>
-        /// Windows paths cannot contain ':'; Xbox (and similar) exports often use "_ " in place of ": " in titles.
-        /// Normalize so the same game merges under one index/browser identity (e.g. "The Witcher 3_ Wild Hunt" → "The Witcher 3: Wild Hunt").
+        /// Windows paths cannot contain ':'; exports often use "_ " or " - " in place of ": " in subtitles.
+        /// Normalize so the same game merges under one index/browser identity (e.g. "The Witcher 3_ Wild Hunt" → "The Witcher 3: Wild Hunt",
+        /// "Eternal Darkness - Sanity's Requiem" → "Eternal Darkness: Sanity's Requiem").
         /// </summary>
         public static string NormalizeColonStandinUnderscoresForGameTitle(string title)
         {
             if (string.IsNullOrWhiteSpace(title)) return title ?? string.Empty;
-            return Regex.Replace(title.Trim(), @"([\p{L}\p{N}])_ ", "$1: ", RegexOptions.CultureInvariant);
+            var s = title.Trim();
+            // Subtitle hyphen (space-delimited) — use lookbehind so "Half-Life - Episode" becomes "Half-Life: Episode", not a broken single-char replace.
+            s = Regex.Replace(s, @"(?<=[\p{L}\p{N}])\s+-\s+(?=[\p{L}\p{M}0-9])", ": ", RegexOptions.CultureInvariant);
+            s = Regex.Replace(s, @"([\p{L}\p{N}])_ ", "$1: ", RegexOptions.CultureInvariant);
+            return s;
         }
 
         void ApplyXboxPcTrailingTimestampParse(FilenameParseResult result, string fileName)
@@ -186,6 +210,7 @@ namespace PixelVaultNative
             {
                 var game = match.Groups["game"].Value;
                 if (LooksLikeNonSteamShortcutId(CleanNumericId(game))) return string.Empty;
+                if (IsCaptureHostPlaceholderGameTitle(game)) return string.Empty;
                 return NormalizeColonStandinUnderscoresForGameTitle(game);
             }
 
@@ -194,22 +219,35 @@ namespace PixelVaultNative
             {
                 var game = match.Groups["game"].Value;
                 if (LooksLikeNonSteamShortcutId(CleanNumericId(game))) return string.Empty;
+                if (IsCaptureHostPlaceholderGameTitle(game)) return string.Empty;
                 return NormalizeColonStandinUnderscoresForGameTitle(game);
             }
 
             match = Regex.Match(cleanedBaseName, "^(?<game>.+?)-(?<year>20\\d{2})[_-](?<mon>\\d{2})[_-](?<day>\\d{2}).*$");
-            if (match.Success) return NormalizeColonStandinUnderscoresForGameTitle(match.Groups["game"].Value);
+            if (match.Success)
+            {
+                var g = match.Groups["game"].Value;
+                if (IsCaptureHostPlaceholderGameTitle(g)) return string.Empty;
+                return NormalizeColonStandinUnderscoresForGameTitle(g);
+            }
 
             if (cleanedBaseName.Contains("_"))
             {
                 var first = cleanedBaseName.Split('_')[0];
                 if (LooksLikeNonSteamShortcutId(CleanNumericId(first))) return string.Empty;
+                if (IsCaptureHostPlaceholderGameTitle(first)) return string.Empty;
                 return NormalizeColonStandinUnderscoresForGameTitle(first);
             }
 
             match = Regex.Match(cleanedBaseName, "^(?<game>.+?)-20\\d{2}.*$");
-            if (match.Success) return NormalizeColonStandinUnderscoresForGameTitle(match.Groups["game"].Value);
+            if (match.Success)
+            {
+                var g = match.Groups["game"].Value;
+                if (IsCaptureHostPlaceholderGameTitle(g)) return string.Empty;
+                return NormalizeColonStandinUnderscoresForGameTitle(g);
+            }
 
+            if (IsCaptureHostPlaceholderGameTitle(cleanedBaseName)) return string.Empty;
             return NormalizeColonStandinUnderscoresForGameTitle(cleanedBaseName);
         }
 
@@ -273,6 +311,22 @@ namespace PixelVaultNative
             {
                 new FilenameConventionRule
                 {
+                    ConventionId = "emulation_nonsteam_shortcut_capture",
+                    Name = "Emulation (non-Steam shortcut ID + timestamp)",
+                    Priority = 1005,
+                    Pattern = @"^(?<appid>\d{16,})_(?<stamp>\d{14})(?:[_-]\d+)?\.(png|jpe?g|jxr|mp4|mkv|avi|mov|wmv|webm)$",
+                    PatternText = @"^(?<appid>\d{16,})_(?<stamp>\d{14})(?:[_-]\d+)?\.(png|jpe?g|jxr|mp4|mkv|avi|mov|wmv|webm)$",
+                    PlatformLabel = "Emulation",
+                    PlatformTagsText = "Emulation",
+                    SteamAppIdGroup = "appid",
+                    TimestampGroup = "stamp",
+                    TimestampFormat = "yyyyMMddHHmmss",
+                    RoutesToManualWhenMissingSteamAppId = true,
+                    ConfidenceLabel = "ExplicitPattern",
+                    IsBuiltIn = true
+                },
+                new FilenameConventionRule
+                {
                     ConventionId = "steam_screenshot_appid",
                     Name = "Steam Screenshot (AppID + Timestamp)",
                     Priority = 1000,
@@ -284,6 +338,19 @@ namespace PixelVaultNative
                     TimestampGroup = "stamp",
                     TimestampFormat = "yyyyMMddHHmmss",
                     ConfidenceLabel = "ExplicitPattern",
+                    IsBuiltIn = true
+                },
+                // Synthetic convention id after ApplyNonSteamShortcutFallback (when emulation_nonsteam_shortcut_capture is disabled). Must remain in the merged list for background intake policy.
+                new FilenameConventionRule
+                {
+                    ConventionId = "steam_screenshot_nonsteam_id",
+                    Name = "Emulation (fallback: non-Steam shortcut via Steam rule)",
+                    Priority = 50,
+                    Pattern = "^$",
+                    PatternText = "^$",
+                    PlatformLabel = "Emulation",
+                    PlatformTagsText = "Emulation",
+                    ConfidenceLabel = "Heuristic",
                     IsBuiltIn = true
                 },
                 new FilenameConventionRule
@@ -365,8 +432,8 @@ namespace PixelVaultNative
                     ConventionId = "ps5_share_segmented_fractional",
                     Name = "PS5 Share (Segmented/Fractional)",
                     Priority = 848,
-                    Pattern = @"^(?<title>.+?)(?:_[^_]+)*_(?<stamp>\d{14})(?:\d{2})?\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$",
-                    PatternText = @"^(?<title>.+?)(?:_[^_]+)*_(?<stamp>\d{14})(?:\d{2})?\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$",
+                    Pattern = @"^(?<title>.+?)(?:_[^_]+)*_(?<stamp>\d{14})(?:\d{2})?\.(png|jpe?g|jxr|mp4|mkv|avi|mov|wmv|webm)$",
+                    PatternText = @"^(?<title>.+?)(?:_[^_]+)*_(?<stamp>\d{14})(?:\d{2})?\.(png|jpe?g|jxr|mp4|mkv|avi|mov|wmv|webm)$",
                     PlatformLabel = "PS5",
                     PlatformTagsText = "PS5;PlayStation",
                     TitleGroup = "title",
@@ -412,8 +479,8 @@ namespace PixelVaultNative
                     ConventionId = "xbox_pc_capture_ampm",
                     Name = "Xbox PC Capture (Windows)",
                     Priority = 836,
-                    Pattern = @"^(?<title>.+?)\s+(?<stamp>\d{1,2}_\d{1,2}_\d{4}\s+\d{1,2}_\d{2}_\d{2}\s+[AP]M)\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$",
-                    PatternText = @"^(?<title>.+?)\s+(?<stamp>\d{1,2}_\d{1,2}_\d{4}\s+\d{1,2}_\d{2}_\d{2}\s+[AP]M)\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$",
+                    Pattern = @"^(?<title>.+?)\s+(?<stamp>\d{1,2}_\d{1,2}_\d{4}\s+\d{1,2}_\d{2}_\d{2}\s+[AP]M)\.(png|jpe?g|jxr|mp4|mkv|avi|mov|wmv|webm)$",
+                    PatternText = @"^(?<title>.+?)\s+(?<stamp>\d{1,2}_\d{1,2}_\d{4}\s+\d{1,2}_\d{2}_\d{2}\s+[AP]M)\.(png|jpe?g|jxr|mp4|mkv|avi|mov|wmv|webm)$",
                     PlatformLabel = "Xbox PC",
                     PlatformTagsText = "Platform:Xbox PC",
                     TitleGroup = "title",
@@ -531,19 +598,8 @@ namespace PixelVaultNative
             result.PlatformLabel = "Emulation";
             result.PlatformTags = new[] { "Emulation" };
             result.ConventionId = "steam_screenshot_nonsteam_id";
-            result.ConventionName = "Steam Screenshot (Non-Steam Shortcut)";
+            result.ConventionName = "Emulation (fallback: non-Steam shortcut via Steam rule)";
             result.ConfidenceLabel = "Heuristic";
-
-            if (!string.IsNullOrWhiteSpace(root))
-            {
-                KnownNonSteamLookupEntry lookupEntry;
-                if (GetKnownNonSteamLookup(root).TryGetValue(candidateId, out lookupEntry) && !string.IsNullOrWhiteSpace(lookupEntry.Name))
-                {
-                    result.GameTitleHint = lookupEntry.Name ?? string.Empty;
-                    result.RoutesToManualWhenMissingSteamAppId = false;
-                    return;
-                }
-            }
 
             if (string.Equals(CleanTag(result.GameTitleHint), candidateId, StringComparison.Ordinal))
             {
@@ -553,6 +609,27 @@ namespace PixelVaultNative
             // Keep unknown shortcut IDs in the manual flow so the user can name the game once,
             // while we still preserve the shortcut ID for the new master row.
             result.RoutesToManualWhenMissingSteamAppId = true;
+        }
+
+        /// <summary>
+        /// Fills <see cref="FilenameParseResult.GameTitleHint"/> from the saved game index <c>non_steam_id</c> column when
+        /// <see cref="FilenameParseResult.NonSteamId"/> is set (built-in emulation rule or steam-shaped fallback).
+        /// </summary>
+        void ResolveNonSteamTitleFromGameIndex(FilenameParseResult result, string root)
+        {
+            if (result == null || string.IsNullOrWhiteSpace(root)) return;
+            if (string.IsNullOrWhiteSpace(result.NonSteamId)) return;
+            if (!string.IsNullOrWhiteSpace(result.GameTitleHint)) return;
+
+            var candidateId = CleanNumericId(result.NonSteamId);
+            if (!LooksLikeNonSteamShortcutId(candidateId)) return;
+
+            KnownNonSteamLookupEntry lookupEntry;
+            if (!GetKnownNonSteamLookup(root).TryGetValue(candidateId, out lookupEntry) || string.IsNullOrWhiteSpace(lookupEntry.Name))
+                return;
+
+            result.GameTitleHint = lookupEntry.Name ?? string.Empty;
+            result.RoutesToManualWhenMissingSteamAppId = false;
         }
 
         Dictionary<string, KnownSteamRenameLookupEntry> GetKnownSteamRenameLookup(string root)
@@ -650,6 +727,20 @@ namespace PixelVaultNative
                 && value.All(char.IsDigit);
         }
 
+        /// <summary>True when the parse represents a Steam library non-Steam shortcut capture (long numeric id), e.g. Dolphin per-ROM shortcuts.</summary>
+        internal static bool ParseResultUsesNonSteamShortcutIdentity(FilenameParseResult parsed)
+        {
+            if (parsed == null || string.IsNullOrWhiteSpace(parsed.NonSteamId)) return false;
+            return LooksLikeNonSteamShortcutId(CleanNumericId(parsed.NonSteamId));
+        }
+
+        /// <summary>True when <see cref="FilenameParseResult.SteamAppId"/> contains at least one digit (do not treat keyword-only Steam cues as platform evidence).</summary>
+        internal static bool ParsedResultHasSubstantiveSteamAppId(FilenameParseResult parsed)
+        {
+            if (parsed == null) return false;
+            return CleanNumericId(parsed.SteamAppId ?? string.Empty).Length > 0;
+        }
+
         void ApplyMatchedPrimaryId(FilenameParseResult result, FilenameConventionRule rule, string rawValue)
         {
             if (result == null || string.IsNullOrWhiteSpace(rawValue)) return;
@@ -740,7 +831,7 @@ namespace PixelVaultNative
             var candidate = fileName ?? string.Empty;
             var extension = Path.GetExtension(candidate);
             if (!string.IsNullOrWhiteSpace(extension)
-                && !Regex.IsMatch(extension, @"^\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$", RegexOptions.IgnoreCase))
+                && !Regex.IsMatch(extension, @"^\.(png|jpe?g|jxr|mp4|mkv|avi|mov|wmv|webm)$", RegexOptions.IgnoreCase))
             {
                 return false;
             }
@@ -1031,9 +1122,9 @@ namespace PixelVaultNative
                     return @"[AP]M";
                 case "ext:media":
                 case "ext":
-                    return @"(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)";
+                    return @"(png|jpe?g|jxr|mp4|mkv|avi|mov|wmv|webm)";
                 case "ext:image":
-                    return @"(png|jpe?g)";
+                    return @"(png|jpe?g|jxr)";
                 case "ext:video":
                     return @"(mp4|mkv|avi|mov|wmv|webm)";
                 default:
@@ -1069,13 +1160,13 @@ namespace PixelVaultNative
 
         static readonly Dictionary<string, string> KnownRegexPatterns = new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            { @"^(?<appid>\d{3,})_(?<stamp>\d{14})(?:[_-]\d+)?\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$", "[appid]_[yyyy][MM][dd][HH][mm][ss][opt-counter].[ext:media]" },
-            { @"^(?<stamp>\d{14})(?:[_-]\d+)?\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$", "[yyyy][MM][dd][HH][mm][ss][opt-counter].[ext:media]" },
-            { @"^(?<title>.+?)_(?<stamp>\d{4}-\d{2}-\d{2})_\d+\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$", "[title]_[yyyy]-[MM]-[dd]_[counter].[ext:media]" },
+            { @"^(?<appid>\d{3,})_(?<stamp>\d{14})(?:[_-]\d+)?\.(png|jpe?g|jxr|mp4|mkv|avi|mov|wmv|webm)$", "[appid]_[yyyy][MM][dd][HH][mm][ss][opt-counter].[ext:media]" },
+            { @"^(?<stamp>\d{14})(?:[_-]\d+)?\.(png|jpe?g|jxr|mp4|mkv|avi|mov|wmv|webm)$", "[yyyy][MM][dd][HH][mm][ss][opt-counter].[ext:media]" },
+            { @"^(?<title>.+?)_(?<stamp>\d{4}-\d{2}-\d{2})_\d+\.(png|jpe?g|jxr|mp4|mkv|avi|mov|wmv|webm)$", "[title]_[yyyy]-[MM]-[dd]_[counter].[ext:media]" },
             { @"^clip_(?<stamp>[\d,]{13,17})\.(mp4|mkv|avi|mov|wmv|webm)$", "clip_[unixms].[ext:video]" },
-            { @"^(?<title>.+?)_(?<stamp>\d{14})\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$", "[title]_[yyyy][MM][dd][HH][mm][ss].[ext:media]" },
-            { @"^(?<title>.+?)[-–—](?<stamp>\d{4}_\d{2}_\d{2}[-_]\d{2}[-_]\d{2}[-_]\d{2})\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$", "[title]-[yyyy]_[MM]_[dd]-[HH]_[mm]_[ss].[ext:media]" },
-            { @"^(?<title>.+?)\s+(?<stamp>\d{1,2}_\d{1,2}_\d{4}\s+\d{1,2}_\d{2}_\d{2}\s+[AP]M)\.(png|jpe?g|mp4|mkv|avi|mov|wmv|webm)$", "[title] [M]_[d]_[yyyy] [h]_[mm]_[ss] [tt].[ext:media]" },
+            { @"^(?<title>.+?)_(?<stamp>\d{14})\.(png|jpe?g|jxr|mp4|mkv|avi|mov|wmv|webm)$", "[title]_[yyyy][MM][dd][HH][mm][ss].[ext:media]" },
+            { @"^(?<title>.+?)[-–—](?<stamp>\d{4}_\d{2}_\d{2}[-_]\d{2}[-_]\d{2}[-_]\d{2})\.(png|jpe?g|jxr|mp4|mkv|avi|mov|wmv|webm)$", "[title]-[yyyy]_[MM]_[dd]-[HH]_[mm]_[ss].[ext:media]" },
+            { @"^(?<title>.+?)\s+(?<stamp>\d{1,2}_\d{1,2}_\d{4}\s+\d{1,2}_\d{2}_\d{2}\s+[AP]M)\.(png|jpe?g|jxr|mp4|mkv|avi|mov|wmv|webm)$", "[title] [M]_[d]_[yyyy] [h]_[mm]_[ss] [tt].[ext:media]" },
             { @".*PS5.*", "[contains:PS5]" },
             { @".*PlayStation.*", "[contains:PlayStation]" }
         };

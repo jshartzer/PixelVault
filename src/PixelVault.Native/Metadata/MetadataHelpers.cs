@@ -162,6 +162,22 @@ namespace PixelVaultNative
             return true;
         }
 
+        /// <summary>Removes tags that <see cref="ExtractConsolePlatformFamilies"/> would treat as a console label (embedded Game Bar / GeForce noise must not override filename-based emulation).</summary>
+        internal static string[] StripTagsThatParticipateInConsolePlatformDetection(IEnumerable<string> tags)
+        {
+            var kept = new List<string>();
+            foreach (var raw in tags ?? Enumerable.Empty<string>())
+            {
+                if (string.IsNullOrWhiteSpace(raw)) continue;
+                var cleaned = CleanTag(raw);
+                if (string.IsNullOrWhiteSpace(cleaned)) continue;
+                var fams = ExtractConsolePlatformFamilies(new[] { cleaned });
+                if (fams != null && fams.Length > 0) continue;
+                kept.Add(cleaned);
+            }
+            return kept.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        }
+
         internal static string[] BuildFilenamePlatformHintTags(FilenameParseResult parsed)
         {
             var extras = (parsed == null ? Enumerable.Empty<string>() : (parsed.PlatformTags ?? new string[0]))
@@ -185,6 +201,8 @@ namespace PixelVaultNative
             {
                 extras.Add(CustomPlatformPrefix + normalizedPlatform);
             }
+            if (!FilenameParserService.ParsedResultHasSubstantiveSteamAppId(parsed))
+                extras.RemoveAll(t => string.Equals(CleanTag(t), "Steam", StringComparison.OrdinalIgnoreCase));
             return extras
                 .Select(CleanTag)
                 .Where(tag => !string.IsNullOrWhiteSpace(tag))
@@ -200,6 +218,17 @@ namespace PixelVaultNative
                 .Where(tag => !string.IsNullOrWhiteSpace(tag))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
+            if (parsed != null && FilenameParserService.ParseResultUsesNonSteamShortcutIdentity(parsed))
+            {
+                var stripped = StripTagsThatParticipateInConsolePlatformDetection(tagArray);
+                var shortcutHintTags = BuildFilenamePlatformHintTags(parsed);
+                return stripped
+                    .Concat(shortcutHintTags)
+                    .Select(CleanTag)
+                    .Where(t => !string.IsNullOrWhiteSpace(t))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
+            }
             var label = NormalizeConsoleLabel(DetermineConsoleLabelFromTags(tagArray));
             if (ConsoleLabelBlocksFilenameFallback(label)) return tagArray;
             var extras = BuildFilenamePlatformHintTags(parsed);
@@ -243,7 +272,7 @@ namespace PixelVaultNative
             }
             if (string.Equals(resolvedPlatform, "Steam", StringComparison.OrdinalIgnoreCase))
             {
-                tagSteam = true;
+                tagSteam = FilenameParserService.ParsedResultHasSubstantiveSteamAppId(parsed);
                 return;
             }
             if (string.Equals(resolvedPlatform, "PC", StringComparison.OrdinalIgnoreCase))
@@ -381,15 +410,26 @@ namespace PixelVaultNative
                     ? GetGameNameFromFileName(Path.GetFileName(item.FilePath))
                     : item.GameName;
                 var wantedIdentity = BuildGameIndexIdentity(titleForIdentity, platform);
+                GameIndexEditorRow matched = null;
                 foreach (var row in rows)
                 {
                     if (row == null) continue;
                     if (string.Equals(BuildGameIndexIdentity(row.Name, row.PlatformLabel), wantedIdentity, StringComparison.OrdinalIgnoreCase))
                     {
-                        item.GameId = NormalizeGameId(row.GameId);
+                        matched = row;
                         break;
                     }
                 }
+                if (matched != null)
+                {
+                    item.GameId = NormalizeGameId(matched.GameId);
+                    continue;
+                }
+                // Intake / import items start with OriginalGameId empty. GetGameNameFromFileName() can echo another game's title when
+                // the same non-Steam shortcut ID is shared across ROMs, which previously synced a stale GameId that never cleared
+                // after the user typed the real title.
+                if (string.IsNullOrWhiteSpace(NormalizeGameId(item.OriginalGameId ?? string.Empty)))
+                    item.GameId = string.Empty;
             }
         }
 

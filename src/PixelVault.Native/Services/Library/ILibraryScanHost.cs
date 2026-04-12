@@ -33,6 +33,12 @@ namespace PixelVaultNative
             Dictionary<string, LibraryMetadataIndexEntry> index,
             List<GameIndexEditorRow> gameRows);
 
+        /// <summary>True when a library rescan should rebuild a seemingly-complete row (wrong platform tags for non-Steam shortcut filenames).</summary>
+        bool IndexEntryShouldReResolveForNonSteamShortcutMislabel(string root, string file, LibraryMetadataIndexEntry entry);
+
+        /// <summary>True when a complete row is labeled Steam but neither the filename parse nor the assigned game index row supplies a Steam App ID.</summary>
+        bool IndexEntryShouldReResolveSteamPlatformWithoutAppId(string root, string file, LibraryMetadataIndexEntry entry, List<GameIndexEditorRow> gameRows);
+
         void SetCachedFileTagsForLibraryScan(string file, string[] tags, long stampTicks);
 
         long MetadataCacheStamp(string file);

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading;
 
 namespace PixelVaultNative
@@ -123,19 +124,40 @@ namespace PixelVaultNative
             return existingEntry == null ? new string[0] : ParseTagText(existingEntry.TagText);
         }
 
-        string[] MergeLibraryMetadataTagsWithFilenameHint(string root, string file, string[] tags)
+        string ResolveStoredLibraryMetadataConsoleLabel(LibraryMetadataIndexEntry existingEntry, IEnumerable<string> tags, FilenameParseResult filenameParseHint, List<GameIndexEditorRow> gameRows)
         {
-            return MergePlatformTagsWithFilenamePlatformHint(tags, ParseFilename(file, root));
-        }
-
-        string ResolveStoredLibraryMetadataConsoleLabel(LibraryMetadataIndexEntry existingEntry, IEnumerable<string> tags)
-        {
+            var tagSeq = tags ?? Enumerable.Empty<string>();
+            if (filenameParseHint != null && FilenameParserService.ParseResultUsesNonSteamShortcutIdentity(filenameParseHint))
+                return NormalizeConsoleLabel(DetermineConsoleLabelFromTags(tagSeq));
             var storedLabel = NormalizeConsoleLabel(existingEntry == null ? string.Empty : existingEntry.ConsoleLabel);
             if (ConsoleLabelBlocksFilenameFallback(storedLabel))
             {
+                if (string.Equals(storedLabel, "Steam", StringComparison.OrdinalIgnoreCase)
+                    && !HasSteamAppIdEvidence(filenameParseHint, existingEntry, gameRows))
+                    return NormalizeConsoleLabel(DetermineConsoleLabelFromTags(tagSeq));
                 return storedLabel;
             }
-            return NormalizeConsoleLabel(DetermineConsoleLabelFromTags(tags));
+            return NormalizeConsoleLabel(DetermineConsoleLabelFromTags(tagSeq));
+        }
+
+        bool HasSteamAppIdEvidence(FilenameParseResult parsed, LibraryMetadataIndexEntry existingEntry, List<GameIndexEditorRow> gameRows)
+        {
+            if (FilenameParserService.ParsedResultHasSubstantiveSteamAppId(parsed)) return true;
+            var gid = NormalizeGameId(existingEntry == null ? string.Empty : existingEntry.GameId);
+            if (string.IsNullOrWhiteSpace(gid) || gameRows == null) return false;
+            var row = FindSavedGameIndexRowById(gameRows, gid);
+            if (row == null) return false;
+            var digits = new string((row.SteamAppId ?? string.Empty).Where(char.IsDigit).ToArray());
+            return digits.Length > 0;
+        }
+
+        string[] StripSteamKeywordWhenNoSteamAppIdEvidence(string[] tags, FilenameParseResult parsed, LibraryMetadataIndexEntry existingEntry, List<GameIndexEditorRow> gameRows)
+        {
+            if (tags == null || tags.Length == 0 || HasSteamAppIdEvidence(parsed, existingEntry, gameRows)) return tags ?? Array.Empty<string>();
+            return tags
+                .Where(t => !string.Equals(CleanTag(t), "Steam", StringComparison.OrdinalIgnoreCase))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
         }
 
         long ResolveLibraryMetadataCaptureUtcTicks(string file, string stamp, EmbeddedMetadataSnapshot snapshot, LibraryMetadataIndexEntry existingEntry)
@@ -163,9 +185,11 @@ namespace PixelVaultNative
 
         LibraryMetadataIndexEntry BuildResolvedLibraryMetadataIndexEntry(string root, string file, string stamp, EmbeddedMetadataSnapshot snapshot, LibraryMetadataIndexEntry existingEntry, Dictionary<string, LibraryMetadataIndexEntry> index, List<GameIndexEditorRow> gameRows)
         {
+            var filenameParseHint = ParseFilename(file, root);
             var tags = ResolveLibraryMetadataTags(snapshot, existingEntry);
-            tags = MergeLibraryMetadataTagsWithFilenameHint(root, file, tags);
-            var platformLabel = ResolveStoredLibraryMetadataConsoleLabel(existingEntry, tags);
+            tags = MergePlatformTagsWithFilenamePlatformHint(tags, filenameParseHint);
+            tags = StripSteamKeywordWhenNoSteamAppIdEvidence(tags, filenameParseHint, existingEntry, gameRows);
+            var platformLabel = ResolveStoredLibraryMetadataConsoleLabel(existingEntry, tags, filenameParseHint, gameRows);
             var preferredGameId = NormalizeGameId(existingEntry == null ? string.Empty : existingEntry.GameId);
             var resolvedGameId = !string.IsNullOrWhiteSpace(preferredGameId)
                 ? preferredGameId
@@ -184,6 +208,37 @@ namespace PixelVaultNative
                     : DateTime.UtcNow.Ticks,
                 RetroAchievementsGameId = existingEntry != null ? CleanTag(existingEntry.RetroAchievementsGameId ?? string.Empty) : string.Empty
             };
+        }
+
+        /// <summary>
+        /// Complete photo-index rows are skipped during library scans; shortcut-shaped filenames that were mis-tagged (e.g. GeForce → Xbox PC)
+        /// need a full re-resolve so tags and <see cref="LibraryMetadataIndexEntry.ConsoleLabel"/> match filename rules without waiting for a re-import.
+        /// </summary>
+        bool IndexEntryShouldReResolveForNonSteamShortcutMislabel(string root, string file, LibraryMetadataIndexEntry entry)
+        {
+            if (entry == null || string.IsNullOrWhiteSpace(file) || !File.Exists(file)) return false;
+            var displayName = Path.GetFileName(file);
+            if (string.IsNullOrWhiteSpace(displayName)) return false;
+            if (!Regex.IsMatch(displayName, @"^\d{16,}_\d{14}", RegexOptions.CultureInvariant))
+                return false;
+            var parsed = ParseFilename(file, root);
+            if (!FilenameParserService.ParseResultUsesNonSteamShortcutIdentity(parsed)) return false;
+            var existingTags = ParseTagText(entry.TagText);
+            var merged = MergePlatformTagsWithFilenamePlatformHint(existingTags, parsed);
+            var canonExisting = string.Join(", ", existingTags.Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(s => s, StringComparer.OrdinalIgnoreCase));
+            var canonMerged = string.Join(", ", merged.Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(s => s, StringComparer.OrdinalIgnoreCase));
+            if (!string.Equals(canonExisting, canonMerged, StringComparison.OrdinalIgnoreCase)) return true;
+            var implied = NormalizeConsoleLabel(DetermineConsoleLabelFromTags(merged));
+            return !string.Equals(implied, NormalizeConsoleLabel(entry.ConsoleLabel), StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>Complete rows labeled Steam without filename or game-index Steam App ID evidence are re-resolved so embedded keyword tags cannot stick as Steam.</summary>
+        bool IndexEntryShouldReResolveSteamPlatformWithoutAppId(string root, string file, LibraryMetadataIndexEntry entry, List<GameIndexEditorRow> gameRows)
+        {
+            if (entry == null || string.IsNullOrWhiteSpace(file) || !File.Exists(file)) return false;
+            if (!string.Equals(NormalizeConsoleLabel(entry.ConsoleLabel), "Steam", StringComparison.OrdinalIgnoreCase)) return false;
+            var parsed = ParseFilename(file, root);
+            return !HasSteamAppIdEvidence(parsed, entry, gameRows);
         }
 
         DateTime ResolveIndexedLibraryDate(string root, string file, Dictionary<string, LibraryMetadataIndexEntry> index = null)

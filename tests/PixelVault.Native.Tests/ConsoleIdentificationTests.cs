@@ -38,6 +38,59 @@ public sealed class ConsoleIdentificationTests
     }
 
     [Fact]
+    public void MergePlatformTagsWithFilenamePlatformHint_SteamParseWithoutAppId_DoesNotInjectSteam()
+    {
+        var parsed = new FilenameParseResult
+        {
+            PlatformLabel = "Steam",
+            PlatformTags = new[] { "Steam" },
+            SteamAppId = string.Empty,
+            RoutesToManualWhenMissingSteamAppId = true
+        };
+
+        var merged = MainWindow.MergePlatformTagsWithFilenamePlatformHint(Array.Empty<string>(), parsed);
+
+        Assert.DoesNotContain("Steam", merged);
+    }
+
+    [Fact]
+    public void MergePlatformTagsWithFilenamePlatformHint_SteamParseWithAppId_AddsSteam()
+    {
+        var parsed = new FilenameParseResult
+        {
+            PlatformLabel = "Steam",
+            PlatformTags = new[] { "Steam" },
+            SteamAppId = "2561580"
+        };
+
+        var merged = MainWindow.MergePlatformTagsWithFilenamePlatformHint(Array.Empty<string>(), parsed);
+
+        Assert.Contains("Steam", merged);
+    }
+
+    [Fact]
+    public void ApplyFilenameParseResultToManualPlatformFlags_SteamLabelWithoutAppId_DoesNotSetTagSteam()
+    {
+        MainWindow.ApplyFilenameParseResultToManualPlatformFlags(
+            new FilenameParseResult { PlatformLabel = "Steam", PlatformTags = new[] { "Steam" }, SteamAppId = string.Empty },
+            out var tagSteam,
+            out var tagPc,
+            out var tagEmulation,
+            out var tagPs5,
+            out var tagXbox,
+            out var tagOther,
+            out var customPlatformTag);
+
+        Assert.False(tagSteam);
+        Assert.False(tagPc);
+        Assert.False(tagEmulation);
+        Assert.False(tagPs5);
+        Assert.False(tagXbox);
+        Assert.False(tagOther);
+        Assert.Equal(string.Empty, customPlatformTag);
+    }
+
+    [Fact]
     public void MergePlatformTagsWithFilenamePlatformHint_CustomPlatformAddsPlatformPrefixTag()
     {
         var parsed = new FilenameParseResult
@@ -109,6 +162,27 @@ public sealed class ConsoleIdentificationTests
         Assert.False(tagXbox);
         Assert.True(tagOther);
         Assert.Equal("Switch", customPlatformTag);
+    }
+
+    [Fact]
+    public void MergePlatformTagsWithFilenamePlatformHint_NonSteamShortcutId_StripsEmbeddedConsoleTagsAndKeepsEmulationOnly()
+    {
+        var parsed = new FilenameParseResult
+        {
+            NonSteamId = "14365183643867938816",
+            PlatformLabel = "Emulation",
+            PlatformTags = new[] { "Emulation" }
+        };
+
+        var merged = MainWindow.MergePlatformTagsWithFilenamePlatformHint(
+            new[] { "Platform:Xbox PC", "Steam", "Game Capture" },
+            parsed);
+
+        Assert.Equal("Emulation", MainWindow.DetermineConsoleLabelFromTags(merged));
+        Assert.Contains("Emulation", merged);
+        Assert.DoesNotContain("Steam", merged);
+        Assert.DoesNotContain("Platform:Xbox PC", merged);
+        Assert.Contains("Game Capture", merged);
     }
 
     [Fact]

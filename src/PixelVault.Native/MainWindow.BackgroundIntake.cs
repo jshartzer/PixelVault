@@ -392,7 +392,8 @@ namespace PixelVaultNative
                 if (moved <= 0) return;
                 _host.Log("Background auto-intake: moved " + moved + " file(s) into the library pipeline.");
                 if (!_host.backgroundAutoIntakeToastsEnabled) return;
-                var msg = "Background import moved " + moved + " file(s). Use Review or command palette → Background imports to see moves or undo.";
+                if (!_host.backgroundAutoIntakeShowSummary) return;
+                var msg = "Background import moved " + moved + " file(s). Command palette → Background imports to review or undo.";
                 TryLibraryToast(msg, MessageBoxImage.Information, () => _host.EnsureBackgroundIntakeActivityWindow());
             }
 
@@ -473,12 +474,7 @@ namespace PixelVaultNative
 
             if (batch.Rows.Count == 0) return;
             _backgroundIntakeActivitySession.AddBatch(batch);
-            _ = Dispatcher.BeginInvoke(new Action(delegate
-            {
-                ReloadBackgroundIntakeActivityWindowIfOpen();
-                if (backgroundAutoIntakeShowSummary)
-                    EnsureBackgroundIntakeActivityWindow();
-            }));
+            _ = Dispatcher.BeginInvoke(new Action(ReloadBackgroundIntakeActivityWindowIfOpen));
         }
     }
 }

@@ -45,6 +45,12 @@ namespace PixelVaultNative
                 List<GameIndexEditorRow> gameRows) =>
                 window.BuildResolvedLibraryMetadataIndexEntry(root, file, stamp, snapshot, existingEntry, index, gameRows);
 
+            public bool IndexEntryShouldReResolveForNonSteamShortcutMislabel(string root, string file, LibraryMetadataIndexEntry entry) =>
+                window.IndexEntryShouldReResolveForNonSteamShortcutMislabel(root, file, entry);
+
+            public bool IndexEntryShouldReResolveSteamPlatformWithoutAppId(string root, string file, LibraryMetadataIndexEntry entry, List<GameIndexEditorRow> gameRows) =>
+                window.IndexEntryShouldReResolveSteamPlatformWithoutAppId(root, file, entry, gameRows);
+
             public void SetCachedFileTagsForLibraryScan(string file, string[] tags, long stampTicks) => window.SetCachedFileTags(file, tags, stampTicks);
 
             public long MetadataCacheStamp(string file) => window.MetadataCacheStamp(file);
