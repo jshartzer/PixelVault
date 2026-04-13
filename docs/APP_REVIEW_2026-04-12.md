@@ -2,6 +2,8 @@
 
 Date: 2026-04-12
 
+**Follow-up (repo):** Remediation and sequencing live in **[`docs/plans/PV-PLN-RVW-001-post-app-review-hardening.md`](plans/PV-PLN-RVW-001-post-app-review-hardening.md)**. **`docs/NEXT_TRIM_PLAN.md`** baseline was **fully refreshed 2026-04-12** (version train, measured line counts)—Finding 3 below describes the **pre-refresh** state for audit trail.
+
 Scope:
 - app/code review
 - policy/history/docs review
@@ -84,20 +86,11 @@ File:
 Title:
 - Refresh next-work plan to the current release line
 
-Why it matters:
+Why it matters (at review time):
 
-This planning doc still describes the repo as post-`0.854` and says `PixelVault.Native.cs` is about `2.9k` lines.
+The planning doc described the repo as post-`0.854` and said `PixelVault.Native.cs` was about `2.9k` lines. That was stale vs the **`0.075.xxx`** train and extracted tree, and it steered ROI away from real hotspots.
 
-That is now stale:
-- live line is `0.075.010`
-- `src/PixelVault.Native/PixelVault.Native.cs` is already under `2k` lines
-
-Leaving this stale makes it harder to pick the highest-ROI next work, because the current largest hotspots are now elsewhere.
-
-Recommendation:
-
-- refresh `docs/NEXT_TRIM_PLAN.md` to the current release line
-- update it to reflect today’s real hotspots, not the old `PixelVault.Native.cs` target
+**Status (2026-04-12):** **`docs/NEXT_TRIM_PLAN.md`** was refreshed (current publish pointer, measured hotspots, tier notes). Treat this finding as **addressed** in-repo; keep **`CHANGELOG`** / **`APP_REVIEW`** text as historical audit unless you intentionally rewrite the review body.
 
 ## Recommended Next Work
 

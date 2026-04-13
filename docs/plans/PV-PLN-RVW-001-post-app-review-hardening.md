@@ -3,10 +3,10 @@
 | Field | Value |
 |-------|--------|
 | **Plan ID** | `PV-PLN-RVW-001` |
-| **Status** | **Draft** — not started |
+| **Status** | **In progress** — Phase **0** (repo) **done** 2026-04-12; Phases **1–3** (code) not started |
 | **Owner** | PixelVault / Codex |
 | **Source review** | [`docs/APP_REVIEW_2026-04-12.md`](../APP_REVIEW_2026-04-12.md) (build/test health + code inspection; not a hands-on WPF smoke pass) |
-| **Related** | [`docs/NEXT_TRIM_PLAN.md`](../NEXT_TRIM_PLAN.md) (refresh in Phase 0), [`docs/PERFORMANCE_TODO.md`](../PERFORMANCE_TODO.md), [`docs/CODE_QUALITY_IMPROVEMENT_PLAN.md`](../CODE_QUALITY_IMPROVEMENT_PLAN.md), [`docs/DOC_SYNC_POLICY.md`](../DOC_SYNC_POLICY.md) (Notion mirror optional) |
+| **Related** | [`docs/NEXT_TRIM_PLAN.md`](../NEXT_TRIM_PLAN.md) (**refreshed** 2026-04-12), [`docs/PERFORMANCE_TODO.md`](../PERFORMANCE_TODO.md), [`docs/CODE_QUALITY_IMPROVEMENT_PLAN.md`](../CODE_QUALITY_IMPROVEMENT_PLAN.md), [`docs/DOC_SYNC_POLICY.md`](../DOC_SYNC_POLICY.md) (optional Notion mirror) |
 
 **Topic mnemonic:** `RVW` — **R**e**v**ie**w** (codified follow-up from the dated app review).
 
@@ -20,7 +20,7 @@ Ship **bounded-risk** improvements called out in the **2026-04-12** app review, 
 
 1. **P1** — User-authored filename-rule **regex safety** (compile + runtime bounds).
 2. **P2** — Photo workspace **hero/banner download** dedupe, cancellation, or coalescing for rapid selection changes.
-3. **P2** — Refresh **`docs/NEXT_TRIM_PLAN.md`** (and plan index) to the **current** version train and real file hotspots.
+3. **P2** — Refresh **`docs/NEXT_TRIM_PLAN.md`** (and plan index) to the **current** version train and real file hotspots — **done in repo** 2026-04-12 (optional **Notion** mirror still per `DOC_SYNC_POLICY.md`).
 
 **Out of scope (unless a follow-up plan says otherwise)**
 
@@ -50,9 +50,8 @@ Ship **bounded-risk** improvements called out in the **2026-04-12** app review, 
 
 ### Finding 3 — Stale trim plan (P2)
 
-- **`docs/NEXT_TRIM_PLAN.md`** still frames work as **post–0.854** and cites **`PixelVault.Native.cs` ~2.9k lines** as the primary monolith target.
-- **Reality at review time:** version line **0.075.010**; `PixelVault.Native.cs` already **under ~2k** lines; largest hotspots have **moved** (e.g. indexing, convention editor, detail pane—see review “Likely candidates”).
-- **Risk:** wrong ROI ordering—teams optimize the wrong file or defer real bottlenecks.
+- **At review time (2026-04-12),** **`docs/NEXT_TRIM_PLAN.md`** still framed work as **post–0.854** and cited **`PixelVault.Native.cs` ~2.9k lines** as the primary monolith target—stale vs the **`0.075.xxx`** train and extracted tree.
+- **Remediation:** **`docs/NEXT_TRIM_PLAN.md`** was **fully refreshed** the same day (measured baseline table, current publish pointer, links to this plan and the app review). **Phase 0** steps **0.1–0.3** are **complete in-repo**; optional **Notion** mirror remains if your workflow uses it.
 
 ---
 
@@ -61,6 +60,8 @@ Ship **bounded-risk** improvements called out in the **2026-04-12** app review, 
 ### Phase 0 — Planning doc refresh (docs-only)
 
 **Goal:** `NEXT_TRIM_PLAN.md` is a **decision tool** for the current train, not a snapshot of an old milestone.
+
+**Repo status:** Steps **0.1–0.3** satisfied **2026-04-12** (see **Execution log**).
 
 | Step | Action | Done when |
 |------|--------|-----------|
@@ -140,7 +141,7 @@ Add **targeted** tests for Phase 1; Phase 2 may remain **manual + log** unless s
 
 | Date | Phase | Notes |
 |------|--------|--------|
-| *(pending)* | 0 | Refresh `NEXT_TRIM_PLAN.md` + README index |
+| 2026-04-12 | **0 (repo complete)** | **`docs/NEXT_TRIM_PLAN.md`** rewritten: **`0.075.010`** pointer, measured line-count baseline, tiers updated, RVW/FNRU links. **`PERFORMANCE_MONOLITH_SLICE_PLAN.md`** monolith goal line updated. **`FILENAME_RULES_GUIDED_BUILDER_TEST_HANDOFF.md`** + **FNRU** execution log aligned to **0.075.010** / **`f5d69ff`** (re-record SHA after your next commit if these docs ship in that commit). **`APP_REVIEW_2026-04-12.md`** follow-up + Finding 3 **status** note. **Notion** mirror: update manually if required by `DOC_SYNC_POLICY.md`. |
 
 ---
 

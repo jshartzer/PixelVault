@@ -15,7 +15,7 @@
 
 1. **Stability** — Fewer concurrent mutations of shared caches; clear ownership of mutable state; smaller blast radius when fixing regressions.
 2. **Speed** — No new UI-thread blocking on background paths; preserve or extend virtualization, debouncing, and async-first call patterns already documented in `PERFORMANCE_TODO.md`.
-3. **Monolith size** — Reduce `PixelVault.Native.cs` (~2.9k lines as of draft) toward a **primary file under ~2k lines**, then toward **~1.5k**, by moving **coherent verticals** into services or feature hosts—not by cosmetic reshuffles.
+3. **Monolith size** — Reduce `PixelVault.Native.cs` (**~1.9k lines** as measured **2026-04-12**; see [`docs/NEXT_TRIM_PLAN.md`](NEXT_TRIM_PLAN.md)) toward **~1.5k** by moving **coherent verticals** into services or feature hosts—not by cosmetic reshuffles. (The **~2k** intermediate target from older drafts is largely satisfied; next gains are incremental.)
 
 ## Non-goals (for this program)
 
@@ -33,7 +33,7 @@
 ## Current baseline (reference)
 
 - Large Library perf items (virtualization, search debounce, sort-key caching, instrumentation, cache locking on hot paths, `IFileSystemService`, async-first paths for major workflows) are **landed** per `PERFORMANCE_TODO.md` (summary table there).
-- MainWindow extraction **Phases A–F** are **complete**; remaining work is **incremental**: thinner shell, smaller `PixelVault.Native.cs`, clearer services (`ROADMAP.md`, `completed-projects/README.md`).
+- MainWindow extraction **Phases A–F** are **complete**; remaining work is **incremental**: thinner shell, smaller `PixelVault.Native.cs` (~1.9k lines), clearer services (`ROADMAP.md`, `completed-projects/README.md`). Larger single files now include **`IndexPersistenceService`** and **`FilenameConventionEditorWindow`**—see **`docs/NEXT_TRIM_PLAN.md`** measured baseline.
 
 ## Recommended phases
 

@@ -191,7 +191,7 @@ Use the docs by role:
 - `C:\Codex\docs\MAINWINDOW_EXTRACTION_ROADMAP.md`: full historical record for MainWindow extraction (complete)
 - `C:\Codex\docs\PERFORMANCE_TODO.md`: active responsiveness and scalability backlog
 - `C:\Codex\docs\CODE_QUALITY_IMPROVEMENT_PLAN.md`: security, edge cases, and hardening backlog (slim); archive snapshot in `docs/archive/`
-- `C:\Codex\docs\NEXT_TRIM_PLAN.md`: ranked next steps to shrink/optimize after current publish (horizon doc; avoid duplicating `PERFORMANCE_TODO.md` long-term)
+- `C:\Codex\docs\NEXT_TRIM_PLAN.md`: ranked next steps to shrink/optimize after current publish (horizon doc; avoid duplicating `PERFORMANCE_TODO.md` long-term); **baseline refreshed 2026-04-12** for the **`0.075.xxx`** train and measured hotspots
 - `C:\Codex\docs\archive\README.md`: frozen snapshots of older perf / service-split plans (not a live backlog)
 - `C:\Codex\docs\MANUAL_GOLDEN_PATH_CHECKLIST.md`: short manual verification path for risky changes
 - `C:\Codex\docs\XBOX_ACHIEVEMENTS_API_READINESS_CHECKLIST.md`: parking-lot checklist for future Microsoft Xbox achievements integration readiness
