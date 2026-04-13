@@ -2,7 +2,7 @@
 
 **Purpose:** Rank **near-horizon** shrink, perf, and hardening work after the **`0.075.xxx`** version train and completed MainWindow extraction **A–F**. Aligns with `PERFORMANCE_TODO.md`, `PERFORMANCE_MONOLITH_SLICE_PLAN.md`, `CODE_QUALITY_IMPROVEMENT_PLAN.md`, and `ARCHITECTURE_REFACTOR_PLAN.md`.
 
-**Published build (doc refresh):** **`0.075.010`** — see [`docs/CURRENT_BUILD.txt`](CURRENT_BUILD.txt) and [`docs/CHANGELOG.md`](CHANGELOG.md).
+**Published build (doc refresh):** **`0.075.011`** — see [`docs/CURRENT_BUILD.txt`](CURRENT_BUILD.txt) and [`docs/CHANGELOG.md`](CHANGELOG.md).
 
 **Staged MainWindow thin-out (post–extraction A–F):** [`docs/plans/PV-PLN-UI-001-ui-thin-mainwindow-ios-aligned.md`](plans/PV-PLN-UI-001-ui-thin-mainwindow-ios-aligned.md) and [`docs/ios_foundation_guide.md`](ios_foundation_guide.md).
 

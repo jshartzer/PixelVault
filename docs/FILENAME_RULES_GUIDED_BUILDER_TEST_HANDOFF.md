@@ -12,7 +12,7 @@ This is the intended behavior for the new guided builder work introduced on the 
 
 ## Regression anchor (fill in when testing)
 Record the build under test so results stay comparable across machines:
-- **App version / build:** PixelVault **0.075.010** — git **`f5d69ff`** — published path `C:\Codex\dist\PixelVault-0.075.010\PixelVault.exe` (per [`CURRENT_BUILD.txt`](./CURRENT_BUILD.txt))
+- **App version / build:** PixelVault **0.075.011** — git **`2304e88`** — published path `C:\Codex\dist\PixelVault-0.075.011\PixelVault.exe` (per [`CURRENT_BUILD.txt`](./CURRENT_BUILD.txt))
 - **Date initiated / anchor set:** **2026-04-12** (docs + planning alignment); prior anchor **2026-04-09** / **0.075.008** / `6309851` superseded for new runs
 - **Date tested (manual A–G):** _fill when manual checklist completes_
 

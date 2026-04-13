@@ -68,7 +68,7 @@ This aligns the filename-rules experience with the goal: **analyze a basename, c
 | Date | Stage | Notes |
 |------|--------|--------|
 | 2026-04-09 | **0** — Regression anchor | Handoff anchor: **0.075.008**, git **`6309851`**, dist `C:\Codex\dist\PixelVault-0.075.008\PixelVault.exe` |
-| 2026-04-12 | **Docs alignment** | Handoff + trim plan: **0.075.010**, git **`f5d69ff`**, dist `C:\Codex\dist\PixelVault-0.075.010\PixelVault.exe`; see [`FILENAME_RULES_GUIDED_BUILDER_TEST_HANDOFF.md`](../FILENAME_RULES_GUIDED_BUILDER_TEST_HANDOFF.md) |
+| 2026-04-12 | **Docs alignment** | Handoff + trim plan: **0.075.011**, git **`2304e88`**, dist `C:\Codex\dist\PixelVault-0.075.011\PixelVault.exe`; see [`FILENAME_RULES_GUIDED_BUILDER_TEST_HANDOFF.md`](../FILENAME_RULES_GUIDED_BUILDER_TEST_HANDOFF.md) |
 | 2026-04-09 | **Automation baseline** | `dotnet test` `PixelVault.Native.Tests` — **`FilenameRulesServiceTests`**: 4 passed |
 
 **Next:** **Stage 1** — manual Tests **A → D** (gates **G1–G3**) in the Renaming Rules window using the anchored build.

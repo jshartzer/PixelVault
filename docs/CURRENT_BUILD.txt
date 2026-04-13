@@ -1,10 +1,10 @@
 Current PixelVault version:
 
-0.075.010
+0.075.011
 
 Current PixelVault build:
 
-C:\Codex\dist\PixelVault-0.075.010\PixelVault.exe
+C:\Codex\dist\PixelVault-0.075.011\PixelVault.exe
 
 Shortcut that should point at the latest build:
 
