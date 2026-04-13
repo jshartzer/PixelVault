@@ -91,6 +91,11 @@ namespace PixelVaultNative
             ws.EstimatedDetailRowHeight = EstimateLibraryVariableDetailRowHeight(
                 new List<(string File, int Width)> { (string.Empty, effectiveTileSize) },
                 timelineView);
+            if (timelineView && TryAlignLibraryTimelineRollingPresetToToday(ws))
+            {
+                if (panes.TimelineStartDatePicker != null) panes.TimelineStartDatePicker.SelectedDate = ws.TimelineStartDate;
+                if (panes.TimelineEndDatePicker != null) panes.TimelineEndDatePicker.SelectedDate = ws.TimelineEndDate;
+            }
             var timelineRangeStart = ws.TimelineStartDate;
             var timelineRangeEnd = ws.TimelineEndDate;
             NormalizeLibraryTimelineDateRange(ref timelineRangeStart, ref timelineRangeEnd);

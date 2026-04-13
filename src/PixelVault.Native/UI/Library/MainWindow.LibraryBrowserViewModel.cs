@@ -219,6 +219,33 @@ namespace PixelVaultNative
             return captureDay >= startDate && captureDay <= endDate;
         }
 
+        /// <summary>
+        /// Rolling presets (Today / This month / 30 days) are anchored to the calendar day when chosen.
+        /// If the library stays open past midnight, <paramref name="ws"/> still holds yesterday’s end date and new captures disappear from the timeline until the user re-applies a preset.
+        /// Recompute start/end from <see cref="DateTime.Today"/> when the preset is not custom.
+        /// </summary>
+        internal static bool TryAlignLibraryTimelineRollingPresetToToday(LibraryBrowserWorkingSet ws)
+        {
+            if (ws == null) return false;
+            var key = (ws.TimelineDatePresetKey ?? string.Empty).Trim().ToLowerInvariant();
+            if (string.IsNullOrEmpty(key) || string.Equals(key, "custom", StringComparison.OrdinalIgnoreCase)) return false;
+            string presetArg;
+            if (string.Equals(key, "today", StringComparison.OrdinalIgnoreCase)) presetArg = "today";
+            else if (string.Equals(key, "month", StringComparison.OrdinalIgnoreCase)) presetArg = "month";
+            else if (string.Equals(key, "30d", StringComparison.OrdinalIgnoreCase)) presetArg = "30d";
+            else return false;
+
+            DateTime start;
+            DateTime end;
+            BuildLibraryTimelinePresetDateRange(presetArg, DateTime.Today, out start, out end);
+            var curStart = ws.TimelineStartDate <= DateTime.MinValue ? DateTime.MinValue : ws.TimelineStartDate.Date;
+            var curEnd = ws.TimelineEndDate <= DateTime.MinValue ? DateTime.MinValue : ws.TimelineEndDate.Date;
+            if (curStart == start && curEnd == end) return false;
+            ws.TimelineStartDate = start;
+            ws.TimelineEndDate = end;
+            return true;
+        }
+
         internal static string BuildLibraryTimelineSummaryText(int captureCount, int gameCount, int platformCount, DateTime newestCapture, DateTime oldestCapture)
         {
             var parts = new List<string>

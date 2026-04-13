@@ -1,5 +1,7 @@
 # Next trim and optimization plan (post–0.854)
 
+> **Note (2026-04-12):** This document’s baseline (version line, `PixelVault.Native.cs` line count) is **stale** relative to the current **`0.075.xxx`** train. A **full refresh** (facts, hotspots, tier ordering) is tracked under **[`docs/plans/PV-PLN-RVW-001-post-app-review-hardening.md`](plans/PV-PLN-RVW-001-post-app-review-hardening.md)** — Phase 0.
+
 **Purpose:** Rank follow-up work after publishing **0.854**. Aligns with `PERFORMANCE_TODO.md`, `PERFORMANCE_MONOLITH_SLICE_PLAN.md`, `CODE_QUALITY_IMPROVEMENT_PLAN.md`, and `ARCHITECTURE_REFACTOR_PLAN.md`.
 
 **Staged MainWindow thin-out (post–extraction A–F):** see **`docs/plans/PV-PLN-UI-001-ui-thin-mainwindow-ios-aligned.md`** and **`docs/ios_foundation_guide.md`**.

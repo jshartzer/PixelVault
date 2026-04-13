@@ -18,6 +18,39 @@ public sealed class LibraryFolderCacheIoTests
     }
 
     [Fact]
+    public void IsLibraryMediaFileUnderLibraryRoot_AcceptsNestedGameSubfolders()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "PixelVault-Native-Tests", Guid.NewGuid().ToString("N"), "Library");
+        var game = Path.Combine(root, "Alan Wake");
+        var nested = Path.Combine(game, "Screenshots");
+        Directory.CreateDirectory(nested);
+        var top = Path.Combine(game, "a.png");
+        var deep = Path.Combine(nested, "b.png");
+        File.WriteAllText(top, "x");
+        File.WriteAllText(deep, "x");
+
+        try
+        {
+            Assert.True(MainWindow.IsLibraryMediaFileUnderLibraryRoot(root, top));
+            Assert.True(MainWindow.IsLibraryMediaFileUnderLibraryRoot(root, deep));
+            Assert.True(MainWindow.IsLibraryMediaFileDirectlyUnderGameFolder(root, top));
+            Assert.False(MainWindow.IsLibraryMediaFileDirectlyUnderGameFolder(root, deep));
+            Assert.False(MainWindow.IsLibraryMediaFileUnderLibraryRoot(root, Path.Combine(Path.GetTempPath(), "Outside", "c.png")));
+        }
+        finally
+        {
+            try
+            {
+                var wipe = Path.GetDirectoryName(root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+                if (!string.IsNullOrWhiteSpace(wipe) && Directory.Exists(wipe)) Directory.Delete(wipe, true);
+            }
+            catch
+            {
+            }
+        }
+    }
+
+    [Fact]
     public void IsLibraryFolderCacheMetadataRevisionLine_RecognizesIndexRevisionFormat()
     {
         Assert.True(MainWindow.IsLibraryFolderCacheMetadataRevisionLine("12345|638547890123456789"));

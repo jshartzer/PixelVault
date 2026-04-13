@@ -31,7 +31,7 @@ namespace PixelVaultNative
                 && long.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out _);
         }
 
-        /// <summary>True when the file sits in <c>libraryRoot\GameFolder\file</c> (same rule as top-level-only enumeration in <see cref="LibraryScanner.LoadLibraryFolders"/>).</summary>
+        /// <summary>True when the file sits in <c>libraryRoot\GameFolder\file</c> (one directory under the library root).</summary>
         internal static bool IsLibraryMediaFileDirectlyUnderGameFolder(string libraryRoot, string filePath)
         {
             if (string.IsNullOrWhiteSpace(libraryRoot) || string.IsNullOrWhiteSpace(filePath)) return false;
@@ -41,6 +41,25 @@ namespace PixelVaultNative
             var grandparent = Path.GetDirectoryName(parent);
             if (string.IsNullOrEmpty(grandparent)) return false;
             return string.Equals(grandparent, rootNorm, StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>True when <paramref name="filePath"/> resolves under <paramref name="libraryRoot"/> at any depth (game subfolders included). Used when rebuilding folder lists from the metadata index.</summary>
+        internal static bool IsLibraryMediaFileUnderLibraryRoot(string libraryRoot, string filePath)
+        {
+            if (string.IsNullOrWhiteSpace(libraryRoot) || string.IsNullOrWhiteSpace(filePath)) return false;
+            try
+            {
+                var root = Path.GetFullPath(libraryRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+                var file = Path.GetFullPath(filePath);
+                if (file.Length <= root.Length) return false;
+                if (!file.StartsWith(root, StringComparison.OrdinalIgnoreCase)) return false;
+                var next = file[root.Length];
+                return next == Path.DirectorySeparatorChar || next == Path.AltDirectorySeparatorChar;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         internal string GetLibraryMetadataIndexRevision(string root)
@@ -58,7 +77,7 @@ namespace PixelVaultNative
             }
         }
 
-        /// <summary>When folder-cache line 3 matches the metadata index revision and only directory mtimes drifted, rebuild file list from the persisted index (no per-game folder file sweep). New files on disk that are not yet indexed will not appear until a library scan.</summary>
+        /// <summary>When folder-cache line 3 matches the metadata index revision and only directory mtimes drifted, rebuild file list from the persisted index (no per-game folder file sweep). New files on disk that are not yet indexed will not appear until a library scan. Paths may live in nested folders under each game directory (same scope as a full library folder rebuild).</summary>
         internal bool TryGetIndexOnlyFolderCacheRefresh(string root, string currentFullStamp, out List<string> mediaFilePathsOneLevelUnderRoot)
         {
             mediaFilePathsOneLevelUnderRoot = null;
@@ -86,7 +105,7 @@ namespace PixelVaultNative
             {
                 var p = kv.Key;
                 if (string.IsNullOrWhiteSpace(p) || !IsMedia(p) || !File.Exists(p)) continue;
-                if (!IsLibraryMediaFileDirectlyUnderGameFolder(root, p)) continue;
+                if (!IsLibraryMediaFileUnderLibraryRoot(root, p)) continue;
                 files.Add(p);
             }
 

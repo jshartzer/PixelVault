@@ -10,6 +10,7 @@ Long-lived execution plans that use a **stable plan ID** for cross-linking (repo
 | **PV-PLN-AINT-001** | [PV-PLN-AINT-001-background-intake-agent.md](PV-PLN-AINT-001-background-intake-agent.md) | Opt-in **Background Intake Agent**: **custom** trusted rules + **built-in** only when full auto-import completes; **modeless** activity/undo; pause list refined in implementation; prerequisites vs FNRU/UI-001/LIBST in-plan. |
 | **PV-PLN-UI-001** | [PV-PLN-UI-001-ui-thin-mainwindow-ios-aligned.md](PV-PLN-UI-001-ui-thin-mainwindow-ios-aligned.md) | **Post–A–F** MainWindow / `PixelVault.Native.cs` thin-out; extraction stages aligned with **`docs/ios_foundation_guide.md`** (services, plain models, mobile-safe writes). |
 | **PV-PLN-FNRU-001** | [PV-PLN-FNRU-001-guided-builder-verification.md](PV-PLN-FNRU-001-guided-builder-verification.md) | **Guided Builder**: verification (Tests A–G) + **strategy** (save rule = format memory; optional sample→rule; parser ordering). Handoff: **`docs/FILENAME_RULES_GUIDED_BUILDER_TEST_HANDOFF.md`**. |
+| **PV-PLN-RVW-001** | [PV-PLN-RVW-001-post-app-review-hardening.md](PV-PLN-RVW-001-post-app-review-hardening.md) | **Post–app-review (2026-04-12):** P1 **user regex** bounds (save + runtime); P2 **hero/banner** download dedupe/cancel; refresh **`NEXT_TRIM_PLAN.md`** to current release/hotspots; then pick one structural slice from updated data. |
 
 **ID format:** `PV-PLN-<TOPIC>-<NNN>`  
 - **PV** — PixelVault  
