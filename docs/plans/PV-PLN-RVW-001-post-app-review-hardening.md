@@ -1,7 +1,7 @@
-# Moved — PV-PLN-RVW-001
+# Moved — PV-PLN-RVW-001 (complete)
 
-This plan is **in progress** and lives under the **open plans** folder:
+**PV-PLN-RVW-001** is **complete**. Canonical text:
 
-**[`open/PV-PLN-RVW-001-post-app-review-hardening.md`](open/PV-PLN-RVW-001-post-app-review-hardening.md)**
+**[`docs/completed-projects/PV-PLN-RVW-001-post-app-review-hardening.md`](../completed-projects/PV-PLN-RVW-001-post-app-review-hardening.md)**
 
-See also [`open/README.md`](open/README.md).
+The **`open/`** stub remains for old links: [`open/PV-PLN-RVW-001-post-app-review-hardening.md`](open/PV-PLN-RVW-001-post-app-review-hardening.md).

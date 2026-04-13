@@ -1,9 +1,5 @@
 # Open plans (in progress)
 
-Plans listed here are **actively being executed**; canonical text lives in the linked files under this folder.
-
-| Plan ID | Document | Notes |
-|---------|----------|--------|
-| **PV-PLN-RVW-001** | [PV-PLN-RVW-001-post-app-review-hardening.md](PV-PLN-RVW-001-post-app-review-hardening.md) | Post–app-review: **Phases 1–2** **done** (regex + hero coalesce/cancel); **Phase 3** next. |
+No codified plans are registered as **open** in this folder right now. **PV-PLN-RVW-001** finished **2026-04-12** — canonical copy: [`../completed-projects/PV-PLN-RVW-001-post-app-review-hardening.md`](../completed-projects/PV-PLN-RVW-001-post-app-review-hardening.md).
 
 The main plan index remains [`../README.md`](../README.md). When a plan is finished, move it to **`../completed-projects/`** (or **`../archive/`**) and remove its row from this README.

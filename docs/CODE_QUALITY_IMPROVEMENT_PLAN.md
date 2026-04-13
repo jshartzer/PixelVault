@@ -14,6 +14,7 @@
 | Empty `catch` in audited hot paths | Replaced with logging / narrower handling (`PERFORMANCE_TODO` 4b). Re-audit when adding new I/O. |
 | `CoverService` dictionary races | Locks on Steam/SteamGridDB caches (e.g. `_steamGridDbResponseCacheLock`, related cache fields in `CoverService.cs`). |
 | Game-capture keyword `Dispatcher.Invoke` | Mirror flag on settings / `MainWindow` (`PERFORMANCE_TODO` 5a). |
+| `SteamAppIdLooksLikeFilenamePrefix` hardening | **RVW-001 Phase 3 (2026-04-12):** **≥2** digit token; when basename continues, boundary **`_`** or **`-`** only (no max — long numeric NonSteamId); module `<remarks>` on `SteamImportRename.cs`; `SteamRenamePathMappingTests`. |
 
 ---
 
@@ -24,14 +25,13 @@
 | Issue | Why it matters | Next step |
 |--------|----------------|-----------|
 | `MainWindow` / `PixelVault.Native.cs` still central | Conflicts and reasoning cost | Incremental extractions when touching an area (`HANDOFF.md`, `PERFORMANCE_MONOLITH_SLICE_PLAN.md`, `ARCHITECTURE_REFACTOR_PLAN.md`). |
-| Steam rename rules scattered | One path fixed, another regresses | Single docblock or small doc: AppID prefix, `gameTitleHint` + `_`, canonical skip; align with `SteamImportRename.cs` tests. |
+| Steam rename rules scattered | One path fixed, another regresses | **AppID prefix** documented in **`SteamImportRename`** `<remarks>` + tests (**2026-04-12**). Remaining: title-hint / `ImportWorkflow` cross-links if those surfaces churn. |
 
 ### Bugs / edge cases
 
 | Issue | Why it matters | Next step |
 |--------|----------------|-----------|
 | `TryBuildSteamRenameBase` title-hint branch | Unicode/spacing vs filesystem | Normalize hint + basename before compare, or document exact capture contract. |
-| `SteamAppIdLooksLikeFilenamePrefix` | Long digit-prefix filenames | Require separator after AppID and/or length bounds (`SteamImportRename.cs`). |
 | `BuildLibraryFolderInventoryStamp` | NAS / huge trees | Session cache, incremental stamp, or ensure caller never blocks UI for full enumeration. |
 
 ### Performance / UX polish
@@ -55,7 +55,7 @@
 
 ## Suggested order (remaining)
 
-1. **Steam rename** — separator/length on `SteamAppIdLooksLikeFilenamePrefix`; optional normalization for title-hint (good test ROI).  
+1. **Steam rename title-hint** — optional normalization for `TryBuildSteamRenameBase` title-hint branch (good test ROI).  
 2. **`SizeChanged` debounce** — if resize jank shows up in traces.  
 3. **Regex / ReDoS** — when touching `FilenameRulesService` or convention editor save path.  
 4. **MainWindow shrink** — only with functional work in that file.  

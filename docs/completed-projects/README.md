@@ -24,6 +24,7 @@ This folder indexes **finished initiatives** in the **C:\Codex** repo: enough co
 | **MainWindow extraction (Phases A–F)** | Apr 2026 | `C:\Codex\docs\MAINWINDOW_EXTRACTION_ROADMAP.md` | Library host + `ILibraryBrowserShell`, settings `SettingsShellHost`, photography partial, settings persistence partial; Phases A–F bars done. |
 | | | `C:\Codex\docs\completed-projects\MAINWINDOW_EXTRACTION_PHASES_A-F.md` | Short completion record + changelog pointer. |
 | **Single-folder storage model (LIBST)** | Apr 2026 | `C:\Codex\docs\completed-projects\PV-PLN-LIBST-001-single-folder-storage-model.md` | PV-PLN-LIBST-001: storage-group / placement, photo index re-home, SQLite integration tests; Steps 0–9 shipped. |
+| **Post–app-review hardening (RVW)** | Apr 2026 | `C:\Codex\docs\APP_REVIEW_2026-04-12.md` | PV-PLN-RVW-001: regex safety, hero coalesce/cancel, **`NEXT_TRIM`** refresh, **`SteamAppIdLooksLikeFilenamePrefix`** separator + min digit length (long NonSteamId-safe); canonical write-up: `C:\Codex\docs\completed-projects\PV-PLN-RVW-001-post-app-review-hardening.md`. |
 
 ---
 

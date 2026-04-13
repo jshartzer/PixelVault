@@ -10,7 +10,7 @@
 
 **Small UI / polish backlog (tiered by effort):** [`docs/SMALL_FEATURE_TODO.md`](SMALL_FEATURE_TODO.md) — same items as [PixelVault HQ — Small Feature To-Do](https://www.notion.so/cf63eb7c2524470d9b9a601ab46f4cc6).
 
-**Review-driven hardening (P1/P2):** [`docs/plans/open/PV-PLN-RVW-001-post-app-review-hardening.md`](plans/open/PV-PLN-RVW-001-post-app-review-hardening.md) (from [`docs/APP_REVIEW_2026-04-12.md`](APP_REVIEW_2026-04-12.md)).
+**Review-driven hardening (P1–P3):** **PV-PLN-RVW-001** **complete** — [`docs/completed-projects/PV-PLN-RVW-001-post-app-review-hardening.md`](completed-projects/PV-PLN-RVW-001-post-app-review-hardening.md) (from [`docs/APP_REVIEW_2026-04-12.md`](APP_REVIEW_2026-04-12.md)); stubs [`docs/plans/PV-PLN-RVW-001-post-app-review-hardening.md`](plans/PV-PLN-RVW-001-post-app-review-hardening.md) / [`open/…`](plans/open/PV-PLN-RVW-001-post-app-review-hardening.md).
 
 ---
 
@@ -22,10 +22,10 @@ Line counts are **non-blank lines** (`Measure-Object -Line`) for orientation onl
 |---------------------------------------------|-------:|------|
 | **`PixelVault.Native.cs`** | **~1.9k** | Still the **largest** single compilation unit; further vertical moves per UI-001 / monolith slice plan. |
 | **`Services/Indexing/IndexPersistenceService.cs`** | **~1.5k** | Persistence hot spot; split by schema domain only when that work is active. |
-| **`UI/Editors/FilenameConventionEditorWindow.cs`** | **~1.4k** | Large editor surface; pair with **PV-PLN-FNRU-001** / **PV-PLN-RVW-001** when touching rules UI or regex safety. |
+| **`UI/Editors/FilenameConventionEditorWindow.cs`** | **~1.4k** | Large editor surface; pair with **PV-PLN-FNRU-001** / **PV-PLN-RVW-001** (regex **P1** shipped; plan **complete**) when touching rules UI or regex safety. |
 | **`UI/Library/MainWindow.LibraryBrowserRender.DetailPane.cs`** | **~1.1k** | Library detail / timeline render; profile before broad refactors. |
-| **`Services/FilenameParsing/FilenameParserService.cs`** | **~1.1k** | Parser + built-ins; **custom regex hardening** in RVW-001. |
-| **`Services/Covers/CoverService.cs`** | **~1.1k** | Covers + hero fetch; **banner dedupe** in RVW-001. |
+| **`Services/FilenameParsing/FilenameParserService.cs`** | **~1.1k** | Parser + built-ins; **custom regex hardening** (**RVW-001** **P1**, plan **complete**). |
+| **`Services/Covers/CoverService.cs`** | **~1.1k** | Covers + hero fetch; **banner dedupe** (**RVW-001** **P2**, plan **complete**). |
 
 Historical context: older plans referred to **`PixelVault.Native.cs` ~2.9k lines** and a **post–0.854** milestone—that era is **closed**; the **`0.854`** entry remains in **`CHANGELOG.md`** as a docs-only publish marker.
 
@@ -55,8 +55,8 @@ Historical context: older plans referred to **`PixelVault.Native.cs` ~2.9k lines
 
 | Item | Notes |
 |------|--------|
-| **`SteamAppIdLooksLikeFilenamePrefix`** | Require separator + length bounds (`CODE_QUALITY_IMPROVEMENT_PLAN.md`, `SteamImportRename.cs`). |
-| Steam rename **single doc** | One module-level docblock linking parser, `ImportWorkflow`, and tests. |
+| **`SteamAppIdLooksLikeFilenamePrefix`** | **Done (2026-04-12, RVW-001 P3):** `_`/`-` separator when stem continues + **≥2** digit token (no max — NonSteamId); module `<remarks>` on `SteamImportRename.cs`; `SteamRenamePathMappingTests`. |
+| Steam rename **single doc** | **Partially done:** module-level **`SteamImportRename`** remarks link tests + plans; optional follow-up: title-hint branch / `ImportWorkflow` cross-links (`CODE_QUALITY_IMPROVEMENT_PLAN.md`). |
 | **`BuildLibraryFolderInventoryStamp`** | NAS / huge trees — session cache or off-UI if startup stalls reported. |
 | **User-authored filename regex** | **PV-PLN-RVW-001** Phase 1 — timeouts, NonBacktracking where compatible, save-time limits (`FilenameRulesService` / `FilenameParserService`). |
 

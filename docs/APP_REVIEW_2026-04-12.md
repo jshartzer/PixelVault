@@ -2,7 +2,7 @@
 
 Date: 2026-04-12
 
-**Follow-up (repo):** Remediation and sequencing live in **[`docs/plans/open/PV-PLN-RVW-001-post-app-review-hardening.md`](plans/open/PV-PLN-RVW-001-post-app-review-hardening.md)** (**open plans** folder). **`docs/NEXT_TRIM_PLAN.md`** baseline was **fully refreshed 2026-04-12** (version train, measured line counts)—Finding 3 below describes the **pre-refresh** state for audit trail.
+**Follow-up (repo):** **PV-PLN-RVW-001** is **complete** — canonical plan **[`docs/completed-projects/PV-PLN-RVW-001-post-app-review-hardening.md`](completed-projects/PV-PLN-RVW-001-post-app-review-hardening.md)** (stubs: [`plans/PV-PLN-RVW-001-post-app-review-hardening.md`](plans/PV-PLN-RVW-001-post-app-review-hardening.md), [`plans/open/…`](plans/open/PV-PLN-RVW-001-post-app-review-hardening.md)). **`docs/NEXT_TRIM_PLAN.md`** baseline was **fully refreshed 2026-04-12** (version train, measured line counts)—Finding 3 below describes the **pre-refresh** state for audit trail.
 
 Scope:
 - app/code review
