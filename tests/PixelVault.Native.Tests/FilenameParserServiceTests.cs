@@ -1,4 +1,5 @@
 using System.Linq;
+using System;
 using System.Text.RegularExpressions;
 using PixelVaultNative;
 using SQLitePCL;
@@ -524,6 +525,13 @@ public sealed class FilenameParserServiceTests
         var xboxPcRule = parser.GetConventionRules(string.Empty).First(rule => rule.ConventionId == "xbox_pc_capture_ampm");
 
         Assert.Equal("[title] [M]_[d]_[yyyy] [h]_[mm]_[ss] [tt].[ext:media]", xboxPcRule.PatternText);
+    }
+
+    [Fact]
+    public void ValidateConventionPatternForSave_RejectsExcessiveRawAlternation()
+    {
+        var pattern = string.Join("|", Enumerable.Range(0, FilenameParserService.MaxFilenameConventionRawAlternationBars + 6).Select(i => i.ToString()));
+        Assert.Throws<InvalidOperationException>(() => FilenameParserService.ValidateConventionPatternForSave(pattern, string.Empty));
     }
 
     static FilenameParserService CreateParser(

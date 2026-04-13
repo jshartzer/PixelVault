@@ -35,6 +35,7 @@ If this path fails, stop and fix that first before spending time on deeper spot 
 8. If Manual Intake changed, verify one manual case from start to finish.
 9. If Steam handling changed, verify at least one Steam filename case.
 10. If virtualization or layout changed, scroll a larger folder and look for spacing, rerender, or selection regressions.
+11. If **Photo workspace hero/banner** download or selection handling changed: switch to **Photo** mode, scrub the folder rail quickly on a few titles that auto-fetch banner art, and confirm the header banner still tracks the current selection without obvious duplicate fetch churn (network tray or debugger optional).
 
 ## Library detail scroll + import-and-edit Steam title (threading)
 

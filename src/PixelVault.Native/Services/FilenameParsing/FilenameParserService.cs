@@ -49,7 +49,15 @@ namespace PixelVaultNative
             {
                 var storedPattern = NormalizePatternTextForStorage(rule.PatternText ?? rule.Pattern);
                 if (!rule.Enabled || string.IsNullOrWhiteSpace(storedPattern)) continue;
-                var match = GetRegex(storedPattern, rule.TimestampGroup).Match(fileName);
+                Match match;
+                try
+                {
+                    match = GetRegex(storedPattern, rule.TimestampGroup).Match(fileName);
+                }
+                catch (RegexMatchTimeoutException)
+                {
+                    continue;
+                }
                 if (!match.Success) continue;
                 result.MatchedConvention = true;
                 result.ConventionId = rule.ConventionId ?? string.Empty;
@@ -299,7 +307,7 @@ namespace PixelVaultNative
             {
                 Regex cached;
                 if (regexCache.TryGetValue(compiledPattern, out cached)) return cached;
-                cached = new Regex(compiledPattern, RegexOptions.IgnoreCase | RegexOptions.Compiled);
+                cached = CreateConventionRegex(compiledPattern, FilenameConventionRuntimeMatchTimeout, preferCompiledOnFallback: true);
                 regexCache[compiledPattern] = cached;
                 return cached;
             }
@@ -935,6 +943,104 @@ namespace PixelVaultNative
         internal static string NormalizePatternTextForStorage(string patternText)
         {
             return (patternText ?? string.Empty).Trim();
+        }
+
+        /// <summary>Max length (chars) of the <em>compiled</em> pattern string passed to <see cref="Regex"/> for conventions.</summary>
+        internal const int MaxFilenameConventionCompiledPatternLength = 8192;
+
+        /// <summary>Raw (non-readable-token) patterns with more alternation branches than this are rejected at save time.</summary>
+        internal const int MaxFilenameConventionRawAlternationBars = 64;
+
+        internal static readonly TimeSpan FilenameConventionSaveValidationTimeout = TimeSpan.FromMilliseconds(200);
+        internal static readonly TimeSpan FilenameConventionRuntimeMatchTimeout = TimeSpan.FromMilliseconds(750);
+
+        /// <summary>Compiles a convention regex with match timeout; prefers <see cref="RegexOptions.NonBacktracking"/> when the pattern allows it.</summary>
+        internal static Regex CreateConventionRegex(string compiledPattern, TimeSpan matchTimeout, bool preferCompiledOnFallback)
+        {
+            if (compiledPattern == null) throw new ArgumentNullException(nameof(compiledPattern));
+            if (compiledPattern.Length > MaxFilenameConventionCompiledPatternLength)
+                throw new ArgumentException($"Compiled pattern exceeds {MaxFilenameConventionCompiledPatternLength} characters.", nameof(compiledPattern));
+
+            const RegexOptions Base = RegexOptions.IgnoreCase | RegexOptions.CultureInvariant;
+            try
+            {
+                return new Regex(compiledPattern, Base | RegexOptions.NonBacktracking, matchTimeout);
+            }
+            catch (RegexParseException)
+            {
+                throw;
+            }
+            catch (ArgumentException)
+            {
+                var extras = preferCompiledOnFallback ? RegexOptions.Compiled : RegexOptions.None;
+                return new Regex(compiledPattern, Base | extras, matchTimeout);
+            }
+        }
+
+        /// <summary>Save-time validation: compile, short smoke match, and (for raw regex) a second probe to catch obvious catastrophic backtracking.</summary>
+        /// <remarks>
+        /// User pattern execution surface (PV-PLN-RVW-001 Phase 1): <see cref="FilenameRulesService"/> save;
+        /// <see cref="FilenameParserService.Parse"/> / <c>GetRegex</c>; <see cref="FilenameConventionBuilder.HydrateDraftWithActualFileName"/>.
+        /// Editor preview shows <see cref="BuildRegexPattern"/> text only (no unbounded <c>Regex.Match</c> on full filenames).
+        /// </remarks>
+        internal static void ValidateConventionPatternForSave(string patternText, string timestampGroup)
+        {
+            var trimmed = NormalizePatternTextForStorage(patternText);
+            if (string.IsNullOrWhiteSpace(trimmed)) return;
+
+            var built = BuildRegexPattern(trimmed, timestampGroup);
+            if (string.IsNullOrWhiteSpace(built)) return;
+
+            if (built.Length > MaxFilenameConventionCompiledPatternLength)
+            {
+                throw new InvalidOperationException(
+                    $"Rule pattern is too long after normalization (maximum {MaxFilenameConventionCompiledPatternLength} characters).");
+            }
+
+            if (!LooksLikeReadablePattern(trimmed))
+            {
+                var bars = 0;
+                foreach (var ch in built)
+                {
+                    if (ch == '|') bars++;
+                }
+                if (bars > MaxFilenameConventionRawAlternationBars)
+                {
+                    throw new InvalidOperationException(
+                        $"Raw regex has too many alternation branches ({bars} '|' characters; maximum {MaxFilenameConventionRawAlternationBars}). Split into multiple rules or simplify.");
+                }
+            }
+
+            Regex regex;
+            try
+            {
+                regex = CreateConventionRegex(built, FilenameConventionSaveValidationTimeout, preferCompiledOnFallback: false);
+            }
+            catch (RegexParseException ex)
+            {
+                throw new InvalidOperationException("Rule pattern is not a valid regular expression: " + ex.Message, ex);
+            }
+            catch (ArgumentException ex)
+            {
+                throw new InvalidOperationException("Rule pattern is not a valid regular expression: " + ex.Message, ex);
+            }
+
+            try
+            {
+                _ = regex.Match("_pixelvault_regex_smoke_.png");
+                if (!LooksLikeReadablePattern(trimmed))
+                {
+                    // Near-miss inputs tend to trigger catastrophic backtracking on nested quantifiers (e.g. `(a+)+b`).
+                    var probeInput = new string('a', 48) + "c";
+                    _ = regex.Match(probeInput);
+                }
+            }
+            catch (RegexMatchTimeoutException ex)
+            {
+                throw new InvalidOperationException(
+                    "Rule pattern took too long to test-match a sample filename. Simplify nested repeats or alternation (possible catastrophic backtracking).",
+                    ex);
+            }
         }
 
         internal static string BuildRegexPattern(string patternText, string timestampGroup)

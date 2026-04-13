@@ -801,11 +801,25 @@ namespace PixelVaultNative
             if (string.IsNullOrWhiteSpace(patternText)) return;
 
             var regexText = FilenameParserService.BuildRegexPattern(patternText, string.IsNullOrWhiteSpace(rule.TimestampGroup) ? "stamp" : rule.TimestampGroup);
-            var match = Regex.Match(actualFileName, regexText, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
             var extension = Path.GetExtension(actualFileName) ?? string.Empty;
             var baseName = Path.GetFileNameWithoutExtension(actualFileName) ?? string.Empty;
             var counterMatch = Regex.Match(baseName, @"[_-]\d+$", RegexOptions.CultureInvariant);
             var counterValue = counterMatch.Success ? counterMatch.Value : string.Empty;
+
+            var conventionRx = FilenameParserService.CreateConventionRegex(
+                regexText,
+                FilenameParserService.FilenameConventionRuntimeMatchTimeout,
+                preferCompiledOnFallback: true);
+            Match match;
+            try
+            {
+                match = conventionRx.Match(actualFileName);
+            }
+            catch (RegexMatchTimeoutException)
+            {
+                return;
+            }
+
             var appIdValue = ReadGroup(match, string.IsNullOrWhiteSpace(rule.SteamAppIdGroup) ? "appid" : rule.SteamAppIdGroup);
             var titleValue = ReadGroup(match, string.IsNullOrWhiteSpace(rule.TitleGroup) ? "title" : rule.TitleGroup);
             var stampValue = ReadGroup(match, string.IsNullOrWhiteSpace(rule.TimestampGroup) ? "stamp" : rule.TimestampGroup);

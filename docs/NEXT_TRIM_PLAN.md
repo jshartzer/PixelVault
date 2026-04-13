@@ -10,7 +10,7 @@
 
 **Small UI / polish backlog (tiered by effort):** [`docs/SMALL_FEATURE_TODO.md`](SMALL_FEATURE_TODO.md) — same items as [PixelVault HQ — Small Feature To-Do](https://www.notion.so/cf63eb7c2524470d9b9a601ab46f4cc6).
 
-**Review-driven hardening (P1/P2):** [`docs/plans/PV-PLN-RVW-001-post-app-review-hardening.md`](plans/PV-PLN-RVW-001-post-app-review-hardening.md) (from [`docs/APP_REVIEW_2026-04-12.md`](APP_REVIEW_2026-04-12.md)).
+**Review-driven hardening (P1/P2):** [`docs/plans/open/PV-PLN-RVW-001-post-app-review-hardening.md`](plans/open/PV-PLN-RVW-001-post-app-review-hardening.md) (from [`docs/APP_REVIEW_2026-04-12.md`](APP_REVIEW_2026-04-12.md)).
 
 ---
 

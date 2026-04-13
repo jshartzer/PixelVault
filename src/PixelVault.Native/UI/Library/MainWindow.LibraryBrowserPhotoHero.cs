@@ -13,6 +13,50 @@ namespace PixelVaultNative
 {
     public sealed partial class MainWindow
     {
+        /// <summary>Serialized/coalesced in-flight hero resolves keyed by <see cref="LibraryHeroResolveDedupeKey"/>.</summary>
+        readonly object _libraryHeroResolveCoalesceLock = new object();
+        readonly Dictionary<string, Task<string>> _libraryHeroResolveInFlight = new Dictionary<string, Task<string>>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>Cancels the previous photo-workspace banner download wait when the user changes selection quickly.</summary>
+        readonly object _photoWorkspaceHeroBannerDownloadLock = new object();
+        CancellationTokenSource _photoWorkspaceHeroBannerDownloadCts;
+
+        string LibraryHeroResolveDedupeKey(LibraryFolderInfo folder)
+        {
+            if (folder == null) return string.Empty;
+            var n = NormalizeTitle(folder.Name);
+            return string.IsNullOrEmpty(n) ? (folder.Name ?? string.Empty).Trim() : n;
+        }
+
+        CancellationTokenSource ReplacePhotoWorkspaceHeroBannerDownloadCts(CancellationTokenSource next)
+        {
+            lock (_photoWorkspaceHeroBannerDownloadLock)
+            {
+                var previous = _photoWorkspaceHeroBannerDownloadCts;
+                _photoWorkspaceHeroBannerDownloadCts = next;
+                return previous;
+            }
+        }
+
+        void CancelAndDisposeCts(CancellationTokenSource cts)
+        {
+            if (cts == null) return;
+            try
+            {
+                cts.Cancel();
+            }
+            catch
+            {
+            }
+            try
+            {
+                cts.Dispose();
+            }
+            catch
+            {
+            }
+        }
+
         void LibraryBrowserWirePhotoWorkspaceHeroMenus(
             LibraryBrowserWorkingSet ws,
             LibraryBrowserPaneRefs panes,
@@ -208,11 +252,16 @@ namespace PixelVaultNative
             }
 
             ApplyBannerSource(null, false);
+
+            var downloadCts = new CancellationTokenSource();
+            CancelAndDisposeCts(ReplacePhotoWorkspaceHeroBannerDownloadCts(downloadCts));
+            var downloadToken = downloadCts.Token;
+
             _ = Task.Run(async () =>
             {
                 try
                 {
-                    var downloaded = await ResolveLibraryHeroBannerWithDownloadAsync(displayFolder, CancellationToken.None).ConfigureAwait(false);
+                    var downloaded = await ResolveLibraryHeroBannerWithDownloadAsync(displayFolder, downloadToken).ConfigureAwait(false);
                     var ok = !string.IsNullOrWhiteSpace(downloaded) && File.Exists(downloaded);
                     _ = libraryWindow.Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(delegate
                     {

@@ -231,7 +231,7 @@ namespace PixelVaultNative
             rule.IsBuiltIn = false;
             rule.AutoIntakeMode = FilenameAutoIntakeModes.Normalize(rule.AutoIntakeMode);
 
-            _ = new Regex(FilenameParserService.BuildRegexPattern(rule.PatternText, rule.TimestampGroup), RegexOptions.IgnoreCase);
+            FilenameParserService.ValidateConventionPatternForSave(rule.PatternText, rule.TimestampGroup);
             if (UsesTimestampTokens(rule.PatternText) && string.IsNullOrWhiteSpace(rule.TimestampFormat))
             {
                 throw new InvalidOperationException("Timestamp format is required when a rule captures a filename timestamp.");

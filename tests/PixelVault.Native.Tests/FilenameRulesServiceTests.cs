@@ -169,6 +169,86 @@ public sealed class FilenameRulesServiceTests
     }
 
     [Fact]
+    public void SaveRules_RejectsMalformedRegexPattern()
+    {
+        var service = CreateService();
+        var rule = new FilenameConventionRule
+        {
+            ConventionId = "bad_regex",
+            Name = "Bad Regex",
+            Enabled = true,
+            Priority = 500,
+            Pattern = "(?<>broken",
+            PatternText = "(?<>broken",
+            PlatformLabel = "Other",
+            PlatformTagsText = string.Empty
+        };
+
+        Assert.Throws<InvalidOperationException>(() => service.SaveRules(@"C:\lib", new[] { rule }));
+    }
+
+    [Fact]
+    public void SaveRules_AllowsRawRegexWithNestedQuantifiers_WhenSaveValidationCompletes()
+    {
+        // Historically catastrophic for classic backtracking; NonBacktracking + bounded save probe completes quickly.
+        var service = CreateService();
+        var rule = new FilenameConventionRule
+        {
+            ConventionId = "nested_quant",
+            Name = "Nested quantifiers",
+            Enabled = true,
+            Priority = 500,
+            Pattern = "(a+)+b",
+            PatternText = "(a+)+b",
+            PlatformLabel = "Other",
+            PlatformTagsText = string.Empty
+        };
+
+        var ex = Record.Exception(() => service.SaveRules(@"C:\lib", new[] { rule }));
+        Assert.Null(ex);
+    }
+
+    [Fact]
+    public void SaveRules_RejectsCompiledPatternOverMaxLength()
+    {
+        var service = CreateService();
+        var longCore = new string('a', FilenameParserService.MaxFilenameConventionCompiledPatternLength + 4);
+        var rule = new FilenameConventionRule
+        {
+            ConventionId = "too_long",
+            Name = "Too Long",
+            Enabled = true,
+            Priority = 500,
+            Pattern = longCore,
+            PatternText = longCore,
+            PlatformLabel = "Other",
+            PlatformTagsText = string.Empty
+        };
+
+        Assert.Throws<InvalidOperationException>(() => service.SaveRules(@"C:\lib", new[] { rule }));
+    }
+
+    [Fact]
+    public void SaveRules_RejectsRawPatternWithTooManyAlternations()
+    {
+        var service = CreateService();
+        var pattern = string.Join("|", Enumerable.Range(0, FilenameParserService.MaxFilenameConventionRawAlternationBars + 6).Select(i => i.ToString()));
+        var rule = new FilenameConventionRule
+        {
+            ConventionId = "many_alt",
+            Name = "Many alternations",
+            Enabled = true,
+            Priority = 500,
+            Pattern = pattern,
+            PatternText = pattern,
+            PlatformLabel = "Other",
+            PlatformTagsText = string.Empty
+        };
+
+        Assert.Throws<InvalidOperationException>(() => service.SaveRules(@"C:\lib", new[] { rule }));
+    }
+
+    [Fact]
     public void CreateBuilderDraftFromSample_SuggestsNonSteamId_ForLongShortcutPrefix()
     {
         var service = CreateService(
