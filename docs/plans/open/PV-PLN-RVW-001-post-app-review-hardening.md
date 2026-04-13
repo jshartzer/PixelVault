@@ -3,7 +3,7 @@
 | Field | Value |
 |-------|-------|
 | **Plan ID** | `PV-PLN-RVW-001` |
-| **Status** | **In progress** — Phase **0** **done**; Phase **1** (regex) **done** in repo; Phase **2** (hero/banner) **started** — coalesce + selection **CTS** in `MainWindow` (see execution log) |
+| **Status** | **In progress** — Phase **0–1** **done**; Phase **2** (hero/banner) **in progress** — `CoverService` HTTP coalesce + `HeroDownloadCoalesce` tests; photo selection **CTS** + fetch-menu timeout in `MainWindow` |
 | **Owner** | PixelVault / Codex |
 | **Source review** | [`docs/APP_REVIEW_2026-04-12.md`](../../APP_REVIEW_2026-04-12.md) (build/test health + code inspection; not a hands-on WPF smoke pass) |
 | **Related** | [`docs/NEXT_TRIM_PLAN.md`](../../NEXT_TRIM_PLAN.md) (**refreshed** 2026-04-12), [`docs/PERFORMANCE_TODO.md`](../../PERFORMANCE_TODO.md), [`docs/CODE_QUALITY_IMPROVEMENT_PLAN.md`](../../CODE_QUALITY_IMPROVEMENT_PLAN.md), [`docs/DOC_SYNC_POLICY.md`](../../DOC_SYNC_POLICY.md) (optional Notion mirror) |
@@ -120,7 +120,7 @@ Ship **bounded-risk** improvements called out in the **2026-04-12** app review, 
 | 2.2 | Thread **`CancellationToken`** from Photo workspace selection into **`ResolveLibraryHeroBannerWithDownloadAsync`** (replace `None` where appropriate). | Cancelled work stops quickly; no dispatcher apply after cancellation. |
 | 2.3 | **Coalesce:** if a download for key K is already running, **await** it instead of starting a second. | Logs / network show deduped behavior under manual stress. |
 
-**Repo status (partial):** Implemented on **`MainWindow`** (same concern as review: photo rail + resolver): **`LibraryHeroResolveDedupeKey`** + **`_libraryHeroResolveInFlight`** coalesce concurrent **`ResolveLibraryHeroBannerWithDownloadAsync`** for one normalized title; in-flight HTTP uses **`CancellationToken.None`** so waiters can cancel without tearing down a shared download. **`LibraryBrowserRefreshPhotoWorkspaceHeroBanner`** replaces a per-selection **`CancellationTokenSource`** so **`WaitAsync`** stops applying stale results when the user scrubs quickly. Optional follow-up: push dedupe deeper into **`CoverService`** if other callers need it.
+**Repo status:** **`CoverService.TryDownloadSteamGridDbHeroAsync`** / **`TryDownloadSteamStoreHeaderHeroAsync`** coalesce concurrent HTTP for the same title+id key via **`HeroDownloadCoalesce.RunAsync`** (shared inner task uses **`CancellationToken.None`**; callers use **`WaitAsync`** with their token). **`MainWindow.ResolveLibraryHeroBannerWithDownloadAsync`** is a linear resolver again (no duplicate map). **`LibraryBrowserRefreshPhotoWorkspaceHeroBanner`** keeps per-selection **`CancellationTokenSource`**. **Fetch Banner Art** uses a **4-minute** bounded **`CancellationTokenSource`** per menu action. Unit tests: **`HeroDownloadCoalesceTests`**.
 
 **Acceptance criteria**
 
@@ -161,7 +161,7 @@ Add **targeted** tests for Phase 1; Phase 2 may remain **manual + log** unless s
 | 2026-04-12 | **0 (repo complete)** | **`docs/NEXT_TRIM_PLAN.md`** rewritten: **`0.075.010`** pointer, measured line-count baseline, tiers updated, RVW/FNRU links. **`PERFORMANCE_MONOLITH_SLICE_PLAN.md`** monolith goal line updated. **`FILENAME_RULES_GUIDED_BUILDER_TEST_HANDOFF.md`** + **FNRU** execution log aligned to **0.075.010** / **`f5d69ff`** (re-record SHA after your next commit if these docs ship in that commit). **`APP_REVIEW_2026-04-12.md`** follow-up + Finding 3 **status** note. **Notion** mirror: update manually if required by `DOC_SYNC_POLICY.md`. |
 | 2026-04-12 | **1 (started)** | Plan moved to **`docs/plans/open/`**; **Phase 1 (partial):** `FilenameParserService` — `CreateConventionRegex` (NonBacktracking → classic + **match timeout**), **`ValidateConventionPatternForSave`** (length cap, smoke + raw near-miss probe), **`GetRegex`** cache uses bounded regex; **`Parse`** skips rule on **`RegexMatchTimeoutException`**. **`FilenameRulesService.NormalizeRuleForSave`** calls validation. **`FilenameConventionBuilder.HydrateDraftWithActualFileName`** uses bounded match. Tests: malformed regex, overlong pattern, nested-quantifier save smoke. |
 | 2026-04-12 | **1 (complete)** | Raw-pattern **`|`** cap (**`MaxFilenameConventionRawAlternationBars`**), **`ValidateConventionPatternForSave`** XML inventory, tests **`SaveRules_RejectsRawPatternWithTooManyAlternations`** + **`ValidateConventionPatternForSave_RejectsExcessiveRawAlternation`**. |
-| 2026-04-12 | **2 (started)** | **`MainWindow`**: **`ResolveLibraryHeroBannerWithDownloadAsync`** coalesces by **`LibraryHeroResolveDedupeKey`** + **`Task.WaitAsync`**; **`ResolveLibraryHeroBannerWithDownloadCoreAsync`** runs HTTP with **`CancellationToken.None`**. Photo refresh: **`ReplacePhotoWorkspaceHeroBannerDownloadCts`** cancels prior selection wait. **`MANUAL_GOLDEN_PATH_CHECKLIST.md`** item **11** (photo hero scrub). |
+| 2026-04-12 | **2 (in progress)** | **`MainWindow`**: per-selection **`CancellationTokenSource`** for photo hero refresh; **Fetch Banner Art** 4-minute timeout. **`CoverService`**: **`HeroDownloadCoalesce`** + in-flight maps on SteamGridDB / Steam store hero downloads; **`MainWindow.ResolveLibraryHeroBannerWithDownloadAsync`** linear chain. Tests **`HeroDownloadCoalesceTests`**. **`MANUAL_GOLDEN_PATH_CHECKLIST.md`** item **11**. |
 
 ---
 

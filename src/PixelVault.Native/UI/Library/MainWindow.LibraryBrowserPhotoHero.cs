@@ -13,20 +13,9 @@ namespace PixelVaultNative
 {
     public sealed partial class MainWindow
     {
-        /// <summary>Serialized/coalesced in-flight hero resolves keyed by <see cref="LibraryHeroResolveDedupeKey"/>.</summary>
-        readonly object _libraryHeroResolveCoalesceLock = new object();
-        readonly Dictionary<string, Task<string>> _libraryHeroResolveInFlight = new Dictionary<string, Task<string>>(StringComparer.OrdinalIgnoreCase);
-
         /// <summary>Cancels the previous photo-workspace banner download wait when the user changes selection quickly.</summary>
         readonly object _photoWorkspaceHeroBannerDownloadLock = new object();
         CancellationTokenSource _photoWorkspaceHeroBannerDownloadCts;
-
-        string LibraryHeroResolveDedupeKey(LibraryFolderInfo folder)
-        {
-            if (folder == null) return string.Empty;
-            var n = NormalizeTitle(folder.Name);
-            return string.IsNullOrEmpty(n) ? (folder.Name ?? string.Empty).Trim() : n;
-        }
 
         CancellationTokenSource ReplacePhotoWorkspaceHeroBannerDownloadCts(CancellationTokenSource next)
         {
@@ -172,8 +161,9 @@ namespace PixelVaultNative
                 {
                     try
                     {
+                        using var fetchTimeout = new CancellationTokenSource(TimeSpan.FromMinutes(4));
                         foreach (var targetFolder in folders)
-                            await ResolveLibraryHeroBannerWithDownloadAsync(targetFolder, CancellationToken.None).ConfigureAwait(false);
+                            await ResolveLibraryHeroBannerWithDownloadAsync(targetFolder, fetchTimeout.Token).ConfigureAwait(false);
                     }
                     catch (OperationCanceledException)
                     {

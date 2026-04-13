@@ -63,6 +63,48 @@ namespace PixelVaultNative
         public Action<IEnumerable<string>> RemoveCachedImageEntries;
     }
 
+    /// <summary>Coalesces concurrent hero HTTP work for the same dedupe key (PV-PLN-RVW-001 Phase 2).</summary>
+    internal static class HeroDownloadCoalesce
+    {
+        public static async Task<string> RunAsync(
+            object gate,
+            Dictionary<string, Task<string>> inflight,
+            string key,
+            Func<CancellationToken, Task<string>> inner,
+            CancellationToken waitCancellation)
+        {
+            Task<string> run;
+            lock (gate)
+            {
+                if (inflight.TryGetValue(key, out var existing)
+                    && existing != null
+                    && !existing.IsCompleted)
+                {
+                    run = existing;
+                }
+                else
+                {
+                    run = inner(CancellationToken.None);
+                    inflight[key] = run;
+                    _ = run.ContinueWith(
+                        _ =>
+                        {
+                            lock (gate)
+                            {
+                                if (inflight.TryGetValue(key, out var cur) && ReferenceEquals(cur, run))
+                                    inflight.Remove(key);
+                            }
+                        },
+                        CancellationToken.None,
+                        TaskContinuationOptions.ExecuteSynchronously,
+                        TaskScheduler.Default);
+                }
+            }
+
+            return await run.WaitAsync(waitCancellation).ConfigureAwait(false);
+        }
+    }
+
     /// <summary>Steam / SteamGridDB HTTP and local cover file helpers (<c>*Async</c> for network).</summary>
     /// <remarks>Local file operations (<see cref="CustomCoverPath"/>, etc.) remain synchronous.</remarks>
     sealed class CoverService : ICoverService
@@ -81,6 +123,11 @@ namespace PixelVaultNative
         readonly Dictionary<string, List<Tuple<string, string>>> _retroAchievementsSearchCache = new Dictionary<string, List<Tuple<string, string>>>(StringComparer.OrdinalIgnoreCase);
         List<Tuple<int, string>> _retroAchievementsConsolesCache;
         string _retroAchievementsConsolesCacheKey;
+
+        readonly object _steamGridDbHeroDownloadCoalesceLock = new object();
+        readonly Dictionary<string, Task<string>> _steamGridDbHeroDownloadsInFlight = new Dictionary<string, Task<string>>(StringComparer.OrdinalIgnoreCase);
+        readonly object _steamStoreHeaderHeroDownloadCoalesceLock = new object();
+        readonly Dictionary<string, Task<string>> _steamStoreHeaderHeroDownloadsInFlight = new Dictionary<string, Task<string>>(StringComparer.OrdinalIgnoreCase);
 
         public CoverService(CoverServiceDependencies dependencies)
         {
@@ -1017,6 +1064,17 @@ namespace PixelVaultNative
         {
             if (string.IsNullOrWhiteSpace(title) || string.IsNullOrWhiteSpace(steamGridDbId) || !HasSteamGridDbApiToken()) return null;
             cancellationToken.ThrowIfCancellationRequested();
+            var key = SafeCacheName(title) + "\u001f" + steamGridDbId.Trim();
+            return await HeroDownloadCoalesce.RunAsync(
+                _steamGridDbHeroDownloadCoalesceLock,
+                _steamGridDbHeroDownloadsInFlight,
+                key,
+                ct => TryDownloadSteamGridDbHeroWorkAsync(title, steamGridDbId, ct),
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        async Task<string> TryDownloadSteamGridDbHeroWorkAsync(string title, string steamGridDbId, CancellationToken cancellationToken)
+        {
             var stopwatch = Stopwatch.StartNew();
             try
             {
@@ -1061,6 +1119,17 @@ namespace PixelVaultNative
         {
             if (string.IsNullOrWhiteSpace(title) || string.IsNullOrWhiteSpace(appId)) return null;
             cancellationToken.ThrowIfCancellationRequested();
+            var key = SafeCacheName(title) + "\u001f" + appId.Trim();
+            return await HeroDownloadCoalesce.RunAsync(
+                _steamStoreHeaderHeroDownloadCoalesceLock,
+                _steamStoreHeaderHeroDownloadsInFlight,
+                key,
+                ct => TryDownloadSteamStoreHeaderHeroWorkAsync(title, appId, ct),
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        async Task<string> TryDownloadSteamStoreHeaderHeroWorkAsync(string title, string appId, CancellationToken cancellationToken)
+        {
             var stopwatch = Stopwatch.StartNew();
             try
             {

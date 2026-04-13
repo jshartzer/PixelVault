@@ -1210,49 +1210,8 @@ namespace PixelVaultNative
         }
 
         /// <summary>Resolves banner art: custom → <b>SteamGridDB Heroes</b> → Valve library_hero / store header fallback.</summary>
-        /// <remarks>Coalesces concurrent resolves for the same normalized title; <paramref name="cancellationToken"/> stops waiting (in-flight HTTP continues).</remarks>
+        /// <remarks>Per-step HTTP coalescing lives in <see cref="CoverService"/>; <paramref name="cancellationToken"/> cancels resolution waits (not always in-flight shared downloads).</remarks>
         async Task<string> ResolveLibraryHeroBannerWithDownloadAsync(LibraryFolderInfo folder, CancellationToken cancellationToken = default(CancellationToken))
-        {
-            if (folder == null) return null;
-            if (TryGetCustomOrCachedHeroPath(folder, out var early)) return early;
-
-            var key = LibraryHeroResolveDedupeKey(folder);
-            if (string.IsNullOrWhiteSpace(key)) key = (folder.Name ?? "?").Trim();
-
-            Task<string> run;
-            lock (_libraryHeroResolveCoalesceLock)
-            {
-                if (_libraryHeroResolveInFlight.TryGetValue(key, out var existing)
-                    && existing != null
-                    && !existing.IsCompleted)
-                {
-                    run = existing;
-                }
-                else
-                {
-                    run = ResolveLibraryHeroBannerWithDownloadCoreAsync(folder, CancellationToken.None);
-                    _libraryHeroResolveInFlight[key] = run;
-                    _ = run.ContinueWith(
-                        _ => PurgeLibraryHeroResolveSlot(key, run),
-                        CancellationToken.None,
-                        TaskContinuationOptions.ExecuteSynchronously,
-                        TaskScheduler.Default);
-                }
-            }
-
-            return await run.WaitAsync(cancellationToken).ConfigureAwait(false);
-        }
-
-        void PurgeLibraryHeroResolveSlot(string key, Task<string> expected)
-        {
-            lock (_libraryHeroResolveCoalesceLock)
-            {
-                if (_libraryHeroResolveInFlight.TryGetValue(key, out var current) && ReferenceEquals(current, expected))
-                    _libraryHeroResolveInFlight.Remove(key);
-            }
-        }
-
-        async Task<string> ResolveLibraryHeroBannerWithDownloadCoreAsync(LibraryFolderInfo folder, CancellationToken cancellationToken)
         {
             if (folder == null) return null;
             if (TryGetCustomOrCachedHeroPath(folder, out var early)) return early;
