@@ -3,7 +3,7 @@
 | Field | Value |
 |-------|-------|
 | **Plan ID** | `PV-PLN-RVW-001` |
-| **Status** | **In progress** — Phase **0–1** **done**; Phase **2** (hero/banner) **in progress** — `CoverService` HTTP coalesce + `HeroDownloadCoalesce` tests; photo selection **CTS** + fetch-menu timeout in `MainWindow` |
+| **Status** | **In progress** — Phases **0–2** **done** in repo; **Phase 3** (one structural slice from `NEXT_TRIM_PLAN`) **next** |
 | **Owner** | PixelVault / Codex |
 | **Source review** | [`docs/APP_REVIEW_2026-04-12.md`](../../APP_REVIEW_2026-04-12.md) (build/test health + code inspection; not a hands-on WPF smoke pass) |
 | **Related** | [`docs/NEXT_TRIM_PLAN.md`](../../NEXT_TRIM_PLAN.md) (**refreshed** 2026-04-12), [`docs/PERFORMANCE_TODO.md`](../../PERFORMANCE_TODO.md), [`docs/CODE_QUALITY_IMPROVEMENT_PLAN.md`](../../CODE_QUALITY_IMPROVEMENT_PLAN.md), [`docs/DOC_SYNC_POLICY.md`](../../DOC_SYNC_POLICY.md) (optional Notion mirror) |
@@ -49,6 +49,8 @@ Ship **bounded-risk** improvements called out in the **2026-04-12** app review, 
 - **Risk:** duplicate network work, races on the same cache file, quiet background churn when the user scrubs the photo rail quickly.
 
 **Engineering note:** Prefer **one in-flight download per dedupe key** (e.g. normalized title + banner source identity), **`CancellationToken`** tied to the current selection, and **await existing** in-flight work instead of spawning duplicates.
+
+**Status (repo):** Addressed for the photo hero path — **`CoverService`** coalesced hero downloads, **`MainWindow`** selection **CTS** + resolver **`ThrowIfCancellationRequested`** between steps and around Steam / SteamGridDB **ID resolution** (see Phase 2 completion notes).
 
 ### Finding 3 — Stale trim plan (P2)
 
@@ -120,7 +122,7 @@ Ship **bounded-risk** improvements called out in the **2026-04-12** app review, 
 | 2.2 | Thread **`CancellationToken`** from Photo workspace selection into **`ResolveLibraryHeroBannerWithDownloadAsync`** (replace `None` where appropriate). | Cancelled work stops quickly; no dispatcher apply after cancellation. |
 | 2.3 | **Coalesce:** if a download for key K is already running, **await** it instead of starting a second. | Logs / network show deduped behavior under manual stress. |
 
-**Repo status:** **`CoverService.TryDownloadSteamGridDbHeroAsync`** / **`TryDownloadSteamStoreHeaderHeroAsync`** coalesce concurrent HTTP for the same title+id key via **`HeroDownloadCoalesce.RunAsync`** (shared inner task uses **`CancellationToken.None`**; callers use **`WaitAsync`** with their token). **`MainWindow.ResolveLibraryHeroBannerWithDownloadAsync`** is a linear resolver again (no duplicate map). **`LibraryBrowserRefreshPhotoWorkspaceHeroBanner`** keeps per-selection **`CancellationTokenSource`**. **Fetch Banner Art** uses a **4-minute** bounded **`CancellationTokenSource`** per menu action. Unit tests: **`HeroDownloadCoalesceTests`**.
+**Repo status (complete):** **`CoverService.TryDownloadSteamGridDbHeroAsync`** / **`TryDownloadSteamStoreHeaderHeroAsync`** coalesce concurrent HTTP for the same title+id key via **`HeroDownloadCoalesce.RunAsync`** (shared inner task uses **`CancellationToken.None`**; callers use **`WaitAsync`** with their token). **`MainWindow`**: **`ResolveLibraryHeroBannerWithDownloadAsync`** with **`ThrowIfCancellationRequested`** at start and between GridDB vs Steam fallback; **`TryDownloadSteamGridDbHeroAsync`** / **`TryDownloadSteamStoreHeaderHeroAsync`** throw after ID resolution and before hero HTTP **`WaitAsync`**. **`ResolveBestLibraryFolderSteamGridDbIdAsync`** / **`ResolveBestLibraryFolderSteamAppIdAsync`** and **`CoverService.TryResolveSteamAppIdAsync`** gain extra cancellation checkpoints before/after network hops. **`LibraryBrowserRefreshPhotoWorkspaceHeroBanner`**: per-selection **`CancellationTokenSource`**. **Fetch Banner Art**: **4-minute** **`CancellationTokenSource`**. Tests: **`HeroDownloadCoalesceTests`**.
 
 **Acceptance criteria**
 
@@ -129,7 +131,7 @@ Ship **bounded-risk** improvements called out in the **2026-04-12** app review, 
 
 ---
 
-### Phase 3 — Pick next structural slice (after 0–2)
+### Phase 3 — Pick next structural slice (after 0–2; Phase 2 **done**)
 
 **Goal:** Use refreshed `NEXT_TRIM_PLAN.md` to choose **one** next extraction or perf slice based on **current** hotspots—not legacy `PixelVault.Native.cs` size alone.
 
@@ -150,7 +152,7 @@ dotnet test C:\Codex\tests\PixelVault.Native.Tests\PixelVault.Native.Tests.cspro
 dotnet test C:\Codex\tests\PixelVault.LibraryAssets.Tests\PixelVault.LibraryAssets.Tests.csproj -c Release
 ```
 
-Add **targeted** tests for Phase 1; Phase 2 may remain **manual + log** unless seams are extracted.
+Add **targeted** tests for Phase 1; Phase 2 includes **`HeroDownloadCoalesceTests`** plus manual **`MANUAL_GOLDEN_PATH_CHECKLIST.md`** item **11**.
 
 ---
 
@@ -162,6 +164,7 @@ Add **targeted** tests for Phase 1; Phase 2 may remain **manual + log** unless s
 | 2026-04-12 | **1 (started)** | Plan moved to **`docs/plans/open/`**; **Phase 1 (partial):** `FilenameParserService` — `CreateConventionRegex` (NonBacktracking → classic + **match timeout**), **`ValidateConventionPatternForSave`** (length cap, smoke + raw near-miss probe), **`GetRegex`** cache uses bounded regex; **`Parse`** skips rule on **`RegexMatchTimeoutException`**. **`FilenameRulesService.NormalizeRuleForSave`** calls validation. **`FilenameConventionBuilder.HydrateDraftWithActualFileName`** uses bounded match. Tests: malformed regex, overlong pattern, nested-quantifier save smoke. |
 | 2026-04-12 | **1 (complete)** | Raw-pattern **`|`** cap (**`MaxFilenameConventionRawAlternationBars`**), **`ValidateConventionPatternForSave`** XML inventory, tests **`SaveRules_RejectsRawPatternWithTooManyAlternations`** + **`ValidateConventionPatternForSave_RejectsExcessiveRawAlternation`**. |
 | 2026-04-12 | **2 (in progress)** | **`MainWindow`**: per-selection **`CancellationTokenSource`** for photo hero refresh; **Fetch Banner Art** 4-minute timeout. **`CoverService`**: **`HeroDownloadCoalesce`** + in-flight maps on SteamGridDB / Steam store hero downloads; **`MainWindow.ResolveLibraryHeroBannerWithDownloadAsync`** linear chain. Tests **`HeroDownloadCoalesceTests`**. **`MANUAL_GOLDEN_PATH_CHECKLIST.md`** item **11**. |
+| 2026-04-12 | **2 (complete)** | **`ThrowIfCancellationRequested`** on **`ResolveLibraryHeroBannerWithDownloadAsync`** / hero **`TryDownload*`** between ID resolution and coalesced HTTP wait; **`ResolveBestLibraryFolderSteamGridDbIdAsync`** / **`ResolveBestLibraryFolderSteamAppIdAsync`** between resolution hops; **`TryResolveSteamAppIdAsync`** before Steam search when cache miss. |
 
 ---
 
@@ -191,7 +194,7 @@ Add **targeted** tests for Phase 1; Phase 2 may remain **manual + log** unless s
 |----------|--------|---------|
 | P2 | Phase 0 | Accurate **next trim** doc → better sequencing. |
 | P1 | Phase 1 | **Regex safety** → lower denial-of-self risk from rules. |
-| P2 | Phase 2 | **Banner dedupe** → less background churn in Photo workspace. |
+| P2 | Phase 2 | **Banner dedupe + cancel** → less background churn in Photo workspace (**done** in repo). |
 | — | Phase 3 | **One** deliberate structural follow-up from fresh hotspots. |
 
 This plan **incorporates** the review verbatim priorities and adds **implementation constraints** (NonBacktracking caveats, cancellation, README/Notion hygiene) so execution stays bounded and testable.

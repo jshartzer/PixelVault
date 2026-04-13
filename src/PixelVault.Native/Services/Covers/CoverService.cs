@@ -695,6 +695,7 @@ namespace PixelVaultNative
             {
                 if (steamSearchCache.TryGetValue(title, out cached)) return cached;
             }
+            cancellationToken.ThrowIfCancellationRequested();
             foreach (var match in await SearchSteamAppMatchesAsync(title, cancellationToken).ConfigureAwait(false))
             {
                 if (NormalizeTitle(match.Item2) == NormalizeTitle(title))

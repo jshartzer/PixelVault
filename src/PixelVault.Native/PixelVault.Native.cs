@@ -754,7 +754,11 @@ namespace PixelVaultNative
             if (!ShouldUseSteamStoreLookups(folder)) return string.Empty;
             if (!allowLookup) return folder.SteamAppId ?? string.Empty;
             var appId = ResolveLibraryFolderSteamAppId(folder.PlatformLabel, folder.FilePaths ?? new string[0]);
-            if (string.IsNullOrWhiteSpace(appId)) appId = await coverService.TryResolveSteamAppIdAsync(folder.Name, cancellationToken).ConfigureAwait(false);
+            if (string.IsNullOrWhiteSpace(appId))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                appId = await coverService.TryResolveSteamAppIdAsync(folder.Name, cancellationToken).ConfigureAwait(false);
+            }
             if (!string.IsNullOrWhiteSpace(appId))
             {
                 folder.SteamAppId = appId;
@@ -786,12 +790,14 @@ namespace PixelVaultNative
             if (ShouldUseSteamStoreLookups(folder))
             {
                 var appId = await ResolveBestLibraryFolderSteamAppIdAsync(root, folder, true, cancellationToken).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
                 steamGridDbId = !string.IsNullOrWhiteSpace(appId)
                     ? await coverService.TryResolveSteamGridDbIdBySteamAppIdAsync(appId, cancellationToken).ConfigureAwait(false)
                     : null;
             }
             if (string.IsNullOrWhiteSpace(steamGridDbId))
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 steamGridDbId = await coverService.TryResolveSteamGridDbIdByNameAsync(folder.Name, cancellationToken).ConfigureAwait(false);
             }
             if (!string.IsNullOrWhiteSpace(steamGridDbId))
@@ -1210,13 +1216,15 @@ namespace PixelVaultNative
         }
 
         /// <summary>Resolves banner art: custom → <b>SteamGridDB Heroes</b> → Valve library_hero / store header fallback.</summary>
-        /// <remarks>Per-step HTTP coalescing lives in <see cref="CoverService"/>; <paramref name="cancellationToken"/> cancels resolution waits (not always in-flight shared downloads).</remarks>
+        /// <remarks>Per-step HTTP coalescing lives in <see cref="CoverService"/>; <paramref name="cancellationToken"/> is observed between Steam/SteamGridDB ID resolution and fallback steps (shared in-flight hero HTTP uses <see cref="CancellationToken.None"/> inside coalesced work).</remarks>
         async Task<string> ResolveLibraryHeroBannerWithDownloadAsync(LibraryFolderInfo folder, CancellationToken cancellationToken = default(CancellationToken))
         {
             if (folder == null) return null;
+            cancellationToken.ThrowIfCancellationRequested();
             if (TryGetCustomOrCachedHeroPath(folder, out var early)) return early;
             var steamGridDbHero = await TryDownloadSteamGridDbHeroAsync(folder, cancellationToken).ConfigureAwait(false);
             if (!string.IsNullOrWhiteSpace(steamGridDbHero) && File.Exists(steamGridDbHero)) return steamGridDbHero;
+            cancellationToken.ThrowIfCancellationRequested();
             var steamFallback = await TryDownloadSteamStoreHeaderHeroAsync(folder, cancellationToken).ConfigureAwait(false);
             if (!string.IsNullOrWhiteSpace(steamFallback) && File.Exists(steamFallback)) return steamFallback;
             return null;
@@ -1227,7 +1235,9 @@ namespace PixelVaultNative
             if (folder == null || !HasSteamGridDbApiToken()) return null;
             try
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var steamGridDbId = await ResolveBestLibraryFolderSteamGridDbIdAsync(libraryRoot, folder, cancellationToken).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
                 return await coverService.TryDownloadSteamGridDbHeroAsync(folder.Name, steamGridDbId, cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
@@ -1246,7 +1256,9 @@ namespace PixelVaultNative
             if (folder == null) return null;
             try
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var appId = await ResolveBestLibraryFolderSteamAppIdAsync(libraryRoot, folder, true, cancellationToken).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
                 return await coverService.TryDownloadSteamStoreHeaderHeroAsync(folder.Name, appId, cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
