@@ -1,3 +1,9 @@
+## 0.075.016
+- **Release:** Version **0.075.016** — system tray controls for background auto-intake, background-import activity window polish, and undo/import loop protection.
+- **System tray / background running:** Background auto-intake can now keep PixelVault running from the **system tray** with separate **Settings** toggles for **minimize to tray** and **ask on close**. Closing can offer **Send to Tray / Exit / Cancel**, and the tray icon can show a compact recent-import status flyout with quick actions.
+- **Background imports activity:** The **Background imports** window now shows a single flat **newest-first** list instead of per-time expanders, uses higher-contrast column headers, keeps **Clear selection** reliable even during active checkbox edits, and preserves the same undo/open-location workflow in the simplified layout.
+- **Undo / auto-intake safety:** Undoing a background-import move now temporarily suppresses the exact restored source path from the watcher pipeline so restored captures are not immediately auto-imported again.
+
 ## 0.075.011
 - **Release:** Version **0.075.011** — **`PV-PLN-RVW-001`** (**post–app-review hardening**) **Phase 3** complete: stricter **Steam / manual rename** rules for numeric **App ID** and **Non-Steam ID** prefixes at the start of filenames, plus planning doc updates.
 - **Import / rename:** When a file name begins with a digit run that matches the resolved Steam App ID or Non-Steam ID, the rename logic now requires the next character to be **`_`** or **`-`** (or the name must be **exactly** that id). This avoids mis-renaming captures where digits only *look* like an id (for example before a **letter** or **dot**). Long numeric Non-Steam IDs are unchanged.

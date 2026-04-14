@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Media;
 using PixelVaultNative.UI.Design;
@@ -19,6 +20,26 @@ namespace PixelVaultNative
 
         public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture) =>
             throw new NotSupportedException();
+    }
+
+    internal static class BackgroundIntakeGridStyles
+    {
+        static Style _columnHeaderStyle;
+
+        public static Style ColumnHeaderStyle =>
+            _columnHeaderStyle ?? (_columnHeaderStyle = CreateColumnHeaderStyle());
+
+        static Style CreateColumnHeaderStyle()
+        {
+            var style = new Style(typeof(DataGridColumnHeader));
+            style.Setters.Add(new Setter(Control.BackgroundProperty, UiBrushHelper.FromHex("#E7EEF3")));
+            style.Setters.Add(new Setter(Control.ForegroundProperty, UiBrushHelper.FromHex("#22313A")));
+            style.Setters.Add(new Setter(Control.BorderBrushProperty, UiBrushHelper.FromHex(DesignTokens.BorderDefault)));
+            style.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(0, 0, 1, 1)));
+            style.Setters.Add(new Setter(Control.FontWeightProperty, FontWeights.SemiBold));
+            style.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(8, 6, 8, 6)));
+            return style;
+        }
     }
 
     /// <summary>Entry point for palette / host to open the modeless activity window (<c>PV-PLN-AINT-001</c> Slice 7).</summary>
@@ -70,24 +91,33 @@ namespace PixelVaultNative
                 Text = "Files moved by background auto-intake. Undo moves copies back to the upload folder; embedded metadata and comments may remain in the files (same as Undo Last Import).",
                 Foreground = Brush(DesignTokens.TextLabelMuted),
                 TextWrapping = TextWrapping.Wrap,
-                Margin = new Thickness(0, 0, 0, 12),
+                Margin = new Thickness(0, 0, 0, 8),
                 FontSize = 13
             };
-            Grid.SetRow(header, 0);
-            root.Children.Add(header);
+            var summary = new TextBlock
+            {
+                Foreground = Brush("#A7B5BD"),
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 0, 0, 12),
+                FontSize = 12
+            };
+            var headerPanel = new StackPanel();
+            headerPanel.Children.Add(header);
+            headerPanel.Children.Add(summary);
+            Grid.SetRow(headerPanel, 0);
+            root.Children.Add(headerPanel);
 
             var allRowModels = new List<BackgroundIntakeActivityRowModel>();
-            var innerGrids = new List<DataGrid>();
-            var batchesPanel = new StackPanel();
 
-            DataGrid CreateBatchRowsGrid(IList<BackgroundIntakeActivityRowModel> batchModels)
+            DataGrid CreateRowsGrid(IList<BackgroundIntakeActivityRowModel> rowModels)
             {
                 var grid = new DataGrid
                 {
                     AutoGenerateColumns = false,
                     CanUserAddRows = false,
                     CanUserDeleteRows = false,
-                    SelectionUnit = DataGridSelectionUnit.Cell,
+                    SelectionUnit = DataGridSelectionUnit.FullRow,
+                    SelectionMode = DataGridSelectionMode.Extended,
                     GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
                     HeadersVisibility = DataGridHeadersVisibility.Column,
                     BorderThickness = new Thickness(1),
@@ -96,10 +126,16 @@ namespace PixelVaultNative
                     Foreground = Brushes.White,
                     RowBackground = Brush(DesignTokens.PanelElevated),
                     AlternatingRowBackground = Brush("#141B20"),
+                    ColumnHeaderStyle = BackgroundIntakeGridStyles.ColumnHeaderStyle,
                     VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                    MaxHeight = 280,
-                    ItemsSource = batchModels
+                    ItemsSource = rowModels
                 };
+                grid.Columns.Add(new DataGridTextColumn
+                {
+                    Header = "Imported (UTC)",
+                    Binding = new Binding("BatchUtc") { StringFormat = "yyyy-MM-dd HH:mm:ss" },
+                    Width = 152
+                });
                 grid.Columns.Add(new DataGridCheckBoxColumn
                 {
                     Header = "Pick",
@@ -119,59 +155,50 @@ namespace PixelVaultNative
                 return grid;
             }
 
+            var activityGrid = CreateRowsGrid(allRowModels);
+
             void RebuildModels()
             {
                 allRowModels.Clear();
-                innerGrids.Clear();
-                batchesPanel.Children.Clear();
-                foreach (var batch in _backgroundIntakeActivitySession.GetBatchesSnapshot().OrderByDescending(b => b.CompletedUtc))
+                var batches = _backgroundIntakeActivitySession.GetBatchesSnapshot().OrderByDescending(b => b.CompletedUtc).ToList();
+                foreach (var batch in batches)
                 {
-                    var batchModels = new List<BackgroundIntakeActivityRowModel>();
                     foreach (var row in batch.Rows)
                     {
-                        var m = new BackgroundIntakeActivityRowModel
+                        allRowModels.Add(new BackgroundIntakeActivityRowModel
                         {
                             BatchUtc = batch.CompletedUtc,
                             IsSelected = false,
                             Row = row
-                        };
-                        batchModels.Add(m);
-                        allRowModels.Add(m);
+                        });
                     }
-                    var inner = CreateBatchRowsGrid(batchModels);
-                    innerGrids.Add(inner);
-                    var hdr = new TextBlock
-                    {
-                        Text = batch.CompletedUtc.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture) + " UTC · " + batch.Rows.Count + " file(s)",
-                        Foreground = Brush(DesignTokens.TextLabelMuted),
-                        FontSize = 13
-                    };
-                    var exp = new Expander
-                    {
-                        Header = hdr,
-                        Content = inner,
-                        IsExpanded = true,
-                        Foreground = Brushes.White,
-                        Margin = new Thickness(0, 0, 0, 10)
-                    };
-                    batchesPanel.Children.Add(exp);
                 }
+                activityGrid.ItemsSource = null;
+                activityGrid.ItemsSource = allRowModels;
+                activityGrid.Items.Refresh();
+                activityGrid.UnselectAll();
+                activityGrid.SelectedCells.Clear();
+                summary.Text = allRowModels.Count == 0
+                    ? "No background imports recorded in this PixelVault session yet."
+                    : allRowModels.Count + " item(s) across " + batches.Count + " batch(es), shown together newest first.";
             }
 
             RebuildModels();
 
-            var batchScroll = new ScrollViewer
-            {
-                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
-                Content = batchesPanel
-            };
-            Grid.SetRow(batchScroll, 1);
-            root.Children.Add(batchScroll);
+            Grid.SetRow(activityGrid, 1);
+            root.Children.Add(activityGrid);
 
-            void RefreshAllGrids()
+            void CommitGridSelectionEdits()
             {
-                foreach (var g in innerGrids) g.Items.Refresh();
+                try { activityGrid.CommitEdit(DataGridEditingUnit.Cell, true); } catch { }
+                try { activityGrid.CommitEdit(DataGridEditingUnit.Row, true); } catch { }
+            }
+
+            void RefreshGridSelectionState()
+            {
+                activityGrid.Items.Refresh();
+                activityGrid.UnselectAll();
+                activityGrid.SelectedCells.Clear();
             }
 
             _backgroundIntakeActivityReload = delegate
@@ -189,14 +216,16 @@ namespace PixelVaultNative
 
             AddBtn("Select movable", delegate
             {
+                CommitGridSelectionEdits();
                 foreach (var m in allRowModels.Where(x => x.Row != null && !x.Row.Undone)) m.IsSelected = true;
-                RefreshAllGrids();
+                RefreshGridSelectionState();
             }, DesignTokens.ActionSecondaryFill);
 
             AddBtn("Clear selection", delegate
             {
+                CommitGridSelectionEdits();
                 foreach (var m in allRowModels) m.IsSelected = false;
-                RefreshAllGrids();
+                RefreshGridSelectionState();
             }, DesignTokens.ActionSecondaryFill);
 
             AddBtn("Open file location", delegate
@@ -228,7 +257,11 @@ namespace PixelVaultNative
                 }
             }, DesignTokens.ActionSecondaryFill);
 
-            AddBtn("Undo selected", delegate { RunBackgroundIntakeSelectiveUndoFromUi(() => allRowModels, RefreshAllGrids, w); }, DesignTokens.ActionPrimaryFill);
+            AddBtn("Undo selected", delegate
+            {
+                CommitGridSelectionEdits();
+                RunBackgroundIntakeSelectiveUndoFromUi(() => allRowModels, RefreshGridSelectionState, w);
+            }, DesignTokens.ActionPrimaryFill);
 
             var close = Btn("Close", (_, __) => w.Close(), DesignTokens.ActionShortcutDismissFill, Brushes.White);
             close.Margin = new Thickness(0, 0, 0, 8);

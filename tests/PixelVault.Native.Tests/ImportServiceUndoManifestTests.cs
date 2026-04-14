@@ -92,4 +92,63 @@ public sealed class ImportServiceUndoManifestTests
             }
         }
     }
+
+    [Fact]
+    public void ExecuteUndoImportMoves_RegistersExactRestoredTargetForBackgroundSuppression()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "pv-undo-suppress-" + System.Guid.NewGuid().ToString("n"));
+        var sourceDir = Path.Combine(root, "source");
+        var destinationDir = Path.Combine(root, "destination");
+        var currentPath = Path.Combine(destinationDir, "clip.png");
+        var conflictingSourcePath = Path.Combine(sourceDir, "clip.png");
+        string suppressedPath = null;
+        try
+        {
+            Directory.CreateDirectory(sourceDir);
+            Directory.CreateDirectory(destinationDir);
+            File.WriteAllText(currentPath, "new");
+            File.WriteAllText(conflictingSourcePath, "existing");
+
+            var svc = new ImportService(new ImportServiceDependencies
+            {
+                FileSystem = new FileSystemService(),
+                MetadataService = new StubMetadataService(),
+                GetFileCreationTime = _ => System.DateTime.MinValue,
+                GetFileLastWriteTime = _ => System.DateTime.MinValue,
+                CoverService = new StubCoverService(),
+                NormalizeGameIndexName = s => s.Trim(),
+                GetDestinationRoot = () => destinationDir,
+                GetLibraryRoot = () => string.Empty,
+                UniquePath = path => Path.Combine(Path.GetDirectoryName(path) ?? string.Empty, Path.GetFileNameWithoutExtension(path) + " (1)" + Path.GetExtension(path)),
+                SuppressBackgroundAutoIntakePathBeforeUndoMove = path => suppressedPath = path
+            });
+
+            var result = svc.ExecuteUndoImportMoves(new[]
+            {
+                new UndoImportEntry
+                {
+                    SourceDirectory = sourceDir,
+                    ImportedFileName = "clip.png",
+                    CurrentPath = currentPath
+                }
+            });
+
+            var expectedTarget = Path.Combine(sourceDir, "clip (1).png");
+            Assert.Equal(1, result.Moved);
+            Assert.Equal(expectedTarget, suppressedPath, ignoreCase: true);
+            Assert.True(File.Exists(expectedTarget));
+            Assert.False(File.Exists(currentPath));
+        }
+        finally
+        {
+            try
+            {
+                if (Directory.Exists(root)) Directory.Delete(root, true);
+            }
+            catch
+            {
+                // ignore
+            }
+        }
+    }
 }

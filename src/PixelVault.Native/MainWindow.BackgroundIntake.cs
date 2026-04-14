@@ -13,6 +13,9 @@ namespace PixelVaultNative
     {
         BackgroundIntakeAgent _backgroundIntakeAgent;
 
+        internal void SuppressBackgroundAutoIntakePathBeforeUndoMove(string path) =>
+            _backgroundIntakeAgent?.SuppressUndoRestorePath(path);
+
         internal bool IsForegroundIntakeBusy => _foregroundIntakeBusyGate.IsBusy;
 
         void BeginForegroundIntakeBusy() => _foregroundIntakeBusyGate.Enter();
@@ -43,11 +46,14 @@ namespace PixelVaultNative
         {
             const int DebounceMilliseconds = 500;
             const int MaxBatchFiles = 80;
+            const int UndoRestoreSuppressionSeconds = 15;
             static readonly TimeSpan StabilityMaxWait = TimeSpan.FromMinutes(10);
 
             readonly MainWindow _host;
             readonly object _pendingSync = new object();
+            readonly object _suppressedUndoSync = new object();
             readonly HashSet<string> _pendingPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            readonly Dictionary<string, DateTime> _suppressedUndoRestorePaths = new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
             readonly List<FileSystemWatcher> _watchers = new List<FileSystemWatcher>();
             DispatcherTimer _debounceTimer;
             CancellationTokenSource _runCts = new CancellationTokenSource();
@@ -59,6 +65,57 @@ namespace PixelVaultNative
             }
 
             void V(string message) => _host.LogBackgroundIntakeVerbose(message);
+
+            public void SuppressUndoRestorePath(string path)
+            {
+                if (string.IsNullOrWhiteSpace(path)) return;
+                if (_host.Dispatcher.CheckAccess())
+                    SuppressUndoRestorePathCore(path);
+                else
+                    _ = _host.Dispatcher.BeginInvoke(new Action(() => SuppressUndoRestorePathCore(path)));
+            }
+
+            void SuppressUndoRestorePathCore(string path)
+            {
+                try
+                {
+                    path = Path.GetFullPath(path);
+                }
+                catch
+                {
+                    return;
+                }
+
+                var expiresUtc = DateTime.UtcNow.AddSeconds(UndoRestoreSuppressionSeconds);
+                lock (_suppressedUndoSync)
+                {
+                    PruneSuppressedUndoRestorePathsLocked(DateTime.UtcNow);
+                    _suppressedUndoRestorePaths[path] = expiresUtc;
+                }
+                lock (_pendingSync)
+                {
+                    _pendingPaths.Remove(path);
+                }
+                V("Suppressed undo-restored path for " + UndoRestoreSuppressionSeconds + "s: " + path);
+            }
+
+            bool IsUndoRestorePathSuppressed(string path)
+            {
+                if (string.IsNullOrWhiteSpace(path)) return false;
+                lock (_suppressedUndoSync)
+                {
+                    var nowUtc = DateTime.UtcNow;
+                    PruneSuppressedUndoRestorePathsLocked(nowUtc);
+                    return _suppressedUndoRestorePaths.TryGetValue(path, out var expiresUtc) && expiresUtc > nowUtc;
+                }
+            }
+
+            void PruneSuppressedUndoRestorePathsLocked(DateTime nowUtc)
+            {
+                if (_suppressedUndoRestorePaths.Count == 0) return;
+                foreach (var expired in _suppressedUndoRestorePaths.Where(kvp => kvp.Value <= nowUtc).Select(kvp => kvp.Key).ToList())
+                    _suppressedUndoRestorePaths.Remove(expired);
+            }
 
             static string SummarizePaths(IReadOnlyList<string> paths, int maxNames = 10)
             {
@@ -179,6 +236,11 @@ namespace PixelVaultNative
                 {
                     return;
                 }
+                if (IsUndoRestorePathSuppressed(path))
+                {
+                    V("SchedulePath ignored (undo-restored suppression): " + path);
+                    return;
+                }
                 if (!File.Exists(path))
                 {
                     V("SchedulePath ignored (file missing): " + path);
@@ -228,6 +290,14 @@ namespace PixelVaultNative
                 lock (_pendingSync)
                 {
                     if (_pendingPaths.Count == 0) return;
+                    var suppressedPending = _pendingPaths.Where(IsUndoRestorePathSuppressed).ToList();
+                    foreach (var suppressed in suppressedPending)
+                        _pendingPaths.Remove(suppressed);
+                    if (_pendingPaths.Count == 0)
+                    {
+                        V("Debounce fired, but only suppressed undo-restored paths were pending.");
+                        return;
+                    }
                     batch = _pendingPaths.Take(MaxBatchFiles).ToList();
                     foreach (var p in batch) _pendingPaths.Remove(p);
                 }

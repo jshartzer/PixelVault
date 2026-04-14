@@ -122,6 +122,8 @@ namespace PixelVaultNative
         public Func<string, string> UniquePath;
         public Action<string, string> MoveMetadataSidecarIfPresent;
         public Action<string, string, List<UndoImportEntry>> AddSidecarUndoEntryIfPresent;
+        /// <summary>Called before an undo move restores a file into a watched source folder so background auto-intake can ignore the self-generated watcher event.</summary>
+        public Action<string> SuppressBackgroundAutoIntakePathBeforeUndoMove;
         public Action<string> Log;
         public Func<string, bool> IsMedia;
         public Func<string, string> GetSafeGameFolderName;
@@ -421,6 +423,14 @@ namespace PixelVaultNative
                 var target = d.UniquePath == null
                     ? Path.Combine(entry.SourceDirectory, Path.GetFileName(currentPath))
                     : d.UniquePath(Path.Combine(entry.SourceDirectory, Path.GetFileName(currentPath)));
+                try
+                {
+                    d.SuppressBackgroundAutoIntakePathBeforeUndoMove?.Invoke(target);
+                }
+                catch (Exception ex)
+                {
+                    d.Log?.Invoke("Undo suppression registration failed for " + target + ". " + ex.Message);
+                }
                 fs.MoveFile(currentPath, target);
                 result.Moved++;
                 result.RemovedFromLibraryPaths.Add(currentPath);

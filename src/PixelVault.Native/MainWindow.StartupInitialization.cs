@@ -109,6 +109,7 @@ namespace PixelVaultNative
                 UniquePath = MainWindow.Unique,
                 MoveMetadataSidecarIfPresent = mw.MoveMetadataSidecarIfPresent,
                 AddSidecarUndoEntryIfPresent = mw.AddSidecarUndoEntryIfPresent,
+                SuppressBackgroundAutoIntakePathBeforeUndoMove = mw.SuppressBackgroundAutoIntakePathBeforeUndoMove,
                 Log = mw.Log,
                 IsMedia = MainWindow.IsMedia,
                 GetSafeGameFolderName = mw.GetSafeGameFolderName,
