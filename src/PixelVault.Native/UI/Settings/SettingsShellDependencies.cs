@@ -62,6 +62,10 @@ namespace PixelVaultNative
         public Action<bool> SetBackgroundAutoIntakeShowSummary { get; set; }
         public Func<bool> GetBackgroundAutoIntakeVerboseLogging { get; set; }
         public Action<bool> SetBackgroundAutoIntakeVerboseLogging { get; set; }
+        public Func<bool> GetSystemTrayMinimizeEnabled { get; set; }
+        public Action<bool> SetSystemTrayMinimizeEnabled { get; set; }
+        public Func<bool> GetSystemTrayPromptOnCloseEnabled { get; set; }
+        public Action<bool> SetSystemTrayPromptOnCloseEnabled { get; set; }
 
         public Action SaveSettings { get; set; }
         public Action<string> Log { get; set; }

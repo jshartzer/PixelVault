@@ -474,7 +474,11 @@ namespace PixelVaultNative
 
             if (batch.Rows.Count == 0) return;
             _backgroundIntakeActivitySession.AddBatch(batch);
-            _ = Dispatcher.BeginInvoke(new Action(ReloadBackgroundIntakeActivityWindowIfOpen));
+            _ = Dispatcher.BeginInvoke(new Action(delegate
+            {
+                ReloadBackgroundIntakeActivityWindowIfOpen();
+                ReloadSystemTrayStatusFlyoutIfOpen();
+            }));
         }
     }
 }

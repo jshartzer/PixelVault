@@ -245,6 +245,7 @@ namespace PixelVaultNative
             if (File.Exists(iconPath)) Icon = BitmapFrame.Create(new Uri(iconPath));
             Content = new Grid();
             ShowLibraryBrowser(true);
+            InitializeSystemTraySupport();
             Log("PixelVault " + AppVersion + " ready.");
         }
     }

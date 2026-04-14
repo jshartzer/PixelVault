@@ -127,7 +127,9 @@ public sealed class SettingsServiceTests
                 "library_grouping_mode=console",
                 "troubleshooting_logging_enabled=1",
                 "library_double_click_set_folder_cover=1",
-                "library_refresh_hero_banner_cache_on_next_open=1"
+                "library_refresh_hero_banner_cache_on_next_open=1",
+                "system_tray_minimize_enabled=1",
+                "system_tray_prompt_on_close_enabled=1"
             });
 
             var initial = new AppSettings
@@ -168,6 +170,8 @@ public sealed class SettingsServiceTests
             Assert.True(loaded.TroubleshootingLoggingEnabled);
             Assert.True(loaded.LibraryDoubleClickSetsFolderCover);
             Assert.True(loaded.LibraryRefreshHeroBannerCacheOnNextLibraryOpen);
+            Assert.True(loaded.SystemTrayMinimizeEnabled);
+            Assert.True(loaded.SystemTrayPromptOnCloseEnabled);
             Assert.Empty(loaded.LibraryIndexAnchor ?? string.Empty);
         }
         finally
@@ -238,6 +242,8 @@ public sealed class SettingsServiceTests
                 TroubleshootingLoggingEnabled = true,
                 LibraryDoubleClickSetsFolderCover = true,
                 LibraryRefreshHeroBannerCacheOnNextLibraryOpen = true,
+                SystemTrayMinimizeEnabled = true,
+                SystemTrayPromptOnCloseEnabled = true,
                 LibraryBrowserFolderPaneWidth = 542.25,
                 StarredExportFolder = @"D:\immich-drop"
             };
@@ -273,6 +279,8 @@ public sealed class SettingsServiceTests
             Assert.True(loaded.TroubleshootingLoggingEnabled);
             Assert.True(loaded.LibraryDoubleClickSetsFolderCover);
             Assert.True(loaded.LibraryRefreshHeroBannerCacheOnNextLibraryOpen);
+            Assert.True(loaded.SystemTrayMinimizeEnabled);
+            Assert.True(loaded.SystemTrayPromptOnCloseEnabled);
             Assert.Equal(542.25, loaded.LibraryBrowserFolderPaneWidth, 5);
             Assert.Equal(@"D:\immich-drop", loaded.StarredExportFolder, ignoreCase: true);
             Assert.Equal(loaded.LibraryRoot ?? string.Empty, loaded.LibraryIndexAnchor ?? string.Empty, ignoreCase: true);
@@ -334,7 +342,9 @@ public sealed class SettingsServiceTests
                 BackgroundAutoIntakeQuietSeconds = 7,
                 BackgroundAutoIntakeToastsEnabled = false,
                 BackgroundAutoIntakeShowSummary = false,
-                BackgroundAutoIntakeVerboseLogging = true
+                BackgroundAutoIntakeVerboseLogging = true,
+                SystemTrayMinimizeEnabled = true,
+                SystemTrayPromptOnCloseEnabled = true
             });
 
             var loaded = svc.LoadFromIni(path, new AppSettings(), Path.GetTempPath(), () => string.Empty, () => string.Empty);
@@ -344,6 +354,8 @@ public sealed class SettingsServiceTests
             Assert.False(loaded.BackgroundAutoIntakeToastsEnabled);
             Assert.False(loaded.BackgroundAutoIntakeShowSummary);
             Assert.True(loaded.BackgroundAutoIntakeVerboseLogging);
+            Assert.True(loaded.SystemTrayMinimizeEnabled);
+            Assert.True(loaded.SystemTrayPromptOnCloseEnabled);
         }
         finally
         {

@@ -67,6 +67,10 @@ namespace PixelVaultNative
         public bool BackgroundAutoIntakeShowSummary;
         /// <summary>Extra <c>[BGINT]</c> lines in the main PixelVault log for background intake (watchers, batches, eligibility).</summary>
         public bool BackgroundAutoIntakeVerboseLogging;
+        /// <summary>When true, minimizing the main window hides PixelVault to the notification area instead of leaving it on the taskbar.</summary>
+        public bool SystemTrayMinimizeEnabled;
+        /// <summary>When true, closing the main window asks whether PixelVault should keep running in the notification area.</summary>
+        public bool SystemTrayPromptOnCloseEnabled;
 
         public static AppSettings Clone(AppSettings s)
         {
@@ -111,7 +115,9 @@ namespace PixelVaultNative
                 BackgroundAutoIntakeQuietSeconds = s.BackgroundAutoIntakeQuietSeconds,
                 BackgroundAutoIntakeToastsEnabled = s.BackgroundAutoIntakeToastsEnabled,
                 BackgroundAutoIntakeShowSummary = s.BackgroundAutoIntakeShowSummary,
-                BackgroundAutoIntakeVerboseLogging = s.BackgroundAutoIntakeVerboseLogging
+                BackgroundAutoIntakeVerboseLogging = s.BackgroundAutoIntakeVerboseLogging,
+                SystemTrayMinimizeEnabled = s.SystemTrayMinimizeEnabled,
+                SystemTrayPromptOnCloseEnabled = s.SystemTrayPromptOnCloseEnabled
             };
         }
     }

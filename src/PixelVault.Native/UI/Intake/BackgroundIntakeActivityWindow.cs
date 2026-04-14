@@ -294,6 +294,7 @@ namespace PixelVaultNative
                 Log("Background intake selective undo: moved " + undoResult.Moved + ", skipped " + undoResult.Skipped + ".");
                 RefreshPreview();
                 refreshGrids?.Invoke();
+                ReloadSystemTrayStatusFlyoutIfOpen();
                 TryLibraryToast(undoResult.Moved > 0 ? "Moved " + undoResult.Moved + " file(s) back to the upload folder." : "No files were moved (see log).", MessageBoxImage.Information);
             }
             catch (Exception ex)

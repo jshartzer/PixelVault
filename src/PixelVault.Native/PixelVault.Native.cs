@@ -121,6 +121,8 @@ namespace PixelVaultNative
         bool backgroundAutoIntakeToastsEnabled = true;
         bool backgroundAutoIntakeShowSummary;
         bool backgroundAutoIntakeVerboseLogging;
+        bool systemTrayMinimizeEnabled;
+        bool systemTrayPromptOnCloseEnabled;
         readonly ForegroundIntakeBusyGate _foregroundIntakeBusyGate = new ForegroundIntakeBusyGate();
         readonly string _diagnosticsSessionId;
         const long TroubleshootingLogMaxBytes = 5_000_000L;
@@ -2036,7 +2038,6 @@ namespace PixelVaultNative
         }
     }
 }
-
 
 
 

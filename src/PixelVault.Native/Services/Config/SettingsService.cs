@@ -315,6 +315,24 @@ namespace PixelVaultNative
                         || string.Equals(normalizedValue, "yes", StringComparison.OrdinalIgnoreCase)
                         || string.Equals(normalizedValue, "on", StringComparison.OrdinalIgnoreCase);
                 }
+                else if (key == "system_tray_minimize_enabled")
+                {
+                    var normalizedValue = (value ?? string.Empty).Trim();
+                    s.SystemTrayMinimizeEnabled =
+                        string.Equals(normalizedValue, "1", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(normalizedValue, "true", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(normalizedValue, "yes", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(normalizedValue, "on", StringComparison.OrdinalIgnoreCase);
+                }
+                else if (key == "system_tray_prompt_on_close_enabled")
+                {
+                    var normalizedValue = (value ?? string.Empty).Trim();
+                    s.SystemTrayPromptOnCloseEnabled =
+                        string.Equals(normalizedValue, "1", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(normalizedValue, "true", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(normalizedValue, "yes", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(normalizedValue, "on", StringComparison.OrdinalIgnoreCase);
+                }
             }
 
             var bundledExifTool = Path.Combine(appRoot ?? string.Empty, "tools", "exiftool.exe");
@@ -411,7 +429,9 @@ namespace PixelVaultNative
                 "background_auto_intake_quiet_seconds=" + NormalizeBackgroundAutoIntakeQuietSeconds(state.BackgroundAutoIntakeQuietSeconds).ToString(CultureInfo.InvariantCulture),
                 "background_auto_intake_toasts_enabled=" + (state.BackgroundAutoIntakeToastsEnabled ? "1" : "0"),
                 "background_auto_intake_show_summary=" + (state.BackgroundAutoIntakeShowSummary ? "1" : "0"),
-                "background_auto_intake_verbose_logging=" + (state.BackgroundAutoIntakeVerboseLogging ? "1" : "0")
+                "background_auto_intake_verbose_logging=" + (state.BackgroundAutoIntakeVerboseLogging ? "1" : "0"),
+                "system_tray_minimize_enabled=" + (state.SystemTrayMinimizeEnabled ? "1" : "0"),
+                "system_tray_prompt_on_close_enabled=" + (state.SystemTrayPromptOnCloseEnabled ? "1" : "0")
             });
         }
 

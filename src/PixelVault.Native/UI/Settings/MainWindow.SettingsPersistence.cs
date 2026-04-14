@@ -47,7 +47,9 @@ namespace PixelVaultNative
                 BackgroundAutoIntakeQuietSeconds = backgroundAutoIntakeQuietSeconds,
                 BackgroundAutoIntakeToastsEnabled = backgroundAutoIntakeToastsEnabled,
                 BackgroundAutoIntakeShowSummary = backgroundAutoIntakeShowSummary,
-                BackgroundAutoIntakeVerboseLogging = backgroundAutoIntakeVerboseLogging
+                BackgroundAutoIntakeVerboseLogging = backgroundAutoIntakeVerboseLogging,
+                SystemTrayMinimizeEnabled = systemTrayMinimizeEnabled,
+                SystemTrayPromptOnCloseEnabled = systemTrayPromptOnCloseEnabled
             };
         }
 
@@ -93,6 +95,8 @@ namespace PixelVaultNative
             backgroundAutoIntakeToastsEnabled = s.BackgroundAutoIntakeToastsEnabled;
             backgroundAutoIntakeShowSummary = s.BackgroundAutoIntakeShowSummary;
             backgroundAutoIntakeVerboseLogging = s.BackgroundAutoIntakeVerboseLogging;
+            systemTrayMinimizeEnabled = s.SystemTrayMinimizeEnabled;
+            systemTrayPromptOnCloseEnabled = s.SystemTrayPromptOnCloseEnabled;
         }
 
         void LoadSettings()

@@ -176,6 +176,44 @@ namespace PixelVaultNative
             while (panel.RowDefinitions.Count <= 16) panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             panel.Children.Add(verboseIntakeBox);
 
+            var trayHeader = new TextBlock
+            {
+                Text = "System tray",
+                FontWeight = FontWeights.SemiBold,
+                Foreground = labelFg,
+                Margin = new Thickness(0, 18, 0, 6)
+            };
+            Grid.SetRow(trayHeader, 17);
+            Grid.SetColumnSpan(trayHeader, 3);
+            while (panel.RowDefinitions.Count <= 17) panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            panel.Children.Add(trayHeader);
+
+            var minimizeToTrayBox = new CheckBox
+            {
+                Content = "When minimized, hide PixelVault to the system tray instead of leaving it on the taskbar",
+                IsChecked = d.GetSystemTrayMinimizeEnabled?.Invoke() ?? false,
+                Margin = new Thickness(0, 0, 0, 4),
+                Foreground = boxFg
+            };
+            minimizeToTrayBox.ToolTip = "Useful if you want background auto-intake to keep running without a taskbar window.";
+            Grid.SetRow(minimizeToTrayBox, 18);
+            Grid.SetColumnSpan(minimizeToTrayBox, 3);
+            while (panel.RowDefinitions.Count <= 18) panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            panel.Children.Add(minimizeToTrayBox);
+
+            var promptOnCloseBox = new CheckBox
+            {
+                Content = "When closing PixelVault, ask whether to keep it running in the system tray",
+                IsChecked = d.GetSystemTrayPromptOnCloseEnabled?.Invoke() ?? false,
+                Margin = new Thickness(0, 0, 0, 4),
+                Foreground = boxFg
+            };
+            promptOnCloseBox.ToolTip = "The tray icon shows recent background-import activity and quick actions like Restore and Background Imports.";
+            Grid.SetRow(promptOnCloseBox, 19);
+            Grid.SetColumnSpan(promptOnCloseBox, 3);
+            while (panel.RowDefinitions.Count <= 19) panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            panel.Children.Add(promptOnCloseBox);
+
             var pathScroll = new ScrollViewer
             {
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
@@ -216,6 +254,8 @@ namespace PixelVaultNative
                 d.SetBackgroundAutoIntakeToastsEnabled(toastBox.IsChecked == true);
                 d.SetBackgroundAutoIntakeShowSummary(summaryBox.IsChecked == true);
                 d.SetBackgroundAutoIntakeVerboseLogging(verboseIntakeBox.IsChecked == true);
+                d.SetSystemTrayMinimizeEnabled(minimizeToTrayBox.IsChecked == true);
+                d.SetSystemTrayPromptOnCloseEnabled(promptOnCloseBox.IsChecked == true);
                 d.SaveSettings();
                 d.RefreshMainUi();
                 window.Close();
