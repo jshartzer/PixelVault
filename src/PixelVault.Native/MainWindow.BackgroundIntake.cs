@@ -66,6 +66,45 @@ namespace PixelVaultNative
 
             void V(string message) => _host.LogBackgroundIntakeVerbose(message);
 
+            internal static IReadOnlyList<string> EnumerateExistingTopLevelMediaFiles(IEnumerable<string> sourceRoots, Func<string, bool> isMedia)
+            {
+                var result = new List<string>();
+                var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                if (sourceRoots == null || isMedia == null) return result;
+                foreach (var root in sourceRoots)
+                {
+                    if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root)) continue;
+                    IEnumerable<string> files;
+                    try
+                    {
+                        files = Directory.EnumerateFiles(root, "*", SearchOption.TopDirectoryOnly);
+                    }
+                    catch
+                    {
+                        continue;
+                    }
+
+                    foreach (var file in files)
+                    {
+                        if (!isMedia(file)) continue;
+                        string fullPath;
+                        try
+                        {
+                            fullPath = Path.GetFullPath(file);
+                        }
+                        catch
+                        {
+                            continue;
+                        }
+
+                        if (seen.Add(fullPath))
+                            result.Add(fullPath);
+                    }
+                }
+
+                return result;
+            }
+
             public void SuppressUndoRestorePath(string path)
             {
                 if (string.IsNullOrWhiteSpace(path)) return;
@@ -214,9 +253,26 @@ namespace PixelVaultNative
                 }
 
                 if (_watchers.Count > 0)
+                {
                     _host.Log("Background auto-intake: watching " + _watchers.Count + " source folder(s).");
+                    QueueExistingTopLevelMediaFiles(sourceRoots);
+                }
                 else
                     V("No FileSystemWatchers started (check source folders exist and are configured).");
+            }
+
+            void QueueExistingTopLevelMediaFiles(IReadOnlyList<string> sourceRoots)
+            {
+                var existing = EnumerateExistingTopLevelMediaFiles(sourceRoots, IsMedia);
+                if (existing.Count == 0)
+                {
+                    V("Startup seed found no existing top-level media files.");
+                    return;
+                }
+
+                V("Startup seed queuing existing top-level media count=" + existing.Count + " files=" + SummarizePaths(existing));
+                foreach (var path in existing)
+                    SchedulePathCore(path);
             }
 
             void SchedulePath(string path)
