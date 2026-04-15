@@ -182,8 +182,8 @@ namespace PixelVaultNative
         }
 
         /// <summary>
-        /// Justified rows: every row uses one shared height so tile bottoms align — no dead space beside a shorter neighbor
-        /// (unlike column-based masonry + hero spans). Widths split proportionally to aspect ratio within each row.
+        /// Square-first quilt rows: every row uses a shared cell height so the feed stays solid and the density control
+        /// directly changes the visible tile size. Individual tiles can claim extra horizontal cells for variation.
         /// </summary>
         internal static List<LibraryDetailMasonryChunk> BuildLibraryDetailMasonryChunks(
             IReadOnlyList<string> files,
@@ -200,7 +200,7 @@ namespace PixelVaultNative
 
             var gap = Math.Max(0, gapPx);
             var avail = Math.Max(120d, availableWidth);
-            var minColW = Math.Max(minWidth, 240);
+            var requestedCell = Math.Max(120, baseWidth <= 0 ? 260 : baseWidth);
 
             var filtered = new List<string>();
             foreach (var f in files)
@@ -209,21 +209,26 @@ namespace PixelVaultNative
             }
             if (filtered.Count == 0) return chunks;
 
-            var cols = Math.Max(1, (int)Math.Floor((avail + gap) / (minColW + gap)));
+            var cols = Math.Max(1, (int)Math.Round((avail + gap) / (requestedCell + gap), MidpointRounding.AwayFromZero));
             cols = Math.Min(cols, Math.Max(1, filtered.Count));
+            var minCell = Math.Max(120d, Math.Min(requestedCell, Math.Max(120, minWidth)));
             while (cols > 1)
             {
-                var testColW = (avail - (cols - 1) * gap) / cols;
-                if (testColW + 0.5 >= minColW) break;
+                var testCell = (avail - (cols - 1) * gap) / cols;
+                if (testCell + 0.5 >= minCell) break;
                 cols--;
             }
+            var cellSize = Math.Max(1, (int)Math.Floor((avail - ((cols - 1) * gap)) / cols));
 
-            const int maxItemsPerChunk = 42;
+            const int maxItemsPerChunk = 48;
             const double maxChunkPaintHeight = 3400d;
+            var maxRowsPerChunk = Math.Max(4, (int)Math.Floor((maxChunkPaintHeight + gap) / Math.Max(1d, cellSize + gap)));
 
             var placements = new List<LibraryDetailMasonryPlacement>();
             var yInChunk = 0d;
+            var rowsInChunk = 0;
             var index = 0;
+            var rowIndex = 0;
 
             void FlushChunk()
             {
@@ -237,51 +242,151 @@ namespace PixelVaultNative
                 });
                 placements = new List<LibraryDetailMasonryPlacement>();
                 yInChunk = 0d;
+                rowsInChunk = 0;
             }
 
             while (index < filtered.Count)
             {
-                if (placements.Count >= maxItemsPerChunk || (placements.Count > 0 && yInChunk >= maxChunkPaintHeight))
+                if (placements.Count >= maxItemsPerChunk || rowsInChunk >= maxRowsPerChunk)
                     FlushChunk();
 
-                var rowCount = Math.Min(cols, filtered.Count - index);
-                var innerW = avail - (rowCount - 1) * gap;
-                if (innerW < 1) innerW = 1;
-
-                var aspects = new double[rowCount];
-                double sumA = 0;
-                for (var i = 0; i < rowCount; i++)
-                {
-                    var a = ResolveLibraryDetailAspectRatio(filtered[index + i], mediaLayoutByFile);
-                    aspects[i] = Math.Max(0.25, a);
-                    sumA += aspects[i];
-                }
-                if (sumA <= 1e-9) sumA = rowCount;
-
-                var rowH = innerW / sumA;
-                var hInt = Math.Max(1, (int)Math.Ceiling(rowH));
-                var widths = JustifiedRowWidthsInt(innerW, aspects);
+                var remaining = filtered.Count - index;
+                var rowItemCount = ChooseLibraryQuiltRowItemCount(cols, rowIndex, remaining);
+                var rowFiles = filtered.Skip(index).Take(rowItemCount).ToList();
+                var spans = BuildLibraryQuiltRowUnitSpans(rowFiles, cols, rowIndex, mediaLayoutByFile);
 
                 double x = 0;
-                for (var i = 0; i < rowCount; i++)
+                for (var i = 0; i < rowFiles.Count; i++)
                 {
+                    var spanUnits = Math.Max(1, spans[i]);
+                    var width = (spanUnits * cellSize) + ((spanUnits - 1) * gap);
                     placements.Add(new LibraryDetailMasonryPlacement
                     {
-                        File = filtered[index + i],
+                        File = rowFiles[i],
                         X = x,
                         Y = yInChunk,
-                        Width = widths[i],
-                        Height = hInt
+                        Width = width,
+                        Height = cellSize
                     });
-                    x += widths[i] + gap;
+                    x += width + gap;
                 }
 
-                yInChunk += hInt + gap;
-                index += rowCount;
+                yInChunk += cellSize + gap;
+                rowsInChunk++;
+                index += rowFiles.Count;
+                rowIndex++;
             }
 
             FlushChunk();
             return chunks;
+        }
+
+        static int ChooseLibraryQuiltRowItemCount(int columns, int rowIndex, int remainingItems)
+        {
+            if (remainingItems <= 0) return 0;
+            if (columns <= 2) return Math.Min(columns, remainingItems);
+            int target;
+            switch (rowIndex % 4)
+            {
+                case 1:
+                    target = Math.Max(2, columns - 1);
+                    break;
+                case 2:
+                    target = Math.Max(2, columns - 2);
+                    break;
+                default:
+                    target = columns;
+                    break;
+            }
+            return Math.Max(1, Math.Min(target, remainingItems));
+        }
+
+        static List<int> BuildLibraryQuiltRowUnitSpans(
+            IReadOnlyList<string> rowFiles,
+            int columns,
+            int rowIndex,
+            IReadOnlyDictionary<string, LibraryDetailMediaLayoutInfo> mediaLayoutByFile)
+        {
+            var spans = new List<int>();
+            if (rowFiles == null || rowFiles.Count == 0) return spans;
+
+            for (var i = 0; i < rowFiles.Count; i++) spans.Add(1);
+            var remainingUnits = Math.Max(0, columns - rowFiles.Count);
+            if (remainingUnits == 0) return spans;
+
+            var candidateIndexes = Enumerable.Range(0, rowFiles.Count)
+                .OrderByDescending(index => ScoreLibraryQuiltSpanCandidate(rowFiles[index], rowIndex, index, rowFiles.Count, mediaLayoutByFile))
+                .ThenBy(index => Math.Abs((((rowFiles.Count - 1) / 2d) - index)))
+                .ToList();
+            var maxSpans = new int[rowFiles.Count];
+            foreach (var index in candidateIndexes)
+                maxSpans[index] = DetermineLibraryQuiltMaxSpan(rowFiles[index], rowFiles.Count, columns, mediaLayoutByFile);
+
+            var safety = 0;
+            while (remainingUnits > 0 && candidateIndexes.Count > 0 && safety < 128)
+            {
+                var expanded = false;
+                foreach (var index in candidateIndexes)
+                {
+                    if (remainingUnits <= 0) break;
+                    if (spans[index] >= maxSpans[index]) continue;
+                    spans[index]++;
+                    remainingUnits--;
+                    expanded = true;
+                }
+                if (!expanded) break;
+                safety++;
+            }
+
+            if (remainingUnits > 0)
+            {
+                while (remainingUnits > 0)
+                {
+                    var distributed = false;
+                    foreach (var index in Enumerable.Range(0, rowFiles.Count).OrderBy(index => Math.Abs((((rowFiles.Count - 1) / 2d) - index))))
+                    {
+                        spans[index]++;
+                        remainingUnits--;
+                        distributed = true;
+                        if (remainingUnits == 0) break;
+                    }
+                    if (!distributed) break;
+                }
+            }
+
+            return spans;
+        }
+
+        static int DetermineLibraryQuiltMaxSpan(
+            string file,
+            int rowItemCount,
+            int columns,
+            IReadOnlyDictionary<string, LibraryDetailMediaLayoutInfo> mediaLayoutByFile)
+        {
+            var aspect = ResolveLibraryDetailAspectRatio(file, mediaLayoutByFile);
+            if (rowItemCount <= 1) return columns;
+            if (rowItemCount == 2 && columns >= 5)
+            {
+                if (aspect >= 1.8d) return 4;
+                return 3;
+            }
+            if (aspect < 0.82d && rowItemCount > 2) return 1;
+            if (aspect >= 1.8d) return Math.Min(3, columns);
+            if (aspect >= 1.18d) return Math.Min(2, columns);
+            return Math.Min(2, columns);
+        }
+
+        static double ScoreLibraryQuiltSpanCandidate(
+            string file,
+            int rowIndex,
+            int index,
+            int rowItemCount,
+            IReadOnlyDictionary<string, LibraryDetailMediaLayoutInfo> mediaLayoutByFile)
+        {
+            var aspect = ResolveLibraryDetailAspectRatio(file, mediaLayoutByFile);
+            var centerBias = 1d - Math.Abs((((rowItemCount - 1) / 2d) - index));
+            var rhythmBias = ((rowIndex + index) % 3 == 0) ? 0.15d : 0d;
+            return aspect + (centerBias * 0.18d) + rhythmBias;
         }
 
         /// <summary>Integer tile widths for one row that sum to <paramref name="innerWidth"/> (tile area only, not gaps).</summary>

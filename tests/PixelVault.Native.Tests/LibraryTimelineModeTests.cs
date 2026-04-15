@@ -106,12 +106,12 @@ public sealed class LibraryTimelineModeTests
     }
 
     [Fact]
-    public void EstimateLibraryPackedDayCardDesiredWidth_MakesTimelineCardsLargerThanDetailCards()
+    public void EstimateLibraryPackedDayCardDesiredWidth_UsesProvidedDetailTileSizeAsDensityAnchor()
     {
-        var normalWidth = MainWindow.EstimateLibraryPackedDayCardDesiredWidth(4, 1600, false);
-        var timelineWidth = MainWindow.EstimateLibraryPackedDayCardDesiredWidth(4, 1600, true);
+        var compactWidth = MainWindow.EstimateLibraryPackedDayCardDesiredWidth(4, 1600, false, 260);
+        var roomyWidth = MainWindow.EstimateLibraryPackedDayCardDesiredWidth(4, 1600, false, 420);
 
-        Assert.True(timelineWidth > normalWidth);
+        Assert.True(roomyWidth > compactWidth);
     }
 
     [Fact]

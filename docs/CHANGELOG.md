@@ -1,3 +1,10 @@
+## 0.076.000
+- **Release:** Version **0.076.000** — feature-sized refresh for the library capture mosaic with a new square-first quilt layout and continuous timeline flow.
+- **Library capture mosaic:** Screenshot and timeline feeds now use a square-first **quilt** layout instead of the older justified/day-card behavior, so the gallery reads as one continuous wall of captures with wider and hero-style tiles mixed into a solid grid.
+- **Capture density:** **`Compact`** and **`Roomy`** now drive the actual quilt cell size, so the control meaningfully changes how dense the capture wall feels instead of getting lost in the old aspect-ratio packing math.
+- **Timeline flow:** Timeline no longer burns standalone date header rows that isolate each day into its own block. The first capture of a day now carries the date chip, which keeps the feed visually continuous between days while still preserving chronology.
+- **Tile rendering:** Detail tiles now crop-fill their quilt cells, which allows some captures to become square or wider framed tiles and keeps the layout solid without letterboxing.
+
 ## 0.075.017
 - **Release:** Version **0.075.017** — background auto-intake startup pickup, library metadata editor responsiveness fixes, and photo-workspace exit flicker cleanup.
 - **Background auto-intake:** When watcher-based auto-intake starts or restarts, it now seeds its queue from existing **top-level media files** already sitting in the configured upload folder instead of waiting only for fresh filesystem events, so captures present before launch are picked up automatically.

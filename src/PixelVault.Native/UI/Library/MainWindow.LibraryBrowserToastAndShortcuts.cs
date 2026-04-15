@@ -215,7 +215,7 @@ namespace PixelVaultNative
             AddRow("Enter", "Apply library search (search box)");
             AddRow("Ctrl + click", "Add or remove a capture from the selection");
             AddRow("Shift + click", "Select a range of captures from the anchor");
-            AddRow("Ctrl + mouse wheel", "On the folder cover list: fine-tune cover tile size (saved). On capture/timeline grids: fine-tune capture size (saved).");
+            AddRow("Ctrl + mouse wheel", "On the folder cover list: fine-tune cover tile size (saved).");
             var close = Btn("Close", null, DesignTokens.ActionShortcutDismissFill, Brushes.White);
             close.Margin = new Thickness(0, 18, 0, 0);
             close.HorizontalAlignment = HorizontalAlignment.Right;

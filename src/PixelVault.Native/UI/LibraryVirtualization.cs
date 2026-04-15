@@ -510,10 +510,11 @@ namespace PixelVaultNative
             tile.Clip = new RectangleGeometry(new Rect(0, 0, w, h), r, r);
         }
 
-        Border CreateLibraryDetailTile(string file, int size, int decodePixelWidth, Func<bool> shouldLoad, Action<string> openSingleFileMetadataEditor, Action<string, ModifierKeys> updateDetailSelection, HashSet<string> selectedDetailFiles, Action refreshDetailSelectionUi, Action redrawDetailPane, Action<string> useFileAsFolderCover, int? masonryLayoutHeight = null, LibraryTimelineCaptureContext timelineContext = null, bool prioritizeImageDecode = true)
+        Border CreateLibraryDetailTile(string file, int size, int decodePixelWidth, Func<bool> shouldLoad, Action<string> openSingleFileMetadataEditor, Action<string, ModifierKeys> updateDetailSelection, HashSet<string> selectedDetailFiles, Action refreshDetailSelectionUi, Action redrawDetailPane, Action<string> useFileAsFolderCover, int? masonryLayoutHeight = null, LibraryTimelineCaptureContext timelineContext = null, bool prioritizeImageDecode = true, string timelineDayLabel = null)
         {
             var isVideoFile = IsVideo(file);
             var tileIsActive = true;
+            var hasTimelineDayLabel = !string.IsNullOrWhiteSpace(timelineDayLabel);
             Func<bool> shouldKeepLoading = delegate
             {
                 return tileIsActive && (shouldLoad == null || shouldLoad());
@@ -623,6 +624,7 @@ namespace PixelVaultNative
             }
             if (isVideoFile)
             {
+                var videoBadgeTopMargin = hasTimelineDayLabel ? 42d : 8d;
                 videoPreviewMedia = new MediaElement
                 {
                     LoadedBehavior = MediaState.Manual,
@@ -655,7 +657,7 @@ namespace PixelVaultNative
                     CornerRadius = new CornerRadius(11),
                     HorizontalAlignment = HorizontalAlignment.Left,
                     VerticalAlignment = VerticalAlignment.Top,
-                    Margin = new Thickness(8, 8, 0, 0),
+                    Margin = new Thickness(8, videoBadgeTopMargin, 0, 0),
                     Padding = new Thickness(10, 5, 10, 5),
                     Child = new TextBlock
                     {
@@ -699,6 +701,27 @@ namespace PixelVaultNative
                 }, shouldKeepLoading);
             }
             else applyVideoInfo(null);
+            if (hasTimelineDayLabel)
+            {
+                contentRoot.Children.Add(new Border
+                {
+                    HorizontalAlignment = HorizontalAlignment.Left,
+                    VerticalAlignment = VerticalAlignment.Top,
+                    Margin = new Thickness(8, 8, 0, 0),
+                    Background = Brush("#CC162028"),
+                    BorderBrush = Brush("#45606E"),
+                    BorderThickness = new Thickness(1),
+                    CornerRadius = new CornerRadius(9),
+                    Padding = new Thickness(9, 4, 9, 4),
+                    Child = new TextBlock
+                    {
+                        Text = timelineDayLabel,
+                        Foreground = Brush("#E6EEF3"),
+                        FontSize = 11,
+                        FontWeight = FontWeights.SemiBold
+                    }
+                });
+            }
             var timelineFooterHost = BuildLibraryTimelineCaptureFooter(size, file, timelineContext);
             if (timelineFooterHost != null) contentRoot.Children.Add(timelineFooterHost);
             if (!isVideoFile && detailStarButton != null) contentRoot.Children.Add(detailStarButton);
@@ -1022,12 +1045,12 @@ namespace PixelVaultNative
                 tile.BorderThickness = new Thickness(0);
                 contentRoot.HorizontalAlignment = HorizontalAlignment.Stretch;
                 contentRoot.VerticalAlignment = VerticalAlignment.Stretch;
-                image.Stretch = Stretch.Uniform;
+                image.Stretch = Stretch.UniformToFill;
                 image.HorizontalAlignment = HorizontalAlignment.Stretch;
                 image.VerticalAlignment = VerticalAlignment.Stretch;
                 if (videoPreviewMedia != null)
                 {
-                    videoPreviewMedia.Stretch = Stretch.Uniform;
+                    videoPreviewMedia.Stretch = Stretch.UniformToFill;
                     videoPreviewMedia.HorizontalAlignment = HorizontalAlignment.Stretch;
                     videoPreviewMedia.VerticalAlignment = VerticalAlignment.Stretch;
                 }

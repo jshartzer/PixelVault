@@ -132,24 +132,12 @@ namespace PixelVaultNative
             var maxColumnsCeiling = viewportWidth >= 1600d ? 8 : viewportWidth >= 1280d ? 7 : viewportWidth >= 1040d ? 6 : viewportWidth >= 820d ? 5 : viewportWidth >= 560d ? 4 : viewportWidth >= 380d ? 3 : 2;
             if (viewportWidth < 300d) maxColumnsCeiling = 1;
 
-            int TileWidthForColumns(int columns)
-            {
-                var safeColumns = Math.Max(1, columns);
-                return Math.Max(1, (int)Math.Floor((viewportWidth - ((safeColumns - 1) * gapPx)) / (double)safeColumns));
-            }
-
-            var fixedPhotoCols = SettingsService.NormalizeLibraryPhotoGridColumnCount(fixedPhotoColumns);
-            if (applySavedPhotoTileSizePreference && fixedPhotoCols > 0)
-            {
-                return (fixedPhotoCols, TileWidthForColumns(fixedPhotoCols));
-            }
-
             var targetTileWidth = applySavedPhotoTileSizePreference
                 ? SettingsService.NormalizeLibraryPhotoTileSize(preferredPhotoTileSize)
                 : 320;
-            var autoColumns = (int)Math.Floor((viewportWidth + gapPx) / (targetTileWidth + gapPx));
-            autoColumns = Math.Max(1, Math.Min(maxColumnsCeiling, autoColumns));
-            return (autoColumns, TileWidthForColumns(autoColumns));
+            var estimatedColumns = (int)Math.Round((viewportWidth + gapPx) / (targetTileWidth + gapPx), MidpointRounding.AwayFromZero);
+            estimatedColumns = Math.Max(1, Math.Min(maxColumnsCeiling, estimatedColumns));
+            return (estimatedColumns, targetTileWidth);
         }
     }
 }

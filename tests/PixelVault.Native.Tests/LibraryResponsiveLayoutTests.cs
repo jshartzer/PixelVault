@@ -19,26 +19,44 @@ public sealed class LibraryResponsiveLayoutTests
             preferredPhotoTileSize: 420,
             fixedPhotoColumns: 0);
 
-        Assert.True(compact.TileSize < roomy.TileSize);
+        Assert.Equal(260, compact.TileSize);
+        Assert.Equal(420, roomy.TileSize);
         Assert.True(compact.Columns > roomy.Columns);
     }
 
     [Fact]
-    public void CalculateResponsiveLibraryDetailLayoutForWidth_FixedColumns_StayFixedAcrossViewportSizes()
+    public void CalculateResponsiveLibraryDetailLayoutForWidth_IgnoresLegacyFixedColumnSetting()
     {
-        var wide = MainWindow.CalculateResponsiveLibraryDetailLayoutForWidth(
-            viewportWidth: 2200,
+        var auto = MainWindow.CalculateResponsiveLibraryDetailLayoutForWidth(
+            viewportWidth: 1600,
+            applySavedPhotoTileSizePreference: true,
+            preferredPhotoTileSize: 260,
+            fixedPhotoColumns: 0);
+        var legacyPinned = MainWindow.CalculateResponsiveLibraryDetailLayoutForWidth(
+            viewportWidth: 1600,
             applySavedPhotoTileSizePreference: true,
             preferredPhotoTileSize: 260,
             fixedPhotoColumns: 8);
-        var narrow = MainWindow.CalculateResponsiveLibraryDetailLayoutForWidth(
-            viewportWidth: 1100,
-            applySavedPhotoTileSizePreference: true,
-            preferredPhotoTileSize: 420,
-            fixedPhotoColumns: 8);
 
-        Assert.Equal(8, wide.Columns);
-        Assert.Equal(8, narrow.Columns);
-        Assert.True(narrow.TileSize < wide.TileSize);
+        Assert.Equal(auto.Columns, legacyPinned.Columns);
+        Assert.Equal(auto.TileSize, legacyPinned.TileSize);
+    }
+
+    [Fact]
+    public void CalculateResponsiveLibraryDetailLayoutForWidth_ReactsToViewportWidth()
+    {
+        var wide = MainWindow.CalculateResponsiveLibraryDetailLayoutForWidth(
+            viewportWidth: 1800,
+            applySavedPhotoTileSizePreference: true,
+            preferredPhotoTileSize: 260,
+            fixedPhotoColumns: 0);
+        var narrow = MainWindow.CalculateResponsiveLibraryDetailLayoutForWidth(
+            viewportWidth: 960,
+            applySavedPhotoTileSizePreference: true,
+            preferredPhotoTileSize: 260,
+            fixedPhotoColumns: 0);
+
+        Assert.Equal(wide.TileSize, narrow.TileSize);
+        Assert.True(narrow.Columns < wide.Columns);
     }
 }

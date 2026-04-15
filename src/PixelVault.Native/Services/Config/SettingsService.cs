@@ -17,10 +17,10 @@ namespace PixelVaultNative
                 .Distinct(StringComparer.OrdinalIgnoreCase));
         }
 
-        /// <summary>Largest photo-size preset in the library menu; Ctrl+scroll can go up to <see cref="LibraryPhotoTileScrollHardMax"/> (250% of this).</summary>
-        public const int LibraryPhotoTileMenuLargestPreset = 560;
+        /// <summary>Largest capture-density preset in the library menu.</summary>
+        public const int LibraryPhotoTileMenuLargestPreset = 420;
 
-        /// <summary>Max capture tile width when using Ctrl+scroll — 150% above the largest menu preset (total 250% of <see cref="LibraryPhotoTileMenuLargestPreset"/>).</summary>
+        /// <summary>Upper clamp for saved capture density values, including older settings created before the density-only UI.</summary>
         public static int LibraryPhotoTileScrollHardMax => (int)Math.Round(LibraryPhotoTileMenuLargestPreset * 2.5d);
 
         public static int NormalizeLibraryFolderTileSize(int value)
@@ -30,7 +30,7 @@ namespace PixelVaultNative
             return value;
         }
 
-        /// <summary>Clamps library capture tile width; upper bound allows zoom past menu presets via Ctrl+scroll.</summary>
+        /// <summary>Clamps library capture density width; upper bound preserves older saved values beyond the current menu presets.</summary>
         public static int NormalizeLibraryPhotoTileSize(int value)
         {
             if (value < 160) return 160;
@@ -47,7 +47,7 @@ namespace PixelVaultNative
             return value;
         }
 
-        /// <summary>0 = auto; 1–8 = fixed columns for non-timeline capture grids.</summary>
+        /// <summary>Legacy capture-grid column setting. Newer capture layout uses density-first auto packing.</summary>
         public static int NormalizeLibraryPhotoGridColumnCount(int value)
         {
             if (value < 0) return 0;

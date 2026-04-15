@@ -363,15 +363,21 @@ namespace PixelVaultNative
 
         internal static double EstimateLibraryPackedDayCardDesiredWidth(int captureCount, double availableWidth, bool timelineView)
         {
-            const double scale = 1.75d;
+            return EstimateLibraryPackedDayCardDesiredWidth(captureCount, availableWidth, timelineView, 0);
+        }
+
+        internal static double EstimateLibraryPackedDayCardDesiredWidth(int captureCount, double availableWidth, bool timelineView, int detailTileSize)
+        {
             var safeCaptureCount = Math.Max(1, captureCount);
             var width = availableWidth <= 0d ? 1280d : availableWidth;
+            var targetTileWidth = detailTileSize > 0
+                ? detailTileSize
+                : (timelineView
+                    ? CalculateLibraryTimelinePackedTileSize(360, width)
+                    : (width >= 1450d ? 420 : (width >= 1080d ? 340 : 280)));
             var minCardWidth = timelineView
-                ? (width >= 1850d ? 760d * scale : (width >= 1450d ? 660d * scale : 560d * scale))
-                : (width >= 1450d ? 540d * scale : (width >= 1080d ? 460d * scale : 390d * scale));
-            var targetTileWidth = timelineView
-                ? (width >= 1850d ? 520d * scale : (width >= 1450d ? 440d * scale : 360d * scale))
-                : (width >= 1450d ? 400d * scale : (width >= 1080d ? 330d * scale : 280d * scale));
+                ? Math.Max(320d, targetTileWidth * 1.2d)
+                : Math.Max(280d, targetTileWidth * 1.45d);
             var preferredColumns = 1;
             if (safeCaptureCount >= (timelineView ? 4 : 3) && width >= (timelineView ? 1250d : 920d))
                 preferredColumns = 2;
@@ -380,7 +386,7 @@ namespace PixelVaultNative
             const double innerGap = 8d;
             const double horizontalPadding = 24d;
             var desiredWidth = horizontalPadding + (preferredColumns * targetTileWidth) + ((preferredColumns - 1) * innerGap);
-            if (safeCaptureCount >= 8) desiredWidth += targetTileWidth * (timelineView ? 0.22d : 0.16d);
+            if (safeCaptureCount >= 8) desiredWidth += targetTileWidth * (timelineView ? 0.18d : 0.12d);
             return Math.Max(minCardWidth, Math.Min(width, desiredWidth));
         }
 

@@ -134,27 +134,7 @@ namespace PixelVaultNative
                     if (snapshot == null || snapshot.Groups == null || snapshot.Groups.Count == 0) return null;
                     var timelineCtx = snapshot.TimelineContextByFile ?? new Dictionary<string, LibraryTimelineCaptureContext>(StringComparer.OrdinalIgnoreCase);
                     var mediaMap = snapshot.MediaLayoutByFile ?? new Dictionary<string, LibraryDetailMediaLayoutInfo>(StringComparer.OrdinalIgnoreCase);
-                    var fixedColumnMode = SettingsService.NormalizeLibraryPhotoGridColumnCount(libraryPhotoGridColumnCount) > 0;
-                    if (timelineView || fixedColumnMode)
-                    {
-                        return BuildLibraryExactColumnRowDefinitions(
-                            ws,
-                            renderFolder,
-                            snapshot.Groups,
-                            timelineCtx,
-                            mediaMap,
-                            panes == null ? null : panes.ThumbScroll,
-                            detailViewportWidth,
-                            targetDetailColumns,
-                            detailDpiScaleForBackground,
-                            timelineView,
-                            openSingleFileMetadataEditor,
-                            updateDetailSelection,
-                            refreshDetailSelectionUi,
-                            redrawSelectedFolderDetail,
-                            renderFolderTiles);
-                    }
-                    return BuildLibraryPackedDayCardRowDefinitions(
+                    return BuildLibraryContinuousMosaicRowDefinitions(
                         ws,
                         renderFolder,
                         snapshot.Groups,
@@ -163,7 +143,6 @@ namespace PixelVaultNative
                         panes == null ? null : panes.ThumbScroll,
                         detailViewportWidth,
                         effectiveTileSize,
-                        targetDetailColumns,
                         detailDpiScaleForBackground,
                         timelineView,
                         openSingleFileMetadataEditor,
@@ -644,7 +623,7 @@ namespace PixelVaultNative
             });
         }
 
-        List<VirtualizedRowDefinition> BuildLibraryExactColumnRowDefinitions(
+        List<VirtualizedRowDefinition> BuildLibraryContinuousMosaicRowDefinitions(
             LibraryBrowserWorkingSet ws,
             LibraryBrowserFolderView renderFolder,
             IList<LibraryDetailRenderGroup> groups,
@@ -652,7 +631,7 @@ namespace PixelVaultNative
             IReadOnlyDictionary<string, LibraryDetailMediaLayoutInfo> mediaLayoutByFile,
             ScrollViewer detailScroll,
             double viewportWidth,
-            int detailColumns,
+            int detailTileSize,
             double dpiScale,
             bool timelineView,
             Action<string> openSingleFileMetadataEditor,
@@ -666,125 +645,104 @@ namespace PixelVaultNative
                 .ToList();
             if (safeGroups.Count == 0) return new List<VirtualizedRowDefinition>();
 
+            const int masonryTileGap = 4;
             const int rowGap = 8;
-            var groupGap = timelineView ? 18d : 14d;
-            var headerHeight = timelineView ? 34d : 24d;
             var availableWidth = viewportWidth <= 0d ? 1100d : Math.Max(320d, viewportWidth - 6d);
-            var targetColumns = Math.Max(1, detailColumns);
             var rowDefinitions = new List<VirtualizedRowDefinition>();
             var nextRowDocumentTop = 0d;
-
+            var orderedFiles = new List<string>();
+            var timelineDayLabels = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             foreach (var group in safeGroups)
             {
                 var groupFiles = (group.Files ?? new List<string>())
                     .Where(file => !string.IsNullOrWhiteSpace(file))
                     .ToList();
                 if (groupFiles.Count == 0) continue;
+                if (timelineView)
+                {
+                    timelineDayLabels[groupFiles[0]] = BuildLibraryTimelineDayCardTitle(group.CaptureDate, DateTime.Today);
+                }
+                orderedFiles.AddRange(groupFiles);
+            }
 
-                var headerLabel = timelineView
-                    ? BuildLibraryTimelineDayCardTitle(group.CaptureDate, DateTime.Today)
-                    : (group.CaptureDate <= DateTime.MinValue
-                        ? string.Empty
-                        : (group.CaptureDate.Year == DateTime.Today.Year
-                            ? group.CaptureDate.ToString("ddd, MMM d")
-                            : group.CaptureDate.ToString("ddd, MMM d, yyyy")));
-                nextRowDocumentTop += headerHeight;
+            if (orderedFiles.Count == 0) return rowDefinitions;
+
+            var requestedTileSize = Math.Max(160, detailTileSize);
+            var minTileWidth = Math.Max(120, (int)Math.Round(requestedTileSize * 0.72d));
+            var maxTileWidth = Math.Max(minTileWidth, (int)Math.Round(requestedTileSize * 1.35d));
+            var chunks = BuildLibraryDetailMasonryChunks(
+                orderedFiles,
+                availableWidth,
+                masonryTileGap,
+                requestedTileSize,
+                minTileWidth,
+                maxTileWidth,
+                timelineView,
+                mediaLayoutByFile);
+
+            for (var chunkIndex = 0; chunkIndex < chunks.Count; chunkIndex++)
+            {
+                var chunk = chunks[chunkIndex];
+                if (chunk == null) continue;
+                var bottomMargin = chunkIndex == chunks.Count - 1 ? 0d : rowGap;
+                var capturedChunk = chunk;
+                var capturedDocTop = nextRowDocumentTop;
+                var rowVirtualHeight = (int)Math.Ceiling(capturedChunk.CanvasHeight + bottomMargin);
+                nextRowDocumentTop += rowVirtualHeight;
                 rowDefinitions.Add(new VirtualizedRowDefinition
                 {
-                    Height = (int)Math.Ceiling(headerHeight),
+                    Height = rowVirtualHeight,
                     Build = delegate
                     {
-                        return new TextBlock
+                        var prioritizeDecodes = LibraryDetailTileRowIntersectsViewport(detailScroll, capturedDocTop, rowVirtualHeight);
+                        var canvas = new Canvas
                         {
-                            Text = headerLabel,
-                            Foreground = Brush(timelineView ? DesignTokens.TextLabelMuted : "#8FA1AD"),
-                            FontSize = timelineView ? 15.5 : 11.5,
-                            FontWeight = timelineView ? FontWeights.SemiBold : FontWeights.Medium,
-                            Margin = new Thickness(2, 0, 0, timelineView ? 8 : 6)
+                            Width = capturedChunk.CanvasWidth,
+                            Height = capturedChunk.CanvasHeight,
+                            Margin = new Thickness(0, 0, 0, bottomMargin)
                         };
+                        foreach (var placement in capturedChunk.Placements)
+                        {
+                            var decodeWidth = CalculateLibraryDetailTileDecodeWidth(placement.Width, dpiScale);
+                            LibraryTimelineCaptureContext timelineContext;
+                            if (timelineContexts == null || !timelineContexts.TryGetValue(placement.File, out timelineContext)) timelineContext = null;
+                            Action<string> useFileAsFolderCover = null;
+                            if (!timelineView)
+                            {
+                                useFileAsFolderCover = delegate(string imagePath)
+                                {
+                                    var folder = activeSelectedLibraryFolder;
+                                    if (folder == null || string.IsNullOrWhiteSpace(imagePath) || !File.Exists(imagePath) || !IsImage(imagePath)) return;
+                                    SaveCustomCover(folder, imagePath);
+                                    renderFolderTiles?.Invoke();
+                                    redrawSelectedFolderDetail?.Invoke();
+                                    ShowLibraryBrowserToast(ws, "Cover saved");
+                                };
+                            }
+                            string timelineDayLabel = null;
+                            if (timelineView) timelineDayLabels.TryGetValue(placement.File, out timelineDayLabel);
+                            var tile = CreateLibraryDetailTile(
+                                placement.File,
+                                placement.Width,
+                                decodeWidth,
+                                delegate { return ws != null && SameLibraryBrowserSelection(ws.Current, renderFolder); },
+                                openSingleFileMetadataEditor,
+                                updateDetailSelection,
+                                ws == null ? new HashSet<string>(StringComparer.OrdinalIgnoreCase) : ws.SelectedDetailFiles,
+                                refreshDetailSelectionUi,
+                                redrawSelectedFolderDetail,
+                                useFileAsFolderCover,
+                                placement.Height,
+                                timelineView ? timelineContext : null,
+                                prioritizeDecodes,
+                                timelineDayLabel);
+                            Canvas.SetLeft(tile, placement.X);
+                            Canvas.SetTop(tile, placement.Y);
+                            canvas.Children.Add(tile);
+                        }
+                        return canvas;
                     }
                 });
-
-                for (var fileIndex = 0; fileIndex < groupFiles.Count; fileIndex += targetColumns)
-                {
-                    var rowFiles = groupFiles.Skip(fileIndex).Take(targetColumns).ToList();
-                    if (rowFiles.Count == 0) continue;
-                    var rowTileWidth = Math.Max(1, (int)Math.Floor((availableWidth - ((targetColumns - 1) * rowGap)) / (double)targetColumns));
-                    var placements = new List<LibraryDetailMasonryPlacement>();
-                    var rowHeight = 1;
-                    for (var tileIndex = 0; tileIndex < rowFiles.Count; tileIndex++)
-                    {
-                        var file = rowFiles[tileIndex];
-                        var aspectRatio = ResolveLibraryDetailAspectRatio(file, mediaLayoutByFile);
-                        var tileHeight = Math.Max(1, (int)Math.Ceiling(rowTileWidth / Math.Max(0.25d, aspectRatio)));
-                        placements.Add(new LibraryDetailMasonryPlacement
-                        {
-                            File = file,
-                            X = tileIndex * (rowTileWidth + rowGap),
-                            Y = 0,
-                            Width = rowTileWidth,
-                            Height = tileHeight
-                        });
-                        rowHeight = Math.Max(rowHeight, tileHeight);
-                    }
-                    var lastChunkInGroup = fileIndex + rowFiles.Count >= groupFiles.Count;
-                    var bottomMargin = lastChunkInGroup ? groupGap : rowGap;
-                    var capturedPlacements = placements;
-                    var capturedDocTop = nextRowDocumentTop;
-                    var rowVirtualHeight = (int)Math.Ceiling(rowHeight + bottomMargin);
-                    nextRowDocumentTop += rowVirtualHeight;
-                    rowDefinitions.Add(new VirtualizedRowDefinition
-                    {
-                        Height = rowVirtualHeight,
-                        Build = delegate
-                        {
-                            var prioritizeDecodes = LibraryDetailTileRowIntersectsViewport(detailScroll, capturedDocTop, rowVirtualHeight);
-                            var canvas = new Canvas
-                            {
-                                Width = availableWidth,
-                                Height = rowHeight,
-                                Margin = new Thickness(0, 0, 0, bottomMargin)
-                            };
-                            foreach (var placement in capturedPlacements)
-                            {
-                                var decodeWidth = CalculateLibraryDetailTileDecodeWidth(placement.Width, dpiScale);
-                                LibraryTimelineCaptureContext timelineContext;
-                                if (timelineContexts == null || !timelineContexts.TryGetValue(placement.File, out timelineContext)) timelineContext = null;
-                                Action<string> useFileAsFolderCover = null;
-                                if (!timelineView)
-                                {
-                                    useFileAsFolderCover = delegate(string imagePath)
-                                    {
-                                        var folder = activeSelectedLibraryFolder;
-                                        if (folder == null || string.IsNullOrWhiteSpace(imagePath) || !File.Exists(imagePath) || !IsImage(imagePath)) return;
-                                        SaveCustomCover(folder, imagePath);
-                                        renderFolderTiles?.Invoke();
-                                        redrawSelectedFolderDetail?.Invoke();
-                                        ShowLibraryBrowserToast(ws, "Cover saved");
-                                    };
-                                }
-                                var tile = CreateLibraryDetailTile(
-                                    placement.File,
-                                    placement.Width,
-                                    decodeWidth,
-                                    delegate { return ws != null && SameLibraryBrowserSelection(ws.Current, renderFolder); },
-                                    openSingleFileMetadataEditor,
-                                    updateDetailSelection,
-                                    ws == null ? new HashSet<string>(StringComparer.OrdinalIgnoreCase) : ws.SelectedDetailFiles,
-                                    refreshDetailSelectionUi,
-                                    redrawSelectedFolderDetail,
-                                    useFileAsFolderCover,
-                                    placement.Height,
-                                    timelineView ? timelineContext : null,
-                                    prioritizeDecodes);
-                                Canvas.SetLeft(tile, placement.X);
-                                Canvas.SetTop(tile, placement.Y);
-                                canvas.Children.Add(tile);
-                            }
-                            return canvas;
-                        }
-                    });
-                }
             }
 
             return rowDefinitions;
@@ -980,42 +938,17 @@ namespace PixelVaultNative
 
             var availableWidth = viewportWidth <= 0d ? 1100d : Math.Max(320d, viewportWidth - 6d);
             var desiredWidths = safeGroups
-                .Select(group => EstimateLibraryPackedDayCardDesiredWidth((group.Files ?? new List<string>()).Count, availableWidth, timelineView))
+                .Select(group => EstimateLibraryPackedDayCardDesiredWidth((group.Files ?? new List<string>()).Count, availableWidth, timelineView, detailTileSize))
                 .ToList();
-            List<List<int>> packedRows;
-            if (timelineView)
-            {
-                packedRows = new List<List<int>>();
-                var columnsPerRow = Math.Max(1, detailColumns);
-                for (var groupIndex = 0; groupIndex < safeGroups.Count; groupIndex += columnsPerRow)
-                {
-                    var row = new List<int>();
-                    for (var offset = 0; offset < columnsPerRow && groupIndex + offset < safeGroups.Count; offset++)
-                        row.Add(groupIndex + offset);
-                    if (row.Count > 0) packedRows.Add(row);
-                }
-            }
-            else
-            {
-                packedRows = BuildLibraryTimelinePackedRows(desiredWidths, availableWidth, cardGap);
-            }
+            var packedRows = BuildLibraryTimelinePackedRows(desiredWidths, availableWidth, cardGap);
             var rowDefinitions = new List<VirtualizedRowDefinition>();
             var nextRowDocumentTop = 0d;
             foreach (var row in packedRows)
             {
                 var rowIndexes = row == null ? new List<int>() : row.ToList();
                 if (rowIndexes.Count == 0) continue;
-                List<double> rowActualWidths;
-                if (timelineView)
-                {
-                    var widthPerCard = Math.Max(220d, (availableWidth - ((rowIndexes.Count - 1) * cardGap)) / rowIndexes.Count);
-                    rowActualWidths = rowIndexes.Select(_ => widthPerCard).ToList();
-                }
-                else
-                {
-                    var rowDesiredWidths = rowIndexes.Select(index => desiredWidths[index]).ToList();
-                    rowActualWidths = ExpandLibraryPackedRowWidths(rowDesiredWidths, availableWidth, cardGap);
-                }
+                var rowDesiredWidths = rowIndexes.Select(index => desiredWidths[index]).ToList();
+                var rowActualWidths = ExpandLibraryPackedRowWidths(rowDesiredWidths, availableWidth, cardGap);
                 var rowCards = new List<LibraryPackedDayCardLayout>();
                 for (var i = 0; i < rowIndexes.Count; i++)
                 {
@@ -1029,9 +962,9 @@ namespace PixelVaultNative
                 }
                 var estimatedHeight = rowCards
                     .Select(card => card.Height)
-                    .DefaultIfEmpty(ws == null ? 420d : ws.EstimatedDetailRowHeight)
+                    .DefaultIfEmpty(420d)
                     .Max();
-                var rowVirtualHeight = Math.Max(ws == null ? 420 : ws.EstimatedDetailRowHeight, (int)Math.Ceiling(estimatedHeight + cardGap));
+                var rowVirtualHeight = (int)Math.Ceiling(estimatedHeight + cardGap);
                 var capturedDocTop = nextRowDocumentTop;
                 nextRowDocumentTop += rowVirtualHeight;
                 rowDefinitions.Add(new VirtualizedRowDefinition
@@ -1082,7 +1015,6 @@ namespace PixelVaultNative
             if (groupFiles.Count == 0) return null;
 
             const int masonryTileGap = 4;
-            const double packedTileSizeScale = 1.25d;
             var innerPackWidth = Math.Max(240d, cardWidth);
             int targetTileWidth;
             int minTileWidth;
@@ -1091,20 +1023,19 @@ namespace PixelVaultNative
             {
                 var packedTileSize = CalculateLibraryTimelinePackedTileSize(detailTileSize, innerPackWidth);
                 targetTileWidth = Math.Max(180, packedTileSize);
-                minTileWidth = Math.Max((int)Math.Round(targetTileWidth * 0.72d), Math.Min(targetTileWidth, (int)Math.Floor(innerPackWidth * 0.34d)));
+                minTileWidth = Math.Max(140, Math.Min(targetTileWidth, (int)Math.Round(targetTileWidth * 0.58d)));
                 maxTileWidth = groupFiles.Count == 1
                     ? (int)Math.Floor(innerPackWidth)
-                    : Math.Min((int)Math.Floor(innerPackWidth), targetTileWidth + (int)Math.Round(96d * packedTileSizeScale));
+                    : Math.Min((int)Math.Floor(innerPackWidth), (int)Math.Round(targetTileWidth * 1.55d));
             }
             else
             {
-                // Packed day cards previously ignored detailTileSize; wire user density (PV-PLN-LIBWS-001 Step 6).
                 var userBase = Math.Max(160, detailTileSize);
-                targetTileWidth = (int)Math.Round(Math.Min(userBase * packedTileSizeScale, Math.Max(220 * packedTileSizeScale, innerPackWidth * 0.72)));
-                minTileWidth = Math.Max((int)Math.Round(200 * packedTileSizeScale), Math.Min(targetTileWidth, (int)Math.Floor(innerPackWidth * 0.38)));
+                targetTileWidth = Math.Max(180, (int)Math.Round(Math.Min(userBase * 1.05d, Math.Max(220d, innerPackWidth * 0.72d))));
+                minTileWidth = Math.Max(120, Math.Min(targetTileWidth, (int)Math.Round(targetTileWidth * 0.58d)));
                 maxTileWidth = groupFiles.Count == 1
                     ? (int)Math.Floor(innerPackWidth)
-                    : Math.Min((int)Math.Floor(innerPackWidth), targetTileWidth + (int)Math.Round(120 * packedTileSizeScale));
+                    : Math.Min((int)Math.Floor(innerPackWidth), (int)Math.Round(targetTileWidth * 1.55d));
             }
             maxTileWidth = Math.Max(minTileWidth, maxTileWidth);
             var chunks = BuildLibraryDetailMasonryChunks(
