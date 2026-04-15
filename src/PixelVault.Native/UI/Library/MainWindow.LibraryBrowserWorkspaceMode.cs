@@ -1,4 +1,5 @@
 using System;
+using System.Windows.Threading;
 
 namespace PixelVaultNative
 {
@@ -25,7 +26,7 @@ namespace PixelVaultNative
             ws.WorkspaceMode = LibraryWorkspaceMode.Folder;
             ApplyLibraryBrowserLayoutMode(ws.Panes, ws.WorkspaceMode);
             ws.RefreshSortFilterChrome?.Invoke();
-            renderTiles?.Invoke();
+            ScheduleLibraryBrowserFolderListRerenderAfterLayout(ws, renderTiles);
         }
 
         internal void LibraryBrowserEnterPhotoWorkspaceFromSelection(LibraryBrowserWorkingSet ws, Action<LibraryBrowserFolderView> showFolder)
@@ -49,6 +50,23 @@ namespace PixelVaultNative
             if (ws.WorkspaceMode == LibraryWorkspaceMode.Photo)
                 return;
             ws.WorkspaceMode = LibraryWorkspaceMode.Folder;
+        }
+
+        void ScheduleLibraryBrowserFolderListRerenderAfterLayout(LibraryBrowserWorkingSet ws, Action renderTiles)
+        {
+            if (renderTiles == null) return;
+            var dispatcher = ws?.Panes?.TileScroll?.Dispatcher;
+            if (dispatcher == null)
+            {
+                renderTiles();
+                return;
+            }
+
+            _ = dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(delegate
+            {
+                if (ws == null || ws.WorkspaceMode != LibraryWorkspaceMode.Folder) return;
+                renderTiles();
+            }));
         }
     }
 }

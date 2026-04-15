@@ -1,3 +1,9 @@
+## 0.075.017
+- **Release:** Version **0.075.017** — background auto-intake startup pickup, library metadata editor responsiveness fixes, and photo-workspace exit flicker cleanup.
+- **Background auto-intake:** When watcher-based auto-intake starts or restarts, it now seeds its queue from existing **top-level media files** already sitting in the configured upload folder instead of waiting only for fresh filesystem events, so captures present before launch are picked up automatically.
+- **Library metadata editor:** Opening metadata for a single capture now loads embedded metadata only for the **requested files** instead of scanning the entire folder first, which removes a major UI stall on large folders. The dialog also resolves its owner from the best visible app window so it does not disappear behind a tray-hidden shell.
+- **Library photo workspace:** Leaving Photo view now defers the folder-list rerender until the post-layout pass, preventing the brief skinny multi-column cover rail flash before the normal folder screen returns.
+
 ## 0.075.016
 - **Release:** Version **0.075.016** — system tray controls for background auto-intake, background-import activity window polish, and undo/import loop protection.
 - **System tray / background running:** Background auto-intake can now keep PixelVault running from the **system tray** with separate **Settings** toggles for **minimize to tray** and **ask on close**. Closing can offer **Send to Tray / Exit / Cancel**, and the tray icon can show a compact recent-import status flyout with quick actions.

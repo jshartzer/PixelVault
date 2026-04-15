@@ -57,11 +57,11 @@ Then use these based on the task:
 
 Current live build:
 
-- `0.075.016`
+- `0.075.017`
 
 Current executable:
 
-- `C:\Codex\dist\PixelVault-0.075.016\PixelVault.exe`
+- `C:\Codex\dist\PixelVault-0.075.017\PixelVault.exe`
 
 Current build pointer:
 
@@ -95,12 +95,13 @@ Practical current focus:
 
 ## Current Stop Point
 
-The app is currently published at `0.075.016`.
+The app is currently published at `0.075.017`.
 
 **Notion:** [MainWindow extraction roadmap](https://www.notion.so/33573adc59b681d88b7dcd88cad53cb6) updated for Phase **E** capstone (**`ILibraryBrowserShell`**). If release rows in Notion lag `docs/CURRENT_BUILD.txt`, re-sync per `docs/DOC_SYNC_POLICY.md`.
 
 Recent extraction progress (repo):
 
+- **Auto-intake + metadata editor + photo-exit polish (0.075.017):** Background auto-intake now seeds existing top-level files already present in watched upload roots on startup/restart, so pre-existing captures do not sit idle waiting for a new file event. The library metadata editor now batch-loads embedded metadata only for the selected files and resolves the best visible owner window, which removes the worst single-photo open stalls and tray-hidden modal issues. Exiting **Photo** workspace now waits for the folder pane layout pass before re-rendering covers, preventing the brief skinny multi-column cover flash during the return to folder view. See **`docs/CHANGELOG.md`**.
 - **Tray controls + background imports polish (0.075.016):** Background auto-intake can keep PixelVault running from the **system tray** with separate **Settings** toggles for **minimize to tray** and **ask on close**, a close prompt that can send the app to tray, and a tray status flyout for recent imports. The **Background imports** window is now a single **newest-first** list with more readable headers and reliable **Clear selection**, and undo restores are temporarily suppressed from watcher re-import so files do not loop straight back through auto-intake. See **`docs/CHANGELOG.md`**.
 - **Post–app-review rename hardening (0.075.011):** **`PV-PLN-RVW-001`** Phase 3 — Steam / Non-Steam **numeric id** prefix detection for intake rename uses an explicit **`_`** / **`-`** boundary (or exact id stem) so odd filenames are not misclassified; plan closed under **`docs/completed-projects/`**. See **`docs/CHANGELOG.md`**.
 - **Library storage + auto-intake + metadata fixes (0.075.010):** Single-folder **LIBST** behavior (re-home, nested scans, photo index alignment) ships with **background auto-intake** (`PV-PLN-AINT-001` slice 9), **metadata index** re-merge when Steam/non-Steam shortcut labels disagree with filename + game index, **filename** tweaks (emulation shortcut convention, Dolphin placeholder suppression, subtitle ` - ` → `: `), **`.jxr`** as library media, and import **Emulation** tags for shortcut captures. See **`docs/CHANGELOG.md`** for the full list.
