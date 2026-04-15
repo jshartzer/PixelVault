@@ -114,93 +114,42 @@ namespace PixelVaultNative
         }
         (int Columns, int TileSize) CalculateResponsiveLibraryDetailLayout(ScrollViewer scrollViewer, bool applySavedPhotoTileSizePreference)
         {
+            return CalculateResponsiveLibraryDetailLayoutForWidth(
+                ResolveScrollViewerLayoutWidth(scrollViewer),
+                applySavedPhotoTileSizePreference,
+                libraryPhotoTileSize,
+                libraryPhotoGridColumnCount);
+        }
+
+        internal static (int Columns, int TileSize) CalculateResponsiveLibraryDetailLayoutForWidth(
+            double viewportWidth,
+            bool applySavedPhotoTileSizePreference,
+            int preferredPhotoTileSize,
+            int fixedPhotoColumns)
+        {
             const int gapPx = 8;
-            const double moreColumnsSlackBudgetPx = 16d;
-            const double libraryDetailPhotoTileSizeScale = 1.75d;
-            var viewportWidth = ResolveScrollViewerLayoutWidth(scrollViewer);
             viewportWidth = Math.Max(160, viewportWidth - 24);
-            var maxColumnsCeiling = viewportWidth >= 1280d ? 8 : viewportWidth >= 1040d ? 6 : viewportWidth >= 820d ? 5 : viewportWidth >= 560d ? 4 : viewportWidth >= 380d ? 3 : 2;
+            var maxColumnsCeiling = viewportWidth >= 1600d ? 8 : viewportWidth >= 1280d ? 7 : viewportWidth >= 1040d ? 6 : viewportWidth >= 820d ? 5 : viewportWidth >= 560d ? 4 : viewportWidth >= 380d ? 3 : 2;
             if (viewportWidth < 300d) maxColumnsCeiling = 1;
-            var minTile = (int)Math.Round((viewportWidth < 420d ? 156 : (viewportWidth < 900d ? 176 : 208)) * libraryDetailPhotoTileSizeScale);
-            var layoutMaxTile = applySavedPhotoTileSizePreference
-                ? Math.Max((int)Math.Round(900d * libraryDetailPhotoTileSizeScale), SettingsService.LibraryPhotoTileScrollHardMax + 200)
-                : (int)Math.Round(900d * libraryDetailPhotoTileSizeScale);
 
-            int ClampRoundedTile(int rawEqualSplit)
+            int TileWidthForColumns(int columns)
             {
-                var clamped = Math.Max(minTile, Math.Min(layoutMaxTile, rawEqualSplit));
-                var roundedDown = (int)(Math.Floor(clamped / 12d) * 12);
-                if (roundedDown < minTile) roundedDown = clamped;
-                return Math.Max(minTile, Math.Min(rawEqualSplit, roundedDown));
+                var safeColumns = Math.Max(1, columns);
+                return Math.Max(1, (int)Math.Floor((viewportWidth - ((safeColumns - 1) * gapPx)) / (double)safeColumns));
             }
 
-            var bestColumns = 1;
-            var bestTileWidth = ClampRoundedTile((int)Math.Floor(viewportWidth));
-            var bestSlack = Math.Max(0d, viewportWidth - bestTileWidth);
-
-            if (applySavedPhotoTileSizePreference)
+            var fixedPhotoCols = SettingsService.NormalizeLibraryPhotoGridColumnCount(fixedPhotoColumns);
+            if (applySavedPhotoTileSizePreference && fixedPhotoCols > 0)
             {
-                var fixedPhotoCols = NormalizeLibraryPhotoGridColumnCount(libraryPhotoGridColumnCount);
-                if (fixedPhotoCols > 0)
-                {
-                    var c = Math.Min(fixedPhotoCols, maxColumnsCeiling);
-                    while (c > 1)
-                    {
-                        var rawFillProbe = (int)Math.Floor((viewportWidth - ((c - 1) * gapPx)) / (double)c);
-                        if (rawFillProbe >= minTile) break;
-                        c--;
-                    }
-                    c = Math.Max(1, c);
-                    bestColumns = c;
-                    var rawFillFixed = (int)Math.Floor((viewportWidth - ((bestColumns - 1) * gapPx)) / (double)bestColumns);
-                    var cappedFixed = Math.Max(minTile, Math.Min(layoutMaxTile, rawFillFixed));
-                    bestTileWidth = ClampRoundedTile(cappedFixed);
-                }
-                else
-                {
-                    bestTileWidth = ClampRoundedTile(minTile);
-                    for (var columns = 1; columns <= maxColumnsCeiling; columns++)
-                    {
-                        var rawFill = (int)Math.Floor((viewportWidth - ((columns - 1) * gapPx)) / (double)columns);
-                        if (rawFill < minTile) continue;
-                        var capped = Math.Max(minTile, Math.Min(layoutMaxTile, rawFill));
-                        var tileW = ClampRoundedTile(capped);
-                        if (tileW > bestTileWidth || (tileW == bestTileWidth && columns < bestColumns))
-                        {
-                            bestTileWidth = tileW;
-                            bestColumns = columns;
-                        }
-                    }
-                }
-            }
-            else
-            {
-                var autoMaxCols = viewportWidth >= 1100d ? 4 : (viewportWidth >= 560d ? 3 : (viewportWidth >= 360d ? 2 : 1));
-                for (var columns = 1; columns <= autoMaxCols; columns++)
-                {
-                    var rawEqualSplit = (int)Math.Floor((viewportWidth - ((columns - 1) * gapPx)) / columns);
-                    if (rawEqualSplit < minTile) continue;
-                    var tileWidth = ClampRoundedTile(rawEqualSplit);
-                    var usedWidth = (columns * tileWidth) + ((columns - 1) * gapPx);
-                    var slack = Math.Max(0d, viewportWidth - usedWidth);
-                    if (slack + moreColumnsSlackBudgetPx < bestSlack)
-                    {
-                        bestColumns = columns;
-                        bestTileWidth = tileWidth;
-                        bestSlack = slack;
-                        continue;
-                    }
-
-                    if (slack <= bestSlack + moreColumnsSlackBudgetPx && columns > bestColumns)
-                    {
-                        bestColumns = columns;
-                        bestTileWidth = tileWidth;
-                        bestSlack = slack;
-                    }
-                }
+                return (fixedPhotoCols, TileWidthForColumns(fixedPhotoCols));
             }
 
-            return (bestColumns, bestTileWidth);
+            var targetTileWidth = applySavedPhotoTileSizePreference
+                ? SettingsService.NormalizeLibraryPhotoTileSize(preferredPhotoTileSize)
+                : 320;
+            var autoColumns = (int)Math.Floor((viewportWidth + gapPx) / (targetTileWidth + gapPx));
+            autoColumns = Math.Max(1, Math.Min(maxColumnsCeiling, autoColumns));
+            return (autoColumns, TileWidthForColumns(autoColumns));
         }
     }
 }

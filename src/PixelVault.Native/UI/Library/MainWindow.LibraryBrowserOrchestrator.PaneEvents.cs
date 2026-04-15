@@ -24,8 +24,7 @@ namespace PixelVaultNative
                 {
                     panes.DetailResizeDebounceTimer.Stop();
                     if (ws.Current == null) return;
-                    var usePhotoDensity = ws.Current != null && !IsLibraryBrowserTimelineView(ws.Current);
-                    var layout = CalculateResponsiveLibraryDetailLayout(panes.ThumbScroll, usePhotoDensity);
+                    var layout = CalculateResponsiveLibraryDetailLayout(panes.ThumbScroll, true);
                     var viewportWidth = ResolveScrollViewerLayoutWidth(panes.ThumbScroll);
                     if (layout.Columns == ws.LastDetailColumns
                         && layout.TileSize == ws.LastDetailTileSize
@@ -75,6 +74,16 @@ namespace PixelVaultNative
                 SaveSettings();
                 if (renderTiles != null) renderTiles();
                 ShowLibraryBrowserToast(ws, "Covers: " + libraryFolderTileSize + " px");
+            };
+            panes.ThumbScroll.PreviewMouseWheel += delegate(object _, MouseWheelEventArgs e)
+            {
+                if ((Keyboard.Modifiers & ModifierKeys.Control) == 0) return;
+                if (ws.Current == null) return;
+                e.Handled = true;
+                libraryPhotoTileSize = SettingsService.NormalizeLibraryPhotoTileSize(libraryPhotoTileSize + (e.Delta > 0 ? 24 : -24));
+                SaveSettings();
+                renderSelectedFolder?.Invoke();
+                ShowLibraryBrowserToast(ws, "Capture size: " + libraryPhotoTileSize + " px");
             };
             if (panes.ScrollPersistDebounceTimer != null)
             {

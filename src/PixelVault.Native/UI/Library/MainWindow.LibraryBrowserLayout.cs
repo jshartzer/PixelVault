@@ -503,12 +503,12 @@ namespace PixelVaultNative
             };
             panes.ExitTimelineButton.Margin = new Thickness(0);
             panes.ExitTimelineButton.Visibility = Visibility.Collapsed;
-            panes.PhotoCaptureLayoutButton = Btn("Capture columns ▾", null, "#20343A", Brushes.White);
+            panes.PhotoCaptureLayoutButton = Btn("Capture layout ▾", null, "#20343A", Brushes.White);
             panes.PhotoCaptureLayoutButton.MinWidth = 118;
             panes.PhotoCaptureLayoutButton.Height = 30;
             panes.PhotoCaptureLayoutButton.FontSize = 11;
             panes.PhotoCaptureLayoutButton.Padding = new Thickness(10, 0, 10, 0);
-            panes.PhotoCaptureLayoutButton.ToolTip = "How many columns of captures fill the detail pane (saved). Auto sizes tiles to the pane width.";
+            panes.PhotoCaptureLayoutButton.ToolTip = "Capture density and columns (saved) for screenshot and Timeline views.";
             ApplyLibraryPillChrome(panes.PhotoCaptureLayoutButton, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
             panes.PhotoCaptureLayoutButton.Visibility = Visibility.Collapsed;
             var bannerButtonRow = new Grid { Margin = new Thickness(0, 8, 0, 0) };

@@ -678,6 +678,20 @@ namespace PixelVaultNative
                 if (panes.PhotoCaptureLayoutButton != null)
                 {
                     var photoCaptureLayoutMenu = new ContextMenu();
+                    var photoColumnsMenu = new MenuItem { Header = "Columns" };
+                    void AddPhotoSizeChoice(string label, int px)
+                    {
+                        var sizeItem = new MenuItem { Header = label };
+                        sizeItem.Click += delegate
+                        {
+                            var norm = _shell.NormalizeLibraryPhotoTileSizeValue(px);
+                            _shell.LibraryPhotoTileSize = norm;
+                            _shell.SaveSettings();
+                            if (renderSelectedFolder != null) renderSelectedFolder();
+                            _shell.LibraryBrowserShowToast(ws, "Capture size: " + label + " (" + norm + " px)");
+                        };
+                        photoCaptureLayoutMenu.Items.Add(sizeItem);
+                    }
                     void AddPhotoColumnChoice(string label, int cols)
                     {
                         var colItem = new MenuItem { Header = label };
@@ -688,16 +702,21 @@ namespace PixelVaultNative
                             if (renderSelectedFolder != null) renderSelectedFolder();
                             _shell.LibraryBrowserShowToast(ws, cols <= 0 ? "Capture columns: auto" : "Capture columns: " + cols);
                         };
-                        photoCaptureLayoutMenu.Items.Add(colItem);
-                    }
-                    AddPhotoColumnChoice("Auto", 0);
-                    for (var pc = 1; pc <= 8; pc++)
-                    {
-                        var captured = pc;
-                        AddPhotoColumnChoice(captured.ToString(), captured);
+                        photoColumnsMenu.Items.Add(colItem);
                     }
                     panes.PhotoCaptureLayoutButton.Click += delegate
                     {
+                        photoCaptureLayoutMenu.Items.Clear();
+                        AddPhotoSizeChoice("Compact", 260);
+                        AddPhotoSizeChoice("Roomy", 420);
+                        photoColumnsMenu.Items.Clear();
+                        AddPhotoColumnChoice("Auto", 0);
+                        for (var pc = 1; pc <= 8; pc++)
+                        {
+                            var captured = pc;
+                            AddPhotoColumnChoice(captured.ToString(), captured);
+                        }
+                        photoCaptureLayoutMenu.Items.Add(photoColumnsMenu);
                         photoCaptureLayoutMenu.PlacementTarget = panes.PhotoCaptureLayoutButton;
                         photoCaptureLayoutMenu.Placement = PlacementMode.Bottom;
                         photoCaptureLayoutMenu.IsOpen = true;

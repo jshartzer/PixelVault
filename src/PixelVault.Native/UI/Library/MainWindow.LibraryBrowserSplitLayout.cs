@@ -53,7 +53,7 @@ namespace PixelVaultNative
             if (panes.GroupAllButton != null) panes.GroupAllButton.Visibility = isPhoto ? Visibility.Collapsed : Visibility.Visible;
             if (panes.GroupConsoleButton != null) panes.GroupConsoleButton.Visibility = isPhoto ? Visibility.Collapsed : Visibility.Visible;
             if (panes.PhotoCaptureLayoutButton != null)
-                panes.PhotoCaptureLayoutButton.Visibility = isPhoto ? Visibility.Visible : Visibility.Collapsed;
+                panes.PhotoCaptureLayoutButton.Visibility = (isPhoto || isTimeline) ? Visibility.Visible : Visibility.Collapsed;
             if (panes.GroupTimelineButton != null)
                 panes.GroupTimelineButton.Visibility = isPhoto ? Visibility.Collapsed : Visibility.Visible;
             if (panes.PhotoWorkspaceHeroBannerStrip != null)

@@ -25,6 +25,7 @@ namespace PixelVaultNative
         int LibraryFolderTileSize { get; set; }
         int LibraryFolderGridColumnCount { get; set; }
         bool LibraryFolderFillPaneWidth { get; set; }
+        int LibraryPhotoTileSize { get; set; }
         int LibraryPhotoGridColumnCount { get; set; }
         int LibraryPhotoRailFolderTileSize { get; set; }
         string LibraryPhotoRailFolderSortMode { get; set; }
@@ -80,6 +81,7 @@ namespace PixelVaultNative
         void SaveSettings();
         int NormalizeLibraryFolderTileSizeValue(int value);
         int NormalizeLibraryFolderGridColumnCountValue(int value);
+        int NormalizeLibraryPhotoTileSizeValue(int value);
         int NormalizeLibraryPhotoGridColumnCountValue(int value);
         int NormalizeLibraryPhotoRailFolderGridColumnCountValue(int value);
         List<LibraryFolderInfo> GetLibraryBrowserActionFolders(MainWindow.LibraryBrowserFolderView view);
