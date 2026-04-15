@@ -140,17 +140,8 @@ namespace PixelVaultNative
             }
             var displayFolder = getDisplayFolder(ws.Current);
             var actionFolder = getActionFolder(ws.Current) ?? displayFolder;
-            var canBuildFromFolder = displayFolder != null
-                && !string.IsNullOrWhiteSpace(displayFolder.FolderPath)
-                && Directory.Exists(displayFolder.FolderPath);
-            var selectedItems = canBuildFromFolder
-                ? BuildLibraryMetadataItems(displayFolder)
-                    .Where(item => wantedFiles.Contains(item.FilePath))
-                    .ToList()
-                : wantedFiles
-                    .Select(file => BuildLibraryMetadataItemForPath(file, actionFolder))
-                    .Where(item => item != null)
-                    .ToList();
+            var metadataContextFolder = actionFolder ?? displayFolder;
+            var selectedItems = BuildLibraryMetadataItemsForPaths(wantedFiles, metadataContextFolder);
             if (selectedItems.Count == 0)
             {
                 ShowLibraryBrowserToast(ws, "That capture could not be loaded for metadata editing.");

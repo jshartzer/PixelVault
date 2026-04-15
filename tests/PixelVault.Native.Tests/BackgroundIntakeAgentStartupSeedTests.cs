@@ -30,10 +30,15 @@ public sealed class BackgroundIntakeAgentStartupSeedTests
             File.WriteAllText(topLevelTextA, "b");
             File.WriteAllText(nestedMedia, "c");
             File.WriteAllText(topLevelMediaB, "d");
+            static bool IsMediaPath(string path)
+            {
+                var extension = Path.GetExtension(path ?? string.Empty).ToLowerInvariant();
+                return extension is ".jpg" or ".jpeg" or ".png" or ".webp" or ".jxr" or ".mp4" or ".mkv" or ".avi" or ".mov" or ".wmv" or ".webm";
+            }
 
             var results = MainWindow.BackgroundIntakeAgent.EnumerateExistingTopLevelMediaFiles(
                 new[] { rootA, rootA, rootB, Path.Combine(baseDir, "missing") },
-                MainWindow.IsMedia);
+                IsMediaPath);
 
             Assert.Equal(
                 new[] { Path.GetFullPath(topLevelMediaA), Path.GetFullPath(topLevelMediaB) }.OrderBy(path => path),

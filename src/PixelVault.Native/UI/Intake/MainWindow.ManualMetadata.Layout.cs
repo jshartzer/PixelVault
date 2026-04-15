@@ -71,6 +71,7 @@ namespace PixelVaultNative
 
         void BuildManualMetadataDialogLayout(ManualMetadataDialogHost h, string windowLabel, string headerTitleText, string headerDescriptionText, string leaveButtonText, string finishButtonText)
         {
+            var resolvedOwner = ResolveStatusWindowOwner();
             h.ManualWindow = new Window
             {
                 Title = "PixelVault " + AppVersion + " " + windowLabel,
@@ -78,8 +79,8 @@ namespace PixelVaultNative
                 Height = 1040,
                 MinWidth = 1040,
                 MinHeight = 920,
-                Owner = this,
-                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Owner = resolvedOwner,
+                WindowStartupLocation = resolvedOwner == null ? WindowStartupLocation.CenterScreen : WindowStartupLocation.CenterOwner,
                 Background = Brush("#0F1519")
             };
 

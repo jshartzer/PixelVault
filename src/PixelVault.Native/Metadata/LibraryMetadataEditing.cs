@@ -23,6 +23,47 @@ namespace PixelVaultNative
             return items;
         }
 
+        List<ManualMetadataItem> BuildLibraryMetadataItemsForPaths(IEnumerable<string> files, LibraryFolderInfo folder)
+        {
+            return BuildLibraryMetadataItemsForPathsCore(
+                files,
+                File.Exists,
+                paths => ReadEmbeddedMetadataBatch(paths),
+                delegate(string file, EmbeddedMetadataSnapshot snapshot)
+                {
+                    return BuildLibraryMetadataItemCore(file, folder, snapshot ?? new EmbeddedMetadataSnapshot());
+                },
+                GetLibraryDate);
+        }
+
+        internal static List<TItem> BuildLibraryMetadataItemsForPathsCore<TItem>(
+            IEnumerable<string> files,
+            Func<string, bool> fileExists,
+            Func<IEnumerable<string>, Dictionary<string, EmbeddedMetadataSnapshot>> readEmbeddedMetadataBatch,
+            Func<string, EmbeddedMetadataSnapshot, TItem> buildItem,
+            Func<string, DateTime> getLibraryDate)
+            where TItem : class
+        {
+            var items = new List<TItem>();
+            if (files == null || fileExists == null || readEmbeddedMetadataBatch == null || buildItem == null || getLibraryDate == null) return items;
+            var requestedFiles = files
+                .Where(file => !string.IsNullOrWhiteSpace(file) && fileExists(file))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderByDescending(getLibraryDate)
+                .ThenBy(Path.GetFileName)
+                .ToList();
+            if (requestedFiles.Count == 0) return items;
+            var metadataSnapshots = readEmbeddedMetadataBatch(requestedFiles) ?? new Dictionary<string, EmbeddedMetadataSnapshot>(StringComparer.OrdinalIgnoreCase);
+            foreach (var file in requestedFiles)
+            {
+                EmbeddedMetadataSnapshot snapshot;
+                if (!metadataSnapshots.TryGetValue(file, out snapshot) || snapshot == null) snapshot = new EmbeddedMetadataSnapshot();
+                var item = buildItem(file, snapshot);
+                if (item != null) items.Add(item);
+            }
+            return items;
+        }
+
         /// <summary>Builds a <see cref="ManualMetadataItem"/> from embedded metadata (single-file reads). <paramref name="folder"/> may be null when resolving outside an open library folder context.</summary>
         ManualMetadataItem BuildLibraryMetadataItemForPath(string file, LibraryFolderInfo folder = null)
         {
