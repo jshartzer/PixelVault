@@ -624,8 +624,7 @@ namespace PixelVaultNative
             }
             if (isVideoFile)
             {
-                // Date badge sits top-right; CLIP stays top-left, so no vertical offset for the label.
-                var videoBadgeTopMargin = 8d;
+                var videoBadgeTopMargin = hasCaptureDateLabel ? 44d : 8d;
                 videoPreviewMedia = new MediaElement
                 {
                     LoadedBehavior = MediaState.Manual,
@@ -704,13 +703,11 @@ namespace PixelVaultNative
             else applyVideoInfo(null);
             if (hasCaptureDateLabel)
             {
-                // Upper-right day stamp; keep clear of the star affordance (32×32 @ ~6px inset) on image tiles.
-                var dateRightInset = isVideoFile ? 8d : 40d;
                 contentRoot.Children.Add(new Border
                 {
-                    HorizontalAlignment = HorizontalAlignment.Right,
+                    HorizontalAlignment = HorizontalAlignment.Left,
                     VerticalAlignment = VerticalAlignment.Top,
-                    Margin = new Thickness(0, 8, dateRightInset, 0),
+                    Margin = new Thickness(8, 8, 0, 0),
                     Background = Brush("#CC162028"),
                     BorderBrush = Brush("#45606E"),
                     BorderThickness = new Thickness(1),
@@ -723,7 +720,7 @@ namespace PixelVaultNative
                         FontSize = 12.5,
                         FontWeight = FontWeights.SemiBold,
                         TextTrimming = TextTrimming.CharacterEllipsis,
-                        MaxWidth = 132
+                        MaxWidth = 160
                     }
                 });
             }

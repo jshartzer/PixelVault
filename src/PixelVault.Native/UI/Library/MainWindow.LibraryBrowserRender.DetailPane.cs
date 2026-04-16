@@ -393,10 +393,17 @@ namespace PixelVaultNative
                             .GroupBy(entry => entry.CaptureDate.Date)
                             .OrderByDescending(group => group.Key))
                         {
+                            // Per calendar day: newest capture first so index 0 is always the chronologically
+                            // last shot that day (the day-badge anchor), regardless of GroupBy iteration quirks.
+                            var dayFilesOrdered = group
+                                .OrderByDescending(entry => entry.CaptureDate)
+                                .ThenBy(entry => entry.FilePath, StringComparer.OrdinalIgnoreCase)
+                                .Select(entry => entry.FilePath)
+                                .ToList();
                             snapshot.Groups.Add(new LibraryDetailRenderGroup
                             {
                                 CaptureDate = group.Key,
-                                Files = group.Select(entry => entry.FilePath).ToList()
+                                Files = dayFilesOrdered
                             });
                         }
 
@@ -785,10 +792,9 @@ namespace PixelVaultNative
         {
             var labels = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             if (groups == null) return labels;
-            // Day labels belong on the chronologically last capture of each calendar day. Snapshot groups
-            // list files in descending capture time (see detail snapshot build), so the first path in each
-            // group is that anchor tile. The <paramref name="chunks"/> argument is retained for call-site
-            // compatibility only.
+            // One day stamp per calendar day: anchor is the chronologically last capture that day (latest
+            // timestamp). Snapshot Files are ordered newest-first per day; Distinct keeps first occurrence.
+            // The chunks argument is unused; retained for call-site compatibility.
 
             foreach (var renderGroup in groups)
             {
