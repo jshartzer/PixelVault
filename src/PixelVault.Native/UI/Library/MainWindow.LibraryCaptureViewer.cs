@@ -7,14 +7,13 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using System.Windows.Threading;
 using System.Windows.Automation;
 
 namespace PixelVaultNative
 {
     public sealed partial class MainWindow
     {
-        /// <summary>PV-PLN-LIBPV-001 — Open a non-modal viewer sized to <paramref name="sizeReferenceWindow"/>; navigation uses <see cref="LibraryBrowserWorkingSet.DetailFilesDisplayOrder"/> (images only).</summary>
+        /// <summary>PV-PLN-LIBPV-001 — Open a non-modal viewer (fixed comfortable size); navigation uses <see cref="LibraryBrowserWorkingSet.DetailFilesDisplayOrder"/> (images only).</summary>
         void OpenLibraryCaptureViewer(Window sizeReferenceWindow, LibraryBrowserWorkingSet ws, string filePath)
         {
             if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath) || !IsImage(filePath)) return;
@@ -33,7 +32,6 @@ namespace PixelVaultNative
             if (idx < 0) idx = 0;
 
             var win = new LibraryCaptureViewerWindow(this, sizeReferenceWindow, paths, idx);
-            win.ApplyInitialSizeAndPositionFromReference();
             win.Show();
             win.Activate();
         }
@@ -53,20 +51,20 @@ namespace PixelVaultNative
         internal sealed class LibraryCaptureViewerWindow : Window
         {
             const int ViewerDecodeMaxEdge = 4096;
+            /// <summary>One consistent viewer size (DIP); not tied to the main window.</summary>
+            const double ViewerWindowWidth = 1180;
+            const double ViewerWindowHeight = 760;
             readonly MainWindow _host;
-            readonly Window _sizeReference;
             readonly List<string> _paths;
             int _index;
             readonly Image _image;
             readonly StackPanel _footerSlot;
             readonly Border _navLeft;
             readonly Border _navRight;
-            readonly DispatcherTimer _resizeCoalesce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(120) };
 
-            internal LibraryCaptureViewerWindow(MainWindow host, Window sizeReference, List<string> paths, int startIndex)
+            internal LibraryCaptureViewerWindow(MainWindow host, Window ownerWindow, List<string> paths, int startIndex)
             {
                 _host = host;
-                _sizeReference = sizeReference;
                 _paths = paths ?? new List<string>();
                 _index = _paths.Count == 0 ? 0 : Math.Max(0, Math.Min(startIndex, _paths.Count - 1));
 
@@ -76,8 +74,14 @@ namespace PixelVaultNative
                 WindowStartupLocation = WindowStartupLocation.Manual;
                 ShowInTaskbar = true;
                 ShowActivated = true;
-                if (sizeReference != null)
-                    Owner = sizeReference;
+                if (ownerWindow != null)
+                    Owner = ownerWindow;
+
+                var wa = SystemParameters.WorkArea;
+                Width = Math.Min(ViewerWindowWidth, Math.Max(640, wa.Width - 32));
+                Height = Math.Min(ViewerWindowHeight, Math.Max(480, wa.Height - 32));
+                Left = wa.Left + Math.Round((wa.Width - Width) * 0.5);
+                Top = wa.Top + Math.Round((wa.Height - Height) * 0.5);
 
                 // UniformToFill: scale without distortion so the image meets left/right edges (no letterboxing);
                 // excess height is cropped in the photo row, matching a full-bleed capture viewer.
@@ -121,7 +125,6 @@ namespace PixelVaultNative
 
                 Loaded += delegate
                 {
-                    SyncSizeAndPositionFromReference();
                     ReloadCurrent();
                 };
 
@@ -148,27 +151,8 @@ namespace PixelVaultNative
 
                 Closing += delegate
                 {
-                    _resizeCoalesce.Stop();
-                    if (_sizeReference != null)
-                        _sizeReference.SizeChanged -= SizeReferenceOnSizeChanged;
                     _image.Source = null;
                 };
-
-                if (_sizeReference != null)
-                {
-                    _sizeReference.SizeChanged += SizeReferenceOnSizeChanged;
-                    _resizeCoalesce.Tick += delegate
-                    {
-                        _resizeCoalesce.Stop();
-                        SyncSizeAndPositionFromReference();
-                    };
-                }
-            }
-
-            /// <summary>Apply size/position before <see cref="Window.Show"/> when the reference window already has layout metrics.</summary>
-            internal void ApplyInitialSizeAndPositionFromReference()
-            {
-                SyncSizeAndPositionFromReference();
             }
 
             static Border BuildNavChrome(string glyph, string automationName)
@@ -191,28 +175,6 @@ namespace PixelVaultNative
                 };
                 AutomationProperties.SetName(b, automationName);
                 return b;
-            }
-
-            void SizeReferenceOnSizeChanged(object sender, SizeChangedEventArgs e)
-            {
-                _resizeCoalesce.Stop();
-                _resizeCoalesce.Start();
-            }
-
-            void SyncSizeAndPositionFromReference()
-            {
-                if (_sizeReference == null) return;
-                var w = _sizeReference.ActualWidth;
-                var h = _sizeReference.ActualHeight;
-                if (w <= 1 || h <= 1) return;
-                const double scale = 0.75;
-                Width = Math.Max(480, Math.Round(w * scale));
-                Height = Math.Max(360, Math.Round(h * scale));
-                if (Owner == _sizeReference || Owner == null)
-                {
-                    Left = _sizeReference.Left + Math.Round((w - Width) * 0.5);
-                    Top = _sizeReference.Top + Math.Round((h - Height) * 0.5);
-                }
             }
 
             void Navigate(int delta)
@@ -240,7 +202,7 @@ namespace PixelVaultNative
                 _image.Visibility = Visibility.Hidden;
 
                 _footerSlot.Children.Clear();
-                var footerWidth = (int)Math.Max(400, Math.Round(ActualWidth > 1 ? ActualWidth - 48 : 800));
+                var footerWidth = (int)Math.Max(400, Math.Round(ActualWidth > 1 ? ActualWidth - 48 : Math.Max(Width, 400) - 48));
                 var ctx = _host.TryGetLibraryTimelineCaptureContextForViewer(path);
                 if (ctx != null)
                 {
@@ -263,7 +225,8 @@ namespace PixelVaultNative
                     });
                 }
 
-                var decode = Math.Min(ViewerDecodeMaxEdge, Math.Max(640, (int)Math.Round(Math.Max(ActualWidth, 800) * 2)));
+                var layoutW = ActualWidth > 1 ? ActualWidth : Math.Max(Width, 640);
+                var decode = Math.Min(ViewerDecodeMaxEdge, Math.Max(640, (int)Math.Round(layoutW * 2)));
                 // Do not pass shouldLoad: QueueImageLoad evaluates it on a background thread, and reading
                 // WPF DispatcherObject.IsLoaded from Task.Run faults or fails the load for this window.
                 _host.QueueImageLoad(
