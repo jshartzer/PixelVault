@@ -6,22 +6,41 @@ namespace PixelVaultNative.Tests;
 public sealed class LibraryResponsiveLayoutTests
 {
     [Fact]
-    public void CalculateResponsiveLibraryDetailLayoutForWidth_AutoMode_UsesPreferredCaptureSize()
+    public void CalculateResponsiveLibraryDetailLayoutForWidth_WideViewportUsesRoomyDensity()
     {
-        var compact = MainWindow.CalculateResponsiveLibraryDetailLayoutForWidth(
+        var fromCompactPreference = MainWindow.CalculateResponsiveLibraryDetailLayoutForWidth(
             viewportWidth: 1600,
             applySavedPhotoTileSizePreference: true,
             preferredPhotoTileSize: 260,
             fixedPhotoColumns: 0);
-        var roomy = MainWindow.CalculateResponsiveLibraryDetailLayoutForWidth(
+        var fromRoomyPreference = MainWindow.CalculateResponsiveLibraryDetailLayoutForWidth(
             viewportWidth: 1600,
             applySavedPhotoTileSizePreference: true,
-            preferredPhotoTileSize: 420,
+            preferredPhotoTileSize: 560,
             fixedPhotoColumns: 0);
 
-        Assert.Equal(260, compact.TileSize);
-        Assert.Equal(420, roomy.TileSize);
-        Assert.True(compact.Columns > roomy.Columns);
+        Assert.Equal(SettingsService.LibraryPhotoTileRoomyPreset, fromCompactPreference.TileSize);
+        Assert.Equal(SettingsService.LibraryPhotoTileRoomyPreset, fromRoomyPreference.TileSize);
+        Assert.Equal(fromCompactPreference.Columns, fromRoomyPreference.Columns);
+    }
+
+    [Fact]
+    public void CalculateResponsiveLibraryDetailLayoutForWidth_NarrowViewportUsesCompactDensity()
+    {
+        var fromCompactPreference = MainWindow.CalculateResponsiveLibraryDetailLayoutForWidth(
+            viewportWidth: 900,
+            applySavedPhotoTileSizePreference: true,
+            preferredPhotoTileSize: 260,
+            fixedPhotoColumns: 0);
+        var fromRoomyPreference = MainWindow.CalculateResponsiveLibraryDetailLayoutForWidth(
+            viewportWidth: 900,
+            applySavedPhotoTileSizePreference: true,
+            preferredPhotoTileSize: 560,
+            fixedPhotoColumns: 0);
+
+        Assert.Equal(SettingsService.LibraryPhotoTileCompactPreset, fromCompactPreference.TileSize);
+        Assert.Equal(SettingsService.LibraryPhotoTileCompactPreset, fromRoomyPreference.TileSize);
+        Assert.Equal(fromCompactPreference.Columns, fromRoomyPreference.Columns);
     }
 
     [Fact]
@@ -53,10 +72,33 @@ public sealed class LibraryResponsiveLayoutTests
         var narrow = MainWindow.CalculateResponsiveLibraryDetailLayoutForWidth(
             viewportWidth: 960,
             applySavedPhotoTileSizePreference: true,
-            preferredPhotoTileSize: 260,
+            preferredPhotoTileSize: 560,
             fixedPhotoColumns: 0);
 
-        Assert.Equal(wide.TileSize, narrow.TileSize);
-        Assert.True(narrow.Columns < wide.Columns);
+        Assert.Equal(SettingsService.LibraryPhotoTileRoomyPreset, wide.TileSize);
+        Assert.Equal(SettingsService.LibraryPhotoTileCompactPreset, narrow.TileSize);
+        Assert.True(wide.TileSize > narrow.TileSize);
+        Assert.True(wide.Columns < narrow.Columns);
+    }
+
+    [Fact]
+    public void CalculateResponsiveLibraryDetailLayoutForWidth_TimelineUsesCompactDensityEarlier()
+    {
+        var photo = MainWindow.CalculateResponsiveLibraryDetailLayoutForWidth(
+            viewportWidth: 1240,
+            timelineView: false,
+            applySavedPhotoTileSizePreference: true,
+            preferredPhotoTileSize: 560,
+            fixedPhotoColumns: 0);
+        var timeline = MainWindow.CalculateResponsiveLibraryDetailLayoutForWidth(
+            viewportWidth: 1240,
+            timelineView: true,
+            applySavedPhotoTileSizePreference: true,
+            preferredPhotoTileSize: 560,
+            fixedPhotoColumns: 0);
+
+        Assert.Equal(SettingsService.LibraryPhotoTileRoomyPreset, photo.TileSize);
+        Assert.Equal(SettingsService.LibraryPhotoTileCompactPreset, timeline.TileSize);
+        Assert.True(timeline.Columns >= photo.Columns);
     }
 }

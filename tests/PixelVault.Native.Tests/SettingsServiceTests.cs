@@ -29,7 +29,7 @@ public sealed class SettingsServiceTests
     [Theory]
     [InlineData(100, 160)]
     [InlineData(280, 280)]
-    [InlineData(9999, 1050)]
+    [InlineData(9999, 1400)]
     public void NormalizeLibraryPhotoTileSize_ClampsToRange(int input, int expected)
     {
         Assert.Equal(expected, SettingsService.NormalizeLibraryPhotoTileSize(input));

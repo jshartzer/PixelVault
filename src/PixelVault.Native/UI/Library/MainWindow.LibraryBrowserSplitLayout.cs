@@ -148,7 +148,7 @@ namespace PixelVaultNative
                 if (panes.DetailTitle != null) panes.DetailTitle.FontSize = 22;
                 if (panes.PhotoCaptureLayoutButton != null)
                 {
-                    panes.PhotoCaptureLayoutButton.MinWidth = 92;
+                    panes.PhotoCaptureLayoutButton.MinWidth = 122;
                     panes.PhotoCaptureLayoutButton.Margin = new Thickness(8, 4, 0, 0);
                     panes.PhotoCaptureLayoutButton.HorizontalAlignment = HorizontalAlignment.Right;
                     panes.PhotoCaptureLayoutButton.VerticalAlignment = VerticalAlignment.Top;
@@ -194,7 +194,7 @@ namespace PixelVaultNative
                 if (panes.DetailTitle != null) panes.DetailTitle.FontSize = 28;
                 if (panes.PhotoCaptureLayoutButton != null)
                 {
-                    panes.PhotoCaptureLayoutButton.MinWidth = 108;
+                    panes.PhotoCaptureLayoutButton.MinWidth = 136;
                     panes.PhotoCaptureLayoutButton.Margin = new Thickness(12, 0, 0, 0);
                     panes.PhotoCaptureLayoutButton.HorizontalAlignment = HorizontalAlignment.Right;
                     panes.PhotoCaptureLayoutButton.VerticalAlignment = VerticalAlignment.Center;

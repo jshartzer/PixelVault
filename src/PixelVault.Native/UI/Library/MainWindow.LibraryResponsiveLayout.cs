@@ -6,6 +6,9 @@ namespace PixelVaultNative
 {
     public sealed partial class MainWindow
     {
+        internal const double LibraryResponsiveRoomyViewportThreshold = 1120d;
+        internal const double LibraryResponsiveTimelineRoomyViewportThreshold = 1240d;
+
         double ResolveScrollViewerLayoutWidth(ScrollViewer scrollViewer, double fallback = 0)
         {
             if (scrollViewer == null) return Math.Max(0d, fallback);
@@ -112,13 +115,33 @@ namespace PixelVaultNative
             }
             return (bestColumns, bestTileW);
         }
-        (int Columns, int TileSize) CalculateResponsiveLibraryDetailLayout(ScrollViewer scrollViewer, bool applySavedPhotoTileSizePreference)
+        (int Columns, int TileSize) CalculateResponsiveLibraryDetailLayout(ScrollViewer scrollViewer, bool applySavedPhotoTileSizePreference, bool timelineView = false)
         {
             return CalculateResponsiveLibraryDetailLayoutForWidth(
                 ResolveScrollViewerLayoutWidth(scrollViewer),
+                timelineView,
                 applySavedPhotoTileSizePreference,
                 libraryPhotoTileSize,
                 libraryPhotoGridColumnCount);
+        }
+
+        internal static (int Columns, int TileSize) CalculateResponsiveLibraryDetailLayoutForWidth(
+            double viewportWidth,
+            bool timelineView,
+            bool applySavedPhotoTileSizePreference,
+            int preferredPhotoTileSize,
+            int fixedPhotoColumns)
+        {
+            const int gapPx = 8;
+            viewportWidth = NormalizeResponsiveLibraryDetailViewportWidth(viewportWidth);
+            var maxColumnsCeiling = viewportWidth >= 1600d ? 8 : viewportWidth >= 1280d ? 7 : viewportWidth >= 1040d ? 6 : viewportWidth >= 820d ? 5 : viewportWidth >= 560d ? 4 : viewportWidth >= 380d ? 3 : 2;
+            if (viewportWidth < 300d) maxColumnsCeiling = 1;
+
+            // Capture density is now automatic: wide panes use the roomy anchor, narrower panes use the compact anchor.
+            var targetTileWidth = ResolveResponsiveLibraryDetailTileSizeForNormalizedWidth(viewportWidth, timelineView);
+            var estimatedColumns = (int)Math.Round((viewportWidth + gapPx) / (targetTileWidth + gapPx), MidpointRounding.AwayFromZero);
+            estimatedColumns = Math.Max(1, Math.Min(maxColumnsCeiling, estimatedColumns));
+            return (estimatedColumns, targetTileWidth);
         }
 
         internal static (int Columns, int TileSize) CalculateResponsiveLibraryDetailLayoutForWidth(
@@ -127,17 +150,52 @@ namespace PixelVaultNative
             int preferredPhotoTileSize,
             int fixedPhotoColumns)
         {
-            const int gapPx = 8;
-            viewportWidth = Math.Max(160, viewportWidth - 24);
-            var maxColumnsCeiling = viewportWidth >= 1600d ? 8 : viewportWidth >= 1280d ? 7 : viewportWidth >= 1040d ? 6 : viewportWidth >= 820d ? 5 : viewportWidth >= 560d ? 4 : viewportWidth >= 380d ? 3 : 2;
-            if (viewportWidth < 300d) maxColumnsCeiling = 1;
+            return CalculateResponsiveLibraryDetailLayoutForWidth(
+                viewportWidth,
+                false,
+                applySavedPhotoTileSizePreference,
+                preferredPhotoTileSize,
+                fixedPhotoColumns);
+        }
 
-            var targetTileWidth = applySavedPhotoTileSizePreference
-                ? SettingsService.NormalizeLibraryPhotoTileSize(preferredPhotoTileSize)
-                : 320;
-            var estimatedColumns = (int)Math.Round((viewportWidth + gapPx) / (targetTileWidth + gapPx), MidpointRounding.AwayFromZero);
-            estimatedColumns = Math.Max(1, Math.Min(maxColumnsCeiling, estimatedColumns));
-            return (estimatedColumns, targetTileWidth);
+        internal static double NormalizeResponsiveLibraryDetailViewportWidth(double viewportWidth)
+        {
+            return Math.Max(160d, viewportWidth - 24d);
+        }
+
+        internal static int ResolveResponsiveLibraryDetailTileSizeForWidth(double viewportWidth)
+        {
+            return ResolveResponsiveLibraryDetailTileSizeForNormalizedWidth(
+                NormalizeResponsiveLibraryDetailViewportWidth(viewportWidth),
+                false);
+        }
+
+        internal static int ResolveResponsiveLibraryDetailTileSizeForWidth(double viewportWidth, bool timelineView)
+        {
+            return ResolveResponsiveLibraryDetailTileSizeForNormalizedWidth(
+                NormalizeResponsiveLibraryDetailViewportWidth(viewportWidth),
+                timelineView);
+        }
+
+        internal static string DescribeResponsiveLibraryDetailDensityForWidth(double viewportWidth)
+        {
+            return DescribeResponsiveLibraryDetailDensity(
+                ResolveResponsiveLibraryDetailTileSizeForWidth(viewportWidth));
+        }
+
+        internal static string DescribeResponsiveLibraryDetailDensity(int tileSize)
+        {
+            return tileSize >= SettingsService.LibraryPhotoTileRoomyPreset ? "Roomy" : "Compact";
+        }
+
+        static int ResolveResponsiveLibraryDetailTileSizeForNormalizedWidth(double viewportWidth, bool timelineView)
+        {
+            var roomyThreshold = timelineView
+                ? LibraryResponsiveTimelineRoomyViewportThreshold
+                : LibraryResponsiveRoomyViewportThreshold;
+            return viewportWidth >= roomyThreshold
+                ? SettingsService.LibraryPhotoTileRoomyPreset
+                : SettingsService.LibraryPhotoTileCompactPreset;
         }
     }
 }

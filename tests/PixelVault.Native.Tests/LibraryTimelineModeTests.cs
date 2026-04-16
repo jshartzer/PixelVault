@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using PixelVaultNative;
 using Xunit;
 
@@ -109,7 +110,7 @@ public sealed class LibraryTimelineModeTests
     public void EstimateLibraryPackedDayCardDesiredWidth_UsesProvidedDetailTileSizeAsDensityAnchor()
     {
         var compactWidth = MainWindow.EstimateLibraryPackedDayCardDesiredWidth(4, 1600, false, 260);
-        var roomyWidth = MainWindow.EstimateLibraryPackedDayCardDesiredWidth(4, 1600, false, 420);
+        var roomyWidth = MainWindow.EstimateLibraryPackedDayCardDesiredWidth(4, 1600, false, 560);
 
         Assert.True(roomyWidth > compactWidth);
     }
@@ -123,5 +124,48 @@ public sealed class LibraryTimelineModeTests
         Assert.True(expanded[0] > 420d);
         Assert.True(expanded[1] > 420d);
         Assert.Equal(1000d - 14d, expanded[0] + expanded[1], 3);
+    }
+
+    [Fact]
+    public void BuildLibraryTimelineDayLabelMap_AttachesLabelToLastFileOfDay()
+    {
+        var groups = new List<LibraryDetailRenderGroup>
+        {
+            new LibraryDetailRenderGroup
+            {
+                CaptureDate = new DateTime(2026, 4, 5, 20, 0, 0),
+                Files = new List<string> { "a.png", "b.png", "c.png" }
+            },
+            new LibraryDetailRenderGroup
+            {
+                CaptureDate = new DateTime(2026, 4, 4, 9, 0, 0),
+                Files = new List<string> { "d.png" }
+            }
+        };
+
+        var labels = MainWindow.BuildLibraryTimelineDayLabelMap(groups, new DateTime(2026, 4, 5));
+
+        Assert.False(labels.ContainsKey("a.png"));
+        Assert.False(labels.ContainsKey("b.png"));
+        Assert.Equal("Today", labels["c.png"]);
+        Assert.Equal("Yesterday", labels["d.png"]);
+    }
+
+    [Fact]
+    public void BuildLibraryCaptureDateLabelMap_ForSharedPhotoAndTimelineBehavior_LabelsOnlyLastFileOfDay()
+    {
+        var groups = new List<LibraryDetailRenderGroup>
+        {
+            new LibraryDetailRenderGroup
+            {
+                CaptureDate = new DateTime(2026, 4, 5, 20, 0, 0),
+                Files = new List<string> { "a.png", "b.png" }
+            }
+        };
+
+        var labels = MainWindow.BuildLibraryCaptureDateLabelMap(groups, new DateTime(2026, 4, 5), true);
+
+        Assert.Equal("Today", labels["b.png"]);
+        Assert.False(labels.ContainsKey("a.png"));
     }
 }

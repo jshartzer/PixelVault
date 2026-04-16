@@ -503,12 +503,12 @@ namespace PixelVaultNative
             };
             panes.ExitTimelineButton.Margin = new Thickness(0);
             panes.ExitTimelineButton.Visibility = Visibility.Collapsed;
-            panes.PhotoCaptureLayoutButton = Btn("Capture density ▾", null, "#20343A", Brushes.White);
-            panes.PhotoCaptureLayoutButton.MinWidth = 118;
+            panes.PhotoCaptureLayoutButton = Btn("Density: Auto", null, "#20343A", Brushes.White);
+            panes.PhotoCaptureLayoutButton.MinWidth = 130;
             panes.PhotoCaptureLayoutButton.Height = 30;
             panes.PhotoCaptureLayoutButton.FontSize = 11;
             panes.PhotoCaptureLayoutButton.Padding = new Thickness(10, 0, 10, 0);
-            panes.PhotoCaptureLayoutButton.ToolTip = "Capture density (saved) for screenshot and Timeline views.";
+            panes.PhotoCaptureLayoutButton.ToolTip = "Capture density follows the detail pane width automatically. Wide panes use Roomy; narrower panes use Compact.";
             ApplyLibraryPillChrome(panes.PhotoCaptureLayoutButton, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
             panes.PhotoCaptureLayoutButton.Visibility = Visibility.Collapsed;
             var bannerButtonRow = new Grid { Margin = new Thickness(0, 8, 0, 0) };

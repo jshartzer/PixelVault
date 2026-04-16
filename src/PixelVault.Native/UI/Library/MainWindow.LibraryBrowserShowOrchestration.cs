@@ -677,29 +677,9 @@ namespace PixelVaultNative
                 }
                 if (panes.PhotoCaptureLayoutButton != null)
                 {
-                    var photoCaptureLayoutMenu = new ContextMenu();
-                    void AddPhotoDensityChoice(string label, int px)
-                    {
-                        var sizeItem = new MenuItem { Header = label };
-                        sizeItem.Click += delegate
-                        {
-                            var norm = _shell.NormalizeLibraryPhotoTileSizeValue(px);
-                            _shell.LibraryPhotoTileSize = norm;
-                            _shell.LibraryPhotoGridColumnCount = 0;
-                            _shell.SaveSettings();
-                            if (renderSelectedFolder != null) renderSelectedFolder();
-                            _shell.LibraryBrowserShowToast(ws, "Capture density: " + label);
-                        };
-                        photoCaptureLayoutMenu.Items.Add(sizeItem);
-                    }
                     panes.PhotoCaptureLayoutButton.Click += delegate
                     {
-                        photoCaptureLayoutMenu.Items.Clear();
-                        AddPhotoDensityChoice("Compact", 260);
-                        AddPhotoDensityChoice("Roomy", 420);
-                        photoCaptureLayoutMenu.PlacementTarget = panes.PhotoCaptureLayoutButton;
-                        photoCaptureLayoutMenu.Placement = PlacementMode.Bottom;
-                        photoCaptureLayoutMenu.IsOpen = true;
+                        _shell.LibraryBrowserShowToast(ws, "Capture density follows the pane width automatically: roomy on wide windows, compact on narrower panes.");
                     };
                 }
                 panes.TimelinePresetTodayButton.Click += delegate { applyTimelinePreset("today"); };

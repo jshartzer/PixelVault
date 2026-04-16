@@ -29,6 +29,18 @@ namespace PixelVaultNative
             public List<LibraryDetailMasonryPlacement> Placements;
         }
 
+        readonly struct LibraryDetailQuiltShape
+        {
+            public readonly int ColSpan;
+            public readonly int RowSpan;
+
+            public LibraryDetailQuiltShape(int colSpan, int rowSpan)
+            {
+                ColSpan = Math.Max(1, colSpan);
+                RowSpan = Math.Max(1, rowSpan);
+            }
+        }
+
         LibraryDetailMediaLayoutInfo ResolveLibraryDetailMediaLayoutInfo(string file)
         {
             if (string.IsNullOrWhiteSpace(file)) return null;
@@ -182,8 +194,8 @@ namespace PixelVaultNative
         }
 
         /// <summary>
-        /// Square-first quilt rows: every row uses a shared cell height so the feed stays solid and the density control
-        /// directly changes the visible tile size. Individual tiles can claim extra horizontal cells for variation.
+        /// True cell-based quilt: tiles occupy a grid of square cells and can span multiple cells horizontally and vertically.
+        /// This keeps the feed continuous while allowing rectangles and occasional hero tiles to dominate the rhythm.
         /// </summary>
         internal static List<LibraryDetailMasonryChunk> BuildLibraryDetailMasonryChunks(
             IReadOnlyList<string> files,
@@ -201,7 +213,6 @@ namespace PixelVaultNative
             var gap = Math.Max(0, gapPx);
             var avail = Math.Max(120d, availableWidth);
             var requestedCell = Math.Max(120, baseWidth <= 0 ? 260 : baseWidth);
-
             var filtered = new List<string>();
             foreach (var f in files)
             {
@@ -219,174 +230,205 @@ namespace PixelVaultNative
                 cols--;
             }
             var cellSize = Math.Max(1, (int)Math.Floor((avail - ((cols - 1) * gap)) / cols));
+            var canvasWidth = Math.Max(1d, (cols * cellSize) + ((cols - 1) * gap));
 
-            const int maxItemsPerChunk = 48;
             const double maxChunkPaintHeight = 3400d;
             var maxRowsPerChunk = Math.Max(4, (int)Math.Floor((maxChunkPaintHeight + gap) / Math.Max(1d, cellSize + gap)));
-
-            var placements = new List<LibraryDetailMasonryPlacement>();
-            var yInChunk = 0d;
-            var rowsInChunk = 0;
             var index = 0;
-            var rowIndex = 0;
-
-            void FlushChunk()
-            {
-                if (placements.Count == 0) return;
-                var h = yInChunk > gap ? yInChunk - gap : yInChunk;
-                chunks.Add(new LibraryDetailMasonryChunk
-                {
-                    CanvasWidth = avail,
-                    CanvasHeight = Math.Max(1, h),
-                    Placements = placements
-                });
-                placements = new List<LibraryDetailMasonryPlacement>();
-                yInChunk = 0d;
-                rowsInChunk = 0;
-            }
 
             while (index < filtered.Count)
             {
-                if (placements.Count >= maxItemsPerChunk || rowsInChunk >= maxRowsPerChunk)
-                    FlushChunk();
-
-                var remaining = filtered.Count - index;
-                var rowItemCount = ChooseLibraryQuiltRowItemCount(cols, rowIndex, remaining);
-                var rowFiles = filtered.Skip(index).Take(rowItemCount).ToList();
-                var spans = BuildLibraryQuiltRowUnitSpans(rowFiles, cols, rowIndex, mediaLayoutByFile);
-
-                double x = 0;
-                for (var i = 0; i < rowFiles.Count; i++)
+                var occupied = new List<bool[]>();
+                var placements = new List<LibraryDetailMasonryPlacement>();
+                var placedThisChunk = 0;
+                while (index + placedThisChunk < filtered.Count)
                 {
-                    var spanUnits = Math.Max(1, spans[i]);
-                    var width = (spanUnits * cellSize) + ((spanUnits - 1) * gap);
-                    placements.Add(new LibraryDetailMasonryPlacement
+                    int anchorX;
+                    int anchorY;
+                    if (!TryFindLibraryQuiltAnchorCell(occupied, cols, maxRowsPerChunk, out anchorX, out anchorY))
+                        break;
+
+                    var file = filtered[index + placedThisChunk];
+                    var ordinal = index + placedThisChunk;
+                    var shapes = BuildLibraryQuiltShapePreferenceOrder(file, ordinal, cols, mediaLayoutByFile);
+                    var placed = false;
+                    foreach (var shape in shapes)
                     {
-                        File = rowFiles[i],
-                        X = x,
-                        Y = yInChunk,
-                        Width = width,
-                        Height = cellSize
-                    });
-                    x += width + gap;
+                        if (anchorX + shape.ColSpan > cols) continue;
+                        if (anchorY + shape.RowSpan > maxRowsPerChunk) continue;
+                        if (!LibraryQuiltAreaIsFree(occupied, anchorX, anchorY, shape)) continue;
+                        EnsureLibraryQuiltRows(occupied, anchorY + shape.RowSpan, cols);
+                        MarkLibraryQuiltOccupied(occupied, anchorX, anchorY, shape);
+                        placements.Add(new LibraryDetailMasonryPlacement
+                        {
+                            File = file,
+                            X = anchorX * (cellSize + gap),
+                            Y = anchorY * (cellSize + gap),
+                            Width = (shape.ColSpan * cellSize) + ((shape.ColSpan - 1) * gap),
+                            Height = (shape.RowSpan * cellSize) + ((shape.RowSpan - 1) * gap)
+                        });
+                        placed = true;
+                        placedThisChunk++;
+                        break;
+                    }
+
+                    if (!placed)
+                    {
+                        EnsureLibraryQuiltRows(occupied, anchorY + 1, cols);
+                        occupied[anchorY][anchorX] = true;
+                        placements.Add(new LibraryDetailMasonryPlacement
+                        {
+                            File = file,
+                            X = anchorX * (cellSize + gap),
+                            Y = anchorY * (cellSize + gap),
+                            Width = cellSize,
+                            Height = cellSize
+                        });
+                        placedThisChunk++;
+                    }
                 }
 
-                yInChunk += cellSize + gap;
-                rowsInChunk++;
-                index += rowFiles.Count;
-                rowIndex++;
+                if (placements.Count == 0) break;
+                var usedRows = placements
+                    .Select(placement => LibraryQuiltPlacementBottomRow(placement, cellSize, gap))
+                    .DefaultIfEmpty(1)
+                    .Max();
+                var canvasHeight = Math.Max(1d, (usedRows * cellSize) + ((usedRows - 1) * gap));
+                chunks.Add(new LibraryDetailMasonryChunk
+                {
+                    CanvasWidth = canvasWidth,
+                    CanvasHeight = canvasHeight,
+                    Placements = placements
+                });
+                index += placedThisChunk;
             }
 
-            FlushChunk();
             return chunks;
         }
 
-        static int ChooseLibraryQuiltRowItemCount(int columns, int rowIndex, int remainingItems)
+        static int LibraryQuiltPlacementBottomRow(LibraryDetailMasonryPlacement placement, int cellSize, int gap)
         {
-            if (remainingItems <= 0) return 0;
-            if (columns <= 2) return Math.Min(columns, remainingItems);
-            int target;
-            switch (rowIndex % 4)
-            {
-                case 1:
-                    target = Math.Max(2, columns - 1);
-                    break;
-                case 2:
-                    target = Math.Max(2, columns - 2);
-                    break;
-                default:
-                    target = columns;
-                    break;
-            }
-            return Math.Max(1, Math.Min(target, remainingItems));
+            var pitch = Math.Max(1, cellSize + gap);
+            return Math.Max(1, (int)Math.Round((placement.Y + placement.Height + gap) / pitch, MidpointRounding.AwayFromZero));
         }
 
-        static List<int> BuildLibraryQuiltRowUnitSpans(
-            IReadOnlyList<string> rowFiles,
-            int columns,
-            int rowIndex,
-            IReadOnlyDictionary<string, LibraryDetailMediaLayoutInfo> mediaLayoutByFile)
-        {
-            var spans = new List<int>();
-            if (rowFiles == null || rowFiles.Count == 0) return spans;
-
-            for (var i = 0; i < rowFiles.Count; i++) spans.Add(1);
-            var remainingUnits = Math.Max(0, columns - rowFiles.Count);
-            if (remainingUnits == 0) return spans;
-
-            var candidateIndexes = Enumerable.Range(0, rowFiles.Count)
-                .OrderByDescending(index => ScoreLibraryQuiltSpanCandidate(rowFiles[index], rowIndex, index, rowFiles.Count, mediaLayoutByFile))
-                .ThenBy(index => Math.Abs((((rowFiles.Count - 1) / 2d) - index)))
-                .ToList();
-            var maxSpans = new int[rowFiles.Count];
-            foreach (var index in candidateIndexes)
-                maxSpans[index] = DetermineLibraryQuiltMaxSpan(rowFiles[index], rowFiles.Count, columns, mediaLayoutByFile);
-
-            var safety = 0;
-            while (remainingUnits > 0 && candidateIndexes.Count > 0 && safety < 128)
-            {
-                var expanded = false;
-                foreach (var index in candidateIndexes)
-                {
-                    if (remainingUnits <= 0) break;
-                    if (spans[index] >= maxSpans[index]) continue;
-                    spans[index]++;
-                    remainingUnits--;
-                    expanded = true;
-                }
-                if (!expanded) break;
-                safety++;
-            }
-
-            if (remainingUnits > 0)
-            {
-                while (remainingUnits > 0)
-                {
-                    var distributed = false;
-                    foreach (var index in Enumerable.Range(0, rowFiles.Count).OrderBy(index => Math.Abs((((rowFiles.Count - 1) / 2d) - index))))
-                    {
-                        spans[index]++;
-                        remainingUnits--;
-                        distributed = true;
-                        if (remainingUnits == 0) break;
-                    }
-                    if (!distributed) break;
-                }
-            }
-
-            return spans;
-        }
-
-        static int DetermineLibraryQuiltMaxSpan(
+        static IReadOnlyList<LibraryDetailQuiltShape> BuildLibraryQuiltShapePreferenceOrder(
             string file,
-            int rowItemCount,
+            int ordinal,
             int columns,
             IReadOnlyDictionary<string, LibraryDetailMediaLayoutInfo> mediaLayoutByFile)
         {
             var aspect = ResolveLibraryDetailAspectRatio(file, mediaLayoutByFile);
-            if (rowItemCount <= 1) return columns;
-            if (rowItemCount == 2 && columns >= 5)
+            var layoutSeed = LibraryDetailFileLayoutHash(file);
+            var compactVariation = columns >= 3;
+            var pattern = Math.Abs(layoutSeed + (ordinal * 31)) % (compactVariation ? 6 : 4);
+            var preferHero = columns >= 3 && ((layoutSeed + ordinal) % (compactVariation ? 6 : 9) == 2);
+            var preferSquareAccent = compactVariation
+                ? pattern == 0 || pattern == 3 || ((layoutSeed + ordinal) % 5 == 1)
+                : ((layoutSeed + ordinal) % 5 == 1);
+            var preferSquareFirst = compactVariation && (pattern == 1 || pattern == 4);
+            var preferRectangleFirst = pattern == 2 || pattern == 5;
+            var shapes = new List<LibraryDetailQuiltShape>();
+
+            void AddShape(int colSpan, int rowSpan)
             {
-                if (aspect >= 1.8d) return 4;
-                return 3;
+                if (colSpan > columns) return;
+                if (shapes.Any(existing => existing.ColSpan == colSpan && existing.RowSpan == rowSpan)) return;
+                shapes.Add(new LibraryDetailQuiltShape(colSpan, rowSpan));
             }
-            if (aspect < 0.82d && rowItemCount > 2) return 1;
-            if (aspect >= 1.8d) return Math.Min(3, columns);
-            if (aspect >= 1.18d) return Math.Min(2, columns);
-            return Math.Min(2, columns);
+
+            if (aspect >= 1.55d)
+            {
+                if (preferSquareFirst) AddShape(1, 1);
+                if (preferHero) AddShape(2, 2);
+                if (preferRectangleFirst || !preferSquareFirst) AddShape(2, 1);
+                AddShape(1, 1);
+                AddShape(2, 1);
+                if (!preferHero) AddShape(2, 2);
+            }
+            else if (aspect >= 1.05d)
+            {
+                if (preferSquareFirst || preferSquareAccent) AddShape(1, 1);
+                if (preferHero) AddShape(2, 2);
+                if (preferRectangleFirst || !preferSquareFirst) AddShape(2, 1);
+                AddShape(1, 1);
+                AddShape(2, 1);
+                if (!preferHero) AddShape(2, 2);
+            }
+            else if (aspect >= 0.78d)
+            {
+                if (preferHero) AddShape(2, 2);
+                if (preferSquareAccent) AddShape(1, 1);
+                if (preferRectangleFirst && !preferSquareFirst) AddShape(2, 1);
+                AddShape(1, 1);
+                AddShape(2, 1);
+            }
+            else
+            {
+                if (preferSquareFirst || preferSquareAccent) AddShape(1, 1);
+                if (preferHero) AddShape(2, 2);
+                if (preferRectangleFirst && !preferSquareFirst) AddShape(2, 1);
+                AddShape(1, 1);
+                AddShape(2, 1);
+                if (!preferHero) AddShape(2, 2);
+            }
+
+            AddShape(1, 1);
+            return shapes;
         }
 
-        static double ScoreLibraryQuiltSpanCandidate(
-            string file,
-            int rowIndex,
-            int index,
-            int rowItemCount,
-            IReadOnlyDictionary<string, LibraryDetailMediaLayoutInfo> mediaLayoutByFile)
+        static bool TryFindLibraryQuiltAnchorCell(
+            List<bool[]> occupiedRows,
+            int columns,
+            int maxRows,
+            out int cellX,
+            out int cellY)
         {
-            var aspect = ResolveLibraryDetailAspectRatio(file, mediaLayoutByFile);
-            var centerBias = 1d - Math.Abs((((rowItemCount - 1) / 2d) - index));
-            var rhythmBias = ((rowIndex + index) % 3 == 0) ? 0.15d : 0d;
-            return aspect + (centerBias * 0.18d) + rhythmBias;
+            cellX = 0;
+            cellY = 0;
+            for (var y = 0; y < maxRows; y++)
+            {
+                EnsureLibraryQuiltRows(occupiedRows, y + 1, columns);
+                for (var x = 0; x < columns; x++)
+                {
+                    if (occupiedRows[y][x]) continue;
+                    cellX = x;
+                    cellY = y;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        static bool LibraryQuiltAreaIsFree(List<bool[]> occupiedRows, int x, int y, LibraryDetailQuiltShape shape)
+        {
+            for (var row = y; row < y + shape.RowSpan; row++)
+            {
+                if (row >= occupiedRows.Count) continue;
+                var rowData = occupiedRows[row];
+                for (var col = x; col < x + shape.ColSpan; col++)
+                {
+                    if (rowData[col]) return false;
+                }
+            }
+            return true;
+        }
+
+        static void EnsureLibraryQuiltRows(List<bool[]> occupiedRows, int rowCount, int columns)
+        {
+            while (occupiedRows.Count < rowCount)
+                occupiedRows.Add(new bool[columns]);
+        }
+
+        static void MarkLibraryQuiltOccupied(List<bool[]> occupiedRows, int x, int y, LibraryDetailQuiltShape shape)
+        {
+            for (var row = y; row < y + shape.RowSpan; row++)
+            {
+                var rowData = occupiedRows[row];
+                for (var col = x; col < x + shape.ColSpan; col++)
+                    rowData[col] = true;
+            }
         }
 
         /// <summary>Integer tile widths for one row that sum to <paramref name="innerWidth"/> (tile area only, not gaps).</summary>

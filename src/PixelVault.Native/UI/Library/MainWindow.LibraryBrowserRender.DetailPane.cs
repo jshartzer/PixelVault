@@ -61,9 +61,15 @@ namespace PixelVaultNative
             }
             var renderFolder = ws.Current;
             var timelineView = IsLibraryBrowserTimelineView(renderFolder);
-            var detailLayout = CalculateResponsiveLibraryDetailLayout(panes.ThumbScroll, true);
+            var detailLayout = CalculateResponsiveLibraryDetailLayout(panes.ThumbScroll, true, timelineView);
             var size = detailLayout.TileSize;
             ws.LastDetailViewportWidth = ResolveScrollViewerLayoutWidth(panes == null ? null : panes.ThumbScroll);
+            if (panes?.PhotoCaptureLayoutButton != null)
+            {
+                var densityLabel = DescribeResponsiveLibraryDetailDensity(size);
+                panes.PhotoCaptureLayoutButton.Content = "Density: " + densityLabel;
+                panes.PhotoCaptureLayoutButton.ToolTip = "Capture density follows the detail pane width automatically. Wide panes use Roomy; narrower panes use Compact.";
+            }
             var shouldRestoreDetailScroll = ws.PreserveDetailScrollOnNextRender && ws.PreservedDetailScrollOffset > 0.1d;
             var restoreDetailScrollOffset = shouldRestoreDetailScroll ? (double?)ws.PreservedDetailScrollOffset : null;
             var restoreDetailScrollPending = shouldRestoreDetailScroll;
@@ -651,17 +657,13 @@ namespace PixelVaultNative
             var rowDefinitions = new List<VirtualizedRowDefinition>();
             var nextRowDocumentTop = 0d;
             var orderedFiles = new List<string>();
-            var timelineDayLabels = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var captureDateLabels = BuildLibraryCaptureDateLabelMap(safeGroups, DateTime.Today, true);
             foreach (var group in safeGroups)
             {
                 var groupFiles = (group.Files ?? new List<string>())
                     .Where(file => !string.IsNullOrWhiteSpace(file))
                     .ToList();
                 if (groupFiles.Count == 0) continue;
-                if (timelineView)
-                {
-                    timelineDayLabels[groupFiles[0]] = BuildLibraryTimelineDayCardTitle(group.CaptureDate, DateTime.Today);
-                }
                 orderedFiles.AddRange(groupFiles);
             }
 
@@ -719,8 +721,8 @@ namespace PixelVaultNative
                                     ShowLibraryBrowserToast(ws, "Cover saved");
                                 };
                             }
-                            string timelineDayLabel = null;
-                            if (timelineView) timelineDayLabels.TryGetValue(placement.File, out timelineDayLabel);
+                            string captureDateLabel = null;
+                            captureDateLabels.TryGetValue(placement.File, out captureDateLabel);
                             var tile = CreateLibraryDetailTile(
                                 placement.File,
                                 placement.Width,
@@ -735,7 +737,7 @@ namespace PixelVaultNative
                                 placement.Height,
                                 timelineView ? timelineContext : null,
                                 prioritizeDecodes,
-                                timelineDayLabel);
+                                captureDateLabel);
                             Canvas.SetLeft(tile, placement.X);
                             Canvas.SetTop(tile, placement.Y);
                             canvas.Children.Add(tile);
@@ -746,6 +748,41 @@ namespace PixelVaultNative
             }
 
             return rowDefinitions;
+        }
+
+        internal static Dictionary<string, string> BuildLibraryCaptureDateLabelMap(
+            IEnumerable<LibraryDetailRenderGroup> groups,
+            DateTime referenceDate,
+            bool attachToLastFileOnly)
+        {
+            var labels = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (groups == null) return labels;
+            foreach (var group in groups)
+            {
+                var groupFiles = (group?.Files ?? new List<string>())
+                    .Where(file => !string.IsNullOrWhiteSpace(file))
+                    .ToList();
+                if (groupFiles.Count == 0) continue;
+                var label = BuildLibraryTimelineDayCardTitle(group.CaptureDate, referenceDate);
+                if (string.IsNullOrWhiteSpace(label)) continue;
+                if (attachToLastFileOnly)
+                {
+                    labels[groupFiles[groupFiles.Count - 1]] = label;
+                    continue;
+                }
+
+                foreach (var file in groupFiles)
+                    labels[file] = label;
+            }
+
+            return labels;
+        }
+
+        internal static Dictionary<string, string> BuildLibraryTimelineDayLabelMap(
+            IEnumerable<LibraryDetailRenderGroup> groups,
+            DateTime referenceDate)
+        {
+            return BuildLibraryCaptureDateLabelMap(groups, referenceDate, true);
         }
 
         void ScheduleDeferredLibraryDetailMetadataRepair(

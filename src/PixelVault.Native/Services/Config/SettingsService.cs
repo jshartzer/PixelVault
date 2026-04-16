@@ -17,8 +17,14 @@ namespace PixelVaultNative
                 .Distinct(StringComparer.OrdinalIgnoreCase));
         }
 
+        /// <summary>Compact capture-density preset used for narrower detail panes.</summary>
+        public const int LibraryPhotoTileCompactPreset = 240;
+
         /// <summary>Largest capture-density preset in the library menu.</summary>
-        public const int LibraryPhotoTileMenuLargestPreset = 420;
+        public const int LibraryPhotoTileMenuLargestPreset = 560;
+
+        /// <summary>Roomy capture-density preset used for wide detail panes.</summary>
+        public const int LibraryPhotoTileRoomyPreset = LibraryPhotoTileMenuLargestPreset;
 
         /// <summary>Upper clamp for saved capture density values, including older settings created before the density-only UI.</summary>
         public static int LibraryPhotoTileScrollHardMax => (int)Math.Round(LibraryPhotoTileMenuLargestPreset * 2.5d);

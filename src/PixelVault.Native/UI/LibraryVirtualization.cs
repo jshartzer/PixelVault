@@ -510,11 +510,11 @@ namespace PixelVaultNative
             tile.Clip = new RectangleGeometry(new Rect(0, 0, w, h), r, r);
         }
 
-        Border CreateLibraryDetailTile(string file, int size, int decodePixelWidth, Func<bool> shouldLoad, Action<string> openSingleFileMetadataEditor, Action<string, ModifierKeys> updateDetailSelection, HashSet<string> selectedDetailFiles, Action refreshDetailSelectionUi, Action redrawDetailPane, Action<string> useFileAsFolderCover, int? masonryLayoutHeight = null, LibraryTimelineCaptureContext timelineContext = null, bool prioritizeImageDecode = true, string timelineDayLabel = null)
+        Border CreateLibraryDetailTile(string file, int size, int decodePixelWidth, Func<bool> shouldLoad, Action<string> openSingleFileMetadataEditor, Action<string, ModifierKeys> updateDetailSelection, HashSet<string> selectedDetailFiles, Action refreshDetailSelectionUi, Action redrawDetailPane, Action<string> useFileAsFolderCover, int? masonryLayoutHeight = null, LibraryTimelineCaptureContext timelineContext = null, bool prioritizeImageDecode = true, string captureDateLabel = null)
         {
             var isVideoFile = IsVideo(file);
             var tileIsActive = true;
-            var hasTimelineDayLabel = !string.IsNullOrWhiteSpace(timelineDayLabel);
+            var hasCaptureDateLabel = !string.IsNullOrWhiteSpace(captureDateLabel);
             Func<bool> shouldKeepLoading = delegate
             {
                 return tileIsActive && (shouldLoad == null || shouldLoad());
@@ -624,7 +624,7 @@ namespace PixelVaultNative
             }
             if (isVideoFile)
             {
-                var videoBadgeTopMargin = hasTimelineDayLabel ? 42d : 8d;
+                var videoBadgeTopMargin = hasCaptureDateLabel ? 44d : 8d;
                 videoPreviewMedia = new MediaElement
                 {
                     LoadedBehavior = MediaState.Manual,
@@ -701,7 +701,7 @@ namespace PixelVaultNative
                 }, shouldKeepLoading);
             }
             else applyVideoInfo(null);
-            if (hasTimelineDayLabel)
+            if (hasCaptureDateLabel)
             {
                 contentRoot.Children.Add(new Border
                 {
@@ -711,13 +711,13 @@ namespace PixelVaultNative
                     Background = Brush("#CC162028"),
                     BorderBrush = Brush("#45606E"),
                     BorderThickness = new Thickness(1),
-                    CornerRadius = new CornerRadius(9),
-                    Padding = new Thickness(9, 4, 9, 4),
+                    CornerRadius = new CornerRadius(10),
+                    Padding = new Thickness(11, 5, 11, 5),
                     Child = new TextBlock
                     {
-                        Text = timelineDayLabel,
+                        Text = captureDateLabel,
                         Foreground = Brush("#E6EEF3"),
-                        FontSize = 11,
+                        FontSize = 12.5,
                         FontWeight = FontWeights.SemiBold
                     }
                 });
