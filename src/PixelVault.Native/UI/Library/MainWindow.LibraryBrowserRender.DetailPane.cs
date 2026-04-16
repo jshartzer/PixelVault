@@ -764,7 +764,8 @@ namespace PixelVaultNative
                                 placement.Height,
                                 timelineView ? timelineContext : null,
                                 prioritizeDecodes,
-                                captureDateLabel);
+                                captureDateLabel,
+                                path => OpenLibraryCaptureViewer(this, ws, path));
                             Canvas.SetLeft(tile, placement.X);
                             Canvas.SetTop(tile, placement.Y);
                             canvas.Children.Add(tile);
@@ -1261,7 +1262,8 @@ namespace PixelVaultNative
                         placement.Height,
                         timelineView ? timelineContext : null,
                         prioritizeRowDecodes,
-                        captureDateLabel);
+                        captureDateLabel,
+                        path => OpenLibraryCaptureViewer(this, ws, path));
                     Canvas.SetLeft(tile, placement.X);
                     Canvas.SetTop(tile, placement.Y);
                     canvas.Children.Add(tile);

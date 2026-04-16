@@ -495,6 +495,22 @@ namespace PixelVaultNative
             };
         }
 
+        /// <summary>PV-POL-LIBPV-OPEN-001: suppress in-app viewer when the hit target is star, day badge, or timeline footer chrome.</summary>
+        static bool LibraryDetailTileInputShouldSuppressCaptureViewer(DependencyObject hit, Border tileBorder)
+        {
+            for (var d = hit; d != null; d = VisualTreeHelper.GetParent(d))
+            {
+                if (ReferenceEquals(d, tileBorder)) return false;
+                if (d is System.Windows.Controls.Primitives.ButtonBase) return true;
+                if (d is TextBox) return true;
+                var fe = d as FrameworkElement;
+                var tag = fe == null ? null : fe.Tag as string;
+                if (string.Equals(tag, "LibTimelineFooter", StringComparison.Ordinal)) return true;
+                if (string.Equals(tag, "LibDayBadge", StringComparison.Ordinal)) return true;
+            }
+            return false;
+        }
+
         static void SyncLibraryMasonryTileRoundedClip(Border tile)
         {
             if (tile == null) return;
@@ -510,7 +526,7 @@ namespace PixelVaultNative
             tile.Clip = new RectangleGeometry(new Rect(0, 0, w, h), r, r);
         }
 
-        Border CreateLibraryDetailTile(string file, int size, int decodePixelWidth, Func<bool> shouldLoad, Action<string> openSingleFileMetadataEditor, Action<string, ModifierKeys> updateDetailSelection, HashSet<string> selectedDetailFiles, Action refreshDetailSelectionUi, Action redrawDetailPane, Action<string> useFileAsFolderCover, int? masonryLayoutHeight = null, LibraryTimelineCaptureContext timelineContext = null, bool prioritizeImageDecode = true, string captureDateLabel = null)
+        Border CreateLibraryDetailTile(string file, int size, int decodePixelWidth, Func<bool> shouldLoad, Action<string> openSingleFileMetadataEditor, Action<string, ModifierKeys> updateDetailSelection, HashSet<string> selectedDetailFiles, Action refreshDetailSelectionUi, Action redrawDetailPane, Action<string> useFileAsFolderCover, int? masonryLayoutHeight = null, LibraryTimelineCaptureContext timelineContext = null, bool prioritizeImageDecode = true, string captureDateLabel = null, Action<string> openCaptureViewer = null)
         {
             var isVideoFile = IsVideo(file);
             var tileIsActive = true;
@@ -705,6 +721,7 @@ namespace PixelVaultNative
             {
                 contentRoot.Children.Add(new Border
                 {
+                    Tag = "LibDayBadge",
                     HorizontalAlignment = HorizontalAlignment.Left,
                     VerticalAlignment = VerticalAlignment.Top,
                     Margin = new Thickness(8, 8, 0, 0),
@@ -725,6 +742,7 @@ namespace PixelVaultNative
                 });
             }
             var timelineFooterHost = BuildLibraryTimelineCaptureFooter(size, file, timelineContext);
+            if (timelineFooterHost is FrameworkElement footerFe) footerFe.Tag = "LibTimelineFooter";
             if (timelineFooterHost != null) contentRoot.Children.Add(timelineFooterHost);
             if (!isVideoFile && detailStarButton != null) contentRoot.Children.Add(detailStarButton);
             tile.Child = contentRoot;
@@ -738,12 +756,26 @@ namespace PixelVaultNative
             {
                 var clicked = sender as Border;
                 var clickedFile = clicked == null ? string.Empty : clicked.Tag as string;
-                updateDetailSelection(clickedFile, Keyboard.Modifiers);
+                var mods = Keyboard.Modifiers;
+                if (LibraryDetailTileInputShouldSuppressCaptureViewer(e.OriginalSource as DependencyObject, clicked))
+                {
+                    updateDetailSelection(clickedFile, mods);
+                    return;
+                }
+                if ((mods & ModifierKeys.Control) != 0 || (mods & ModifierKeys.Shift) != 0)
+                {
+                    updateDetailSelection(clickedFile, mods);
+                    return;
+                }
+                updateDetailSelection(clickedFile, mods);
+                if (!isVideoFile && IsImage(clickedFile) && e.ClickCount == 1 && openCaptureViewer != null)
+                    openCaptureViewer(clickedFile);
                 if (e.ClickCount >= 2 && !string.IsNullOrWhiteSpace(clickedFile))
                 {
                     if (libraryDoubleClickSetsFolderCover && !isVideoFile && IsImage(clickedFile) && useFileAsFolderCover != null)
                         useFileAsFolderCover(clickedFile);
-                    else OpenWithShell(clickedFile);
+                    else if (isVideoFile || openCaptureViewer == null)
+                        OpenWithShell(clickedFile);
                 }
             };
             tile.MouseRightButtonDown += delegate(object sender, System.Windows.Input.MouseButtonEventArgs e)
