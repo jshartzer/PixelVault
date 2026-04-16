@@ -784,20 +784,11 @@ namespace PixelVaultNative
             DateTime referenceDate)
         {
             var labels = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            if (groups == null || chunks == null) return labels;
-
-            var placementByFile = (chunks ?? Enumerable.Empty<LibraryDetailMasonryChunk>())
-                .Where(chunk => chunk != null)
-                .SelectMany(chunk => chunk.Placements ?? new List<LibraryDetailMasonryPlacement>())
-                .Where(placement => placement != null && !string.IsNullOrWhiteSpace(placement.File))
-                .GroupBy(placement => placement.File, StringComparer.OrdinalIgnoreCase)
-                .ToDictionary(
-                    group => group.Key,
-                    group => group
-                        .OrderByDescending(placement => placement.Y)
-                        .ThenByDescending(placement => placement.X)
-                        .First(),
-                    StringComparer.OrdinalIgnoreCase);
+            if (groups == null) return labels;
+            // Day labels belong on the chronologically last capture of each calendar day. Snapshot groups
+            // list files in descending capture time (see detail snapshot build), so the first path in each
+            // group is that anchor tile. The <paramref name="chunks"/> argument is retained for call-site
+            // compatibility only.
 
             foreach (var renderGroup in groups)
             {
@@ -810,18 +801,7 @@ namespace PixelVaultNative
                 var label = BuildLibraryTimelineDayCardTitle(renderGroup.CaptureDate, referenceDate);
                 if (string.IsNullOrWhiteSpace(label)) continue;
 
-                var chosenPlacement = groupFiles
-                    .Select(file =>
-                    {
-                        LibraryDetailMasonryPlacement placement;
-                        return placementByFile.TryGetValue(file, out placement) ? placement : null;
-                    })
-                    .Where(placement => placement != null)
-                    .OrderByDescending(placement => placement.Y)
-                    .ThenByDescending(placement => placement.X)
-                    .FirstOrDefault();
-                if (chosenPlacement == null) continue;
-                labels[chosenPlacement.File] = label;
+                labels[groupFiles[0]] = label;
             }
 
             return labels;
