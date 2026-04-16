@@ -657,7 +657,6 @@ namespace PixelVaultNative
             var rowDefinitions = new List<VirtualizedRowDefinition>();
             var nextRowDocumentTop = 0d;
             var orderedFiles = new List<string>();
-            var captureDateLabels = BuildLibraryCaptureDateLabelMap(safeGroups, DateTime.Today, true);
             foreach (var group in safeGroups)
             {
                 var groupFiles = (group.Files ?? new List<string>())
@@ -681,6 +680,7 @@ namespace PixelVaultNative
                 maxTileWidth,
                 timelineView,
                 mediaLayoutByFile);
+            var captureDateLabels = BuildLibraryCaptureDateLabelMapForPlacements(safeGroups, chunks, DateTime.Today);
 
             for (var chunkIndex = 0; chunkIndex < chunks.Count; chunkIndex++)
             {
@@ -773,6 +773,55 @@ namespace PixelVaultNative
 
                 foreach (var file in groupFiles)
                     labels[file] = label;
+            }
+
+            return labels;
+        }
+
+        internal static Dictionary<string, string> BuildLibraryCaptureDateLabelMapForPlacements(
+            IEnumerable<LibraryDetailRenderGroup> groups,
+            IEnumerable<LibraryDetailMasonryChunk> chunks,
+            DateTime referenceDate)
+        {
+            var labels = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (groups == null || chunks == null) return labels;
+
+            var placementByFile = (chunks ?? Enumerable.Empty<LibraryDetailMasonryChunk>())
+                .Where(chunk => chunk != null)
+                .SelectMany(chunk => chunk.Placements ?? new List<LibraryDetailMasonryPlacement>())
+                .Where(placement => placement != null && !string.IsNullOrWhiteSpace(placement.File))
+                .GroupBy(placement => placement.File, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group
+                        .OrderByDescending(placement => placement.Y)
+                        .ThenByDescending(placement => placement.X)
+                        .First(),
+                    StringComparer.OrdinalIgnoreCase);
+
+            foreach (var renderGroup in groups)
+            {
+                var groupFiles = (renderGroup?.Files ?? new List<string>())
+                    .Where(file => !string.IsNullOrWhiteSpace(file))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                if (groupFiles.Count == 0) continue;
+
+                var label = BuildLibraryTimelineDayCardTitle(renderGroup.CaptureDate, referenceDate);
+                if (string.IsNullOrWhiteSpace(label)) continue;
+
+                var chosenPlacement = groupFiles
+                    .Select(file =>
+                    {
+                        LibraryDetailMasonryPlacement placement;
+                        return placementByFile.TryGetValue(file, out placement) ? placement : null;
+                    })
+                    .Where(placement => placement != null)
+                    .OrderByDescending(placement => placement.Y)
+                    .ThenByDescending(placement => placement.X)
+                    .FirstOrDefault();
+                if (chosenPlacement == null) continue;
+                labels[chosenPlacement.File] = label;
             }
 
             return labels;
@@ -1126,6 +1175,10 @@ namespace PixelVaultNative
                 : (group.CaptureDate.Year == DateTime.Today.Year
                     ? group.CaptureDate.ToString("ddd, MMM d")
                     : group.CaptureDate.ToString("ddd, MMM d, yyyy"));
+            var captureDateLabels = BuildLibraryCaptureDateLabelMapForPlacements(
+                new[] { group },
+                cardLayout.Chunks,
+                DateTime.Today);
             var stack = new StackPanel();
             if (!string.IsNullOrWhiteSpace(labelText))
             {
@@ -1166,6 +1219,8 @@ namespace PixelVaultNative
                             ShowLibraryBrowserToast(ws, "Cover saved");
                         };
                     }
+                    string captureDateLabel = null;
+                    captureDateLabels.TryGetValue(placement.File, out captureDateLabel);
                     var tile = CreateLibraryDetailTile(
                         placement.File,
                         placement.Width,
@@ -1179,7 +1234,8 @@ namespace PixelVaultNative
                         useFileAsFolderCover,
                         placement.Height,
                         timelineView ? timelineContext : null,
-                        prioritizeRowDecodes);
+                        prioritizeRowDecodes,
+                        captureDateLabel);
                     Canvas.SetLeft(tile, placement.X);
                     Canvas.SetTop(tile, placement.Y);
                     canvas.Children.Add(tile);
