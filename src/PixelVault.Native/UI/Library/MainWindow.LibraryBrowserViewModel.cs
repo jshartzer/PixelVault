@@ -485,6 +485,8 @@ namespace PixelVaultNative
                 var entry = TryGetLibraryMetadataIndexEntry(libraryRoot, file, metadataIndex);
                 EmbeddedMetadataSnapshot metadataSnapshot;
                 if (metadataSnapshots == null || !metadataSnapshots.TryGetValue(file, out metadataSnapshot) || metadataSnapshot == null) metadataSnapshot = null;
+                if (metadataSnapshot != null && metadataSnapshot.CaptureTime.HasValue)
+                    captureDate = metadataSnapshot.CaptureTime.Value;
                 var normalizedGameId = NormalizeGameId(entry == null ? string.Empty : entry.GameId);
                 GameIndexEditorRow savedRow;
                 rowsByGameId.TryGetValue(normalizedGameId, out savedRow);

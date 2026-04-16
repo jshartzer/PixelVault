@@ -349,7 +349,24 @@ namespace PixelVaultNative
                     {
                         var segmentSw = Stopwatch.StartNew();
                         var datedFiles = detailFiles
-                            .Select(file => new { FilePath = file, CaptureDate = librarySession.ResolveIndexedLibraryDate(file, metadataIndex) })
+                            .Select(file =>
+                            {
+                                var captureDate = librarySession.ResolveIndexedLibraryDate(file, metadataIndex);
+                                // Timeline merges many folders; index/mtime-only dates often collapse into one day until
+                                // embedded EXIF is read. Prefer CaptureTime from the batch read when present so day groups
+                                // (and per-day badges) match real capture dates.
+                                if (timelineView && timelineMetadataSnapshots != null)
+                                {
+                                    EmbeddedMetadataSnapshot embedded;
+                                    if (timelineMetadataSnapshots.TryGetValue(file, out embedded)
+                                        && embedded != null
+                                        && embedded.CaptureTime.HasValue)
+                                    {
+                                        captureDate = embedded.CaptureTime.Value;
+                                    }
+                                }
+                                return new { FilePath = file, CaptureDate = captureDate };
+                            })
                             .Where(entry => !timelineView || LibraryTimelineRangeContainsCapture(entry.CaptureDate, timelineRangeStart, timelineRangeEnd))
                             .Where(entry => !PhotoWorkspaceShouldHideCapture(entry.FilePath))
                             .OrderByDescending(entry => entry.CaptureDate)
@@ -455,12 +472,15 @@ namespace PixelVaultNative
                                     }
                                 }
                             }
-                            if (commentsChanged)
+                            var dayGroupingChanged = LibraryTimelineDetailGroupingFingerprint(quickSnapshot.Groups)
+                                != LibraryTimelineDetailGroupingFingerprint(commentSnapshot.Groups);
+                            if (commentsChanged || dayGroupingChanged)
                             {
-                                traceStep("LibraryDetailTimelineMetadataDispatchStart", "stage=comment-refresh");
+                                traceStep("LibraryDetailTimelineMetadataDispatchStart",
+                                    "stage=timeline-refresh; commentsChanged=" + commentsChanged + "; dayGroupingChanged=" + dayGroupingChanged);
                                 var commentVirtualRows = buildVirtualRowsForSnapshot(commentSnapshot);
                                 await libraryWindow.Dispatcher.InvokeAsync((Action)(delegate { applyDetailSnapshot(commentSnapshot, false, commentVirtualRows); }));
-                                traceStep("LibraryDetailTimelineMetadataDispatchComplete", "stage=comment-refresh");
+                                traceStep("LibraryDetailTimelineMetadataDispatchComplete", "stage=timeline-refresh");
                                 quickSnapshot = commentSnapshot;
                             }
                         }
@@ -783,6 +803,26 @@ namespace PixelVaultNative
             }
 
             return labels;
+        }
+
+        /// <summary>Stable signature of calendar-day buckets for deciding whether embedded metadata changed timeline grouping.</summary>
+        static string LibraryTimelineDetailGroupingFingerprint(IList<LibraryDetailRenderGroup> groups)
+        {
+            if (groups == null || groups.Count == 0) return string.Empty;
+            var parts = new string[groups.Count];
+            for (var i = 0; i < groups.Count; i++)
+            {
+                var g = groups[i];
+                if (g == null)
+                {
+                    parts[i] = "x";
+                    continue;
+                }
+                var files = g.Files ?? new List<string>();
+                var anchor = files.Count == 0 ? string.Empty : files[0];
+                parts[i] = g.CaptureDate.Ticks + ":" + files.Count + ":" + anchor;
+            }
+            return string.Join("|", parts);
         }
 
         internal static Dictionary<string, string> BuildLibraryCaptureDateLabelMapForPlacements(
