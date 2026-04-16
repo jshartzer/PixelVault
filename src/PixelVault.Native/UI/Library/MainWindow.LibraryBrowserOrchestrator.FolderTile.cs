@@ -414,8 +414,7 @@ namespace PixelVaultNative
             var refreshThisFolderItem = new MenuItem { Header = "Refresh this folder", IsEnabled = actionFolders.Count > 0 };
             refreshThisFolderItem.Click += delegate
             {
-                showFolder(folder);
-                runScopedCoverRefresh(actionFolders, BuildLibraryBrowserActionScopeLabel(folder), true, false, false);
+                LibraryBrowserRefreshFolderSelectionFromDisk(ws, ws?.Panes, folder, refreshLibraryFoldersAsync, showFolder);
             };
             var reloadLibraryListItem = new MenuItem { Header = "Reload library folder list" };
             reloadLibraryListItem.Click += delegate

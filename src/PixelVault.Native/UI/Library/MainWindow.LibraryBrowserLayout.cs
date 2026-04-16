@@ -460,7 +460,7 @@ namespace PixelVaultNative
             panes.OpenFolderButton.Content = BuildToolbarButtonContent("\uE8B7", "Open Folder");
             panes.RefreshThisFolderButton.Content = BuildToolbarButtonContent("\uE72C", "Refresh folder");
             panes.ExitTimelineButton.Content = BuildToolbarButtonContent("\uE72B", "Folder Browser");
-            panes.RefreshThisFolderButton.ToolTip = "Refresh IDs and cover art for this folder only";
+            panes.RefreshThisFolderButton.ToolTip = "Reload this folder from disk and refresh the library list";
             panes.ExitTimelineButton.ToolTip = "Return to the folder browser";
             ApplyLibraryPillChrome(panes.OpenFolderButton, "#1F3340", "#314754", "#29424F", "#172630");
             ApplyLibraryPillChrome(panes.EditMetadataButton, "#1C2A32", "#2A3C46", "#22323C", "#141E24");

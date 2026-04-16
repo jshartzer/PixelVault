@@ -186,6 +186,12 @@ namespace PixelVaultNative
 
         void LibraryBrowserRefreshFoldersAsync(Window libraryWindow, MainWindow.LibraryBrowserWorkingSet ws, bool forceRefresh, Action renderTiles);
         void LibraryBrowserPrefillFoldersFromSnapshot(Window libraryWindow, MainWindow.LibraryBrowserWorkingSet ws, Action renderTiles);
+        void LibraryBrowserRefreshFolderSelectionFromDisk(
+            MainWindow.LibraryBrowserWorkingSet ws,
+            MainWindow.LibraryBrowserPaneRefs panes,
+            MainWindow.LibraryBrowserFolderView targetFolder,
+            Action<bool> refreshLibraryFoldersAsync,
+            Action<MainWindow.LibraryBrowserFolderView> showFolder);
 
         void LibraryBrowserRunFolderMetadataScan(
             Window libraryWindow,

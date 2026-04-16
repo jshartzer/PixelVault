@@ -336,44 +336,54 @@ namespace PixelVaultNative
             };
         }
 
-        FrameworkElement BuildLibraryTimelineCaptureFooter(int size, string filePath, LibraryTimelineCaptureContext timelineContext)
+        internal static bool ShouldShowLibraryCaptureFooter(LibraryTimelineCaptureContext timelineContext, bool showTimelineMeta)
         {
-            if (timelineContext == null) return null;
+            if (timelineContext == null) return false;
+            if (showTimelineMeta) return true;
+            return !string.IsNullOrWhiteSpace(timelineContext.Comment ?? string.Empty);
+        }
+
+        FrameworkElement BuildLibraryTimelineCaptureFooter(int size, string filePath, LibraryTimelineCaptureContext timelineContext, bool showTimelineMeta = true)
+        {
+            if (!ShouldShowLibraryCaptureFooter(timelineContext, showTimelineMeta)) return null;
             var savedComment = CleanComment(timelineContext.Comment ?? string.Empty);
             var editMode = false;
             var saveInFlight = false;
             var footer = new StackPanel();
-            footer.Children.Add(new TextBlock
+            if (showTimelineMeta)
             {
-                Text = string.IsNullOrWhiteSpace(timelineContext.GameTitle) ? "Unknown Game" : timelineContext.GameTitle,
-                Foreground = Brushes.White,
-                FontSize = 12.5,
-                FontWeight = FontWeights.SemiBold,
-                TextWrapping = TextWrapping.Wrap,
-                TextTrimming = TextTrimming.CharacterEllipsis,
-                MaxHeight = 40
-            });
-            var footerMetaRow = new DockPanel { Margin = new Thickness(0, 5, 0, 0), LastChildFill = false };
-            var timeText = BuildLibraryTimelineCaptureTimeLabel(timelineContext.CaptureDate);
-            if (!string.IsNullOrWhiteSpace(timeText))
-            {
-                var captureTimeBlock = new TextBlock
+                footer.Children.Add(new TextBlock
                 {
-                    Text = timeText,
-                    Foreground = Brush("#9FB0BA"),
-                    FontSize = 10.5,
-                    VerticalAlignment = VerticalAlignment.Center
-                };
-                DockPanel.SetDock(captureTimeBlock, Dock.Right);
-                footerMetaRow.Children.Add(captureTimeBlock);
+                    Text = string.IsNullOrWhiteSpace(timelineContext.GameTitle) ? "Unknown Game" : timelineContext.GameTitle,
+                    Foreground = Brushes.White,
+                    FontSize = 12.5,
+                    FontWeight = FontWeights.SemiBold,
+                    TextWrapping = TextWrapping.Wrap,
+                    TextTrimming = TextTrimming.CharacterEllipsis,
+                    MaxHeight = 40
+                });
+                var footerMetaRow = new DockPanel { Margin = new Thickness(0, 5, 0, 0), LastChildFill = false };
+                var timeText = BuildLibraryTimelineCaptureTimeLabel(timelineContext.CaptureDate);
+                if (!string.IsNullOrWhiteSpace(timeText))
+                {
+                    var captureTimeBlock = new TextBlock
+                    {
+                        Text = timeText,
+                        Foreground = Brush("#9FB0BA"),
+                        FontSize = 10.5,
+                        VerticalAlignment = VerticalAlignment.Center
+                    };
+                    DockPanel.SetDock(captureTimeBlock, Dock.Right);
+                    footerMetaRow.Children.Add(captureTimeBlock);
+                }
+                var platformChip = BuildLibraryTimelinePlatformChip(timelineContext.PlatformLabel);
+                if (platformChip != null)
+                {
+                    DockPanel.SetDock(platformChip, Dock.Left);
+                    footerMetaRow.Children.Add(platformChip);
+                }
+                if (footerMetaRow.Children.Count > 0) footer.Children.Add(footerMetaRow);
             }
-            var platformChip = BuildLibraryTimelinePlatformChip(timelineContext.PlatformLabel);
-            if (platformChip != null)
-            {
-                DockPanel.SetDock(platformChip, Dock.Left);
-                footerMetaRow.Children.Add(platformChip);
-            }
-            if (footerMetaRow.Children.Count > 0) footer.Children.Add(footerMetaRow);
 
             var commentShell = new Grid { Margin = new Thickness(0, 6, 0, 0), Cursor = Cursors.IBeam };
             var commentDisplay = new TextBlock
@@ -489,7 +499,7 @@ namespace PixelVaultNative
                 HorizontalAlignment = HorizontalAlignment.Stretch,
                 VerticalAlignment = VerticalAlignment.Bottom,
                 Background = LibraryTimelineTileFooterScrimBrush,
-                Padding = new Thickness(10, 20, 10, 8),
+                Padding = showTimelineMeta ? new Thickness(10, 20, 10, 8) : new Thickness(10, 8, 10, 8),
                 MaxWidth = Math.Max(64, size),
                 Child = footer
             };
@@ -526,7 +536,7 @@ namespace PixelVaultNative
             tile.Clip = new RectangleGeometry(new Rect(0, 0, w, h), r, r);
         }
 
-        Border CreateLibraryDetailTile(string file, int size, int decodePixelWidth, Func<bool> shouldLoad, Action<string> openSingleFileMetadataEditor, Action<string, ModifierKeys> updateDetailSelection, HashSet<string> selectedDetailFiles, Action refreshDetailSelectionUi, Action redrawDetailPane, Action<string> useFileAsFolderCover, int? masonryLayoutHeight = null, LibraryTimelineCaptureContext timelineContext = null, bool prioritizeImageDecode = true, string captureDateLabel = null, Action<string> openCaptureViewer = null)
+        Border CreateLibraryDetailTile(string file, int size, int decodePixelWidth, Func<bool> shouldLoad, Action<string> openSingleFileMetadataEditor, Action<string, ModifierKeys> updateDetailSelection, HashSet<string> selectedDetailFiles, Action refreshDetailSelectionUi, Action redrawDetailPane, Action<string> useFileAsFolderCover, int? masonryLayoutHeight = null, LibraryTimelineCaptureContext timelineContext = null, bool prioritizeImageDecode = true, string captureDateLabel = null, Action<string> openCaptureViewer = null, bool showTimelineMeta = true)
         {
             var isVideoFile = IsVideo(file);
             var tileIsActive = true;
@@ -741,7 +751,7 @@ namespace PixelVaultNative
                     }
                 });
             }
-            var timelineFooterHost = BuildLibraryTimelineCaptureFooter(size, file, timelineContext);
+            var timelineFooterHost = BuildLibraryTimelineCaptureFooter(size, file, timelineContext, showTimelineMeta);
             if (timelineFooterHost is FrameworkElement footerFe) footerFe.Tag = "LibTimelineFooter";
             if (timelineFooterHost != null) contentRoot.Children.Add(timelineFooterHost);
             if (!isVideoFile && detailStarButton != null) contentRoot.Children.Add(detailStarButton);

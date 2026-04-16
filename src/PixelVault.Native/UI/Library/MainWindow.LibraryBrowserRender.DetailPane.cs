@@ -402,10 +402,7 @@ namespace PixelVaultNative
 
                         var mediaLayoutMs = segmentSw.ElapsedMilliseconds;
                         segmentSw.Restart();
-                        if (timelineView)
-                        {
-                            snapshot.TimelineContextByFile = BuildLibraryTimelineCaptureContextMap(snapshot.VisibleFiles, metadataIndex, savedGameRows, timelineMetadataSnapshots);
-                        }
+                        snapshot.TimelineContextByFile = BuildLibraryTimelineCaptureContextMap(snapshot.VisibleFiles, metadataIndex, savedGameRows, timelineMetadataSnapshots);
                         foreach (var group in datedFiles
                             .GroupBy(entry => entry.CaptureDate.Date)
                             .OrderByDescending(group => group.Key))
@@ -444,13 +441,13 @@ namespace PixelVaultNative
                     await libraryWindow.Dispatcher.InvokeAsync((Action)(delegate { applyDetailSnapshot(quickSnapshot, true, quickVirtualRows); }));
                     traceStep("LibraryDetailQuickSnapshotDispatchComplete", "stage=initial; dispatcherWallMs=" + dispatcherWallSw.ElapsedMilliseconds);
                     Dictionary<string, EmbeddedMetadataSnapshot> timelineMetadataSnapshots = null;
-                    if (timelineView && quickSnapshot.VisibleFiles.Count > 0)
+                    if (quickSnapshot.VisibleFiles.Count > 0)
                     {
                         try
                         {
-                            traceStep("LibraryDetailTimelineMetadataReadStart", "files=" + quickSnapshot.VisibleFiles.Count);
+                            traceStep("LibraryDetailMetadataReadStart", "files=" + quickSnapshot.VisibleFiles.Count);
                             timelineMetadataSnapshots = await metadataService.ReadEmbeddedMetadataBatchAsync(quickSnapshot.VisibleFiles, CancellationToken.None).ConfigureAwait(false);
-                            traceStep("LibraryDetailTimelineMetadataReadComplete", "metadataResults=" + timelineMetadataSnapshots.Count);
+                            traceStep("LibraryDetailMetadataReadComplete", "metadataResults=" + timelineMetadataSnapshots.Count);
                             var commentSnapshot = buildSnapshot(timelineMetadataSnapshots, quickSnapshot);
                             var commentsChanged = commentSnapshot.TimelineContextByFile.Count != quickSnapshot.TimelineContextByFile.Count;
                             if (!commentsChanged)
@@ -476,18 +473,18 @@ namespace PixelVaultNative
                                 != LibraryTimelineDetailGroupingFingerprint(commentSnapshot.Groups);
                             if (commentsChanged || dayGroupingChanged)
                             {
-                                traceStep("LibraryDetailTimelineMetadataDispatchStart",
-                                    "stage=timeline-refresh; commentsChanged=" + commentsChanged + "; dayGroupingChanged=" + dayGroupingChanged);
+                                traceStep("LibraryDetailMetadataDispatchStart",
+                                    "stage=metadata-refresh; commentsChanged=" + commentsChanged + "; dayGroupingChanged=" + dayGroupingChanged);
                                 var commentVirtualRows = buildVirtualRowsForSnapshot(commentSnapshot);
                                 await libraryWindow.Dispatcher.InvokeAsync((Action)(delegate { applyDetailSnapshot(commentSnapshot, false, commentVirtualRows); }));
-                                traceStep("LibraryDetailTimelineMetadataDispatchComplete", "stage=timeline-refresh");
+                                traceStep("LibraryDetailMetadataDispatchComplete", "stage=metadata-refresh");
                                 quickSnapshot = commentSnapshot;
                             }
                         }
                         catch (Exception timelineMetadataEx)
                         {
-                            LogException("Library detail timeline metadata read | " + (renderFolder.Name ?? renderFolder.PrimaryFolderPath ?? "(unknown)"), timelineMetadataEx);
-                            LogTroubleshooting("LibraryDetailTimelineMetadataReadFail",
+                            LogException("Library detail metadata read | " + (renderFolder.Name ?? renderFolder.PrimaryFolderPath ?? "(unknown)"), timelineMetadataEx);
+                            LogTroubleshooting("LibraryDetailMetadataReadFail",
                                 "renderVersion=" + renderVersion
                                 + "; type=" + timelineMetadataEx.GetType().FullName
                                 + "; message=" + timelineMetadataEx.Message
@@ -762,10 +759,11 @@ namespace PixelVaultNative
                                 redrawSelectedFolderDetail,
                                 useFileAsFolderCover,
                                 placement.Height,
-                                timelineView ? timelineContext : null,
+                                timelineContext,
                                 prioritizeDecodes,
                                 captureDateLabel,
-                                path => OpenLibraryCaptureViewer(this, ws, path));
+                                path => OpenLibraryCaptureViewer(this, ws, path),
+                                timelineView);
                             Canvas.SetLeft(tile, placement.X);
                             Canvas.SetTop(tile, placement.Y);
                             canvas.Children.Add(tile);
@@ -1260,10 +1258,11 @@ namespace PixelVaultNative
                         redrawSelectedFolderDetail,
                         useFileAsFolderCover,
                         placement.Height,
-                        timelineView ? timelineContext : null,
+                        timelineContext,
                         prioritizeRowDecodes,
                         captureDateLabel,
-                        path => OpenLibraryCaptureViewer(this, ws, path));
+                        path => OpenLibraryCaptureViewer(this, ws, path),
+                        timelineView);
                     Canvas.SetLeft(tile, placement.X);
                     Canvas.SetTop(tile, placement.Y);
                     canvas.Children.Add(tile);

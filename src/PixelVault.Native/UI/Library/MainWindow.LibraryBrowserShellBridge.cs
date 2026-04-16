@@ -319,6 +319,14 @@ namespace PixelVaultNative
             public void LibraryBrowserPrefillFoldersFromSnapshot(Window libraryWindow, LibraryBrowserWorkingSet ws, Action renderTiles) =>
                 _m.LibraryBrowserPrefillFoldersFromSnapshot(libraryWindow, ws, renderTiles);
 
+            public void LibraryBrowserRefreshFolderSelectionFromDisk(
+                LibraryBrowserWorkingSet ws,
+                LibraryBrowserPaneRefs panes,
+                LibraryBrowserFolderView targetFolder,
+                Action<bool> refreshLibraryFoldersAsync,
+                Action<LibraryBrowserFolderView> showFolder) =>
+                _m.LibraryBrowserRefreshFolderSelectionFromDisk(ws, panes, targetFolder, refreshLibraryFoldersAsync, showFolder);
+
             public void LibraryBrowserRunFolderMetadataScan(
                 Window libraryWindow,
                 LibraryBrowserWorkingSet ws,

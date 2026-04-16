@@ -71,6 +71,29 @@ namespace PixelVaultNative
             }, TaskScheduler.Default);
         }
 
+        void LibraryBrowserRefreshFolderSelectionFromDisk(
+            LibraryBrowserWorkingSet ws,
+            LibraryBrowserPaneRefs panes,
+            LibraryBrowserFolderView targetFolder,
+            Action<bool> refreshLibraryFoldersAsync,
+            Action<LibraryBrowserFolderView> showFolder)
+        {
+            if (ws == null || targetFolder == null) return;
+            if (refreshLibraryFoldersAsync == null || string.IsNullOrWhiteSpace(targetFolder.ViewKey))
+            {
+                showFolder?.Invoke(targetFolder);
+                return;
+            }
+
+            ws.PendingSessionRestore = true;
+            ws.PendingRestoreViewKey = targetFolder.ViewKey ?? string.Empty;
+            ws.PendingRestoreDetailScrollAfterShow =
+                SameLibraryBrowserSelection(ws.Current, targetFolder) && panes?.ThumbScroll != null
+                    ? Math.Max(0d, panes.ThumbScroll.VerticalOffset)
+                    : 0d;
+            refreshLibraryFoldersAsync(false);
+        }
+
         void LibraryBrowserPrefillFoldersFromSnapshot(Window libraryWindow, LibraryBrowserWorkingSet ws, Action renderTiles)
         {
             Task.Factory.StartNew(delegate

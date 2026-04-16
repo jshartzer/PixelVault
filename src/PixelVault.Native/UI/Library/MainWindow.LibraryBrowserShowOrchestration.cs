@@ -690,10 +690,7 @@ namespace PixelVaultNative
                 panes.RefreshThisFolderButton.Click += delegate
                 {
                     if (ws.Current == null) return;
-                    var scopeFolders = _shell.GetLibraryBrowserActionFolders(ws.Current);
-                    if (scopeFolders.Count == 0) return;
-                    showFolder(ws.Current);
-                    runScopedCoverRefresh(scopeFolders, _shell.BuildLibraryBrowserActionScopeLabel(ws.Current), true, false, false);
+                    _shell.LibraryBrowserRefreshFolderSelectionFromDisk(ws, panes, ws.Current, refreshLibraryFoldersAsync, showFolder);
                 };
                 if (panes.PhotoAchievementsButton != null)
                 {

@@ -168,4 +168,18 @@ public sealed class LibraryTimelineModeTests
         Assert.Equal("Today", labels["b.png"]);
         Assert.False(labels.ContainsKey("a.png"));
     }
+
+    [Fact]
+    public void ShouldShowLibraryCaptureFooter_HidesPhotoFooterWithoutComment()
+    {
+        var context = new LibraryTimelineCaptureContext
+        {
+            Comment = string.Empty
+        };
+
+        Assert.False(MainWindow.ShouldShowLibraryCaptureFooter(context, false));
+        context.Comment = "Nice shot";
+        Assert.True(MainWindow.ShouldShowLibraryCaptureFooter(context, false));
+        Assert.True(MainWindow.ShouldShowLibraryCaptureFooter(context, true));
+    }
 }
