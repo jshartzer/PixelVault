@@ -13,7 +13,7 @@ namespace PixelVaultNative
 {
     public sealed partial class MainWindow
     {
-        /// <summary>PV-PLN-LIBPV-001 — Open a non-modal viewer (fixed comfortable size); navigation uses <see cref="LibraryBrowserWorkingSet.DetailFilesDisplayOrder"/> (images only).</summary>
+        /// <summary>PV-PLN-LIBPV-001 — Open a non-modal viewer sized to each capture’s aspect (large max bounds); navigation uses <see cref="LibraryBrowserWorkingSet.DetailFilesDisplayOrder"/> (images only).</summary>
         void OpenLibraryCaptureViewer(Window sizeReferenceWindow, LibraryBrowserWorkingSet ws, string filePath)
         {
             if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath) || !IsImage(filePath)) return;
@@ -51,12 +51,15 @@ namespace PixelVaultNative
         internal sealed class LibraryCaptureViewerWindow : Window
         {
             const int ViewerDecodeMaxEdge = 4096;
-            /// <summary>One consistent viewer size (DIP); not tied to the main window.</summary>
-            const double ViewerWindowWidth = 1180;
-            const double ViewerWindowHeight = 760;
+            /// <summary>Max logical size of the photo surface (DIP); content uses the image’s pixel aspect inside this cap.</summary>
+            const double ViewerMaxContentWidth = 1520;
+            const double ViewerMaxContentHeight = 1000;
+            const double ViewerFallbackContentWidth = 1360;
+            const double ViewerFallbackContentHeight = 860;
             readonly MainWindow _host;
             readonly List<string> _paths;
             int _index;
+            readonly Grid _photoSurface;
             readonly Image _image;
             readonly StackPanel _footerSlot;
             readonly Border _navLeft;
@@ -72,22 +75,16 @@ namespace PixelVaultNative
                 Background = new SolidColorBrush(Color.FromRgb(16, 24, 29));
                 ResizeMode = ResizeMode.CanResize;
                 WindowStartupLocation = WindowStartupLocation.Manual;
+                SizeToContent = SizeToContent.WidthAndHeight;
                 ShowInTaskbar = true;
                 ShowActivated = true;
                 if (ownerWindow != null)
                     Owner = ownerWindow;
 
-                var wa = SystemParameters.WorkArea;
-                Width = Math.Min(ViewerWindowWidth, Math.Max(640, wa.Width - 32));
-                Height = Math.Min(ViewerWindowHeight, Math.Max(480, wa.Height - 32));
-                Left = wa.Left + Math.Round((wa.Width - Width) * 0.5);
-                Top = wa.Top + Math.Round((wa.Height - Height) * 0.5);
-
-                // UniformToFill: scale without distortion so the image meets left/right edges (no letterboxing);
-                // excess height is cropped in the photo row, matching a full-bleed capture viewer.
+                // Photo surface explicit W/H = image aspect × scale so Uniform stretch fills with no letterboxing.
                 _image = new Image
                 {
-                    Stretch = Stretch.UniformToFill,
+                    Stretch = Stretch.Uniform,
                     HorizontalAlignment = HorizontalAlignment.Stretch,
                     VerticalAlignment = VerticalAlignment.Stretch
                 };
@@ -100,10 +97,9 @@ namespace PixelVaultNative
                 _navRight = BuildNavChrome("\u203A", "Next capture");
                 _navRight.MouseLeftButtonDown += delegate { Navigate(1); };
 
-                // Photo fills the client area; timeline footer (badges, comment, time) sits on a scrim over the
-                // bottom of the image; prev/next are narrow side strips above the footer so they stay clickable.
-                var photoGrid = new Grid { ClipToBounds = true };
-                photoGrid.Children.Add(_image);
+                // Photo fills the surface; timeline footer overlays the bottom; prev/next on the sides.
+                _photoSurface = new Grid { ClipToBounds = true };
+                _photoSurface.Children.Add(_image);
                 var footerOverlay = new Border
                 {
                     VerticalAlignment = VerticalAlignment.Bottom,
@@ -111,17 +107,20 @@ namespace PixelVaultNative
                     Background = Brushes.Transparent,
                     Child = _footerSlot
                 };
-                photoGrid.Children.Add(footerOverlay);
+                _photoSurface.Children.Add(footerOverlay);
                 _navLeft.HorizontalAlignment = HorizontalAlignment.Left;
                 _navLeft.VerticalAlignment = VerticalAlignment.Stretch;
                 _navLeft.Width = 88;
                 _navRight.HorizontalAlignment = HorizontalAlignment.Right;
                 _navRight.VerticalAlignment = VerticalAlignment.Stretch;
                 _navRight.Width = 88;
-                photoGrid.Children.Add(_navLeft);
-                photoGrid.Children.Add(_navRight);
+                _photoSurface.Children.Add(_navLeft);
+                _photoSurface.Children.Add(_navRight);
 
-                Content = photoGrid;
+                Content = _photoSurface;
+
+                if (_paths.Count > 0)
+                    ApplyPhotoSurfaceDimensions(_paths[_index]);
 
                 Loaded += delegate
                 {
@@ -153,6 +152,64 @@ namespace PixelVaultNative
                 {
                     _image.Source = null;
                 };
+            }
+
+            static bool TryGetImagePixelSize(string path, out int pixelWidth, out int pixelHeight)
+            {
+                pixelWidth = 0;
+                pixelHeight = 0;
+                if (string.IsNullOrWhiteSpace(path) || !File.Exists(path)) return false;
+                try
+                {
+                    using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                    {
+                        var decoder = BitmapDecoder.Create(
+                            stream,
+                            BitmapCreateOptions.IgnoreColorProfile,
+                            BitmapCacheOption.OnDemand);
+                        var frame = decoder.Frames[0];
+                        pixelWidth = frame.PixelWidth;
+                        pixelHeight = frame.PixelHeight;
+                        return pixelWidth > 0 && pixelHeight > 0;
+                    }
+                }
+                catch
+                {
+                    return false;
+                }
+            }
+
+            /// <summary>Logical photo area matches decoded pixel aspect ratio, scaled up to (at most) viewer max bounds.</summary>
+            void ApplyPhotoSurfaceDimensions(string imagePath)
+            {
+                var wa = SystemParameters.WorkArea;
+                const double margin = 56;
+                var maxW = Math.Min(ViewerMaxContentWidth, Math.Max(640, wa.Width - margin));
+                var maxH = Math.Min(ViewerMaxContentHeight, Math.Max(480, wa.Height - margin));
+                double gridW, gridH;
+                if (!string.IsNullOrWhiteSpace(imagePath)
+                    && File.Exists(imagePath)
+                    && TryGetImagePixelSize(imagePath, out var nw, out var nh))
+                {
+                    var s = Math.Min(maxW / nw, maxH / nh);
+                    gridW = Math.Round(nw * s);
+                    gridH = Math.Round(nh * s);
+                }
+                else
+                {
+                    gridW = Math.Min(ViewerFallbackContentWidth, maxW);
+                    gridH = Math.Min(ViewerFallbackContentHeight, maxH);
+                }
+
+                _photoSurface.Width = gridW;
+                _photoSurface.Height = gridH;
+            }
+
+            void CenterOnWorkArea()
+            {
+                var wa = SystemParameters.WorkArea;
+                Left = wa.Left + Math.Round((wa.Width - ActualWidth) * 0.5);
+                Top = wa.Top + Math.Round((wa.Height - ActualHeight) * 0.5);
             }
 
             static Border BuildNavChrome(string glyph, string automationName)
@@ -197,12 +254,15 @@ namespace PixelVaultNative
                 var path = _paths[_index];
                 Title = Path.GetFileName(path) + " — PixelVault";
 
+                ApplyPhotoSurfaceDimensions(path);
+
                 _image.Source = null;
                 // Hidden (not Collapsed) keeps the grid cell measured so the bitmap has a non-zero arrange slot.
                 _image.Visibility = Visibility.Hidden;
 
                 _footerSlot.Children.Clear();
-                var footerWidth = (int)Math.Max(400, Math.Round(ActualWidth > 1 ? ActualWidth - 48 : Math.Max(Width, 400) - 48));
+                var surfaceW = _photoSurface.Width;
+                var footerWidth = (int)Math.Max(400, Math.Round(surfaceW > 1 ? surfaceW - 48 : 800));
                 var ctx = _host.TryGetLibraryTimelineCaptureContextForViewer(path);
                 if (ctx != null)
                 {
@@ -225,7 +285,7 @@ namespace PixelVaultNative
                     });
                 }
 
-                var layoutW = ActualWidth > 1 ? ActualWidth : Math.Max(Width, 640);
+                var layoutW = surfaceW > 1 ? surfaceW : 640;
                 var decode = Math.Min(ViewerDecodeMaxEdge, Math.Max(640, (int)Math.Round(layoutW * 2)));
                 // Do not pass shouldLoad: QueueImageLoad evaluates it on a background thread, and reading
                 // WPF DispatcherObject.IsLoaded from Task.Run faults or fails the load for this window.
@@ -242,6 +302,8 @@ namespace PixelVaultNative
                     null);
 
                 UpdateNavChrome();
+                UpdateLayout();
+                CenterOnWorkArea();
             }
         }
     }
