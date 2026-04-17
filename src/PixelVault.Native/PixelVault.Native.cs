@@ -810,6 +810,43 @@ namespace PixelVaultNative
             return folder.SteamGridDbId ?? string.Empty;
         }
 
+        async Task<string> ResolveBestLibraryFolderSteamGridDbIdForHeroAssetsAsync(string root, LibraryFolderInfo folder, CancellationToken cancellationToken = default(CancellationToken))
+        {
+            if (folder == null || string.IsNullOrWhiteSpace(folder.Name) || !HasSteamGridDbApiToken()) return string.Empty;
+            if (!string.IsNullOrWhiteSpace(folder.SteamGridDbId)) return folder.SteamGridDbId;
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var saved = FindSavedGameIndexRow(GetSavedGameIndexRowsForRoot(root), folder);
+            if (saved != null && !string.IsNullOrWhiteSpace(saved.SteamGridDbId))
+            {
+                folder.SteamGridDbId = saved.SteamGridDbId;
+                folder.SuppressSteamGridDbIdAutoResolve = false;
+                return folder.SteamGridDbId;
+            }
+
+            string steamGridDbId = null;
+            if (ShouldUseSteamStoreLookups(folder))
+            {
+                var appId = await ResolveBestLibraryFolderSteamAppIdAsync(root, folder, true, cancellationToken).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
+                steamGridDbId = !string.IsNullOrWhiteSpace(appId)
+                    ? await coverService.TryResolveSteamGridDbIdBySteamAppIdAsync(appId, cancellationToken).ConfigureAwait(false)
+                    : null;
+            }
+            if (string.IsNullOrWhiteSpace(steamGridDbId))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                steamGridDbId = await coverService.TryResolveSteamGridDbIdByNameAsync(folder.Name, cancellationToken).ConfigureAwait(false);
+            }
+            if (!string.IsNullOrWhiteSpace(steamGridDbId))
+            {
+                folder.SteamGridDbId = steamGridDbId;
+                folder.SuppressSteamGridDbIdAutoResolve = false;
+                UpdateCachedLibraryFolderInfo(root, folder);
+            }
+            return folder.SteamGridDbId ?? string.Empty;
+        }
+
         bool ShouldUseSteamStoreLookups(LibraryFolderInfo folder)
         {
             var platform = NormalizeConsoleLabel(folder == null ? string.Empty : folder.PlatformLabel);
@@ -1274,7 +1311,7 @@ namespace PixelVaultNative
             try
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var steamGridDbId = await ResolveBestLibraryFolderSteamGridDbIdAsync(libraryRoot, folder, cancellationToken).ConfigureAwait(false);
+                var steamGridDbId = await ResolveBestLibraryFolderSteamGridDbIdForHeroAssetsAsync(libraryRoot, folder, cancellationToken).ConfigureAwait(false);
                 cancellationToken.ThrowIfCancellationRequested();
                 var downloaded = await coverService.TryDownloadSteamGridDbHeroAsync(folder.Name, steamGridDbId, cancellationToken).ConfigureAwait(false);
                 if (!string.IsNullOrWhiteSpace(downloaded) && File.Exists(downloaded)) return downloaded;
@@ -1286,6 +1323,8 @@ namespace PixelVaultNative
                     if (!string.IsNullOrWhiteSpace(downloaded) && File.Exists(downloaded))
                     {
                         folder.SteamGridDbId = fallbackId;
+                        folder.SuppressSteamGridDbIdAutoResolve = false;
+                        UpdateCachedLibraryFolderInfo(libraryRoot, folder);
                         return downloaded;
                     }
                 }
@@ -1307,7 +1346,7 @@ namespace PixelVaultNative
             try
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var steamGridDbId = await ResolveBestLibraryFolderSteamGridDbIdAsync(libraryRoot, folder, cancellationToken).ConfigureAwait(false);
+                var steamGridDbId = await ResolveBestLibraryFolderSteamGridDbIdForHeroAssetsAsync(libraryRoot, folder, cancellationToken).ConfigureAwait(false);
                 cancellationToken.ThrowIfCancellationRequested();
                 var downloaded = await coverService.TryDownloadSteamGridDbLogoAsync(folder.Name, steamGridDbId, cancellationToken).ConfigureAwait(false);
                 if (!string.IsNullOrWhiteSpace(downloaded) && File.Exists(downloaded)) return downloaded;
@@ -1319,6 +1358,8 @@ namespace PixelVaultNative
                     if (!string.IsNullOrWhiteSpace(downloaded) && File.Exists(downloaded))
                     {
                         folder.SteamGridDbId = fallbackId;
+                        folder.SuppressSteamGridDbIdAutoResolve = false;
+                        UpdateCachedLibraryFolderInfo(libraryRoot, folder);
                         return downloaded;
                     }
                 }
@@ -2141,7 +2182,6 @@ namespace PixelVaultNative
         }
     }
 }
-
 
 
 
