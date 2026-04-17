@@ -38,6 +38,7 @@ namespace PixelVaultNative
             internal Button RefreshThisFolderButton;
             internal Button PhotoAchievementsButton;
             internal TextBlock PhotoAchievementsSummary;
+            internal WrapPanel PhotoAchievementsRecentPanel;
             internal Button ExitTimelineButton;
             internal WrapPanel TimelineFilterPanel;
             internal Button TimelinePresetTodayButton;
@@ -64,6 +65,8 @@ namespace PixelVaultNative
             internal Border PhotoWorkspaceTitleReadabilityBorder;
             internal Border PhotoWorkspaceHeroBannerStrip;
             internal Image PhotoWorkspaceHeroBannerImage;
+            internal Border PhotoWorkspaceHeroLogoHost;
+            internal Image PhotoWorkspaceHeroLogoImage;
             internal Grid PhotoWorkspaceHeroBannerRoot;
             internal DockPanel LibraryDetailControlsDock;
             internal DispatcherTimer FolderPaneSplitClampTimer;
@@ -409,6 +412,42 @@ namespace PixelVaultNative
             Panel.SetZIndex(panes.PhotoWorkspaceHeaderMenuHit, 1);
             headerHost.Children.Add(panes.PhotoWorkspaceHeaderMenuHit);
 
+            panes.PhotoWorkspaceHeroLogoImage = new Image
+            {
+                Stretch = Stretch.Uniform,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                VerticalAlignment = VerticalAlignment.Top,
+                MaxWidth = 340,
+                MaxHeight = 118,
+                Effect = new System.Windows.Media.Effects.DropShadowEffect
+                {
+                    Color = Color.FromArgb(180, 7, 10, 14),
+                    BlurRadius = 18,
+                    ShadowDepth = 0,
+                    Opacity = 0.95
+                },
+                IsHitTestVisible = false
+            };
+            panes.PhotoWorkspaceHeroLogoHost = new Border
+            {
+                Child = panes.PhotoWorkspaceHeroLogoImage,
+                Background = Brushes.Transparent,
+                BorderBrush = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                CornerRadius = new CornerRadius(0),
+                Padding = new Thickness(0),
+                HorizontalAlignment = HorizontalAlignment.Left,
+                VerticalAlignment = VerticalAlignment.Top,
+                Margin = new Thickness(18, 18, 20, 0),
+                MaxWidth = 360,
+                Visibility = Visibility.Collapsed
+            };
+            Grid.SetRow(panes.PhotoWorkspaceHeroLogoHost, 0);
+            Grid.SetColumn(panes.PhotoWorkspaceHeroLogoHost, 0);
+            Panel.SetZIndex(panes.PhotoWorkspaceHeroLogoHost, 3);
+            AutomationProperties.SetName(panes.PhotoWorkspaceHeroLogoHost, "Game logo");
+            headerHost.Children.Add(panes.PhotoWorkspaceHeroLogoHost);
+
             var previewFrame = new Border
             {
                 HorizontalAlignment = HorizontalAlignment.Left,
@@ -501,6 +540,13 @@ namespace PixelVaultNative
                 Margin = new Thickness(10, 0, 12, 0),
                 TextTrimming = TextTrimming.CharacterEllipsis
             };
+            panes.PhotoAchievementsRecentPanel = new WrapPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 0, 0),
+                Visibility = Visibility.Collapsed
+            };
             panes.ExitTimelineButton.Margin = new Thickness(0);
             panes.ExitTimelineButton.Visibility = Visibility.Collapsed;
             var bannerButtonRow = new WrapPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 8, 0, 0) };
@@ -511,6 +557,7 @@ namespace PixelVaultNative
             var photoAchievementsGroup = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
             photoAchievementsGroup.Children.Add(panes.PhotoAchievementsButton);
             photoAchievementsGroup.Children.Add(panes.PhotoAchievementsSummary);
+            photoAchievementsGroup.Children.Add(panes.PhotoAchievementsRecentPanel);
             bannerActionsLeft.Children.Add(photoAchievementsGroup);
             bannerActionsLeft.Children.Add(panes.ExitTimelineButton);
             chromeStack.Children.Add(panes.DetailMeta);

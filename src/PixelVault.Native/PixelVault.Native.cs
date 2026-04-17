@@ -1190,6 +1190,11 @@ namespace PixelVaultNative
             return coverService.CachedHeroPath(title);
         }
 
+        string CachedLogoPath(string title)
+        {
+            return coverService.CachedLogoPath(title);
+        }
+
         bool TryGetCustomOrCachedHeroPath(LibraryFolderInfo folder, out string path)
         {
             path = null;
@@ -1211,10 +1216,30 @@ namespace PixelVaultNative
             return false;
         }
 
+        bool TryGetCachedHeroLogoPath(LibraryFolderInfo folder, out string path)
+        {
+            path = null;
+            if (folder == null) return false;
+            var cached = CachedLogoPath(folder.Name);
+            if (cached != null)
+            {
+                path = cached;
+                return true;
+            }
+
+            return false;
+        }
+
         /// <summary>Photo-workspace banner: custom or cached wide art only — prefers SteamGridDB Heroes (same asset class as https://www.steamgriddb.com/hero/…), not library cover.</summary>
         internal string GetLibraryHeroBannerPathForDisplayOnly(LibraryFolderInfo folder)
         {
             return TryGetCustomOrCachedHeroPath(folder, out var p) ? p : null;
+        }
+
+        /// <summary>Photo-workspace logo slot: auto-cached SteamGridDB logo only; falls back to title text when absent.</summary>
+        internal string GetLibraryHeroLogoPathForDisplayOnly(LibraryFolderInfo folder)
+        {
+            return TryGetCachedHeroLogoPath(folder, out var p) ? p : null;
         }
 
         /// <summary>Resolves banner art: custom → <b>SteamGridDB Heroes</b> → Valve library_hero / store header fallback.</summary>
@@ -1232,6 +1257,17 @@ namespace PixelVaultNative
             return null;
         }
 
+        /// <summary>Resolves photo-workspace logo art: cached SteamGridDB logo or network download; falls back to title text when unavailable.</summary>
+        async Task<string> ResolveLibraryHeroLogoWithDownloadAsync(LibraryFolderInfo folder, CancellationToken cancellationToken = default(CancellationToken))
+        {
+            if (folder == null) return null;
+            cancellationToken.ThrowIfCancellationRequested();
+            if (TryGetCachedHeroLogoPath(folder, out var early)) return early;
+            var steamGridDbLogo = await TryDownloadSteamGridDbLogoAsync(folder, cancellationToken).ConfigureAwait(false);
+            if (!string.IsNullOrWhiteSpace(steamGridDbLogo) && File.Exists(steamGridDbLogo)) return steamGridDbLogo;
+            return null;
+        }
+
         async Task<string> TryDownloadSteamGridDbHeroAsync(LibraryFolderInfo folder, CancellationToken cancellationToken = default(CancellationToken))
         {
             if (folder == null || !HasSteamGridDbApiToken()) return null;
@@ -1240,7 +1276,19 @@ namespace PixelVaultNative
                 cancellationToken.ThrowIfCancellationRequested();
                 var steamGridDbId = await ResolveBestLibraryFolderSteamGridDbIdAsync(libraryRoot, folder, cancellationToken).ConfigureAwait(false);
                 cancellationToken.ThrowIfCancellationRequested();
-                return await coverService.TryDownloadSteamGridDbHeroAsync(folder.Name, steamGridDbId, cancellationToken).ConfigureAwait(false);
+                var downloaded = await coverService.TryDownloadSteamGridDbHeroAsync(folder.Name, steamGridDbId, cancellationToken).ConfigureAwait(false);
+                if (!string.IsNullOrWhiteSpace(downloaded) && File.Exists(downloaded)) return downloaded;
+                var fallbackId = await TryResolveSteamGridDbNameFallbackIdAsync(folder.Name, steamGridDbId, cancellationToken).ConfigureAwait(false);
+                if (!string.IsNullOrWhiteSpace(fallbackId))
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    downloaded = await coverService.TryDownloadSteamGridDbHeroAsync(folder.Name, fallbackId, cancellationToken).ConfigureAwait(false);
+                    if (!string.IsNullOrWhiteSpace(downloaded) && File.Exists(downloaded))
+                    {
+                        folder.SteamGridDbId = fallbackId;
+                        return downloaded;
+                    }
+                }
             }
             catch (OperationCanceledException)
             {
@@ -1249,6 +1297,61 @@ namespace PixelVaultNative
             catch (Exception ex)
             {
                 Log("SteamGridDB hero download failed for " + (folder.Name ?? "unknown title") + ". " + ex.Message);
+            }
+            return null;
+        }
+
+        async Task<string> TryDownloadSteamGridDbLogoAsync(LibraryFolderInfo folder, CancellationToken cancellationToken = default(CancellationToken))
+        {
+            if (folder == null || !HasSteamGridDbApiToken()) return null;
+            try
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var steamGridDbId = await ResolveBestLibraryFolderSteamGridDbIdAsync(libraryRoot, folder, cancellationToken).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
+                var downloaded = await coverService.TryDownloadSteamGridDbLogoAsync(folder.Name, steamGridDbId, cancellationToken).ConfigureAwait(false);
+                if (!string.IsNullOrWhiteSpace(downloaded) && File.Exists(downloaded)) return downloaded;
+                var fallbackId = await TryResolveSteamGridDbNameFallbackIdAsync(folder.Name, steamGridDbId, cancellationToken).ConfigureAwait(false);
+                if (!string.IsNullOrWhiteSpace(fallbackId))
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    downloaded = await coverService.TryDownloadSteamGridDbLogoAsync(folder.Name, fallbackId, cancellationToken).ConfigureAwait(false);
+                    if (!string.IsNullOrWhiteSpace(downloaded) && File.Exists(downloaded))
+                    {
+                        folder.SteamGridDbId = fallbackId;
+                        return downloaded;
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                Log("SteamGridDB logo download failed for " + (folder.Name ?? "unknown title") + ". " + ex.Message);
+            }
+            return null;
+        }
+
+        async Task<string> TryResolveSteamGridDbNameFallbackIdAsync(string title, string currentSteamGridDbId, CancellationToken cancellationToken = default(CancellationToken))
+        {
+            if (string.IsNullOrWhiteSpace(title) || !HasSteamGridDbApiToken()) return null;
+            try
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var fallbackId = await coverService.TryResolveSteamGridDbIdByNameAsync(title, cancellationToken).ConfigureAwait(false);
+                if (string.IsNullOrWhiteSpace(fallbackId)) return null;
+                if (string.Equals(fallbackId.Trim(), (currentSteamGridDbId ?? string.Empty).Trim(), StringComparison.OrdinalIgnoreCase)) return null;
+                return fallbackId.Trim();
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                Log("SteamGridDB fallback ID search failed for " + title + ". " + ex.Message);
             }
             return null;
         }
@@ -2038,8 +2141,6 @@ namespace PixelVaultNative
         }
     }
 }
-
-
 
 
 

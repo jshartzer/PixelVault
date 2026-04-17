@@ -64,6 +64,7 @@ namespace PixelVaultNative
             }
             Attach(panes.PhotoWorkspaceHeaderMenuHit);
             Attach(panes.PhotoWorkspaceHeroBannerStrip);
+            if (panes.PhotoWorkspaceHeroLogoHost != null) Attach(panes.PhotoWorkspaceHeroLogoHost);
             Attach(panes.PhotoWorkspaceTitleReadabilityBorder);
         }
 
@@ -163,7 +164,10 @@ namespace PixelVaultNative
                     {
                         using var fetchTimeout = new CancellationTokenSource(TimeSpan.FromMinutes(4));
                         foreach (var targetFolder in folders)
+                        {
                             await ResolveLibraryHeroBannerWithDownloadAsync(targetFolder, fetchTimeout.Token).ConfigureAwait(false);
+                            await ResolveLibraryHeroLogoWithDownloadAsync(targetFolder, fetchTimeout.Token).ConfigureAwait(false);
+                        }
                     }
                     catch (OperationCanceledException)
                     {
@@ -200,15 +204,26 @@ namespace PixelVaultNative
             Window libraryWindow,
             LibraryBrowserFolderView info)
         {
-            if (panes?.PhotoWorkspaceHeroBannerImage == null || libraryWindow == null) return;
+            if (panes?.PhotoWorkspaceHeroBannerImage == null || panes.PhotoWorkspaceHeroLogoImage == null || libraryWindow == null) return;
+            void ApplyLogoMode(bool showLogo)
+            {
+                if (panes.PhotoWorkspaceHeroLogoHost != null)
+                    panes.PhotoWorkspaceHeroLogoHost.Visibility = showLogo ? Visibility.Visible : Visibility.Collapsed;
+                if (panes.DetailTitle != null)
+                    panes.DetailTitle.Visibility = showLogo ? Visibility.Collapsed : Visibility.Visible;
+            }
             if (ws?.WorkspaceMode != LibraryWorkspaceMode.Photo)
             {
                 panes.PhotoWorkspaceHeroBannerImage.Source = null;
+                panes.PhotoWorkspaceHeroLogoImage.Source = null;
+                ApplyLogoMode(false);
                 return;
             }
             if (info == null || IsLibraryBrowserTimelineView(info))
             {
                 panes.PhotoWorkspaceHeroBannerImage.Source = null;
+                panes.PhotoWorkspaceHeroLogoImage.Source = null;
+                ApplyLogoMode(false);
                 return;
             }
 
@@ -234,14 +249,46 @@ namespace PixelVaultNative
                     delegate { return SameLibraryBrowserSelection(ws.Current, infoCapture); });
             }
 
-            var localPath = GetLibraryHeroBannerPathForDisplayOnly(displayFolder);
-            if (!string.IsNullOrWhiteSpace(localPath) && File.Exists(localPath))
+            void ApplyLogoSource(string path, bool fileExists)
             {
-                ApplyBannerSource(localPath, true);
-                return;
+                if (!SameLibraryBrowserSelection(ws.Current, infoCapture)) return;
+                panes.PhotoWorkspaceHeroLogoImage.Uid = Guid.NewGuid().ToString("N");
+                if (!fileExists || string.IsNullOrWhiteSpace(path))
+                {
+                    panes.PhotoWorkspaceHeroLogoImage.Source = null;
+                    ApplyLogoMode(false);
+                    return;
+                }
+
+                ApplyLogoMode(true);
+                QueueImageLoad(
+                    panes.PhotoWorkspaceHeroLogoImage,
+                    path,
+                    CalculateLibraryBannerArtDecodeWidth(panes.PhotoWorkspaceHeroLogoHost, libraryWindow, ResolveLibraryDpiScale(panes.PhotoWorkspaceHeroLogoImage)),
+                    delegate(BitmapImage loaded)
+                    {
+                        panes.PhotoWorkspaceHeroLogoImage.Source = loaded;
+                        ApplyLogoMode(true);
+                    },
+                    true,
+                    delegate { return SameLibraryBrowserSelection(ws.Current, infoCapture); });
             }
 
-            ApplyBannerSource(null, false);
+            var localPath = GetLibraryHeroBannerPathForDisplayOnly(displayFolder);
+            var localLogoPath = GetLibraryHeroLogoPathForDisplayOnly(displayFolder);
+            if (!string.IsNullOrWhiteSpace(localPath) && File.Exists(localPath))
+                ApplyBannerSource(localPath, true);
+            else
+                ApplyBannerSource(null, false);
+
+            if (!string.IsNullOrWhiteSpace(localLogoPath) && File.Exists(localLogoPath))
+                ApplyLogoSource(localLogoPath, true);
+            else
+                ApplyLogoSource(null, false);
+
+            if (!string.IsNullOrWhiteSpace(localPath) && File.Exists(localPath)
+                && !string.IsNullOrWhiteSpace(localLogoPath) && File.Exists(localLogoPath))
+                return;
 
             var downloadCts = new CancellationTokenSource();
             CancelAndDisposeCts(ReplacePhotoWorkspaceHeroBannerDownloadCts(downloadCts));
@@ -252,10 +299,13 @@ namespace PixelVaultNative
                 try
                 {
                     var downloaded = await ResolveLibraryHeroBannerWithDownloadAsync(displayFolder, downloadToken).ConfigureAwait(false);
+                    var downloadedLogo = await ResolveLibraryHeroLogoWithDownloadAsync(displayFolder, downloadToken).ConfigureAwait(false);
                     var ok = !string.IsNullOrWhiteSpace(downloaded) && File.Exists(downloaded);
+                    var logoOk = !string.IsNullOrWhiteSpace(downloadedLogo) && File.Exists(downloadedLogo);
                     _ = libraryWindow.Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(delegate
                     {
                         ApplyBannerSource(downloaded, ok);
+                        ApplyLogoSource(downloadedLogo, logoOk);
                     }));
                 }
                 catch (OperationCanceledException)
@@ -271,7 +321,7 @@ namespace PixelVaultNative
             });
         }
 
-        /// <summary>When <see cref="libraryRefreshHeroBannerCacheOnNextLibraryOpen"/> is set, purges auto-cached hero files for loaded library titles (custom heroes preserved).</summary>
+        /// <summary>When <see cref="libraryRefreshHeroBannerCacheOnNextLibraryOpen"/> is set, purges auto-cached hero files and SteamGridDB logos for loaded library titles (custom heroes preserved).</summary>
         internal void TryRunPendingLibraryHeroBannerCacheRefresh(IReadOnlyList<LibraryFolderInfo> folders)
         {
             if (!libraryRefreshHeroBannerCacheOnNextLibraryOpen) return;
@@ -286,8 +336,11 @@ namespace PixelVaultNative
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
             foreach (var t in titles)
+            {
                 coverService.PurgeCachedHeroDownloads(t);
-            Log("Cleared auto-cached hero banners for " + titles.Count + " library titles. Custom banners unchanged; open captures or Fetch Banner Art to re-download.");
+                coverService.PurgeCachedLogoDownloads(t);
+            }
+            Log("Cleared auto-cached hero banners and logos for " + titles.Count + " library titles. Custom banners unchanged; open captures or Fetch Banner Art to re-download.");
         }
     }
 }

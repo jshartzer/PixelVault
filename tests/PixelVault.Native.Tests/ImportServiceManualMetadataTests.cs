@@ -85,9 +85,15 @@ sealed class StubCoverService : ICoverService
 
     public string CachedHeroPath(string title) => null;
 
+    public string CachedLogoPath(string title) => null;
+
     public void PurgeCachedHeroDownloads(string title) { }
 
+    public void PurgeCachedLogoDownloads(string title) { }
+
     public Task<string> TryDownloadSteamGridDbHeroAsync(string title, string steamGridDbId, CancellationToken cancellationToken = default) => Task.FromResult<string>(null);
+
+    public Task<string> TryDownloadSteamGridDbLogoAsync(string title, string steamGridDbId, CancellationToken cancellationToken = default) => Task.FromResult<string>(null);
 
     public Task<string> TryDownloadSteamStoreHeaderHeroAsync(string title, string appId, CancellationToken cancellationToken = default) => Task.FromResult<string>(null);
 }

@@ -516,6 +516,7 @@ namespace PixelVaultNative
             var timelineView = IsLibraryBrowserTimelineView(info);
             activeSelectedLibraryFolder = timelineView ? null : CloneLibraryFolderInfo(actionFolder);
             panes.DetailTitle.Text = timelineView ? "Timeline" : info.Name;
+            panes.DetailTitle.Visibility = Visibility.Visible;
             if (ws.WorkspaceMode != LibraryWorkspaceMode.Photo)
                 UpdateLibraryBrowserDetailTitleBadges(panes, timelineView ? null : info);
             panes.DetailMeta.Text = BuildLibraryBrowserDetailMetaText(info, actionFolder);

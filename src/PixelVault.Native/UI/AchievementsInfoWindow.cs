@@ -255,6 +255,27 @@ namespace PixelVaultNative
             return "Progress unknown";
         }
 
+        internal static string FormatAchievementEarnedDateLabel(long unlockUtcTicks)
+        {
+            if (unlockUtcTicks <= 0) return string.Empty;
+            try
+            {
+                return new DateTime(unlockUtcTicks, DateTimeKind.Utc)
+                    .ToLocalTime()
+                    .ToString("MMM d, yyyy");
+            }
+            catch
+            {
+                return string.Empty;
+            }
+        }
+
+        internal static string FormatAchievementEarnedMeta(long unlockUtcTicks)
+        {
+            var date = FormatAchievementEarnedDateLabel(unlockUtcTicks);
+            return string.IsNullOrWhiteSpace(date) ? string.Empty : "Achieved " + date;
+        }
+
         Border BuildAchievementRowCard(GameAchievementsFetchService.AchievementRow row, string userAgent)
         {
             var card = new Border
@@ -283,7 +304,7 @@ namespace PixelVaultNative
             };
             var img = new Image { Stretch = Stretch.UniformToFill, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
             badgeHost.Child = img;
-            BeginAchievementBadgeDownload(img, row, userAgent);
+            StartAchievementBadgeDownload(img, row, userAgent);
             Grid.SetColumn(badgeHost, 0);
             grid.Children.Add(badgeHost);
 
@@ -309,20 +330,38 @@ namespace PixelVaultNative
             Grid.SetColumn(stack, 1);
             grid.Children.Add(stack);
 
-            if (!string.IsNullOrWhiteSpace(row.Meta))
+            var earnedMeta = FormatAchievementEarnedMeta(row.UnlockUtcTicks);
+            if (!string.IsNullOrWhiteSpace(row.Meta) || !string.IsNullOrWhiteSpace(earnedMeta))
             {
-                var meta = new TextBlock
+                var metaStack = new StackPanel
                 {
-                    Text = row.Meta,
-                    Foreground = UiBrushHelper.FromHex("#B8C9D4"),
-                    FontSize = 11,
                     Margin = new Thickness(14, 0, 0, 0),
                     VerticalAlignment = VerticalAlignment.Top,
-                    TextWrapping = TextWrapping.Wrap,
-                    MaxWidth = 132
+                    MaxWidth = 144
                 };
-                Grid.SetColumn(meta, 2);
-                grid.Children.Add(meta);
+                if (!string.IsNullOrWhiteSpace(row.Meta))
+                {
+                    metaStack.Children.Add(new TextBlock
+                    {
+                        Text = row.Meta,
+                        Foreground = UiBrushHelper.FromHex("#B8C9D4"),
+                        FontSize = 11,
+                        TextWrapping = TextWrapping.Wrap
+                    });
+                }
+                if (!string.IsNullOrWhiteSpace(earnedMeta))
+                {
+                    metaStack.Children.Add(new TextBlock
+                    {
+                        Text = earnedMeta,
+                        Foreground = UiBrushHelper.FromHex("#88B8A0"),
+                        FontSize = 11,
+                        Margin = new Thickness(0, string.IsNullOrWhiteSpace(row.Meta) ? 0 : 4, 0, 0),
+                        TextWrapping = TextWrapping.Wrap
+                    });
+                }
+                Grid.SetColumn(metaStack, 2);
+                grid.Children.Add(metaStack);
             }
 
             card.Child = grid;
@@ -332,8 +371,9 @@ namespace PixelVaultNative
         /// <summary>Steam CDN and similar hosts often reject anonymous <see cref="BitmapImage"/> URI downloads; use HttpClient with the same User-Agent as API fetches.</summary>
         const int AchievementIconDownloadMaxBytes = 786432;
 
-        void BeginAchievementBadgeDownload(Image img, GameAchievementsFetchService.AchievementRow row, string userAgent)
+        internal static void StartAchievementBadgeDownload(Image img, GameAchievementsFetchService.AchievementRow row, string userAgent)
         {
+            if (img == null || row == null) return;
             var grayOut = row.ProgressKnown && !row.Unlocked;
             string primary;
             string fallback = null;
@@ -357,7 +397,7 @@ namespace PixelVaultNative
             _ = LoadAchievementBadgeIntoImageAsync(img, row, primary, fallback, grayOut, ua);
         }
 
-        async Task LoadAchievementBadgeIntoImageAsync(
+        static async Task LoadAchievementBadgeIntoImageAsync(
             Image img,
             GameAchievementsFetchService.AchievementRow row,
             string primaryUrl,
@@ -377,12 +417,12 @@ namespace PixelVaultNative
 
             if (bytes == null || bytes.Length == 0)
             {
-                await Dispatcher.InvokeAsync(() => { img.Visibility = Visibility.Collapsed; });
+                await img.Dispatcher.InvokeAsync(() => { img.Visibility = Visibility.Collapsed; });
                 return;
             }
 
             var copy = bytes;
-            await Dispatcher.InvokeAsync(() =>
+            await img.Dispatcher.InvokeAsync(() =>
             {
                 try
                 {

@@ -108,6 +108,7 @@ namespace PixelVaultNative
                 ws.DetailSelectionAnchorIndex = -1;
                 ws.DetailFilesDisplayOrder.Clear();
                 panes.DetailTitle.Text = "Select a folder";
+                panes.DetailTitle.Visibility = Visibility.Visible;
                 panes.DetailMeta.Text = "Browse the library you chose in Settings.";
                 if (panes.DetailTitleBadgePanel != null)
                 {

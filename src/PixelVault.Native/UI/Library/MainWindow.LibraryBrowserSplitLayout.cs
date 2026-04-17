@@ -13,10 +13,10 @@ namespace PixelVaultNative
         /// <summary>Default width for the Photo-workspace cover rail; sized so two columns + tile margins avoid horizontal scroll at typical DPI.</summary>
         internal const double LibraryBrowserPhotoRailWidth = 308;
         internal const double LibraryBrowserPhotoDividerStripWidth = 28;
-        /// <summary>Fixed hero band height in captures view — matches Steam-style headers and avoids unbounded vertical scaling when the window grows.</summary>
-        internal const double LibraryPhotoWorkspaceHeroBandHeight = 316;
+        /// <summary>Fixed hero band height in captures view — slightly taller to fit banner art plus left-side logo branding without crowding actions.</summary>
+        internal const double LibraryPhotoWorkspaceHeroBandHeight = 372;
         /// <summary>Negative top margin pulls title chrome up over the hero so the grid gains vertical space and art shows through the panel.</summary>
-        internal const double LibraryPhotoWorkspaceChromeOverlapHeroPixels = 76;
+        internal const double LibraryPhotoWorkspaceChromeOverlapHeroPixels = 88;
 
         void ApplyLibraryBrowserLayoutMode(LibraryBrowserPaneRefs panes, LibraryWorkspaceMode workspaceMode)
         {
@@ -48,6 +48,11 @@ namespace PixelVaultNative
                 else if (panes.PhotoAchievementsButton != null && panes.PhotoAchievementsButton.Visibility != Visibility.Visible)
                     panes.PhotoAchievementsSummary.Visibility = Visibility.Collapsed;
             }
+            if (panes.PhotoAchievementsRecentPanel != null && (!isPhoto || hideGameChrome))
+            {
+                panes.PhotoAchievementsRecentPanel.Children.Clear();
+                panes.PhotoAchievementsRecentPanel.Visibility = Visibility.Collapsed;
+            }
             if (panes.ExitTimelineButton != null) panes.ExitTimelineButton.Visibility = isTimeline ? Visibility.Visible : Visibility.Collapsed;
             if (panes.TimelineFilterPanel != null) panes.TimelineFilterPanel.Visibility = isTimeline ? Visibility.Visible : Visibility.Collapsed;
             if (panes.GroupAllButton != null) panes.GroupAllButton.Visibility = isPhoto ? Visibility.Collapsed : Visibility.Visible;
@@ -56,6 +61,10 @@ namespace PixelVaultNative
                 panes.GroupTimelineButton.Visibility = isPhoto ? Visibility.Collapsed : Visibility.Visible;
             if (panes.PhotoWorkspaceHeroBannerStrip != null)
                 panes.PhotoWorkspaceHeroBannerStrip.Visibility = isPhoto ? Visibility.Visible : Visibility.Collapsed;
+            if (panes.PhotoWorkspaceHeroLogoHost != null && !isPhoto)
+                panes.PhotoWorkspaceHeroLogoHost.Visibility = Visibility.Collapsed;
+            if (panes.DetailTitle != null && !isPhoto)
+                panes.DetailTitle.Visibility = Visibility.Visible;
             if (panes.PhotoWorkspaceHeaderMenuHit != null)
                 panes.PhotoWorkspaceHeaderMenuHit.Visibility = isPhoto ? Visibility.Visible : Visibility.Collapsed;
 
@@ -171,8 +180,8 @@ namespace PixelVaultNative
                 {
                     var c0 = panes.LibraryDetailBannerGrid.ColumnDefinitions[0];
                     c0.MinWidth = 0;
-                    c0.MaxWidth = 0;
-                    c0.Width = new GridLength(0);
+                    c0.MaxWidth = 380;
+                    c0.Width = GridLength.Auto;
                 }
             }
             else

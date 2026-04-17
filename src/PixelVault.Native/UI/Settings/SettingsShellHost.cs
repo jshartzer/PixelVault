@@ -536,19 +536,19 @@ namespace PixelVaultNative
                 Foreground = textPrimary
             };
             refreshHeroBannerCacheBox.ToolTip =
-                "Removes auto-downloaded wide banner files under My Covers (hero-*). Custom banners you set are not deleted. "
-                + "After the library reloads, open captures for a game or use Fetch Banner Art to pull SteamGridDB Heroes / Steam library hero again.";
+                "Removes auto-downloaded wide banner and logo files under My Covers (hero-* / logo-*). Custom banners you set are not deleted. "
+                + "After the library reloads, open captures for a game or use Fetch Banner Art to pull SteamGridDB Heroes / logos and Steam hero art again.";
             refreshHeroBannerCacheBox.Checked += delegate
             {
                 if (d.SetLibraryRefreshHeroBannerCacheOnNextLibraryOpen != null) d.SetLibraryRefreshHeroBannerCacheOnNextLibraryOpen(true);
                 d.SaveSettings();
-                d.Log("Library: scheduled cached hero banner clear on next folder load.");
+                d.Log("Library: scheduled cached hero banner/logo clear on next folder load.");
             };
             refreshHeroBannerCacheBox.Unchecked += delegate
             {
                 if (d.SetLibraryRefreshHeroBannerCacheOnNextLibraryOpen != null) d.SetLibraryRefreshHeroBannerCacheOnNextLibraryOpen(false);
                 d.SaveSettings();
-                d.Log("Library: cancelled scheduled hero banner cache clear.");
+                d.Log("Library: cancelled scheduled hero banner/logo cache clear.");
             };
             stack.Children.Add(refreshHeroBannerCacheBox);
             border.Child = stack;

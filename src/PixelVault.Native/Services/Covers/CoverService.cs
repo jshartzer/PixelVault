@@ -34,9 +34,13 @@ namespace PixelVaultNative
         void SaveCustomHero(LibraryFolderInfo folder, string sourcePath);
         void ClearCustomHero(LibraryFolderInfo folder);
         string CachedHeroPath(string title);
+        string CachedLogoPath(string title);
         /// <summary>Deletes downloaded <c>hero-*</c> cache files for <paramref name="title"/>; does not remove <c>custom-hero-*</c>.</summary>
         void PurgeCachedHeroDownloads(string title);
+        /// <summary>Deletes downloaded <c>logo-*</c> cache files for <paramref name="title"/>.</summary>
+        void PurgeCachedLogoDownloads(string title);
         Task<string> TryDownloadSteamGridDbHeroAsync(string title, string steamGridDbId, CancellationToken cancellationToken = default(CancellationToken));
+        Task<string> TryDownloadSteamGridDbLogoAsync(string title, string steamGridDbId, CancellationToken cancellationToken = default(CancellationToken));
         Task<string> TryDownloadSteamStoreHeaderHeroAsync(string title, string appId, CancellationToken cancellationToken = default(CancellationToken));
         /// <summary>Search RetroAchievements games by title for consoles that best match <paramref name="platformLabel"/>. Requires a web API key from Path Settings.</summary>
         Task<List<Tuple<string, string>>> SearchRetroAchievementsGameMatchesAsync(string title, string platformLabel, CancellationToken cancellationToken = default(CancellationToken));
@@ -126,6 +130,8 @@ namespace PixelVaultNative
 
         readonly object _steamGridDbHeroDownloadCoalesceLock = new object();
         readonly Dictionary<string, Task<string>> _steamGridDbHeroDownloadsInFlight = new Dictionary<string, Task<string>>(StringComparer.OrdinalIgnoreCase);
+        readonly object _steamGridDbLogoDownloadCoalesceLock = new object();
+        readonly Dictionary<string, Task<string>> _steamGridDbLogoDownloadsInFlight = new Dictionary<string, Task<string>>(StringComparer.OrdinalIgnoreCase);
         readonly object _steamStoreHeaderHeroDownloadCoalesceLock = new object();
         readonly Dictionary<string, Task<string>> _steamStoreHeaderHeroDownloadsInFlight = new Dictionary<string, Task<string>>(StringComparer.OrdinalIgnoreCase);
 
@@ -801,6 +807,16 @@ namespace PixelVaultNative
             return HeroCacheFileBase(SafeCacheName(title));
         }
 
+        static string LogoCacheFileBase(string safeTitleBase)
+        {
+            return "logo-" + safeTitleBase;
+        }
+
+        string LogoCacheFileBaseFromTitle(string title)
+        {
+            return LogoCacheFileBase(SafeCacheName(title));
+        }
+
         public string CustomHeroPath(LibraryFolderInfo folder)
         {
             var key = CustomCoverKey(folder);
@@ -866,11 +882,38 @@ namespace PixelVaultNative
             return null;
         }
 
+        public string CachedLogoPath(string title)
+        {
+            var safe = LogoCacheFileBaseFromTitle(title);
+            foreach (var ext in new[] { ".png", ".jpg", ".jpeg", ".jxr", ".bmp", ".gif" })
+            {
+                var path = Path.Combine(dependencies.CoversRoot, safe + ext);
+                if (File.Exists(path)) return path;
+            }
+            return null;
+        }
+
         public void PurgeCachedHeroDownloads(string title)
         {
             var safe = HeroCacheFileBaseFromTitle(title);
             var invalidated = new List<string>();
             foreach (var ext in new[] { ".jpg", ".jpeg", ".png", ".jxr", ".bmp", ".gif" })
+            {
+                var path = Path.Combine(dependencies.CoversRoot, safe + ext);
+                if (File.Exists(path))
+                {
+                    invalidated.Add(path);
+                    File.Delete(path);
+                }
+            }
+            InvalidateCoverImageCache(invalidated);
+        }
+
+        public void PurgeCachedLogoDownloads(string title)
+        {
+            var safe = LogoCacheFileBaseFromTitle(title);
+            var invalidated = new List<string>();
+            foreach (var ext in new[] { ".png", ".jpg", ".jpeg", ".jxr", ".bmp", ".gif", ".svg", ".webp" })
             {
                 var path = Path.Combine(dependencies.CoversRoot, safe + ext);
                 if (File.Exists(path))
@@ -1074,6 +1117,22 @@ namespace PixelVaultNative
                 cancellationToken).ConfigureAwait(false);
         }
 
+        /// <summary>
+        /// SteamGridDB logos (transparent wordmarks / marks for photo-workspace header branding).
+        /// </summary>
+        public async Task<string> TryDownloadSteamGridDbLogoAsync(string title, string steamGridDbId, CancellationToken cancellationToken = default(CancellationToken))
+        {
+            if (string.IsNullOrWhiteSpace(title) || string.IsNullOrWhiteSpace(steamGridDbId) || !HasSteamGridDbApiToken()) return null;
+            cancellationToken.ThrowIfCancellationRequested();
+            var key = SafeCacheName(title) + "\u001f" + steamGridDbId.Trim();
+            return await HeroDownloadCoalesce.RunAsync(
+                _steamGridDbLogoDownloadCoalesceLock,
+                _steamGridDbLogoDownloadsInFlight,
+                key,
+                ct => TryDownloadSteamGridDbLogoWorkAsync(title, steamGridDbId, ct),
+                cancellationToken).ConfigureAwait(false);
+        }
+
         async Task<string> TryDownloadSteamGridDbHeroWorkAsync(string title, string steamGridDbId, CancellationToken cancellationToken)
         {
             var stopwatch = Stopwatch.StartNew();
@@ -1084,7 +1143,7 @@ namespace PixelVaultNative
                 {
                     if (wc == null) return null;
                     var json = await wc.DownloadStringAsync(
-                        "https://www.steamgriddb.com/api/v2/heroes/game/" + Uri.EscapeDataString(steamGridDbId) + "?dimensions=3840x1240,1920x620,1600x650,930x310&types=static,alternate&nsfw=false&humor=false&limit=1",
+                        "https://www.steamgriddb.com/api/v2/heroes/game/" + Uri.EscapeDataString(steamGridDbId) + "?nsfw=false&humor=false&limit=1",
                         cancellationToken).ConfigureAwait(false);
                     var match = Regex.Match(json, "\"url\"\\s*:\\s*\"(?<u>(?:\\\\.|[^\"])*)\"");
                     if (!match.Success) return null;
@@ -1109,6 +1168,91 @@ namespace PixelVaultNative
             {
                 stopwatch.Stop();
                 LogPerformanceSample("SteamGridDbHeroDownload", stopwatch, "title=" + title + "; stid=" + steamGridDbId, 180);
+            }
+            return null;
+        }
+
+        async Task<string> TryDownloadSteamGridDbLogoWorkAsync(string title, string steamGridDbId, CancellationToken cancellationToken)
+        {
+            var stopwatch = Stopwatch.StartNew();
+            try
+            {
+                Directory.CreateDirectory(dependencies.CoversRoot);
+                using (var wc = CreateSteamGridDbWebClient())
+                {
+                    if (wc == null) return null;
+                    string json = null;
+                    foreach (var requestUrl in new[]
+                    {
+                        "https://www.steamgriddb.com/api/v2/logos/game/" + Uri.EscapeDataString(steamGridDbId) + "?styles=white&nsfw=false&humor=false&limit=1",
+                        "https://www.steamgriddb.com/api/v2/logos/game/" + Uri.EscapeDataString(steamGridDbId) + "?nsfw=false&humor=false&limit=1"
+                    })
+                    {
+                        try
+                        {
+                            json = await wc.DownloadStringAsync(requestUrl, cancellationToken).ConfigureAwait(false);
+                            if (!string.IsNullOrWhiteSpace(json)) break;
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            throw;
+                        }
+                        catch
+                        {
+                        }
+                    }
+                    if (string.IsNullOrWhiteSpace(json)) return null;
+                    var urlMatch = Regex.Match(json, "\"url\"\\s*:\\s*\"(?<u>(?:\\\\.|[^\"])*)\"");
+                    var thumbMatch = Regex.Match(json, "\"thumb\"\\s*:\\s*\"(?<u>(?:\\\\.|[^\"])*)\"");
+                    var url = urlMatch.Success
+                        ? Regex.Unescape(urlMatch.Groups["u"].Value).Replace("\\/", "/")
+                        : (thumbMatch.Success ? Regex.Unescape(thumbMatch.Groups["u"].Value).Replace("\\/", "/") : string.Empty);
+                    if (string.IsNullOrWhiteSpace(url)) return null;
+                    var ext = Path.GetExtension(new Uri(url).AbsolutePath);
+                    if (string.IsNullOrWhiteSpace(ext)) ext = ".png";
+                    if (!string.Equals(ext, ".png", StringComparison.OrdinalIgnoreCase)
+                        && !string.Equals(ext, ".jpg", StringComparison.OrdinalIgnoreCase)
+                        && !string.Equals(ext, ".jpeg", StringComparison.OrdinalIgnoreCase)
+                        && !string.Equals(ext, ".bmp", StringComparison.OrdinalIgnoreCase)
+                        && !string.Equals(ext, ".gif", StringComparison.OrdinalIgnoreCase)
+                        && !string.Equals(ext, ".jxr", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (thumbMatch.Success)
+                        {
+                            url = Regex.Unescape(thumbMatch.Groups["u"].Value).Replace("\\/", "/");
+                            ext = Path.GetExtension(new Uri(url).AbsolutePath);
+                            if (string.IsNullOrWhiteSpace(ext)) ext = ".png";
+                            if (!string.Equals(ext, ".png", StringComparison.OrdinalIgnoreCase)
+                                && !string.Equals(ext, ".jpg", StringComparison.OrdinalIgnoreCase)
+                                && !string.Equals(ext, ".jpeg", StringComparison.OrdinalIgnoreCase)
+                                && !string.Equals(ext, ".bmp", StringComparison.OrdinalIgnoreCase)
+                                && !string.Equals(ext, ".gif", StringComparison.OrdinalIgnoreCase)
+                                && !string.Equals(ext, ".jxr", StringComparison.OrdinalIgnoreCase))
+                                return null;
+                        }
+                        else
+                        {
+                            return null;
+                        }
+                    }
+                    PurgeCachedLogoDownloads(title);
+                    var target = Path.Combine(dependencies.CoversRoot, LogoCacheFileBaseFromTitle(title) + ext);
+                    await wc.DownloadFileAsync(url, target, cancellationToken).ConfigureAwait(false);
+                    if (File.Exists(target) && new FileInfo(target).Length > 0) return target;
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                Log("SteamGridDB logo download failed for " + title + ". " + ex.Message);
+            }
+            finally
+            {
+                stopwatch.Stop();
+                LogPerformanceSample("SteamGridDbLogoDownload", stopwatch, "title=" + title + "; stid=" + steamGridDbId, 180);
             }
             return null;
         }
