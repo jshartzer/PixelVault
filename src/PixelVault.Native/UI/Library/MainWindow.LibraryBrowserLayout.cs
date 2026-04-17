@@ -47,7 +47,6 @@ namespace PixelVaultNative
             internal DatePicker TimelineEndDatePicker;
             internal Button DeleteSelectedButton;
             internal Button FolderCoverLayoutButton;
-            internal Button PhotoCaptureLayoutButton;
             internal StackPanel PhotoRailColumnPickerHost;
             internal Button PhotoRailColumnOneButton;
             internal Button PhotoRailColumnTwoButton;
@@ -68,6 +67,19 @@ namespace PixelVaultNative
             internal Grid PhotoWorkspaceHeroBannerRoot;
             internal DockPanel LibraryDetailControlsDock;
             internal DispatcherTimer FolderPaneSplitClampTimer;
+        }
+
+        Button BuildPhotoWorkspaceIconBadgeButton(string glyph, string automationName, string toolTip, string backgroundHex, string borderHex, string hoverBackgroundHex, string pressedBackgroundHex, string iconHex = "#E7EFF4")
+        {
+            var button = Btn(automationName, null, backgroundHex, Brushes.White);
+            button.Content = BuildSymbolIcon(glyph, iconHex, 14);
+            button.ToolTip = toolTip;
+            button.Margin = new Thickness(0, 0, 10, 0);
+            ApplyLibraryCircleToolbarChrome(button, backgroundHex, borderHex, hoverBackgroundHex, pressedBackgroundHex, iconHex);
+            button.Width = 40;
+            button.Height = 40;
+            AccessibilityUi.TrySetAutomationName(button, automationName);
+            return button;
         }
 
         LibraryBrowserPaneRefs BuildLibraryBrowserContentPanes(Grid contentGrid)
@@ -453,26 +465,14 @@ namespace PixelVaultNative
             titleRow.Children.Add(panes.DetailTitleBadgePanel);
             chromeStack.Children.Add(titleRow);
             panes.DetailMeta = new TextBlock { Text = "Browse the library you chose in Settings.", Foreground = Brush("#9CB1BC"), Margin = new Thickness(0, 8, 0, 14), TextWrapping = TextWrapping.Wrap, FontSize = 13.5 };
-            panes.OpenFolderButton = Btn("Open Folder", null, "#275D47", Brushes.White);
-            panes.EditMetadataButton = Btn("Edit Metadata", null, "#20343A", Brushes.White);
-            panes.RefreshThisFolderButton = Btn("Refresh folder", null, "#20343A", Brushes.White);
+            panes.OpenFolderButton = BuildPhotoWorkspaceIconBadgeButton("\uE8B7", "Open folder", "Open folder", "#1F3340", "#314754", "#29424F", "#172630");
+            panes.EditMetadataButton = BuildPhotoWorkspaceIconBadgeButton("\uE70F", "Edit metadata", "Edit metadata", "#1C2A32", "#2A3C46", "#22323C", "#141E24");
+            panes.RefreshThisFolderButton = BuildPhotoWorkspaceIconBadgeButton("\uE72C", "Refresh folder", "Reload this folder from disk and refresh the library list", "#1C2A32", "#2A3C46", "#22323C", "#141E24");
             panes.ExitTimelineButton = Btn("Folder Browser", null, "#20343A", Brushes.White);
-            panes.OpenFolderButton.Content = BuildToolbarButtonContent("\uE8B7", "Open Folder");
-            panes.RefreshThisFolderButton.Content = BuildToolbarButtonContent("\uE72C", "Refresh folder");
             panes.ExitTimelineButton.Content = BuildToolbarButtonContent("\uE72B", "Folder Browser");
-            panes.RefreshThisFolderButton.ToolTip = "Reload this folder from disk and refresh the library list";
             panes.ExitTimelineButton.ToolTip = "Return to the folder browser";
-            ApplyLibraryPillChrome(panes.OpenFolderButton, "#1F3340", "#314754", "#29424F", "#172630");
-            ApplyLibraryPillChrome(panes.EditMetadataButton, "#1C2A32", "#2A3C46", "#22323C", "#141E24");
-            ApplyLibraryPillChrome(panes.RefreshThisFolderButton, "#1C2A32", "#2A3C46", "#22323C", "#141E24");
             ApplyLibraryPillChrome(panes.ExitTimelineButton, "#1C2A32", "#2A3C46", "#22323C", "#141E24");
-            panes.OpenFolderButton.Height = 38;
-            panes.EditMetadataButton.Height = 38;
-            panes.RefreshThisFolderButton.Height = 38;
             panes.ExitTimelineButton.Height = 38;
-            panes.OpenFolderButton.Margin = new Thickness(0, 0, 12, 0);
-            panes.EditMetadataButton.Margin = new Thickness(0, 0, 12, 0);
-            panes.RefreshThisFolderButton.Margin = new Thickness(0, 0, 12, 0);
             panes.PhotoAchievementsButton = Btn("", null, "#20343A", Brushes.White);
             panes.PhotoAchievementsButton.Content = new TextBlock
             {
@@ -503,18 +503,8 @@ namespace PixelVaultNative
             };
             panes.ExitTimelineButton.Margin = new Thickness(0);
             panes.ExitTimelineButton.Visibility = Visibility.Collapsed;
-            panes.PhotoCaptureLayoutButton = Btn("Density: Auto", null, "#20343A", Brushes.White);
-            panes.PhotoCaptureLayoutButton.MinWidth = 130;
-            panes.PhotoCaptureLayoutButton.Height = 30;
-            panes.PhotoCaptureLayoutButton.FontSize = 11;
-            panes.PhotoCaptureLayoutButton.Padding = new Thickness(10, 0, 10, 0);
-            panes.PhotoCaptureLayoutButton.ToolTip = "Capture density follows the detail pane width automatically. Wide panes use Roomy; narrower panes use Compact.";
-            ApplyLibraryPillChrome(panes.PhotoCaptureLayoutButton, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
-            panes.PhotoCaptureLayoutButton.Visibility = Visibility.Collapsed;
-            var bannerButtonRow = new Grid { Margin = new Thickness(0, 8, 0, 0) };
-            bannerButtonRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            bannerButtonRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            var bannerActionsLeft = new WrapPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Left };
+            var bannerButtonRow = new WrapPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 8, 0, 0) };
+            var bannerActionsLeft = bannerButtonRow;
             bannerActionsLeft.Children.Add(panes.OpenFolderButton);
             bannerActionsLeft.Children.Add(panes.EditMetadataButton);
             bannerActionsLeft.Children.Add(panes.RefreshThisFolderButton);
@@ -523,13 +513,6 @@ namespace PixelVaultNative
             photoAchievementsGroup.Children.Add(panes.PhotoAchievementsSummary);
             bannerActionsLeft.Children.Add(photoAchievementsGroup);
             bannerActionsLeft.Children.Add(panes.ExitTimelineButton);
-            Grid.SetColumn(bannerActionsLeft, 0);
-            bannerButtonRow.Children.Add(bannerActionsLeft);
-            Grid.SetColumn(panes.PhotoCaptureLayoutButton, 1);
-            panes.PhotoCaptureLayoutButton.HorizontalAlignment = HorizontalAlignment.Right;
-            panes.PhotoCaptureLayoutButton.Margin = new Thickness(12, 0, 0, 0);
-            panes.PhotoCaptureLayoutButton.VerticalAlignment = VerticalAlignment.Center;
-            bannerButtonRow.Children.Add(panes.PhotoCaptureLayoutButton);
             chromeStack.Children.Add(panes.DetailMeta);
             chromeStack.Children.Add(bannerButtonRow);
             detailChromePanel.Child = chromeStack;

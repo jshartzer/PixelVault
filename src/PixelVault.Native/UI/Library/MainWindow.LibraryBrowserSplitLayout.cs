@@ -52,8 +52,6 @@ namespace PixelVaultNative
             if (panes.TimelineFilterPanel != null) panes.TimelineFilterPanel.Visibility = isTimeline ? Visibility.Visible : Visibility.Collapsed;
             if (panes.GroupAllButton != null) panes.GroupAllButton.Visibility = isPhoto ? Visibility.Collapsed : Visibility.Visible;
             if (panes.GroupConsoleButton != null) panes.GroupConsoleButton.Visibility = isPhoto ? Visibility.Collapsed : Visibility.Visible;
-            if (panes.PhotoCaptureLayoutButton != null)
-                panes.PhotoCaptureLayoutButton.Visibility = (isPhoto || isTimeline) ? Visibility.Visible : Visibility.Collapsed;
             if (panes.GroupTimelineButton != null)
                 panes.GroupTimelineButton.Visibility = isPhoto ? Visibility.Collapsed : Visibility.Visible;
             if (panes.PhotoWorkspaceHeroBannerStrip != null)
@@ -146,13 +144,6 @@ namespace PixelVaultNative
                 if (panes.LibraryDetailControlsDock != null) panes.LibraryDetailControlsDock.Margin = new Thickness(0, 2, 0, 6);
                 if (panes.DetailMeta != null) panes.DetailMeta.Margin = new Thickness(0, 4, 0, 6);
                 if (panes.DetailTitle != null) panes.DetailTitle.FontSize = 22;
-                if (panes.PhotoCaptureLayoutButton != null)
-                {
-                    panes.PhotoCaptureLayoutButton.MinWidth = 122;
-                    panes.PhotoCaptureLayoutButton.Margin = new Thickness(8, 4, 0, 0);
-                    panes.PhotoCaptureLayoutButton.HorizontalAlignment = HorizontalAlignment.Right;
-                    panes.PhotoCaptureLayoutButton.VerticalAlignment = VerticalAlignment.Top;
-                }
                 if (panes.LibraryDetailBannerGrid != null && panes.LibraryDetailBannerGrid.ColumnDefinitions.Count > 1)
                 {
                     var chromeCol = panes.LibraryDetailBannerGrid.ColumnDefinitions[1];
@@ -192,13 +183,6 @@ namespace PixelVaultNative
                 if (panes.LibraryDetailControlsDock != null) panes.LibraryDetailControlsDock.Margin = new Thickness(0, 4, 0, 14);
                 if (panes.DetailMeta != null) panes.DetailMeta.Margin = new Thickness(0, 8, 0, 14);
                 if (panes.DetailTitle != null) panes.DetailTitle.FontSize = 28;
-                if (panes.PhotoCaptureLayoutButton != null)
-                {
-                    panes.PhotoCaptureLayoutButton.MinWidth = 136;
-                    panes.PhotoCaptureLayoutButton.Margin = new Thickness(12, 0, 0, 0);
-                    panes.PhotoCaptureLayoutButton.HorizontalAlignment = HorizontalAlignment.Right;
-                    panes.PhotoCaptureLayoutButton.VerticalAlignment = VerticalAlignment.Center;
-                }
                 if (panes.LibraryDetailBannerGrid != null && panes.LibraryDetailBannerGrid.ColumnDefinitions.Count > 1)
                 {
                     var chromeCol = panes.LibraryDetailBannerGrid.ColumnDefinitions[1];

@@ -360,7 +360,6 @@ namespace PixelVaultNative
                     if (panes.OpenCapturesButton != null && isBusy) panes.OpenCapturesButton.IsEnabled = false;
                     if (panes.PhotoWorkspaceDividerToggleButton != null) panes.PhotoWorkspaceDividerToggleButton.IsEnabled = !isBusy;
                     panes.FolderCoverLayoutButton.IsEnabled = !isBusy;
-                    if (panes.PhotoCaptureLayoutButton != null) panes.PhotoCaptureLayoutButton.IsEnabled = !isBusy;
                     if (panes.PhotoAchievementsButton != null) panes.PhotoAchievementsButton.IsEnabled = !isBusy && ws.Current != null;
                     if (panes.PhotoRailColumnOneButton != null) panes.PhotoRailColumnOneButton.IsEnabled = !isBusy;
                     if (panes.PhotoRailColumnTwoButton != null) panes.PhotoRailColumnTwoButton.IsEnabled = !isBusy;
@@ -673,13 +672,6 @@ namespace PixelVaultNative
                         _shell.SaveSettings();
                         if (renderTiles != null) renderTiles();
                         ws.RefreshPhotoRailColumnPickerUi?.Invoke();
-                    };
-                }
-                if (panes.PhotoCaptureLayoutButton != null)
-                {
-                    panes.PhotoCaptureLayoutButton.Click += delegate
-                    {
-                        _shell.LibraryBrowserShowToast(ws, "Capture density follows the pane width automatically: roomy on wide windows, compact on narrower panes.");
                     };
                 }
                 panes.TimelinePresetTodayButton.Click += delegate { applyTimelinePreset("today"); };

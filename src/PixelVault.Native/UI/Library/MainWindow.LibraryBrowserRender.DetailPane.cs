@@ -64,12 +64,6 @@ namespace PixelVaultNative
             var detailLayout = CalculateResponsiveLibraryDetailLayout(panes.ThumbScroll, true, timelineView);
             var size = detailLayout.TileSize;
             ws.LastDetailViewportWidth = ResolveScrollViewerLayoutWidth(panes == null ? null : panes.ThumbScroll);
-            if (panes?.PhotoCaptureLayoutButton != null)
-            {
-                var densityLabel = DescribeResponsiveLibraryDetailDensity(size);
-                panes.PhotoCaptureLayoutButton.Content = "Density: " + densityLabel;
-                panes.PhotoCaptureLayoutButton.ToolTip = "Capture density follows the detail pane width automatically. Wide panes use Roomy; narrower panes use Compact.";
-            }
             var shouldRestoreDetailScroll = ws.PreserveDetailScrollOnNextRender && ws.PreservedDetailScrollOffset > 0.1d;
             var restoreDetailScrollOffset = shouldRestoreDetailScroll ? (double?)ws.PreservedDetailScrollOffset : null;
             var restoreDetailScrollPending = shouldRestoreDetailScroll;

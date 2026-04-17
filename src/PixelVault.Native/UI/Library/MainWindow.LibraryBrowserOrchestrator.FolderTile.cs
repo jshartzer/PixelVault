@@ -519,7 +519,9 @@ namespace PixelVaultNative
             if (ws.WorkspaceMode != LibraryWorkspaceMode.Photo)
                 UpdateLibraryBrowserDetailTitleBadges(panes, timelineView ? null : info);
             panes.DetailMeta.Text = BuildLibraryBrowserDetailMetaText(info, actionFolder);
-            panes.OpenFolderButton.Content = BuildToolbarButtonContent("\uE8B7", BuildLibraryBrowserOpenFoldersLabel(info));
+            var openFolderLabel = BuildLibraryBrowserOpenFoldersLabel(info);
+            panes.OpenFolderButton.ToolTip = openFolderLabel;
+            AccessibilityUi.TrySetAutomationName(panes.OpenFolderButton, openFolderLabel);
             if (timelineView)
             {
                 panes.PreviewImage.Source = null;
