@@ -79,7 +79,16 @@ if (-not $MakeInstaller)
 }
 Write-Host ""
 
-$publishArgs = @{ Force = $Force }
+# If dist\Velopack\publish-<ver> already exists, Publish-Velopack.ps1 requires -Force.
+# Repeat "release check" runs should not fail for that reason — overwrite when the folder is already there.
+$publishDirPreview = Join-Path $repoRoot ("dist\Velopack\publish-" + $ver)
+$overwrite = $Force -or (Test-Path -LiteralPath $publishDirPreview)
+if ((Test-Path -LiteralPath $publishDirPreview) -and -not $Force)
+{
+    Write-Host "Replacing existing publish folder (same version)." -ForegroundColor DarkYellow
+}
+
+$publishArgs = @{ Force = $overwrite }
 if (-not $MakeInstaller) { $publishArgs.SkipVpk = $true }
 if (-not [string]::IsNullOrWhiteSpace($Version)) { $publishArgs.Version = $Version }
 if ($MakeInstaller -and -not [string]::IsNullOrWhiteSpace($SignParams)) { $publishArgs.SignParams = $SignParams }

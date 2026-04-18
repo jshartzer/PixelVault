@@ -50,6 +50,8 @@ That script will:
 2. **Check** the output folder automatically.  
 3. **Print** what to do next in normal language.
 
+If **`dist\Velopack\publish-<version>`** already exists from a previous run, the script **replaces it** automatically (same version number). Direct use of **`Publish-Velopack.ps1`** still asks for **`-Force`** until you delete that folder — that is a safety rule for manual runs only.
+
 **Full installer + update packages** (needs `vpk` and ASP.NET 8 runtime — see **`docs/VELOPACK.md`**):
 
 ```powershell
