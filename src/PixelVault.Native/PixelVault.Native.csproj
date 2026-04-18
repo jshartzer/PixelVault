@@ -102,6 +102,7 @@
     <Compile Include="UI\Settings\SettingsShellDependencies.cs" />
     <Compile Include="UI\Settings\SettingsShellHost.cs" />
     <Compile Include="UI\Settings\MainWindow.SettingsPersistence.cs" />
+    <Compile Include="UI\Library\LibraryButtonChrome.cs" />
     <Compile Include="UI\Library\LibraryWorkspaceContext.cs" />
     <Compile Include="UI\Library\LibraryWorkspaceMode.cs" />
     <Compile Include="UI\Library\ILibraryBrowserShell.cs" />
