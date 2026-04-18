@@ -356,6 +356,7 @@ namespace PixelVaultNative
                 var foilLastScrollOffset = double.NaN;
                 var foilScrollBiasY = 0d;
                 var foilRenderIdleFrames = 0;
+                var foilHovering = false;
 
                 Point ResolveTileViewportCenter()
                 {
@@ -380,7 +381,9 @@ namespace PixelVaultNative
                 void UpdateFoilFromViewport(bool animate)
                 {
                     var viewportCenter = ResolveTileViewportCenter();
-                    var blendedY = Math.Max(0, Math.Min(1, viewportCenter.Y + foilScrollBiasY));
+                    var blendedY = foilHovering
+                        ? viewportCenter.Y
+                        : Math.Max(0, Math.Min(1, viewportCenter.Y + foilScrollBiasY));
                     foilVisual.Update(viewportCenter.X, blendedY, animate);
                 }
 
@@ -402,26 +405,10 @@ namespace PixelVaultNative
                             return;
                         }
 
-                        var currentOffset = foilScrollHost.VerticalOffset;
-                        var offsetDelta = double.IsNaN(foilLastScrollOffset) ? 0d : currentOffset - foilLastScrollOffset;
-                        foilLastScrollOffset = currentOffset;
-
-                        var updated = false;
-                        if (Math.Abs(offsetDelta) > 0.01d)
-                        {
-                            foilScrollBiasY = Math.Max(-0.6d, Math.Min(0.6d, offsetDelta / 48d));
-                            foilRenderIdleFrames = 6;
-                            updated = true;
-                        }
-                        else if (Math.Abs(foilScrollBiasY) > 0.002d)
+                        if (Math.Abs(foilScrollBiasY) > 0.002d)
                         {
                             foilScrollBiasY *= 0.82d;
                             if (Math.Abs(foilScrollBiasY) < 0.002d) foilScrollBiasY = 0d;
-                            updated = true;
-                        }
-
-                        if (updated)
-                        {
                             UpdateFoilFromViewport(false);
                             return;
                         }
@@ -458,18 +445,16 @@ namespace PixelVaultNative
                             : (double.IsNaN(foilLastScrollOffset) ? 0d : se.VerticalOffset - foilLastScrollOffset);
                         foilLastScrollOffset = se.VerticalOffset;
                         foilScrollBiasY = Math.Max(-0.6d, Math.Min(0.6d, delta / 48d));
-                        foilRenderIdleFrames = 6;
+                        if (foilRenderIdleFrames < 6) foilRenderIdleFrames = 6;
                         EnsureFoilRendering();
                         UpdateFoilFromViewport(false);
                     };
                     foilScrollHost.ScrollChanged += foilScrollChanged;
 
-                    foilPreviewMouseWheel = delegate(object _, MouseWheelEventArgs e)
+                    foilPreviewMouseWheel = delegate
                     {
-                        foilScrollBiasY = Math.Max(-0.6d, Math.Min(0.6d, (-e.Delta) / 320d));
-                        foilRenderIdleFrames = 8;
+                        if (foilRenderIdleFrames < 8) foilRenderIdleFrames = 8;
                         EnsureFoilRendering();
-                        UpdateFoilFromViewport(false);
                     };
                     foilScrollHost.PreviewMouseWheel += foilPreviewMouseWheel;
                 }
@@ -492,10 +477,16 @@ namespace PixelVaultNative
                     foilLastScrollOffset = double.NaN;
                     foilScrollBiasY = 0d;
                     foilRenderIdleFrames = 0;
+                    foilHovering = false;
+                };
+                tile.MouseEnter += delegate
+                {
+                    foilHovering = true;
                 };
                 tile.MouseMove += delegate(object _, MouseEventArgs e)
                 {
                     if (imageBorder == null || imageBorder.ActualWidth <= 0 || imageBorder.ActualHeight <= 0) return;
+                    foilHovering = true;
                     var position = e.GetPosition(imageBorder);
                     foilVisual.Update(
                         Math.Max(0, Math.Min(1, position.X / imageBorder.ActualWidth)),
@@ -504,6 +495,7 @@ namespace PixelVaultNative
                 };
                 tile.MouseLeave += delegate
                 {
+                    foilHovering = false;
                     UpdateFoilFromViewport(true);
                 };
             }

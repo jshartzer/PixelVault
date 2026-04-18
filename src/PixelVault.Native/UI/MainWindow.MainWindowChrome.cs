@@ -609,9 +609,9 @@ namespace PixelVaultNative
 
                 SetDouble(glossLayer, UIElement.OpacityProperty, 0.36d + shimmer * 0.36d, animate, 150);
                 SetDouble(prismLayer, UIElement.OpacityProperty, 0.30d + shimmer * 0.42d, animate, 150);
-                SetDouble(crossLayer, UIElement.OpacityProperty, 0.16d + shimmer * 0.22d, animate, 150);
+                SetDouble(crossLayer, UIElement.OpacityProperty, 0.22d + shimmer * 0.22d, animate, 150);
                 SetDouble(stripeLayer, UIElement.OpacityProperty, 0.15d + shimmer * 0.18d, animate, 180);
-                SetDouble(glintLayer, UIElement.OpacityProperty, 0.18d + shimmer * 0.30d, animate, 120);
+                SetDouble(glintLayer, UIElement.OpacityProperty, 0.28d + shimmer * 0.30d, animate, 120);
             }
 
             static void SetDouble(DependencyObject target, DependencyProperty property, double value, bool animate, int durationMs)
@@ -727,7 +727,7 @@ namespace PixelVaultNative
             var prismLayer = new Border
             {
                 Background = prismSweepBrush,
-                Opacity = 0.18,
+                Opacity = 0.30,
                 Margin = new Thickness(-32),
                 RenderTransform = prismShift
             };
@@ -738,17 +738,17 @@ namespace PixelVaultNative
                 StartPoint = new Point(0.06, 0.18),
                 EndPoint = new Point(0.94, 0.82)
             };
+            crossSweepBrush.GradientStops.Add(new GradientStop(Brush("#00FFFFFF").Color, 0.38));
             crossSweepBrush.GradientStops.Add(new GradientStop(Brush("#00FFFFFF").Color, 0.48));
-            crossSweepBrush.GradientStops.Add(new GradientStop(Brush("#00FFFFFF").Color, 0.535));
-            crossSweepBrush.GradientStops.Add(new GradientStop(Brush("#44C6A8FF").Color, 0.565));
-            crossSweepBrush.GradientStops.Add(new GradientStop(Brush("#2EFFF6D7").Color, 0.592));
-            crossSweepBrush.GradientStops.Add(new GradientStop(Brush("#00FFFFFF").Color, 0.635));
+            crossSweepBrush.GradientStops.Add(new GradientStop(Brush("#66C6A8FF").Color, 0.55));
+            crossSweepBrush.GradientStops.Add(new GradientStop(Brush("#44FFF6D7").Color, 0.61));
+            crossSweepBrush.GradientStops.Add(new GradientStop(Brush("#00FFFFFF").Color, 0.72));
             crossSweepBrush.GradientStops.Add(new GradientStop(Brush("#00FFFFFF").Color, 1));
             if (crossSweepBrush.CanFreeze) crossSweepBrush.Freeze();
             var crossLayer = new Border
             {
                 Background = crossSweepBrush,
-                Opacity = 0.10,
+                Opacity = 0.22,
                 Margin = new Thickness(-26),
                 RenderTransform = crossShift
             };
@@ -757,7 +757,7 @@ namespace PixelVaultNative
             var stripeDrawing = new DrawingGroup();
             stripeDrawing.Children.Add(new GeometryDrawing(
                 Brushes.Transparent,
-                new Pen(Brush("#58FFFFFF"), 0.8),
+                new Pen(Brush("#58FFFFFF"), 1.4),
                 Geometry.Parse("M 0 10 L 10 0")));
             if (stripeDrawing.CanFreeze) stripeDrawing.Freeze();
             var stripeBrush = new DrawingBrush(stripeDrawing)
@@ -786,7 +786,7 @@ namespace PixelVaultNative
                 RadiusX = 0.32,
                 RadiusY = 0.26
             };
-            topGlintBrush.GradientStops.Add(new GradientStop(Brush("#BBFFFFFF").Color, 0));
+            topGlintBrush.GradientStops.Add(new GradientStop(Brush("#88FFFFFF").Color, 0));
             topGlintBrush.GradientStops.Add(new GradientStop(Brush("#50FFF9F0").Color, 0.28));
             topGlintBrush.GradientStops.Add(new GradientStop(Brush("#18FFFFFF").Color, 0.60));
             topGlintBrush.GradientStops.Add(new GradientStop(Brush("#00FFFFFF").Color, 1));
@@ -794,7 +794,7 @@ namespace PixelVaultNative
             var glintLayer = new Border
             {
                 Background = topGlintBrush,
-                Opacity = 0.12,
+                Opacity = 0.28,
                 Margin = new Thickness(-16),
                 RenderTransform = glintShift
             };
