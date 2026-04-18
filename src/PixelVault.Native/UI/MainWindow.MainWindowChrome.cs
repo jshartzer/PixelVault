@@ -596,22 +596,22 @@ namespace PixelVaultNative
                 var shimmer = Math.Max(Math.Abs(xBias), Math.Abs(yBias));
 
                 SetDouble(root, UIElement.OpacityProperty, 0.98d + shimmer * 0.08d, animate, 150);
-                SetDouble(glossShift, TranslateTransform.XProperty, xBias * 7d, animate, 150);
-                SetDouble(glossShift, TranslateTransform.YProperty, yBias * 5d, animate, 150);
-                SetDouble(prismShift, TranslateTransform.XProperty, xBias * 24d - yBias * 6d, animate, 150);
-                SetDouble(prismShift, TranslateTransform.YProperty, yBias * 14d - xBias * 5d, animate, 150);
-                SetDouble(crossShift, TranslateTransform.XProperty, -xBias * 20d + yBias * 8d, animate, 150);
-                SetDouble(crossShift, TranslateTransform.YProperty, -yBias * 10d + xBias * 7d, animate, 150);
-                SetDouble(stripeShift, TranslateTransform.XProperty, xBias * 10d, animate, 180);
-                SetDouble(stripeShift, TranslateTransform.YProperty, yBias * 8d, animate, 180);
-                SetDouble(glintShift, TranslateTransform.XProperty, xBias * 14d + yBias * 8d, animate, 120);
-                SetDouble(glintShift, TranslateTransform.YProperty, yBias * 8d - xBias * 5d, animate, 120);
+                SetDouble(glossShift, TranslateTransform.XProperty, xBias * 10d, animate, 150);
+                SetDouble(glossShift, TranslateTransform.YProperty, yBias * 8d, animate, 150);
+                SetDouble(prismShift, TranslateTransform.XProperty, xBias * 36d - yBias * 9d, animate, 150);
+                SetDouble(prismShift, TranslateTransform.YProperty, yBias * 22d - xBias * 8d, animate, 150);
+                SetDouble(crossShift, TranslateTransform.XProperty, -xBias * 30d + yBias * 12d, animate, 150);
+                SetDouble(crossShift, TranslateTransform.YProperty, -yBias * 16d + xBias * 10d, animate, 150);
+                SetDouble(stripeShift, TranslateTransform.XProperty, xBias * 14d, animate, 180);
+                SetDouble(stripeShift, TranslateTransform.YProperty, yBias * 11d, animate, 180);
+                SetDouble(glintShift, TranslateTransform.XProperty, xBias * 20d + yBias * 12d, animate, 120);
+                SetDouble(glintShift, TranslateTransform.YProperty, yBias * 12d - xBias * 8d, animate, 120);
 
-                SetDouble(glossLayer, UIElement.OpacityProperty, 0.36d + shimmer * 0.18d, animate, 150);
-                SetDouble(prismLayer, UIElement.OpacityProperty, 0.30d + shimmer * 0.22d, animate, 150);
-                SetDouble(crossLayer, UIElement.OpacityProperty, 0.16d + shimmer * 0.12d, animate, 150);
-                SetDouble(stripeLayer, UIElement.OpacityProperty, 0.15d + shimmer * 0.10d, animate, 180);
-                SetDouble(glintLayer, UIElement.OpacityProperty, 0.18d + shimmer * 0.14d, animate, 120);
+                SetDouble(glossLayer, UIElement.OpacityProperty, 0.36d + shimmer * 0.36d, animate, 150);
+                SetDouble(prismLayer, UIElement.OpacityProperty, 0.30d + shimmer * 0.42d, animate, 150);
+                SetDouble(crossLayer, UIElement.OpacityProperty, 0.16d + shimmer * 0.22d, animate, 150);
+                SetDouble(stripeLayer, UIElement.OpacityProperty, 0.15d + shimmer * 0.18d, animate, 180);
+                SetDouble(glintLayer, UIElement.OpacityProperty, 0.18d + shimmer * 0.30d, animate, 120);
             }
 
             static void SetDouble(DependencyObject target, DependencyProperty property, double value, bool animate, int durationMs)
@@ -696,9 +696,10 @@ namespace PixelVaultNative
                 EndPoint = new Point(0.92, 1)
             };
             glossBrush.GradientStops.Add(new GradientStop(Brush("#00FFFFFF").Color, 0));
-            glossBrush.GradientStops.Add(new GradientStop(Brush("#26FFFFFF").Color, 0.24));
-            glossBrush.GradientStops.Add(new GradientStop(Brush("#0AF9FCFF").Color, 0.42));
-            glossBrush.GradientStops.Add(new GradientStop(Brush("#18FFFFFF").Color, 0.64));
+            glossBrush.GradientStops.Add(new GradientStop(Brush("#44FFFFFF").Color, 0.22));
+            glossBrush.GradientStops.Add(new GradientStop(Brush("#28F9FCFF").Color, 0.40));
+            glossBrush.GradientStops.Add(new GradientStop(Brush("#50FFFFFF").Color, 0.60));
+            glossBrush.GradientStops.Add(new GradientStop(Brush("#10FFFFFF").Color, 0.82));
             glossBrush.GradientStops.Add(new GradientStop(Brush("#00FFFFFF").Color, 1));
             if (glossBrush.CanFreeze) glossBrush.Freeze();
             var glossLayer = new Border
@@ -714,12 +715,13 @@ namespace PixelVaultNative
                 StartPoint = new Point(0, 0.94),
                 EndPoint = new Point(1, 0.08)
             };
-            prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#00FFFFFF").Color, 0.30));
-            prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#78A8F6FF").Color, 0.40));
-            prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#8AE39BFF").Color, 0.49));
-            prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#94FFF4A8").Color, 0.57));
-            prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#66FFE7C8").Color, 0.66));
-            prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#00FFFFFF").Color, 0.78));
+            prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#00FFFFFF").Color, 0.26));
+            prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#A0A8F6FF").Color, 0.38));
+            prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#A8E39BFF").Color, 0.46));
+            prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#BBFFF4A8").Color, 0.54));
+            prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#A0FFB6E8").Color, 0.61));
+            prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#72FFE7C8").Color, 0.68));
+            prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#00FFFFFF").Color, 0.80));
             prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#00FFFFFF").Color, 1));
             if (prismSweepBrush.CanFreeze) prismSweepBrush.Freeze();
             var prismLayer = new Border
@@ -779,13 +781,14 @@ namespace PixelVaultNative
 
             var topGlintBrush = new RadialGradientBrush
             {
-                Center = new Point(0.24, 0.2),
-                GradientOrigin = new Point(0.24, 0.2),
-                RadiusX = 0.24,
-                RadiusY = 0.18
+                Center = new Point(0.22, 0.18),
+                GradientOrigin = new Point(0.22, 0.18),
+                RadiusX = 0.32,
+                RadiusY = 0.26
             };
-            topGlintBrush.GradientStops.Add(new GradientStop(Brush("#8AFFFFFF").Color, 0));
-            topGlintBrush.GradientStops.Add(new GradientStop(Brush("#2EFFF9F0").Color, 0.3));
+            topGlintBrush.GradientStops.Add(new GradientStop(Brush("#BBFFFFFF").Color, 0));
+            topGlintBrush.GradientStops.Add(new GradientStop(Brush("#50FFF9F0").Color, 0.28));
+            topGlintBrush.GradientStops.Add(new GradientStop(Brush("#18FFFFFF").Color, 0.60));
             topGlintBrush.GradientStops.Add(new GradientStop(Brush("#00FFFFFF").Color, 1));
             if (topGlintBrush.CanFreeze) topGlintBrush.Freeze();
             var glintLayer = new Border
