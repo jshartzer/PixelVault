@@ -7,8 +7,12 @@ namespace PixelVaultNative
 {
     public sealed partial class MainWindow
     {
-        long _libraryBrowserAllMergeProjectionFingerprint = long.MinValue;
-        List<LibraryBrowserFolderView> _libraryBrowserAllMergeProjection;
+        // PV-PLN-UI-001 Step 13 Pass C: merged "All" projection state lives in
+        // LibraryBrowserProjectionCache (top-level class, no MainWindow type). The cache holds
+        // the prior `_libraryBrowserAllMergeProjection*` fields; MainWindow keeps a single
+        // instance so the existing GetOrBuildLibraryBrowserFolderViews call site keeps the same
+        // signature.
+        readonly LibraryBrowserProjectionCache _libraryBrowserProjectionCache = new LibraryBrowserProjectionCache();
 
         // PV-PLN-UI-001 Step 13 Pass A: LibraryBrowserFolderView moved to
         // UI/Library/LibraryBrowserFolderView.cs (top-level internal sealed class) so plain
@@ -599,28 +603,17 @@ namespace PixelVaultNative
         internal static string MergeLibraryBrowserRetroAchievementsGameIdForCombinedView(IReadOnlyList<LibraryFolderInfo> sourceFolders)
             => LibraryBrowserViewModelMath.MergeLibraryBrowserRetroAchievementsGameIdForCombinedView(sourceFolders);
 
-        /// <summary>Returns cached merged rows for "All" grouping when folder data unchanged; console mode is always rebuilt and clears the cache.</summary>
+        /// <summary>
+        /// PV-PLN-UI-001 Step 13 Pass C: thin forwarder. Cache lives in
+        /// <see cref="LibraryBrowserProjectionCache"/>; we just hand it the grouping-mode
+        /// normalizer + builder so it can decide hit vs. rebuild.
+        /// </summary>
         List<LibraryBrowserFolderView> GetOrBuildLibraryBrowserFolderViews(IReadOnlyList<LibraryFolderInfo> folders, string groupingMode)
-        {
-            var normalizedGrouping = NormalizeLibraryGroupingMode(groupingMode);
-            if (string.Equals(normalizedGrouping, "console", StringComparison.OrdinalIgnoreCase))
-            {
-                _libraryBrowserAllMergeProjection = null;
-                _libraryBrowserAllMergeProjectionFingerprint = long.MinValue;
-                return BuildLibraryBrowserFolderViews(folders, groupingMode);
-            }
-
-            var fp = ComputeLibraryBrowserFoldersMergeFingerprint(folders);
-            if (_libraryBrowserAllMergeProjection != null && fp == _libraryBrowserAllMergeProjectionFingerprint)
-            {
-                return _libraryBrowserAllMergeProjection;
-            }
-
-            var built = BuildLibraryBrowserFolderViews(folders, groupingMode);
-            _libraryBrowserAllMergeProjection = built;
-            _libraryBrowserAllMergeProjectionFingerprint = fp;
-            return built;
-        }
+            => _libraryBrowserProjectionCache.GetOrBuild(
+                folders,
+                groupingMode,
+                NormalizeLibraryGroupingMode,
+                (rawFolders, mode) => BuildLibraryBrowserFolderViews(rawFolders, mode));
 
         /// <summary>Sort key for folder tiles: prefer precomputed UTC ticks on the view; avoid Alloc in OrderBy hot path.</summary>
         DateTime GetLibraryBrowserFolderViewSortNewest(LibraryBrowserFolderView view)

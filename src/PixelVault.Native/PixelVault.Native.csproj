@@ -129,6 +129,7 @@
     <Compile Include="UI\Library\LibraryBrowseFolderSummary.cs" />
     <Compile Include="UI\Library\LibraryBrowserFolderView.cs" />
     <Compile Include="UI\Library\LibraryBrowserViewModelMath.cs" />
+    <Compile Include="UI\Library\LibraryBrowserProjectionCache.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryPhotoMasonryLayout.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserRender.FolderList.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserFolderFilter.cs" />
