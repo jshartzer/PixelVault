@@ -116,6 +116,7 @@
     <Compile Include="UI\Library\MainWindow.LibraryBrowserWorkspaceMode.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserAchievements.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserLayout.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryCoverResolution.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserViewModel.cs" />
     <Compile Include="UI\Library\LibraryDetailRenderModels.cs" />
     <Compile Include="UI\Library\LibraryBrowseFolderSummary.cs" />
