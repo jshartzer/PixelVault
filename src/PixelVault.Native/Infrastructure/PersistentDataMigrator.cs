@@ -36,12 +36,24 @@ namespace PixelVaultNative
             "This folder is not part of the cache; PixelVault will not delete it when refreshing covers.\r\n";
 
         /// <summary>
+        /// Writable application data root (settings, SQLite cache, logs, saved covers). Same layout as
+        /// repo <c>PixelVaultData/</c>: <c>PixelVault.settings.ini</c>, <c>cache/</c>, <c>logs/</c>, <c>saved-covers/</c>.
+        /// </summary>
+        internal const string LocalAppDataPixelVaultFolderName = "PixelVault";
+
+        /// <summary>
         /// Probes for an external <c>PixelVaultData</c> root so data is shared across release folders.
         /// Order: (1) if we're running from a <c>dist/PixelVault-VERSION</c> or <c>dist/PixelVault-current</c>
-        /// layout, use <c>&lt;dist parent&gt;/PixelVaultData</c>; (2) otherwise walk upwards until we
-        /// find a folder that contains both <c>PixelVaultData/</c> and <c>src/PixelVault.Native/</c>
-        /// (dev-checkout). Falls back to the current app root if neither matches.
+        /// layout, use <c>&lt;dist parent&gt;/PixelVaultData</c>; (2) walk upwards until we find a folder
+        /// that contains both <c>PixelVaultData/</c> and <c>src/PixelVault.Native/</c> (dev-checkout);
+        /// (3) if the EXE directory is under a restricted install location (Program Files, WindowsApps),
+        /// use <c>%LocalAppData%\PixelVault</c> so mutable state is never written beside a read-only install;
+        /// (4) otherwise fall back to the current app root (portable / arbitrary writable folder).
         /// </summary>
+        /// <remarks>
+        /// PV-PLN-DIST-001 §5.8: installed builds must not assume a writable install directory.
+        /// See <c>docs/DISTRIBUTION_STORAGE.md</c>.
+        /// </remarks>
         public static string ResolvePersistentDataRoot(string currentAppRoot, Action<string>? log)
         {
             try
@@ -68,12 +80,53 @@ namespace PixelVaultNative
                     }
                     probe = probe.Parent;
                 }
+
+                if (LooksLikeRestrictedInstallDirectory(currentAppRoot))
+                {
+                    return Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                        LocalAppDataPixelVaultFolderName);
+                }
             }
             catch (Exception ex)
             {
                 log?.Invoke("ResolvePersistentDataRoot: " + ex.Message);
             }
             return currentAppRoot;
+        }
+
+        /// <summary>
+        /// Program Files / WindowsApps-style locations are typically not writable for app data beside the EXE.
+        /// </summary>
+        internal static bool LooksLikeRestrictedInstallDirectory(string appRoot)
+        {
+            if (string.IsNullOrWhiteSpace(appRoot)) return false;
+            string full;
+            try
+            {
+                full = Path.GetFullPath(appRoot.TrimEnd(Path.DirectorySeparatorChar));
+            }
+            catch
+            {
+                return false;
+            }
+
+            var programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+            var programFilesX86 = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86);
+            foreach (var anchor in new[] { programFiles, programFilesX86 })
+            {
+                if (string.IsNullOrEmpty(anchor)) continue;
+                var root = anchor.TrimEnd(Path.DirectorySeparatorChar);
+                if (full.Equals(root, StringComparison.OrdinalIgnoreCase)) return true;
+                if (full.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+
+            // Desktop Bridge / MSIX extracted layouts commonly live under ...\WindowsApps\...
+            if (full.IndexOf("\\WindowsApps\\", StringComparison.OrdinalIgnoreCase) >= 0)
+                return true;
+
+            return false;
         }
 
         /// <summary>

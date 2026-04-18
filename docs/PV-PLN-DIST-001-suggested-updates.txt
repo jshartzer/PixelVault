@@ -1,0 +1,121 @@
+Suggested updates for PV-PLN-DIST-001
+Date: 2026-04-18
+
+MERGED (2026-04-18): substantive items were folded into docs/plans/PV-PLN-DIST-001-windows-store-and-distribution-roadmap.md — keep this file only as an audit trail if useful.
+
+
+Overall assessment
+- The roadmap is strong and the phase order is right:
+  1. Ship a real Windows 1.0 first.
+  2. Then do Microsoft Store packaging.
+  3. Keep iOS/backend explicitly deferred.
+- The plan is also grounded in the repo well: the packaging facts match the current csproj and the signing script work is already reflected in the document.
+
+Main update 1: promote persistent-data path hardening into Phase 1 / early Phase 2
+
+Why this matters
+- The current app still derives a lot of runtime storage from appRoot plus a repo/dist-specific PixelVaultData probe.
+- That works for the current dev and zip-style publish layout, but it is a risk for installer-based distribution and especially for MSIX/Desktop Bridge.
+- If this is left implicit, the packaging work can look "mostly done" while the app still depends on install-layout assumptions.
+
+What to add to the roadmap
+- Add a new checklist item under Phase 1 exit criteria or Phase 1 engineering/distribution checklist:
+  - "Persistent storage path hardening complete: installed builds do not depend on writable app/install directories or repo-style dist layout assumptions."
+
+- Add a new subsection, something like:
+  - 5.x Persistent data and install-root hardening
+
+Recommended checklist text
+- [ ] Decide the authoritative writable runtime data location for installed builds.
+- [ ] Ensure settings, caches, logs, saved covers, and other mutable data do not rely on appRoot being writable.
+- [ ] Ensure release builds do not require repo-style path discovery such as dist/PixelVault-* or src/PixelVault.Native sibling probing in order to find their data root.
+- [ ] Keep install-root assets/tools read-only in the product model; writable state must live outside the install folder.
+- [ ] Add migration logic from current PixelVaultData / legacy dist-local layouts into the chosen installed-build data root.
+- [ ] Validate clean install, upgrade, and uninstall behavior with user data preserved as intended.
+- [ ] Document the final storage contract in HANDOFF/README/CHANGELOG or a dedicated distribution doc.
+
+Implementation note worth capturing in the plan
+- This is not only a Store concern.
+- It should happen before or alongside installer/updater work so update/uninstall behavior is predictable.
+
+Suggested risk-register addition
+- Add a new risk entry under section 7:
+  - "Install-root and layout assumptions"
+  - Summary: current runtime storage discovery is optimized for repo/dist publishing, not yet clearly formalized for installed/MSIX builds.
+  - Action: harden writable-state paths before Store submission and preferably before the final Phase 1 installer decision.
+
+Main update 2: add an explicit bundled-tools licensing / redistribution checklist
+
+Why this matters
+- The roadmap already notes bundled tools and full-trust packaging, which is good.
+- What is still missing is an explicit redistribution/legal/compliance checkpoint for FFmpeg and ExifTool.
+- This is the kind of issue that can block release polish late if it is not surfaced early.
+
+What to add to the roadmap
+- Add a dedicated checklist row in Phase 1 distribution/legal work or add a small subsection:
+  - 5.x Bundled external tools and redistribution compliance
+
+Recommended checklist text
+- [ ] Audit redistribution terms for bundled third-party tools, especially FFmpeg and ExifTool.
+- [ ] Confirm whether the exact binaries being shipped may be redistributed in the chosen channel(s).
+- [ ] Include required license/notice files in release artifacts when redistribution is allowed.
+- [ ] Document user-facing attribution/notice requirements if needed.
+- [ ] Confirm the Microsoft Store/Desktop Bridge submission is compatible with the bundled-tool model under the chosen full-trust approach.
+- [ ] Define fallback behavior if a bundled tool cannot be shipped in some channel (for example: require a user-specified external path in that channel only).
+
+Suggested risk-register addition
+- Expand section 7.3 beyond just "bundled tools imply full trust".
+- Suggested wording:
+  - "Bundled third-party tool redistribution and notice requirements"
+  - Summary: even if the packaging model supports full-trust execution, release artifacts still need redistribution/legal review and any required attribution.
+
+Main update 3: make Phase 2 explicitly include a packaging spike for storage + tool execution behavior
+
+Why this matters
+- The current plan correctly recommends Desktop Bridge with runFullTrust.
+- A small spike should be explicitly called out to verify:
+  - writable-state locations
+  - launching bundled tools
+  - startup/tray behavior
+  - updates/install identity assumptions
+
+What to add
+- In Phase 2 packaging artifacts / MSIX prep, add:
+  - [ ] Spike packaged build on a clean machine and verify:
+    - settings load/save
+    - cache/log/saved-cover writes
+    - bundled ExifTool/FFmpeg invocation
+    - system tray / startup behavior
+    - arbitrary library-root access works as expected
+
+Main update 4: keep the "ground truth" snapshot intentionally date-scoped
+
+Why this matters
+- The plan currently references the present version posture and current project facts correctly.
+- Over time this section will drift unless it is treated as a dated snapshot rather than timeless truth.
+
+Suggested text adjustment
+- In section 2 / 3, add a small note like:
+  - "These values are a snapshot as of the revision date below; re-check csproj, CURRENT_BUILD.txt, and publish scripts when reopening this plan after a gap."
+
+Main update 5: optional wording improvement around Microsoft Store difficulty
+
+What is already good
+- The plan correctly says Store is not a small checkbox and that strict sandbox is not recommended.
+
+Suggested wording tweak
+- In the Store readiness row or Phase 2 intro, clarify:
+  - "Desktop Bridge MSIX is the recommended path, but it should be treated as a packaging-and-behavior verification project, not only a manifest/listing task."
+
+Recommended priority order for these roadmap edits
+1. Add persistent-data/install-root hardening as an explicit milestone.
+2. Add bundled-tools redistribution/licensing checklist.
+3. Add a packaged-build verification spike under Phase 2.
+4. Add the snapshot-date note to the ground-truth section.
+5. Optionally tighten wording around Desktop Bridge complexity.
+
+Short version for Cursor
+- The roadmap is good.
+- The biggest missing item is a first-class "persistent data path hardening" milestone before installer/MSIX work.
+- The second missing item is an explicit FFmpeg/ExifTool redistribution + notice checklist.
+- Phase 2 should also include a real packaged-build spike that verifies writable-state paths and bundled-tool execution, not just manifest/listing work.

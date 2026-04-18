@@ -97,6 +97,43 @@ public sealed class PersistentDataMigratorTests : IDisposable
         Assert.Equal(release, result);
     }
 
+    [Fact]
+    public void ResolvePersistentDataRoot_UnderProgramFiles_UsesLocalAppDataPixelVault()
+    {
+        var programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+        var appRoot = Path.Combine(programFiles, "PixelVault.Tests.Restricted_" + Guid.NewGuid().ToString("N"), "app");
+        var expected = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            PersistentDataMigrator.LocalAppDataPixelVaultFolderName);
+
+        var result = PersistentDataMigrator.ResolvePersistentDataRoot(appRoot, LogLine);
+
+        Assert.Equal(expected, result);
+        Assert.Empty(_log);
+    }
+
+    [Fact]
+    public void ResolvePersistentDataRoot_WindowsAppsSegment_UsesLocalAppDataPixelVault()
+    {
+        var appRoot = @"C:\Program Files\WindowsApps\PixelVault.TestPkg_mw2568r49kw7j\PixelVault";
+        var expected = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            PersistentDataMigrator.LocalAppDataPixelVaultFolderName);
+
+        var result = PersistentDataMigrator.ResolvePersistentDataRoot(appRoot, LogLine);
+
+        Assert.Equal(expected, result);
+    }
+
+    [Fact]
+    public void LooksLikeRestrictedInstallDirectory_True_ForProgramFilesAndWindowsApps()
+    {
+        var pf = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+        Assert.True(PersistentDataMigrator.LooksLikeRestrictedInstallDirectory(Path.Combine(pf, "PixelVault", "PixelVault.exe")));
+        Assert.True(PersistentDataMigrator.LooksLikeRestrictedInstallDirectory(@"C:\Program Files\WindowsApps\SomePkg\App"));
+        Assert.False(PersistentDataMigrator.LooksLikeRestrictedInstallDirectory(Path.Combine(Path.GetTempPath(), "portable", "PixelVault")));
+    }
+
     // ------------------------------------------------------------------
     // CopyIfNewerOrMissing
     // ------------------------------------------------------------------

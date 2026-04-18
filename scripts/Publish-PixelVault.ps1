@@ -1,5 +1,10 @@
 # If -Force fails removing the output folder (often PixelVault.ico / exe in use), close PixelVault and
 # any Explorer windows on that dist folder, or use -OutputRoot to publish to a fresh directory first.
+#
+# Optional Authenticode signing (Phase 1 distribution — PV-PLN-DIST-001):
+#   pwsh -File Publish-PixelVault.ps1 -Force -Sign -CertificateThumbprint "<40-char hex>"
+# Or set env PIXELVAULT_AUTHENTICODE_THUMBPRINT and pass -Sign only.
+# Requires Windows SDK signtool.exe (Windows Kits 10) and the cert installed in CurrentUser/My or LocalMachine/My.
 [CmdletBinding()]
 param(
     [string]$Version,
@@ -9,7 +14,11 @@ param(
     [int]$KeepLatest = 10,
     [switch]$SelfContained,
     [switch]$IncludeBootstrapSettings,
-    [switch]$Force
+    [switch]$Force,
+    [switch]$Sign,
+    [string]$CertificateThumbprint,
+    [string]$SignToolPath,
+    [string]$TimestampServer = "http://timestamp.digicert.com"
 )
 
 $ErrorActionPreference = "Stop"
@@ -114,6 +123,81 @@ Write-Host "Publishing PixelVault $Version to $outputDir"
 if ($LASTEXITCODE -ne 0)
 {
     throw "dotnet publish failed with exit code $LASTEXITCODE"
+}
+
+function Get-PixelVaultSigntoolExe
+{
+    param([string]$ExplicitPath)
+
+    if (-not [string]::IsNullOrWhiteSpace($ExplicitPath))
+    {
+        if (-not (Test-Path -LiteralPath $ExplicitPath))
+        {
+            throw "SignToolPath not found: $ExplicitPath"
+        }
+        return (Resolve-Path -LiteralPath $ExplicitPath).Path
+    }
+
+    $kitsBin = Join-Path ${env:ProgramFiles(x86)} "Windows Kits\10\bin"
+    if (Test-Path $kitsBin)
+    {
+        $found = Get-ChildItem $kitsBin -Filter signtool.exe -Recurse -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -match '\\x64\\signtool\.exe$' } |
+            Sort-Object FullName -Descending |
+            Select-Object -First 1
+        if ($null -ne $found)
+        {
+            return $found.FullName
+        }
+    }
+
+    throw @"
+Could not find signtool.exe under Windows Kits.
+Install the Windows SDK (Signing Tools for Desktop Apps) or pass -SignToolPath to signtool.exe.
+"@
+}
+
+function Invoke-PixelVaultAuthenticodeSign
+{
+    param(
+        [Parameter(Mandatory)][string]$ExePath,
+        [Parameter(Mandatory)][string]$Thumbprint,
+        [Parameter(Mandatory)][string]$SigntoolExe,
+        [Parameter(Mandatory)][string]$TimestampUrl
+    )
+
+    $t = $Thumbprint
+    if ($null -eq $t) { $t = "" }
+    $thumb = $t.Trim().Replace(" ", "")
+    if ($thumb.Length -lt 20)
+    {
+        throw "CertificateThumbprint looks invalid (expected hex thumbprint from certmgr / MMC)."
+    }
+
+    Write-Host "Signing $ExePath with thumbprint $thumb ..."
+    & $SigntoolExe sign /fd SHA256 /sha1 $thumb /tr $TimestampUrl /td SHA256 $ExePath
+    if ($LASTEXITCODE -ne 0)
+    {
+        throw "signtool failed with exit code $LASTEXITCODE"
+    }
+}
+
+if ($Sign)
+{
+    $thumbFromEnv = $env:PIXELVAULT_AUTHENTICODE_THUMBPRINT
+    $effectiveThumb = $CertificateThumbprint
+    if ([string]::IsNullOrWhiteSpace($effectiveThumb))
+    {
+        $effectiveThumb = $thumbFromEnv
+    }
+
+    if ([string]::IsNullOrWhiteSpace($effectiveThumb))
+    {
+        throw "Signing requested (-Sign) but no thumbprint: pass -CertificateThumbprint or set PIXELVAULT_AUTHENTICODE_THUMBPRINT."
+    }
+
+    $signtoolExe = Get-PixelVaultSigntoolExe -ExplicitPath $SignToolPath
+    Invoke-PixelVaultAuthenticodeSign -ExePath $exePath -Thumbprint $effectiveThumb -SigntoolExe $signtoolExe -TimestampUrl $TimestampServer
 }
 
 Copy-Item $sourcePath (Join-Path $outputDir "PixelVault.Native.cs") -Force
