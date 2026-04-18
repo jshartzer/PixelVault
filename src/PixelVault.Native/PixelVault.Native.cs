@@ -81,7 +81,7 @@ namespace PixelVaultNative
         readonly object libraryMaintenanceSync = new object();
         /// <summary>Serializes folder-cache disk reads/writes and full <see cref="LibraryScanner.RebuildLibraryFolderCache"/> without blocking cache hits during metadata index maintenance.</summary>
         internal readonly ReaderWriterLockSlim libraryFolderCacheRwLock = new ReaderWriterLockSlim(LockRecursionPolicy.NoRecursion);
-        readonly object logFileSync = new object();
+        readonly TroubleshootingLog troubleshootingLog;
         string libraryMetadataIndexRoot;
 
         string sourceRoot;
@@ -125,7 +125,6 @@ namespace PixelVaultNative
         bool systemTrayPromptOnCloseEnabled;
         readonly ForegroundIntakeBusyGate _foregroundIntakeBusyGate = new ForegroundIntakeBusyGate();
         readonly string _diagnosticsSessionId;
-        const long TroubleshootingLogMaxBytes = 5_000_000L;
         string _libraryBrowserPersistedSearch = string.Empty;
         string _libraryBrowserPersistedLastViewKey = string.Empty;
         double _libraryBrowserPersistedFolderScroll;
@@ -180,6 +179,13 @@ namespace PixelVaultNative
             settingsPath = paths.SettingsPath;
             changelogPath = paths.ChangelogPath;
             undoManifestPath = paths.UndoManifestPath;
+            troubleshootingLog = new TroubleshootingLog(new TroubleshootingLogDependencies
+            {
+                LogsRoot = logsRoot,
+                IsTroubleshootingLoggingEnabled = () => troubleshootingLoggingEnabled,
+                RedactPathsEnabled = () => troubleshootingLogRedactPaths,
+                DiagnosticsSessionId = _diagnosticsSessionId,
+            });
             InitializeLibraryThumbnailPipeline(thumbsRoot);
             (settingsService, fileSystemService) = CreateSettingsAndFileServices();
             coverService = CreateCoverService(this, fileSystemService, coversRoot);
@@ -938,93 +944,23 @@ namespace PixelVaultNative
         }
         void OpenWithShell(string path) { if (!string.IsNullOrWhiteSpace(path) && File.Exists(path)) Process.Start(new ProcessStartInfo(path) { UseShellExecute = true }); }
 
-        string LogFilePath() { return Path.Combine(logsRoot, "PixelVault-native.log"); }
-        string TroubleshootingLogFilePath() { return Path.Combine(logsRoot, "PixelVault-troubleshooting.log"); }
-        string TryReadLogFile()
-        {
-            var path = LogFilePath();
-            if (!File.Exists(path)) return string.Empty;
-            for (int attempt = 0; attempt < 3; attempt++)
-            {
-                try
-                {
-                    using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
-                    using (var reader = new StreamReader(stream))
-                    {
-                        return reader.ReadToEnd();
-                    }
-                }
-                catch (IOException)
-                {
-                    Thread.Sleep(25 * (attempt + 1));
-                }
-            }
-            return string.Empty;
-        }
-        static string FormatLogUtcTimestamp()
-        {
-            return DateTimeOffset.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ", CultureInfo.InvariantCulture);
-        }
-
-        void RotateTroubleshootingLogIfNeeded(string troubleshootingPath)
-        {
-            try
-            {
-                if (string.IsNullOrWhiteSpace(troubleshootingPath) || !File.Exists(troubleshootingPath)) return;
-                var length = new FileInfo(troubleshootingPath).Length;
-                if (length < TroubleshootingLogMaxBytes) return;
-                var rotated = Path.Combine(
-                    logsRoot,
-                    "PixelVault-troubleshooting-" + DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture) + ".log");
-                File.Move(troubleshootingPath, rotated);
-            }
-            catch
-            {
-            }
-        }
-
-        void AppendLogFileLine(string path, string line)
-        {
-            if (string.IsNullOrWhiteSpace(path)) return;
-            Directory.CreateDirectory(logsRoot);
-            lock (logFileSync)
-            {
-                if (string.Equals(path, TroubleshootingLogFilePath(), StringComparison.OrdinalIgnoreCase))
-                    RotateTroubleshootingLogIfNeeded(path);
-                for (int attempt = 0; attempt < 4; attempt++)
-                {
-                    try
-                    {
-                        using (var stream = new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete))
-                        using (var writer = new StreamWriter(stream))
-                        {
-                            writer.WriteLine(line);
-                            writer.Flush();
-                            return;
-                        }
-                    }
-                    catch (IOException)
-                    {
-                        if (attempt == 3) return;
-                        Thread.Sleep(25 * (attempt + 1));
-                    }
-                }
-            }
-        }
-        void AppendLogFileLine(string line)
-        {
-            AppendLogFileLine(LogFilePath(), line);
-        }
+        // PV-PLN-UI-001 Step 10: log file IO + redaction live in Infrastructure/TroubleshootingLog.cs.
+        // These thin instance forwarders exist so MainWindow partials (Log / LogException / LogTroubleshooting)
+        // and a handful of other call sites (SettingsShellHost paths, LibraryBrowserViewModel path formatters,
+        // LibraryBrowserRender.DetailPane exception formatting) keep binding to MainWindow members unchanged.
+        // Keep them one-liners; don't grow.
+        string LogFilePath() => troubleshootingLog.MainLogFilePath();
+        string TroubleshootingLogFilePath() => troubleshootingLog.TroubleshootingLogFilePath();
+        string TryReadLogFile() => troubleshootingLog.TryReadMainLog();
         void LoadLogView()
         {
             if (logBox == null) return;
-            var content = TryReadLogFile();
-            logBox.Text = content;
+            logBox.Text = TryReadLogFile();
             logBox.ScrollToEnd();
         }
         void Log(string message)
         {
-            var line = "[" + FormatLogUtcTimestamp() + "] " + message;
+            var line = troubleshootingLog.AppendMainLine(message);
             if (logBox != null)
             {
                 Action append = delegate
@@ -1035,7 +971,6 @@ namespace PixelVaultNative
                 if (logBox.Dispatcher.CheckAccess()) append();
                 else logBox.Dispatcher.BeginInvoke(append);
             }
-            AppendLogFileLine(line);
         }
 
         /// <summary>Writes a full exception (including stack trace) to the main log with ERROR prefix and managed thread id.</summary>
@@ -1046,160 +981,10 @@ namespace PixelVaultNative
             Log("ERROR | T" + Environment.CurrentManagedThreadId + " | " + prefix + ex);
         }
 
-        string FormatExceptionForTroubleshooting(Exception ex)
-        {
-            if (ex == null) return string.Empty;
-            var s = ex.ToString();
-            const int max = 32768;
-            if (s.Length > max) s = s.Substring(0, max) + "... (truncated)";
-            return s;
-        }
-
-        /// <summary>
-        /// Strips absolute path-shaped fragments from free text when <see cref="troubleshootingLogRedactPaths"/> is on (exception messages, stack lines, IO errors).
-        /// </summary>
-        string RedactEmbeddedPathsForTroubleshooting(string text)
-        {
-            if (string.IsNullOrEmpty(text) || !troubleshootingLogRedactPaths) return text ?? string.Empty;
-            try
-            {
-                var s = text;
-                // Quoted Win32 extended paths (common in IO exception text): '\\?\C:\…' or '\\?\UNC\…'
-                s = Regex.Replace(
-                    s,
-                    @"'(?:\\{2}\?\\)([^']*)'",
-                    m => "'" + RedactBareWindowsPathForTroubleshooting(m.Groups[1].Value) + "'",
-                    RegexOptions.CultureInvariant);
-                // Quoted drive-letter paths — regex above stops at spaces; IO messages quote full paths.
-                s = Regex.Replace(
-                    s,
-                    @"'([A-Za-z]:\\[^']*)'",
-                    m => "'" + RedactBareWindowsPathForTroubleshooting(m.Groups[1].Value) + "'",
-                    RegexOptions.CultureInvariant);
-                // Double-quoted drive paths
-                s = Regex.Replace(
-                    s,
-                    @"""([A-Za-z]:\\[^""]*)""",
-                    m => "\"" + RedactBareWindowsPathForTroubleshooting(m.Groups[1].Value) + "\"",
-                    RegexOptions.CultureInvariant);
-                // DIAG-style key=value segments often hold spaced paths; stop at ';' or line end (not at first space).
-                s = Regex.Replace(
-                    s,
-                    @"([A-Za-z_][\w]*=)(\\\\[^;|\r\n]+)",
-                    m => m.Groups[1].Value + RedactBareWindowsPathForTroubleshooting(m.Groups[2].Value),
-                    RegexOptions.CultureInvariant);
-                s = Regex.Replace(
-                    s,
-                    @"([A-Za-z_][\w]*=)([A-Za-z]:\\[^;|\r\n]+)",
-                    m => m.Groups[1].Value + RedactBareWindowsPathForTroubleshooting(m.Groups[2].Value),
-                    RegexOptions.CultureInvariant);
-                // Long/Win32 extended: \\?\C:\... or \\?\UNC\...
-                s = Regex.Replace(s, @"\\{2}\?\\[^\s|""]+", RedactPathMatchForTroubleshooting, RegexOptions.CultureInvariant);
-                // Standard UNC \\server\share\...
-                s = Regex.Replace(s, @"\\{2}(?!\?\\)[^\s|""]+", RedactPathMatchForTroubleshooting, RegexOptions.CultureInvariant);
-                // Drive-letter paths (UTF-16 style); optional forward-slash form — tokens without spaces only
-                s = Regex.Replace(s, @"(?<![\w/:])(?:[A-Za-z]:\\[^\s|""]+|[A-Za-z]:/[^\s|""]+)", RedactPathMatchForTroubleshooting, RegexOptions.CultureInvariant);
-                return s;
-            }
-            catch
-            {
-                return text;
-            }
-        }
-
-        /// <summary>
-        /// Turns a Windows file path into <see cref="FormatPathForTroubleshooting"/> form (e.g. <c>.../LastSegment</c>) when redaction is on.
-        /// </summary>
-        string RedactBareWindowsPathForTroubleshooting(string raw)
-        {
-            if (string.IsNullOrWhiteSpace(raw)) return raw ?? string.Empty;
-            try
-            {
-                var t = raw.Trim().Trim('"', '\'');
-                t = t.Replace('/', Path.DirectorySeparatorChar);
-                return FormatPathForTroubleshooting(t);
-            }
-            catch
-            {
-                return "(redacted)";
-            }
-        }
-
-        string RedactPathMatchForTroubleshooting(Match m)
-        {
-            if (m == null || string.IsNullOrEmpty(m.Value)) return string.Empty;
-            var raw = m.Value.TrimEnd('"', '\'', ')', ']', ',', ';');
-            if (string.IsNullOrWhiteSpace(raw)) return m.Value;
-            // Stack / compiler snippets like "…\Foo.cs:line 42" or "…\Foo.cs:12" — strip :line so we do not treat ":12" as path.
-            if (Regex.IsMatch(raw, @"\.[A-Za-z0-9]{1,12}:\d+$", RegexOptions.CultureInvariant))
-                raw = Regex.Replace(raw, @":\d+$", string.Empty, RegexOptions.CultureInvariant);
-            try
-            {
-                return FormatPathForTroubleshooting(raw.Replace('/', Path.DirectorySeparatorChar));
-            }
-            catch
-            {
-                return "(redacted)";
-            }
-        }
-
-        /// <summary>
-        /// Troubleshooting-only log file shape:
-        /// <c>[UTC] DIAG | S&lt;session&gt; | T&lt;managedThreadId&gt; | &lt;Area&gt; | &lt;message&gt;</c>.
-        /// When path redaction is enabled, <paramref name="message"/> is passed through <see cref="RedactEmbeddedPathsForTroubleshooting"/> so IO exceptions cannot bypass folder-path redaction via <c>ex.Message</c> / stack text.
-        /// </summary>
-        void LogTroubleshooting(string area, string message)
-        {
-            if (!troubleshootingLoggingEnabled) return;
-            var safeBody = RedactEmbeddedPathsForTroubleshooting(message ?? string.Empty);
-            var line = "[" + FormatLogUtcTimestamp() + "] "
-                + "DIAG"
-                + " | S=" + _diagnosticsSessionId
-                + " | T=" + Environment.CurrentManagedThreadId
-                + " | " + (string.IsNullOrWhiteSpace(area) ? "General" : area.Trim())
-                + " | " + safeBody;
-            AppendLogFileLine(TroubleshootingLogFilePath(), line);
-        }
-
-        string FormatPathForTroubleshooting(string path)
-        {
-            if (string.IsNullOrWhiteSpace(path)) return string.Empty;
-            if (!troubleshootingLogRedactPaths) return path;
-            try
-            {
-                var trimmed = path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-                var name = Path.GetFileName(trimmed);
-                return string.IsNullOrWhiteSpace(name) ? "(redacted)" : ".../" + name;
-            }
-            catch
-            {
-                return "(redacted)";
-            }
-        }
-
-        /// <summary>
-        /// <see cref="LibraryBrowserFolderView.ViewKey"/> can embed a full folder path (e.g. console grouping). When path redaction is on, only path-like pipe segments are shortened.
-        /// </summary>
-        string FormatViewKeyForTroubleshooting(string viewKey)
-        {
-            if (string.IsNullOrWhiteSpace(viewKey) || !troubleshootingLogRedactPaths) return viewKey ?? string.Empty;
-            var parts = viewKey.Split('|');
-            for (var i = 0; i < parts.Length; i++)
-            {
-                if (TroubleshootingSegmentLooksLikePath(parts[i]))
-                    parts[i] = FormatPathForTroubleshooting(parts[i]);
-            }
-            return string.Join("|", parts);
-        }
-
-        static bool TroubleshootingSegmentLooksLikePath(string segment)
-        {
-            if (string.IsNullOrWhiteSpace(segment)) return false;
-            if (segment.IndexOf(Path.DirectorySeparatorChar) >= 0) return true;
-            if (segment.IndexOf(Path.AltDirectorySeparatorChar) >= 0) return true;
-            if (segment.StartsWith("\\\\", StringComparison.Ordinal)) return true;
-            return segment.Length >= 2 && char.IsLetter(segment[0]) && segment[1] == ':';
-        }
+        void LogTroubleshooting(string area, string message) => troubleshootingLog.LogTroubleshooting(area, message);
+        string FormatExceptionForTroubleshooting(Exception ex) => TroubleshootingLog.FormatException(ex);
+        string FormatPathForTroubleshooting(string path) => troubleshootingLog.FormatPath(path);
+        string FormatViewKeyForTroubleshooting(string viewKey) => troubleshootingLog.FormatViewKey(viewKey);
     }
 }
 

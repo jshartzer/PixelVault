@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <Compile Include="Infrastructure\TimeoutWebClient.cs" />
+    <Compile Include="Infrastructure\TroubleshootingLog.cs" />
     <Compile Include="Indexing\GameIndexCore.cs" />
     <Compile Include="Indexing\GameIndexIdentityMatch.cs" />
     <Compile Include="Indexing\GameIndexEditorOperations.cs" />
