@@ -78,6 +78,18 @@ Provide a **`{PUBLISH_CONTACT}`** email or issue URL before Store submission (su
 
 ---
 
+## Hosting this policy (**§5.4**)
+
+Public distribution and **Microsoft Store** require a stable **HTTPS** URL to this content (not only a file in the repo).
+
+1. Replace **`{PUBLISH_CONTACT}`** in **Contact** with a real support email or public issue URL.
+2. Publish the edited text (Markdown or rendered HTML) somewhere durable — for example **GitHub Pages**, a **`docs/`** branch on GitHub, a project wiki, or your own static site. A **raw** `githubusercontent.com` link to Markdown is acceptable only if you intend to keep that repo layout stable; prefer a proper page for end users.
+3. Put the final URL in **Partner Center** (privacy policy field) and any store listing or download page you control.
+
+Keep the **Effective** date in sync when behavior or disclosures change (**`CHANGELOG.md`**).
+
+---
+
 ## Legal
 
 This repository and build pipeline are provided **as-is** unless you attach a separate end-user license. Coordinate **`docs/PRIVACY_POLICY.md`** with your **`EULA`** or terms if you distribute commercially.

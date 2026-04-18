@@ -16,6 +16,7 @@
 - MainWindow / service seams (ongoing): **`docs/plans/PV-PLN-UI-001-ui-thin-mainwindow-ios-aligned.md`**
 - Writable‑data contract (**§5.8**): **`docs/DISTRIBUTION_STORAGE.md`**
 - Privacy policy draft (**§5.4**): **`docs/PRIVACY_POLICY.md`**
+- Signing ritual (**§5.2**): **`docs/PUBLISH_SIGNING.md`**
 
 ---
 
@@ -173,7 +174,7 @@ Use **`docs/APP_REVIEW_2026-04-12.md`** as the audit trail.
 **Steps in repo / automation:**
 
 - [x] Add **`signtool sign`** (SHA256 + trusted timestamp server) to **`scripts/Publish-PixelVault.ps1`** post‑publish — **`-Sign`**, **`-CertificateThumbprint`**, optional **`-SignToolPath`**, **`-TimestampServer`**, or env **`PIXELVAULT_AUTHENTICODE_THUMBPRINT`**. Requires Windows Kits **signtool.exe** and cert in the store (PFX path not wired yet — add later if needed).
-- [ ] Document the one‑machine publish ritual in **`docs/HANDOFF.md`** or a short **`docs/PUBLISH_SIGNING.md`** if you want a dedicated page (optional follow‑up).
+- [x] Document the one‑machine publish ritual — **`docs/PUBLISH_SIGNING.md`** (**zip `dist`** + **`vpk pack`** **`-n`** / **`VPK_SIGN_PARAMS`** pointer).
 
 ### 5.3 Distribution checklist — installer & updates
 
@@ -466,3 +467,4 @@ Protect scope until **Phase 1** desktop distribution is **boringly stable**:
 | **2026‑04‑18** | §5.3: recorded **upgrade in place** as the shipped model (vs dev **`dist`** side‑by‑side); VM + N→N+1 spikes still manual. |
 | **2026‑04‑18** | §5.5: **CHANGELOG** + **README** document self-contained (**Velopack**) vs framework-dependent (**`Publish-PixelVault`**); **`docs/VELOPACK_VM_SPIKE_CHECKLIST.md`**; gate **§4.1** installer + self-contained rows checked; **`docs/BUNDLED_TOOLS_REDISTRIBUTION.md`** worksheet for **§5.9**. |
 | **2026‑04‑18** | §5.9: **`tools-licenses\`** (**GPLv3** for **ExifTool** + **gyan.dev essentials** **FFmpeg** via **`ffmpeg-gpl-3.0-COPYING.txt`**) + **`Merge-BundledToolLicenses.ps1`** on publish scripts; worksheet expanded; gate **bundled‑tools** still open until Partner Center disclosure. |
+| **2026‑04‑18** | §5.2 + §5.4: **`docs/PUBLISH_SIGNING.md`** (Authenticode + Velopack **`vpk`** signing); **`docs/PRIVACY_POLICY.md`** hosting checklist. |

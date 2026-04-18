@@ -152,6 +152,8 @@ Optional: `-OutputRoot` if the default `dist` folder is locked; see script heade
 
 **Installer / delta-update channel (Velopack):** self-contained **`win-x64`** publish + **`vpk pack`** — **`scripts/Publish-Velopack.ps1`** and **`docs/VELOPACK.md`**. Fresh-machine smoke tests: **`docs/VELOPACK_VM_SPIKE_CHECKLIST.md`**.
 
+**Code signing (Authenticode):** **`docs/PUBLISH_SIGNING.md`** — **`Publish-PixelVault.ps1 -Sign`** and **`vpk pack`** **`signParams`**.
+
 ## Project Documents
 
 Use these together:

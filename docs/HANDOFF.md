@@ -51,6 +51,7 @@ Then use these based on the task:
 - `C:\Codex\docs\CODE_QUALITY_IMPROVEMENT_PLAN.md` for hardening / edge-case backlog
 - `C:\Codex\docs\MANUAL_GOLDEN_PATH_CHECKLIST.md` for risky manual verification
 - `C:\Codex\docs\VELOPACK.md` + `C:\Codex\docs\VELOPACK_VM_SPIKE_CHECKLIST.md` for **installer / Velopack** distribution (**`PV-PLN-DIST-001`** §5.3)
+- `C:\Codex\docs\PUBLISH_SIGNING.md` — **Authenticode** signing (**`-Sign`**, **`vpk`** **`-n`**) (**§5.2**)
 - `C:\Codex\docs\BUNDLED_TOOLS_REDISTRIBUTION.md` — **ExifTool / FFmpeg** redistribution worksheet (**§5.9**)
 - `C:\Codex\docs\archive\PV-PLN-LIBWS-001-library-workspace-modes.md` — **done** plan: library **Folder / Photo / Timeline** modes; **Photo workspace: exit & restoration** spells out what exits clear vs. what scroll state is not restored
 - `C:\Codex\docs\SERVICE_OWNERSHIP_AND_PARALLEL_WORK_MAP.md` for service boundaries and parallel lanes
