@@ -13,10 +13,11 @@ What ships in **`tools\licenses\`** after publish
 -------------------------------------------------
 Publish scripts merge this folder into **`<dist>\tools\licenses\`** next to any copied binaries:
 
-  ffmpeg-lgpl-2.1-COPYING.txt   GNU LGPL v2.1 full text — required for typical LGPL FFmpeg builds.
-  exiftool-gpl-3.0-COPYING.txt  GNU GPL v3 full text — Windows **exiftool.exe** from exiftool.org is GPLv3.
+  exiftool-gpl-3.0-COPYING.txt  GNU GPL v3 full text — Windows **exiftool.exe** from exiftool.org (e.g. 13.x).
+  ffmpeg-gpl-3.0-COPYING.txt    GNU GPL v3 full text — matches **gyan.dev “essentials”** builds built with
+                                **--enable-gpl** (GPL-enabled codecs; not LGPL-only). If you ship **LGPL shared**
+                                FFmpeg instead, replace this file with **LGPL v2.1** COPYING from your build.
 
-If your FFmpeg build uses different licensing or you ship a GPLv3 FFmpeg, replace these files with the
-**exact COPYING / LICENSE files** packaged with **your** FFmpeg **and** ExifTool downloads before release.
+If your shipped binaries use different licensing, replace with the **exact COPYING / LICENSE** from those builds.
 
 Authoritative worksheet (versions, URLs, channels): **`docs/BUNDLED_TOOLS_REDISTRIBUTION.md`**.
