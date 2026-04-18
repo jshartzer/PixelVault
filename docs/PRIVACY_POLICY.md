@@ -81,7 +81,7 @@ Provide a **`{PUBLISH_CONTACT}`** email or issue URL before Store submission (su
 
 ## Hosting this policy (**§5.4**)
 
-Public distribution and **Microsoft Store** require a stable **HTTPS** URL to this content (not only a file in the repo).
+You may complete this step **near the end of Phase 1** (after installer and signing confidence) — see **`PV-PLN-DIST-001` §10.1**. Public distribution and **Microsoft Store** ultimately require a stable **HTTPS** URL (not only this repo file).
 
 1. Replace **`{PUBLISH_CONTACT}`** in **Contact** with a real support email or public issue URL.
 2. Publish the edited text (Markdown or rendered HTML) somewhere durable — for example **GitHub Pages**, a **`docs/`** branch on GitHub, a project wiki, or your own static site. A **raw** `githubusercontent.com` link to Markdown is acceptable only if you intend to keep that repo layout stable; prefer a proper page for end users.

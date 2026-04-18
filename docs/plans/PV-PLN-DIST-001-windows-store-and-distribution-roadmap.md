@@ -200,6 +200,8 @@ Pick **one** primary path (others become optional):
 
 Even with no telemetry, you still owe users clarity.
 
+**Ordering:** Source drafts live in **`docs/`**. Per **§10.1**, teams may finish **installer QA, signing, and golden-path** verification **before** hosting HTTPS URLs and locking listing copy — do not block technical distribution work on legal hosting unless required.
+
 - [ ] **Privacy policy** hosted at a stable HTTPS URL — **source draft:** **`docs/PRIVACY_POLICY.md`** (replace placeholders, publish, link from Store/listing).
 - [x] **EULA / Terms** — **source draft:** **`docs/EULA.md`** (replace **`{LEGAL_ENTITY}`**, **`{JURISDICTION}`**, **`{PUBLISH_CONTACT}`**, counsel review); **hosted HTTPS URL** still required before Store/wide distribution (same as privacy).
 - [ ] **Support contact** — email or issue tracker linked from Store/listing later (tie to **`{PUBLISH_CONTACT}`** in **`docs/EULA.md`** / **`docs/PRIVACY_POLICY.md`**).
@@ -423,7 +425,7 @@ Optional **SteamGridDB** token and web APIs — disclose in privacy policy; no s
 When you open this doc cold:
 
 1. **Read §1.3** (Store blockers) and **scan §3** (scorecard) and **§7** (risks).
-2. If **Phase 1** not done: work **§5** — after signing (**§5.2**), prioritize **§5.8** (data root) **alongside** **§5.3** (installer/updater), **§5.9** (tool licenses), **§5.4** (policies/support).
+2. If **Phase 1** not done: work **§5** — **§5.8** (data root) **alongside** **§5.3** (installer/updater), **§5.9** (tool licenses), **§5.2** (signing). Treat **§5.4** (hosted privacy / EULA / support URLs) as **last** before public or Store release unless counsel needs it earlier.
 3. Check **§4.1** gate before touching serious MSIX work.
 4. If Phase 1 is genuinely done: **§6** — manifest **plus** packaged spike (**§6.3**, **§6.6**).
 5. **Ignore §8** until desktop distribution feels boring.
@@ -436,8 +438,8 @@ Use when choosing the next sprint without re‑reading the whole plan:
 |----------|--------|
 | **1** | Lock **Phase 1**: signing decision, installer/updater, self‑contained vs runtime, **`MANUAL_GOLDEN_PATH`** on **clean install + upgrade** |
 | **2** | **§5.8** + minimal **MSIX spike** (**§6.3**) — data paths + bundled **tool** execution under packaged desktop |
-| **3** | Policy + branding: privacy/support URLs, **§7.2** logo audit, publish ritual docs |
-| **4** | Keep thinning **startup/path** assumptions where it reduces distribution risk (**`PV-PLN-UI-001`**, sessions) |
+| **3** | Keep thinning **startup/path** assumptions where it reduces distribution risk (**`PV-PLN-UI-001`**, sessions) |
+| **4** | **Last before public / Store:** hosted **privacy** + **EULA** + support URLs (**§5.4**), **§7.2** logo audit, Partner Center listing polish — legal/listing bundle intentionally **after** technical installer confidence |
 
 **Avoid until desktop 1.0 is stable:** strict sandbox redesign, iOS/backend depth, Store‑only UI churn, chasing multiple optional channels at once.
 
@@ -471,3 +473,4 @@ Protect scope until **Phase 1** desktop distribution is **boringly stable**:
 | **2026‑04‑18** | §5.2 + §5.4: **`docs/PUBLISH_SIGNING.md`** (Authenticode + Velopack **`vpk`** signing); **`docs/PRIVACY_POLICY.md`** hosting checklist. |
 | **2026‑04‑18** | §5.4: **`docs/EULA.md`** end-user license **draft** (placeholders **`{LEGAL_ENTITY}`** / **`{JURISDICTION}`** / **`{PUBLISH_CONTACT}`**); hosted HTTPS URL still checklist item. |
 | **2026‑04‑18** | §5.2: **`Publish-Velopack.ps1`** **`-SignParams`** / **`VPK_SIGN_PARAMS`** → **`vpk pack -n`**; in-app legal links deferred per handoff. |
+| **2026‑04‑18** | §5.4 / §10.1: **legal hosting + listing polish** explicitly **last** in Phase 1 priority table; §10 suggested order updated. |

@@ -91,7 +91,7 @@ Licensor may revise this Agreement by posting an updated version and updating th
 
 ## 11. Hosting this document (**§5.4**)
 
-Public distribution and **Microsoft Store** typically require a stable **HTTPS** URL to your terms (often linked from the listing, installer, or in-app About).
+Prefer to **host HTTPS** **after** technical installer QA and signing meet your bar — roadmap **`PV-PLN-DIST-001` §10.1**. Store and broad distribution ultimately need a stable **HTTPS** URL (listing, installer, About).
 
 1. Replace all **`{…}`** placeholders with final legal names and contacts **after counsel review**.
 2. Publish Markdown or HTML to the same class of hosting you use for **`docs/PRIVACY_POLICY.md`**.

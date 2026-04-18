@@ -8,6 +8,7 @@ Use this after touching import, indexing, metadata persistence, or Library behav
 
 - Confirm the app launches from the current published build (for **zip-style** **`dist/PixelVault-*`**, **`PixelVault-current`**, or **`PixelVault.lnk`**).
 - **Velopack / installer builds:** after **`Publish-Velopack.ps1`**, run **`docs/VELOPACK_VM_SPIKE_CHECKLIST.md`** on a clean VM before relying on this golden path alone.
+- **Legal / listing URLs** (privacy, EULA, support): roadmap recommends finishing **after** installer + signing confidence — **`PV-PLN-DIST-001` §10.1**.
 - Keep one small known-good intake sample ready.
 - Optional: use repo **`C:\Codex\PixelVaultData\import-stability-test-upload`** (minimal PNGs + `README.txt`) as the Settings upload folder for import smoke tests, or copy those files into your real upload folder.
 - Keep the NAS-backed test export folder available at `E:\PixelVault-Test-Exports`.

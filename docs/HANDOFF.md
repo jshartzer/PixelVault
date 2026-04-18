@@ -52,7 +52,7 @@ Then use these based on the task:
 - `C:\Codex\docs\MANUAL_GOLDEN_PATH_CHECKLIST.md` for risky manual verification
 - `C:\Codex\docs\VELOPACK.md` + `C:\Codex\docs\VELOPACK_VM_SPIKE_CHECKLIST.md` for **installer / Velopack** distribution (**`PV-PLN-DIST-001`** §5.3)
 - `C:\Codex\docs\PUBLISH_SIGNING.md` — **Authenticode** signing (**`-Sign`**, **`vpk`** **`-n`**) (**§5.2**)
-- `C:\Codex\docs\EULA.md` — **EULA draft** (**§5.4**); pair with **`docs/PRIVACY_POLICY.md`** for listing URLs
+- `C:\Codex\docs\EULA.md` + **`docs/PRIVACY_POLICY.md`** — **§5.4** drafts; **host HTTPS + finalize copy last** before Store/wide release (**`PV-PLN-DIST-001` §10.1**)
 - `C:\Codex\docs\BUNDLED_TOOLS_REDISTRIBUTION.md` — bundled **ExifTool** + optional **FFmpeg** notes (**§5.9**)
 - `C:\Codex\docs\archive\PV-PLN-LIBWS-001-library-workspace-modes.md` — **done** plan: library **Folder / Photo / Timeline** modes; **Photo workspace: exit & restoration** spells out what exits clear vs. what scroll state is not restored
 - `C:\Codex\docs\SERVICE_OWNERSHIP_AND_PARALLEL_WORK_MAP.md` for service boundaries and parallel lanes
@@ -88,7 +88,7 @@ Practical current focus:
 - continue the MainWindow extraction roadmap in small slices
 - keep service extraction coordinated so parallel work does not collide
 - treat source-only refactors and published-build changes as different things
-- distribution (**`PV-PLN-DIST-001`**): Velopack path + **§5.5** changelog notes landed; **next:** hosted **HTTPS** for **`docs/PRIVACY_POLICY.md`** + **`docs/EULA.md`**, **`docs/VELOPACK_VM_SPIKE_CHECKLIST.md`** on a VM, trial **signed** build (**`docs/PUBLISH_SIGNING.md`**, **`Publish-Velopack.ps1`** **`-SignParams`** / **`VPK_SIGN_PARAMS`**); **in-app** legal links deferred; **`tools-licenses\`** = **ExifTool**; **FFmpeg** user-installed (**§5.9**)
+- distribution (**`PV-PLN-DIST-001`**): Velopack path + **§5.5** landed; **next (technical):** **`docs/VELOPACK_VM_SPIKE_CHECKLIST.md`** on a VM, **`docs/MANUAL_GOLDEN_PATH_CHECKLIST.md`** on an RC, trial **signed** build (**`docs/PUBLISH_SIGNING.md`**, **`Publish-Velopack.ps1`** **`-SignParams`** / **`VPK_SIGN_PARAMS`**); **legal last:** hosted **HTTPS** for **`docs/PRIVACY_POLICY.md`** + **`docs/EULA.md`**, support contact, in-app links — **back of Phase 1** per **`PV-PLN-DIST-001` §10.1**; **`tools-licenses\`** = **ExifTool**; **FFmpeg** user-installed (**§5.9**)
 
 ## Working Expectations
 

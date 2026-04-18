@@ -7,6 +7,8 @@ PixelVault integrates **[Velopack](https://docs.velopack.io/)** for:
 
 **NuGet:** package **`Velopack`** version must stay aligned with the **`vpk`** CLI tool version ([docs](https://docs.velopack.io/getting-started/csharp)).
 
+**Phase 1 order:** run **VM / golden-path** QA and **signing** on installer builds first; **host** privacy + EULA at stable HTTPS **last** before a public or Store push unless counsel needs it earlier — **`PV-PLN-DIST-001` §10.1**.
+
 ---
 
 ## Prerequisites
