@@ -69,7 +69,7 @@ Use a **stable URL** that serves the **`releases.json`** (or equivalent) Velopac
 | **`scripts/Publish-PixelVault.ps1`** | Daily dev **`dist/PixelVault-*`** layout, single-file, optional **`-Sign`**, repo-style **`PixelVaultData`**. |
 | **`scripts/Publish-Velopack.ps1`** | Shipping an **installer**, **delta updates**, or Microsoft Store prep that expects a Velopack release layout. |
 
-**Signing:** **`docs/PUBLISH_SIGNING.md`** — **Authenticode** for **`dist`** builds and **`vpk pack`** **`-n`** / **`VPK_SIGN_PARAMS`**.
+**Signing:** **`docs/PUBLISH_SIGNING.md`** — **`Publish-Velopack.ps1`** **`-SignParams`** or **`$env:VPK_SIGN_PARAMS`** → **`vpk pack -n`**; **`Publish-PixelVault.ps1`** **`-Sign`** for **`dist`**.
 
 ---
 

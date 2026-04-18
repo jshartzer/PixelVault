@@ -470,3 +470,4 @@ Protect scope until **Phase 1** desktop distribution is **boringly stable**:
 | **2026‑04‑18** | §5.9: **`tools-licenses\`** (**GPLv3** for **ExifTool** only) + **`Merge-BundledToolLicenses.ps1`**; **FFmpeg** optional / not bundled; **`SettingsService`** drops **`tools\ffmpeg.exe`** fallback. |
 | **2026‑04‑18** | §5.2 + §5.4: **`docs/PUBLISH_SIGNING.md`** (Authenticode + Velopack **`vpk`** signing); **`docs/PRIVACY_POLICY.md`** hosting checklist. |
 | **2026‑04‑18** | §5.4: **`docs/EULA.md`** end-user license **draft** (placeholders **`{LEGAL_ENTITY}`** / **`{JURISDICTION}`** / **`{PUBLISH_CONTACT}`**); hosted HTTPS URL still checklist item. |
+| **2026‑04‑18** | §5.2: **`Publish-Velopack.ps1`** **`-SignParams`** / **`VPK_SIGN_PARAMS`** → **`vpk pack -n`**; in-app legal links deferred per handoff. |

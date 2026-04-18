@@ -33,12 +33,25 @@ Or pass **`-CertificateThumbprint`** explicitly. Optional **`-TimestampServer`**
 
 ## Velopack / **`vpk pack`** (`Publish-Velopack.ps1`)
 
-**`Publish-Velopack.ps1`** does **not** pass signing flags to **`vpk`** yet. After publish, **`vpk pack`** may warn that files are unsigned.
-
-Use **`vpk pack`** **`-n` / `--signParams`** so Velopack invokes **signtool** with the same thumbprint/timestamp style:
+**`Publish-Velopack.ps1`** forwards **Authenticode** to **`vpk`** when you set **`signParams`**:
 
 ```powershell
-# Example: append to the pack step (thumbprint + timestamp — align with your CA)
+# Same thumbprint + timestamp style as Publish-PixelVault (align with your CA)
+$env:VPK_SIGN_PARAMS = "/fd SHA256 /sha1 YOUR40CHARHEXTHUMBPRINT /tr http://timestamp.digicert.com /td SHA256"
+pwsh -File C:\Codex\scripts\Publish-Velopack.ps1 -Force
+```
+
+Or pass **`-SignParams`** once (overrides env):
+
+```powershell
+pwsh -File C:\Codex\scripts\Publish-Velopack.ps1 -Force -SignParams '/fd SHA256 /sha1 YOUR40CHARHEXTHUMBPRINT /tr http://timestamp.digicert.com /td SHA256'
+```
+
+Those map to **`vpk pack -n`**. See **[Velopack CLI](https://docs.velopack.io/reference/cli)** for **`--signTemplate`**, **`--signSkipDll`**, etc.
+
+Manual **`vpk pack`** (without the script) works the same way:
+
+```powershell
 vpk pack `
   -u Codex.PixelVault `
   -v 0.76.0 `
@@ -47,10 +60,6 @@ vpk pack `
   -o "C:\Codex\dist\Velopack\0.76.0" `
   -n "/fd SHA256 /sha1 YOUR40CHARHEXTHUMBPRINT /tr http://timestamp.digicert.com /td SHA256"
 ```
-
-Velopack also documents **`VPK_SIGN_PARAMS`** and **`--signTemplate`** for custom signers — see **[Velopack CLI](https://docs.velopack.io/reference/cli)**.
-
-Use **`--signSkipDll`** if you only want EXEs signed during pack.
 
 ---
 

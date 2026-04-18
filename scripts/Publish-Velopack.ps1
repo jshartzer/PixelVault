@@ -3,12 +3,14 @@
 # Example:
 #   pwsh -File C:\Codex\scripts\Publish-Velopack.ps1
 #   pwsh -File C:\Codex\scripts\Publish-Velopack.ps1 -SkipVpk -Force
+# Optional Authenticode during vpk pack: pass -SignParams '...' or set env VPK_SIGN_PARAMS (signtool args after /fd). See docs/PUBLISH_SIGNING.md.
 [CmdletBinding()]
 param(
     [string]$Version,
     [string]$Configuration = "Release",
     [string]$RuntimeIdentifier = "win-x64",
     [string]$OutputRoot,
+    [string]$SignParams,
     [switch]$SkipVpk,
     [switch]$Force
 )
@@ -80,7 +82,7 @@ if (Test-Path $toolsPath)
 }
 else
 {
-    Write-Warning "Repo tools\ missing — exiftool.exe / ffmpeg.exe not copied (licenses still merged)."
+    Write-Warning "Repo tools\ missing — optional tools\exiftool.exe not copied (ExifTool license texts still merged)."
 }
 
 Merge-PixelVaultBundledToolLicenses -RepoRoot $repoRoot -DestinationRoot $publishDir
@@ -108,12 +110,24 @@ if (Test-Path $releaseDir)
 
 Write-Host "Running vpk pack (SemVer $vpkVersion from AppVersion $Version)..."
 # CLI flags: https://docs.velopack.io/reference/cli — short forms avoid typos across vpk versions.
-& vpk pack `
-    -u $packId `
-    -v $vpkVersion `
-    -p $publishDir `
-    -e PixelVault.exe `
-    -o $releaseDir
+$vpkCmd = @(
+    "pack",
+    "-u", $packId,
+    "-v", $vpkVersion,
+    "-p", $publishDir,
+    "-e", "PixelVault.exe",
+    "-o", $releaseDir
+)
+$signArgs = $SignParams
+if ([string]::IsNullOrWhiteSpace($signArgs)) { $signArgs = $env:VPK_SIGN_PARAMS }
+if (-not [string]::IsNullOrWhiteSpace($signArgs))
+{
+    $vpkCmd += "-n"
+    $vpkCmd += $signArgs.Trim()
+    Write-Host "vpk: passing -n (signtool params from -SignParams or env VPK_SIGN_PARAMS)."
+}
+
+& vpk @vpkCmd
 
 if ($LASTEXITCODE -ne 0) { throw "vpk pack failed with exit code $LASTEXITCODE" }
 
