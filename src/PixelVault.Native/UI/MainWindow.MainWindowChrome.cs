@@ -537,10 +537,10 @@ namespace PixelVaultNative
                 StartPoint = new Point(0, 0),
                 EndPoint = new Point(1, 1)
             };
-            brush.GradientStops.Add(new GradientStop(Brush("#FFF8DB").Color, 0));
-            brush.GradientStops.Add(new GradientStop(Brush("#D5C08A").Color, 0.28));
-            brush.GradientStops.Add(new GradientStop(Brush("#F2E6BC").Color, 0.62));
-            brush.GradientStops.Add(new GradientStop(Brush("#8A7751").Color, 1));
+            brush.GradientStops.Add(new GradientStop(Brush("#FFF2BF").Color, 0));
+            brush.GradientStops.Add(new GradientStop(Brush("#E0B44A").Color, 0.28));
+            brush.GradientStops.Add(new GradientStop(Brush("#F8D979").Color, 0.62));
+            brush.GradientStops.Add(new GradientStop(Brush("#936915").Color, 1));
             if (brush.CanFreeze) brush.Freeze();
             return brush;
         }
@@ -595,7 +595,7 @@ namespace PixelVaultNative
                 var yBias = normalizedY - 0.5;
                 var shimmer = Math.Max(Math.Abs(xBias), Math.Abs(yBias));
 
-                SetDouble(root, UIElement.OpacityProperty, 0.96d + shimmer * 0.04d, animate, 150);
+                SetDouble(root, UIElement.OpacityProperty, 0.98d + shimmer * 0.08d, animate, 150);
                 SetDouble(glossShift, TranslateTransform.XProperty, xBias * 7d, animate, 150);
                 SetDouble(glossShift, TranslateTransform.YProperty, yBias * 5d, animate, 150);
                 SetDouble(prismShift, TranslateTransform.XProperty, xBias * 24d - yBias * 6d, animate, 150);
@@ -607,11 +607,11 @@ namespace PixelVaultNative
                 SetDouble(glintShift, TranslateTransform.XProperty, xBias * 14d + yBias * 8d, animate, 120);
                 SetDouble(glintShift, TranslateTransform.YProperty, yBias * 8d - xBias * 5d, animate, 120);
 
-                SetDouble(glossLayer, UIElement.OpacityProperty, 0.12d + shimmer * 0.08d, animate, 150);
-                SetDouble(prismLayer, UIElement.OpacityProperty, 0.08d + shimmer * 0.1d, animate, 150);
-                SetDouble(crossLayer, UIElement.OpacityProperty, 0.035d + shimmer * 0.05d, animate, 150);
-                SetDouble(stripeLayer, UIElement.OpacityProperty, 0.05d + shimmer * 0.04d, animate, 180);
-                SetDouble(glintLayer, UIElement.OpacityProperty, 0.04d + shimmer * 0.06d, animate, 120);
+                SetDouble(glossLayer, UIElement.OpacityProperty, 0.36d + shimmer * 0.18d, animate, 150);
+                SetDouble(prismLayer, UIElement.OpacityProperty, 0.30d + shimmer * 0.22d, animate, 150);
+                SetDouble(crossLayer, UIElement.OpacityProperty, 0.16d + shimmer * 0.12d, animate, 150);
+                SetDouble(stripeLayer, UIElement.OpacityProperty, 0.15d + shimmer * 0.10d, animate, 180);
+                SetDouble(glintLayer, UIElement.OpacityProperty, 0.18d + shimmer * 0.14d, animate, 120);
             }
 
             static void SetDouble(DependencyObject target, DependencyProperty property, double value, bool animate, int durationMs)
@@ -644,31 +644,46 @@ namespace PixelVaultNative
                 Height = height,
                 IsHitTestVisible = false
             };
+            var frameRadius = cornerRadius.TopLeft;
+            var frameClip = new RectangleGeometry(new Rect(0, 0, width, height), frameRadius, frameRadius);
+            if (frameClip.CanFreeze) frameClip.Freeze();
+            frame.Clip = frameClip;
 
             frame.Children.Add(new Border
             {
                 CornerRadius = cornerRadius,
                 Background = Brushes.Transparent,
                 BorderBrush = BuildLibraryTileCompletionBorderBrush(),
-                BorderThickness = new Thickness(2),
-                Effect = new DropShadowEffect
-                {
-                    Color = Brush("#C8B37A").Color,
-                    BlurRadius = 10,
-                    ShadowDepth = 0,
-                    Opacity = 0.18
-                }
+                BorderThickness = new Thickness(2)
+            });
+            frame.Children.Add(new Border
+            {
+                Margin = new Thickness(1),
+                CornerRadius = new CornerRadius(
+                    Math.Max(0, cornerRadius.TopLeft - 1),
+                    Math.Max(0, cornerRadius.TopRight - 1),
+                    Math.Max(0, cornerRadius.BottomRight - 1),
+                    Math.Max(0, cornerRadius.BottomLeft - 1)),
+                Background = Brushes.Transparent,
+                BorderBrush = Brush("#6EF6DE7A"),
+                BorderThickness = new Thickness(2)
             });
 
             return frame;
         }
-        LibraryTileCompletionFoilVisual BuildLibraryTileCompletionFoilOverlay()
+        LibraryTileCompletionFoilVisual BuildLibraryTileCompletionFoilOverlay(double tileWidth, double tileHeight, double cornerRadius)
         {
             var foil = new Grid
             {
+                Width = tileWidth,
+                Height = tileHeight,
                 IsHitTestVisible = false,
-                Opacity = 0.96
+                Opacity = 0.96,
+                ClipToBounds = false
             };
+            var foilClip = new RectangleGeometry(new Rect(0, 0, tileWidth, tileHeight), cornerRadius, cornerRadius);
+            if (foilClip.CanFreeze) foilClip.Freeze();
+            foil.Clip = foilClip;
             var glossShift = new TranslateTransform();
             var prismShift = new TranslateTransform();
             var crossShift = new TranslateTransform();
@@ -699,20 +714,19 @@ namespace PixelVaultNative
                 StartPoint = new Point(0, 0.94),
                 EndPoint = new Point(1, 0.08)
             };
-            prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#00FFFFFF").Color, 0.42));
-            prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#00FFFFFF").Color, 0.465));
-            prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#38A8F6FF").Color, 0.49));
-            prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#44E39BFF").Color, 0.505));
-            prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#48FFF4A8").Color, 0.52));
-            prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#28FFE7C8").Color, 0.54));
-            prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#00FFFFFF").Color, 0.575));
+            prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#00FFFFFF").Color, 0.30));
+            prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#78A8F6FF").Color, 0.40));
+            prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#8AE39BFF").Color, 0.49));
+            prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#94FFF4A8").Color, 0.57));
+            prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#66FFE7C8").Color, 0.66));
+            prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#00FFFFFF").Color, 0.78));
             prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#00FFFFFF").Color, 1));
             if (prismSweepBrush.CanFreeze) prismSweepBrush.Freeze();
             var prismLayer = new Border
             {
                 Background = prismSweepBrush,
-                Opacity = 0.12,
-                Margin = new Thickness(-26),
+                Opacity = 0.18,
+                Margin = new Thickness(-32),
                 RenderTransform = prismShift
             };
             foil.Children.Add(prismLayer);
@@ -724,16 +738,16 @@ namespace PixelVaultNative
             };
             crossSweepBrush.GradientStops.Add(new GradientStop(Brush("#00FFFFFF").Color, 0.48));
             crossSweepBrush.GradientStops.Add(new GradientStop(Brush("#00FFFFFF").Color, 0.535));
-            crossSweepBrush.GradientStops.Add(new GradientStop(Brush("#24C6A8FF").Color, 0.565));
-            crossSweepBrush.GradientStops.Add(new GradientStop(Brush("#18FFF6D7").Color, 0.592));
+            crossSweepBrush.GradientStops.Add(new GradientStop(Brush("#44C6A8FF").Color, 0.565));
+            crossSweepBrush.GradientStops.Add(new GradientStop(Brush("#2EFFF6D7").Color, 0.592));
             crossSweepBrush.GradientStops.Add(new GradientStop(Brush("#00FFFFFF").Color, 0.635));
             crossSweepBrush.GradientStops.Add(new GradientStop(Brush("#00FFFFFF").Color, 1));
             if (crossSweepBrush.CanFreeze) crossSweepBrush.Freeze();
             var crossLayer = new Border
             {
                 Background = crossSweepBrush,
-                Opacity = 0.06,
-                Margin = new Thickness(-22),
+                Opacity = 0.10,
+                Margin = new Thickness(-26),
                 RenderTransform = crossShift
             };
             foil.Children.Add(crossLayer);
@@ -741,7 +755,7 @@ namespace PixelVaultNative
             var stripeDrawing = new DrawingGroup();
             stripeDrawing.Children.Add(new GeometryDrawing(
                 Brushes.Transparent,
-                new Pen(Brush("#3EFFFFFF"), 0.7),
+                new Pen(Brush("#58FFFFFF"), 0.8),
                 Geometry.Parse("M 0 10 L 10 0")));
             if (stripeDrawing.CanFreeze) stripeDrawing.Freeze();
             var stripeBrush = new DrawingBrush(stripeDrawing)
@@ -757,7 +771,7 @@ namespace PixelVaultNative
             var stripeLayer = new Border
             {
                 Background = stripeBrush,
-                Opacity = 0.08,
+                Opacity = 0.12,
                 Margin = new Thickness(-10),
                 RenderTransform = stripeShift
             };
@@ -777,8 +791,8 @@ namespace PixelVaultNative
             var glintLayer = new Border
             {
                 Background = topGlintBrush,
-                Opacity = 0.08,
-                Margin = new Thickness(-14),
+                Opacity = 0.12,
+                Margin = new Thickness(-16),
                 RenderTransform = glintShift
             };
             foil.Children.Add(glintLayer);

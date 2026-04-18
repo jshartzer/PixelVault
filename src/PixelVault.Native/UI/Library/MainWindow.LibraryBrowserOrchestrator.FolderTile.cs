@@ -262,13 +262,13 @@ namespace PixelVaultNative
             };
             tile.Template = BuildRoundedTileButtonTemplate();
             var coverCorner = new CornerRadius(12);
-            var completedCardInset = 6d;
-            var completedInnerCorner = new CornerRadius(7);
+            var completedCardInset = 0d;
+            var completedInnerCorner = coverCorner;
             var coverRoot = new Grid { Width = tileWidth, Height = tileHeight };
             var showCompletedCardTreatment = folder != null
                 && folder.IsCompleted100Percent
                 && ws?.WorkspaceMode != LibraryWorkspaceMode.Photo;
-            var foilVisual = showCompletedCardTreatment ? BuildLibraryTileCompletionFoilOverlay() : null;
+            var foilVisual = showCompletedCardTreatment ? BuildLibraryTileCompletionFoilOverlay(tileWidth, tileHeight, coverCorner.TopLeft) : null;
             coverRoot.Children.Add(CreateAsyncImageTile(
                 GetLibraryArtPathForDisplayOnly(displayFolder),
                 CalculateLibraryFolderArtDecodeWidth(tileWidth, ResolveLibraryDpiScale()),
@@ -283,7 +283,6 @@ namespace PixelVaultNative
                 new CornerRadius(0),
                 Brushes.Transparent,
                 new Thickness(0)));
-            if (foilVisual != null) coverRoot.Children.Add(foilVisual.Root);
             var overlayPadRight = showPlatformBadgeOnTile ? 84d : 10d;
             var titleBlock = new TextBlock
             {
@@ -345,13 +344,13 @@ namespace PixelVaultNative
             if (roundedCoverClip.CanFreeze) roundedCoverClip.Freeze();
             imageBorder.Clip = roundedCoverClip;
             cardHost.Children.Add(imageBorder);
+            if (foilVisual != null) cardHost.Children.Add(foilVisual.Root);
             if (showCompletedCardTreatment) cardHost.Children.Add(BuildLibraryTileCompletionFrameOverlay(tileWidth, tileHeight, coverCorner));
             tile.Content = cardHost;
             if (foilVisual != null)
             {
                 ScrollViewer foilScrollHost = null;
                 ScrollChangedEventHandler foilScrollChanged = null;
-                var foilHovering = false;
 
                 Point ResolveTileViewportCenter()
                 {
@@ -394,7 +393,6 @@ namespace PixelVaultNative
 
                     foilScrollChanged = delegate
                     {
-                        if (foilHovering) return;
                         UpdateFoilFromViewport(true);
                     };
                     foilScrollHost.ScrollChanged += foilScrollChanged;
@@ -411,25 +409,18 @@ namespace PixelVaultNative
                         foilScrollHost.ScrollChanged -= foilScrollChanged;
                     foilScrollHost = null;
                     foilScrollChanged = null;
-                    foilHovering = false;
-                };
-                tile.MouseEnter += delegate
-                {
-                    foilHovering = true;
                 };
                 tile.MouseMove += delegate(object _, MouseEventArgs e)
                 {
                     if (imageBorder == null || imageBorder.ActualWidth <= 0 || imageBorder.ActualHeight <= 0) return;
-                    foilHovering = true;
                     var position = e.GetPosition(imageBorder);
                     foilVisual.Update(
                         Math.Max(0, Math.Min(1, position.X / imageBorder.ActualWidth)),
                         Math.Max(0, Math.Min(1, position.Y / imageBorder.ActualHeight)),
-                        false);
+                        true);
                 };
                 tile.MouseLeave += delegate
                 {
-                    foilHovering = false;
                     UpdateFoilFromViewport(true);
                 };
             }
