@@ -1,5 +1,5 @@
 # Reusable local build into a fixed folder (not a release).
-# Builds from repo source only: dotnet publish on src\PixelVault.Native, then copies repo assets/ + tools/.
+# Builds from repo source only: dotnet publish on src\PixelVault.Native, then copies repo assets/ + tools/ + tools-licenses -> tools/licenses.
 # Does not read or copy from dist\ — ever.
 # Does not bump AppVersion, CHANGELOG, CURRENT_BUILD, dist/*, PixelVault-current, or repo-root PixelVault.lnk.
 #
@@ -25,6 +25,8 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+
+. (Join-Path $PSScriptRoot "Merge-BundledToolLicenses.ps1")
 
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $projectPath = Join-Path $repoRoot "src\PixelVault.Native\PixelVault.Native.csproj"
@@ -208,7 +210,16 @@ if ($IncludeSourceBundle)
 }
 
 Copy-Item $assetsPath (Join-Path $outputDir "assets") -Recurse -Force
-Copy-Item $toolsPath (Join-Path $outputDir "tools") -Recurse -Force
+if (Test-Path $toolsPath)
+{
+    Copy-Item $toolsPath (Join-Path $outputDir "tools") -Recurse -Force
+}
+else
+{
+    Write-Warning "Repo tools\ missing — exiftool.exe / ffmpeg.exe not copied (licenses still merged)."
+}
+
+Merge-PixelVaultBundledToolLicenses -RepoRoot $repoRoot -DestinationRoot $outputDir
 
 if ($IncludeBootstrapSettings -and (Test-Path $settingsPath))
 {

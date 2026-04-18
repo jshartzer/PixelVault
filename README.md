@@ -108,6 +108,7 @@ Important paths (names depend on configured library root and cache hashing — a
 - `C:\Codex\scripts`: build/publish and developer utility scripts
 - `C:\Codex\docs`: handoff, policy, changelog, project context, and current-build marker
 - `C:\Codex\dist`: published versioned builds (`PixelVault-<version>/`) plus `PixelVault-current` junction
+- `C:\Codex\tools-licenses`: third-party **license texts** merged into published `tools\licenses\` (ExifTool / FFmpeg — see `docs/BUNDLED_TOOLS_REDISTRIBUTION.md`)
 - `C:\Codex\assets`: shared branding and UI assets
 - `C:\Codex\tools`: bundled runtime dependencies such as `ExifTool` and `FFmpeg`
 - `C:\Codex\PixelVaultData`: live shared app data, indexes, caches, and logs

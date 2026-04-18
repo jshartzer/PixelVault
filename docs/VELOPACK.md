@@ -39,7 +39,7 @@ Optional: `-Version 0.076.000`, `-SkipVpk` (publish folder only), `-Force` overw
 
 Outputs under **`dist\Velopack\<semver>\`** (Velopack **`packVersion`** is normalized SemVer from **`AppVersion`**, e.g. **`0.076.000`** → **`0.76.0`**) — upload the generated release assets to HTTPS static hosting (or GitHub Releases) and point users at the setup, or wire **`UpdateManager`** (below).
 
-This script publishes **self-contained** **`win-x64`** with **`PublishSingleFile=false`** for that output only (better fit for **`vpk`** delta updates than a single mega-exe).
+This script publishes **self-contained** **`win-x64`** with **`PublishSingleFile=false`** for that output only (better fit for **`vpk`** delta updates than a single mega-exe). It copies optional repo **`tools\`** next to **`PixelVault.exe`** and merges **`tools-licenses\`** → **`tools\licenses\`** (**§5.9**).
 
 ### Phase 1 decision — upgrade in place vs side‑by‑side
 
@@ -77,3 +77,4 @@ Use a **stable URL** that serves the **`releases.json`** (or equivalent) Velopac
 |------|------|
 | **2026-04-18** | Initial Velopack bootstrap **`Main`**, **`Publish-Velopack.ps1`**, **`Velopack` 0.0.942. |
 | **2026-04-18** | **`vpk -v`** uses normalized SemVer from **`AppVersion`** (see script **`ConvertTo-VpkSemVer`**). |
+| **2026-04-18** | Publish copies **`tools\`** + merges **`tools-licenses\`** → **`tools\licenses\`** (**§5.9**). |

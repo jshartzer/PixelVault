@@ -15,7 +15,10 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot "Merge-BundledToolLicenses.ps1")
+
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
+$toolsPath = Join-Path $repoRoot "tools"
 $projectPath = Join-Path $repoRoot "src\PixelVault.Native\PixelVault.Native.csproj"
 $sourcePath = Join-Path $repoRoot "src\PixelVault.Native\PixelVault.Native.cs"
 
@@ -70,6 +73,17 @@ $publishArgs = @(
 
 & dotnet @publishArgs
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed with exit code $LASTEXITCODE" }
+
+if (Test-Path $toolsPath)
+{
+    Copy-Item $toolsPath (Join-Path $publishDir "tools") -Recurse -Force
+}
+else
+{
+    Write-Warning "Repo tools\ missing — exiftool.exe / ffmpeg.exe not copied (licenses still merged)."
+}
+
+Merge-PixelVaultBundledToolLicenses -RepoRoot $repoRoot -DestinationRoot $publishDir
 
 if ($SkipVpk)
 {

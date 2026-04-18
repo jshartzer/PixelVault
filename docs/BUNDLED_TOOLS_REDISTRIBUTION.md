@@ -1,20 +1,39 @@
 # Bundled external tools — redistribution worksheet (**PV-PLN-DIST-001** §5.9)
 
-PixelVault may **launch** third-party binaries (**ExifTool**, **FFmpeg**) from **`Path Settings`** or bundled **`tools/`**. Shipping them in installers or Store packages requires matching each vendor’s **license**, **attribution**, and **redistribution** rules.
+PixelVault **invokes** third-party binaries (**ExifTool**, **FFmpeg**) from **Path Settings** or, when unset, from **`tools\`** next to **`PixelVault.exe`** (**`MainWindow.StartupInitialization`**, **`SettingsService`**).
 
-This page is an **engineering worksheet** — not legal advice. Fill it before calling **§5.9** complete.
+Shipping those binaries with **`Publish-PixelVault.ps1`**, **`Publish-Velopack.ps1`**, or **`Build-PixelVault-AppTesting.ps1`** requires matching each vendor’s **license** and **notice** rules. This document is an **engineering worksheet** — not legal advice.
 
-| Tool | Binary / version shipped | Source download URL | License name / URL | Redistribution allowed? (Y/N / notes) | Notice / **`LICENSE` file** required in artifact? | Shipped in channel (zip / Velopack / Store) |
-|------|--------------------------|---------------------|-------------------|--------------------------------------|---------------------------------------------------|--------------------------------------------|
-| **ExifTool** | *(fill — e.g. Windows exe)* | | | | | |
-| **FFmpeg** | *(fill — build flavor)* | | | | | |
+---
 
-**Release packaging checklist**
+## Ship automation (repo)
 
-- [ ] Required **`LICENSE` / COPYING / NOTICE`** files copied **next to** or **under** **`tools/`** in **`Publish-PixelVault`** / **`Publish-Velopack`** outputs as licenses demand.
-- [ ] **About** / **Setup & health** / **`tools/`** readme mentions third-party tools if attribution is required.
-- [ ] **Partner Center / Desktop Bridge:** bundled **`runFullTrust`** executables disclosed per submission guidance.
+Publish scripts dot-source **`scripts/Merge-BundledToolLicenses.ps1`** and merge **`tools-licenses\`** into **`<publish output>\tools\licenses\`** every time (even when the local repo **`tools\`** folder has no binaries). Committed texts today:
 
-**Fallback (product)**
+| File | Purpose |
+|------|---------|
+| **`tools-licenses/README.txt`** | Short operator instructions (also copied into **`tools\licenses\`**). |
+| **`tools-licenses/exiftool-gpl-3.0-COPYING.txt`** | Full **GNU GPL v3** text — appropriate for **Windows standalone `exiftool.exe`** from **[exiftool.org](https://exiftool.org/)** as published by Phil Harvey. |
+| **`tools-licenses/ffmpeg-lgpl-2.1-COPYING.txt`** | Full **GNU LGPL v2.1** text — typical for **shared FFmpeg** Windows builds (e.g. **[gyan.dev](https://www.gyan.dev/ffmpeg/builds/)**, **[BtbN GitHub Actions](https://github.com/BtbN/FFmpeg-Builds)**). **If your `ffmpeg.exe` is GPL-only or statically linked differently, replace this file with the COPYING from your exact build artifact before release.** |
 
-- **Path Settings–only** external installs if a channel forbids bundling — aligns with roadmap **§5.9** fallback row.
+---
+
+## Vendor matrix (fill versions at release time)
+
+| Tool | Binary expected in **`tools\`** | Version check | Upstream | License (typical) | Redistribution |
+|------|----------------------------------|----------------|----------|-------------------|----------------|
+| **ExifTool** | **`exiftool.exe`** | `exiftool.exe -ver` | [exiftool.org](https://exiftool.org/) | **GPL v3** for the Windows stand-alone executable (see upstream README). | Allowed with full license text — use committed **`exiftool-gpl-3.0-COPYING.txt`** unless your build differs. |
+| **FFmpeg** | **`ffmpeg.exe`** | `ffmpeg.exe -version` | [ffmpeg.org](https://ffmpeg.org/) — [legal / license FAQ](https://ffmpeg.org/legal.html) | Most public **shared** Windows builds are **LGPL v2.1**; **GPL** builds exist. | Allowed for LGPL shared builds with license text — use committed **`ffmpeg-lgpl-2.1-COPYING.txt`** only when it matches **your** build’s license. |
+
+**Channels:** zip **`dist/PixelVault-*`** and **Velopack** both receive **`tools\licenses\`** via the same merge step. **Microsoft Store / Desktop Bridge** still needs Partner Center disclosure for **`runFullTrust`** helpers.
+
+---
+
+## Release packaging checklist
+
+- [x] **Automated:** **`tools\licenses\`** merged into publish output from **`tools-licenses\`** (**`Merge-BundledToolLicenses.ps1`**).
+- [ ] **Per release:** Confirm **`exiftool.exe`** / **`ffmpeg.exe`** versions and replace COPYING files if your binaries are not “stock” GPLv3 ExifTool + LGPL shared FFmpeg.
+- [ ] **User-visible attribution** if upstream requires it beyond file drop (About box, **`tools\licenses\README.txt`** is a start; extend if counsel requires).
+- [ ] **Partner Center / Desktop Bridge:** disclose bundled executables per submission guidance.
+
+**Fallback (product):** users can point **Path Settings** at externally installed tools if a channel forbids bundling — **`SettingsService`** already prefers saved paths over **`tools\`** when valid.

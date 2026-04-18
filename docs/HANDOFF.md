@@ -86,7 +86,7 @@ Practical current focus:
 - continue the MainWindow extraction roadmap in small slices
 - keep service extraction coordinated so parallel work does not collide
 - treat source-only refactors and published-build changes as different things
-- distribution (**`PV-PLN-DIST-001`**): Velopack path + **§5.5** changelog notes landed; run **`docs/VELOPACK_VM_SPIKE_CHECKLIST.md`** on a VM before treating installer QA as done; fill **`docs/BUNDLED_TOOLS_REDISTRIBUTION.md`** before shipping bundled **`tools/`** (**§5.9**)
+- distribution (**`PV-PLN-DIST-001`**): Velopack path + **§5.5** changelog notes landed; run **`docs/VELOPACK_VM_SPIKE_CHECKLIST.md`** on a VM before treating installer QA as done; **`tools-licenses\`** auto-merges to **`tools\licenses\`** on publish — still **audit exact `exiftool.exe` / `ffmpeg.exe` builds** and Partner Center disclosure (**§5.9**)
 
 ## Working Expectations
 

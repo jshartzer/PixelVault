@@ -246,14 +246,14 @@ Automated tests are strong; distribution changes need smoke manual QA.
 
 **Why:** Full‑trust packaging can **run** **ExifTool** / **FFmpeg**; **Store / legal** still require **redistribution** and **notice** hygiene.
 
-**Worksheet:** **`docs/BUNDLED_TOOLS_REDISTRIBUTION.md`** — fill versions, license URLs, and channel matrix before closing this section.
+**Worksheet:** **`docs/BUNDLED_TOOLS_REDISTRIBUTION.md`** — vendor matrix + per-release COPY verification.
 
-- [ ] Audit **license / redistribution terms** for the **exact** **ExifTool** and **FFmpeg** binaries you ship.
+- [ ] Audit **license / redistribution terms** for the **exact** **ExifTool** and **FFmpeg** binaries you ship (replace repo **`tools-licenses\`** COPYING files when your build’s license differs).
 - [ ] Confirm those binaries may be redistributed in **each** channel you use (zip, installer, Store Desktop Bridge).
-- [ ] Ship **required** **`LICENSE` / notice** files inside release artifacts when redistribution demands it.
-- [ ] Meet any **user‑visible attribution** requirements (About box, **`tools/`** readme, etc.).
+- [x] Ship **required** **`LICENSE` / notice** files inside release artifacts — **`tools-licenses\`** merged to **`tools\licenses\`** on every **`Publish-*`** / **`Build-PixelVault-AppTesting`** run (**`Merge-BundledToolLicenses.ps1`**).
+- [ ] Meet any **user‑visible attribution** requirements (About box, **`tools\licenses\README.txt`**, etc.) beyond file drop — confirm with counsel if unsure.
 - [ ] Confirm **Partner Center / Desktop Bridge** submission allows this **bundled‑tool model** under **`runFullTrust`** (expect disclosure in listing/privacy text).
-- [ ] Define **fallback** if a channel forbids bundling (e.g. **Path Settings**‑only external paths for that channel).
+- [x] **Fallback** documented — **Path Settings** overrides bundled **`tools\`** paths when set (**`SettingsService`**); see **`docs/BUNDLED_TOOLS_REDISTRIBUTION.md`**.
 
 ### 5.10 External tool strategy (product decision — optional table)
 
@@ -465,3 +465,4 @@ Protect scope until **Phase 1** desktop distribution is **boringly stable**:
 | **2026‑04‑18** | §5.3: Velopack integration (**`docs/VELOPACK.md`**, **`Publish-Velopack.ps1`**); **`vpk`** requires **ASP.NET Core 8** runtime if the global tool won’t start; **`dist/Velopack/`** gitignored. |
 | **2026‑04‑18** | §5.3: recorded **upgrade in place** as the shipped model (vs dev **`dist`** side‑by‑side); VM + N→N+1 spikes still manual. |
 | **2026‑04‑18** | §5.5: **CHANGELOG** + **README** document self-contained (**Velopack**) vs framework-dependent (**`Publish-PixelVault`**); **`docs/VELOPACK_VM_SPIKE_CHECKLIST.md`**; gate **§4.1** installer + self-contained rows checked; **`docs/BUNDLED_TOOLS_REDISTRIBUTION.md`** worksheet for **§5.9**. |
+| **2026‑04‑18** | §5.9: **`tools-licenses\`** (GPLv3 + LGPL 2.1 full texts) + **`Merge-BundledToolLicenses.ps1`** wired into **`Publish-PixelVault`**, **`Publish-Velopack`**, **`Build-PixelVault-AppTesting`**; worksheet expanded; gate item **bundled‑tools** still open until exact-binary audit + Store disclosure. |
