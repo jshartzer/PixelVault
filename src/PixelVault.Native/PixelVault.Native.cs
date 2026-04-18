@@ -20,6 +20,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Microsoft.Data.Sqlite;
 using SQLitePCL;
+using Velopack;
 using Forms = System.Windows.Forms;
 
 namespace PixelVaultNative
@@ -40,8 +41,11 @@ namespace PixelVaultNative
         }
 
         [STAThread]
-        private static void Main()
+        private static void Main(string[] args)
         {
+            // PV-PLN-DIST-001 §5.3: Velopack bootstrap (no-op when not installed via vpk). Same vpk major as NuGet Velopack.
+            VelopackApp.Build().SetArgs(args).Run();
+
             ServicePointManager.SecurityProtocol =
                 (SecurityProtocolType)3072 |
                 (SecurityProtocolType)768 |

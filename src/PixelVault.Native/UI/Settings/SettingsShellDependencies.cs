@@ -113,6 +113,9 @@ namespace PixelVaultNative
         /// <summary>PixelVault data cache root (indexes, thumbnails).</summary>
         public Func<string> GetCacheRoot { get; set; }
 
+        /// <summary>Authoritative writable app data root (settings parent, sibling of <c>cache/</c>). See <c>docs/DISTRIBUTION_STORAGE.md</c>.</summary>
+        public Func<string> GetPersistentDataRoot { get; set; }
+
         /// <summary>SQLite path for the active library root, or empty if no library.</summary>
         public Func<string> GetActiveLibraryIndexDatabasePath { get; set; }
 

@@ -66,12 +66,17 @@ namespace PixelVaultNative
             var session = d.GetDiagnosticsSessionId?.Invoke() ?? string.Empty;
             var starredExport = d.GetStarredExportFolder?.Invoke() ?? string.Empty;
 
+            var dataRoot = d.GetPersistentDataRoot?.Invoke() ?? string.Empty;
+
             stack.Children.Add(SectionCard(d, "This session",
                 Row(d, "App version", d.AppVersion ?? "—", DesignTokens.StatusNeutral),
                 Row(d, "Diagnostics session", string.IsNullOrWhiteSpace(session) ? "—" : session, DesignTokens.StatusNeutral)));
 
             var pathLines = new List<UIElement>
             {
+                Row(d, "App data folder", string.IsNullOrWhiteSpace(dataRoot) ? "—" : dataRoot,
+                    DirOk(dataRoot),
+                    "Settings, indexes, logs, saved covers. Overrides: PIXELVAULT_DATA_ROOT or PixelVault.data-root.ini — docs/DISTRIBUTION_STORAGE.md."),
                 Row(d, "Cache folder", string.IsNullOrWhiteSpace(cacheRoot) ? "—" : cacheRoot,
                     DirOk(cacheRoot), DescribeDir(cacheRoot))
             };
@@ -872,6 +877,7 @@ namespace PixelVaultNative
             sb.AppendLine("Time (local): " + DateTime.Now.ToString("u"));
             sb.AppendLine();
             sb.AppendLine("Paths:");
+            sb.AppendLine("  App data: " + (d.GetPersistentDataRoot?.Invoke() ?? ""));
             sb.AppendLine("  Cache: " + (cacheRoot ?? ""));
             if (sources.Count == 0) sb.AppendLine("  Sources: (none)");
             else

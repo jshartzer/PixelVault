@@ -15,6 +15,7 @@
 - iOS / backend direction (Phase 3 only): **`docs/ios_foundation_guide.md`**
 - MainWindow / service seams (ongoing): **`docs/plans/PV-PLN-UI-001-ui-thin-mainwindow-ios-aligned.md`**
 - Writable‑data contract (**§5.8**): **`docs/DISTRIBUTION_STORAGE.md`**
+- Privacy policy draft (**§5.4**): **`docs/PRIVACY_POLICY.md`**
 
 ---
 
@@ -184,17 +185,20 @@ Pick **one** primary path (others become optional):
 | **Squirrel.Windows** | Familiar pattern | Less momentum vs newer stacks |
 | **MSIX only** | Same artifact as Store later | Heavier lift if you’re not ready for manifest/capabilities yet |
 
+**Working choice (Phase 1):** **Velopack** — integration notes, **`vpk`** alignment, and publish ritual: **`docs/VELOPACK.md`**.
+
 **Checklist:**
 
+- [x] Repo spike: **`Velopack`** package + **`VelopackApp`** bootstrap in **`PixelVault.Native`**, **`scripts/Publish-Velopack.ps1`** (self‑contained publish + **`vpk pack`**), **`docs/VELOPACK.md`** — keep **`vpk`** CLI major/minor aligned with the NuGet version.
 - [ ] Spike: install + launch + uninstall on a clean VM.
 - [ ] Spike: update from **N → N+1** without losing settings under **`PixelVaultData`**.
-- [ ] Decide default: **upgrade in place** vs side‑by‑side version folders (today’s **`dist`** pattern is dev‑oriented).
+- [x] Decide default: **upgrade in place** (Velopack) vs dev‑oriented side‑by‑side **`dist/PixelVault-*`** — documented in **`docs/VELOPACK.md`**; mutable data outside install dir (**§5.8**).
 
 ### 5.4 Distribution checklist — legal & user‑facing pages
 
 Even with no telemetry, you still owe users clarity.
 
-- [ ] **Privacy policy** hosted at a stable HTTPS URL — describe: local files, SQLite caches, optional network calls (Steam, SteamGridDB, etc.), **no analytics** if true.
+- [ ] **Privacy policy** hosted at a stable HTTPS URL — **source draft:** **`docs/PRIVACY_POLICY.md`** (replace placeholders, publish, link from Store/listing).
 - [ ] **EULA** or Terms — especially if you distribute beyond personal friends.
 - [ ] **Support contact** — email or issue tracker linked from Store/listing later.
 
@@ -230,7 +234,7 @@ Automated tests are strong; distribution changes need smoke manual QA.
 **Grounded doc:** **`docs/DISTRIBUTION_STORAGE.md`** (probe order + layout). **Code:** **`PersistentDataMigrator.ResolvePersistentDataRoot`** — **`Program Files` / `WindowsApps`** → **`%LocalAppData%\PixelVault`** (**2026‑04‑18**); **dist** + **dev‑checkout** probes unchanged.
 
 - [x] **Restricted install dirs** (**`Program Files`**, **`Program Files (x86)`**, **`…\WindowsApps\…`**): authoritative root is **`%LocalAppData%\PixelVault`** — mutable data does not sit beside the EXE.
-- [ ] Optional: **explicit user‑chosen data directory** or **ProgramData** shared profile — product decision if needed later.
+- [x] **Explicit data‑root overrides** — **`PIXELVAULT_DATA_ROOT`** env + **`PixelVault.data-root.ini`** beside the EXE (**`docs/DISTRIBUTION_STORAGE.md`**); full **ProgramData** / roaming shared profile remains optional if you need it later.
 - [ ] Ensure **settings**, **caches**, **logs**, **SQLite**, **covers/thumbs**, and other mutable data **do not require** the install directory to be writable **for every supported distribution shape** (portable fallback still uses app root — document user expectations).
 - [ ] Ensure release builds **do not depend** on repo‑style discovery (**`dist/PixelVault-*`**, **`src/`** sibling probing, etc.) to resolve the data root.
 - [ ] Treat **install‑root** (`tools/`, bundled assets) as **read‑only** in the product model; mutable state lives outside Program Files (or declared Package cache areas for MSIX).
@@ -455,3 +459,6 @@ Protect scope until **Phase 1** desktop distribution is **boringly stable**:
 | **2026‑04‑18** | §5.1 P1 regex marked **landed** (implementation + tests). **`Publish-PixelVault.ps1`**: optional **`-Sign`** / thumbprint / **`PIXELVAULT_AUTHENTICODE_THUMBPRINT`** + **`signtool`** (§5.2). |
 | **2026‑04‑18** | Feedback integration: §1.3 Store blockers; §3.1 technical vs submission; §4.1 Phase 2 gate; §5.8–§5.10 storage/tools; §6 packaged spike + §6.6 audit; risks §7.4–§7.6; §10.1 priorities; §11 out‑of‑scope. Sources: `pixelvault_microsoft_store_plan_feedback.txt`, `docs/PV-PLN-DIST-001-suggested-updates.txt`. |
 | **2026‑04‑18** | §5.8 implementation slice: **`docs/DISTRIBUTION_STORAGE.md`**; **`PersistentDataMigrator`** LocalAppData routing for Program Files / WindowsApps; tests in **`PersistentDataMigratorTests`**. |
+| **2026‑04‑18** | Overrides: **`PIXELVAULT_DATA_ROOT`**, **`PixelVault.data-root.ini`**; sidecar+migration tests; Setup & health **App data folder** row; **`docs/PRIVACY_POLICY.md`** draft (**§5.4**). |
+| **2026‑04‑18** | §5.3: Velopack integration (**`docs/VELOPACK.md`**, **`Publish-Velopack.ps1`**); **`vpk`** requires **ASP.NET Core 8** runtime if the global tool won’t start; **`dist/Velopack/`** gitignored. |
+| **2026‑04‑18** | §5.3: recorded **upgrade in place** as the shipped model (vs dev **`dist`** side‑by‑side); VM + N→N+1 spikes still manual. |

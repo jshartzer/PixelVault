@@ -41,14 +41,20 @@ namespace PixelVaultNative
         /// </summary>
         internal const string LocalAppDataPixelVaultFolderName = "PixelVault";
 
+        /// <summary>Process env override (highest precedence). Set to an absolute directory path.</summary>
+        internal const string PixelVaultDataRootEnvVar = "PIXELVAULT_DATA_ROOT";
+
+        /// <summary>Optional file beside the EXE: one line <c>DataRoot=C:\path</c> (see <c>docs/DISTRIBUTION_STORAGE.md</c>).</summary>
+        internal const string DataRootSidecarFileName = "PixelVault.data-root.ini";
+
         /// <summary>
-        /// Probes for an external <c>PixelVaultData</c> root so data is shared across release folders.
-        /// Order: (1) if we're running from a <c>dist/PixelVault-VERSION</c> or <c>dist/PixelVault-current</c>
-        /// layout, use <c>&lt;dist parent&gt;/PixelVaultData</c>; (2) walk upwards until we find a folder
-        /// that contains both <c>PixelVaultData/</c> and <c>src/PixelVault.Native/</c> (dev-checkout);
-        /// (3) if the EXE directory is under a restricted install location (Program Files, WindowsApps),
-        /// use <c>%LocalAppData%\PixelVault</c> so mutable state is never written beside a read-only install;
-        /// (4) otherwise fall back to the current app root (portable / arbitrary writable folder).
+        /// Probes for the writable data root. Order:
+        /// (1) <c>PIXELVAULT_DATA_ROOT</c> environment variable;
+        /// (2) <c>PixelVault.data-root.ini</c> beside the EXE (<c>DataRoot=</c>);
+        /// (3) <c>dist/PixelVault-VERSION</c> / <c>dist/PixelVault-current</c> → sibling <c>PixelVaultData</c>;
+        /// (4) dev checkout walk (<c>PixelVaultData</c> + <c>src/PixelVault.Native</c>);
+        /// (5) restricted install dir (Program Files / WindowsApps) → <c>%LocalAppData%\PixelVault</c>;
+        /// (6) fallback: app directory (portable).
         /// </summary>
         /// <remarks>
         /// PV-PLN-DIST-001 §5.8: installed builds must not assume a writable install directory.
@@ -58,6 +64,15 @@ namespace PixelVaultNative
         {
             try
             {
+                var envRoot = TryNormalizeWritableRootOverride(
+                    Environment.GetEnvironmentVariable(PixelVaultDataRootEnvVar),
+                    log,
+                    PixelVaultDataRootEnvVar);
+                if (envRoot != null) return envRoot;
+
+                var sidecarRoot = TryReadDataRootSidecar(currentAppRoot, log);
+                if (sidecarRoot != null) return sidecarRoot;
+
                 var currentDir = new DirectoryInfo(currentAppRoot);
                 if (currentDir != null
                     && currentDir.Parent != null
@@ -93,6 +108,49 @@ namespace PixelVaultNative
                 log?.Invoke("ResolvePersistentDataRoot: " + ex.Message);
             }
             return currentAppRoot;
+        }
+
+        /// <summary>Normalizes an absolute override path; returns null if empty or invalid.</summary>
+        internal static string? TryNormalizeWritableRootOverride(string? value, Action<string>? log, string sourceLabel)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return null;
+            try
+            {
+                var trimmed = value.Trim().Trim('"');
+                if (trimmed.Length == 0) return null;
+                return Path.GetFullPath(trimmed);
+            }
+            catch (Exception ex)
+            {
+                log?.Invoke(sourceLabel + ": invalid path — " + ex.Message);
+                return null;
+            }
+        }
+
+        internal static string? TryReadDataRootSidecar(string appRoot, Action<string>? log)
+        {
+            if (string.IsNullOrWhiteSpace(appRoot)) return null;
+            try
+            {
+                var sidecar = Path.Combine(appRoot, DataRootSidecarFileName);
+                if (!File.Exists(sidecar)) return null;
+                foreach (var raw in File.ReadAllLines(sidecar))
+                {
+                    var line = raw.Trim();
+                    if (line.Length == 0 || line.StartsWith("#", StringComparison.Ordinal) || line.StartsWith(";", StringComparison.Ordinal))
+                        continue;
+                    if (line.StartsWith("DataRoot=", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var pathPart = line.Substring("DataRoot=".Length).Trim();
+                        return TryNormalizeWritableRootOverride(pathPart, log, DataRootSidecarFileName);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                log?.Invoke(DataRootSidecarFileName + ": " + ex.Message);
+            }
+            return null;
         }
 
         /// <summary>

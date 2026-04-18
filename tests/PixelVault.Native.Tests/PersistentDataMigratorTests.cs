@@ -14,6 +14,9 @@ namespace PixelVaultNative.Tests;
 /// </summary>
 public sealed class PersistentDataMigratorTests : IDisposable
 {
+    /// <summary>Serializes tests that touch <see cref="PersistentDataMigrator.PixelVaultDataRootEnvVar"/>.</summary>
+    static readonly object EnvOverrideLock = new object();
+
     readonly string _root;
     readonly FileSystemService _fs;
     readonly List<string> _log;
@@ -132,6 +135,67 @@ public sealed class PersistentDataMigratorTests : IDisposable
         Assert.True(PersistentDataMigrator.LooksLikeRestrictedInstallDirectory(Path.Combine(pf, "PixelVault", "PixelVault.exe")));
         Assert.True(PersistentDataMigrator.LooksLikeRestrictedInstallDirectory(@"C:\Program Files\WindowsApps\SomePkg\App"));
         Assert.False(PersistentDataMigrator.LooksLikeRestrictedInstallDirectory(Path.Combine(Path.GetTempPath(), "portable", "PixelVault")));
+    }
+
+    [Fact]
+    public void ResolvePersistentDataRoot_SidecarDataRoot_SelectsAbsoluteFolder()
+    {
+        var target = Directory.CreateDirectory(Path.Combine(_root, "sidecar_dest")).FullName;
+        var appRoot = Directory.CreateDirectory(Path.Combine(_root, "sidecar_app")).FullName;
+        File.WriteAllText(
+            Path.Combine(appRoot, PersistentDataMigrator.DataRootSidecarFileName),
+            "# comment\r\nDataRoot=" + target + "\r\n");
+
+        var result = PersistentDataMigrator.ResolvePersistentDataRoot(appRoot, LogLine);
+
+        Assert.Equal(Path.GetFullPath(target), Path.GetFullPath(result));
+    }
+
+    [Fact]
+    public void ResolvePersistentDataRoot_EnvironmentVariable_OverridesSidecarAndLayout()
+    {
+        var envDir = Directory.CreateDirectory(Path.Combine(_root, "env_dest")).FullName;
+        var sidecarDir = Directory.CreateDirectory(Path.Combine(_root, "sidecar_ignored")).FullName;
+        var appRoot = Directory.CreateDirectory(Path.Combine(_root, "env_app")).FullName;
+        File.WriteAllText(
+            Path.Combine(appRoot, PersistentDataMigrator.DataRootSidecarFileName),
+            "DataRoot=" + sidecarDir);
+
+        lock (EnvOverrideLock)
+        {
+            var key = PersistentDataMigrator.PixelVaultDataRootEnvVar;
+            var old = Environment.GetEnvironmentVariable(key);
+            try
+            {
+                Environment.SetEnvironmentVariable(key, envDir);
+                var result = PersistentDataMigrator.ResolvePersistentDataRoot(appRoot, LogLine);
+                Assert.Equal(Path.GetFullPath(envDir), Path.GetFullPath(result));
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable(key, old);
+            }
+        }
+    }
+
+    [Fact]
+    public void MigrateFromLegacyVersions_AfterSidecarResolution_CopiesSettingsIntoOverrideFolder()
+    {
+        var dataTarget = Directory.CreateDirectory(Path.Combine(_root, "mig_override")).FullName;
+        var appRoot = Directory.CreateDirectory(Path.Combine(_root, "mig_install")).FullName;
+        File.WriteAllText(Path.Combine(appRoot, PersistentDataMigrator.DataRootSidecarFileName), "DataRoot=" + dataTarget);
+        File.WriteAllText(Path.Combine(appRoot, "PixelVault.settings.ini"), "mode=test");
+
+        var resolved = PersistentDataMigrator.ResolvePersistentDataRoot(appRoot, LogLine);
+        Assert.Equal(Path.GetFullPath(dataTarget), Path.GetFullPath(resolved));
+
+        var settingsPath = Path.Combine(resolved, "PixelVault.settings.ini");
+        var cacheRoot = Path.Combine(resolved, "cache");
+        var logsRoot = Path.Combine(resolved, "logs");
+
+        PersistentDataMigrator.MigrateFromLegacyVersions(appRoot, resolved, settingsPath, cacheRoot, logsRoot, _fs);
+
+        Assert.Equal("mode=test", File.ReadAllText(settingsPath));
     }
 
     // ------------------------------------------------------------------

@@ -25,17 +25,23 @@ Regardless of which root is chosen, **`MainWindow.ComputePersistentStorageLayout
 
 ## How the data root is resolved (probe order)
 
-1. **`dist/PixelVault-<M.AAA.BBB>`** or **`dist/PixelVault-current`**  
+1. **`PIXELVAULT_DATA_ROOT`** — if this environment variable is set to an absolute directory path, it wins (automation / power users).
+
+2. **`PixelVault.data-root.ini`** beside the executable — text file with a line **`DataRoot=C:\absolute\path`** (`#` / `;` comments allowed). Highest precedence among file-based probes.
+
+3. **`dist/PixelVault-<M.AAA.BBB>`** or **`dist/PixelVault-current`**  
    → **`<parent of dist>/PixelVaultData`** (shared across published version folders — dev/publish workflow).
 
-2. **Dev checkout** — walk parents until a folder contains both **`PixelVaultData/`** and **`src/PixelVault.Native/`**  
+4. **Dev checkout** — walk parents until a folder contains both **`PixelVaultData/`** and **`src/PixelVault.Native/`**  
    → that **`PixelVaultData`** path.
 
-3. **Restricted install directory** — EXE path is under **`Program Files`**, **`Program Files (x86)`**, or contains **`\\WindowsApps\\`** (typical packaged desktop / Store‑style layout)  
+5. **Restricted install directory** — EXE path is under **`Program Files`**, **`Program Files (x86)`**, or contains **`\\WindowsApps\\`** (typical packaged desktop / Store‑style layout)  
    → **`%LocalAppData%\PixelVault`**  
    so settings and caches are **not** written next to a non‑writable install.
 
-4. **Fallback** — **`AppDomain.CurrentDomain.BaseDirectory`** (same as today for portable installs, arbitrary folders, zip extracts outside Program Files).
+6. **Fallback** — **`AppDomain.CurrentDomain.BaseDirectory`** (portable installs, arbitrary writable folders, zip extracts outside Program Files).
+
+**Setup & health** UI shows the resolved **App data folder** (and points here).
 
 ---
 
@@ -58,3 +64,4 @@ When **`dataRoot`** ≠ **`appRoot`**, first‑run behavior copies **settings / 
 | Date | Change |
 |------|--------|
 | **2026‑04‑18** | Initial doc; **`ResolvePersistentDataRoot`** gains LocalAppData branch for Program Files / WindowsApps (**`PV-PLN-DIST-001` §5.8**). |
+| **2026‑04‑18** | **`PIXELVAULT_DATA_ROOT`**, **`PixelVault.data-root.ini`**, Health dashboard row, migration test with sidecar. |

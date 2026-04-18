@@ -37,6 +37,7 @@ PixelVaultData/saved-covers/
 .cursor/
 backups/
 dist/publish-latest/
+dist/Velopack/
 PixelVault_BugReport.docx
 tmp/
 tmp_*

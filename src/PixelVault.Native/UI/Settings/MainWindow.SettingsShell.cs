@@ -107,6 +107,7 @@ namespace PixelVaultNative
                 GetLogBox = () => logBox,
                 GetConfiguredSourceRoots = () => GetSourceRoots(),
                 GetCacheRoot = () => cacheRoot,
+                GetPersistentDataRoot = () => dataRoot,
                 GetActiveLibraryIndexDatabasePath = () => string.IsNullOrWhiteSpace(libraryRoot) ? string.Empty : IndexDatabasePath(libraryRoot),
                 GetDiagnosticsSessionId = () => _diagnosticsSessionId,
                 GetLibraryStoragePlacementHealth = BuildLibraryStoragePlacementHealthSnapshot,
