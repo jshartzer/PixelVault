@@ -7,7 +7,7 @@ namespace PixelVaultNative
     /// <summary>
     /// Immutable browse-row snapshot for a library game/folder row (PV-PLN-UI-001 Step 4).
     /// No WPF types — suitable for future <c>GameSummary</c>-style APIs per <c>docs/ios_foundation_guide.md</c>.
-    /// Built from <see cref="MainWindow.LibraryBrowserFolderView"/> after folder-cache projection.
+    /// Built from <see cref="LibraryBrowserFolderView"/> after folder-cache projection.
     /// </summary>
     internal sealed class LibraryBrowseFolderSummary
     {
@@ -76,8 +76,8 @@ namespace PixelVaultNative
             PendingGameAssignment = pendingGameAssignment;
         }
 
-        /// <summary>Maps a projected folder row to a portable summary (no <see cref="MainWindow.LibraryBrowserFolderView.SearchBlob"/> — search stays client-side).</summary>
-        public static LibraryBrowseFolderSummary? FromFolderView(MainWindow.LibraryBrowserFolderView? view)
+        /// <summary>Maps a projected folder row to a portable summary (no <see cref="LibraryBrowserFolderView.SearchBlob"/> — search stays client-side).</summary>
+        public static LibraryBrowseFolderSummary? FromFolderView(LibraryBrowserFolderView? view)
         {
             if (view == null) return null;
             var labels = view.PlatformLabels == null ? Array.Empty<string>() : (string[])view.PlatformLabels.Clone();

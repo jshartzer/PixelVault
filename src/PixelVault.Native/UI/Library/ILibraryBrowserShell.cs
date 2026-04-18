@@ -46,12 +46,12 @@ namespace PixelVaultNative
         MainWindow.LibraryBrowserNavChrome BuildLibraryBrowserNavChrome();
         MainWindow.LibraryBrowserPaneRefs BuildLibraryBrowserContentPanes(Grid contentGrid);
 
-        LibraryFolderInfo BuildLibraryBrowserDisplayFolder(MainWindow.LibraryBrowserFolderView view);
-        LibraryFolderInfo GetLibraryBrowserPrimaryFolder(MainWindow.LibraryBrowserFolderView view);
+        LibraryFolderInfo BuildLibraryBrowserDisplayFolder(LibraryBrowserFolderView view);
+        LibraryFolderInfo GetLibraryBrowserPrimaryFolder(LibraryBrowserFolderView view);
 
         Func<List<string>> LibraryBrowserCreateVisibleDetailFilesOrdered(
             MainWindow.LibraryBrowserWorkingSet ws,
-            Func<MainWindow.LibraryBrowserFolderView, LibraryFolderInfo> getDisplayFolder);
+            Func<LibraryBrowserFolderView, LibraryFolderInfo> getDisplayFolder);
 
         Func<List<string>> LibraryBrowserCreateSelectedDetailFiles(
             MainWindow.LibraryBrowserWorkingSet ws,
@@ -84,8 +84,8 @@ namespace PixelVaultNative
         int NormalizeLibraryPhotoTileSizeValue(int value);
         int NormalizeLibraryPhotoGridColumnCountValue(int value);
         int NormalizeLibraryPhotoRailFolderGridColumnCountValue(int value);
-        List<LibraryFolderInfo> GetLibraryBrowserActionFolders(MainWindow.LibraryBrowserFolderView view);
-        string BuildLibraryBrowserActionScopeLabel(MainWindow.LibraryBrowserFolderView view);
+        List<LibraryFolderInfo> GetLibraryBrowserActionFolders(LibraryBrowserFolderView view);
+        string BuildLibraryBrowserActionScopeLabel(LibraryBrowserFolderView view);
         void LibrarySaveCustomCover(LibraryFolderInfo folder, string sourcePath);
         bool IsLibraryRasterImageFilePath(string path);
         void LibraryBrowserMountToastHost(Grid rootGrid, MainWindow.LibraryBrowserWorkingSet ws);
@@ -93,7 +93,7 @@ namespace PixelVaultNative
         void ShowLibraryBrowserKeyboardShortcutsHelp(Window owner);
         void ShowLibraryCommandPalette(Window owner, LibraryBrowserPaletteContext context, string initialSearch);
 
-        void LibraryBrowserShowAchievementsInfo(Window owner, MainWindow.LibraryBrowserFolderView view);
+        void LibraryBrowserShowAchievementsInfo(Window owner, LibraryBrowserFolderView view);
 
         void LibraryBrowserPaletteOpenSettings();
         void LibraryBrowserPaletteOpenHealthDashboard(Window owner);
@@ -113,8 +113,8 @@ namespace PixelVaultNative
             string filePath,
             Func<List<string>> getVisibleDetailFilesOrdered,
             Func<List<string>> getSelectedDetailFiles,
-            Func<MainWindow.LibraryBrowserFolderView, LibraryFolderInfo> getDisplayFolder,
-            Func<MainWindow.LibraryBrowserFolderView, LibraryFolderInfo> getActionFolder,
+            Func<LibraryBrowserFolderView, LibraryFolderInfo> getDisplayFolder,
+            Func<LibraryBrowserFolderView, LibraryFolderInfo> getActionFolder,
             Action<bool> refreshLibraryFoldersAsync);
 
         void LibraryBrowserDeleteSelectedCaptures(
@@ -138,7 +138,7 @@ namespace PixelVaultNative
             MainWindow.LibraryBrowserWorkingSet ws,
             MainWindow.LibraryBrowserPaneRefs panes,
             Window libraryWindow,
-            Action<MainWindow.LibraryBrowserFolderView> showFolder,
+            Action<LibraryBrowserFolderView> showFolder,
             Action renderTiles,
             Action<List<LibraryFolderInfo>, string, bool, bool, bool> runScopedCoverRefresh,
             Action<string> libraryToast,
@@ -148,37 +148,37 @@ namespace PixelVaultNative
             MainWindow.LibraryBrowserWorkingSet ws,
             MainWindow.LibraryBrowserPaneRefs panes,
             Window libraryWindow,
-            MainWindow.LibraryBrowserFolderView info);
+            LibraryBrowserFolderView info);
 
         System.Windows.FrameworkElement LibraryBrowserBuildFolderTile(
-            MainWindow.LibraryBrowserFolderView folder,
+            LibraryBrowserFolderView folder,
             int tileWidth,
             int tileHeight,
             bool showPlatformBadge,
-            Action<MainWindow.LibraryBrowserFolderView> showFolder,
+            Action<LibraryBrowserFolderView> showFolder,
             Action renderTiles,
             Action<bool> refreshLibraryFoldersAsync,
             Action<List<LibraryFolderInfo>, string, bool, bool, bool> runScopedCoverRefresh,
-            Action<MainWindow.LibraryBrowserFolderView> openLibraryMetadataEditor,
+            Action<LibraryBrowserFolderView> openLibraryMetadataEditor,
             Action<string> libraryToast,
             MainWindow.LibraryBrowserWorkingSet ws);
 
         void LibraryBrowserExitPhotoWorkspace(MainWindow.LibraryBrowserWorkingSet ws, Action renderTiles);
 
         /// <summary>Enter Photo workspace using <see cref="MainWindow.LibraryBrowserWorkingSet.Current"/> if valid.</summary>
-        void LibraryBrowserEnterPhotoWorkspaceFromSelection(MainWindow.LibraryBrowserWorkingSet ws, Action<MainWindow.LibraryBrowserFolderView> showFolder);
+        void LibraryBrowserEnterPhotoWorkspaceFromSelection(MainWindow.LibraryBrowserWorkingSet ws, Action<LibraryBrowserFolderView> showFolder);
 
         void LibraryBrowserShowSelectedFolder(
             MainWindow.LibraryBrowserWorkingSet ws,
             MainWindow.LibraryBrowserPaneRefs panes,
             Window libraryWindow,
-            MainWindow.LibraryBrowserFolderView info,
+            LibraryBrowserFolderView info,
             Action renderSelectedFolder);
 
         void LibraryBrowserRenderFolderList(
             MainWindow.LibraryBrowserWorkingSet ws,
-            Func<MainWindow.LibraryBrowserFolderView, int, int, bool, System.Windows.FrameworkElement> buildFolderTile,
-            Action<MainWindow.LibraryBrowserFolderView> showFolder,
+            Func<LibraryBrowserFolderView, int, int, bool, System.Windows.FrameworkElement> buildFolderTile,
+            Action<LibraryBrowserFolderView> showFolder,
             Action renderSelectedFolder,
             Action selfRerender,
             Action clearLibrarySearchAndRerender,
@@ -189,9 +189,9 @@ namespace PixelVaultNative
         void LibraryBrowserRefreshFolderSelectionFromDisk(
             MainWindow.LibraryBrowserWorkingSet ws,
             MainWindow.LibraryBrowserPaneRefs panes,
-            MainWindow.LibraryBrowserFolderView targetFolder,
+            LibraryBrowserFolderView targetFolder,
             Action<bool> refreshLibraryFoldersAsync,
-            Action<MainWindow.LibraryBrowserFolderView> showFolder);
+            Action<LibraryBrowserFolderView> showFolder);
 
         void LibraryBrowserRunFolderMetadataScan(
             Window libraryWindow,
@@ -229,8 +229,8 @@ namespace PixelVaultNative
 
         void LibraryBrowserOpenLibraryMetadataForFolder(
             MainWindow.LibraryBrowserWorkingSet ws,
-            MainWindow.LibraryBrowserFolderView focusFolder,
-            Action<MainWindow.LibraryBrowserFolderView> showFolder,
+            LibraryBrowserFolderView focusFolder,
+            Action<LibraryBrowserFolderView> showFolder,
             Action refreshDetailSelectionUi,
             Action openMetadataForCurrentSelection);
 

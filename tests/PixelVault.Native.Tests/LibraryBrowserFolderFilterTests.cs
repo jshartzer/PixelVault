@@ -10,27 +10,27 @@ public sealed class LibraryBrowserFolderFilterTests
     [Fact]
     public void MatchesFilter_All_AlwaysTrue()
     {
-        var f = new MainWindow.LibraryBrowserFolderView { PrimaryPlatformLabel = "Xbox", FileCount = 1 };
+        var f = new LibraryBrowserFolderView { PrimaryPlatformLabel = "Xbox", FileCount = 1 };
         Assert.True(MainWindow.LibraryBrowserFolderViewMatchesFilter("all", f, Norm));
     }
 
     [Fact]
     public void MatchesFilter_MissingId_WhenGameIndexIdBlank()
     {
-        var noId = new MainWindow.LibraryBrowserFolderView { GameId = "", FileCount = 1 };
+        var noId = new LibraryBrowserFolderView { GameId = "", FileCount = 1 };
         Assert.True(MainWindow.LibraryBrowserFolderViewMatchesFilter("missingid", noId, Norm));
 
-        var hasIdNoStid = new MainWindow.LibraryBrowserFolderView { GameId = "abc-123", FileCount = 1 };
+        var hasIdNoStid = new LibraryBrowserFolderView { GameId = "abc-123", FileCount = 1 };
         Assert.True(MainWindow.LibraryBrowserFolderViewMatchesFilter("missingid", hasIdNoStid, Norm));
 
-        var hasIdWithStid = new MainWindow.LibraryBrowserFolderView { GameId = "abc-123", SteamGridDbId = "5528", FileCount = 1 };
+        var hasIdWithStid = new LibraryBrowserFolderView { GameId = "abc-123", SteamGridDbId = "5528", FileCount = 1 };
         Assert.False(MainWindow.LibraryBrowserFolderViewMatchesFilter("missingid", hasIdWithStid, Norm));
     }
 
     [Fact]
     public void MatchesFilter_MissingId_WhenSteamTagged_AndSteamAppBlank()
     {
-        var steamNoApp = new MainWindow.LibraryBrowserFolderView
+        var steamNoApp = new LibraryBrowserFolderView
         {
             PrimaryPlatformLabel = "Steam",
             SteamAppId = "",
@@ -40,7 +40,7 @@ public sealed class LibraryBrowserFolderFilterTests
         };
         Assert.True(MainWindow.LibraryBrowserFolderViewMatchesFilter("missingid", steamNoApp, Norm));
 
-        var steamWithApp = new MainWindow.LibraryBrowserFolderView
+        var steamWithApp = new LibraryBrowserFolderView
         {
             PrimaryPlatformLabel = "Steam",
             SteamAppId = "123",
@@ -54,7 +54,7 @@ public sealed class LibraryBrowserFolderFilterTests
     [Fact]
     public void MatchesFilter_MissingId_WhenSteamTagged_AndSteamGridBlank()
     {
-        var steamNoGrid = new MainWindow.LibraryBrowserFolderView
+        var steamNoGrid = new LibraryBrowserFolderView
         {
             PrimaryPlatformLabel = "Steam",
             SteamGridDbId = "",
@@ -64,7 +64,7 @@ public sealed class LibraryBrowserFolderFilterTests
         };
         Assert.True(MainWindow.LibraryBrowserFolderViewMatchesFilter("missingid", steamNoGrid, Norm));
 
-        var steamWithGrid = new MainWindow.LibraryBrowserFolderView
+        var steamWithGrid = new LibraryBrowserFolderView
         {
             PrimaryPlatformLabel = "Steam",
             SteamGridDbId = "5528",
@@ -78,7 +78,7 @@ public sealed class LibraryBrowserFolderFilterTests
     [Fact]
     public void MatchesFilter_MissingId_NonSteam_RequiresStid_NotSteamAppId()
     {
-        var xboxMissingStid = new MainWindow.LibraryBrowserFolderView
+        var xboxMissingStid = new LibraryBrowserFolderView
         {
             PrimaryPlatformLabel = "Xbox",
             SteamAppId = "",
@@ -88,7 +88,7 @@ public sealed class LibraryBrowserFolderFilterTests
         };
         Assert.True(MainWindow.LibraryBrowserFolderViewMatchesFilter("missingid", xboxMissingStid, Norm));
 
-        var xboxComplete = new MainWindow.LibraryBrowserFolderView
+        var xboxComplete = new LibraryBrowserFolderView
         {
             PrimaryPlatformLabel = "Xbox",
             SteamAppId = "",
@@ -102,7 +102,7 @@ public sealed class LibraryBrowserFolderFilterTests
     [Fact]
     public void MatchesFilter_MissingId_WhenEmulationTagged_AndRetroAchievementsBlank()
     {
-        var emuNoRa = new MainWindow.LibraryBrowserFolderView
+        var emuNoRa = new LibraryBrowserFolderView
         {
             PrimaryPlatformLabel = "Emulation",
             SteamAppId = "",
@@ -113,7 +113,7 @@ public sealed class LibraryBrowserFolderFilterTests
         };
         Assert.True(MainWindow.LibraryBrowserFolderViewMatchesFilter("missingid", emuNoRa, Norm));
 
-        var emuWithRa = new MainWindow.LibraryBrowserFolderView
+        var emuWithRa = new LibraryBrowserFolderView
         {
             PrimaryPlatformLabel = "Emulation",
             SteamAppId = "",
@@ -128,7 +128,7 @@ public sealed class LibraryBrowserFolderFilterTests
     [Fact]
     public void MatchesFilter_MissingNonSteamId_WhenEmulationTagged_AndShortcutIdBlank()
     {
-        var emuNoShortcutId = new MainWindow.LibraryBrowserFolderView
+        var emuNoShortcutId = new LibraryBrowserFolderView
         {
             PrimaryPlatformLabel = "Emulation",
             NonSteamId = "",
@@ -139,7 +139,7 @@ public sealed class LibraryBrowserFolderFilterTests
         };
         Assert.True(MainWindow.LibraryBrowserFolderViewMatchesFilter("missingnonsteamid", emuNoShortcutId, Norm));
 
-        var emuWithShortcutId = new MainWindow.LibraryBrowserFolderView
+        var emuWithShortcutId = new LibraryBrowserFolderView
         {
             PrimaryPlatformLabel = "Emulation",
             NonSteamId = "16245548604121415680",
@@ -154,10 +154,10 @@ public sealed class LibraryBrowserFolderFilterTests
     [Fact]
     public void MatchesFilter_NoCover_UsesPreviewPathOnly()
     {
-        var noPath = new MainWindow.LibraryBrowserFolderView { PreviewImagePath = "" };
+        var noPath = new LibraryBrowserFolderView { PreviewImagePath = "" };
         Assert.True(MainWindow.LibraryBrowserFolderViewMatchesFilter("nocover", noPath, Norm));
 
-        var hasPath = new MainWindow.LibraryBrowserFolderView { PreviewImagePath = @"D:\a.png" };
+        var hasPath = new LibraryBrowserFolderView { PreviewImagePath = @"D:\a.png" };
         Assert.False(MainWindow.LibraryBrowserFolderViewMatchesFilter("nocover", hasPath, Norm));
     }
 }

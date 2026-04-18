@@ -10,37 +10,10 @@ namespace PixelVaultNative
         long _libraryBrowserAllMergeProjectionFingerprint = long.MinValue;
         List<LibraryBrowserFolderView> _libraryBrowserAllMergeProjection;
 
-        internal sealed class LibraryBrowserFolderView
-        {
-            internal string ViewKey;
-            internal string GameId;
-            internal string Name;
-            internal string PrimaryFolderPath;
-            internal LibraryFolderInfo PrimaryFolder;
-            internal readonly List<LibraryFolderInfo> SourceFolders = new List<LibraryFolderInfo>();
-            internal string PrimaryPlatformLabel;
-            internal string[] PlatformLabels = new string[0];
-            internal string PlatformSummaryText;
-            internal int FileCount;
-            internal string PreviewImagePath;
-            internal string[] FilePaths = new string[0];
-            internal long NewestCaptureUtcTicks;
-            internal long NewestRecentSortUtcTicks;
-            internal string SteamAppId;
-            internal string NonSteamId;
-            internal string SteamGridDbId;
-            internal string RetroAchievementsGameId;
-            internal string CollectionNotes;
-            internal bool SuppressSteamAppIdAutoResolve;
-            internal bool SuppressSteamGridDbIdAutoResolve;
-            internal bool IsCompleted100Percent;
-            internal long CompletedUtcTicks;
-            internal bool IsMergedAcrossPlatforms;
-            internal bool IsTimelineProjection;
-            internal bool PendingGameAssignment;
-            /// <summary>Lowercase, newline-separated tokens for library search (name, paths, ids, platforms).</summary>
-            internal string SearchBlob;
-        }
+        // PV-PLN-UI-001 Step 13 Pass A: LibraryBrowserFolderView moved to
+        // UI/Library/LibraryBrowserFolderView.cs (top-level internal sealed class) so plain
+        // classes (LibraryBrowseFolderSummary, ILibraryBrowserShell, tests, future iOS/backend
+        // projections) can reach it without going through MainWindow.
 
         LibraryBrowserFolderView CloneLibraryBrowserFolderView(LibraryBrowserFolderView view)
         {

@@ -10,7 +10,7 @@ public sealed class LibraryBrowseFolderSummaryTests
     [Fact]
     public void FromFolderView_Copies_Core_Fields()
     {
-        var view = new MainWindow.LibraryBrowserFolderView
+        var view = new LibraryBrowserFolderView
         {
             ViewKey = "vk1",
             GameId = "game-1",
@@ -58,7 +58,7 @@ public sealed class LibraryBrowseFolderSummaryTests
     [Fact]
     public void MatchesFilter_MissingId_Includes_PendingGameAssignment_Even_With_GameId()
     {
-        var view = new MainWindow.LibraryBrowserFolderView
+        var view = new LibraryBrowserFolderView
         {
             GameId = "G00001",
             PrimaryPlatformLabel = "Steam",
@@ -83,7 +83,7 @@ public sealed class LibraryBrowseFolderSummaryTests
     public void FromFolderView_Clones_PlatformLabels()
     {
         var labels = new[] { "PS5" };
-        var view = new MainWindow.LibraryBrowserFolderView { PlatformLabels = labels };
+        var view = new LibraryBrowserFolderView { PlatformLabels = labels };
         var s = LibraryBrowseFolderSummary.FromFolderView(view);
         Assert.NotNull(s);
         labels[0] = "Xbox";
@@ -95,9 +95,9 @@ public sealed class LibraryBrowseFolderSummaryTests
     {
         var cases = new[]
         {
-            new MainWindow.LibraryBrowserFolderView { PrimaryPlatformLabel = "Xbox", FileCount = 1 },
-            new MainWindow.LibraryBrowserFolderView { GameId = "", FileCount = 1 },
-            new MainWindow.LibraryBrowserFolderView
+            new LibraryBrowserFolderView { PrimaryPlatformLabel = "Xbox", FileCount = 1 },
+            new LibraryBrowserFolderView { GameId = "", FileCount = 1 },
+            new LibraryBrowserFolderView
             {
                 PrimaryPlatformLabel = "Steam",
                 SteamAppId = "",
@@ -105,7 +105,7 @@ public sealed class LibraryBrowseFolderSummaryTests
                 GameId = "g",
                 PlatformLabels = new[] { "Steam" }
             },
-            new MainWindow.LibraryBrowserFolderView
+            new LibraryBrowserFolderView
             {
                 PrimaryPlatformLabel = "Emulation",
                 NonSteamId = "",
@@ -114,9 +114,9 @@ public sealed class LibraryBrowseFolderSummaryTests
                 GameId = "g",
                 PlatformLabels = new[] { "Emulation" }
             },
-            new MainWindow.LibraryBrowserFolderView { IsCompleted100Percent = true, FileCount = 1 },
-            new MainWindow.LibraryBrowserFolderView { FileCount = 30, PlatformLabels = new[] { "PC" } },
-            new MainWindow.LibraryBrowserFolderView { PreviewImagePath = "", FileCount = 1 }
+            new LibraryBrowserFolderView { IsCompleted100Percent = true, FileCount = 1 },
+            new LibraryBrowserFolderView { FileCount = 30, PlatformLabels = new[] { "PC" } },
+            new LibraryBrowserFolderView { PreviewImagePath = "", FileCount = 1 }
         };
         var modes = new[] { "all", "missingid", "missingnonsteamid", "completed", "large", "nocover", "crossplatform" };
         foreach (var view in cases)
@@ -140,14 +140,14 @@ public sealed class LibraryBrowseFolderSummaryTests
     [Fact]
     public void IsSteamTagged_Primary_Or_Label()
     {
-        var primary = new MainWindow.LibraryBrowserFolderView
+        var primary = new LibraryBrowserFolderView
         {
             PrimaryPlatformLabel = "Steam",
             PlatformLabels = new[] { "PC" }
         };
         Assert.True(LibraryBrowseFolderSummary.IsSteamTagged(LibraryBrowseFolderSummary.FromFolderView(primary), Norm));
 
-        var labelOnly = new MainWindow.LibraryBrowserFolderView
+        var labelOnly = new LibraryBrowserFolderView
         {
             PrimaryPlatformLabel = "Xbox",
             PlatformLabels = new[] { "Steam" }
@@ -160,14 +160,14 @@ public sealed class LibraryBrowseFolderSummaryTests
     [Fact]
     public void IsEmulationTagged_Primary_Or_Label()
     {
-        var primary = new MainWindow.LibraryBrowserFolderView
+        var primary = new LibraryBrowserFolderView
         {
             PrimaryPlatformLabel = "Emulation",
             PlatformLabels = new[] { "PC" }
         };
         Assert.True(LibraryBrowseFolderSummary.IsEmulationTagged(LibraryBrowseFolderSummary.FromFolderView(primary), Norm));
 
-        var labelOnly = new MainWindow.LibraryBrowserFolderView
+        var labelOnly = new LibraryBrowserFolderView
         {
             PrimaryPlatformLabel = "Xbox",
             PlatformLabels = new[] { "Emulation" }

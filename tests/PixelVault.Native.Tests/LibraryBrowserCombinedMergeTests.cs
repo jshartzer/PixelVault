@@ -54,7 +54,7 @@ public sealed class LibraryBrowserCombinedMergeTests
     [Fact]
     public void MissingId_FilterFalse_OnMergedRow_WhenAllIdsPresent()
     {
-        var merged = new MainWindow.LibraryBrowserFolderView
+        var merged = new LibraryBrowserFolderView
         {
             PrimaryPlatformLabel = "Xbox",
             SteamAppId = "2050650",
@@ -69,7 +69,7 @@ public sealed class LibraryBrowserCombinedMergeTests
     [Fact]
     public void MissingId_FilterTrue_OnMergedRow_WhenGameIdStillMissing()
     {
-        var merged = new MainWindow.LibraryBrowserFolderView
+        var merged = new LibraryBrowserFolderView
         {
             PrimaryPlatformLabel = "Xbox",
             SteamAppId = "2050650",
@@ -84,7 +84,7 @@ public sealed class LibraryBrowserCombinedMergeTests
     [Fact]
     public void MissingId_FilterTrue_OnMergedRow_WhenEmulationTagged_AndRetroAchievementsMissing()
     {
-        var merged = new MainWindow.LibraryBrowserFolderView
+        var merged = new LibraryBrowserFolderView
         {
             PrimaryPlatformLabel = "Emulation",
             SteamAppId = "",
