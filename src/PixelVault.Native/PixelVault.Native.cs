@@ -525,116 +525,49 @@ namespace PixelVaultNative
         // PV-PLN-UI-001 Step 8 Pass A: Steam / SteamGridDB / cover resolution block (GetGameNameFromFileName
         // through UpdateCachedLibraryFolderInfo) moved to UI/Library/MainWindow.LibraryCoverResolution.cs.
 
-        string PrimaryPlatformLabel(string file)
-        {
-            return ParseFilename(file).PlatformLabel;
-        }
+        // PV-PLN-UI-001 Step 12: platform-label helpers live in UI/Library/LibraryPlatformLabels.cs.
+        // Keep the `(string file)` instance overloads as one-line forwarders so the ~a dozen call
+        // sites across partials (ManualMetadata.Helpers, ManualMetadata, IntakePreview, MetadataReview,
+        // LibraryBrowserViewModel, LibraryBrowserRender.FolderList, LibraryBrowserOrchestrator.FolderTile,
+        // LibraryBrowserQuickEditDrawer, and method-group captures in IntakePreview / MetadataReview)
+        // keep resolving without touching `FilenameParseResult` at every caller.
+        string PrimaryPlatformLabel(string file) => LibraryPlatformLabels.PrimaryPlatformLabel(ParseFilename(file));
+        string FilenameGuessLabel(string file) => LibraryPlatformLabels.FilenameGuessLabel(ParseFilename(file));
+        bool IsSteamManualExportWithoutAppId(string file) => LibraryPlatformLabels.IsSteamManualExportWithoutAppId(ParseFilename(file));
+        int PlatformGroupOrder(string label) => LibraryPlatformLabels.PlatformGroupOrder(label);
+        Brush PreviewBadgeBrush(string label) => LibraryPlatformLabels.PreviewBadgeBrush(label);
 
-        string FilenameGuessLabel(string file)
-        {
-            var parsed = ParseFilename(file);
-            var appId = parsed.SteamAppId;
-            if (!string.IsNullOrWhiteSpace(appId)) return "Steam AppID " + appId;
-            var nonSteamId = parsed.NonSteamId;
-            if (!string.IsNullOrWhiteSpace(nonSteamId)) return "Non-Steam ID " + nonSteamId;
-            if (parsed.RoutesToManualWhenMissingSteamAppId) return "Steam export | AppID needed";
-            var label = parsed.PlatformLabel;
-            return string.Equals(label, "Other", StringComparison.OrdinalIgnoreCase) ? "No confident match" : label;
-        }
+        // PV-PLN-UI-001 Step 12: pure text / path / media-type helpers live in
+        // Infrastructure/TextAndPathHelpers.cs. These `MainWindow.X` static forwarders preserve the
+        // public surface other classes reference (e.g. `MainWindow.CleanTag`, `MainWindow.IsImage`,
+        // `MainWindow.Sanitize`, `MainWindow.ParseTagText`, `MainWindow.Unique`, `MainWindow.EnsureDir`,
+        // `MainWindow.IsVideo` — hit by StartupInitialization, IndexServicesWiring, LibraryScanner,
+        // GameIndexCore, LibraryWorkspaceContext, LibraryBrowserShellBridge, LibraryScannerBridge).
+        // Keep them one-liners; don't grow.
+        static int ParseInt(string value) => TextAndPathHelpers.ParseInt(value);
+        static long ParseLong(string value) => TextAndPathHelpers.ParseLong(value);
+        static string FormatFriendlyTimestamp(DateTime value) => TextAndPathHelpers.FormatFriendlyTimestamp(value);
+        static string Sanitize(string s) => TextAndPathHelpers.Sanitize(s);
+        static string CleanComment(string s) => TextAndPathHelpers.CleanComment(s);
+        internal static string CleanTag(string s) => TextAndPathHelpers.CleanTag(s);
+        static string[] ParseTagText(string s) => TextAndPathHelpers.ParseTagText(s);
+        static bool SameManualText(string left, string right) => TextAndPathHelpers.SameManualText(left, right);
+        static string Unique(string path) => TextAndPathHelpers.Unique(path);
+        static void EnsureDir(string path, string label) => TextAndPathHelpers.EnsureDir(path, label);
+        internal static bool IsImage(string p) => TextAndPathHelpers.IsImage(p);
+        static bool IsPngOrJpeg(string p) => TextAndPathHelpers.IsPngOrJpeg(p);
+        static bool IsVideo(string p) => TextAndPathHelpers.IsVideo(p);
+        static bool IsMedia(string p) => TextAndPathHelpers.IsMedia(p);
+        static string Quote(string s) => TextAndPathHelpers.Quote(s);
 
-        bool IsSteamManualExportWithoutAppId(string file)
-        {
-            var parsed = ParseFilename(file);
-            return parsed.RoutesToManualWhenMissingSteamAppId
-                && string.IsNullOrWhiteSpace(parsed.SteamAppId)
-                && string.IsNullOrWhiteSpace(parsed.NonSteamId);
-        }
+        // GetLibraryDate stays as an instance forwarder so the method group captures in
+        // IntakeAnalysisService, LibraryMetadataEditing, PhotographyAndSteam, LibraryVirtualization,
+        // ImportWorkflow.Steps still resolve without rewiring.
+        DateTime GetLibraryDate(string file) => TextAndPathHelpers.GetLibraryDate(file, ParseFilename(file));
 
-        DateTime? ParseSteamManualExportCaptureDate(string file)
-        {
-            return IsSteamManualExportWithoutAppId(file) ? ParseFilename(file).CaptureTime : (DateTime?)null;
-        }
-
-        int PlatformGroupOrder(string label)
-        {
-            switch (label)
-            {
-                case "Steam": return 0;
-                case "Emulation": return 1;
-                case "PS5": return 2;
-                case "Xbox": return 3;
-                case "Xbox PC": return 4;
-                case "PC": return 5;
-                case "Multiple Tags": return 6;
-                case "Other": return 7;
-                default: return 8;
-            }
-        }
-
-        Brush PreviewBadgeBrush(string label)
-        {
-            switch (label)
-            {
-                case "Xbox": return Brush("#2E8B57");
-                case "Xbox PC": return Brush("#4D8F68");
-                case "Steam": return Brush("#2F6FDB");
-                case "Emulation": return Brush("#B26A3C");
-                case "PC": return Brush("#4F6D7A");
-                case "PS5": return Brush("#2563EB");
-                case "PlayStation": return Brush("#2563EB");
-                default: return Brush("#8B6F47");
-            }
-        }
-
-        static int ParseInt(string value) { int result; return int.TryParse(value, out result) ? result : 0; }
-        static long ParseLong(string value) { long result; return long.TryParse(value, out result) ? result : 0L; }
-        static string FormatFriendlyTimestamp(DateTime value)
-        {
-            int hour12 = value.Hour % 12;
-            if (hour12 == 0) hour12 = 12;
-            var suffix = value.Hour >= 12 ? "PM" : "AM";
-            return value.Year.ToString("0000") + "-" + value.Month.ToString("00") + "-" + value.Day.ToString("00") + " " + hour12 + ":" + value.Minute.ToString("00") + ":" + value.Second.ToString("00") + " " + suffix;
-        }
-        static string Sanitize(string s) { foreach (var c in Path.GetInvalidFileNameChars()) s = s.Replace(c, '-'); return Regex.Replace(s, "\\s+", " ").Trim(); }
-        static string CleanComment(string s) { return string.IsNullOrWhiteSpace(s) ? string.Empty : Regex.Replace(s.Replace("\r", " ").Replace("\n", " "), "\\s+", " ").Trim(); }
-        internal static string CleanTag(string s) { return string.IsNullOrWhiteSpace(s) ? string.Empty : Regex.Replace(s, "\\s+", " ").Trim(); }
-        static string[] ParseTagText(string s) { return (s ?? string.Empty).Split(new[] { ',', ';', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).Select(CleanTag).Where(t => !string.IsNullOrWhiteSpace(t)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray(); }
-        static bool SameManualText(string left, string right)
-        {
-            return string.Equals((left ?? string.Empty).Trim(), (right ?? string.Empty).Trim(), StringComparison.Ordinal);
-        }
-
-        static string Unique(string path) { if (!File.Exists(path)) return path; var dir = Path.GetDirectoryName(path); var name = Path.GetFileNameWithoutExtension(path); var ext = Path.GetExtension(path); int i = 2; string candidate; do { candidate = Path.Combine(dir, name + " (" + i + ")" + ext); i++; } while (File.Exists(candidate)); return candidate; }
-        static void EnsureDir(string path, string label) { if (string.IsNullOrWhiteSpace(path) || !Directory.Exists(path)) throw new InvalidOperationException(label + " not found: " + path); }
-        internal static bool IsImage(string p) { var e = Path.GetExtension(p).ToLowerInvariant(); return e == ".png" || e == ".jpg" || e == ".jpeg" || e == ".webp" || e == ".jxr"; }
-        static bool IsPngOrJpeg(string p) { var e = Path.GetExtension(p).ToLowerInvariant(); return e == ".png" || e == ".jpg" || e == ".jpeg"; }
-        static bool IsVideo(string p) { var e = Path.GetExtension(p).ToLowerInvariant(); return e == ".mp4" || e == ".mkv" || e == ".avi" || e == ".mov" || e == ".wmv" || e == ".webm"; }
-        static bool IsMedia(string p) { var e = Path.GetExtension(p).ToLowerInvariant(); return new[] { ".jpg", ".jpeg", ".png", ".webp", ".jxr", ".mp4", ".mkv", ".avi", ".mov", ".wmv", ".webm" }.Contains(e); }
-        static string Quote(string s) { return s.Contains(" ") ? "\"" + s.Replace("\"", "\\\"") + "\"" : s; }
-        DateTime GetLibraryDate(string file)
-        {
-            var parsed = ParseFilename(file);
-            var tags = parsed.PlatformTags ?? new string[0];
-            if (!tags.Contains("Xbox"))
-            {
-                if (parsed.CaptureTime.HasValue) return parsed.CaptureTime.Value;
-            }
-            var created = File.GetCreationTime(file);
-            var modified = File.GetLastWriteTime(file);
-            if (created == DateTime.MinValue) return modified;
-            if (modified == DateTime.MinValue) return created;
-            return created < modified ? created : modified;
-        }
-
-        DateTime? ParseCaptureDate(string file)
-        {
-            return ParseFilename(file).CaptureTime;
-        }
-
-        string SafeCacheName(string title) { return Regex.Replace(NormalizeTitle(title), @"\s+", "_"); }
-
-        string NormalizeTitle(string title) { title = WebUtility.HtmlDecode(title ?? string.Empty); title = title.Replace("â„¢", " ").Replace("Â®", " ").Replace("Â©", " ").Replace("_", " ").Replace("-", " ").Replace(":", " "); title = Regex.Replace(title, @"[^\p{L}\p{Nd}]+", " "); return Regex.Replace(title, @"\s+", " ").Trim().ToLowerInvariant(); }
-        string StripTags(string html) { return Regex.Replace(html ?? string.Empty, "<.*?>", string.Empty); }
+        string SafeCacheName(string title) => TextAndPathHelpers.SafeCacheName(title);
+        string NormalizeTitle(string title) => TextAndPathHelpers.NormalizeTitle(title);
+        string StripTags(string html) => TextAndPathHelpers.StripTags(html);
 
         // PV-PLN-UI-001 Step 11: persistent-data migration + open-folder glue live in
         // Infrastructure/PersistentDataMigrator.cs. These thin instance forwarders exist so

@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <Compile Include="Infrastructure\PersistentDataMigrator.cs" />
+    <Compile Include="Infrastructure\TextAndPathHelpers.cs" />
     <Compile Include="Infrastructure\TimeoutWebClient.cs" />
     <Compile Include="Infrastructure\TroubleshootingLog.cs" />
     <Compile Include="Indexing\GameIndexCore.cs" />
@@ -105,6 +106,7 @@
     <Compile Include="UI\Settings\SettingsShellHost.cs" />
     <Compile Include="UI\Settings\MainWindow.SettingsPersistence.cs" />
     <Compile Include="UI\Library\LibraryButtonChrome.cs" />
+    <Compile Include="UI\Library\LibraryPlatformLabels.cs" />
     <Compile Include="UI\Library\LibraryWorkspaceContext.cs" />
     <Compile Include="UI\Library\LibraryWorkspaceMode.cs" />
     <Compile Include="UI\Library\ILibraryBrowserShell.cs" />
