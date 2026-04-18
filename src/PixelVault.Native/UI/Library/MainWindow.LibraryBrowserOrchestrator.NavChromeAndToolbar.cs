@@ -43,7 +43,24 @@ namespace PixelVaultNative
             {
                 if (refreshLibraryFoldersAsync != null) refreshLibraryFoldersAsync(false);
             };
-            navChrome.SettingsButton.Click += delegate { ShowSettingsWindow(); if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge(); };
+            navChrome.SettingsButton.Click += delegate
+            {
+                var settingsItem = new MenuItem { Header = "Settings..." };
+                settingsItem.Click += delegate
+                {
+                    ShowSettingsWindow();
+                    if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge();
+                };
+
+                var exportStarredItem = new MenuItem
+                {
+                    Header = "Export Starred",
+                    IsEnabled = navChrome.ExportStarredButton == null || navChrome.ExportStarredButton.IsEnabled
+                };
+                exportStarredItem.Click += delegate { ExportStarredLibraryCapturesToFolder(libraryWindow); };
+
+                OpenLibraryButtonMenu(navChrome.SettingsButton, settingsItem, exportStarredItem);
+            };
             navChrome.GameIndexButton.Click += delegate { OpenGameIndexEditor(); };
             navChrome.PhotoIndexButton.Click += delegate { OpenPhotoIndexEditor(); };
             navChrome.PhotographyGalleryButton.Click += delegate { ShowPhotographyGallery(libraryWindow); };

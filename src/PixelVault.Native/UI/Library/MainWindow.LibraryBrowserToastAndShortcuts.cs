@@ -211,7 +211,7 @@ namespace PixelVaultNative
             AddRow("Ctrl + Shift + E", "Toggle quick edit panel (side drawer)");
             AddRow("Ctrl + Shift + P", "Command palette (library tools, sort, filter, import)");
             AddRow("⋯ (footer)", "Open command palette (same as Ctrl+Shift+P)");
-            AddRow("—", "Export Starred (toolbar): copy starred captures to the folder in Path Settings");
+            AddRow("—", "Export Starred (Settings menu): copy starred captures to the folder in Path Settings");
             AddRow("Enter", "Apply library search (search box)");
             AddRow("Ctrl + click", "Add or remove a capture from the selection");
             AddRow("Shift + click", "Select a range of captures from the anchor");

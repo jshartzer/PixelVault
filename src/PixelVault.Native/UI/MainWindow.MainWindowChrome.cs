@@ -82,6 +82,18 @@ namespace PixelVaultNative
             });
             return row;
         }
+        object BuildToolbarIconButtonContent(string glyph, string iconHex = "#D8E4EA", double fontSize = 15)
+        {
+            return new Border
+            {
+                Width = 18,
+                Height = 18,
+                Background = Brushes.Transparent,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Child = BuildSymbolIcon(glyph, iconHex, fontSize)
+            };
+        }
         string IntakeBadgeCountText(int count)
         {
             if (count <= 0) return string.Empty;
