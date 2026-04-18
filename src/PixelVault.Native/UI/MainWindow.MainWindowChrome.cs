@@ -332,16 +332,20 @@ namespace PixelVaultNative
             switch (normalized)
             {
                 case "Steam":
-                    return ResolveWorkspaceAssetPath("Steam Library Icon.jpg");
+                    return ResolveWorkspaceAssetPath("Steam Library Icon.png");
                 case "PS5":
                 case "PlayStation":
                     return ResolveWorkspaceAssetPath("PS5 Library Logo.png");
+                case "Nintendo":
+                case "Switch":
+                    return ResolveWorkspaceAssetPath("Nintendo Library Icon.png");
                 case "Xbox":
                     return ResolveWorkspaceAssetPath("Xbox Library Logo.png");
                 case "Xbox PC":
                     return ResolveWorkspaceAssetPath("Xbox PC Library Icon.png");
                 case "PC":
-                    return ResolveWorkspaceAssetPath("PC Library Icon.jpg");
+                    return ResolveWorkspaceAssetPath("PC Library Icon.png");
+                case "Emulation":
                 case "Multiple Tags":
                 case "Other":
                     return ResolveWorkspaceAssetPath("emulator library licon.png");
@@ -358,17 +362,64 @@ namespace PixelVaultNative
                 case "PS5":
                 case "PlayStation":
                     return Brush("#4E7CFF");
+                case "Nintendo":
+                case "Switch":
+                    return Brush("#E94B43");
                 case "Xbox":
                     return Brush("#69B157");
                 case "Xbox PC":
                     return Brush("#5FA77A");
                 case "PC":
                     return Brush("#8DA0AF");
+                case "Emulation":
+                    return Brush("#B26A3C");
                 case "Multiple Tags":
                     return Brush("#D39B4A");
                 default:
                     return Brush("#B67ECF");
             }
+        }
+        FrameworkElement BuildLibraryPlatformIconVisual(string platformLabel, double size, Thickness margin, HorizontalAlignment horizontalAlignment = HorizontalAlignment.Center, VerticalAlignment verticalAlignment = VerticalAlignment.Center)
+        {
+            var resolvedLabel = NormalizeConsoleLabel(platformLabel);
+            if (string.IsNullOrWhiteSpace(resolvedLabel)) return null;
+            var iconPath = ResolveLibrarySectionIconPath(resolvedLabel);
+            var accent = LibrarySectionAccentBrush(resolvedLabel);
+            if (!string.IsNullOrWhiteSpace(iconPath))
+            {
+                return new Image
+                {
+                    Width = size,
+                    Height = size,
+                    Margin = margin,
+                    Source = LoadImageSource(iconPath, Math.Max(64, (int)Math.Ceiling(size * 2))),
+                    Stretch = Stretch.Uniform,
+                    HorizontalAlignment = horizontalAlignment,
+                    VerticalAlignment = verticalAlignment,
+                    SnapsToDevicePixels = true,
+                    IsHitTestVisible = false
+                };
+            }
+            return new Border
+            {
+                Width = size,
+                Height = size,
+                Margin = margin,
+                Background = Brushes.Transparent,
+                HorizontalAlignment = horizontalAlignment,
+                VerticalAlignment = verticalAlignment,
+                IsHitTestVisible = false,
+                Child = new TextBlock
+                {
+                    Text = resolvedLabel == "Multiple Tags" ? "+" : "•",
+                    FontSize = Math.Max(18, size * 0.5),
+                    FontWeight = FontWeights.Bold,
+                    Foreground = accent,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    TextAlignment = TextAlignment.Center
+                }
+            };
         }
         string LibrarySectionCountLabel(int count)
         {
@@ -379,44 +430,44 @@ namespace PixelVaultNative
             var normalized = NormalizeConsoleLabel(platformLabel);
             var iconPath = ResolveLibrarySectionIconPath(normalized);
             var accent = LibrarySectionAccentBrush(normalized);
-            var badge = new Border
-            {
-                Width = 34,
-                Height = 34,
-                CornerRadius = new CornerRadius(11),
-                Background = Brush("#F6FAFC"),
-                BorderBrush = accent,
-                BorderThickness = new Thickness(1.2),
-                Padding = new Thickness(5),
-                HorizontalAlignment = HorizontalAlignment.Right,
-                VerticalAlignment = VerticalAlignment.Bottom,
-                Margin = new Thickness(0, 0, 8, 8),
-                Opacity = 0.96
-            };
+            const double badgeSize = 68;
+            var badgeMargin = new Thickness(0, 0, 10, 10);
             if (!string.IsNullOrWhiteSpace(iconPath))
             {
-                badge.Child = new Image
+                return new Image
                 {
-                    Source = LoadImageSource(iconPath, 68),
+                    Width = badgeSize,
+                    Height = badgeSize,
+                    Source = LoadImageSource(iconPath, 136),
                     Stretch = Stretch.Uniform,
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Center
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    VerticalAlignment = VerticalAlignment.Bottom,
+                    Margin = badgeMargin,
+                    Opacity = 0.98,
+                    SnapsToDevicePixels = true,
+                    IsHitTestVisible = false
                 };
             }
-            else
+            return new Border
             {
-                badge.Child = new TextBlock
+                Width = badgeSize,
+                Height = badgeSize,
+                Background = Brushes.Transparent,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Bottom,
+                Margin = badgeMargin,
+                IsHitTestVisible = false,
+                Child = new TextBlock
                 {
                     Text = normalized == "Multiple Tags" ? "+" : "•",
-                    FontSize = 14,
+                    FontSize = 28,
                     FontWeight = FontWeights.Bold,
-                    Foreground = Brush("#1D2931"),
+                    Foreground = accent,
                     HorizontalAlignment = HorizontalAlignment.Center,
                     VerticalAlignment = VerticalAlignment.Center,
                     TextAlignment = TextAlignment.Center
-                };
-            }
-            return badge;
+                }
+            };
         }
         FrameworkElement BuildLibraryTileCompletionBadge(double targetHeight = 66, Thickness? margin = null)
         {
@@ -482,7 +533,6 @@ namespace PixelVaultNative
         {
             var resolvedLabel = NormalizeConsoleLabel(platformLabel);
             var accent = LibrarySectionAccentBrush(resolvedLabel);
-            var iconPath = ResolveLibrarySectionIconPath(resolvedLabel);
 
             var headerGrid = new Grid();
             headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -520,43 +570,12 @@ namespace PixelVaultNative
             }
             headerGrid.Children.Add(chevronHit);
 
-            var iconFrame = new Border
+            var iconVisual = BuildLibraryPlatformIconVisual(resolvedLabel, 34, new Thickness(0, 0, 10, 0));
+            if (iconVisual != null)
             {
-                Width = 56,
-                Height = 56,
-                Margin = new Thickness(0, 0, 14, 0),
-                Padding = new Thickness(10),
-                CornerRadius = new CornerRadius(16),
-                Background = Brush("#EEF3F6"),
-                BorderBrush = accent,
-                BorderThickness = new Thickness(1.5),
-                VerticalAlignment = VerticalAlignment.Center
-            };
-            if (!string.IsNullOrWhiteSpace(iconPath))
-            {
-                iconFrame.Child = new Image
-                {
-                    Source = LoadImageSource(iconPath, 112),
-                    Stretch = Stretch.Uniform,
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Center
-                };
+                Grid.SetColumn(iconVisual, 1);
+                headerGrid.Children.Add(iconVisual);
             }
-            else
-            {
-                iconFrame.Child = new TextBlock
-                {
-                    Text = resolvedLabel == "Multiple Tags" ? "+" : "•",
-                    FontSize = 22,
-                    FontWeight = FontWeights.Bold,
-                    Foreground = Brush("#1D2931"),
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Center,
-                    TextAlignment = TextAlignment.Center
-                };
-            }
-            Grid.SetColumn(iconFrame, 1);
-            headerGrid.Children.Add(iconFrame);
 
             var titleStack = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
             titleStack.Children.Add(new TextBlock

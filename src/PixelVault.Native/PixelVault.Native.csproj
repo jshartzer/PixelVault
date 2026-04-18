@@ -131,6 +131,7 @@
     <Compile Include="UI\Library\MainWindow.LibraryBrowserSessionPersistence.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserSplitLayout.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserPhotoHero.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryAssetPicker.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserRender.DetailPane.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserShowOrchestration.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserShellBridge.cs" />
@@ -174,9 +175,33 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="..\..\assets\Steam Library Icon.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>assets\Steam Library Icon.png</Link>
+    </None>
+    <None Include="..\..\assets\PS5 Library Logo.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>assets\PS5 Library Logo.png</Link>
+    </None>
+    <None Include="..\..\assets\Xbox Library Logo.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>assets\Xbox Library Logo.png</Link>
+    </None>
     <None Include="..\..\assets\Xbox PC Library Icon.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <Link>assets\Xbox PC Library Icon.png</Link>
+    </None>
+    <None Include="..\..\assets\PC Library Icon.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>assets\PC Library Icon.png</Link>
+    </None>
+    <None Include="..\..\assets\emulator library licon.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>assets\emulator library licon.png</Link>
+    </None>
+    <None Include="..\..\assets\Nintendo Library Icon.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>assets\Nintendo Library Icon.png</Link>
     </None>
   </ItemGroup>
 </Project>

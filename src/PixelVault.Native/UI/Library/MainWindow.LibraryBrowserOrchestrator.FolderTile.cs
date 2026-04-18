@@ -96,27 +96,35 @@ namespace PixelVaultNative
             if (string.IsNullOrWhiteSpace(resolvedLabel)) return null;
             var iconPath = ResolveLibrarySectionIconPath(resolvedLabel);
             var accent = LibrarySectionAccentBrush(resolvedLabel);
+            var iconSize = string.Equals(resolvedLabel, "PC", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(resolvedLabel, "Xbox PC", StringComparison.OrdinalIgnoreCase)
+                ? 20d
+                : 22d;
             var badge = new Border
             {
-                Width = 30,
-                Height = 30,
-                CornerRadius = new CornerRadius(10),
+                Width = 38,
+                Height = 38,
+                CornerRadius = new CornerRadius(11),
                 Background = Brush("#F6FAFC"),
                 BorderBrush = accent,
-                BorderThickness = new Thickness(1.1),
-                Padding = new Thickness(4),
-                Margin = new Thickness(0, 0, 6, 6),
+                BorderThickness = new Thickness(1.15),
+                Padding = new Thickness(5),
+                Margin = new Thickness(0),
                 HorizontalAlignment = HorizontalAlignment.Left,
-                VerticalAlignment = VerticalAlignment.Center
+                VerticalAlignment = VerticalAlignment.Center,
+                SnapsToDevicePixels = true
             };
             if (!string.IsNullOrWhiteSpace(iconPath))
             {
                 badge.Child = new Image
                 {
-                    Source = LoadImageSource(iconPath, 60),
+                    Width = iconSize,
+                    Height = iconSize,
+                    Source = LoadImageSource(iconPath, 64),
                     Stretch = Stretch.Uniform,
                     HorizontalAlignment = HorizontalAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Center
+                    VerticalAlignment = VerticalAlignment.Center,
+                    SnapsToDevicePixels = true
                 };
             }
             else
@@ -124,7 +132,7 @@ namespace PixelVaultNative
                 badge.Child = new TextBlock
                 {
                     Text = resolvedLabel == "Multiple Tags" ? "+" : "•",
-                    FontSize = 12,
+                    FontSize = 14,
                     FontWeight = FontWeights.Bold,
                     Foreground = Brush("#1D2931"),
                     HorizontalAlignment = HorizontalAlignment.Center,
@@ -199,7 +207,7 @@ namespace PixelVaultNative
                     Opacity = excluded ? 0.35 : 1,
                     Background = Brushes.Transparent,
                     Cursor = Cursors.Hand,
-                    Margin = new Thickness(0, 0, 6, 6),
+                    Margin = new Thickness(0, 0, 6, 0),
                     VerticalAlignment = VerticalAlignment.Center,
                     ToolTip = excluded ? "Show " + label + " captures" : "Hide " + label + " captures"
                 };
@@ -270,7 +278,7 @@ namespace PixelVaultNative
                 new CornerRadius(0),
                 Brushes.Transparent,
                 new Thickness(0)));
-            var overlayPadRight = showPlatformBadgeOnTile ? 48d : 10d;
+            var overlayPadRight = showPlatformBadgeOnTile ? 84d : 10d;
             var titleBlock = new TextBlock
             {
                 Text = folder.Name,
@@ -427,6 +435,20 @@ namespace PixelVaultNative
                 showFolder(folder);
                 runScopedCoverRefresh(actionFolders, BuildLibraryBrowserActionScopeLabel(folder), true, false, true);
             };
+            var chooseCoverItem = new MenuItem { Header = "Choose Cover...", IsEnabled = actionFolders.Count > 0 && HasSteamGridDbApiToken() };
+            chooseCoverItem.Click += async delegate
+            {
+                await ChooseLibraryAssetFromSteamGridDbAsync(
+                    Window.GetWindow(tile) ?? this,
+                    folder,
+                    actionFolder,
+                    actionFolders,
+                    LibraryAssetPickerKind.Cover,
+                    showFolder,
+                    renderTiles,
+                    null,
+                    libraryToast).ConfigureAwait(true);
+            };
             contextMenu.Items.Add(openFolderItem);
             contextMenu.Items.Add(copyFolderPathItem);
             contextMenu.Items.Add(editMetadataItem);
@@ -436,6 +458,7 @@ namespace PixelVaultNative
             contextMenu.Items.Add(refreshThisFolderItem);
             contextMenu.Items.Add(reloadLibraryListItem);
             contextMenu.Items.Add(fetchFolderCoverItem);
+            contextMenu.Items.Add(chooseCoverItem);
             contextMenu.Items.Add(new Separator());
             contextMenu.Items.Add(openMyCoversItem);
             contextMenu.Items.Add(setCoverItem);

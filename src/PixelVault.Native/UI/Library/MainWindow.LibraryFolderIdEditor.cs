@@ -11,7 +11,7 @@ namespace PixelVaultNative
 {
     public sealed partial class MainWindow
     {
-        void OpenLibraryFolderIdEditor(LibraryFolderInfo folder, Action refreshLibrary)
+        void OpenLibraryFolderIdEditor(LibraryFolderInfo folder, Action refreshLibrary, Window owner = null)
         {
             if (folder == null)
             {
@@ -70,7 +70,7 @@ namespace PixelVaultNative
                 Height = 590,
                 MinWidth = 540,
                 MinHeight = 560,
-                Owner = this,
+                Owner = owner ?? this,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
                 Background = Brush("#F3EEE4"),
                 ResizeMode = ResizeMode.NoResize

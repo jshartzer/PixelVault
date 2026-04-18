@@ -55,7 +55,7 @@ namespace PixelVaultNative
         public bool TroubleshootingLogRedactPaths;
         /// <summary>When true, double-click a still image in the library detail grid (or use its context menu) to set that file as the folder custom cover.</summary>
         public bool LibraryDoubleClickSetsFolderCover;
-        /// <summary>When true, the next successful library folder load clears auto-cached hero banner files (<c>hero-*</c>) for loaded titles so captures view can re-download with the current SteamGridDB/Steam pipeline. Custom banners are untouched.</summary>
+        /// <summary>When true, the next successful library folder load clears auto-cached hero banner files (<c>hero-*</c>) for loaded titles so captures view can re-download with the current SteamGridDB/Steam pipeline. Custom banners/logos are untouched.</summary>
         public bool LibraryRefreshHeroBannerCacheOnNextLibraryOpen;
 
         /// <summary>Watch configured source folders and run background import for eligible files (custom rules with trusted match, or built-ins when full auto metadata applies).</summary>

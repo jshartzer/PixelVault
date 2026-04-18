@@ -83,6 +83,12 @@ sealed class StubCoverService : ICoverService
 
     public void ClearCustomHero(LibraryFolderInfo folder) { }
 
+    public string CustomLogoPath(LibraryFolderInfo folder) => null;
+
+    public void SaveCustomLogo(LibraryFolderInfo folder, string sourcePath) { }
+
+    public void ClearCustomLogo(LibraryFolderInfo folder) { }
+
     public string CachedHeroPath(string title) => null;
 
     public string CachedLogoPath(string title) => null;
@@ -90,6 +96,14 @@ sealed class StubCoverService : ICoverService
     public void PurgeCachedHeroDownloads(string title) { }
 
     public void PurgeCachedLogoDownloads(string title) { }
+
+    public Task<List<SteamGridDbAssetChoice>> GetSteamGridDbCoverChoicesAsync(string steamGridDbId, CancellationToken cancellationToken = default) => Task.FromResult(new List<SteamGridDbAssetChoice>());
+
+    public Task<List<SteamGridDbAssetChoice>> GetSteamGridDbHeroChoicesAsync(string steamGridDbId, CancellationToken cancellationToken = default) => Task.FromResult(new List<SteamGridDbAssetChoice>());
+
+    public Task<List<SteamGridDbAssetChoice>> GetSteamGridDbLogoChoicesAsync(string steamGridDbId, CancellationToken cancellationToken = default) => Task.FromResult(new List<SteamGridDbAssetChoice>());
+
+    public Task<List<SteamGridDbAssetChoice>> GetSteamGridDbIconChoicesAsync(string steamGridDbId, CancellationToken cancellationToken = default) => Task.FromResult(new List<SteamGridDbAssetChoice>());
 
     public Task<string> TryDownloadSteamGridDbHeroAsync(string title, string steamGridDbId, CancellationToken cancellationToken = default) => Task.FromResult<string>(null);
 

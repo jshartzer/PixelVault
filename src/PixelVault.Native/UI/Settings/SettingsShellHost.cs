@@ -536,7 +536,7 @@ namespace PixelVaultNative
                 Foreground = textPrimary
             };
             refreshHeroBannerCacheBox.ToolTip =
-                "Removes auto-downloaded wide banner and logo files under My Covers (hero-* / logo-*). Custom banners you set are not deleted. "
+                "Removes auto-downloaded wide banner and logo files under My Covers (hero-* / logo-*). Custom banners or logos you set are not deleted. "
                 + "After the library reloads, open captures for a game or use Fetch Banner Art to pull SteamGridDB Heroes / logos and Steam hero art again.";
             refreshHeroBannerCacheBox.Checked += delegate
             {

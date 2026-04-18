@@ -86,6 +86,53 @@ namespace PixelVaultNative
                 var primary = GetLibraryBrowserPrimaryFolder(folder) ?? BuildLibraryBrowserDisplayFolder(folder);
                 if (primary != null) actionFolders = new List<LibraryFolderInfo> { primary };
             }
+            var lookupFolder = GetLibraryBrowserPrimaryFolder(folder) ?? BuildLibraryBrowserDisplayFolder(folder);
+
+            void QueuePhotoWorkspaceHeaderArtFetch(List<LibraryFolderInfo> targetFolders, string scopeLabel, bool forceRefreshCachedHeaderArt, string completionToast, string logContext)
+            {
+                if (libraryWindow == null || targetFolders == null || targetFolders.Count == 0) return;
+                showFolder(folder);
+                var folders = targetFolders.ToList();
+                if (forceRefreshCachedHeaderArt)
+                {
+                    foreach (var title in folders
+                        .Where(targetFolder => targetFolder != null && !string.IsNullOrWhiteSpace(targetFolder.Name))
+                        .Select(targetFolder => targetFolder.Name.Trim())
+                        .Distinct(StringComparer.OrdinalIgnoreCase))
+                    {
+                        coverService.PurgeCachedHeroDownloads(title);
+                        coverService.PurgeCachedLogoDownloads(title);
+                    }
+                    refreshPhotoWorkspaceHeroBanner?.Invoke();
+                }
+
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        using var fetchTimeout = new CancellationTokenSource(TimeSpan.FromMinutes(4));
+                        foreach (var targetFolder in folders)
+                        {
+                            await ResolveLibraryHeroBannerWithDownloadAsync(targetFolder, fetchTimeout.Token).ConfigureAwait(false);
+                            await ResolveLibraryHeroLogoWithDownloadAsync(targetFolder, fetchTimeout.Token).ConfigureAwait(false);
+                        }
+                    }
+                    catch (OperationCanceledException)
+                    {
+                    }
+                    catch (Exception ex)
+                    {
+                        await libraryWindow.Dispatcher.InvokeAsync(() => LogException(logContext + " | " + scopeLabel, ex));
+                        return;
+                    }
+
+                    await libraryWindow.Dispatcher.InvokeAsync(() =>
+                    {
+                        refreshPhotoWorkspaceHeroBanner?.Invoke();
+                        libraryToast?.Invoke(completionToast);
+                    });
+                });
+            }
 
             var openMyCoversItem = new MenuItem { Header = "Open My Covers Folder" };
             openMyCoversItem.Click += delegate { OpenSavedCoversFolder(); };
@@ -124,6 +171,21 @@ namespace PixelVaultNative
                 runScopedCoverRefresh?.Invoke(actionFolders, BuildLibraryBrowserActionScopeLabel(folder), true, false, true);
             };
 
+            var chooseCoverItem = new MenuItem { Header = "Choose Cover...", IsEnabled = actionFolders.Count > 0 && HasSteamGridDbApiToken() };
+            chooseCoverItem.Click += async delegate
+            {
+                await ChooseLibraryAssetFromSteamGridDbAsync(
+                    libraryWindow,
+                    folder,
+                    lookupFolder,
+                    actionFolders,
+                    LibraryAssetPickerKind.Cover,
+                    showFolder,
+                    renderTiles,
+                    refreshPhotoWorkspaceHeroBanner,
+                    libraryToast).ConfigureAwait(true);
+            };
+
             var setBannerItem = new MenuItem { Header = "Set Custom Banner...", IsEnabled = actionFolders.Count > 0 };
             setBannerItem.Click += delegate
             {
@@ -135,6 +197,49 @@ namespace PixelVaultNative
                 refreshPhotoWorkspaceHeroBanner?.Invoke();
                 libraryToast?.Invoke("Banner saved");
                 Log("Custom banner set for " + BuildLibraryBrowserActionScopeLabel(folder) + ".");
+            };
+
+            var setLogoItem = new MenuItem { Header = "Set Custom Logo...", IsEnabled = actionFolders.Count > 0 };
+            setLogoItem.Click += delegate
+            {
+                Directory.CreateDirectory(savedCoversRoot);
+                var picked = PickFile(string.Empty, "Image Files|*.png;*.jpg;*.jpeg;*.jxr;*.bmp;*.gif;*.ico|All Files|*.*", savedCoversRoot);
+                if (string.IsNullOrWhiteSpace(picked)) return;
+                foreach (var targetFolder in actionFolders) SaveCustomLogo(targetFolder, picked);
+                showFolder(folder);
+                refreshPhotoWorkspaceHeroBanner?.Invoke();
+                libraryToast?.Invoke("Logo saved");
+                Log("Custom logo set for " + BuildLibraryBrowserActionScopeLabel(folder) + ".");
+            };
+
+            var chooseBannerItem = new MenuItem { Header = "Choose Banner...", IsEnabled = actionFolders.Count > 0 && HasSteamGridDbApiToken() };
+            chooseBannerItem.Click += async delegate
+            {
+                await ChooseLibraryAssetFromSteamGridDbAsync(
+                    libraryWindow,
+                    folder,
+                    lookupFolder,
+                    actionFolders,
+                    LibraryAssetPickerKind.Banner,
+                    showFolder,
+                    renderTiles,
+                    refreshPhotoWorkspaceHeroBanner,
+                    libraryToast).ConfigureAwait(true);
+            };
+
+            var chooseLogoItem = new MenuItem { Header = "Choose Logo / Icon...", IsEnabled = actionFolders.Count > 0 && HasSteamGridDbApiToken() };
+            chooseLogoItem.Click += async delegate
+            {
+                await ChooseLibraryAssetFromSteamGridDbAsync(
+                    libraryWindow,
+                    folder,
+                    lookupFolder,
+                    actionFolders,
+                    LibraryAssetPickerKind.LogoIcon,
+                    showFolder,
+                    renderTiles,
+                    refreshPhotoWorkspaceHeroBanner,
+                    libraryToast).ConfigureAwait(true);
             };
 
             var clearBannerItem = new MenuItem
@@ -151,39 +256,40 @@ namespace PixelVaultNative
                 Log("Custom banner cleared for " + BuildLibraryBrowserActionScopeLabel(folder) + ".");
             };
 
+            var clearLogoItem = new MenuItem
+            {
+                Header = "Clear Custom Logo",
+                IsEnabled = actionFolders.Any(targetFolder => !string.IsNullOrWhiteSpace(CustomLogoPath(targetFolder)))
+            };
+            clearLogoItem.Click += delegate
+            {
+                foreach (var targetFolder in actionFolders.Where(targetFolder => !string.IsNullOrWhiteSpace(CustomLogoPath(targetFolder)))) ClearCustomLogo(targetFolder);
+                showFolder(folder);
+                refreshPhotoWorkspaceHeroBanner?.Invoke();
+                libraryToast?.Invoke("Custom logo cleared");
+                Log("Custom logo cleared for " + BuildLibraryBrowserActionScopeLabel(folder) + ".");
+            };
+
             var fetchBannerItem = new MenuItem { Header = "Fetch Banner Art", IsEnabled = actionFolders.Count > 0 };
             fetchBannerItem.Click += delegate
             {
-                if (libraryWindow == null) return;
-                showFolder(folder);
-                var scopeLabel = BuildLibraryBrowserActionScopeLabel(folder);
-                var folders = actionFolders.ToList();
-                _ = Task.Run(async () =>
-                {
-                    try
-                    {
-                        using var fetchTimeout = new CancellationTokenSource(TimeSpan.FromMinutes(4));
-                        foreach (var targetFolder in folders)
-                        {
-                            await ResolveLibraryHeroBannerWithDownloadAsync(targetFolder, fetchTimeout.Token).ConfigureAwait(false);
-                            await ResolveLibraryHeroLogoWithDownloadAsync(targetFolder, fetchTimeout.Token).ConfigureAwait(false);
-                        }
-                    }
-                    catch (OperationCanceledException)
-                    {
-                    }
-                    catch (Exception ex)
-                    {
-                        await libraryWindow.Dispatcher.InvokeAsync(() => LogException("Fetch banner art | " + scopeLabel, ex));
-                        return;
-                    }
+                QueuePhotoWorkspaceHeaderArtFetch(
+                    actionFolders,
+                    BuildLibraryBrowserActionScopeLabel(folder),
+                    false,
+                    "Banner art updated",
+                    "Fetch banner art");
+            };
 
-                    await libraryWindow.Dispatcher.InvokeAsync(() =>
-                    {
-                        refreshPhotoWorkspaceHeroBanner?.Invoke();
-                        libraryToast?.Invoke("Banner art updated");
-                    });
-                });
+            var refreshHeaderArtItem = new MenuItem { Header = "Refresh Title / Banner Art", IsEnabled = actionFolders.Count > 0 };
+            refreshHeaderArtItem.Click += delegate
+            {
+                QueuePhotoWorkspaceHeaderArtFetch(
+                    actionFolders,
+                    BuildLibraryBrowserActionScopeLabel(folder),
+                    true,
+                    "Title / banner art refreshed",
+                    "Refresh title / banner art");
             };
 
             menu.Items.Add(openMyCoversItem);
@@ -191,10 +297,16 @@ namespace PixelVaultNative
             menu.Items.Add(clearCoverItem);
             menu.Items.Add(new Separator());
             menu.Items.Add(fetchFolderCoverItem);
+            menu.Items.Add(chooseCoverItem);
             menu.Items.Add(new Separator());
             menu.Items.Add(setBannerItem);
+            menu.Items.Add(chooseBannerItem);
+            menu.Items.Add(setLogoItem);
+            menu.Items.Add(chooseLogoItem);
             menu.Items.Add(clearBannerItem);
+            menu.Items.Add(clearLogoItem);
             menu.Items.Add(fetchBannerItem);
+            menu.Items.Add(refreshHeaderArtItem);
             return menu;
         }
 
@@ -321,7 +433,7 @@ namespace PixelVaultNative
             });
         }
 
-        /// <summary>When <see cref="libraryRefreshHeroBannerCacheOnNextLibraryOpen"/> is set, purges auto-cached hero files and SteamGridDB logos for loaded library titles (custom heroes preserved).</summary>
+        /// <summary>When <see cref="libraryRefreshHeroBannerCacheOnNextLibraryOpen"/> is set, purges auto-cached hero files and SteamGridDB logos for loaded library titles (custom heroes/logos preserved).</summary>
         internal void TryRunPendingLibraryHeroBannerCacheRefresh(IReadOnlyList<LibraryFolderInfo> folders)
         {
             if (!libraryRefreshHeroBannerCacheOnNextLibraryOpen) return;
@@ -340,7 +452,7 @@ namespace PixelVaultNative
                 coverService.PurgeCachedHeroDownloads(t);
                 coverService.PurgeCachedLogoDownloads(t);
             }
-            Log("Cleared auto-cached hero banners and logos for " + titles.Count + " library titles. Custom banners unchanged; open captures or Fetch Banner Art to re-download.");
+            Log("Cleared auto-cached hero banners and logos for " + titles.Count + " library titles. Custom banners/logos unchanged; open captures or Fetch Banner Art to re-download.");
         }
     }
 }

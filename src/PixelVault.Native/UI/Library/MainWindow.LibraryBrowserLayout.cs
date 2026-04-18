@@ -31,7 +31,7 @@ namespace PixelVaultNative
             internal Border PreviewFrame;
             internal Image PreviewImage;
             internal TextBlock DetailTitle;
-            internal WrapPanel DetailTitleBadgePanel;
+            internal StackPanel DetailTitleBadgePanel;
             internal TextBlock DetailMeta;
             internal Button OpenFolderButton;
             internal Button EditMetadataButton;
@@ -492,11 +492,13 @@ namespace PixelVaultNative
                 VerticalAlignment = VerticalAlignment.Top,
                 Margin = new Thickness(0, 0, 12, 0)
             };
-            panes.DetailTitleBadgePanel = new WrapPanel
+            panes.DetailTitleBadgePanel = new StackPanel
             {
+                Orientation = Orientation.Horizontal,
                 Visibility = Visibility.Collapsed,
-                VerticalAlignment = VerticalAlignment.Top,
-                HorizontalAlignment = HorizontalAlignment.Right
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Margin = new Thickness(0)
             };
             Grid.SetColumn(panes.DetailTitle, 0);
             Grid.SetColumn(panes.DetailTitleBadgePanel, 1);
