@@ -47,6 +47,8 @@
     <Compile Include="Services\Achievements\GameAchievementsFetchService.cs" />
     <Compile Include="Services\Covers\CoverService.cs" />
     <Compile Include="Services\Covers\CoverWorkflowHelpers.cs" />
+    <Compile Include="Services\Covers\ILibraryCoverResolution.cs" />
+    <Compile Include="Services\Covers\LibraryCoverResolutionService.cs" />
     <Compile Include="Services\FilenameParsing\FilenameParserService.cs" />
     <Compile Include="Services\FilenameRules\FilenameConventionBuilder.cs" />
     <Compile Include="Services\FilenameRules\FilenameRulesService.cs" />

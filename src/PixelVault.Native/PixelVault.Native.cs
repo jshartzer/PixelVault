@@ -152,6 +152,7 @@ namespace PixelVaultNative
         Window filenameConventionEditorWindow;
         PhotographyGalleryWindow _activePhotographyGalleryWindow;
         readonly ICoverService coverService;
+        readonly ILibraryCoverResolution libraryCoverResolutionService;
         readonly IFilenameParserService filenameParserService;
         readonly IFilenameRulesService filenameRulesService;
         readonly IIndexPersistenceService indexPersistenceService;
@@ -183,6 +184,7 @@ namespace PixelVaultNative
             (settingsService, fileSystemService) = CreateSettingsAndFileServices();
             coverService = CreateCoverService(this, fileSystemService, coversRoot);
             (indexPersistenceService, filenameParserService, gameIndexEditorAssignmentService, filenameRulesService) = CreateIndexFilenameRulesServices(cacheRoot, this);
+            libraryCoverResolutionService = CreateLibraryCoverResolutionService(this, coverService, filenameParserService, fileSystemService);
             metadataService = CreateMetadataService(this, cacheRoot);
             libraryScanner = CreateLibraryScanner(this, metadataService, fileSystemService);
             importService = new ImportService(BuildImportServiceDependencies(

@@ -67,6 +67,37 @@ namespace PixelVaultNative
             });
         }
 
+        internal static ILibraryCoverResolution CreateLibraryCoverResolutionService(
+            MainWindow mw,
+            ICoverService coverService,
+            IFilenameParserService filenameParser,
+            IFileSystemService fileSystem)
+        {
+            return new LibraryCoverResolutionService(new LibraryCoverResolutionDependencies
+            {
+                CoverService = coverService,
+                FilenameParser = filenameParser,
+                FileSystem = fileSystem,
+                GetLibraryRoot = delegate { return mw.libraryRoot ?? string.Empty; },
+                HasSteamGridDbApiToken = delegate { return mw.HasSteamGridDbApiToken(); },
+                NormalizeTitle = delegate(string value) { return mw.NormalizeTitle(value); },
+                NormalizeConsoleLabel = delegate(string value) { return MainWindow.NormalizeConsoleLabel(value); },
+                NormalizeGameId = delegate(string value) { return mw.NormalizeGameId(value); },
+                BuildLibraryFolderMasterKey = delegate(LibraryFolderInfo folder) { return mw.BuildLibraryFolderMasterKey(folder); },
+                BuildLibraryFolderInventoryStamp = delegate(string root) { return mw.BuildLibraryFolderInventoryStamp(root); },
+                LoadLibraryFolderCache = delegate(string root, string stamp) { return mw.LoadLibraryFolderCache(root, stamp); },
+                SaveLibraryFolderCache = delegate(string root, string stamp, List<LibraryFolderInfo> folders) { mw.SaveLibraryFolderCache(root, stamp, folders); },
+                RefreshCachedLibraryFoldersFromGameIndex = delegate(string root) { mw.RefreshCachedLibraryFoldersFromGameIndex(root); },
+                GetSavedGameIndexRowsForRoot = delegate(string root) { return mw.GetSavedGameIndexRowsForRoot(root); },
+                FindSavedGameIndexRow = delegate(IEnumerable<GameIndexEditorRow> rows, LibraryFolderInfo folder) { return mw.FindSavedGameIndexRow(rows, folder); },
+                UpsertSavedGameIndexRow = delegate(string root, LibraryFolderInfo folder) { mw.UpsertSavedGameIndexRow(root, folder); },
+                ResolveLibraryFolderSteamAppId = delegate(string platformLabel, IEnumerable<string> files) { return mw.ResolveLibraryFolderSteamAppId(platformLabel, files); },
+                ParseFilename = delegate(string file, string root) { return mw.ParseFilename(file, root); },
+                Log = delegate(string message) { mw.Log(message); },
+                RemoveCachedImageEntries = delegate(IEnumerable<string> paths) { mw.RemoveCachedImageEntries(paths); }
+            });
+        }
+
         internal static IMetadataService CreateMetadataService(MainWindow mw, string cacheRoot)
         {
             return new MetadataService(new MetadataServiceDependencies
