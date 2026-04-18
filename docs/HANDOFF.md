@@ -50,6 +50,8 @@ Then use these based on the task:
 - `C:\Codex\docs\PERFORMANCE_TODO.md` for responsiveness/scalability follow-up
 - `C:\Codex\docs\CODE_QUALITY_IMPROVEMENT_PLAN.md` for hardening / edge-case backlog
 - `C:\Codex\docs\MANUAL_GOLDEN_PATH_CHECKLIST.md` for risky manual verification
+- `C:\Codex\docs\VELOPACK.md` + `C:\Codex\docs\VELOPACK_VM_SPIKE_CHECKLIST.md` for **installer / Velopack** distribution (**`PV-PLN-DIST-001`** §5.3)
+- `C:\Codex\docs\BUNDLED_TOOLS_REDISTRIBUTION.md` — **ExifTool / FFmpeg** redistribution worksheet (**§5.9**)
 - `C:\Codex\docs\archive\PV-PLN-LIBWS-001-library-workspace-modes.md` — **done** plan: library **Folder / Photo / Timeline** modes; **Photo workspace: exit & restoration** spells out what exits clear vs. what scroll state is not restored
 - `C:\Codex\docs\SERVICE_OWNERSHIP_AND_PARALLEL_WORK_MAP.md` for service boundaries and parallel lanes
 
@@ -84,6 +86,7 @@ Practical current focus:
 - continue the MainWindow extraction roadmap in small slices
 - keep service extraction coordinated so parallel work does not collide
 - treat source-only refactors and published-build changes as different things
+- distribution (**`PV-PLN-DIST-001`**): Velopack path + **§5.5** changelog notes landed; run **`docs/VELOPACK_VM_SPIKE_CHECKLIST.md`** on a VM before treating installer QA as done; fill **`docs/BUNDLED_TOOLS_REDISTRIBUTION.md`** before shipping bundled **`tools/`** (**§5.9**)
 
 ## Working Expectations
 

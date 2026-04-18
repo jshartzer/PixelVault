@@ -129,8 +129,8 @@ Split the work so engineering is not constantly mixed with Partner Center admin.
 Avoid burning time on MSIX while core desktop distribution is still unsettled.
 
 - [ ] **Signed** release artifacts exist end‑to‑end (**`-Sign`** or equivalent ritual documented).
-- [ ] **Installer or update path** chosen (not only unzip **`dist/`**).
-- [ ] **Self‑contained vs .NET prerequisite** decided and documented (**§5.5**).
+- [x] **Installer or update path** chosen — **Velopack** (**`docs/VELOPACK.md`**, **`scripts/Publish-Velopack.ps1`**); zip **`dist/`** remains for dev-style drops.
+- [x] **Self‑contained vs .NET prerequisite** decided and documented — **§5.5** + **`docs/CHANGELOG.md`** (**Velopack** channel self-contained; **`Publish-PixelVault`** default remains framework-dependent).
 - [ ] **Fresh‑machine install** smoke‑tested (VM or clean profile) — not only your dev box.
 - [ ] **Persistent / writable data** contract explicit — installed builds do not depend on writable install dir or repo/dist layout (**§5.8**).
 - [ ] **Top Phase 1 blockers** closed **or** explicitly accepted with a note in **§12** revision log.
@@ -190,8 +190,8 @@ Pick **one** primary path (others become optional):
 **Checklist:**
 
 - [x] Repo spike: **`Velopack`** package + **`VelopackApp`** bootstrap in **`PixelVault.Native`**, **`scripts/Publish-Velopack.ps1`** (self‑contained publish + **`vpk pack`**), **`docs/VELOPACK.md`** — keep **`vpk`** CLI major/minor aligned with the NuGet version.
-- [ ] Spike: install + launch + uninstall on a clean VM.
-- [ ] Spike: update from **N → N+1** without losing settings under **`PixelVaultData`**.
+- [ ] Spike: install + launch + uninstall on a clean VM — procedure: **`docs/VELOPACK_VM_SPIKE_CHECKLIST.md`** (**§A**, **§B**).
+- [ ] Spike: update from **N → N+1** without losing settings under **`PixelVaultData`** — procedure: **`docs/VELOPACK_VM_SPIKE_CHECKLIST.md`** (**§C**).
 - [x] Decide default: **upgrade in place** (Velopack) vs dev‑oriented side‑by‑side **`dist/PixelVault-*`** — documented in **`docs/VELOPACK.md`**; mutable data outside install dir (**§5.8**).
 
 ### 5.4 Distribution checklist — legal & user‑facing pages
@@ -208,8 +208,8 @@ Today: **`SelfContained=false`** → users need **.NET 8**.
 
 **For Phase 1 release:**
 
-- [ ] Prefer **`SelfContained=true`** + trimming/R2R defaults appropriate for WPF (validate app still runs; WPF trimming can be finicky — test thoroughly).
-- [ ] Document final choice in **`CHANGELOG.md`** (“requires .NET 8” vs “bundled runtime”).
+- [x] **`Publish-Velopack.ps1`** uses **`SelfContained=true`** for installer-channel bits (no trimming/R2R in script — treat size optimization as a follow-up once smoke tests pass).
+- [x] Document final choice in **`CHANGELOG.md`** — **`0.076.000`** notes **Velopack** self-contained vs **`Publish-PixelVault`** framework-dependent **`dist`** layout; **`README.md`** Building section cross-links **`VELOPACK.md`**.
 
 **For Store:** plan on either self‑contained MSIX **or** declaring framework dependency via Store — decide explicitly; don’t leave it accidental.
 
@@ -245,6 +245,8 @@ Automated tests are strong; distribution changes need smoke manual QA.
 ### 5.9 Bundled external tools — redistribution & compliance
 
 **Why:** Full‑trust packaging can **run** **ExifTool** / **FFmpeg**; **Store / legal** still require **redistribution** and **notice** hygiene.
+
+**Worksheet:** **`docs/BUNDLED_TOOLS_REDISTRIBUTION.md`** — fill versions, license URLs, and channel matrix before closing this section.
 
 - [ ] Audit **license / redistribution terms** for the **exact** **ExifTool** and **FFmpeg** binaries you ship.
 - [ ] Confirm those binaries may be redistributed in **each** channel you use (zip, installer, Store Desktop Bridge).
@@ -462,3 +464,4 @@ Protect scope until **Phase 1** desktop distribution is **boringly stable**:
 | **2026‑04‑18** | Overrides: **`PIXELVAULT_DATA_ROOT`**, **`PixelVault.data-root.ini`**; sidecar+migration tests; Setup & health **App data folder** row; **`docs/PRIVACY_POLICY.md`** draft (**§5.4**). |
 | **2026‑04‑18** | §5.3: Velopack integration (**`docs/VELOPACK.md`**, **`Publish-Velopack.ps1`**); **`vpk`** requires **ASP.NET Core 8** runtime if the global tool won’t start; **`dist/Velopack/`** gitignored. |
 | **2026‑04‑18** | §5.3: recorded **upgrade in place** as the shipped model (vs dev **`dist`** side‑by‑side); VM + N→N+1 spikes still manual. |
+| **2026‑04‑18** | §5.5: **CHANGELOG** + **README** document self-contained (**Velopack**) vs framework-dependent (**`Publish-PixelVault`**); **`docs/VELOPACK_VM_SPIKE_CHECKLIST.md`**; gate **§4.1** installer + self-contained rows checked; **`docs/BUNDLED_TOOLS_REDISTRIBUTION.md`** worksheet for **§5.9**. |

@@ -45,7 +45,7 @@ This script publishes **self-contained** **`win-x64`** with **`PublishSingleFile
 
 **Default:** **upgrade in place** — Velopack installs into a stable per‑app folder and replaces binaries on update (not a parallel **`dist/PixelVault-<version>/`** tree). User libraries and **`PixelVaultData`** remain valid because mutable state is resolved via **`PersistentDataMigrator`** / **`docs/DISTRIBUTION_STORAGE.md`** (not next to the EXE under **`Program Files`**).
 
-**Manual QA still required:** §5.3 checklist — clean VM install/uninstall and **N → N+1** update with settings preserved.
+**Manual QA still required:** §5.3 checklist — use **`docs/VELOPACK_VM_SPIKE_CHECKLIST.md`** for clean VM install/uninstall and **N → N+1** update with settings preserved.
 
 ---
 

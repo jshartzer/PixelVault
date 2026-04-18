@@ -149,6 +149,8 @@ pwsh -File C:\Codex\scripts\Publish-PixelVault.ps1 -Force
 
 Optional: `-OutputRoot` if the default `dist` folder is locked; see script header comments.
 
+**Installer / delta-update channel (Velopack):** self-contained **`win-x64`** publish + **`vpk pack`** — **`scripts/Publish-Velopack.ps1`** and **`docs/VELOPACK.md`**. Fresh-machine smoke tests: **`docs/VELOPACK_VM_SPIKE_CHECKLIST.md`**.
+
 ## Project Documents
 
 Use these together:
