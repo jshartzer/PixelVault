@@ -293,19 +293,25 @@ namespace PixelVaultNative
             };
 
             menu.Items.Add(openMyCoversItem);
+            menu.Items.Add(new Separator());
+
             menu.Items.Add(setCoverItem);
             menu.Items.Add(clearCoverItem);
-            menu.Items.Add(new Separator());
             menu.Items.Add(fetchFolderCoverItem);
             menu.Items.Add(chooseCoverItem);
             menu.Items.Add(new Separator());
+
             menu.Items.Add(setBannerItem);
-            menu.Items.Add(chooseBannerItem);
-            menu.Items.Add(setLogoItem);
-            menu.Items.Add(chooseLogoItem);
             menu.Items.Add(clearBannerItem);
-            menu.Items.Add(clearLogoItem);
             menu.Items.Add(fetchBannerItem);
+            menu.Items.Add(chooseBannerItem);
+            menu.Items.Add(new Separator());
+
+            menu.Items.Add(setLogoItem);
+            menu.Items.Add(clearLogoItem);
+            menu.Items.Add(chooseLogoItem);
+            menu.Items.Add(new Separator());
+
             menu.Items.Add(refreshHeaderArtItem);
             return menu;
         }

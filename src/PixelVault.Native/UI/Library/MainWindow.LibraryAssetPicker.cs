@@ -242,14 +242,6 @@ namespace PixelVaultNative
                 Margin = new Thickness(0, 0, 0, 10)
             };
             var filterStack = new StackPanel();
-            filterStack.Children.Add(new TextBlock
-            {
-                Text = "Search these choices, filter them down, or edit IDs and reload without leaving this picker.",
-                Foreground = Brush("#B7C6C0"),
-                FontSize = 12.5,
-                Margin = new Thickness(0, 0, 0, 10),
-                TextWrapping = TextWrapping.Wrap
-            });
             var searchBox = new TextBox
             {
                 Padding = new Thickness(10, 7, 10, 7),
@@ -421,13 +413,33 @@ namespace PixelVaultNative
             Grid.SetRow(previewDetail, 2);
             previewStack.Children.Add(previewDetail);
 
-            var buttons = new Grid { HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 14, 0, 0) };
+            var footer = new Grid { Margin = new Thickness(0, 14, 0, 0) };
+            footer.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            footer.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            Grid.SetRow(footer, 2);
+            root.Children.Add(footer);
+
+            var footerHint = new TextBlock
+            {
+                Text = openIdEditor == null
+                    ? "Search or filter without leaving this picker."
+                    : "Search, filter, edit IDs, or reload without leaving this picker.",
+                Foreground = Brush("#7E929E"),
+                FontSize = 8.5,
+                MaxWidth = 320,
+                VerticalAlignment = VerticalAlignment.Center,
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 0, 18, 0)
+            };
+            footer.Children.Add(footerHint);
+
+            var buttons = new Grid { HorizontalAlignment = HorizontalAlignment.Right };
             buttons.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             buttons.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             buttons.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             buttons.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            Grid.SetRow(buttons, 2);
-            root.Children.Add(buttons);
+            Grid.SetColumn(buttons, 1);
+            footer.Children.Add(buttons);
 
             var editIdsButton = Btn("Edit IDs...", null, "#20343A", Brushes.White);
             editIdsButton.Margin = new Thickness(0);
