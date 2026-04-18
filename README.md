@@ -162,6 +162,7 @@ Use these together:
 - `HANDOFF.md`: short current stop point for the next conversation
 - `PROJECT_CONTEXT.md`: broader project architecture and current-state overview
 - `CHANGELOG.md`: published version history
+- `docs/EULA.md`: end-user license **draft** for distribution (**§5.4**); host at HTTPS with `docs/PRIVACY_POLICY.md` for Store/listings
 
 ## Git Scope
 

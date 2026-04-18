@@ -16,6 +16,7 @@
 - MainWindow / service seams (ongoing): **`docs/plans/PV-PLN-UI-001-ui-thin-mainwindow-ios-aligned.md`**
 - Writable‑data contract (**§5.8**): **`docs/DISTRIBUTION_STORAGE.md`**
 - Privacy policy draft (**§5.4**): **`docs/PRIVACY_POLICY.md`**
+- EULA draft (**§5.4**): **`docs/EULA.md`**
 - Signing ritual (**§5.2**): **`docs/PUBLISH_SIGNING.md`**
 
 ---
@@ -200,8 +201,8 @@ Pick **one** primary path (others become optional):
 Even with no telemetry, you still owe users clarity.
 
 - [ ] **Privacy policy** hosted at a stable HTTPS URL — **source draft:** **`docs/PRIVACY_POLICY.md`** (replace placeholders, publish, link from Store/listing).
-- [ ] **EULA** or Terms — especially if you distribute beyond personal friends.
-- [ ] **Support contact** — email or issue tracker linked from Store/listing later.
+- [x] **EULA / Terms** — **source draft:** **`docs/EULA.md`** (replace **`{LEGAL_ENTITY}`**, **`{JURISDICTION}`**, **`{PUBLISH_CONTACT}`**, counsel review); **hosted HTTPS URL** still required before Store/wide distribution (same as privacy).
+- [ ] **Support contact** — email or issue tracker linked from Store/listing later (tie to **`{PUBLISH_CONTACT}`** in **`docs/EULA.md`** / **`docs/PRIVACY_POLICY.md`**).
 
 ### 5.5 Self‑contained vs framework‑dependent
 
@@ -468,3 +469,4 @@ Protect scope until **Phase 1** desktop distribution is **boringly stable**:
 | **2026‑04‑18** | §5.5: **CHANGELOG** + **README** document self-contained (**Velopack**) vs framework-dependent (**`Publish-PixelVault`**); **`docs/VELOPACK_VM_SPIKE_CHECKLIST.md`**; gate **§4.1** installer + self-contained rows checked; **`docs/BUNDLED_TOOLS_REDISTRIBUTION.md`** worksheet for **§5.9**. |
 | **2026‑04‑18** | §5.9: **`tools-licenses\`** (**GPLv3** for **ExifTool** only) + **`Merge-BundledToolLicenses.ps1`**; **FFmpeg** optional / not bundled; **`SettingsService`** drops **`tools\ffmpeg.exe`** fallback. |
 | **2026‑04‑18** | §5.2 + §5.4: **`docs/PUBLISH_SIGNING.md`** (Authenticode + Velopack **`vpk`** signing); **`docs/PRIVACY_POLICY.md`** hosting checklist. |
+| **2026‑04‑18** | §5.4: **`docs/EULA.md`** end-user license **draft** (placeholders **`{LEGAL_ENTITY}`** / **`{JURISDICTION}`** / **`{PUBLISH_CONTACT}`**); hosted HTTPS URL still checklist item. |

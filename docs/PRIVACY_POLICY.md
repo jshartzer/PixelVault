@@ -93,4 +93,4 @@ Keep the **Effective** date in sync when behavior or disclosures change (**`CHAN
 
 ## Legal
 
-This repository and build pipeline are provided **as-is** unless you attach a separate end-user license. Coordinate **`docs/PRIVACY_POLICY.md`** with your **`EULA`** or terms if you distribute commercially.
+Coordinate this policy with your end-user license: **draft:** **`docs/EULA.md`** (**`PV-PLN-DIST-001` §5.4**). Publish both documents at stable HTTPS URLs before Store or broad distribution.
