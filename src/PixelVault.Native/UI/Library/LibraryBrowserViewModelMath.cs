@@ -264,10 +264,26 @@ namespace PixelVaultNative
 
         public static int LibraryDetailFileLayoutHash(string? path)
         {
+            // Stable across processes — callers (library detail aspect-ratio fallback, quilt
+            // shape preference order, variable-tile width scales) assume the same file always
+            // maps to the same layout decision. We previously used
+            // StringComparer.OrdinalIgnoreCase.GetHashCode, which is randomized per-process in
+            // .NET Core/5+ — that caused the user's library quilt to silently reroll on every
+            // launch and made filename-hash-sensitive unit tests (LibraryPhotoMasonryLayoutTests)
+            // flake because each dotnet test invocation drew a different hash seed.
             if (string.IsNullOrEmpty(path)) return 0;
             unchecked
             {
-                return Math.Abs(StringComparer.OrdinalIgnoreCase.GetHashCode(path));
+                const int fnvOffsetBasis = (int)2166136261;
+                const int fnvPrime = 16777619;
+                var hash = fnvOffsetBasis;
+                for (var i = 0; i < path.Length; i++)
+                {
+                    var c = path[i];
+                    if (c >= 'a' && c <= 'z') c = (char)(c - 32); // ASCII case fold only (same shape as the old OrdinalIgnoreCase comparer for Western filenames)
+                    hash = (hash ^ c) * fnvPrime;
+                }
+                return hash & int.MaxValue; // drop sign bit (avoid Math.Abs(int.MinValue) undefined)
             }
         }
 
