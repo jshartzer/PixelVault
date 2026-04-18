@@ -8,6 +8,7 @@ using System.Windows.Media.Effects;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows.Media.Animation;
 
 namespace PixelVaultNative
 {
@@ -536,69 +537,253 @@ namespace PixelVaultNative
                 StartPoint = new Point(0, 0),
                 EndPoint = new Point(1, 1)
             };
-            brush.GradientStops.Add(new GradientStop(Brush("#FFF5C5").Color, 0));
-            brush.GradientStops.Add(new GradientStop(Brush("#D9A53E").Color, 0.26));
-            brush.GradientStops.Add(new GradientStop(Brush("#FFF0B0").Color, 0.58));
-            brush.GradientStops.Add(new GradientStop(Brush("#8E6114").Color, 1));
+            brush.GradientStops.Add(new GradientStop(Brush("#FFF8DB").Color, 0));
+            brush.GradientStops.Add(new GradientStop(Brush("#D5C08A").Color, 0.28));
+            brush.GradientStops.Add(new GradientStop(Brush("#F2E6BC").Color, 0.62));
+            brush.GradientStops.Add(new GradientStop(Brush("#8A7751").Color, 1));
             if (brush.CanFreeze) brush.Freeze();
             return brush;
         }
-        FrameworkElement BuildLibraryTileCompletionFoilOverlay()
+        sealed class LibraryTileCompletionFoilVisual
+        {
+            readonly Grid root;
+            readonly Border glossLayer;
+            readonly Border prismLayer;
+            readonly Border crossLayer;
+            readonly Border stripeLayer;
+            readonly Border glintLayer;
+            readonly TranslateTransform glossShift;
+            readonly TranslateTransform prismShift;
+            readonly TranslateTransform crossShift;
+            readonly TranslateTransform stripeShift;
+            readonly TranslateTransform glintShift;
+
+            internal LibraryTileCompletionFoilVisual(
+                Grid root,
+                Border glossLayer,
+                Border prismLayer,
+                Border crossLayer,
+                Border stripeLayer,
+                Border glintLayer,
+                TranslateTransform glossShift,
+                TranslateTransform prismShift,
+                TranslateTransform crossShift,
+                TranslateTransform stripeShift,
+                TranslateTransform glintShift)
+            {
+                this.root = root;
+                this.glossLayer = glossLayer;
+                this.prismLayer = prismLayer;
+                this.crossLayer = crossLayer;
+                this.stripeLayer = stripeLayer;
+                this.glintLayer = glintLayer;
+                this.glossShift = glossShift;
+                this.prismShift = prismShift;
+                this.crossShift = crossShift;
+                this.stripeShift = stripeShift;
+                this.glintShift = glintShift;
+            }
+
+            internal FrameworkElement Root => root;
+
+            internal void Update(double normalizedX, double normalizedY, bool animate)
+            {
+                normalizedX = Math.Max(0, Math.Min(1, normalizedX));
+                normalizedY = Math.Max(0, Math.Min(1, normalizedY));
+
+                var xBias = normalizedX - 0.5;
+                var yBias = normalizedY - 0.5;
+                var shimmer = Math.Max(Math.Abs(xBias), Math.Abs(yBias));
+
+                SetDouble(root, UIElement.OpacityProperty, 0.96d + shimmer * 0.04d, animate, 150);
+                SetDouble(glossShift, TranslateTransform.XProperty, xBias * 7d, animate, 150);
+                SetDouble(glossShift, TranslateTransform.YProperty, yBias * 5d, animate, 150);
+                SetDouble(prismShift, TranslateTransform.XProperty, xBias * 24d - yBias * 6d, animate, 150);
+                SetDouble(prismShift, TranslateTransform.YProperty, yBias * 14d - xBias * 5d, animate, 150);
+                SetDouble(crossShift, TranslateTransform.XProperty, -xBias * 20d + yBias * 8d, animate, 150);
+                SetDouble(crossShift, TranslateTransform.YProperty, -yBias * 10d + xBias * 7d, animate, 150);
+                SetDouble(stripeShift, TranslateTransform.XProperty, xBias * 10d, animate, 180);
+                SetDouble(stripeShift, TranslateTransform.YProperty, yBias * 8d, animate, 180);
+                SetDouble(glintShift, TranslateTransform.XProperty, xBias * 14d + yBias * 8d, animate, 120);
+                SetDouble(glintShift, TranslateTransform.YProperty, yBias * 8d - xBias * 5d, animate, 120);
+
+                SetDouble(glossLayer, UIElement.OpacityProperty, 0.12d + shimmer * 0.08d, animate, 150);
+                SetDouble(prismLayer, UIElement.OpacityProperty, 0.08d + shimmer * 0.1d, animate, 150);
+                SetDouble(crossLayer, UIElement.OpacityProperty, 0.035d + shimmer * 0.05d, animate, 150);
+                SetDouble(stripeLayer, UIElement.OpacityProperty, 0.05d + shimmer * 0.04d, animate, 180);
+                SetDouble(glintLayer, UIElement.OpacityProperty, 0.04d + shimmer * 0.06d, animate, 120);
+            }
+
+            static void SetDouble(DependencyObject target, DependencyProperty property, double value, bool animate, int durationMs)
+            {
+                if (target is Animatable animatable)
+                {
+                    if (animate && durationMs > 0)
+                    {
+                        animatable.BeginAnimation(property, new DoubleAnimation
+                        {
+                            To = value,
+                            Duration = TimeSpan.FromMilliseconds(durationMs),
+                            EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut },
+                            FillBehavior = FillBehavior.HoldEnd
+                        }, HandoffBehavior.SnapshotAndReplace);
+                        return;
+                    }
+
+                    animatable.BeginAnimation(property, null);
+                }
+
+                target.SetValue(property, value);
+            }
+        }
+        FrameworkElement BuildLibraryTileCompletionFrameOverlay(double width, double height, CornerRadius cornerRadius)
+        {
+            var frame = new Grid
+            {
+                Width = width,
+                Height = height,
+                IsHitTestVisible = false
+            };
+
+            frame.Children.Add(new Border
+            {
+                CornerRadius = cornerRadius,
+                Background = Brushes.Transparent,
+                BorderBrush = BuildLibraryTileCompletionBorderBrush(),
+                BorderThickness = new Thickness(2),
+                Effect = new DropShadowEffect
+                {
+                    Color = Brush("#C8B37A").Color,
+                    BlurRadius = 10,
+                    ShadowDepth = 0,
+                    Opacity = 0.18
+                }
+            });
+
+            return frame;
+        }
+        LibraryTileCompletionFoilVisual BuildLibraryTileCompletionFoilOverlay()
         {
             var foil = new Grid
             {
                 IsHitTestVisible = false,
-                Opacity = 0.88
+                Opacity = 0.96
             };
+            var glossShift = new TranslateTransform();
+            var prismShift = new TranslateTransform();
+            var crossShift = new TranslateTransform();
+            var stripeShift = new TranslateTransform();
+            var glintShift = new TranslateTransform();
 
-            var ambientWashBrush = new LinearGradientBrush
+            var glossBrush = new LinearGradientBrush
             {
-                StartPoint = new Point(0, 0),
-                EndPoint = new Point(1, 1)
+                StartPoint = new Point(0.08, 0),
+                EndPoint = new Point(0.92, 1)
             };
-            ambientWashBrush.GradientStops.Add(new GradientStop(Brush("#10FFF8E0").Color, 0));
-            ambientWashBrush.GradientStops.Add(new GradientStop(Brush("#18FFD26B").Color, 0.24));
-            ambientWashBrush.GradientStops.Add(new GradientStop(Brush("#12F0A4FF").Color, 0.54));
-            ambientWashBrush.GradientStops.Add(new GradientStop(Brush("#1498FFE6").Color, 0.82));
-            ambientWashBrush.GradientStops.Add(new GradientStop(Brush("#08FFFFFF").Color, 1));
-            if (ambientWashBrush.CanFreeze) ambientWashBrush.Freeze();
-            foil.Children.Add(new Border { Background = ambientWashBrush });
+            glossBrush.GradientStops.Add(new GradientStop(Brush("#00FFFFFF").Color, 0));
+            glossBrush.GradientStops.Add(new GradientStop(Brush("#26FFFFFF").Color, 0.24));
+            glossBrush.GradientStops.Add(new GradientStop(Brush("#0AF9FCFF").Color, 0.42));
+            glossBrush.GradientStops.Add(new GradientStop(Brush("#18FFFFFF").Color, 0.64));
+            glossBrush.GradientStops.Add(new GradientStop(Brush("#00FFFFFF").Color, 1));
+            if (glossBrush.CanFreeze) glossBrush.Freeze();
+            var glossLayer = new Border
+            {
+                Background = glossBrush,
+                Margin = new Thickness(-12),
+                RenderTransform = glossShift
+            };
+            foil.Children.Add(glossLayer);
 
             var prismSweepBrush = new LinearGradientBrush
             {
-                StartPoint = new Point(0, 0.88),
-                EndPoint = new Point(1, 0.12)
+                StartPoint = new Point(0, 0.94),
+                EndPoint = new Point(1, 0.08)
             };
-            prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#00FFFFFF").Color, 0.08));
-            prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#2CFF90DA").Color, 0.3));
-            prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#34FFF1AD").Color, 0.5));
-            prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#24FFD26F").Color, 0.68));
-            prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#00FFFFFF").Color, 0.88));
+            prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#00FFFFFF").Color, 0.42));
+            prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#00FFFFFF").Color, 0.465));
+            prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#38A8F6FF").Color, 0.49));
+            prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#44E39BFF").Color, 0.505));
+            prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#48FFF4A8").Color, 0.52));
+            prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#28FFE7C8").Color, 0.54));
+            prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#00FFFFFF").Color, 0.575));
+            prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#00FFFFFF").Color, 1));
             if (prismSweepBrush.CanFreeze) prismSweepBrush.Freeze();
-            foil.Children.Add(new Border
+            var prismLayer = new Border
             {
                 Background = prismSweepBrush,
-                Opacity = 0.82
-            });
+                Opacity = 0.12,
+                Margin = new Thickness(-26),
+                RenderTransform = prismShift
+            };
+            foil.Children.Add(prismLayer);
+
+            var crossSweepBrush = new LinearGradientBrush
+            {
+                StartPoint = new Point(0.06, 0.18),
+                EndPoint = new Point(0.94, 0.82)
+            };
+            crossSweepBrush.GradientStops.Add(new GradientStop(Brush("#00FFFFFF").Color, 0.48));
+            crossSweepBrush.GradientStops.Add(new GradientStop(Brush("#00FFFFFF").Color, 0.535));
+            crossSweepBrush.GradientStops.Add(new GradientStop(Brush("#24C6A8FF").Color, 0.565));
+            crossSweepBrush.GradientStops.Add(new GradientStop(Brush("#18FFF6D7").Color, 0.592));
+            crossSweepBrush.GradientStops.Add(new GradientStop(Brush("#00FFFFFF").Color, 0.635));
+            crossSweepBrush.GradientStops.Add(new GradientStop(Brush("#00FFFFFF").Color, 1));
+            if (crossSweepBrush.CanFreeze) crossSweepBrush.Freeze();
+            var crossLayer = new Border
+            {
+                Background = crossSweepBrush,
+                Opacity = 0.06,
+                Margin = new Thickness(-22),
+                RenderTransform = crossShift
+            };
+            foil.Children.Add(crossLayer);
+
+            var stripeDrawing = new DrawingGroup();
+            stripeDrawing.Children.Add(new GeometryDrawing(
+                Brushes.Transparent,
+                new Pen(Brush("#3EFFFFFF"), 0.7),
+                Geometry.Parse("M 0 10 L 10 0")));
+            if (stripeDrawing.CanFreeze) stripeDrawing.Freeze();
+            var stripeBrush = new DrawingBrush(stripeDrawing)
+            {
+                TileMode = TileMode.Tile,
+                Stretch = Stretch.None,
+                Viewbox = new Rect(0, 0, 10, 10),
+                ViewboxUnits = BrushMappingMode.Absolute,
+                Viewport = new Rect(0, 0, 10, 10),
+                ViewportUnits = BrushMappingMode.Absolute
+            };
+            if (stripeBrush.CanFreeze) stripeBrush.Freeze();
+            var stripeLayer = new Border
+            {
+                Background = stripeBrush,
+                Opacity = 0.08,
+                Margin = new Thickness(-10),
+                RenderTransform = stripeShift
+            };
+            foil.Children.Add(stripeLayer);
 
             var topGlintBrush = new RadialGradientBrush
             {
-                Center = new Point(0.18, 0.14),
-                GradientOrigin = new Point(0.18, 0.14),
-                RadiusX = 0.86,
-                RadiusY = 0.62
+                Center = new Point(0.24, 0.2),
+                GradientOrigin = new Point(0.24, 0.2),
+                RadiusX = 0.24,
+                RadiusY = 0.18
             };
-            topGlintBrush.GradientStops.Add(new GradientStop(Brush("#44FFFDF3").Color, 0));
-            topGlintBrush.GradientStops.Add(new GradientStop(Brush("#1EFFF0C2").Color, 0.34));
+            topGlintBrush.GradientStops.Add(new GradientStop(Brush("#8AFFFFFF").Color, 0));
+            topGlintBrush.GradientStops.Add(new GradientStop(Brush("#2EFFF9F0").Color, 0.3));
             topGlintBrush.GradientStops.Add(new GradientStop(Brush("#00FFFFFF").Color, 1));
             if (topGlintBrush.CanFreeze) topGlintBrush.Freeze();
-            foil.Children.Add(new Border
+            var glintLayer = new Border
             {
                 Background = topGlintBrush,
-                Opacity = 0.68
-            });
+                Opacity = 0.08,
+                Margin = new Thickness(-14),
+                RenderTransform = glintShift
+            };
+            foil.Children.Add(glintLayer);
 
-            return foil;
+            return new LibraryTileCompletionFoilVisual(foil, glossLayer, prismLayer, crossLayer, stripeLayer, glintLayer, glossShift, prismShift, crossShift, stripeShift, glintShift);
         }
         FrameworkElement BuildLibrarySectionHeader(string platformLabel, int folderCount, bool sectionCollapsed, Action toggleSectionCollapse)
         {

@@ -262,10 +262,13 @@ namespace PixelVaultNative
             };
             tile.Template = BuildRoundedTileButtonTemplate();
             var coverCorner = new CornerRadius(12);
+            var completedCardInset = 6d;
+            var completedInnerCorner = new CornerRadius(7);
             var coverRoot = new Grid { Width = tileWidth, Height = tileHeight };
             var showCompletedCardTreatment = folder != null
                 && folder.IsCompleted100Percent
                 && ws?.WorkspaceMode != LibraryWorkspaceMode.Photo;
+            var foilVisual = showCompletedCardTreatment ? BuildLibraryTileCompletionFoilOverlay() : null;
             coverRoot.Children.Add(CreateAsyncImageTile(
                 GetLibraryArtPathForDisplayOnly(displayFolder),
                 CalculateLibraryFolderArtDecodeWidth(tileWidth, ResolveLibraryDpiScale()),
@@ -280,7 +283,7 @@ namespace PixelVaultNative
                 new CornerRadius(0),
                 Brushes.Transparent,
                 new Thickness(0)));
-            if (showCompletedCardTreatment) coverRoot.Children.Add(BuildLibraryTileCompletionFoilOverlay());
+            if (foilVisual != null) coverRoot.Children.Add(foilVisual.Root);
             var overlayPadRight = showPlatformBadgeOnTile ? 84d : 10d;
             var titleBlock = new TextBlock
             {
@@ -317,22 +320,119 @@ namespace PixelVaultNative
             };
             coverRoot.Children.Add(footerScrim);
             if (showPlatformBadgeOnTile) coverRoot.Children.Add(BuildLibraryTilePlatformBadge(badgePlatformLabel));
-            var imageBorder = new Border
+            var contentInset = showCompletedCardTreatment ? completedCardInset : 0d;
+            var cardHost = new Grid
             {
                 Width = tileWidth,
                 Height = tileHeight,
+                Background = Brushes.Transparent
+            };
+            var imageBorder = new Border
+            {
+                Width = Math.Max(0, tileWidth - (contentInset * 2)),
+                Height = Math.Max(0, tileHeight - (contentInset * 2)),
+                Margin = new Thickness(contentInset),
                 Background = Brush("#0E1418"),
-                BorderBrush = showCompletedCardTreatment ? BuildLibraryTileCompletionBorderBrush() : Brushes.Transparent,
-                BorderThickness = showCompletedCardTreatment ? new Thickness(2.2) : new Thickness(0),
-                CornerRadius = coverCorner,
+                CornerRadius = showCompletedCardTreatment ? completedInnerCorner : coverCorner,
                 ClipToBounds = true,
                 Child = coverRoot
             };
-            var coverRadius = coverCorner.TopLeft;
-            var roundedCoverClip = new RectangleGeometry(new Rect(0, 0, tileWidth, tileHeight), coverRadius, coverRadius);
+            var coverRadius = showCompletedCardTreatment ? completedInnerCorner.TopLeft : coverCorner.TopLeft;
+            var roundedCoverClip = new RectangleGeometry(
+                new Rect(0, 0, Math.Max(0, tileWidth - (contentInset * 2)), Math.Max(0, tileHeight - (contentInset * 2))),
+                coverRadius,
+                coverRadius);
             if (roundedCoverClip.CanFreeze) roundedCoverClip.Freeze();
             imageBorder.Clip = roundedCoverClip;
-            tile.Content = imageBorder;
+            cardHost.Children.Add(imageBorder);
+            if (showCompletedCardTreatment) cardHost.Children.Add(BuildLibraryTileCompletionFrameOverlay(tileWidth, tileHeight, coverCorner));
+            tile.Content = cardHost;
+            if (foilVisual != null)
+            {
+                ScrollViewer foilScrollHost = null;
+                ScrollChangedEventHandler foilScrollChanged = null;
+                var foilHovering = false;
+
+                Point ResolveTileViewportCenter()
+                {
+                    if (foilScrollHost == null || imageBorder == null || imageBorder.ActualWidth <= 0 || imageBorder.ActualHeight <= 0)
+                        return new Point(0.5, 0.5);
+
+                    try
+                    {
+                        var center = imageBorder.TranslatePoint(new Point(imageBorder.ActualWidth * 0.5, imageBorder.ActualHeight * 0.5), foilScrollHost);
+                        var viewportWidth = Math.Max(1, foilScrollHost.ViewportWidth);
+                        var viewportHeight = Math.Max(1, foilScrollHost.ViewportHeight);
+                        return new Point(
+                            Math.Max(0, Math.Min(1, center.X / viewportWidth)),
+                            Math.Max(0, Math.Min(1, center.Y / viewportHeight)));
+                    }
+                    catch
+                    {
+                        return new Point(0.5, 0.5);
+                    }
+                }
+
+                void UpdateFoilFromViewport(bool animate)
+                {
+                    var viewportCenter = ResolveTileViewportCenter();
+                    foilVisual.Update(viewportCenter.X, viewportCenter.Y, animate);
+                }
+
+                void EnsureFoilScrollHost()
+                {
+                    if (foilScrollHost != null) return;
+                    for (DependencyObject current = tile; current != null; current = VisualTreeHelper.GetParent(current))
+                    {
+                        if (current is ScrollViewer scrollViewer)
+                        {
+                            foilScrollHost = scrollViewer;
+                            break;
+                        }
+                    }
+                    if (foilScrollHost == null) return;
+
+                    foilScrollChanged = delegate
+                    {
+                        if (foilHovering) return;
+                        UpdateFoilFromViewport(true);
+                    };
+                    foilScrollHost.ScrollChanged += foilScrollChanged;
+                }
+
+                tile.Loaded += delegate
+                {
+                    EnsureFoilScrollHost();
+                    UpdateFoilFromViewport(false);
+                };
+                tile.Unloaded += delegate
+                {
+                    if (foilScrollHost != null && foilScrollChanged != null)
+                        foilScrollHost.ScrollChanged -= foilScrollChanged;
+                    foilScrollHost = null;
+                    foilScrollChanged = null;
+                    foilHovering = false;
+                };
+                tile.MouseEnter += delegate
+                {
+                    foilHovering = true;
+                };
+                tile.MouseMove += delegate(object _, MouseEventArgs e)
+                {
+                    if (imageBorder == null || imageBorder.ActualWidth <= 0 || imageBorder.ActualHeight <= 0) return;
+                    foilHovering = true;
+                    var position = e.GetPosition(imageBorder);
+                    foilVisual.Update(
+                        Math.Max(0, Math.Min(1, position.X / imageBorder.ActualWidth)),
+                        Math.Max(0, Math.Min(1, position.Y / imageBorder.ActualHeight)),
+                        false);
+                };
+                tile.MouseLeave += delegate
+                {
+                    foilHovering = false;
+                    UpdateFoilFromViewport(true);
+                };
+            }
             tile.Click += delegate
             {
                 showFolder(folder);
