@@ -88,7 +88,7 @@ Practical current focus:
 - continue the MainWindow extraction roadmap in small slices
 - keep service extraction coordinated so parallel work does not collide
 - treat source-only refactors and published-build changes as different things
-- distribution (**`PV-PLN-DIST-001`**): Velopack path + **§5.5** landed; **next (technical):** **`docs/VELOPACK_VM_SPIKE_CHECKLIST.md`** on a VM, **`docs/MANUAL_GOLDEN_PATH_CHECKLIST.md`** on an RC, trial **signed** build (**`docs/PUBLISH_SIGNING.md`**, **`Publish-Velopack.ps1`** **`-SignParams`** / **`VPK_SIGN_PARAMS`**); **legal last:** hosted **HTTPS** for **`docs/PRIVACY_POLICY.md`** + **`docs/EULA.md`**, support contact, in-app links — **back of Phase 1** per **`PV-PLN-DIST-001` §10.1**; **`tools-licenses\`** = **ExifTool**; **FFmpeg** user-installed (**§5.9**)
+- distribution (**`PV-PLN-DIST-001`**): Velopack path + **§5.5** landed; **next (technical):** **`scripts/Verify-DistributionLayout.ps1`** on **`dist\Velopack\publish-*`** or **`dist\PixelVault-*`** after publish; then **`docs/VELOPACK_VM_SPIKE_CHECKLIST.md`** on a VM, **`docs/MANUAL_GOLDEN_PATH_CHECKLIST.md`** on an RC, trial **signed** build (**`docs/PUBLISH_SIGNING.md`**, **`Publish-Velopack.ps1`** **`-SignParams`** / **`VPK_SIGN_PARAMS`**); **legal last:** hosted **HTTPS** for **`docs/PRIVACY_POLICY.md`** + **`docs/EULA.md`** — **`PV-PLN-DIST-001` §10.1**; **`tools-licenses\`** = **ExifTool**; **FFmpeg** user-installed (**§5.9**)
 
 ## Working Expectations
 
