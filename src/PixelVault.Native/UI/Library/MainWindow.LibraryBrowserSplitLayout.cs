@@ -151,7 +151,12 @@ namespace PixelVaultNative
                 panes.RightPane.Padding = new Thickness(16, 10, 16, 12);
                 if (panes.LibraryDetailBanner != null) panes.LibraryDetailBanner.Margin = new Thickness(0, 0, 0, 4);
                 if (panes.LibraryDetailControlsDock != null) panes.LibraryDetailControlsDock.Margin = new Thickness(0, 2, 0, 6);
-                if (panes.DetailMeta != null) panes.DetailMeta.Margin = new Thickness(0, 4, 0, 6);
+                if (panes.DetailMeta != null)
+                {
+                    panes.DetailMeta.Margin = new Thickness(0, 8, 0, 0);
+                    panes.DetailMeta.FontSize = 14;
+                    panes.DetailMeta.MaxWidth = 420;
+                }
                 if (panes.DetailTitle != null) panes.DetailTitle.FontSize = 22;
                 if (panes.LibraryDetailBannerGrid != null && panes.LibraryDetailBannerGrid.ColumnDefinitions.Count > 1)
                 {
@@ -190,7 +195,12 @@ namespace PixelVaultNative
                 panes.RightPane.Padding = new Thickness(26, 22, 26, 18);
                 if (panes.LibraryDetailBanner != null) panes.LibraryDetailBanner.Margin = new Thickness(0, 0, 0, 18);
                 if (panes.LibraryDetailControlsDock != null) panes.LibraryDetailControlsDock.Margin = new Thickness(0, 4, 0, 14);
-                if (panes.DetailMeta != null) panes.DetailMeta.Margin = new Thickness(0, 8, 0, 14);
+                if (panes.DetailMeta != null)
+                {
+                    panes.DetailMeta.Margin = new Thickness(0, 12, 0, 2);
+                    panes.DetailMeta.FontSize = 15;
+                    panes.DetailMeta.MaxWidth = 640;
+                }
                 if (panes.DetailTitle != null) panes.DetailTitle.FontSize = 28;
                 if (panes.LibraryDetailBannerGrid != null && panes.LibraryDetailBannerGrid.ColumnDefinitions.Count > 1)
                 {

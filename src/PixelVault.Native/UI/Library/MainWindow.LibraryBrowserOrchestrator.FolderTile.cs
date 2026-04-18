@@ -95,7 +95,6 @@ namespace PixelVaultNative
             var resolvedLabel = NormalizeConsoleLabel(platformLabel);
             if (string.IsNullOrWhiteSpace(resolvedLabel)) return null;
             var iconPath = ResolveLibrarySectionIconPath(resolvedLabel);
-            var accent = LibrarySectionAccentBrush(resolvedLabel);
             var iconSize = string.Equals(resolvedLabel, "PC", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(resolvedLabel, "Xbox PC", StringComparison.OrdinalIgnoreCase)
                 ? 20d
@@ -105,8 +104,8 @@ namespace PixelVaultNative
                 Width = 38,
                 Height = 38,
                 CornerRadius = new CornerRadius(11),
-                Background = Brush("#F6FAFC"),
-                BorderBrush = accent,
+                Background = Brush("#070B0E"),
+                BorderBrush = Brush("#F4F8FB"),
                 BorderThickness = new Thickness(1.15),
                 Padding = new Thickness(5),
                 Margin = new Thickness(0),
@@ -134,7 +133,7 @@ namespace PixelVaultNative
                     Text = resolvedLabel == "Multiple Tags" ? "+" : "•",
                     FontSize = 14,
                     FontWeight = FontWeights.Bold,
-                    Foreground = Brush("#1D2931"),
+                    Foreground = Brush("#F4F8FB"),
                     HorizontalAlignment = HorizontalAlignment.Center,
                     VerticalAlignment = VerticalAlignment.Center,
                     TextAlignment = TextAlignment.Center
@@ -264,6 +263,9 @@ namespace PixelVaultNative
             tile.Template = BuildRoundedTileButtonTemplate();
             var coverCorner = new CornerRadius(12);
             var coverRoot = new Grid { Width = tileWidth, Height = tileHeight };
+            var showCompletedCardTreatment = folder != null
+                && folder.IsCompleted100Percent
+                && ws?.WorkspaceMode != LibraryWorkspaceMode.Photo;
             coverRoot.Children.Add(CreateAsyncImageTile(
                 GetLibraryArtPathForDisplayOnly(displayFolder),
                 CalculateLibraryFolderArtDecodeWidth(tileWidth, ResolveLibraryDpiScale()),
@@ -278,6 +280,7 @@ namespace PixelVaultNative
                 new CornerRadius(0),
                 Brushes.Transparent,
                 new Thickness(0)));
+            if (showCompletedCardTreatment) coverRoot.Children.Add(BuildLibraryTileCompletionFoilOverlay());
             var overlayPadRight = showPlatformBadgeOnTile ? 84d : 10d;
             var titleBlock = new TextBlock
             {
@@ -314,13 +317,13 @@ namespace PixelVaultNative
             };
             coverRoot.Children.Add(footerScrim);
             if (showPlatformBadgeOnTile) coverRoot.Children.Add(BuildLibraryTilePlatformBadge(badgePlatformLabel));
-            if (folder != null && folder.IsCompleted100Percent && ws?.WorkspaceMode != LibraryWorkspaceMode.Photo)
-                coverRoot.Children.Add(BuildLibraryTileCompletionBadge());
             var imageBorder = new Border
             {
                 Width = tileWidth,
                 Height = tileHeight,
                 Background = Brush("#0E1418"),
+                BorderBrush = showCompletedCardTreatment ? BuildLibraryTileCompletionBorderBrush() : Brushes.Transparent,
+                BorderThickness = showCompletedCardTreatment ? new Thickness(2.2) : new Thickness(0),
                 CornerRadius = coverCorner,
                 ClipToBounds = true,
                 Child = coverRoot

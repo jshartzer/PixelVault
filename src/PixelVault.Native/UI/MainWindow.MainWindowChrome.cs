@@ -529,6 +529,77 @@ namespace PixelVaultNative
             textHost.Children.Add(text);
             return textHost;
         }
+        Brush BuildLibraryTileCompletionBorderBrush()
+        {
+            var brush = new LinearGradientBrush
+            {
+                StartPoint = new Point(0, 0),
+                EndPoint = new Point(1, 1)
+            };
+            brush.GradientStops.Add(new GradientStop(Brush("#FFF5C5").Color, 0));
+            brush.GradientStops.Add(new GradientStop(Brush("#D9A53E").Color, 0.26));
+            brush.GradientStops.Add(new GradientStop(Brush("#FFF0B0").Color, 0.58));
+            brush.GradientStops.Add(new GradientStop(Brush("#8E6114").Color, 1));
+            if (brush.CanFreeze) brush.Freeze();
+            return brush;
+        }
+        FrameworkElement BuildLibraryTileCompletionFoilOverlay()
+        {
+            var foil = new Grid
+            {
+                IsHitTestVisible = false,
+                Opacity = 0.88
+            };
+
+            var ambientWashBrush = new LinearGradientBrush
+            {
+                StartPoint = new Point(0, 0),
+                EndPoint = new Point(1, 1)
+            };
+            ambientWashBrush.GradientStops.Add(new GradientStop(Brush("#10FFF8E0").Color, 0));
+            ambientWashBrush.GradientStops.Add(new GradientStop(Brush("#18FFD26B").Color, 0.24));
+            ambientWashBrush.GradientStops.Add(new GradientStop(Brush("#12F0A4FF").Color, 0.54));
+            ambientWashBrush.GradientStops.Add(new GradientStop(Brush("#1498FFE6").Color, 0.82));
+            ambientWashBrush.GradientStops.Add(new GradientStop(Brush("#08FFFFFF").Color, 1));
+            if (ambientWashBrush.CanFreeze) ambientWashBrush.Freeze();
+            foil.Children.Add(new Border { Background = ambientWashBrush });
+
+            var prismSweepBrush = new LinearGradientBrush
+            {
+                StartPoint = new Point(0, 0.88),
+                EndPoint = new Point(1, 0.12)
+            };
+            prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#00FFFFFF").Color, 0.08));
+            prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#2CFF90DA").Color, 0.3));
+            prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#34FFF1AD").Color, 0.5));
+            prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#24FFD26F").Color, 0.68));
+            prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#00FFFFFF").Color, 0.88));
+            if (prismSweepBrush.CanFreeze) prismSweepBrush.Freeze();
+            foil.Children.Add(new Border
+            {
+                Background = prismSweepBrush,
+                Opacity = 0.82
+            });
+
+            var topGlintBrush = new RadialGradientBrush
+            {
+                Center = new Point(0.18, 0.14),
+                GradientOrigin = new Point(0.18, 0.14),
+                RadiusX = 0.86,
+                RadiusY = 0.62
+            };
+            topGlintBrush.GradientStops.Add(new GradientStop(Brush("#44FFFDF3").Color, 0));
+            topGlintBrush.GradientStops.Add(new GradientStop(Brush("#1EFFF0C2").Color, 0.34));
+            topGlintBrush.GradientStops.Add(new GradientStop(Brush("#00FFFFFF").Color, 1));
+            if (topGlintBrush.CanFreeze) topGlintBrush.Freeze();
+            foil.Children.Add(new Border
+            {
+                Background = topGlintBrush,
+                Opacity = 0.68
+            });
+
+            return foil;
+        }
         FrameworkElement BuildLibrarySectionHeader(string platformLabel, int folderCount, bool sectionCollapsed, Action toggleSectionCollapse)
         {
             var resolvedLabel = NormalizeConsoleLabel(platformLabel);
