@@ -636,155 +636,19 @@ namespace PixelVaultNative
         string NormalizeTitle(string title) { title = WebUtility.HtmlDecode(title ?? string.Empty); title = title.Replace("â„¢", " ").Replace("Â®", " ").Replace("Â©", " ").Replace("_", " ").Replace("-", " ").Replace(":", " "); title = Regex.Replace(title, @"[^\p{L}\p{Nd}]+", " "); return Regex.Replace(title, @"\s+", " ").Trim().ToLowerInvariant(); }
         string StripTags(string html) { return Regex.Replace(html ?? string.Empty, "<.*?>", string.Empty); }
 
-        string ResolvePersistentDataRoot(string currentAppRoot)
-        {
-            try
-            {
-                var currentDir = new DirectoryInfo(currentAppRoot);
-                if (currentDir != null
-                    && currentDir.Parent != null
-                    && string.Equals(currentDir.Parent.Name, "dist", StringComparison.OrdinalIgnoreCase)
-                    && currentDir.Parent.Parent != null
-                    && (Regex.IsMatch(currentDir.Name, @"^PixelVault-\d+\.\d+$", RegexOptions.IgnoreCase)
-                        || string.Equals(currentDir.Name, "PixelVault-current", StringComparison.OrdinalIgnoreCase)))
-                {
-                    return Path.Combine(currentDir.Parent.Parent.FullName, "PixelVaultData");
-                }
-
-                var probe = currentDir;
-                while (probe != null)
-                {
-                    var pixelVaultDataPath = Path.Combine(probe.FullName, "PixelVaultData");
-                    var sourceProjectPath = Path.Combine(probe.FullName, "src", "PixelVault.Native");
-                    if (Directory.Exists(pixelVaultDataPath) && Directory.Exists(sourceProjectPath))
-                    {
-                        return pixelVaultDataPath;
-                    }
-                    probe = probe.Parent;
-                }
-            }
-            catch (Exception ex)
-            {
-                Log("ResolvePersistentDataRoot: " + ex.Message);
-            }
-            return currentAppRoot;
-        }
-
-        void MigratePersistentDataFromLegacyVersions()
-        {
-            if (string.Equals(dataRoot, appRoot, StringComparison.OrdinalIgnoreCase)) return;
-            CopyIfNewerOrMissing(Path.Combine(appRoot, "PixelVault.settings.ini"), settingsPath);
-            // Shared PixelVaultData becomes authoritative once it exists; release-local caches
-            // can help bootstrap missing files, but they should never roll newer shared index data back.
-            CopyDirectoryContentsIfMissing(Path.Combine(appRoot, "cache"), cacheRoot);
-            CopyDirectoryContentsIfMissing(Path.Combine(appRoot, "logs"), logsRoot);
-            var currentDir = new DirectoryInfo(appRoot);
-            var distDir = currentDir == null ? null : currentDir.Parent;
-            if (distDir == null || !distDir.Exists) return;
-            foreach (var dir in distDir.GetDirectories("PixelVault-*").OrderByDescending(d => d.Name, StringComparer.OrdinalIgnoreCase))
-            {
-                if (string.Equals(dir.FullName.TrimEnd(Path.DirectorySeparatorChar), appRoot, StringComparison.OrdinalIgnoreCase)) continue;
-                CopyIfNewerOrMissing(Path.Combine(dir.FullName, "PixelVault.settings.ini"), settingsPath);
-                CopyDirectoryContentsIfMissing(Path.Combine(dir.FullName, "cache"), cacheRoot);
-                CopyDirectoryContentsIfMissing(Path.Combine(dir.FullName, "logs"), logsRoot);
-            }
-        }
-
-        void CopyIfNewerOrMissing(string sourcePath, string destinationPath)
-        {
-            if (!File.Exists(sourcePath)) return;
-            var destinationDirectory = Path.GetDirectoryName(destinationPath);
-            if (!string.IsNullOrWhiteSpace(destinationDirectory)) Directory.CreateDirectory(destinationDirectory);
-            if (File.Exists(destinationPath))
-            {
-                var sourceInfo = new FileInfo(sourcePath);
-                var destinationInfo = new FileInfo(destinationPath);
-                if (destinationInfo.Length == sourceInfo.Length && destinationInfo.LastWriteTimeUtc >= sourceInfo.LastWriteTimeUtc) return;
-            }
-            fileSystemService.CopyFile(sourcePath, destinationPath, true);
-        }
-
-        void CopyDirectoryContentsIfNewer(string sourceDirectory, string destinationDirectory)
-        {
-            if (!Directory.Exists(sourceDirectory)) return;
-            Directory.CreateDirectory(destinationDirectory);
-            foreach (var sourceFile in Directory.EnumerateFiles(sourceDirectory, "*", SearchOption.AllDirectories))
-            {
-                var relative = sourceFile.Substring(sourceDirectory.Length).TrimStart(Path.DirectorySeparatorChar);
-                var destinationFile = Path.Combine(destinationDirectory, relative);
-                var destinationFolder = Path.GetDirectoryName(destinationFile);
-                if (!string.IsNullOrWhiteSpace(destinationFolder)) Directory.CreateDirectory(destinationFolder);
-                if (File.Exists(destinationFile))
-                {
-                    var sourceInfo = new FileInfo(sourceFile);
-                    var destinationInfo = new FileInfo(destinationFile);
-                    if (destinationInfo.Length == sourceInfo.Length && destinationInfo.LastWriteTimeUtc >= sourceInfo.LastWriteTimeUtc) continue;
-                }
-                fileSystemService.CopyFile(sourceFile, destinationFile, true);
-            }
-        }
-
-        void CopyDirectoryContentsIfMissing(string sourceDirectory, string destinationDirectory)
-        {
-            if (!Directory.Exists(sourceDirectory)) return;
-            Directory.CreateDirectory(destinationDirectory);
-            foreach (var sourceFile in Directory.EnumerateFiles(sourceDirectory, "*", SearchOption.AllDirectories))
-            {
-                var relative = sourceFile.Substring(sourceDirectory.Length).TrimStart(Path.DirectorySeparatorChar);
-                var destinationFile = Path.Combine(destinationDirectory, relative);
-                if (File.Exists(destinationFile)) continue;
-                var destinationFolder = Path.GetDirectoryName(destinationFile);
-                if (!string.IsNullOrWhiteSpace(destinationFolder)) Directory.CreateDirectory(destinationFolder);
-                fileSystemService.CopyFile(sourceFile, destinationFile, false);
-            }
-        }
-        void OpenFolder(string path)
-        {
-            if (string.IsNullOrWhiteSpace(path) || !Directory.Exists(path)) return;
-            var fullPath = Path.GetFullPath(path);
-            try
-            {
-                Process.Start(new ProcessStartInfo { FileName = fullPath, UseShellExecute = true, Verb = "open" });
-            }
-            catch (Exception ex)
-            {
-                Log("OpenFolder primary open failed; trying explorer. " + ex.Message);
-                Process.Start(new ProcessStartInfo("explorer.exe", fullPath) { UseShellExecute = true });
-            }
-        }
-
-        void EnsureSavedCoversReadme()
-        {
-            try
-            {
-                var readme = Path.Combine(savedCoversRoot, "README.txt");
-                if (File.Exists(readme)) return;
-                File.WriteAllText(readme,
-                    "My Covers (permanent stash)\r\n" +
-                    "\r\n" +
-                    "Save or copy cover images here (JPG, PNG, GIF, BMP). Subfolders are fine.\r\n" +
-                    "In the library, right-click a game folder, choose Set Custom Cover — the file picker starts here (use Open My Covers Folder in the same menu if you want Explorer).\r\n" +
-                    "This folder is not part of the cache; PixelVault will not delete it when refreshing covers.\r\n");
-            }
-            catch (Exception ex)
-            {
-                Log("EnsureSavedCoversReadme: " + ex.Message);
-            }
-        }
-
-        void OpenSavedCoversFolder()
-        {
-            try
-            {
-                Directory.CreateDirectory(savedCoversRoot);
-                EnsureSavedCoversReadme();
-            }
-            catch (Exception ex)
-            {
-                Log("OpenSavedCoversFolder setup: " + ex.Message);
-            }
-            OpenFolder(savedCoversRoot);
-        }
+        // PV-PLN-UI-001 Step 11: persistent-data migration + open-folder glue live in
+        // Infrastructure/PersistentDataMigrator.cs. These thin instance forwarders exist so
+        // `ResolvePersistentDataRoot` can still be passed as a method group to
+        // `ComputePersistentStorageLayout`, and so the ~14 call sites that bind `OpenFolder` /
+        // `OpenSavedCoversFolder` as `Action<string>` / `Action` (SettingsShellDependencies,
+        // PhotoIndexEditorHost, GameIndexEditorHost, HealthDashboardWindow, palette commands,
+        // nav chrome, folder tile menu, photo hero menu, quick-edit drawer, manual metadata)
+        // keep resolving unchanged. Keep them one-liners; don't grow.
+        string ResolvePersistentDataRoot(string currentAppRoot) => PersistentDataMigrator.ResolvePersistentDataRoot(currentAppRoot, Log);
+        void MigratePersistentDataFromLegacyVersions() => PersistentDataMigrator.MigrateFromLegacyVersions(appRoot, dataRoot, settingsPath, cacheRoot, logsRoot, fileSystemService);
+        void OpenFolder(string path) => PersistentDataMigrator.OpenFolder(path, Log);
+        void EnsureSavedCoversReadme() => PersistentDataMigrator.EnsureSavedCoversReadme(savedCoversRoot, Log);
+        void OpenSavedCoversFolder() => PersistentDataMigrator.OpenSavedCoversFolder(savedCoversRoot, Log);
 
         void OpenPhotoIndexEditor()
         {
