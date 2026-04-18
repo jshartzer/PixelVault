@@ -1,7 +1,9 @@
 # Build a distributable PixelVault folder, verify it, and explain next steps in plain English.
 # See docs/SIMPLE_RELEASE_STEPS.md
 #
-# Examples:
+# Examples (use full path if your terminal is not in the repo — e.g. system32):
+#   cd C:\Codex
+#   pwsh -File .\scripts\Run-LocalReleaseChecks.ps1
 #   pwsh -File C:\Codex\scripts\Run-LocalReleaseChecks.ps1
 #   pwsh -File C:\Codex\scripts\Run-LocalReleaseChecks.ps1 -MakeInstaller
 #   pwsh -File C:\Codex\scripts\Run-LocalReleaseChecks.ps1 -OnlyVerify "C:\Codex\dist\Velopack\publish-0.076.000"

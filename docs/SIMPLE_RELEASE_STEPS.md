@@ -29,10 +29,19 @@ You want a **folder (or installer)** that contains PixelVault plus the right lic
 
 ## Easiest path: one command from the repo
 
-From **`C:\Codex`** (or your repo root), run:
+**Important:** PowerShell resolves `.\scripts\…` from **whatever folder your terminal is in**, not from “the project.” If you open PowerShell and you see something like `PS C:\WINDOWS\system32>`, you must either **change directory first** or pass the **full path** to the script.
+
+From **`C:\Codex`** (your repo root):
 
 ```powershell
+cd C:\Codex
 pwsh -File .\scripts\Run-LocalReleaseChecks.ps1
+```
+
+Or from **any** folder (no `cd` needed):
+
+```powershell
+pwsh -File C:\Codex\scripts\Run-LocalReleaseChecks.ps1
 ```
 
 That script will:

@@ -152,7 +152,7 @@ Optional: `-OutputRoot` if the default `dist` folder is locked; see script heade
 
 **Installer / delta-update channel (Velopack):** self-contained **`win-x64`** publish + **`vpk pack`** — **`scripts/Publish-Velopack.ps1`** and **`docs/VELOPACK.md`**.
 
-**Plain-English distribution path:** start with **`docs/SIMPLE_RELEASE_STEPS.md`**, then run **`scripts/Run-LocalReleaseChecks.ps1`** from repo root (it builds the Velopack publish folder, runs **`Verify-DistributionLayout.ps1`**, and prints what to do next). Fresh-machine smoke tests: **`docs/VELOPACK_VM_SPIKE_CHECKLIST.md`**.
+**Plain-English distribution path:** start with **`docs/SIMPLE_RELEASE_STEPS.md`**, then run **`scripts/Run-LocalReleaseChecks.ps1`** from repo root (`cd C:\Codex` then `pwsh -File .\scripts\…`, or **`pwsh -File C:\Codex\scripts\Run-LocalReleaseChecks.ps1`** from any folder). It builds the Velopack publish folder, runs **`Verify-DistributionLayout.ps1`**, and prints what to do next. Fresh-machine smoke tests: **`docs/VELOPACK_VM_SPIKE_CHECKLIST.md`**.
 
 **Code signing (Authenticode):** **`docs/PUBLISH_SIGNING.md`** — **`Publish-PixelVault.ps1 -Sign`** and **`vpk pack`** **`signParams`**.
 
