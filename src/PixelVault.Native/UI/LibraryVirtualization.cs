@@ -1029,7 +1029,7 @@ namespace PixelVaultNative
                         else
                         {
                             if (status != null) status.Text = "Clip preview unavailable";
-                            TryLibraryToast("Could not generate a clip preview. Check the FFmpeg path in Path Settings.");
+                            TryLibraryToast("Clip previews use optional FFmpeg. Install it separately and set the FFmpeg path in Path Settings to enable them.");
                         }
                     }
                     catch (Exception ex)

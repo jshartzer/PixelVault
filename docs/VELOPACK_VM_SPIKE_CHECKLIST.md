@@ -39,4 +39,4 @@ Use on a **clean Windows VM** (or disposable machine), not only your dev box —
 ## Cross-checks
 
 - **`docs/MANUAL_GOLDEN_PATH_CHECKLIST.md`** — optional library smoke after installer path works.
-- **`docs/BUNDLED_TOOLS_REDISTRIBUTION.md`** — before wide distribution with bundled **`tools/`**, complete **§5.9**.
+- **`docs/BUNDLED_TOOLS_REDISTRIBUTION.md`** — publish output includes **`tools\licenses\`** for **ExifTool** when you ship **`tools\exiftool.exe`**; **FFmpeg** is **not** bundled — install separately on the VM if you need video smoke tests.

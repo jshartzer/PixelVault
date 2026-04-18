@@ -1,39 +1,38 @@
-# Bundled external tools — redistribution worksheet (**PV-PLN-DIST-001** §5.9)
+# Bundled & optional external tools (**PV-PLN-DIST-001** §5.9)
 
-PixelVault **invokes** third-party binaries (**ExifTool**, **FFmpeg**) from **Path Settings** or, when unset, from **`tools\`** next to **`PixelVault.exe`** (**`MainWindow.StartupInitialization`**, **`SettingsService`**).
+PixelVault **invokes** third-party programs you configure:
 
-Shipping those binaries with **`Publish-PixelVault.ps1`**, **`Publish-Velopack.ps1`**, or **`Build-PixelVault-AppTesting.ps1`** requires matching each vendor’s **license** and **notice** rules. This document is an **engineering worksheet** — not legal advice.
+| Tool | Default product posture | License / notices in repo |
+|------|-------------------------|---------------------------|
+| **ExifTool** | Often shipped beside the app as **`tools\exiftool.exe`** (fallback when Path Settings unset). | **`tools-licenses\exiftool-gpl-3.0-COPYING.txt`** merged into **`tools\licenses\`** on publish. |
+| **FFmpeg** | **Optional add-on** — **not** bundled. Users install FFmpeg separately (or rely on **`PATH`**) and set **Path Settings → FFmpeg**. | **Not** shipped from this repo. If **you** redistribute **`ffmpeg.exe`**, follow **your** build’s license (GPL/LGPL/etc.) yourself. |
+
+Shipping **`Publish-PixelVault.ps1`**, **`Publish-Velopack.ps1`**, or **`Build-PixelVault-AppTesting.ps1`** requires matching redistribution rules for anything you **actually place** under **`tools\`**. This document is an **engineering worksheet** — not legal advice.
 
 ---
 
 ## Ship automation (repo)
 
-Publish scripts dot-source **`scripts/Merge-BundledToolLicenses.ps1`** and merge **`tools-licenses\`** into **`<publish output>\tools\licenses\`** every time (even when the local repo **`tools\`** folder has no binaries). Committed texts today:
+Publish scripts dot-source **`scripts/Merge-BundledToolLicenses.ps1`** and merge **`tools-licenses\`** into **`<publish output>\tools\licenses\`** every time.
 
 | File | Purpose |
 |------|---------|
-| **`tools-licenses/README.txt`** | Short operator instructions (also copied into **`tools\licenses\`**). |
-| **`tools-licenses/exiftool-gpl-3.0-COPYING.txt`** | Full **GNU GPL v3** text — appropriate for **Windows standalone `exiftool.exe`** from **[exiftool.org](https://exiftool.org/)** (verified **13.45** — GPLv3 per upstream **`LICENSE`**). |
-| **`tools-licenses/ffmpeg-gpl-3.0-COPYING.txt`** | Full **GNU GPL v3** text — aligned with **gyan.dev “essentials”** Windows builds that use **`--enable-gpl`** / **`--enable-version3`** (GPL aggregate, not LGPL-only). **If you ship an LGPL shared FFmpeg build instead, replace this file with the LGPL v2.1 COPYING from that build.** |
+| **`tools-licenses/README.txt`** | Operator instructions (also copied into **`tools\licenses\`**). |
+| **`tools-licenses/exiftool-gpl-3.0-COPYING.txt`** | Full **GNU GPL v3** — appropriate for typical Windows **`exiftool.exe`** from **[exiftool.org](https://exiftool.org/)**. Replace if your **`exiftool.exe`** build differs. |
 
 ---
 
-## Vendor matrix (fill versions at release time)
+## Vendor notes (FFmpeg — user-installed)
 
-| Tool | Binary expected in **`tools\`** | Version check | Upstream | License (this repo’s bundle) | Redistribution |
-|------|----------------------------------|----------------|----------|------------------------------|----------------|
-| **ExifTool** | **`exiftool.exe`** | `exiftool.exe -ver` | [exiftool.org](https://exiftool.org/) | **GPL v3** (standalone Windows build). | Use **`exiftool-gpl-3.0-COPYING.txt`**. |
-| **FFmpeg** | **`ffmpeg.exe`** | `ffmpeg.exe -version` | [ffmpeg.org](https://ffmpeg.org/) — builds e.g. **[gyan.dev](https://www.gyan.dev/ffmpeg/builds/)** | **GPL v3** essentials build (**`--enable-gpl`**, static linking flags as published by vendor — **not** LGPL-only). | Use **`ffmpeg-gpl-3.0-COPYING.txt`**. |
-
-**Channels:** zip **`dist/PixelVault-*`** and **Velopack** both receive **`tools\licenses\`** via the same merge step. **Microsoft Store / Desktop Bridge** still needs Partner Center disclosure for **`runFullTrust`** helpers.
+When users point PixelVault at **`ffmpeg.exe`**, they choose the build (e.g. **[gyan.dev](https://www.gyan.dev/ffmpeg/builds/)**, **[BtbN](https://github.com/BtbN/FFmpeg-Builds)**). PixelVault does **not** embed FFmpeg and does **not** ship its license text — **Partner Center / Store** submissions should describe optional invocation of a user-supplied executable per your counsel.
 
 ---
 
 ## Release packaging checklist
 
-- [x] **Automated:** **`tools\licenses\`** merged into publish output from **`tools-licenses\`** (**`Merge-BundledToolLicenses.ps1`**).
-- [ ] **Per release:** Reconfirm **`exiftool.exe`** / **`ffmpeg.exe`** versions and build flavor (`ffmpeg -version` legal line). Swap **`ffmpeg-*-COPYING.txt`** if you change FFmpeg variant (e.g. LGPL shared build from **[BtbN](https://github.com/BtbN/FFmpeg-Builds)**).
-- [ ] **User-visible attribution** if upstream requires it beyond file drop (About box, **`tools\licenses\README.txt`** is a start; extend if counsel requires).
-- [ ] **Partner Center / Desktop Bridge:** disclose bundled executables per submission guidance.
+- [x] **Automated:** **`tools\licenses\`** merged from **`tools-licenses\`** (**`Merge-BundledToolLicenses.ps1`**).
+- [ ] **Per release:** Confirm **`exiftool.exe`** version if present under **`tools\`** (`exiftool.exe -ver`). Swap **`exiftool-*-COPYING.txt`** if the binary’s license differs.
+- [ ] **User-visible attribution** for **ExifTool** if required beyond **`tools\licenses\`** (About, readme).
+- [ ] **Partner Center / Desktop Bridge:** disclose **ExifTool** when bundled; **FFmpeg** as optional user tool per your listing strategy.
 
-**Fallback (product):** users can point **Path Settings** at externally installed tools if a channel forbids bundling — **`SettingsService`** already prefers saved paths over **`tools\`** when valid.
+**Fallback:** **Path Settings** overrides bundled **`tools\exiftool.exe`** when a valid path is set (**`SettingsService`**).

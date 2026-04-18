@@ -250,7 +250,7 @@ namespace PixelVaultNative
             destinationRoot = @"E:\Game Captures";
             libraryRoot = destinationRoot;
             exifToolPath = Path.Combine(appRoot, "tools", "exiftool.exe");
-            ffmpegPath = Path.Combine(appRoot, "tools", "ffmpeg.exe");
+            ffmpegPath = string.Empty;
         }
 
         void RunPostServiceStartup()

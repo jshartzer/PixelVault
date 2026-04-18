@@ -344,12 +344,10 @@ namespace PixelVaultNative
             var bundledExifTool = Path.Combine(appRoot ?? string.Empty, "tools", "exiftool.exe");
             if (!File.Exists(s.ExifToolPath) && File.Exists(bundledExifTool)) s.ExifToolPath = bundledExifTool;
 
-            var bundledFfmpeg = Path.Combine(appRoot ?? string.Empty, "tools", "ffmpeg.exe");
+            // FFmpeg is optional and not shipped next to the app; resolve from PATH when unset or invalid.
             if (string.IsNullOrWhiteSpace(s.FfmpegPath) || !File.Exists(s.FfmpegPath))
             {
-                s.FfmpegPath = File.Exists(bundledFfmpeg)
-                    ? bundledFfmpeg
-                    : (findFfmpegOnPath != null ? findFfmpegOnPath() : string.Empty) ?? string.Empty;
+                s.FfmpegPath = (findFfmpegOnPath != null ? findFfmpegOnPath() : string.Empty) ?? string.Empty;
             }
 
             var envSteamGridDbToken = readSteamGridDbTokenFromEnvironment != null ? readSteamGridDbTokenFromEnvironment() : string.Empty;

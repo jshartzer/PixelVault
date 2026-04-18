@@ -87,7 +87,8 @@ namespace PixelVaultNative
             var destinationBox = SettingsTextBox(panel, 1, "Destination folder", d.GetDestinationRoot(), labelFg, boxBg, boxFg, borderBrush, boxFg);
             var libraryBox = SettingsTextBox(panel, 2, "Library folder", d.GetLibraryRoot(), labelFg, boxBg, boxFg, borderBrush, boxFg);
             var exifBox = SettingsTextBox(panel, 3, "ExifTool path", d.GetExifToolPath(), labelFg, boxBg, boxFg, borderBrush, boxFg);
-            var ffmpegBox = SettingsTextBox(panel, 4, "FFmpeg path", d.GetFfmpegPath(), labelFg, boxBg, boxFg, borderBrush, boxFg);
+            var ffmpegBox = SettingsTextBox(panel, 4, "FFmpeg path (optional)", d.GetFfmpegPath(), labelFg, boxBg, boxFg, borderBrush, boxFg);
+            ffmpegBox.ToolTip = "Optional video add-on. Install FFmpeg separately and point PixelVault to ffmpeg.exe to enable video thumbnails, clip previews, and richer clip details.";
             var steamGridDbTokenBox = SettingsTextBox(panel, 5, "SteamGridDB token", d.GetSteamGridDbApiToken(), labelFg, boxBg, boxFg, borderBrush, boxFg);
             steamGridDbTokenBox.ToolTip = "Stored locally in PixelVault.settings.ini. Environment variables can also override it.";
             var steamWebApiKeyBox = SettingsTextBox(panel, 6, "Steam Web API key (optional)", d.GetSteamWebApiKey(), labelFg, boxBg, boxFg, borderBrush, boxFg);
@@ -486,7 +487,15 @@ namespace PixelVaultNative
             stack.Children.Add(new TextBlock { Text = "Library: " + d.GetLibraryWorkspaceRoot(), TextWrapping = TextWrapping.Wrap, Foreground = textMuted, Margin = new Thickness(0, 0, 0, 4) });
             stack.Children.Add(new TextBlock { Text = "My Covers: " + d.GetSavedCoversRoot(), TextWrapping = TextWrapping.Wrap, Foreground = textMuted, Margin = new Thickness(0, 0, 0, 4) });
             stack.Children.Add(new TextBlock { Text = "ExifTool: " + d.GetExifToolPath(), TextWrapping = TextWrapping.Wrap, Foreground = textMuted, Margin = new Thickness(0, 0, 0, 4) });
-            stack.Children.Add(new TextBlock { Text = "FFmpeg: " + (string.IsNullOrWhiteSpace(d.GetFfmpegPath()) ? "(not configured)" : d.GetFfmpegPath()), TextWrapping = TextWrapping.Wrap, Foreground = textMuted, Margin = new Thickness(0, 0, 0, 4) });
+            stack.Children.Add(new TextBlock
+            {
+                Text = "FFmpeg: " + (string.IsNullOrWhiteSpace(d.GetFfmpegPath())
+                    ? "(optional video add-on not configured — install FFmpeg separately for video thumbnails, clip previews, and richer clip details)"
+                    : d.GetFfmpegPath()),
+                TextWrapping = TextWrapping.Wrap,
+                Foreground = textMuted,
+                Margin = new Thickness(0, 0, 0, 4)
+            });
             stack.Children.Add(new TextBlock { Text = "SteamGridDB: " + (d.HasSteamGridDbApiToken() ? "token configured" : "(token not configured)"), TextWrapping = TextWrapping.Wrap, Foreground = textMuted });
             stack.Children.Add(new TextBlock { Text = "Steam Web API: " + ((d.HasSteamWebApiKey?.Invoke() ?? false) ? "key configured" : "(not configured)"), TextWrapping = TextWrapping.Wrap, Foreground = textMuted, Margin = new Thickness(0, 4, 0, 0) });
             stack.Children.Add(new TextBlock { Text = "RetroAchievements: " + ((d.HasRetroAchievementsApiKey?.Invoke() ?? false) ? "API key configured" : "(not configured)"), TextWrapping = TextWrapping.Wrap, Foreground = textMuted, Margin = new Thickness(0, 4, 0, 0) });

@@ -101,9 +101,11 @@ namespace PixelVaultNative
             var hasRa = d.HasRetroAchievementsApiKey?.Invoke() ?? false;
             stack.Children.Add(SectionCard(d, "External tools",
                 Row(d, "ExifTool", string.IsNullOrWhiteSpace(exif) ? "(not set)" : exif, FileOk(exif), DescribeFile(exif)),
-                Row(d, "FFmpeg", string.IsNullOrWhiteSpace(ffmpeg) ? "(optional, not set)" : ffmpeg,
+                Row(d, "FFmpeg (optional)", string.IsNullOrWhiteSpace(ffmpeg) ? "(not set)" : ffmpeg,
                     string.IsNullOrWhiteSpace(ffmpeg) ? DesignTokens.StatusNeutral : FileOk(ffmpeg),
-                    string.IsNullOrWhiteSpace(ffmpeg) ? "Optional for some video workflows." : DescribeFile(ffmpeg)),
+                    string.IsNullOrWhiteSpace(ffmpeg)
+                        ? "Install FFmpeg separately and point PixelVault to ffmpeg.exe for video thumbnails, clip previews, and richer clip details."
+                        : DescribeFile(ffmpeg)),
                 Row(d, "SteamGridDB", hasToken ? "API token on file" : "(optional, not set)",
                     hasToken ? DesignTokens.StatusOk : DesignTokens.StatusNeutral,
                     hasToken ? "Used for cover downloads." : "Optional unless you fetch covers from SteamGridDB."),
@@ -890,7 +892,7 @@ namespace PixelVaultNative
             sb.AppendLine();
             sb.AppendLine("Tools:");
             sb.AppendLine("  ExifTool: " + exif + " | exists=" + File.Exists(exif ?? ""));
-            sb.AppendLine("  FFmpeg: " + (string.IsNullOrWhiteSpace(ffmpeg) ? "(optional, not set)" : ffmpeg) + " | exists=" + (string.IsNullOrWhiteSpace(ffmpeg) ? "optional" : File.Exists(ffmpeg).ToString()));
+            sb.AppendLine("  FFmpeg: " + (string.IsNullOrWhiteSpace(ffmpeg) ? "(optional video add-on not set)" : ffmpeg) + " | exists=" + (string.IsNullOrWhiteSpace(ffmpeg) ? "optional" : File.Exists(ffmpeg).ToString()));
             sb.AppendLine("  SteamGridDB token: " + (hasSteamToken ? "configured" : "not set"));
             sb.AppendLine();
             sb.AppendLine("Index DB: " + (string.IsNullOrWhiteSpace(indexPath) ? "(n/a)" : indexPath) + " | exists=" + (string.IsNullOrWhiteSpace(indexPath) ? "n/a" : File.Exists(indexPath).ToString()));

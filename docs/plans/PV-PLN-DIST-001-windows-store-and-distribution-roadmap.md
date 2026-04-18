@@ -41,7 +41,7 @@ The Microsoft Store step is **not** mostly paperwork. Treat these as **high‑ri
 
 | Area | Why it bites |
 |------|----------------|
-| **Bundled external tools** (**ExifTool**, **FFmpeg**) | Execution + redistribution terms + packaged‑app launch behavior. |
+| **Bundled / invoked tools** (**ExifTool** bundled typical; **FFmpeg** optional user install) | Execution + redistribution (**ExifTool**) + disclosure for optional **`ffmpeg.exe`**. |
 | **Full‑trust / Desktop Bridge** | Recommended for PixelVault, but **verification work** (data paths, tools, tray) — not “drop in a manifest.” |
 | **Trademark / logo / branding assets** | Certification and **wider distribution** risk if artwork tracks first‑party marks too closely (§7.2). |
 | **Privacy policy + listing requirements** | Store **requires** a privacy URL; disclosures must match real behavior. |
@@ -62,7 +62,7 @@ Use this section when you reopen the doc after months away.
 ### 2.1 Product identity
 
 - **PixelVault** is a **native Windows desktop** app for organizing, tagging, indexing, and browsing game screenshots and clips (`README.md`).
-- Primary workflows: **intake → metadata/index → Library browse**; heavy tooling integration (**ExifTool**, **FFmpeg**, optional **SteamGridDB**, Steam APIs).
+- Primary workflows: **intake → metadata/index → Library browse**; heavy tooling integration (**ExifTool**; **FFmpeg** optional — user-installed / **`PATH`**, optional **SteamGridDB**, Steam APIs).
 - **Persistent data:** a **`PixelVaultData`** / cache concept already exists (`README.md`) — a strength for installers and updates **once** the authoritative writable root is nailed down (**§5.8**).
 
 ### 2.2 Platform & packaging facts (authoritative in repo)
@@ -110,7 +110,7 @@ Split the work so engineering is not constantly mixed with Partner Center admin.
 | MSIX / packaging project, manifest, **`runFullTrust`** | Privacy policy URL, support contact |
 | Behavior under packaged desktop install | Age rating questionnaire |
 | Data paths, writable locations, migration | Branding / trademark review of assets |
-| Bundled **ExifTool** / **FFmpeg** execution + **redistribution / notices** (§5.9) | Keywords, store promotional assets |
+| Bundled **ExifTool** + optional **FFmpeg** invocation + **redistribution / notices** (§5.9) | Keywords, store promotional assets |
 | Crash logs / diagnostics export (near‑1.0) | Certification passes / fix/resubmit loops |
 
 ---
@@ -245,12 +245,12 @@ Automated tests are strong; distribution changes need smoke manual QA.
 
 ### 5.9 Bundled external tools — redistribution & compliance
 
-**Why:** Full‑trust packaging can **run** **ExifTool** / **FFmpeg**; **Store / legal** still require **redistribution** and **notice** hygiene.
+**Why:** Full‑trust packaging can **run** **`exiftool.exe`** beside the app; **FFmpeg** is **optional** and **not** shipped by default — users supply **`ffmpeg.exe`**. **Store / legal** still require **redistribution** and **notice** hygiene for anything **you** bundle.
 
-**Worksheet:** **`docs/BUNDLED_TOOLS_REDISTRIBUTION.md`** — vendor matrix + per-release COPY verification.
+**Worksheet:** **`docs/BUNDLED_TOOLS_REDISTRIBUTION.md`** — **ExifTool** COPYING + optional FFmpeg disclosure notes.
 
-- [ ] Audit **license / redistribution terms** for the **exact** **ExifTool** and **FFmpeg** binaries you ship (replace repo **`tools-licenses\`** COPYING files when your build’s license differs).
-- [ ] Confirm those binaries may be redistributed in **each** channel you use (zip, installer, Store Desktop Bridge).
+- [ ] Audit **license / redistribution terms** for the **exact** **`exiftool.exe`** you ship (replace repo **`tools-licenses\`** COPYING when your build’s license differs). **FFmpeg:** only if **you** redistribute it; end‑users installing their own build handle upstream license.
+- [ ] Confirm **ExifTool** may be redistributed in **each** channel you use (zip, installer, Store Desktop Bridge).
 - [x] Ship **required** **`LICENSE` / notice** files inside release artifacts — **`tools-licenses\`** merged to **`tools\licenses\`** on every **`Publish-*`** / **`Build-PixelVault-AppTesting`** run (**`Merge-BundledToolLicenses.ps1`**).
 - [ ] Meet any **user‑visible attribution** requirements (About box, **`tools\licenses\README.txt`**, etc.) beyond file drop — confirm with counsel if unsure.
 - [ ] Confirm **Partner Center / Desktop Bridge** submission allows this **bundled‑tool model** under **`runFullTrust`** (expect disclosure in listing/privacy text).
@@ -262,7 +262,7 @@ Track the long‑term fork explicitly so packaging work does not thrash.
 
 | Option | Summary | Effort | Risk | Blocks 1.0? | Blocks Store? |
 |--------|---------|--------|------|-------------|----------------|
-| **A** | Keep **ExifTool** + **FFmpeg** bundled (desktop + Store Desktop Bridge) | Low–medium | Low if licenses OK | No if legal clear | No if **`runFullTrust`** + notices |
+| **A** | Keep **ExifTool** bundled; **FFmpeg** optional user install (current repo posture) | Low–medium | Low if **ExifTool** license clear | No if legal clear | No if **`runFullTrust`** + notices |
 | **B** | Replace one or both with **in‑process** libraries over time | High | Medium (parity bugs) | Product choice | Reduces proc‑spawn concerns; still need legal for any native deps |
 | **C** | **Full** desktop build vs **constrained** Store flavor (fewer bundled tools later) | Medium | Split codebase / UX | Optional | Possible if policies tighten |
 
@@ -270,7 +270,7 @@ Track the long‑term fork explicitly so packaging work does not thrash.
 
 ## 6. Phase 2 — Microsoft Store (Desktop Bridge)
 
-**Goal:** Submit a **packaged desktop** MSIX that matches how PixelVault actually works: **full trust**, arbitrary library roots, bundled **`tools/`** (ExifTool, FFmpeg).
+**Goal:** Submit a **packaged desktop** MSIX that matches how PixelVault actually works: **full trust**, arbitrary library roots, bundled **`tools/`** for **ExifTool** (typical); **FFmpeg** remains **optional** / user‑supplied.
 
 **Framing:** **Desktop Bridge + `runFullTrust`** is the recommended shape, but treat Phase 2 as a **packaging and packaged‑behavior verification project** — manifest, identity, Partner Center, **and** proving installed MSIX behaves like your Phase 1 build on **writable paths**, **tool launches**, **tray**, and **library roots on non‑system drives** (**§6.3**, **§6.6**).
 
@@ -310,7 +310,7 @@ Today there is **no** `Package.appxmanifest` in repo (verify with repo search wh
 
 - [ ] Install MSIX build on **VM or clean profile**; cold launch succeeds.
 - [ ] **Settings** load/save; **SQLite** / caches / logs write to intended locations (**§5.8**).
-- [ ] Invoke bundled **ExifTool** / **FFmpeg** from packaged layout; failures surface clearly.
+- [ ] Invoke bundled **ExifTool** from packaged layout; **FFmpeg** optional via user path / **`PATH`**; failures surface clearly.
 - [ ] **System tray** / minimize‑to‑tray / close prompts behave per **`MANUAL_GOLDEN_PATH_CHECKLIST.md`** touchpoints.
 - [ ] **Library roots** on **non‑system drives** (e.g. second volume) still scan/import.
 - [ ] **Upgrade** to next package version preserves user data; **uninstall** leaves documented residue or clean removal per policy.
@@ -375,7 +375,7 @@ Bundled **`tools/`** exes are consistent with **full‑trust** desktop bridge; *
 
 ### 7.4 Bundled third‑party redistribution & notices
 
-**Summary:** Even when **`runFullTrust`** allows execution, shipping **FFmpeg** / **ExifTool** binaries still requires **license compliance** and often **shipping notice files** — a common late‑stage surprise.
+**Summary:** Even when **`runFullTrust`** allows execution, shipping **`exiftool.exe`** (and any **`ffmpeg.exe`** **you** choose to bundle) still requires **license compliance** and often **shipping notice files** — a common late‑stage surprise. Default product posture: **FFmpeg** is **user‑installed**, not bundled.
 
 **Action:** follow **§5.9** before calling Phase 1 “done” for public artifacts.
 
@@ -466,5 +466,5 @@ Protect scope until **Phase 1** desktop distribution is **boringly stable**:
 | **2026‑04‑18** | §5.3: Velopack integration (**`docs/VELOPACK.md`**, **`Publish-Velopack.ps1`**); **`vpk`** requires **ASP.NET Core 8** runtime if the global tool won’t start; **`dist/Velopack/`** gitignored. |
 | **2026‑04‑18** | §5.3: recorded **upgrade in place** as the shipped model (vs dev **`dist`** side‑by‑side); VM + N→N+1 spikes still manual. |
 | **2026‑04‑18** | §5.5: **CHANGELOG** + **README** document self-contained (**Velopack**) vs framework-dependent (**`Publish-PixelVault`**); **`docs/VELOPACK_VM_SPIKE_CHECKLIST.md`**; gate **§4.1** installer + self-contained rows checked; **`docs/BUNDLED_TOOLS_REDISTRIBUTION.md`** worksheet for **§5.9**. |
-| **2026‑04‑18** | §5.9: **`tools-licenses\`** (**GPLv3** for **ExifTool** + **gyan.dev essentials** **FFmpeg** via **`ffmpeg-gpl-3.0-COPYING.txt`**) + **`Merge-BundledToolLicenses.ps1`** on publish scripts; worksheet expanded; gate **bundled‑tools** still open until Partner Center disclosure. |
+| **2026‑04‑18** | §5.9: **`tools-licenses\`** (**GPLv3** for **ExifTool** only) + **`Merge-BundledToolLicenses.ps1`**; **FFmpeg** optional / not bundled; **`SettingsService`** drops **`tools\ffmpeg.exe`** fallback. |
 | **2026‑04‑18** | §5.2 + §5.4: **`docs/PUBLISH_SIGNING.md`** (Authenticode + Velopack **`vpk`** signing); **`docs/PRIVACY_POLICY.md`** hosting checklist. |

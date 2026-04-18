@@ -54,7 +54,7 @@ Primary areas:
 - `C:\Codex\scripts`: publish and developer utility scripts
 - `C:\Codex\dist`: versioned published builds
 - `C:\Codex\assets`: shared branding and UI assets
-- `C:\Codex\tools`: bundled runtime tools such as `ExifTool` and `FFmpeg`
+- `C:\Codex\tools`: optional local **`exiftool.exe`** drop (gitignored); **FFmpeg** is user-installed (**Path Settings** / **`PATH`**), not bundled by default
 - `C:\Codex\PixelVaultData`: shared persistent app data, indexes, caches, and logs
 
 Important runtime pointers:

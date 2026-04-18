@@ -55,5 +55,5 @@ Expected:
 
 ## Notes
 
-- If `FFmpeg` is available at `C:\Codex\tools\ffmpeg.exe`, the stress data includes short MP4 clips for mixed-media coverage.
+- If **FFmpeg** is configured (Path Settings or **`ffmpeg.exe`** on **`PATH`**), the stress data includes short MP4 clips for mixed-media coverage.
 - Use `Refresh` and `Rebuild` once after generating the dataset if you want to verify index rebuild behavior under the larger library shape.

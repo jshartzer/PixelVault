@@ -24,6 +24,7 @@ PixelVault reads and writes files **you control**, including:
 - **Screenshots and videos** under your configured **library** and **destination** folders.
 - **SQLite indexes**, **thumbnail/cover caches**, **logs**, and **`PixelVault.settings.ini`** under the resolved **app data folder** (see **`docs/DISTRIBUTION_STORAGE.md`**). Typical locations include a repo **`PixelVaultData`** tree during development, **`%LocalAppData%\PixelVault`** when installed under protected directories, or a folder beside the executable for portable installs.
 - Optional **embedded metadata** and sidecars managed through **ExifTool** workflows you configure.
+- If you install **FFmpeg** yourself and set its path in **Path Settings**, PixelVault runs **`ffmpeg.exe`** locally for optional video workflows — it is **not** bundled with the application.
 
 You are responsible for backups and for any sensitive content in your library folders.
 
