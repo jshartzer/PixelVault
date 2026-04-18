@@ -50,6 +50,7 @@ Then use these based on the task:
 - `C:\Codex\docs\PERFORMANCE_TODO.md` for responsiveness/scalability follow-up
 - `C:\Codex\docs\CODE_QUALITY_IMPROVEMENT_PLAN.md` for hardening / edge-case backlog
 - `C:\Codex\docs\MANUAL_GOLDEN_PATH_CHECKLIST.md` for risky manual verification
+- `C:\Codex\docs\SIMPLE_RELEASE_STEPS.md` + `C:\Codex\scripts\Run-LocalReleaseChecks.ps1` for **non-expert “build + verify + next steps”** before deep Velopack docs
 - `C:\Codex\docs\VELOPACK.md` + `C:\Codex\docs\VELOPACK_VM_SPIKE_CHECKLIST.md` for **installer / Velopack** distribution (**`PV-PLN-DIST-001`** §5.3)
 - `C:\Codex\docs\PUBLISH_SIGNING.md` — **Authenticode** signing (**`-Sign`**, **`vpk`** **`-n`**) (**§5.2**)
 - `C:\Codex\docs\EULA.md` + **`docs/PRIVACY_POLICY.md`** — **§5.4** drafts; **host HTTPS + finalize copy last** before Store/wide release (**`PV-PLN-DIST-001` §10.1**)

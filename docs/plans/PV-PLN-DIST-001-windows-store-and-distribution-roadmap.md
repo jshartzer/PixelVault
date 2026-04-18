@@ -475,3 +475,4 @@ Protect scope until **Phase 1** desktop distribution is **boringly stable**:
 | **2026‑04‑18** | §5.2: **`Publish-Velopack.ps1`** **`-SignParams`** / **`VPK_SIGN_PARAMS`** → **`vpk pack -n`**; in-app legal links deferred per handoff. |
 | **2026‑04‑18** | §5.4 / §10.1: **legal hosting + listing polish** explicitly **last** in Phase 1 priority table; §10 suggested order updated. |
 | **2026‑04‑18** | **`scripts/Verify-DistributionLayout.ps1`** — local gate before VM / **`MANUAL_GOLDEN_PATH`** on installer bits (**§5.3** / **§5.6**). |
+| **2026‑04‑18** | **`docs/SIMPLE_RELEASE_STEPS.md`** (plain-language release path) + **`scripts/Run-LocalReleaseChecks.ps1`** (Velopack publish + verify + “what next”). |

@@ -9,6 +9,8 @@ PixelVault integrates **[Velopack](https://docs.velopack.io/)** for:
 
 **Phase 1 order:** run **VM / golden-path** QA and **signing** on installer builds first; **host** privacy + EULA at stable HTTPS **last** before a public or Store push unless counsel needs it earlier — **`PV-PLN-DIST-001` §10.1**.
 
+**Plain-English path:** **`docs/SIMPLE_RELEASE_STEPS.md`** and **`scripts/Run-LocalReleaseChecks.ps1`** (wraps **`Publish-Velopack.ps1`** + **`Verify-DistributionLayout.ps1`** with a printed “what next” summary).
+
 **Local pre-check (before copying bits to a VM):**
 
 ```powershell
