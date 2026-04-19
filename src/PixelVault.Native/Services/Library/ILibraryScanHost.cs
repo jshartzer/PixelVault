@@ -5,7 +5,22 @@ using System.Threading;
 
 namespace PixelVaultNative
 {
-    /// <summary>Callbacks into the app for library metadata scanning (Phase 4 split — keeps scanner free of direct UI/index field access).</summary>
+    /// <summary>
+    /// Application port for <see cref="LibraryScanner"/> — persistence, folder cache, game-index merge, and metadata policy without referencing WPF types.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>PV-PLN-EXT-002 A.4:</b> Keep new callbacks grouped by concern; prefer adding methods here over growing <c>MainWindow</c> private helpers that only the scanner calls.</para>
+    /// <para><b>Implementation:</b> nested <c>LibraryScanHost</c> in <see cref="MainWindow"/> (<c>UI/Library/MainWindow.LibraryScannerBridge.cs</c>) forwards to <c>MainWindow</c> partials.</para>
+    /// <list type="bullet">
+    /// <item><description><b>Concurrency / sync:</b> <see cref="LibraryMaintenanceSync"/>, <see cref="LibraryFolderCacheRwLock"/>.</description></item>
+    /// <item><description><b>Prereqs:</b> <see cref="EnsureLibraryRootExists"/>, <see cref="EnsureExifTool"/>.</description></item>
+    /// <item><description><b>Photo index (SQLite-backed):</b> load/save metadata index, stamps, revisions, resolved entries, re-resolve rules.</description></item>
+    /// <item><description><b>Folder cache:</b> stamps, load/save folder list, index-only refresh, cache clears.</description></item>
+    /// <item><description><b>Game index:</b> rows load/save, assignment, sync/prune, Steam App ID resolution.</description></item>
+    /// <item><description><b>Tags / platform / manual metadata bridge:</b> tag cache, console label, manual metadata helpers used during scan merge.</description></item>
+    /// <item><description><b>Telemetry:</b> <see cref="LogLibraryScan"/>, <see cref="LogPerformanceSample"/>.</description></item>
+    /// </list>
+    /// </remarks>
     internal interface ILibraryScanHost
     {
         object LibraryMaintenanceSync { get; }

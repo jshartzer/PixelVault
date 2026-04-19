@@ -7,6 +7,7 @@ namespace PixelVaultNative
 {
     public sealed partial class MainWindow
     {
+        /// <summary>Thin <see cref="ILibraryScanHost"/> adapter — keeps <see cref="LibraryScanner"/> independent of WPF while delegating to <see cref="MainWindow"/>.</summary>
         sealed class LibraryScanHost : ILibraryScanHost
         {
             readonly MainWindow window;

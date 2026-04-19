@@ -351,6 +351,7 @@ namespace PixelVaultNative
         /// <summary>
         /// After import moves: append undo manifest and sort destination root into game folders when anything moved.
         /// Shared by standard import, unified import-and-comment, and manual intake.
+        /// Uses <see cref="IImportService.SortDestinationRootIntoGameFolders"/> directly (no <c>SortDestinationFoldersCore</c> UI side effects).
         /// </summary>
         SortStepResult SaveUndoAndSortAfterImportMoveIfNeeded(
             MoveStepResult moveResult,
@@ -363,7 +364,7 @@ namespace PixelVaultNative
             ImportWorkflowOrchestration.ThrowIfCancellationRequested(cancellationToken, canceledOperationLabel);
             importService.SaveUndoManifest(moveResult.Entries);
             reportProgress(sortProgressSlot, "Sorting imported captures into game folders...");
-            return SortDestinationFoldersCore(false, false, cancellationToken);
+            return importService.SortDestinationRootIntoGameFolders(destinationRoot, libraryRoot, cancellationToken);
         }
     }
 }

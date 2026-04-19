@@ -124,6 +124,7 @@ Tests under **`tests/`** create temp ini files for **`PersistentDataMigrator`** 
 | **2026-04-18** | **`RunWorkflow`**: single **`BuildSourceInventory`** call (was duplicated identical call for rename vs move totals). |
 | **2026-04-18** | **`ImportWorkflowOrchestration.CombineRenameStepResults`**: unified import-and-comment Steam + manual rename aggregation; tests. |
 | **2026-04-18** | **`MainWindow.SaveUndoAndSortAfterImportMoveIfNeeded`**: single path for post-move undo manifest + sort (standard, unified, manual intake). |
+| **2026-04-18** | Post-import sort uses **`IImportService.SortDestinationRootIntoGameFolders`** directly (not **`SortDestinationFoldersCore`**, which adds UI toasts/status). |
 
 ---
 
@@ -137,6 +138,12 @@ Tests under **`tests/`** create temp ini files for **`PersistentDataMigrator`** 
 - Push **metadata scan entry** and **index merge** policy toward **`LibraryScanner`** / **`IMetadataService`** when touching those paths.
 
 **Exit:** Each new scan feature adds **one** clear owner type; host interface changes are **rare** and **reviewed**.
+
+**Landings:**
+
+| Date | Change |
+|------|--------|
+| **2026-04-18** | **`ILibraryScanHost`**: expanded contract XML (grouped concerns, implementation pointer, A.4 guidance). **`LibraryScanHost`** class summary. |
 
 ---
 
@@ -247,3 +254,5 @@ Phase A is “on track” when:
 | **2026-04-18** | **A.2:** `import_move_conflict_mode` persisted (`AppSettings`, `SettingsService.NormalizeImportMoveConflictMode`, tests). |
 | **2026-04-18** | **A.2:** Settings ini I/O sweep documented (table in this plan). |
 | **2026-04-18** | **A.3:** `ImportWorkflow.RunWorkflow` — one `BuildSourceInventory` per run. |
+| **2026-04-18** | **A.3:** `CombineRenameStepResults`; `SaveUndoAndSortAfterImportMoveIfNeeded`; post-import sort → **`IImportService.SortDestinationRootIntoGameFolders`**. |
+| **2026-04-18** | **A.4 (initial):** **`ILibraryScanHost`** / **`LibraryScanHost`** contract documentation. |
