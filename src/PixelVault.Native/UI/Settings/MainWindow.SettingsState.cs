@@ -20,6 +20,7 @@ namespace PixelVaultNative
                 ExifToolPath = exifToolPath ?? string.Empty,
                 FfmpegPath = ffmpegPath ?? string.Empty,
                 ImportSearchSubfoldersForRename = importSearchSubfoldersForRename,
+                ImportMoveConflictMode = importMoveConflictMode ?? string.Empty,
                 SteamGridDbApiToken = steamGridDbApiToken ?? string.Empty,
                 SteamWebApiKey = steamWebApiKey ?? string.Empty,
                 RetroAchievementsApiKey = retroAchievementsApiKey ?? string.Empty,
@@ -68,6 +69,7 @@ namespace PixelVaultNative
             exifToolPath = s.ExifToolPath ?? string.Empty;
             ffmpegPath = s.FfmpegPath ?? string.Empty;
             importSearchSubfoldersForRename = s.ImportSearchSubfoldersForRename;
+            importMoveConflictMode = SettingsService.NormalizeImportMoveConflictMode(s.ImportMoveConflictMode);
             steamGridDbApiToken = s.SteamGridDbApiToken ?? string.Empty;
             steamWebApiKey = s.SteamWebApiKey ?? string.Empty;
             retroAchievementsApiKey = s.RetroAchievementsApiKey ?? string.Empty;

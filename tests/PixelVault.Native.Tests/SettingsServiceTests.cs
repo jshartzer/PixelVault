@@ -16,6 +16,19 @@ public sealed class SettingsServiceTests
     }
 
     [Theory]
+    [InlineData("Rename", "Rename")]
+    [InlineData("rename", "Rename")]
+    [InlineData("Skip", "Skip")]
+    [InlineData("SKIP", "Skip")]
+    [InlineData("Overwrite", "Overwrite")]
+    [InlineData("bogus", "Rename")]
+    [InlineData("", "Rename")]
+    public void NormalizeImportMoveConflictMode_Canonicalizes(string raw, string expected)
+    {
+        Assert.Equal(expected, SettingsService.NormalizeImportMoveConflictMode(raw));
+    }
+
+    [Theory]
     [InlineData("alphabetical", "alpha")]
     [InlineData("date captured", "captured")]
     [InlineData("date added", "added")]
@@ -225,6 +238,7 @@ public sealed class SettingsServiceTests
                 ExifToolPath = exifStub,
                 FfmpegPath = ffmpegStub,
                 ImportSearchSubfoldersForRename = true,
+                ImportMoveConflictMode = "Skip",
                 SteamGridDbApiToken = "tok",
                 SteamWebApiKey = "sw",
                 RetroAchievementsApiKey = "ra",
@@ -263,6 +277,7 @@ public sealed class SettingsServiceTests
             Assert.Equal(original.ExifToolPath, loaded.ExifToolPath, ignoreCase: true);
             Assert.Equal(original.FfmpegPath, loaded.FfmpegPath, ignoreCase: true);
             Assert.True(loaded.ImportSearchSubfoldersForRename);
+            Assert.Equal("Skip", loaded.ImportMoveConflictMode);
             Assert.Equal(original.SteamGridDbApiToken, loaded.SteamGridDbApiToken);
             Assert.Equal(original.SteamWebApiKey, loaded.SteamWebApiKey);
             Assert.Equal(original.RetroAchievementsApiKey, loaded.RetroAchievementsApiKey);

@@ -15,6 +15,8 @@ namespace PixelVaultNative
         public string FfmpegPath = string.Empty;
         /// <summary>When true, import rename/prep can scan media inside subfolders under each configured source root. Default false so normal import only inspects the top level.</summary>
         public bool ImportSearchSubfoldersForRename;
+        /// <summary>Import move step when a file already exists at the destination: <c>Rename</c> (unique name), <c>Skip</c>, or <c>Overwrite</c>.</summary>
+        public string ImportMoveConflictMode = "Rename";
         public string SteamGridDbApiToken = string.Empty;
         /// <summary>Valve Steam Web API key (optional; for future Steam Web API features).</summary>
         public string SteamWebApiKey = string.Empty;
@@ -87,6 +89,7 @@ namespace PixelVaultNative
                 ExifToolPath = s.ExifToolPath ?? string.Empty,
                 FfmpegPath = s.FfmpegPath ?? string.Empty,
                 ImportSearchSubfoldersForRename = s.ImportSearchSubfoldersForRename,
+                ImportMoveConflictMode = s.ImportMoveConflictMode ?? "Rename",
                 SteamGridDbApiToken = s.SteamGridDbApiToken ?? string.Empty,
                 SteamWebApiKey = s.SteamWebApiKey ?? string.Empty,
                 RetroAchievementsApiKey = s.RetroAchievementsApiKey ?? string.Empty,

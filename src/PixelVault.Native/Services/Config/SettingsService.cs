@@ -106,6 +106,15 @@ namespace PixelVaultNative
             return "all";
         }
 
+        /// <summary>Canonical values: <c>Rename</c>, <c>Skip</c>, <c>Overwrite</c> (see <see cref="ImportService.MoveFilesToLibraryDestination"/>).</summary>
+        public static string NormalizeImportMoveConflictMode(string value)
+        {
+            var normalized = (value ?? string.Empty).Trim();
+            if (string.Equals(normalized, "Skip", StringComparison.OrdinalIgnoreCase)) return "Skip";
+            if (string.Equals(normalized, "Overwrite", StringComparison.OrdinalIgnoreCase)) return "Overwrite";
+            return "Rename";
+        }
+
         public static string FindSteamGridDbApiTokenInEnvironment()
         {
             foreach (var key in new[] { "PIXELVAULT_STEAMGRIDDB_TOKEN", "STEAMGRIDDB_API_KEY", "STEAMGRIDDB_TOKEN" })
@@ -188,6 +197,7 @@ namespace PixelVaultNative
                         || string.Equals(normalizedValue, "yes", StringComparison.OrdinalIgnoreCase)
                         || string.Equals(normalizedValue, "on", StringComparison.OrdinalIgnoreCase);
                 }
+                else if (key == "import_move_conflict_mode") s.ImportMoveConflictMode = NormalizeImportMoveConflictMode(value);
                 else if (key == "steamgriddb_token") s.SteamGridDbApiToken = value ?? string.Empty;
                 else if (key == "steam_web_api_key") s.SteamWebApiKey = value ?? string.Empty;
                 else if (key == "retroachievements_api_key") s.RetroAchievementsApiKey = value ?? string.Empty;
@@ -412,6 +422,7 @@ namespace PixelVaultNative
                 "exiftool=" + (state.ExifToolPath ?? string.Empty),
                 "ffmpeg=" + (state.FfmpegPath ?? string.Empty),
                 "import_search_subfolders_for_rename=" + (state.ImportSearchSubfoldersForRename ? "1" : "0"),
+                "import_move_conflict_mode=" + NormalizeImportMoveConflictMode(state.ImportMoveConflictMode),
                 "steamgriddb_token=" + (state.SteamGridDbApiToken ?? string.Empty),
                 "steam_web_api_key=" + (state.SteamWebApiKey ?? string.Empty),
                 "retroachievements_api_key=" + (state.RetroAchievementsApiKey ?? string.Empty),

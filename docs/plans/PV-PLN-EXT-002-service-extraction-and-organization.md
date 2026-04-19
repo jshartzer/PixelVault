@@ -89,7 +89,7 @@ Work items are **sequenced by leverage and merge risk**. Adjust order only when 
 
 **Exit:** Settings-related edits touch **`Services/Config`** + **`UI/Settings/MainWindow.SettingsState`** + thin persistence partial; further stragglers in other partials can move in follow-up slices.
 
-**Follow-ups (not required to call A.2 “started”):** `import_move_conflict_mode` and any other fields not yet on **`AppSettings`**; sweeps for direct **`PixelVault.settings.ini`** access outside **`SettingsService`** / migrator.
+**Follow-ups:** **`import_move_conflict_mode`** is on **`AppSettings`** / load-save / **`MainWindow.SettingsState`** (values **`Rename`** / **`Skip`** / **`Overwrite`**). Remaining: sweeps for direct **`PixelVault.settings.ini`** access outside **`SettingsService`** / **`PersistentDataMigrator`**.
 
 ---
 
@@ -223,3 +223,4 @@ Phase A is “on track” when:
 | **2026-04-18** | Initial plan: Phase A extraction sequence, Phase B organization gates, non-goals. |
 | **2026-04-18** | **A.1:** `MainWindow.ServiceComposition.cs` + `BuildApplicationServiceGraph` / `MainWindowServiceGraph` (`PixelVault.Native.csproj` compile include). |
 | **2026-04-18** | **A.2 (initial):** `MainWindow.SettingsState.cs` (capture/apply); persistence partial slim; `ISettingsService` contract note. |
+| **2026-04-18** | **A.2:** `import_move_conflict_mode` persisted (`AppSettings`, `SettingsService.NormalizeImportMoveConflictMode`, tests). |
