@@ -77,16 +77,19 @@ Work items are **sequenced by leverage and merge risk**. Adjust order only when 
 
 ---
 
-### A.2 — Settings and paths (medium)
+### A.2 — Settings and paths (medium) — **landed (initial slice)**
 
 **Goal:** Path strings, secrets, and **Load/Save** call sites do not sprawl across unrelated partials.
 
 **Deliverables:**
 
-- **`MainWindow`** / **`MainWindow.SettingsPersistence`** call **`ISettingsService`** for **all** persisted fields that are already modeled; move **remaining** ad hoc reads/writes into **`SettingsService`** or **`AppSettings`** in **small** PRs.
-- Reduce duplicate **default path** logic (already partially centralized in startup).
+- **`MainWindow.SettingsState.cs`**: **`CaptureAppSettings`** / **`ApplyAppSettings`** — the only mapping between **`MainWindow`** fields and **`AppSettings`** (includes **`LibraryIndexAnchor`** on capture for parity with load).
+- **`MainWindow.SettingsPersistence.cs`**: **`LoadSettings`** / **`SaveSettings`** + index-scope notify helpers only; all ini I/O via **`ISettingsService.LoadFromIni`** / **`SaveToIni`**.
+- **`ISettingsService`**: contract XML states ini persistence must go through this interface.
 
-**Exit:** Settings-related edits touch **`Services/Config`** + one bridge file, not five partials.
+**Exit:** Settings-related edits touch **`Services/Config`** + **`UI/Settings/MainWindow.SettingsState`** + thin persistence partial; further stragglers in other partials can move in follow-up slices.
+
+**Follow-ups (not required to call A.2 “started”):** `import_move_conflict_mode` and any other fields not yet on **`AppSettings`**; sweeps for direct **`PixelVault.settings.ini`** access outside **`SettingsService`** / migrator.
 
 ---
 
@@ -219,3 +222,4 @@ Phase A is “on track” when:
 |------|--------|
 | **2026-04-18** | Initial plan: Phase A extraction sequence, Phase B organization gates, non-goals. |
 | **2026-04-18** | **A.1:** `MainWindow.ServiceComposition.cs` + `BuildApplicationServiceGraph` / `MainWindowServiceGraph` (`PixelVault.Native.csproj` compile include). |
+| **2026-04-18** | **A.2 (initial):** `MainWindow.SettingsState.cs` (capture/apply); persistence partial slim; `ISettingsService` contract note. |
