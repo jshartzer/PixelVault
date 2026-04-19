@@ -4,7 +4,7 @@ namespace PixelVaultNative
 {
     /// <summary>
     /// PV-PLN-EXT-002 A.2: maps between <see cref="MainWindow"/> fields and <see cref="AppSettings"/>.
-    /// All reads/writes of <c>PixelVault.settings.ini</c> go through <see cref="ISettingsService"/> from <see cref="MainWindow.SettingsPersistence"/>.
+    /// All reads/writes of <c>PixelVault.settings.ini</c> go through <see cref="ISettingsService"/> (load/save in <c>MainWindow.SettingsPersistence.cs</c>).
     /// </summary>
     public sealed partial class MainWindow
     {
