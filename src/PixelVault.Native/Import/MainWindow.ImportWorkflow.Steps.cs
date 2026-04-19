@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Windows;
@@ -27,7 +26,7 @@ namespace PixelVaultNative
                 var item = items[i];
                 var file = item.FilePath;
                 var remaining = total - (i + 1);
-                if (!File.Exists(file))
+                if (!fileSystemService.FileExists(file))
                 {
                     skipped++;
                     if (progress != null) progress(i + 1, total, "Skipped metadata " + (i + 1) + " of " + total + " | " + remaining + " remaining | file missing");
@@ -56,8 +55,8 @@ namespace PixelVaultNative
                 var restoreFileTimes = writeDateMetadata && preserveFileTimes;
                 if (restoreFileTimes)
                 {
-                    originalCreate = File.GetCreationTime(file);
-                    originalWrite = File.GetLastWriteTime(file);
+                    originalCreate = fileSystemService.GetCreationTime(file);
+                    originalWrite = fileSystemService.GetLastWriteTime(file);
                 }
                 requests.Add(new ExifWriteRequest
                 {
@@ -111,7 +110,7 @@ namespace PixelVaultNative
         MoveStepResult RunMove(IEnumerable<string> sourceFiles, HashSet<string> skipFiles, Action<int, int, string> progress = null, CancellationToken cancellationToken = default(CancellationToken))
         {
             var files = (sourceFiles ?? Enumerable.Empty<string>())
-                .Where(File.Exists)
+                .Where(fileSystemService.FileExists)
                 .Where(file => skipFiles == null || !skipFiles.Contains(file));
             return RunMoveFiles(files, "Move summary", progress, cancellationToken);
         }

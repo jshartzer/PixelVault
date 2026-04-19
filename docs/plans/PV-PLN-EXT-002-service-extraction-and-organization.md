@@ -162,6 +162,7 @@ Tests under **`tests/`** create temp ini files for **`PersistentDataMigrator`** 
 | Date | Change |
 |------|--------|
 | **2026-04-18** | **`ImportWorkflow`**: destination **`CreateDirectory`** and **`File.Exists`** checks use **`IFileSystemService`** (`RunWorkflow`, `OpenManualIntakeWindow`, unified move path filter). |
+| **2026-04-18** | **`ImportWorkflowOrchestration`** progress totals / unified + manual plans take **`IFileSystemService`**; **`MainWindow.ImportWorkflow.Steps`** (metadata timestamps, **`RunMove`** filter); **`HeadlessImportCoordinator`** + **`MainWindow.HeadlessImport`**; **`IFileSystemService.GetCreationTime`**. |
 
 ---
 
@@ -220,6 +221,12 @@ Phase A is “on track” when:
 
 - Single **diagram** or table: **UI** → **session/host** → **service** → **persistence**.
 
+**Landings:**
+
+| Date | Change |
+|------|--------|
+| **2026-04-18** | **`SERVICE_OWNERSHIP_AND_PARALLEL_WORK_MAP.md`**: “Composition at a glance” table (**`MainWindow.ServiceComposition`** / graph → import, headless, library session, persistence); **`IFileSystemService`** / **`ISettingsService`** notes refreshed. |
+
 ---
 
 ### Phase B exit criteria
@@ -263,3 +270,5 @@ Phase A is “on track” when:
 | **2026-04-18** | **A.3:** `CombineRenameStepResults`; `SaveUndoAndSortAfterImportMoveIfNeeded`; post-import sort → **`IImportService.SortDestinationRootIntoGameFolders`**. |
 | **2026-04-18** | **A.4 (initial):** **`ILibraryScanHost`** / **`LibraryScanHost`** contract documentation. |
 | **2026-04-18** | **A.5 (slice):** **`ImportWorkflow`** — **`IFileSystemService`** for destination mkdir + file-existence filters. |
+| **2026-04-18** | **A.5 (continuation):** orchestration + headless + workflow steps + **`GetCreationTime`** on **`IFileSystemService`**. |
+| **2026-04-18** | **B.3 (initial slice):** composition table in **`SERVICE_OWNERSHIP_AND_PARALLEL_WORK_MAP.md`**. |

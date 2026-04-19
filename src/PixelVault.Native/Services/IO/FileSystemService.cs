@@ -61,6 +61,11 @@ namespace PixelVaultNative
             if (!string.IsNullOrWhiteSpace(path)) Directory.CreateDirectory(path);
         }
 
+        public DateTime GetCreationTime(string path)
+        {
+            return File.GetCreationTime(path);
+        }
+
         public DateTime GetLastWriteTime(string path)
         {
             return File.GetLastWriteTime(path);

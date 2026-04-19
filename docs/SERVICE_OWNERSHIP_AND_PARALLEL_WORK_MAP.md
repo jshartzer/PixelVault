@@ -17,6 +17,18 @@ This document is based on the current code in `C:\Codex\src\PixelVault.Native` a
 - `C:\Codex\docs\MAINWINDOW_EXTRACTION_ROADMAP.md`
 - `C:\Codex\docs\pixelvault_service_split_plan.txt`
 
+### Composition at a glance (Apr 2026)
+
+| Layer | Where to look first |
+|-------|---------------------|
+| **Application wiring** | `MainWindow.ServiceComposition.cs` — **`BuildApplicationServiceGraph`** builds a **`MainWindowServiceGraph`**; the **`MainWindow`** ctor assigns the same instances to readonly fields. |
+| **Import (foreground)** | `Import/ImportWorkflow.cs`, `Import/MainWindow.ImportWorkflow.Steps.cs` — orchestration partials call **`IImportService`**; progress math lives in **`Services/Import/ImportWorkflowOrchestration.cs`**. |
+| **Import (headless / background)** | `Import/MainWindow.HeadlessImport.cs`, `Services/Intake/HeadlessImportCoordinator.cs` — same pipeline steps as UI import for explicit path subsets. |
+| **Library browser** | `UI/Library/LibraryBrowserHost.cs` → **`ILibraryBrowserShell`** / bridges; data work through **`ILibrarySession`** (**`LibrarySession`**: **`ILibraryScanner`**, **`IFileSystemService`**, **`LibraryRoot`**). |
+| **Library scan** | `Services/Library/LibraryScanner.cs` — **`ILibraryScanHost`** port implemented by **`MainWindow.LibraryScannerBridge`**. |
+| **Persistence** | `Services/Indexing/IndexPersistenceService.cs` — **`IIndexPersistenceService`**. |
+| **Settings** | `Services/Config/SettingsService.cs` — **`ISettingsService`**; window mapping in **`MainWindow.SettingsState.cs`**, load/save in **`MainWindow.SettingsPersistence.cs`**. |
+
 ---
 
 ## Current Service Map
@@ -69,12 +81,12 @@ These are the best next service seams, ordered by usefulness and risk.
 
 | Candidate | Why it matters | Suggested file/home | Risk | Notes |
 |----------|----------------|---------------------|------|------|
-| `ISettingsService` / `SettingsService` | Reduces path/config noise and secrets handling in `MainWindow` | `src/PixelVault.Native/Services/Config/SettingsService.cs` | Low | Best next true service extraction |
+| `ISettingsService` / `SettingsService` | Reduces path/config noise and secrets handling in `MainWindow` | `src/PixelVault.Native/Services/Config/SettingsService.cs` | Low | **Shipped:** ini load/save through **`ISettingsService`**; **`MainWindow.SettingsState`** / **`SettingsPersistence`** (see **PV-PLN-EXT-002 A.2**). Further call-site sweeps only when touching nearby code. |
 | `IImportService` / `ImportService` | Converts `ImportWorkflow.cs` from a `MainWindow` partial into a domain service | `src/PixelVault.Native/Services/Import/ImportService.cs` | Medium | Good boundary because the workflow is already clustered in one file |
 | `ILibraryScanner` / `LibraryScanner` | Pulls scan/rebuild/group logic out of library UI code | `src/PixelVault.Native/Services/Library/LibraryScanner.cs` | Medium-High | Biggest leverage after settings/import, but touches many helpers |
 | `ILibraryBrowserHost` / `LibraryBrowserHost` | Makes the main library window a host instead of one giant construction method | `src/PixelVault.Native/UI/Library/LibraryBrowserHost.cs` | High | **Apr 2026:** show path is **`LibraryBrowserHost`** → **`ILibraryBrowserShell`** (**`LibraryBrowserShellBridge`**) → **`LibraryBrowserShowOrchestration`**. Still a strong UI extraction target; avoid pairing large host edits with service extraction in the same pass |
 | `ILogService` | Centralizes log writes and operational messages | `src/PixelVault.Native/Services/Logging/LogService.cs` | Low-Medium | Helpful, but not the first slice unless logging is actively hurting productivity |
-| `IFileSystemService` | Reduces direct `System.IO` calls and helps testability | `src/PixelVault.Native/Services/IO/FileSystemService.cs` | Medium | **Mar 2026:** `LibraryScanner` + **`ImportService`** + optional **`CoverService`** dep; copy/move/delete/mkdir/lines/timestamps/enumeration; **`MainWindow`** migration + cover backup use the shared instance |
+| `IFileSystemService` | Reduces direct `System.IO` calls and helps testability | `src/PixelVault.Native/Services/IO/FileSystemService.cs` | Medium | **`LibraryScanner`**, **`ImportService`**, **`CoverService`** deps; **`MainWindow`** migration + cover backup. **Apr 2026 (EXT-002 A.5):** **`ImportWorkflow`** / **`ImportWorkflowOrchestration`** / **`MainWindow.ImportWorkflow.Steps`**, headless import (**`HeadlessImportCoordinator`**), creation + last-write times on the seam. |
 
 ---
 

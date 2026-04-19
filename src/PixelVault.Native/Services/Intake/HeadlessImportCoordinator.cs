@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -23,10 +22,12 @@ namespace PixelVaultNative
     /// </summary>
     internal static class HeadlessImportCoordinator
     {
+        /// <param name="fileSystem">Filesystem seam for existence checks on move candidates (same instance as <see cref="IImportService"/> wiring when possible).</param>
         /// <param name="manualPathsOriginal">Paths of manual-intake top-level files (not auto-capable); unchanged after Steam rename until resolved here.</param>
         /// <param name="progress">Cumulative step index and detail (same shape as UI import progress).</param>
         public static async Task<HeadlessStandardImportOutcome> RunStandardTopLevelSubsetAsync(
             IImportService import,
+            IFileSystemService fileSystem,
             string destinationRoot,
             string libraryRoot,
             SourceInventory renameInventory,
@@ -37,6 +38,7 @@ namespace PixelVaultNative
             Action<int, string> progress = null)
         {
             if (import == null) throw new ArgumentNullException(nameof(import));
+            ArgumentNullException.ThrowIfNull(fileSystem);
             if (reviewSubset == null) throw new ArgumentNullException(nameof(reviewSubset));
             if (inventory == null) throw new ArgumentNullException(nameof(inventory));
 
@@ -98,7 +100,7 @@ namespace PixelVaultNative
 
             ImportWorkflowOrchestration.ThrowIfCancellationRequested(cancellationToken, "Headless import");
             var moveFiles = moveSourcePathsAfterRename
-                .Where(p => !string.IsNullOrWhiteSpace(p) && File.Exists(p) && !skipMove.Contains(p));
+                .Where(p => !string.IsNullOrWhiteSpace(p) && fileSystem.FileExists(p) && !skipMove.Contains(p));
             var moveResult = import.MoveFilesToLibraryDestination(
                 moveFiles,
                 "Headless import move",

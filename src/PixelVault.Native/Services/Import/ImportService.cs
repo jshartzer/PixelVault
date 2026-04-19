@@ -462,13 +462,13 @@ namespace PixelVaultNative
         }
 
         public ImportWorkflowStandardWorkTotals ComputeStandardImportWorkTotals(SourceInventory renameInventory, IReadOnlyList<ReviewItem> reviewItems, SourceInventory inventory, HashSet<string> manualPaths) =>
-            ImportWorkflowOrchestration.ComputeStandardImportWorkTotals(renameInventory, reviewItems, inventory, manualPaths);
+            ImportWorkflowOrchestration.ComputeStandardImportWorkTotals(renameInventory, reviewItems, inventory, manualPaths, fs);
 
         public ImportWorkflowUnifiedProgressPlan ComputeUnifiedImportProgressPlan(IReadOnlyList<ManualMetadataItem> batch) =>
-            ImportWorkflowOrchestration.ComputeUnifiedImportProgressPlan(batch);
+            ImportWorkflowOrchestration.ComputeUnifiedImportProgressPlan(batch, fs);
 
         public ImportManualIntakeProgressPlan ComputeManualIntakeProgressPlan(IReadOnlyList<ManualMetadataItem> manualItems) =>
-            ImportWorkflowOrchestration.ComputeManualIntakeProgressPlan(manualItems);
+            ImportWorkflowOrchestration.ComputeManualIntakeProgressPlan(manualItems, fs);
 
         public DeleteStepResult DeleteSourceFiles(IEnumerable<string> filePaths, Action<int, int, string> progress = null, CancellationToken cancellationToken = default)
         {

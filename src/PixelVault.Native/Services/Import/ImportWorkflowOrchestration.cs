@@ -1,7 +1,6 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Threading;
 
@@ -28,14 +27,24 @@ namespace PixelVaultNative
             SourceInventory? renameInventory,
             IReadOnlyList<ReviewItem>? reviewItems,
             SourceInventory? inventory,
-            HashSet<string>? manualPaths) =>
-            new ImportWorkflowStandardWorkTotals(renameInventory, reviewItems, inventory, manualPaths);
+            HashSet<string>? manualPaths,
+            IFileSystemService fileSystem)
+        {
+            ArgumentNullException.ThrowIfNull(fileSystem);
+            return new ImportWorkflowStandardWorkTotals(renameInventory, reviewItems, inventory, manualPaths, fileSystem);
+        }
 
-        public static ImportWorkflowUnifiedProgressPlan ComputeUnifiedImportProgressPlan(IReadOnlyList<ManualMetadataItem>? batch) =>
-            new ImportWorkflowUnifiedProgressPlan(batch);
+        public static ImportWorkflowUnifiedProgressPlan ComputeUnifiedImportProgressPlan(IReadOnlyList<ManualMetadataItem>? batch, IFileSystemService fileSystem)
+        {
+            ArgumentNullException.ThrowIfNull(fileSystem);
+            return new ImportWorkflowUnifiedProgressPlan(batch, fileSystem);
+        }
 
-        public static ImportManualIntakeProgressPlan ComputeManualIntakeProgressPlan(IReadOnlyList<ManualMetadataItem>? manualItems) =>
-            new ImportManualIntakeProgressPlan(manualItems);
+        public static ImportManualIntakeProgressPlan ComputeManualIntakeProgressPlan(IReadOnlyList<ManualMetadataItem>? manualItems, IFileSystemService fileSystem)
+        {
+            ArgumentNullException.ThrowIfNull(fileSystem);
+            return new ImportManualIntakeProgressPlan(manualItems, fileSystem);
+        }
 
         /// <summary>
         /// Unified import-and-comment path: Steam rename + manual title-prefix rename — aggregate counts and path maps for summary.
@@ -70,7 +79,8 @@ namespace PixelVaultNative
             SourceInventory? renameInventory,
             IReadOnlyList<ReviewItem>? reviewItems,
             SourceInventory? inventory,
-            HashSet<string>? manualPaths)
+            HashSet<string>? manualPaths,
+            IFileSystemService fileSystem)
         {
             RenameTotal = renameInventory?.RenameScopeFiles?.Count ?? 0;
             DeleteTotal = reviewItems == null ? 0 : reviewItems.Count(item => item != null && item.DeleteBeforeProcessing);
@@ -79,7 +89,7 @@ namespace PixelVaultNative
                 MoveTotal = 0;
             else
                 MoveTotal = inventory.TopLevelMediaFiles.Count(file =>
-                    !string.IsNullOrWhiteSpace(file) && File.Exists(file) && (manualPaths == null || !manualPaths.Contains(file)));
+                    !string.IsNullOrWhiteSpace(file) && fileSystem.FileExists(file) && (manualPaths == null || !manualPaths.Contains(file)));
             TotalWork = RenameTotal + DeleteTotal + MetadataTotal + MoveTotal + 1;
         }
 
@@ -98,7 +108,7 @@ namespace PixelVaultNative
     /// <summary>Progress counts and offsets for import-and-comment / unified manual batch workflow.</summary>
     internal readonly struct ImportWorkflowUnifiedProgressPlan
     {
-        public ImportWorkflowUnifiedProgressPlan(IReadOnlyList<ManualMetadataItem>? batch)
+        public ImportWorkflowUnifiedProgressPlan(IReadOnlyList<ManualMetadataItem>? batch, IFileSystemService fileSystem)
         {
             var n = batch?.Count ?? 0;
             SteamRenameTotal = n;
@@ -106,7 +116,7 @@ namespace PixelVaultNative
             DeleteTotal = batch == null ? 0 : batch.Count(item => item != null && item.DeleteBeforeProcessing);
             MetadataTotal = n;
             MoveTotal = batch == null ? 0 : batch.Count(item =>
-                item != null && !string.IsNullOrWhiteSpace(item.FilePath) && File.Exists(item.FilePath));
+                item != null && !string.IsNullOrWhiteSpace(item.FilePath) && fileSystem.FileExists(item.FilePath));
             TotalWork = SteamRenameTotal + ManualRenameTotal + DeleteTotal + MetadataTotal + MoveTotal + 1;
         }
 
@@ -127,13 +137,13 @@ namespace PixelVaultNative
     /// <summary>Progress counts and offsets for manual intake-only workflow.</summary>
     internal readonly struct ImportManualIntakeProgressPlan
     {
-        public ImportManualIntakeProgressPlan(IReadOnlyList<ManualMetadataItem>? manualItems)
+        public ImportManualIntakeProgressPlan(IReadOnlyList<ManualMetadataItem>? manualItems, IFileSystemService fileSystem)
         {
             var n = manualItems?.Count ?? 0;
             RenameTotal = n;
             MetadataTotal = n;
             MoveTotal = manualItems == null ? 0 : manualItems.Count(item =>
-                item != null && !string.IsNullOrWhiteSpace(item.FilePath) && File.Exists(item.FilePath));
+                item != null && !string.IsNullOrWhiteSpace(item.FilePath) && fileSystem.FileExists(item.FilePath));
             TotalWork = RenameTotal + MetadataTotal + MoveTotal + 1;
         }
 

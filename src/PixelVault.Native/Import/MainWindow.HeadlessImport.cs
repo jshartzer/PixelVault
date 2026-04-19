@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -21,11 +20,11 @@ namespace PixelVaultNative
         {
             EnsureSourceFolders();
             EnsureExifTool();
-            Directory.CreateDirectory(destinationRoot);
+            fileSystemService.CreateDirectory(destinationRoot);
             var renameInventory = importService.BuildSourceInventory(importSearchSubfoldersForRename);
             var inventory = importService.BuildSourceInventory(importSearchSubfoldersForRename);
             var eligible = (eligibleTopLevelPaths ?? Array.Empty<string>())
-                .Where(p => !string.IsNullOrWhiteSpace(p) && File.Exists(p))
+                .Where(p => !string.IsNullOrWhiteSpace(p) && fileSystemService.FileExists(p))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
             if (eligible.Count == 0)
@@ -46,6 +45,7 @@ namespace PixelVaultNative
 
             return await HeadlessImportCoordinator.RunStandardTopLevelSubsetAsync(
                 importService,
+                fileSystemService,
                 destinationRoot,
                 libraryRoot,
                 renameInventory,

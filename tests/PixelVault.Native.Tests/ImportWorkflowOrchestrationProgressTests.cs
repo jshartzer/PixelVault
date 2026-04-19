@@ -24,7 +24,8 @@ public sealed class ImportWorkflowOrchestrationProgressTests
                 RenameScopeFiles = new List<string> { a }
             };
             var manual = new HashSet<string>(new[] { a }, System.StringComparer.OrdinalIgnoreCase);
-            var t = ImportWorkflowOrchestration.ComputeStandardImportWorkTotals(inv, new List<ReviewItem>(), inv, manual);
+            var fs = new FileSystemService();
+            var t = ImportWorkflowOrchestration.ComputeStandardImportWorkTotals(inv, new List<ReviewItem>(), inv, manual, fs);
             Assert.Equal(1, t.RenameTotal);
             Assert.Equal(1, t.MoveTotal);
             Assert.Equal(0, t.DeleteTotal);
@@ -59,7 +60,8 @@ public sealed class ImportWorkflowOrchestrationProgressTests
                 new ManualMetadataItem { FilePath = path2 },
                 new ManualMetadataItem { FilePath = Path.Combine(tmp, "missing.jpg") }
             };
-            var p = ImportWorkflowOrchestration.ComputeUnifiedImportProgressPlan(batch);
+            var fs = new FileSystemService();
+            var p = ImportWorkflowOrchestration.ComputeUnifiedImportProgressPlan(batch, fs);
             Assert.Equal(3, p.SteamRenameTotal);
             Assert.Equal(3, p.ManualRenameTotal);
             Assert.Equal(1, p.DeleteTotal);
@@ -84,7 +86,8 @@ public sealed class ImportWorkflowOrchestrationProgressTests
     public void ManualIntakePlan_Aligns_Offsets()
     {
         var batch = new List<ManualMetadataItem> { new ManualMetadataItem { FilePath = "nope" } };
-        var p = ImportWorkflowOrchestration.ComputeManualIntakeProgressPlan(batch);
+        var fs = new FileSystemService();
+        var p = ImportWorkflowOrchestration.ComputeManualIntakeProgressPlan(batch, fs);
         Assert.Equal(1, p.RenameTotal);
         Assert.Equal(1, p.MetadataTotal);
         Assert.Equal(0, p.MoveTotal);

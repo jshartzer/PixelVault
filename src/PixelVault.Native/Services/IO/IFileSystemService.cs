@@ -4,7 +4,7 @@ using System.IO;
 
 namespace PixelVaultNative
 {
-    /// <summary>Seam for library scan, import, and cache paths. Default implementation delegates to <see cref="System.IO"/>.</summary>
+    /// <summary>Seam for library scan, import, and cache paths. Default implementation delegates to <see cref="System.IO"/> (including creation and last-write timestamps).</summary>
     internal interface IFileSystemService
     {
         bool FileExists(string path);
@@ -18,6 +18,7 @@ namespace PixelVaultNative
         void MoveFile(string sourceFileName, string destFileName);
         void CopyFile(string sourceFileName, string destFileName, bool overwrite);
         void CreateDirectory(string path);
+        DateTime GetCreationTime(string path);
         DateTime GetLastWriteTime(string path);
     }
 }

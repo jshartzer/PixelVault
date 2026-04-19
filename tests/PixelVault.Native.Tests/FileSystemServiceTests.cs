@@ -123,6 +123,25 @@ public sealed class FileSystemServiceTests
     }
 
     [Fact]
+    public void GetCreationTime_And_GetLastWriteTime_On_Same_File()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "pv-fs-times-" + Guid.NewGuid().ToString("N") + ".tmp");
+        try
+        {
+            File.WriteAllText(path, "x");
+            var fs = new FileSystemService();
+            var c = fs.GetCreationTime(path);
+            var w = fs.GetLastWriteTime(path);
+            Assert.True(c <= DateTime.Now.AddMinutes(5) && c >= DateTime.Now.AddHours(-1));
+            Assert.True(w <= DateTime.Now.AddMinutes(5) && w >= DateTime.Now.AddHours(-1));
+        }
+        finally
+        {
+            if (File.Exists(path)) File.Delete(path);
+        }
+    }
+
+    [Fact]
     public void GetLastWriteTime_And_CreateDirectory_Work()
     {
         var dir = Path.Combine(Path.GetTempPath(), "pv-mkdir-" + Guid.NewGuid().ToString("N"));
