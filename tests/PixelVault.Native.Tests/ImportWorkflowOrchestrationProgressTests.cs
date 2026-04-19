@@ -94,4 +94,40 @@ public sealed class ImportWorkflowOrchestrationProgressTests
         Assert.Equal(2, p.MoveOffset);
         Assert.Equal(2, p.SortOffset);
     }
+
+    [Fact]
+    public void CombineRenameStepResults_SumsCounts_WhenBothPresent()
+    {
+        var a = new RenameStepResult { Renamed = 2, Skipped = 1 };
+        var b = new RenameStepResult { Renamed = 3, Skipped = 4 };
+        var c = ImportWorkflowOrchestration.CombineRenameStepResults(a, b);
+        Assert.Equal(5, c.Renamed);
+        Assert.Equal(5, c.Skipped);
+    }
+
+    [Fact]
+    public void CombineRenameStepResults_TreatsNullAsZero()
+    {
+        var a = new RenameStepResult { Renamed = 1, Skipped = 0 };
+        var c = ImportWorkflowOrchestration.CombineRenameStepResults(a, null!);
+        Assert.Equal(1, c.Renamed);
+        Assert.Equal(0, c.Skipped);
+        var d = ImportWorkflowOrchestration.CombineRenameStepResults(null!, null!);
+        Assert.Equal(0, d.Renamed);
+        Assert.Equal(0, d.Skipped);
+    }
+
+    [Fact]
+    public void CombineRenameStepResults_MergesOldPathToNewPath()
+    {
+        var steam = new RenameStepResult();
+        steam.OldPathToNewPath["a"] = "A";
+        steam.OldPathToNewPath["b"] = "B";
+        var manual = new RenameStepResult();
+        manual.OldPathToNewPath["c"] = "C";
+        var c = ImportWorkflowOrchestration.CombineRenameStepResults(steam, manual);
+        Assert.Equal(3, c.OldPathToNewPath.Count);
+        Assert.Equal("A", c.OldPathToNewPath["a"]);
+        Assert.Equal("C", c.OldPathToNewPath["c"]);
+    }
 }

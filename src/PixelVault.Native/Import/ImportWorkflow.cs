@@ -197,11 +197,7 @@ namespace PixelVaultNative
                         }
                         ImportWorkflowOrchestration.ThrowIfCancellationRequested(cancellationToken, "Import workflow");
                         reportProgress(totalWork, "Import workflow complete.");
-                        var combinedRename = new RenameStepResult
-                        {
-                            Renamed = (steamRenameResult == null ? 0 : steamRenameResult.Renamed) + (manualRenameResult == null ? 0 : manualRenameResult.Renamed),
-                            Skipped = (steamRenameResult == null ? 0 : steamRenameResult.Skipped) + (manualRenameResult == null ? 0 : manualRenameResult.Skipped)
-                        };
+                        var combinedRename = ImportWorkflowOrchestration.CombineRenameStepResults(steamRenameResult, manualRenameResult);
                         return new ImportWorkflowExecutionResult
                         {
                             RenameResult = combinedRename,

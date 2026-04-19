@@ -36,6 +36,31 @@ namespace PixelVaultNative
 
         public static ImportManualIntakeProgressPlan ComputeManualIntakeProgressPlan(IReadOnlyList<ManualMetadataItem>? manualItems) =>
             new ImportManualIntakeProgressPlan(manualItems);
+
+        /// <summary>
+        /// Unified import-and-comment path: Steam rename + manual title-prefix rename — aggregate counts and path maps for summary.
+        /// </summary>
+        public static RenameStepResult CombineRenameStepResults(RenameStepResult steam, RenameStepResult manual)
+        {
+            var combined = new RenameStepResult
+            {
+                Renamed = (steam?.Renamed ?? 0) + (manual?.Renamed ?? 0),
+                Skipped = (steam?.Skipped ?? 0) + (manual?.Skipped ?? 0)
+            };
+            if (steam?.OldPathToNewPath != null)
+            {
+                foreach (var kv in steam.OldPathToNewPath)
+                    combined.OldPathToNewPath[kv.Key] = kv.Value;
+            }
+
+            if (manual?.OldPathToNewPath != null)
+            {
+                foreach (var kv in manual.OldPathToNewPath)
+                    combined.OldPathToNewPath[kv.Key] = kv.Value;
+            }
+
+            return combined;
+        }
     }
 
     /// <summary>Progress counts and offsets for the standard import (review + Steam rename scope) workflow.</summary>
