@@ -396,7 +396,7 @@ namespace PixelVaultNative
             Grid.SetColumn(priorityField, 1);
             topFields.Children.Add(priorityField);
             var platformCombo = MakeCombo();
-            foreach (var item in new[] { "Other", "Steam", "Xbox", "Xbox PC", "PS5", "PlayStation", "PC" }) platformCombo.Items.Add(item);
+            foreach (var item in new[] { "Other", "Steam", "Xbox", "PS5", "PlayStation", "PC" }) platformCombo.Items.Add(item);
             var platformField = Labeled("Platform", platformCombo);
             Grid.SetColumn(platformField, 2);
             topFields.Children.Add(platformField);

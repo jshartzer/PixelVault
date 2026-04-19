@@ -354,8 +354,6 @@ namespace PixelVaultNative
                     return ResolveWorkspaceAssetPath("Nintendo Library Icon.png");
                 case "Xbox":
                     return ResolveWorkspaceAssetPath("Xbox Library Logo.png");
-                case "Xbox PC":
-                    return ResolveWorkspaceAssetPath("Xbox PC Library Icon.png");
                 case "PC":
                     return ResolveWorkspaceAssetPath("PC Library Icon.png");
                 case "Emulation":
@@ -380,8 +378,6 @@ namespace PixelVaultNative
                     return Brush("#E94B43");
                 case "Xbox":
                     return Brush("#69B157");
-                case "Xbox PC":
-                    return Brush("#5FA77A");
                 case "PC":
                     return Brush("#8DA0AF");
                 case "Emulation":

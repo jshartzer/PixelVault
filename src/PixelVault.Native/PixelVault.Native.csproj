@@ -114,6 +114,7 @@
     <Compile Include="UI\Library\LibraryCommandPaletteRegistry.cs" />
     <Compile Include="UI\Library\LibraryCommandPaletteWindow.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserPaletteCommands.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryPlatformCleanup.cs" />
     <Compile Include="UI\Library\ILibrarySession.cs" />
     <Compile Include="UI\Library\LibrarySession.cs" />
     <Compile Include="UI\Library\LibraryBrowserHost.cs" />
@@ -195,10 +196,6 @@
     <None Include="..\..\assets\Xbox Library Logo.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <Link>assets\Xbox Library Logo.png</Link>
-    </None>
-    <None Include="..\..\assets\Xbox PC Library Icon.png">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <Link>assets\Xbox PC Library Icon.png</Link>
     </None>
     <None Include="..\..\assets\PC Library Icon.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

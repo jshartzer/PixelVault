@@ -95,10 +95,7 @@ namespace PixelVaultNative
             var resolvedLabel = NormalizeConsoleLabel(platformLabel);
             if (string.IsNullOrWhiteSpace(resolvedLabel)) return null;
             var iconPath = ResolveLibrarySectionIconPath(resolvedLabel);
-            var iconSize = string.Equals(resolvedLabel, "PC", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(resolvedLabel, "Xbox PC", StringComparison.OrdinalIgnoreCase)
-                ? 20d
-                : 22d;
+            var iconSize = string.Equals(resolvedLabel, "PC", StringComparison.OrdinalIgnoreCase) ? 20d : 22d;
             var badge = new Border
             {
                 Width = 38,

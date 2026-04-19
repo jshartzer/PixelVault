@@ -96,7 +96,6 @@ namespace PixelVaultNative
             if (string.Equals(normalized, "Steam", StringComparison.OrdinalIgnoreCase)) return "Steam";
             if (string.Equals(normalized, "Emulation", StringComparison.OrdinalIgnoreCase)) return "Emulation";
             if (string.Equals(normalized, "Xbox", StringComparison.OrdinalIgnoreCase)) return "Xbox";
-            if (string.Equals(normalized, "Xbox PC", StringComparison.OrdinalIgnoreCase)) return "Platform:Xbox PC";
             if (string.Equals(normalized, "PS5", StringComparison.OrdinalIgnoreCase)) return "PS5;PlayStation";
             if (string.Equals(normalized, "PlayStation", StringComparison.OrdinalIgnoreCase)) return "PlayStation";
             if (string.Equals(normalized, "PC", StringComparison.OrdinalIgnoreCase)) return "PC";
@@ -186,9 +185,9 @@ namespace PixelVaultNative
 
             if (Regex.IsMatch(fileName, @"^.+?\s+\d{1,2}_\d{1,2}_\d{4}\s+\d{1,2}_\d{2}_\d{2}\s+[AP]M\.(png|jpe?g|jxr|mp4|mkv|avi|mov|wmv|webm)$", RegexOptions.IgnoreCase))
             {
-                rule.Name = "Custom: Xbox PC Capture";
-                rule.PlatformLabel = "Xbox PC";
-                rule.PlatformTagsText = "Platform:Xbox PC";
+                rule.Name = "Custom: PC Capture";
+                rule.PlatformLabel = "PC";
+                rule.PlatformTagsText = "PC";
                 rule.PatternText = "[title] [M]_[d]_[yyyy] [h]_[mm]_[ss] [tt].[ext:media]";
                 rule.Pattern = rule.PatternText;
                 rule.TitleGroup = "title";

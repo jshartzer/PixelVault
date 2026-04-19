@@ -261,6 +261,7 @@ namespace PixelVaultNative
             MigratePersistentDataFromLegacyVersions();
             InitializeDefaultWorkspaceRootsAndTools();
             LoadSettings();
+            RunXboxPcPlatformCleanupIfNeeded();
             InitializeBackgroundIntakeAgent();
         }
 

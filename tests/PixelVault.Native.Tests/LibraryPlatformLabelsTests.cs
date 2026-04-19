@@ -14,8 +14,8 @@ public sealed class LibraryPlatformLabelsTests
     [Fact]
     public void PrimaryPlatformLabel_ReturnsParsedLabelVerbatim()
     {
-        var parsed = new FilenameParseResult { PlatformLabel = "Xbox PC" };
-        Assert.Equal("Xbox PC", LibraryPlatformLabels.PrimaryPlatformLabel(parsed));
+        var parsed = new FilenameParseResult { PlatformLabel = "PC" };
+        Assert.Equal("PC", LibraryPlatformLabels.PrimaryPlatformLabel(parsed));
     }
 
     [Fact]
@@ -128,21 +128,19 @@ public sealed class LibraryPlatformLabelsTests
     [InlineData("Emulation", 1)]
     [InlineData("PS5", 2)]
     [InlineData("Xbox", 3)]
-    [InlineData("Xbox PC", 4)]
-    [InlineData("PC", 5)]
-    [InlineData("Multiple Tags", 6)]
-    [InlineData("Other", 7)]
-    [InlineData("PlayStation", 8)]
-    [InlineData("", 8)]
-    [InlineData("unknown label", 8)]
-    public void PlatformGroupOrder_CoversAllKnownBucketsAndFallsBackToEight(string label, int expected)
+    [InlineData("PC", 4)]
+    [InlineData("Multiple Tags", 5)]
+    [InlineData("Other", 6)]
+    [InlineData("PlayStation", 7)]
+    [InlineData("", 7)]
+    [InlineData("unknown label", 7)]
+    public void PlatformGroupOrder_CoversAllKnownBucketsAndFallsBackToSeven(string label, int expected)
     {
         Assert.Equal(expected, LibraryPlatformLabels.PlatformGroupOrder(label));
     }
 
     [Theory]
     [InlineData("Xbox", "#FF2E8B57")]
-    [InlineData("Xbox PC", "#FF4D8F68")]
     [InlineData("Steam", "#FF2F6FDB")]
     [InlineData("Emulation", "#FFB26A3C")]
     [InlineData("PC", "#FF4F6D7A")]

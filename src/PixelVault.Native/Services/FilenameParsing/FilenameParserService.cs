@@ -155,10 +155,10 @@ namespace PixelVaultNative
 
             result.MatchedConvention = true;
             result.ConventionId = "xbox_pc_capture_ampm";
-            result.ConventionName = "Xbox PC Capture (Windows)";
+            result.ConventionName = "PC Capture (Windows Xbox App)";
             result.ConfidenceLabel = "ExplicitPattern";
-            result.PlatformTags = ParseTagText("Platform:Xbox PC");
-            result.PlatformLabel = ResolvePrimaryPlatformLabel("Xbox PC", result.PlatformTags);
+            result.PlatformTags = ParseTagText("PC");
+            result.PlatformLabel = ResolvePrimaryPlatformLabel("PC", result.PlatformTags);
             result.GameTitleHint = title;
             result.CaptureTime = captureTime;
             result.PreserveFileTimes = true;
@@ -485,12 +485,12 @@ namespace PixelVaultNative
                 new FilenameConventionRule
                 {
                     ConventionId = "xbox_pc_capture_ampm",
-                    Name = "Xbox PC Capture (Windows)",
+                    Name = "PC Capture (Windows Xbox App)",
                     Priority = 836,
                     Pattern = @"^(?<title>.+?)\s+(?<stamp>\d{1,2}_\d{1,2}_\d{4}\s+\d{1,2}_\d{2}_\d{2}\s+[AP]M)\.(png|jpe?g|jxr|mp4|mkv|avi|mov|wmv|webm)$",
                     PatternText = @"^(?<title>.+?)\s+(?<stamp>\d{1,2}_\d{1,2}_\d{4}\s+\d{1,2}_\d{2}_\d{2}\s+[AP]M)\.(png|jpe?g|jxr|mp4|mkv|avi|mov|wmv|webm)$",
-                    PlatformLabel = "Xbox PC",
-                    PlatformTagsText = "Platform:Xbox PC",
+                    PlatformLabel = "PC",
+                    PlatformTagsText = "PC",
                     TitleGroup = "title",
                     TimestampGroup = "stamp",
                     TimestampFormat = "M_d_yyyy h_mm_ss tt",
@@ -544,8 +544,7 @@ namespace PixelVaultNative
             foreach (var tag in tags ?? new string[0])
             {
                 var normalized = NormalizeConsoleLabel(tag);
-                if (string.Equals(normalized, "Xbox PC", StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(normalized, "Xbox", StringComparison.OrdinalIgnoreCase)
+                if (string.Equals(normalized, "Xbox", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(normalized, "Steam", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(normalized, "Emulation", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(normalized, "PS5", StringComparison.OrdinalIgnoreCase)

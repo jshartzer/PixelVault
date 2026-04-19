@@ -114,7 +114,7 @@ namespace PixelVaultNative
                 || string.Equals(label, "Xbox Windows", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(label, "Xbox on Windows", StringComparison.OrdinalIgnoreCase))
             {
-                return "Xbox PC";
+                return "PC";
             }
             if (string.Equals(label, "PlayStation", StringComparison.OrdinalIgnoreCase) || string.Equals(label, "PS5", StringComparison.OrdinalIgnoreCase)) return "PS5";
             if (string.Equals(label, "Xbox", StringComparison.OrdinalIgnoreCase)) return "Xbox";
@@ -126,17 +126,16 @@ namespace PixelVaultNative
         {
             var labels = new List<string>();
             var tagList = (tags ?? Enumerable.Empty<string>()).Where(tag => !string.IsNullOrWhiteSpace(tag)).Select(CleanTag).ToList();
-            var hasXboxPcTag = tagList.Any(tag => string.Equals(NormalizeConsoleLabel(tag), "Xbox PC", StringComparison.OrdinalIgnoreCase))
+            var hasPcTag = tagList.Any(tag => string.Equals(NormalizeConsoleLabel(tag), "PC", StringComparison.OrdinalIgnoreCase))
                 || tagList
                     .Where(tag => tag.StartsWith(CustomPlatformPrefix, StringComparison.OrdinalIgnoreCase))
                     .Select(tag => CleanTag(tag.Substring(CustomPlatformPrefix.Length)))
-                    .Any(tag => string.Equals(NormalizeConsoleLabel(tag), "Xbox PC", StringComparison.OrdinalIgnoreCase));
+                    .Any(tag => string.Equals(NormalizeConsoleLabel(tag), "PC", StringComparison.OrdinalIgnoreCase));
             if (tagList.Any(tag => string.Equals(tag, "Steam", StringComparison.OrdinalIgnoreCase))) labels.Add("Steam");
-            else if (!hasXboxPcTag && tagList.Any(tag => string.Equals(tag, "PC", StringComparison.OrdinalIgnoreCase))) labels.Add("PC");
+            else if (hasPcTag) labels.Add("PC");
             if (tagList.Any(tag => string.Equals(tag, "Emulation", StringComparison.OrdinalIgnoreCase))) labels.Add("Emulation");
             if (tagList.Any(tag => string.Equals(tag, "PS5", StringComparison.OrdinalIgnoreCase) || string.Equals(tag, "PlayStation", StringComparison.OrdinalIgnoreCase))) labels.Add("PS5");
-            if (hasXboxPcTag) labels.Add("Xbox PC");
-            else if (tagList.Any(tag => string.Equals(tag, "Xbox", StringComparison.OrdinalIgnoreCase))) labels.Add("Xbox");
+            if (tagList.Any(tag => string.Equals(tag, "Xbox", StringComparison.OrdinalIgnoreCase))) labels.Add("Xbox");
             foreach (var custom in tagList.Where(tag => tag.StartsWith(CustomPlatformPrefix, StringComparison.OrdinalIgnoreCase)).Select(tag => CleanTag(tag.Substring(CustomPlatformPrefix.Length))))
             {
                 if (string.IsNullOrWhiteSpace(custom)) continue;

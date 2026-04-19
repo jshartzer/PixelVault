@@ -186,7 +186,7 @@ public sealed class ConsoleIdentificationTests
     }
 
     [Fact]
-    public void MergePlatformTagsWithFilenamePlatformHint_XboxPcParse_AddsCustomPlatformTag()
+    public void MergePlatformTagsWithFilenamePlatformHint_XboxPcParse_AddsPcTag()
     {
         var parsed = new FilenameParseResult
         {
@@ -196,8 +196,9 @@ public sealed class ConsoleIdentificationTests
 
         var merged = MainWindow.MergePlatformTagsWithFilenamePlatformHint(Array.Empty<string>(), parsed);
 
-        Assert.Contains("Platform:Xbox PC", merged);
-        Assert.Equal("Xbox PC", MainWindow.DetermineConsoleLabelFromTags(merged));
+        Assert.Contains("PC", merged);
+        Assert.DoesNotContain("Platform:Xbox PC", merged);
+        Assert.Equal("PC", MainWindow.DetermineConsoleLabelFromTags(merged));
     }
 
     [Fact]

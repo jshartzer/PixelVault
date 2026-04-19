@@ -211,7 +211,7 @@ namespace PixelVaultNative
         }
 
         /// <summary>
-        /// Complete photo-index rows are skipped during library scans; shortcut-shaped filenames that were mis-tagged (e.g. GeForce → Xbox PC)
+        /// Complete photo-index rows are skipped during library scans; shortcut-shaped filenames that were mis-tagged (e.g. GeForce → PC)
         /// need a full re-resolve so tags and <see cref="LibraryMetadataIndexEntry.ConsoleLabel"/> match filename rules without waiting for a re-import.
         /// </summary>
         bool IndexEntryShouldReResolveForNonSteamShortcutMislabel(string root, string file, LibraryMetadataIndexEntry entry)

@@ -63,11 +63,10 @@ namespace PixelVaultNative
                 case "Emulation": return 1;
                 case "PS5": return 2;
                 case "Xbox": return 3;
-                case "Xbox PC": return 4;
-                case "PC": return 5;
-                case "Multiple Tags": return 6;
-                case "Other": return 7;
-                default: return 8;
+                case "PC": return 4;
+                case "Multiple Tags": return 5;
+                case "Other": return 6;
+                default: return 7;
             }
         }
 
@@ -77,7 +76,6 @@ namespace PixelVaultNative
             switch (label)
             {
                 case "Xbox": return UiBrushHelper.FromHex("#2E8B57");
-                case "Xbox PC": return UiBrushHelper.FromHex("#4D8F68");
                 case "Steam": return UiBrushHelper.FromHex("#2F6FDB");
                 case "Emulation": return UiBrushHelper.FromHex("#B26A3C");
                 case "PC": return UiBrushHelper.FromHex("#4F6D7A");

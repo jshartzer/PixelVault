@@ -109,8 +109,9 @@ public sealed class FilenameParserServiceTests
 
         var parsed = parser.Parse("Human Fall Flat 4_4_2026 7_23_36 PM.png", string.Empty);
 
-        Assert.Equal("Xbox PC", parsed.PlatformLabel);
-        Assert.Contains("Platform:Xbox PC", parsed.PlatformTags);
+        Assert.Equal("PC", parsed.PlatformLabel);
+        Assert.Contains("PC", parsed.PlatformTags);
+        Assert.DoesNotContain("Platform:Xbox PC", parsed.PlatformTags);
         Assert.True(parsed.PreserveFileTimes);
         Assert.Equal("Human Fall Flat", parsed.GameTitleHint);
         Assert.Equal(new DateTime(2026, 4, 4, 19, 23, 36), parsed.CaptureTime);
@@ -125,7 +126,7 @@ public sealed class FilenameParserServiceTests
 
         var parsed = parser.Parse("Forza Horizon 5 4_4_2026 7_23_36 PM.png", string.Empty);
 
-        Assert.Equal("Xbox PC", parsed.PlatformLabel);
+        Assert.Equal("PC", parsed.PlatformLabel);
         Assert.Equal("Forza Horizon 5", parsed.GameTitleHint);
         Assert.Equal(new DateTime(2026, 4, 4, 19, 23, 36), parsed.CaptureTime);
         Assert.Equal("xbox_pc_capture_ampm", parsed.ConventionId);
@@ -142,13 +143,13 @@ public sealed class FilenameParserServiceTests
                 new FilenameConventionRule
                 {
                     ConventionId = "xbox_pc_custom",
-                    Name = "Xbox PC Custom",
+                    Name = "PC Custom",
                     Enabled = true,
                     Priority = 1400,
                     Pattern = "[title] [M]_[d]_[yyyy] [h]_[mm]_[ss] [tt].[ext:media]",
                     PatternText = "[title] [M]_[d]_[yyyy] [h]_[mm]_[ss] [tt].[ext:media]",
-                    PlatformLabel = "Xbox PC",
-                    PlatformTagsText = "Platform:Xbox PC",
+                    PlatformLabel = "PC",
+                    PlatformTagsText = "PC",
                     TitleGroup = "title",
                     TimestampGroup = "stamp",
                     TimestampFormat = "M_d_yyyy h_mm_ss tt",
@@ -161,7 +162,7 @@ public sealed class FilenameParserServiceTests
 
         var parsed = parser.Parse("Human Fall Flat 4_4_2026 7_23_36 PM.png", harness.LibraryRoot);
 
-        Assert.Equal("Xbox PC", parsed.PlatformLabel);
+        Assert.Equal("PC", parsed.PlatformLabel);
         Assert.Equal("Human Fall Flat", parsed.GameTitleHint);
         Assert.True(parsed.PreserveFileTimes);
         Assert.Equal(new DateTime(2026, 4, 4, 19, 23, 36), parsed.CaptureTime);
@@ -562,7 +563,7 @@ public sealed class FilenameParserServiceTests
                 if (string.Equals(normalized, "Xbox PC", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(normalized, "Xbox/Windows", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(normalized, "Xbox Windows", StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(normalized, "Xbox on Windows", StringComparison.OrdinalIgnoreCase)) return "Xbox PC";
+                    || string.Equals(normalized, "Xbox on Windows", StringComparison.OrdinalIgnoreCase)) return "PC";
                 if (string.Equals(normalized, "Xbox", StringComparison.OrdinalIgnoreCase)) return "Xbox";
                 if (string.Equals(normalized, "PC", StringComparison.OrdinalIgnoreCase)) return "PC";
                 if (string.IsNullOrWhiteSpace(normalized)) return "Other";
