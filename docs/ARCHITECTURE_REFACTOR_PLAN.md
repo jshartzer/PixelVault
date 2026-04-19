@@ -2,6 +2,7 @@
 
 This document is the **durable contract** for structural refactoring: modular monolith, clear service boundaries, and incremental extraction. It **complements** (does not replace) execution details in:
 
+- `C:\Codex\docs\plans\PV-PLN-EXT-002-service-extraction-and-organization.md` — **post–MainWindow split:** Phase A extraction milestones, then Phase B service **organization** (folders/facades/docs)
 - `C:\Codex\docs\MAINWINDOW_EXTRACTION_ROADMAP.md` — *where* code moves (phases, hosts, partials)
 - `C:\Codex\docs\PERFORMANCE_TODO.md` — responsiveness and async follow-ups
 - `C:\Codex\docs\SERVICE_OWNERSHIP_AND_PARALLEL_WORK_MAP.md` — parallel lanes and merge risk
@@ -142,6 +143,7 @@ Refactor progress is **on track** when:
 |-----|------|
 | `HANDOFF.md` | Current stop point and what to read first |
 | `POLICY.md` | Durable behavior contract |
+| `plans/PV-PLN-EXT-002-service-extraction-and-organization.md` | Post–UI-split extraction + organization sequence |
 | `MAINWINDOW_EXTRACTION_ROADMAP.md` | Phase E/F and extraction milestones |
 | `PERFORMANCE_TODO.md` | Responsiveness and async backlog |
 | `SERVICE_OWNERSHIP_AND_PARALLEL_WORK_MAP.md` | Safe parallel lanes |

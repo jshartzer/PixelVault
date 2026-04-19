@@ -40,6 +40,7 @@ Phase 7 — ongoing (not a single PR)
 ------------------------------------
 - Shrink `PixelVault.Native.cs` and orchestration in partials/hosts.
 - Route remaining glue through sessions/services when touching a file (`ARCHITECTURE_REFACTOR_PLAN.md`).
+- Sequenced milestones + Phase B (service organization after extraction): `docs/plans/PV-PLN-EXT-002-service-extraction-and-organization.md`.
 
 Cross-cutting (many landed; extend only when touching paths)
 --------------------------------------------------------------
