@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -37,7 +36,7 @@ namespace PixelVaultNative
             {
                 EnsureSourceFolders();
                 EnsureExifTool();
-                Directory.CreateDirectory(destinationRoot);
+                fileSystemService.CreateDirectory(destinationRoot);
                 var prepStopwatch = Stopwatch.StartNew();
                 var inventory = importService.BuildSourceInventory(importSearchSubfoldersForRename);
                 var reviewItems = BuildReviewItems(inventory.TopLevelMediaFiles);
@@ -71,7 +70,7 @@ namespace PixelVaultNative
                     }
                 }
                 var useUnifiedImportBatch = unifiedImportBatch != null;
-                var topAtStart = inventory.TopLevelMediaFiles.Where(File.Exists).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+                var topAtStart = inventory.TopLevelMediaFiles.Where(fileSystemService.FileExists).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
                 var manualLeftOverride = useUnifiedImportBatch
                     ? (int?)Math.Max(0, topAtStart.Count - unifiedImportBatch.Count)
                     : null;
@@ -97,7 +96,7 @@ namespace PixelVaultNative
             {
                 EnsureSourceFolders();
                 EnsureExifTool();
-                Directory.CreateDirectory(destinationRoot);
+                fileSystemService.CreateDirectory(destinationRoot);
                 var prepStopwatch = Stopwatch.StartNew();
                 var inventory = importService.BuildSourceInventory(importSearchSubfoldersForRename);
                 var recognizedPaths = new HashSet<string>(BuildReviewItems(inventory.TopLevelMediaFiles).Select(i => i.FilePath), StringComparer.OrdinalIgnoreCase);
@@ -183,7 +182,7 @@ namespace PixelVaultNative
                             reportProgress(unifiedPlan.MetadataOff + current, detail);
                         }, cancellationToken);
                         ImportWorkflowOrchestration.ThrowIfCancellationRequested(cancellationToken, "Import workflow");
-                        var uniMoveResult = RunMoveFiles(batch.Select(item => item.FilePath).Where(File.Exists), "Import move summary", delegate(int current, int total, string detail)
+                        var uniMoveResult = RunMoveFiles(batch.Select(item => item.FilePath).Where(fileSystemService.FileExists), "Import move summary", delegate(int current, int total, string detail)
                         {
                             reportProgress(unifiedPlan.MoveOff + current, detail);
                         }, cancellationToken);

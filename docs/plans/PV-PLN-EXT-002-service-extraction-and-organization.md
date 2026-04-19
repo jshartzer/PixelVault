@@ -157,6 +157,12 @@ Tests under **`tests/`** create temp ini files for **`PersistentDataMigrator`** 
 
 **Exit:** Trend visible in **diffs**; tests use fake file system where added.
 
+**Landings:**
+
+| Date | Change |
+|------|--------|
+| **2026-04-18** | **`ImportWorkflow`**: destination **`CreateDirectory`** and **`File.Exists`** checks use **`IFileSystemService`** (`RunWorkflow`, `OpenManualIntakeWindow`, unified move path filter). |
+
 ---
 
 ### A.6 — Optional logging seam (low–medium, deferrable)
@@ -256,3 +262,4 @@ Phase A is “on track” when:
 | **2026-04-18** | **A.3:** `ImportWorkflow.RunWorkflow` — one `BuildSourceInventory` per run. |
 | **2026-04-18** | **A.3:** `CombineRenameStepResults`; `SaveUndoAndSortAfterImportMoveIfNeeded`; post-import sort → **`IImportService.SortDestinationRootIntoGameFolders`**. |
 | **2026-04-18** | **A.4 (initial):** **`ILibraryScanHost`** / **`LibraryScanHost`** contract documentation. |
+| **2026-04-18** | **A.5 (slice):** **`ImportWorkflow`** — **`IFileSystemService`** for destination mkdir + file-existence filters. |
