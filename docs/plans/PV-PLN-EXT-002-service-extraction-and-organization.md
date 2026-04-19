@@ -65,14 +65,13 @@ Aligned with **`ARCHITECTURE_REFACTOR_PLAN.md`**:
 
 Work items are **sequenced by leverage and merge risk**. Adjust order only when **`HANDOFF.md`** or a spike shows a hard dependency.
 
-### A.1 — Composition clarity (low risk, optional first)
+### A.1 — Composition clarity (low risk, optional first) — **landed**
 
 **Goal:** Readers can see **which services exist** and **construction order** without reading the entire ctor.
 
 **Deliverables:**
 
-- Comment block or **`#region`** in **`MainWindow`** ctor listing **service graph**, **OR**
-- Small **`AppComposition`** / **`MainWindowServices`** type (plain class) that **returns** constructed services—**no** container required.
+- **`MainWindow.ServiceComposition.cs`**: **`BuildApplicationServiceGraph`** builds the graph in dependency order; **`MainWindowServiceGraph`** record holds the same instances the ctor assigns to readonly fields. Documented XML lists the step sequence (links to existing **`Create*`** helpers).
 
 **Exit:** New contributors find wiring in **one place**; behavior unchanged.
 
@@ -219,3 +218,4 @@ Phase A is “on track” when:
 | Date | Change |
 |------|--------|
 | **2026-04-18** | Initial plan: Phase A extraction sequence, Phase B organization gates, non-goals. |
+| **2026-04-18** | **A.1:** `MainWindow.ServiceComposition.cs` + `BuildApplicationServiceGraph` / `MainWindowServiceGraph` (`PixelVault.Native.csproj` compile include). |

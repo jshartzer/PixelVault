@@ -114,7 +114,6 @@
     <Compile Include="UI\Library\LibraryCommandPaletteRegistry.cs" />
     <Compile Include="UI\Library\LibraryCommandPaletteWindow.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserPaletteCommands.cs" />
-    <Compile Include="UI\Library\MainWindow.LibraryPlatformCleanup.cs" />
     <Compile Include="UI\Library\ILibrarySession.cs" />
     <Compile Include="UI\Library\LibrarySession.cs" />
     <Compile Include="UI\Library\LibraryBrowserHost.cs" />
@@ -170,6 +169,7 @@
     <Compile Include="MainWindow.IndexServicesWiring.cs" />
     <Compile Include="MainWindow.BackgroundIntake.cs" />
     <Compile Include="MainWindow.SystemTray.cs" />
+    <Compile Include="MainWindow.ServiceComposition.cs" />
     <Compile Include="MainWindow.StartupInitialization.cs" />
     <Compile Include="UI\MainWindow.MainWindowChrome.cs" />
     <Compile Include="UI\MainWindow.SteamAndExternalApiCredentials.cs" />

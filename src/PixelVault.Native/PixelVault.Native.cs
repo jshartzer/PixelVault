@@ -145,7 +145,7 @@ namespace PixelVaultNative
 
         TextBox logBox;
         TextBlock status;
-        bool importSearchSubfoldersForRename = true;
+        bool importSearchSubfoldersForRename;
         string importMoveConflictMode = "Rename";
         /// <summary>Thread-safe mirror for background metadata (avoid Dispatcher.Invoke); default matches former Settings checkbox.</summary>
         volatile bool _includeGameCaptureKeywordsMirror = true;
@@ -191,35 +191,22 @@ namespace PixelVaultNative
                 DiagnosticsSessionId = _diagnosticsSessionId,
             });
             InitializeLibraryThumbnailPipeline(thumbsRoot);
-            (settingsService, fileSystemService) = CreateSettingsAndFileServices();
-            coverService = CreateCoverService(this, fileSystemService, coversRoot);
-            (indexPersistenceService, filenameParserService, gameIndexEditorAssignmentService, filenameRulesService) = CreateIndexFilenameRulesServices(cacheRoot, this);
-            libraryCoverResolutionService = CreateLibraryCoverResolutionService(this, coverService, filenameParserService, fileSystemService);
-            metadataService = CreateMetadataService(this, cacheRoot);
-            libraryScanner = CreateLibraryScanner(this, metadataService, fileSystemService);
-            importService = new ImportService(BuildImportServiceDependencies(
-                this,
-                libraryScanner,
-                fileSystemService,
-                metadataService,
-                coverService,
-                gameIndexEditorAssignmentService));
-            intakeAnalysisService = new IntakeAnalysisService(ParseFilename, IsVideo, GetLibraryDate);
-            libraryWorkspace = new LibraryWorkspaceContext(this);
-            librarySession = CreateLibrarySessionForStartup(
-                this,
-                libraryWorkspace,
-                libraryScanner,
-                fileSystemService,
-                gameIndexEditorAssignmentService,
-                indexPersistenceService);
-            importService.AttachLibrarySessionAccessor(() => librarySession);
-            gameIndexService = CreateGameIndexServiceForStartup(
-                this,
-                libraryScanner,
-                librarySession,
-                indexPersistenceService,
-                gameIndexEditorAssignmentService);
+            var services = BuildApplicationServiceGraph(this, cacheRoot, coversRoot);
+            settingsService = services.SettingsService;
+            fileSystemService = services.FileSystemService;
+            coverService = services.CoverService;
+            libraryCoverResolutionService = services.LibraryCoverResolutionService;
+            indexPersistenceService = services.IndexPersistenceService;
+            filenameParserService = services.FilenameParserService;
+            filenameRulesService = services.FilenameRulesService;
+            gameIndexEditorAssignmentService = services.GameIndexEditorAssignmentService;
+            metadataService = services.MetadataService;
+            libraryScanner = services.LibraryScanner;
+            importService = services.ImportService;
+            intakeAnalysisService = services.IntakeAnalysisService;
+            libraryWorkspace = services.LibraryWorkspace;
+            librarySession = services.LibrarySession;
+            gameIndexService = services.GameIndexService;
             RunPostServiceStartup();
             ApplyMainWindowChromeAndShell();
         }
@@ -788,7 +775,6 @@ namespace PixelVaultNative
         string FormatViewKeyForTroubleshooting(string viewKey) => troubleshootingLog.FormatViewKey(viewKey);
     }
 }
-
 
 
 
