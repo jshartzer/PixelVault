@@ -123,6 +123,7 @@ Tests under **`tests/`** create temp ini files for **`PersistentDataMigrator`** 
 |------|--------|
 | **2026-04-18** | **`RunWorkflow`**: single **`BuildSourceInventory`** call (was duplicated identical call for rename vs move totals). |
 | **2026-04-18** | **`ImportWorkflowOrchestration.CombineRenameStepResults`**: unified import-and-comment Steam + manual rename aggregation; tests. |
+| **2026-04-18** | **`MainWindow.SaveUndoAndSortAfterImportMoveIfNeeded`**: single path for post-move undo manifest + sort (standard, unified, manual intake). |
 
 ---
 

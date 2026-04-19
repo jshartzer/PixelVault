@@ -187,14 +187,12 @@ namespace PixelVaultNative
                         {
                             reportProgress(unifiedPlan.MoveOff + current, detail);
                         }, cancellationToken);
-                        SortStepResult uniSortResult = null;
-                        if (uniMoveResult != null && uniMoveResult.Moved > 0)
-                        {
-                            ImportWorkflowOrchestration.ThrowIfCancellationRequested(cancellationToken, "Import workflow");
-                            importService.SaveUndoManifest(uniMoveResult.Entries);
-                            reportProgress(unifiedPlan.SortOff, "Sorting imported captures into game folders...");
-                            uniSortResult = SortDestinationFoldersCore(false, false, cancellationToken);
-                        }
+                        var uniSortResult = SaveUndoAndSortAfterImportMoveIfNeeded(
+                            uniMoveResult,
+                            unifiedPlan.SortOff,
+                            "Import workflow",
+                            reportProgress,
+                            cancellationToken);
                         ImportWorkflowOrchestration.ThrowIfCancellationRequested(cancellationToken, "Import workflow");
                         reportProgress(totalWork, "Import workflow complete.");
                         var combinedRename = ImportWorkflowOrchestration.CombineRenameStepResults(steamRenameResult, manualRenameResult);
@@ -239,14 +237,12 @@ namespace PixelVaultNative
                     {
                         reportProgress(moveOffset + current, detail);
                     }, cancellationToken);
-                    SortStepResult sortResult = null;
-                    if (moveResult != null && moveResult.Moved > 0)
-                    {
-                        ImportWorkflowOrchestration.ThrowIfCancellationRequested(cancellationToken, "Import workflow");
-                        importService.SaveUndoManifest(moveResult.Entries);
-                        reportProgress(sortOffset, "Sorting imported captures into game folders...");
-                        sortResult = SortDestinationFoldersCore(false, false, cancellationToken);
-                    }
+                    var sortResult = SaveUndoAndSortAfterImportMoveIfNeeded(
+                        moveResult,
+                        sortOffset,
+                        "Import workflow",
+                        reportProgress,
+                        cancellationToken);
                     ImportWorkflowOrchestration.ThrowIfCancellationRequested(cancellationToken, "Import workflow");
                     reportProgress(totalWork, "Import workflow complete.");
                     return new ImportWorkflowExecutionResult
@@ -318,14 +314,12 @@ namespace PixelVaultNative
                     {
                         reportProgress(intakePlan.MoveOffset + current, detail);
                     }, cancellationToken);
-                    SortStepResult sortResult = null;
-                    if (moveResult != null && moveResult.Moved > 0)
-                    {
-                        ImportWorkflowOrchestration.ThrowIfCancellationRequested(cancellationToken, "Manual intake workflow");
-                        importService.SaveUndoManifest(moveResult.Entries);
-                        reportProgress(intakePlan.SortOffset, "Sorting imported captures into game folders...");
-                        sortResult = SortDestinationFoldersCore(false, false, cancellationToken);
-                    }
+                    var sortResult = SaveUndoAndSortAfterImportMoveIfNeeded(
+                        moveResult,
+                        intakePlan.SortOffset,
+                        "Manual intake workflow",
+                        reportProgress,
+                        cancellationToken);
                     ImportWorkflowOrchestration.ThrowIfCancellationRequested(cancellationToken, "Manual intake workflow");
                     reportProgress(totalWork, "Manual intake workflow complete.");
                     return new ManualIntakeExecutionResult
@@ -354,5 +348,22 @@ namespace PixelVaultNative
                 });
         }
 
+        /// <summary>
+        /// After import moves: append undo manifest and sort destination root into game folders when anything moved.
+        /// Shared by standard import, unified import-and-comment, and manual intake.
+        /// </summary>
+        SortStepResult SaveUndoAndSortAfterImportMoveIfNeeded(
+            MoveStepResult moveResult,
+            int sortProgressSlot,
+            string canceledOperationLabel,
+            Action<int, string> reportProgress,
+            CancellationToken cancellationToken)
+        {
+            if (moveResult == null || moveResult.Moved <= 0) return null;
+            ImportWorkflowOrchestration.ThrowIfCancellationRequested(cancellationToken, canceledOperationLabel);
+            importService.SaveUndoManifest(moveResult.Entries);
+            reportProgress(sortProgressSlot, "Sorting imported captures into game folders...");
+            return SortDestinationFoldersCore(false, false, cancellationToken);
+        }
     }
 }
