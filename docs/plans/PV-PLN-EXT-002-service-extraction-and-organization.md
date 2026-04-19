@@ -89,7 +89,20 @@ Work items are **sequenced by leverage and merge risk**. Adjust order only when 
 
 **Exit:** Settings-related edits touch **`Services/Config`** + **`UI/Settings/MainWindow.SettingsState`** + thin persistence partial; further stragglers in other partials can move in follow-up slices.
 
-**Follow-ups:** **`import_move_conflict_mode`** is on **`AppSettings`** / load-save / **`MainWindow.SettingsState`** (values **`Rename`** / **`Skip`** / **`Overwrite`**). Remaining: sweeps for direct **`PixelVault.settings.ini`** access outside **`SettingsService`** / **`PersistentDataMigrator`**.
+**Follow-ups:** **`import_move_conflict_mode`** is on **`AppSettings`** / load-save / **`MainWindow.SettingsState`** (values **`Rename`** / **`Skip`** / **`Overwrite`**).
+
+**Settings ini I/O sweep (live `src/` only):** No stray parse/read/write of **`PixelVault.settings.ini`** beyond:
+
+| Location | Role |
+|----------|------|
+| **`SettingsService`** | **`LoadFromIni`**, **`SaveToIni`**, **`TryReadIniValue`** (anchor logic during save) |
+| **`PersistentDataMigrator`** | Copies legacy **`PixelVault.settings.ini`** into resolved data root during migration |
+| **`MainWindow.StartupInitialization.ComputePersistentStorageLayout`** | Builds **`settingsPath`** filename (`…/PixelVault.settings.ini`) |
+| **`MainWindow.SettingsPersistence`** | Delegates to **`ISettingsService`** only |
+| **`UI/Settings/SettingsShellHost.cs`** | Tooltip text only (no file I/O) |
+| **`Publish-PixelVault.ps1`** | Publish script bundles settings into output (expected) |
+
+Tests under **`tests/`** create temp ini files for **`PersistentDataMigrator`** / **`SettingsService`** — expected.
 
 ---
 
@@ -103,6 +116,12 @@ Work items are **sequenced by leverage and merge risk**. Adjust order only when 
 - Stable **result DTOs** for progress UI (avoid raw tuple soup).
 
 **Exit:** New import behavior lands in **`Services/Import`** first; **`ImportWorkflow`** only sequences and shows UI.
+
+**Landings:**
+
+| Date | Change |
+|------|--------|
+| **2026-04-18** | **`RunWorkflow`**: single **`BuildSourceInventory`** call (was duplicated identical call for rename vs move totals). |
 
 ---
 
@@ -224,3 +243,5 @@ Phase A is “on track” when:
 | **2026-04-18** | **A.1:** `MainWindow.ServiceComposition.cs` + `BuildApplicationServiceGraph` / `MainWindowServiceGraph` (`PixelVault.Native.csproj` compile include). |
 | **2026-04-18** | **A.2 (initial):** `MainWindow.SettingsState.cs` (capture/apply); persistence partial slim; `ISettingsService` contract note. |
 | **2026-04-18** | **A.2:** `import_move_conflict_mode` persisted (`AppSettings`, `SettingsService.NormalizeImportMoveConflictMode`, tests). |
+| **2026-04-18** | **A.2:** Settings ini I/O sweep documented (table in this plan). |
+| **2026-04-18** | **A.3:** `ImportWorkflow.RunWorkflow` — one `BuildSourceInventory` per run. |

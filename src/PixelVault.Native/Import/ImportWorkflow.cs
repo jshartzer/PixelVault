@@ -39,7 +39,6 @@ namespace PixelVaultNative
                 EnsureExifTool();
                 Directory.CreateDirectory(destinationRoot);
                 var prepStopwatch = Stopwatch.StartNew();
-                var renameInventory = importService.BuildSourceInventory(importSearchSubfoldersForRename);
                 var inventory = importService.BuildSourceInventory(importSearchSubfoldersForRename);
                 var reviewItems = BuildReviewItems(inventory.TopLevelMediaFiles);
                 var recognizedPaths = new HashSet<string>(reviewItems.Select(i => i.FilePath), StringComparer.OrdinalIgnoreCase);
@@ -76,8 +75,8 @@ namespace PixelVaultNative
                 var manualLeftOverride = useUnifiedImportBatch
                     ? (int?)Math.Max(0, topAtStart.Count - unifiedImportBatch.Count)
                     : null;
-                LogPerformanceSample("ImportPreparation", prepStopwatch, "workflow=" + (withReview ? "import+comment" : "import") + "; includeSubfolders=" + importSearchSubfoldersForRename + "; renameScope=" + renameInventory.RenameScopeFiles.Count + "; importCandidates=" + inventory.TopLevelMediaFiles.Count + "; reviewItems=" + reviewItems.Count + "; manualItems=" + manualItems.Count + "; unifiedImport=" + useUnifiedImportBatch, 40);
-                RunImportWorkflowWithProgress(withReview, useUnifiedImportBatch, renameInventory, inventory, reviewItems, useUnifiedImportBatch ? unifiedImportBatch : manualItems, manualPaths, manualLeftOverride);
+                LogPerformanceSample("ImportPreparation", prepStopwatch, "workflow=" + (withReview ? "import+comment" : "import") + "; includeSubfolders=" + importSearchSubfoldersForRename + "; renameScope=" + inventory.RenameScopeFiles.Count + "; importCandidates=" + inventory.TopLevelMediaFiles.Count + "; reviewItems=" + reviewItems.Count + "; manualItems=" + manualItems.Count + "; unifiedImport=" + useUnifiedImportBatch, 40);
+                RunImportWorkflowWithProgress(withReview, useUnifiedImportBatch, inventory, inventory, reviewItems, useUnifiedImportBatch ? unifiedImportBatch : manualItems, manualPaths, manualLeftOverride);
             }
             catch (Exception ex)
             {
