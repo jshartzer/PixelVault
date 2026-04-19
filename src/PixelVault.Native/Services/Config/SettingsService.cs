@@ -179,6 +179,15 @@ namespace PixelVaultNative
                 else if (key == "library_index_anchor") s.LibraryIndexAnchor = value ?? string.Empty;
                 else if (key == "exiftool" && !string.IsNullOrWhiteSpace(value)) s.ExifToolPath = value;
                 else if (key == "ffmpeg" && !string.IsNullOrWhiteSpace(value)) s.FfmpegPath = value;
+                else if (key == "import_search_subfolders_for_rename")
+                {
+                    var normalizedValue = (value ?? string.Empty).Trim();
+                    s.ImportSearchSubfoldersForRename =
+                        string.Equals(normalizedValue, "1", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(normalizedValue, "true", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(normalizedValue, "yes", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(normalizedValue, "on", StringComparison.OrdinalIgnoreCase);
+                }
                 else if (key == "steamgriddb_token") s.SteamGridDbApiToken = value ?? string.Empty;
                 else if (key == "steam_web_api_key") s.SteamWebApiKey = value ?? string.Empty;
                 else if (key == "retroachievements_api_key") s.RetroAchievementsApiKey = value ?? string.Empty;
@@ -402,6 +411,7 @@ namespace PixelVaultNative
                 "library_index_anchor=" + anchorOut,
                 "exiftool=" + (state.ExifToolPath ?? string.Empty),
                 "ffmpeg=" + (state.FfmpegPath ?? string.Empty),
+                "import_search_subfolders_for_rename=" + (state.ImportSearchSubfoldersForRename ? "1" : "0"),
                 "steamgriddb_token=" + (state.SteamGridDbApiToken ?? string.Empty),
                 "steam_web_api_key=" + (state.SteamWebApiKey ?? string.Empty),
                 "retroachievements_api_key=" + (state.RetroAchievementsApiKey ?? string.Empty),

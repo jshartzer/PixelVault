@@ -111,7 +111,7 @@ namespace PixelVaultNative
 
         List<ReviewItem> BuildReviewItems()
         {
-            return BuildReviewItems(importService.BuildSourceInventory(false).TopLevelMediaFiles);
+            return BuildReviewItems(importService.BuildSourceInventory(importSearchSubfoldersForRename).TopLevelMediaFiles);
         }
 
         List<ReviewItem> BuildReviewItems(IEnumerable<string> sourceFiles, CancellationToken cancellationToken = default(CancellationToken))
@@ -151,7 +151,7 @@ namespace PixelVaultNative
 
         List<ManualMetadataItem> BuildManualMetadataItems(HashSet<string> recognizedPaths)
         {
-            return BuildManualMetadataItems(importService.BuildSourceInventory(false).TopLevelMediaFiles, recognizedPaths);
+            return BuildManualMetadataItems(importService.BuildSourceInventory(importSearchSubfoldersForRename).TopLevelMediaFiles, recognizedPaths);
         }
 
         List<ManualMetadataItem> BuildManualMetadataItems(IEnumerable<string> sourceFiles, HashSet<string> recognizedPaths, CancellationToken cancellationToken = default(CancellationToken))

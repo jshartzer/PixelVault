@@ -71,7 +71,7 @@ namespace PixelVaultNative
             navChrome.ExportStarredButton.Click += delegate { ExportStarredLibraryCapturesToFolder(libraryWindow); };
             navChrome.IntakeReviewButton.Click += delegate
             {
-                ShowIntakePreviewWindow(false);
+                ShowIntakePreviewWindow(importSearchSubfoldersForRename);
                 if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge();
             };
             panes.OpenFolderButton.Click += delegate

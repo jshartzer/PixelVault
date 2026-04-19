@@ -115,6 +115,7 @@ public sealed class SettingsServiceTests
                 "library=C:\\lib",
                 "exiftool=C:\\tools\\exiftool.exe",
                 "ffmpeg=",
+                "import_search_subfolders_for_rename=1",
                 "steamgriddb_token=secret",
                 "steam_web_api_key=steamkey",
                 "retroachievements_api_key=rakey",
@@ -157,6 +158,7 @@ public sealed class SettingsServiceTests
             Assert.Equal(@"C:\dest", loaded.DestinationRoot, ignoreCase: true);
             Assert.Equal(@"C:\lib", loaded.LibraryRoot, ignoreCase: true);
             Assert.Equal(@"C:\tools\exiftool.exe", loaded.ExifToolPath, ignoreCase: true);
+            Assert.True(loaded.ImportSearchSubfoldersForRename);
             Assert.Equal("secret", loaded.SteamGridDbApiToken);
             Assert.Equal("steamkey", loaded.SteamWebApiKey);
             Assert.Equal("rakey", loaded.RetroAchievementsApiKey);
@@ -222,6 +224,7 @@ public sealed class SettingsServiceTests
                 LibraryRoot = @"D:\lib",
                 ExifToolPath = exifStub,
                 FfmpegPath = ffmpegStub,
+                ImportSearchSubfoldersForRename = true,
                 SteamGridDbApiToken = "tok",
                 SteamWebApiKey = "sw",
                 RetroAchievementsApiKey = "ra",
@@ -259,6 +262,7 @@ public sealed class SettingsServiceTests
             Assert.Equal(original.LibraryRoot, loaded.LibraryRoot, ignoreCase: true);
             Assert.Equal(original.ExifToolPath, loaded.ExifToolPath, ignoreCase: true);
             Assert.Equal(original.FfmpegPath, loaded.FfmpegPath, ignoreCase: true);
+            Assert.True(loaded.ImportSearchSubfoldersForRename);
             Assert.Equal(original.SteamGridDbApiToken, loaded.SteamGridDbApiToken);
             Assert.Equal(original.SteamWebApiKey, loaded.SteamWebApiKey);
             Assert.Equal(original.RetroAchievementsApiKey, loaded.RetroAchievementsApiKey);

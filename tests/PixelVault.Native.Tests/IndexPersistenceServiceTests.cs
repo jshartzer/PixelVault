@@ -180,7 +180,7 @@ public sealed class IndexPersistenceServiceTests
                     SteamAppId = "108710",
                     SteamGridDbId = "9991",
                     FileCount = 12,
-                    FolderPath = "E:\\Game Captures\\Alan Wake",
+                    FolderPath = "C:\\Game Captures\\Alan Wake",
                     FilePaths = Array.Empty<string>()
                 }
             });
@@ -197,7 +197,7 @@ public sealed class IndexPersistenceServiceTests
                     SteamAppId = string.Empty,
                     SteamGridDbId = string.Empty,
                     FileCount = 12,
-                    FolderPath = "E:\\Game Captures\\Alan Wake",
+                    FolderPath = "C:\\Game Captures\\Alan Wake",
                     FilePaths = Array.Empty<string>()
                 }
             });
@@ -208,7 +208,7 @@ public sealed class IndexPersistenceServiceTests
         Assert.Equal("G00001", row.GameId);
         Assert.Equal("108710", row.SteamAppId);
         Assert.Equal("9991", row.SteamGridDbId);
-        Assert.Equal("E:\\Game Captures\\Alan Wake", row.FolderPath);
+        Assert.Equal("C:\\Game Captures\\Alan Wake", row.FolderPath);
     }
 
     [Fact]

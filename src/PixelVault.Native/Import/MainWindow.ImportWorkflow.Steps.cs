@@ -100,12 +100,12 @@ namespace PixelVaultNative
 
         MoveStepResult RunMove()
         {
-            return RunMove(importService.BuildSourceInventory(false).TopLevelMediaFiles, null);
+            return RunMove(importService.BuildSourceInventory(importSearchSubfoldersForRename).TopLevelMediaFiles, null);
         }
 
         MoveStepResult RunMove(HashSet<string> skipFiles)
         {
-            return RunMove(importService.BuildSourceInventory(false).TopLevelMediaFiles, skipFiles);
+            return RunMove(importService.BuildSourceInventory(importSearchSubfoldersForRename).TopLevelMediaFiles, skipFiles);
         }
 
         MoveStepResult RunMove(IEnumerable<string> sourceFiles, HashSet<string> skipFiles, Action<int, int, string> progress = null, CancellationToken cancellationToken = default(CancellationToken))

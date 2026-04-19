@@ -109,6 +109,20 @@ namespace PixelVaultNative
             SettingsBrowseButton(panel, 4, delegate { var picked = d.PickFile(ffmpegBox.Text, "Executable (*.exe)|*.exe|All files (*.*)|*.*", null); if (!string.IsNullOrWhiteSpace(picked)) ffmpegBox.Text = picked; });
             SettingsBrowseButton(panel, 10, delegate { var picked = d.PickFolder(starredExportBox.Text); if (!string.IsNullOrWhiteSpace(picked)) starredExportBox.Text = picked; });
 
+            var importSubfolderScanBox = new CheckBox
+            {
+                Content = "During import, also scan subfolders under each source folder",
+                IsChecked = d.GetImportSearchSubfoldersForRename?.Invoke() ?? false,
+                Margin = new Thickness(0, 18, 0, 4),
+                Foreground = boxFg
+            };
+            importSubfolderScanBox.ToolTip =
+                "Default import only inspects the top level of each source folder. Turn this on if you intentionally keep captures in nested folders and want PixelVault to include them in import prep and Steam/non-Steam rename scanning.";
+            Grid.SetRow(importSubfolderScanBox, 11);
+            Grid.SetColumnSpan(importSubfolderScanBox, 3);
+            while (panel.RowDefinitions.Count <= 11) panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            panel.Children.Add(importSubfolderScanBox);
+
             var intakeHeader = new TextBlock
             {
                 Text = "Background auto-intake",
@@ -116,9 +130,9 @@ namespace PixelVaultNative
                 Foreground = labelFg,
                 Margin = new Thickness(0, 18, 0, 6)
             };
-            Grid.SetRow(intakeHeader, 11);
+            Grid.SetRow(intakeHeader, 12);
             Grid.SetColumnSpan(intakeHeader, 3);
-            while (panel.RowDefinitions.Count <= 11) panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            while (panel.RowDefinitions.Count <= 12) panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             panel.Children.Add(intakeHeader);
 
             var autoIntakeEnableBox = new CheckBox
@@ -131,12 +145,12 @@ namespace PixelVaultNative
             autoIntakeEnableBox.ToolTip =
                 "Runs the same standard import pipeline as the Library for matching top-level files. Custom rules need 'Trusted exact match' in Filename Conventions; built-ins import when automatic metadata is fully possible. "
                 + "Review and undo: Library command palette → Background imports.";
-            Grid.SetRow(autoIntakeEnableBox, 12);
+            Grid.SetRow(autoIntakeEnableBox, 13);
             Grid.SetColumnSpan(autoIntakeEnableBox, 3);
-            while (panel.RowDefinitions.Count <= 12) panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            while (panel.RowDefinitions.Count <= 13) panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             panel.Children.Add(autoIntakeEnableBox);
 
-            var quietSecondsBox = SettingsTextBox(panel, 13, "Stability quiet period (seconds)", (d.GetBackgroundAutoIntakeQuietSeconds?.Invoke() ?? 3).ToString(CultureInfo.InvariantCulture), labelFg, boxBg, boxFg, borderBrush, boxFg);
+            var quietSecondsBox = SettingsTextBox(panel, 14, "Stability quiet period (seconds)", (d.GetBackgroundAutoIntakeQuietSeconds?.Invoke() ?? 3).ToString(CultureInfo.InvariantCulture), labelFg, boxBg, boxFg, borderBrush, boxFg);
             quietSecondsBox.ToolTip = "The file must stay unchanged (size and write time) for this long after activity stops. Allowed range: 1–120 seconds.";
 
             var toastBox = new CheckBox
@@ -146,9 +160,9 @@ namespace PixelVaultNative
                 Margin = new Thickness(0, 0, 0, 4),
                 Foreground = boxFg
             };
-            Grid.SetRow(toastBox, 14);
+            Grid.SetRow(toastBox, 15);
             Grid.SetColumnSpan(toastBox, 3);
-            while (panel.RowDefinitions.Count <= 14) panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            while (panel.RowDefinitions.Count <= 15) panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             panel.Children.Add(toastBox);
 
             var summaryBox = new CheckBox
@@ -159,9 +173,9 @@ namespace PixelVaultNative
                 Foreground = boxFg
             };
             summaryBox.ToolTip = "Does not open the Background imports window. Use Library command palette → Background imports anytime. Success toasts include a Review button when the library window is active.";
-            Grid.SetRow(summaryBox, 15);
+            Grid.SetRow(summaryBox, 16);
             Grid.SetColumnSpan(summaryBox, 3);
-            while (panel.RowDefinitions.Count <= 15) panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            while (panel.RowDefinitions.Count <= 16) panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             panel.Children.Add(summaryBox);
 
             var verboseIntakeBox = new CheckBox
@@ -172,9 +186,9 @@ namespace PixelVaultNative
                 Foreground = boxFg
             };
             verboseIntakeBox.ToolTip = "Writes detailed lines prefixed with [BGINT] to the normal PixelVault log (watchers, queue, stability, eligibility). Turn off after diagnosing.";
-            Grid.SetRow(verboseIntakeBox, 16);
+            Grid.SetRow(verboseIntakeBox, 17);
             Grid.SetColumnSpan(verboseIntakeBox, 3);
-            while (panel.RowDefinitions.Count <= 16) panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            while (panel.RowDefinitions.Count <= 17) panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             panel.Children.Add(verboseIntakeBox);
 
             var trayHeader = new TextBlock
@@ -184,9 +198,9 @@ namespace PixelVaultNative
                 Foreground = labelFg,
                 Margin = new Thickness(0, 18, 0, 6)
             };
-            Grid.SetRow(trayHeader, 17);
+            Grid.SetRow(trayHeader, 18);
             Grid.SetColumnSpan(trayHeader, 3);
-            while (panel.RowDefinitions.Count <= 17) panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            while (panel.RowDefinitions.Count <= 18) panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             panel.Children.Add(trayHeader);
 
             var minimizeToTrayBox = new CheckBox
@@ -197,9 +211,9 @@ namespace PixelVaultNative
                 Foreground = boxFg
             };
             minimizeToTrayBox.ToolTip = "Useful if you want background auto-intake to keep running without a taskbar window.";
-            Grid.SetRow(minimizeToTrayBox, 18);
+            Grid.SetRow(minimizeToTrayBox, 19);
             Grid.SetColumnSpan(minimizeToTrayBox, 3);
-            while (panel.RowDefinitions.Count <= 18) panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            while (panel.RowDefinitions.Count <= 19) panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             panel.Children.Add(minimizeToTrayBox);
 
             var promptOnCloseBox = new CheckBox
@@ -210,9 +224,9 @@ namespace PixelVaultNative
                 Foreground = boxFg
             };
             promptOnCloseBox.ToolTip = "The tray icon shows recent background-import activity and quick actions like Restore and Background Imports.";
-            Grid.SetRow(promptOnCloseBox, 19);
+            Grid.SetRow(promptOnCloseBox, 20);
             Grid.SetColumnSpan(promptOnCloseBox, 3);
-            while (panel.RowDefinitions.Count <= 19) panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            while (panel.RowDefinitions.Count <= 20) panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             panel.Children.Add(promptOnCloseBox);
 
             var pathScroll = new ScrollViewer
@@ -241,6 +255,7 @@ namespace PixelVaultNative
                 d.SetStarredExportFolder((starredExportBox.Text ?? string.Empty).Trim());
                 d.SetExifToolPath(exifBox.Text);
                 d.SetFfmpegPath(ffmpegBox.Text);
+                d.SetImportSearchSubfoldersForRename?.Invoke(importSubfolderScanBox.IsChecked == true);
                 d.ClearFailedFfmpegPosterKeys();
                 d.SetSteamGridDbApiToken((steamGridDbTokenBox.Text ?? string.Empty).Trim());
                 d.SetSteamWebApiKey((steamWebApiKeyBox.Text ?? string.Empty).Trim());
@@ -492,6 +507,13 @@ namespace PixelVaultNative
                 Text = "FFmpeg: " + (string.IsNullOrWhiteSpace(d.GetFfmpegPath())
                     ? "(optional video add-on not configured — install FFmpeg separately for video thumbnails, clip previews, and richer clip details)"
                     : d.GetFfmpegPath()),
+                TextWrapping = TextWrapping.Wrap,
+                Foreground = textMuted,
+                Margin = new Thickness(0, 0, 0, 4)
+            });
+            stack.Children.Add(new TextBlock
+            {
+                Text = "Import scan scope: " + ((d.GetImportSearchSubfoldersForRename?.Invoke() ?? false) ? "includes source subfolders" : "top-level only"),
                 TextWrapping = TextWrapping.Wrap,
                 Foreground = textMuted,
                 Margin = new Thickness(0, 0, 0, 4)

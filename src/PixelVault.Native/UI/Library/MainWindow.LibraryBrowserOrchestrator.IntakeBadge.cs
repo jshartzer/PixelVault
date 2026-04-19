@@ -14,7 +14,7 @@ namespace PixelVaultNative
                 try
                 {
                     EnsureSourceFolders();
-                    return importService.BuildSourceInventory(false).TopLevelMediaFiles.Count;
+                    return importService.BuildSourceInventory(importSearchSubfoldersForRename).TopLevelMediaFiles.Count;
                 }
                 catch
                 {

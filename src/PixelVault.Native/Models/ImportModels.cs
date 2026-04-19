@@ -122,7 +122,9 @@ namespace PixelVaultNative
 
     sealed class SourceInventory
     {
+        /// <summary>Import candidate files. Legacy field name: may include nested files when source-folder subfolder scanning is enabled.</summary>
         public List<string> TopLevelMediaFiles = new List<string>();
+        /// <summary>Files considered during the Steam/non-Steam rename prep phase.</summary>
         public List<string> RenameScopeFiles = new List<string>();
     }
 

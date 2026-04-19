@@ -23,7 +23,7 @@ namespace PixelVaultNative
             EnsureExifTool();
             Directory.CreateDirectory(destinationRoot);
             var renameInventory = importService.BuildSourceInventory(importSearchSubfoldersForRename);
-            var inventory = importService.BuildSourceInventory(false);
+            var inventory = importService.BuildSourceInventory(importSearchSubfoldersForRename);
             var eligible = (eligibleTopLevelPaths ?? Array.Empty<string>())
                 .Where(p => !string.IsNullOrWhiteSpace(p) && File.Exists(p))
                 .Distinct(StringComparer.OrdinalIgnoreCase)

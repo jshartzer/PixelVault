@@ -23,7 +23,7 @@ namespace PixelVaultNative
 
         internal void LibraryBrowserPaletteOpenManualIntake() => OpenManualIntakeWindow();
 
-        internal void LibraryBrowserPaletteShowIntakePreview() => ShowIntakePreviewWindow(false);
+        internal void LibraryBrowserPaletteShowIntakePreview() => ShowIntakePreviewWindow(importSearchSubfoldersForRename);
 
         internal void LibraryBrowserPaletteOpenBackgroundImports() => BackgroundIntakeActivityWindow.ShowOrBringToFront(this);
 

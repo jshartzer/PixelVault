@@ -36,6 +36,7 @@ namespace PixelVaultNative
         public Func<string> GetSavedCoversRoot { get; set; }
         public Func<string> GetExifToolPath { get; set; }
         public Func<string> GetFfmpegPath { get; set; }
+        public Func<bool> GetImportSearchSubfoldersForRename { get; set; }
         public Func<string> GetSteamGridDbApiToken { get; set; }
         public Func<bool> HasSteamGridDbApiToken { get; set; }
         public Func<string> GetSteamWebApiKey { get; set; }
@@ -86,6 +87,7 @@ namespace PixelVaultNative
         public Action<string> SetStarredExportFolder { get; set; }
         public Action<string> SetExifToolPath { get; set; }
         public Action<string> SetFfmpegPath { get; set; }
+        public Action<bool> SetImportSearchSubfoldersForRename { get; set; }
         public Action<string> SetSteamGridDbApiToken { get; set; }
         public Action<string> SetSteamWebApiKey { get; set; }
         public Action<string> SetRetroAchievementsApiKey { get; set; }

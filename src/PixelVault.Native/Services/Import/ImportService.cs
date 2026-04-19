@@ -33,8 +33,8 @@ namespace PixelVaultNative
         /// <summary>Resolves where an imported file ended up after move/sort (same rules as undo). Empty if not found.</summary>
         string TryResolveUndoEntryCurrentPath(UndoImportEntry entry);
 
-        /// <summary>Top-level and optional recursive media file lists from configured source roots.</summary>
-        SourceInventory BuildSourceInventory(bool recurseRename);
+        /// <summary>Media-file inventory from configured source roots. When <paramref name="includeSubfolders"/> is true, nested files are included in the import candidate list and rename scope.</summary>
+        SourceInventory BuildSourceInventory(bool includeSubfolders);
 
         /// <summary>Standard import progress totals (Steam rename scope + review steps).</summary>
         ImportWorkflowStandardWorkTotals ComputeStandardImportWorkTotals(SourceInventory renameInventory, IReadOnlyList<ReviewItem> reviewItems, SourceInventory inventory, HashSet<string> manualPaths);
@@ -447,18 +447,17 @@ namespace PixelVaultNative
             return ResolveUndoCurrentPath(entry, usedPaths, destinationRoot, libraryRoot) ?? string.Empty;
         }
 
-        public SourceInventory BuildSourceInventory(bool recurseRename)
+        public SourceInventory BuildSourceInventory(bool includeSubfolders)
         {
             var enumerate = d.EnumerateSourceMediaFiles;
             var isMedia = d.IsMedia;
             if (enumerate == null || isMedia == null) return new SourceInventory();
-            var topLevelMediaFiles = enumerate(SearchOption.TopDirectoryOnly, isMedia).ToList();
+            var searchOption = includeSubfolders ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
+            var candidateMediaFiles = enumerate(searchOption, isMedia).ToList();
             return new SourceInventory
             {
-                TopLevelMediaFiles = topLevelMediaFiles,
-                RenameScopeFiles = recurseRename
-                    ? enumerate(SearchOption.AllDirectories, isMedia).ToList()
-                    : topLevelMediaFiles.ToList()
+                TopLevelMediaFiles = candidateMediaFiles,
+                RenameScopeFiles = candidateMediaFiles.ToList()
             };
         }
 

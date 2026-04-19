@@ -40,7 +40,7 @@ namespace PixelVaultNative
                 Directory.CreateDirectory(destinationRoot);
                 var prepStopwatch = Stopwatch.StartNew();
                 var renameInventory = importService.BuildSourceInventory(importSearchSubfoldersForRename);
-                var inventory = importService.BuildSourceInventory(false);
+                var inventory = importService.BuildSourceInventory(importSearchSubfoldersForRename);
                 var reviewItems = BuildReviewItems(inventory.TopLevelMediaFiles);
                 var recognizedPaths = new HashSet<string>(reviewItems.Select(i => i.FilePath), StringComparer.OrdinalIgnoreCase);
                 var manualItems = BuildManualMetadataItems(inventory.TopLevelMediaFiles, recognizedPaths);
@@ -76,7 +76,7 @@ namespace PixelVaultNative
                 var manualLeftOverride = useUnifiedImportBatch
                     ? (int?)Math.Max(0, topAtStart.Count - unifiedImportBatch.Count)
                     : null;
-                LogPerformanceSample("ImportPreparation", prepStopwatch, "workflow=" + (withReview ? "import+comment" : "import") + "; renameScope=" + renameInventory.RenameScopeFiles.Count + "; topLevel=" + inventory.TopLevelMediaFiles.Count + "; reviewItems=" + reviewItems.Count + "; manualItems=" + manualItems.Count + "; unifiedImport=" + useUnifiedImportBatch, 40);
+                LogPerformanceSample("ImportPreparation", prepStopwatch, "workflow=" + (withReview ? "import+comment" : "import") + "; includeSubfolders=" + importSearchSubfoldersForRename + "; renameScope=" + renameInventory.RenameScopeFiles.Count + "; importCandidates=" + inventory.TopLevelMediaFiles.Count + "; reviewItems=" + reviewItems.Count + "; manualItems=" + manualItems.Count + "; unifiedImport=" + useUnifiedImportBatch, 40);
                 RunImportWorkflowWithProgress(withReview, useUnifiedImportBatch, renameInventory, inventory, reviewItems, useUnifiedImportBatch ? unifiedImportBatch : manualItems, manualPaths, manualLeftOverride);
             }
             catch (Exception ex)
@@ -100,11 +100,11 @@ namespace PixelVaultNative
                 EnsureExifTool();
                 Directory.CreateDirectory(destinationRoot);
                 var prepStopwatch = Stopwatch.StartNew();
-                var inventory = importService.BuildSourceInventory(false);
+                var inventory = importService.BuildSourceInventory(importSearchSubfoldersForRename);
                 var recognizedPaths = new HashSet<string>(BuildReviewItems(inventory.TopLevelMediaFiles).Select(i => i.FilePath), StringComparer.OrdinalIgnoreCase);
                 var manualItems = BuildManualMetadataItems(inventory.TopLevelMediaFiles, recognizedPaths);
                 prepStopwatch.Stop();
-                LogPerformanceSample("ManualIntakePreparation", prepStopwatch, "topLevel=" + inventory.TopLevelMediaFiles.Count + "; manualItems=" + manualItems.Count, 40);
+                LogPerformanceSample("ManualIntakePreparation", prepStopwatch, "includeSubfolders=" + importSearchSubfoldersForRename + "; importCandidates=" + inventory.TopLevelMediaFiles.Count + "; manualItems=" + manualItems.Count, 40);
                 if (manualItems.Count == 0)
                 {
                     status.Text = "No manual intake items";
