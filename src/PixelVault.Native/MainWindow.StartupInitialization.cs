@@ -244,10 +244,52 @@ namespace PixelVaultNative
             Directory.CreateDirectory(savedCoversRoot);
         }
 
+        /// <summary>
+        /// When the exe lives under a PixelVault repo tree, default capture paths stay under that repo (e.g. dev runs from <c>C:\Codex\...</c>).
+        /// Installed builds (no repo markers above the exe) use <c>C:\Game Capture …</c> so first-run installs stay on C: without relying on <c>E:\</c>.
+        /// </summary>
+        static bool TryResolveCodexWorkspaceRoot(string startDirectory, out string repoRoot)
+        {
+            repoRoot = string.Empty;
+            if (string.IsNullOrWhiteSpace(startDirectory)) return false;
+
+            try
+            {
+                var dir = new DirectoryInfo(startDirectory);
+                for (var depth = 0; depth < 16 && dir != null; depth++)
+                {
+                    var candidate = dir.FullName.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                    var slnx = Path.Combine(candidate, "Codex.slnx");
+                    var nativeProj = Path.Combine(candidate, "src", "PixelVault.Native", "PixelVault.Native.csproj");
+                    if (File.Exists(slnx) || File.Exists(nativeProj))
+                    {
+                        repoRoot = candidate;
+                        return true;
+                    }
+
+                    dir = dir.Parent;
+                }
+            }
+            catch
+            {
+                // fall through — use public C:\ roots
+            }
+
+            return false;
+        }
+
         void InitializeDefaultWorkspaceRootsAndTools()
         {
-            sourceRoot = @"E:\Game Capture Uploads";
-            destinationRoot = @"E:\Game Captures";
+            string uploadRoot = @"C:\Game Capture Uploads";
+            string destination = @"C:\Game Captures";
+            if (TryResolveCodexWorkspaceRoot(appRoot, out var codexRoot))
+            {
+                uploadRoot = Path.Combine(codexRoot, "Game Capture Uploads");
+                destination = Path.Combine(codexRoot, "Game Captures");
+            }
+
+            sourceRoot = uploadRoot;
+            destinationRoot = destination;
             libraryRoot = destinationRoot;
             exifToolPath = Path.Combine(appRoot, "tools", "exiftool.exe");
             ffmpegPath = string.Empty;
@@ -261,7 +303,6 @@ namespace PixelVaultNative
             MigratePersistentDataFromLegacyVersions();
             InitializeDefaultWorkspaceRootsAndTools();
             LoadSettings();
-            RunXboxPcPlatformCleanupIfNeeded();
             InitializeBackgroundIntakeAgent();
         }
 
