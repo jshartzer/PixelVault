@@ -5,7 +5,7 @@ using System.Windows;
 namespace PixelVaultNative
 {
     /// <summary>
-    /// Ini load/save only: merge and persist via <see cref="ISettingsService"/>; field mapping lives in <see cref="MainWindow.SettingsState"/>.
+    /// Ini load/save only: merge and persist via <see cref="ISettingsService"/>; field mapping lives in the <c>MainWindow.SettingsState</c> partial.
     /// </summary>
     public sealed partial class MainWindow
     {

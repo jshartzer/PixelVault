@@ -4,7 +4,7 @@ namespace PixelVaultNative
 {
     /// <summary>
     /// Persistence for <c>PixelVault.settings.ini</c>. Callers build <see cref="AppSettings"/> snapshots from UI state
-    /// (see <c>MainWindow.SettingsState</c>) and pass the on-disk path explicitly — do not read/write the ini file elsewhere.
+    /// (see the <c>MainWindow.SettingsState</c> partial) and pass the on-disk path explicitly — do not read/write the ini file elsewhere.
     /// </summary>
     public interface ISettingsService
     {
