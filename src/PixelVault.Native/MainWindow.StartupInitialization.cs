@@ -129,7 +129,8 @@ namespace PixelVaultNative
             IFileSystemService fileSystemService,
             IMetadataService metadataService,
             ICoverService coverService,
-            IGameIndexEditorAssignmentService gameIndexEditorAssignmentService)
+            IGameIndexEditorAssignmentService gameIndexEditorAssignmentService,
+            ILogService logService)
         {
             return new ImportServiceDependencies
             {
@@ -141,7 +142,7 @@ namespace PixelVaultNative
                 MoveMetadataSidecarIfPresent = mw.MoveMetadataSidecarIfPresent,
                 AddSidecarUndoEntryIfPresent = mw.AddSidecarUndoEntryIfPresent,
                 SuppressBackgroundAutoIntakePathBeforeUndoMove = mw.SuppressBackgroundAutoIntakePathBeforeUndoMove,
-                Log = mw.Log,
+                LogService = logService,
                 IsMedia = MainWindow.IsMedia,
                 GetSafeGameFolderName = mw.GetSafeGameFolderName,
                 GetGameNameFromFileName = mw.GetGameNameFromFileName,

@@ -10,6 +10,7 @@ namespace PixelVaultNative
         /// Immutable result of <see cref="BuildApplicationServiceGraph"/>; assigns to <see cref="MainWindow"/> readonly service fields.
         /// </summary>
         readonly record struct MainWindowServiceGraph(
+            ILogService LogService,
             ISettingsService SettingsService,
             IFileSystemService FileSystemService,
             ICoverService CoverService,
@@ -29,6 +30,7 @@ namespace PixelVaultNative
         /// <summary>
         /// Builds the application service graph in dependency order (behavior matches the previous inline <see cref="MainWindow"/> constructor).
         /// <list type="number">
+        /// <item><description><see cref="TroubleshootingLogService"/> from <paramref name="troubleshootingLog"/></description></item>
         /// <item><description><see cref="CreateSettingsAndFileServices"/></description></item>
         /// <item><description><see cref="CreateCoverService"/></description></item>
         /// <item><description><see cref="CreateIndexFilenameRulesServices"/></description></item>
@@ -42,8 +44,9 @@ namespace PixelVaultNative
         /// <item><description><see cref="CreateGameIndexServiceForStartup"/></description></item>
         /// </list>
         /// </summary>
-        static MainWindowServiceGraph BuildApplicationServiceGraph(MainWindow host, string cacheRoot, string coversRoot)
+        static MainWindowServiceGraph BuildApplicationServiceGraph(MainWindow host, string cacheRoot, string coversRoot, TroubleshootingLog troubleshootingLog)
         {
+            var logService = new TroubleshootingLogService(troubleshootingLog);
             var (settingsService, fileSystemService) = CreateSettingsAndFileServices();
             var coverService = CreateCoverService(host, fileSystemService, coversRoot);
             var (indexPersistenceService, filenameParserService, gameIndexEditorAssignmentService, filenameRulesService) =
@@ -61,7 +64,8 @@ namespace PixelVaultNative
                 fileSystemService,
                 metadataService,
                 coverService,
-                gameIndexEditorAssignmentService));
+                gameIndexEditorAssignmentService,
+                logService));
             var intakeAnalysisService = new IntakeAnalysisService(host.ParseFilename, IsVideo, host.GetLibraryDate);
             var libraryWorkspace = new LibraryWorkspaceContext(host);
             var librarySession = CreateLibrarySessionForStartup(
@@ -80,6 +84,7 @@ namespace PixelVaultNative
                 gameIndexEditorAssignmentService);
 
             return new MainWindowServiceGraph(
+                logService,
                 settingsService,
                 fileSystemService,
                 coverService,

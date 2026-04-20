@@ -1,4 +1,5 @@
 #nullable disable
+using PixelVaultNative;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -145,6 +146,7 @@ public sealed class ImportServiceManualMetadataTests
         return new ImportService(new ImportServiceDependencies
         {
             FileSystem = new FileSystemService(),
+            LogService = NullLogService.Instance,
             MetadataService = new StubMetadataService(),
             GetFileCreationTime = _ => DateTime.MinValue,
             GetFileLastWriteTime = _ => DateTime.MinValue,
@@ -533,6 +535,7 @@ public sealed class ImportServiceManualMetadataTests
             var svc = new ImportService(new ImportServiceDependencies
             {
                 FileSystem = new FileSystemService(),
+                LogService = NullLogService.Instance,
                 MetadataService = new StubMetadataService(),
                 GetFileCreationTime = _ => DateTime.MinValue,
                 GetFileLastWriteTime = _ => DateTime.MinValue,
@@ -578,6 +581,7 @@ public sealed class ImportServiceManualMetadataTests
             var svc = new ImportService(new ImportServiceDependencies
             {
                 FileSystem = new FileSystemService(),
+                LogService = NullLogService.Instance,
                 MetadataService = new StubMetadataService(),
                 GetFileCreationTime = _ => DateTime.MinValue,
                 GetFileLastWriteTime = _ => DateTime.MinValue,

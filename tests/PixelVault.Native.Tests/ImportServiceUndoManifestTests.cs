@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using PixelVaultNative;
 using Xunit;
 
 namespace PixelVaultNative.Tests;
@@ -16,6 +17,7 @@ public sealed class ImportServiceUndoManifestTests
             var svc = new ImportService(new ImportServiceDependencies
             {
                 FileSystem = new FileSystemService(),
+                LogService = NullLogService.Instance,
                 MetadataService = new StubMetadataService(),
                 GetFileCreationTime = _ => System.DateTime.MinValue,
                 GetFileLastWriteTime = _ => System.DateTime.MinValue,
@@ -61,6 +63,7 @@ public sealed class ImportServiceUndoManifestTests
             var svc = new ImportService(new ImportServiceDependencies
             {
                 FileSystem = new FileSystemService(),
+                LogService = NullLogService.Instance,
                 MetadataService = new StubMetadataService(),
                 GetFileCreationTime = _ => System.DateTime.MinValue,
                 GetFileLastWriteTime = _ => System.DateTime.MinValue,
@@ -112,6 +115,7 @@ public sealed class ImportServiceUndoManifestTests
             var svc = new ImportService(new ImportServiceDependencies
             {
                 FileSystem = new FileSystemService(),
+                LogService = NullLogService.Instance,
                 MetadataService = new StubMetadataService(),
                 GetFileCreationTime = _ => System.DateTime.MinValue,
                 GetFileLastWriteTime = _ => System.DateTime.MinValue,

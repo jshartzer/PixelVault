@@ -166,7 +166,7 @@ Tests under **`tests/`** create temp ini files for **`PersistentDataMigrator`** 
 
 ---
 
-### A.6 — Optional logging seam (low–medium, deferrable)
+### A.6 — Optional logging seam (low–medium) — **landed (v1)**
 
 **Goal:** Replace ad hoc **`Log(string)`** forwarding with **`ILogService`** only if **multiple** non-UI types need logging **or** testability demands it.
 
@@ -174,7 +174,13 @@ Tests under **`tests/`** create temp ini files for **`PersistentDataMigrator`** 
 
 - Thin wrapper around current behavior; **no** new log sinks required for v1.
 
-**Exit:** Optional; skip until a slice **already** needs it.
+**Exit:** **`ILogService`** + **`TroubleshootingLogService`**; **`ImportService`** consumes **`ImportServiceDependencies.LogService`**; **`NullLogService`** for unit tests.
+
+**Landings:**
+
+| Date | Change |
+|------|--------|
+| **2026-04-18** | **`ILogService`**, **`TroubleshootingLogService`**, **`NullLogService`** (`Services/Logging/`); **`MainWindowServiceGraph.LogService`**; **`MainWindow.Log`** → **`logService.AppendMainLine`** + **`logBox`** mirror; **`ImportServiceDependencies.LogService`** (required); **`LogServiceTests`**. |
 
 ---
 
@@ -185,6 +191,8 @@ Phase A is “on track” when:
 - **`ARCHITECTURE_REFACTOR_PLAN.md`** success bullets hold for **new** work.
 - **`PixelVault.Native.cs`** **stops growing** net new orchestration for library/import; additions go to **services** or **hosts**.
 - **`CHANGELOG.md`** records shipped slices.
+
+**Milestone note (2026-04-18):** A.1–A.6 slices above are **landed** (A.6 is the optional logging seam v1). Further Phase A work is **incremental** (call-site sweeps) unless a new plan item opens.
 
 ---
 
@@ -226,6 +234,7 @@ Phase A is “on track” when:
 | Date | Change |
 |------|--------|
 | **2026-04-18** | **`SERVICE_OWNERSHIP_AND_PARALLEL_WORK_MAP.md`**: “Composition at a glance” table (**`MainWindow.ServiceComposition`** / graph → import, headless, library session, persistence); **`IFileSystemService`** / **`ISettingsService`** notes refreshed. |
+| **2026-04-18** | Same doc: **session log** row (**`ILogService`** / graph **`LogService`**); **`ILogService`** candidate row → shipped v1 notes. |
 
 ---
 
@@ -272,3 +281,5 @@ Phase A is “on track” when:
 | **2026-04-18** | **A.5 (slice):** **`ImportWorkflow`** — **`IFileSystemService`** for destination mkdir + file-existence filters. |
 | **2026-04-18** | **A.5 (continuation):** orchestration + headless + workflow steps + **`GetCreationTime`** on **`IFileSystemService`**. |
 | **2026-04-18** | **B.3 (initial slice):** composition table in **`SERVICE_OWNERSHIP_AND_PARALLEL_WORK_MAP.md`**. |
+| **2026-04-18** | **A.6:** **`ILogService`** v1 + **`ImportService`** wiring (see A.6 landings). |
+| **2026-04-18** | **B.3:** composition table — **`ILogService`** row; **`ILogService`** candidate note refresh. |

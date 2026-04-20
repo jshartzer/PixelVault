@@ -86,6 +86,7 @@ namespace PixelVaultNative
         /// <summary>Serializes folder-cache disk reads/writes and full <see cref="LibraryScanner.RebuildLibraryFolderCache"/> without blocking cache hits during metadata index maintenance.</summary>
         internal readonly ReaderWriterLockSlim libraryFolderCacheRwLock = new ReaderWriterLockSlim(LockRecursionPolicy.NoRecursion);
         readonly TroubleshootingLog troubleshootingLog;
+        readonly ILogService logService;
         string libraryMetadataIndexRoot;
 
         string sourceRoot;
@@ -191,7 +192,8 @@ namespace PixelVaultNative
                 DiagnosticsSessionId = _diagnosticsSessionId,
             });
             InitializeLibraryThumbnailPipeline(thumbsRoot);
-            var services = BuildApplicationServiceGraph(this, cacheRoot, coversRoot);
+            var services = BuildApplicationServiceGraph(this, cacheRoot, coversRoot, troubleshootingLog);
+            logService = services.LogService;
             settingsService = services.SettingsService;
             fileSystemService = services.FileSystemService;
             coverService = services.CoverService;
@@ -748,7 +750,7 @@ namespace PixelVaultNative
         }
         void Log(string message)
         {
-            var line = troubleshootingLog.AppendMainLine(message);
+            var line = logService.AppendMainLine(message);
             if (logBox != null)
             {
                 Action append = delegate

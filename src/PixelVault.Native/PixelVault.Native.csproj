@@ -57,6 +57,9 @@
     <Compile Include="Services\FilenameRules\FilenameRulesService.cs" />
     <Compile Include="Services\IO\FileSystemService.cs" />
     <Compile Include="Services\IO\IFileSystemService.cs" />
+    <Compile Include="Services\Logging\ILogService.cs" />
+    <Compile Include="Services\Logging\NullLogService.cs" />
+    <Compile Include="Services\Logging\TroubleshootingLogService.cs" />
     <Compile Include="Services\Import\ImportService.cs" />
     <Compile Include="Services\Intake\AutoIntakePolicy.cs" />
     <Compile Include="Services\Intake\ForegroundIntakeBusyGate.cs" />

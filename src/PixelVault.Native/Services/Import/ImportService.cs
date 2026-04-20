@@ -124,7 +124,8 @@ namespace PixelVaultNative
         public Action<string, string, List<UndoImportEntry>> AddSidecarUndoEntryIfPresent;
         /// <summary>Called before an undo move restores a file into a watched source folder so background auto-intake can ignore the self-generated watcher event.</summary>
         public Action<string> SuppressBackgroundAutoIntakePathBeforeUndoMove;
-        public Action<string> Log;
+        /// <summary>Session main log (file + optional UI mirror via <see cref="MainWindow"/>).</summary>
+        public ILogService LogService;
         public Func<string, bool> IsMedia;
         public Func<string, string> GetSafeGameFolderName;
         public Func<string, string> GetGameNameFromFileName;
@@ -219,6 +220,7 @@ namespace PixelVaultNative
         {
             d = dependencies ?? throw new ArgumentNullException(nameof(dependencies));
             fs = d.FileSystem ?? throw new ArgumentNullException(nameof(dependencies) + "." + nameof(dependencies.FileSystem));
+            if (d.LogService == null) throw new ArgumentNullException(nameof(dependencies) + "." + nameof(dependencies.LogService));
             if (d.MetadataService == null) throw new ArgumentNullException(nameof(dependencies) + "." + nameof(dependencies.MetadataService));
             if (d.GetFileCreationTime == null) throw new ArgumentNullException(nameof(dependencies) + "." + nameof(dependencies.GetFileCreationTime));
             if (d.GetFileLastWriteTime == null) throw new ArgumentNullException(nameof(dependencies) + "." + nameof(dependencies.GetFileLastWriteTime));
@@ -317,11 +319,11 @@ namespace PixelVaultNative
                 moved++;
                 entries.Add(new UndoImportEntry { SourceDirectory = sourceDirectory, ImportedFileName = Path.GetFileName(target), CurrentPath = target });
                 d.AddSidecarUndoEntryIfPresent?.Invoke(target, sourceDirectory, entries);
-                d.Log?.Invoke("Moved: " + Path.GetFileName(file) + " -> " + target);
+                d.LogService.AppendMainLine("Moved: " + Path.GetFileName(file) + " -> " + target);
                 if (progress != null) progress(i + 1, total, "Moved " + (i + 1) + " of " + total + " | " + remaining + " remaining | " + Path.GetFileName(target));
             }
             if (progress != null) progress(total, total, summaryLabel + ": moved " + moved + ", skipped " + skipped + ", renamed-on-conflict " + renamedConflict + ".");
-            d.Log?.Invoke(summaryLabel + ": moved " + moved + ", skipped " + skipped + ", renamed-on-conflict " + renamedConflict + ".");
+            d.LogService.AppendMainLine(summaryLabel + ": moved " + moved + ", skipped " + skipped + ", renamed-on-conflict " + renamedConflict + ".");
             return new MoveStepResult { Moved = moved, Skipped = skipped, RenamedOnConflict = renamedConflict, Entries = entries };
         }
 
@@ -331,7 +333,7 @@ namespace PixelVaultNative
             var files = fs.EnumerateFiles(destinationRoot, "*", SearchOption.TopDirectoryOnly).Where(f => d.IsMedia != null && d.IsMedia(f)).ToList();
             if (files.Count == 0)
             {
-                d.Log?.Invoke("Sort destination found no root-level media files to organize.");
+                d.LogService.AppendMainLine("Sort destination found no root-level media files to organize.");
                 return new SortStepResult();
             }
 
@@ -393,12 +395,12 @@ namespace PixelVaultNative
                 d.MoveMetadataSidecarIfPresent?.Invoke(file, target);
                 moved++;
                 indexedTargets.Add(target);
-                d.Log?.Invoke("Sorted: " + Path.GetFileName(file) + " -> " + target);
+                d.LogService.AppendMainLine("Sorted: " + Path.GetFileName(file) + " -> " + target);
             }
 
             var scanner = d.GetLibraryScanner == null ? null : d.GetLibraryScanner();
             scanner?.UpsertLibraryMetadataIndexEntries(indexedTargets, libraryRoot);
-            d.Log?.Invoke("Sort summary: sorted " + moved + ", folders created " + created + ", renamed-on-conflict " + renamedConflict + ".");
+            d.LogService.AppendMainLine("Sort summary: sorted " + moved + ", folders created " + created + ", renamed-on-conflict " + renamedConflict + ".");
             return new SortStepResult { Sorted = moved, FoldersCreated = created, RenamedOnConflict = renamedConflict };
         }
 
@@ -415,7 +417,7 @@ namespace PixelVaultNative
                 {
                     result.Skipped++;
                     result.RemainingEntries.Add(entry);
-                    d.Log?.Invoke("Undo skipped: could not find " + entry.ImportedFileName + " in the destination/library folders.");
+                    d.LogService.AppendMainLine("Undo skipped: could not find " + entry.ImportedFileName + " in the destination/library folders.");
                     continue;
                 }
 
@@ -429,12 +431,12 @@ namespace PixelVaultNative
                 }
                 catch (Exception ex)
                 {
-                    d.Log?.Invoke("Undo suppression registration failed for " + target + ". " + ex.Message);
+                    d.LogService.AppendMainLine("Undo suppression registration failed for " + target + ". " + ex.Message);
                 }
                 fs.MoveFile(currentPath, target);
                 result.Moved++;
                 result.RemovedFromLibraryPaths.Add(currentPath);
-                d.Log?.Invoke("Undo move: " + currentPath + " -> " + target);
+                d.LogService.AppendMainLine("Undo move: " + currentPath + " -> " + target);
             }
             return result;
         }
@@ -490,11 +492,11 @@ namespace PixelVaultNative
                 fs.DeleteFile(path);
                 deleted++;
                 var name = Path.GetFileName(path);
-                d.Log?.Invoke("Deleted before processing: " + name);
+                d.LogService.AppendMainLine("Deleted before processing: " + name);
                 if (progress != null) progress(i + 1, total, "Deleted " + (i + 1) + " of " + total + " | " + remaining + " remaining | " + name);
             }
             if (progress != null) progress(total, total, "Delete step complete: deleted " + deleted + ", skipped " + skipped + ".");
-            if (deleted > 0 || skipped > 0) d.Log?.Invoke("Delete summary: deleted " + deleted + ", skipped " + skipped + ".");
+            if (deleted > 0 || skipped > 0) d.LogService.AppendMainLine("Delete summary: deleted " + deleted + ", skipped " + skipped + ".");
             return new DeleteStepResult { Deleted = deleted, Skipped = skipped };
         }
 
@@ -506,12 +508,12 @@ namespace PixelVaultNative
             var parse = d.ParseFilenameForImport;
             if (parse == null)
             {
-                d.Log?.Invoke("Steam rename skipped: ParseFilenameForImport not configured.");
+                d.LogService.AppendMainLine("Steam rename skipped: ParseFilenameForImport not configured.");
                 return new RenameStepResult { Renamed = 0, Skipped = 0, OldPathToNewPath = pathMap };
             }
             if (d.ResolveSteamStoreTitle == null && d.CoverService == null)
             {
-                d.Log?.Invoke("Steam rename skipped: ResolveSteamStoreTitle and CoverService not available.");
+                d.LogService.AppendMainLine("Steam rename skipped: ResolveSteamStoreTitle and CoverService not available.");
                 return new RenameStepResult { Renamed = 0, Skipped = 0, OldPathToNewPath = pathMap };
             }
 
@@ -613,18 +615,18 @@ namespace PixelVaultNative
                 catch (Exception ex)
                 {
                     skipped++;
-                    d.Log?.Invoke("ERROR: Import rename failed | " + Path.GetFileName(file) + " -> " + Path.GetFileName(target) + " | " + ex.Message);
+                    d.LogService.AppendMainLine("ERROR: Import rename failed | " + Path.GetFileName(file) + " -> " + Path.GetFileName(target) + " | " + ex.Message);
                     if (progress != null) progress(i + 1, total, "Skipped rename " + (i + 1) + " of " + total + " | " + remaining + " remaining | " + ex.Message + " | " + Path.GetFileName(file));
                     continue;
                 }
                 pathMap[file] = target;
                 d.MoveMetadataSidecarIfPresent?.Invoke(file, target);
                 renamed++;
-                d.Log?.Invoke("Renamed: " + Path.GetFileName(file) + " -> " + Path.GetFileName(target));
+                d.LogService.AppendMainLine("Renamed: " + Path.GetFileName(file) + " -> " + Path.GetFileName(target));
                 if (progress != null) progress(i + 1, total, "Renamed " + (i + 1) + " of " + total + " | " + remaining + " remaining | " + Path.GetFileName(target));
             }
             if (progress != null) progress(total, total, "Rename step complete: renamed " + renamed + ", skipped " + skipped + ".");
-            d.Log?.Invoke("Rename summary: renamed " + renamed + ", skipped " + skipped + ".");
+            d.LogService.AppendMainLine("Rename summary: renamed " + renamed + ", skipped " + skipped + ".");
             return new RenameStepResult { Renamed = renamed, Skipped = skipped, OldPathToNewPath = pathMap };
         }
 
@@ -641,7 +643,7 @@ namespace PixelVaultNative
             var normalize = d.NormalizeTitleForManualRename;
             if (sanitize == null || normalize == null)
             {
-                d.Log?.Invoke("Manual rename skipped: SanitizeManualRenameGameTitle or NormalizeTitleForManualRename not configured.");
+                d.LogService.AppendMainLine("Manual rename skipped: SanitizeManualRenameGameTitle or NormalizeTitleForManualRename not configured.");
                 return new RenameStepResult();
             }
 
@@ -683,7 +685,7 @@ namespace PixelVaultNative
                     var originalPathShortcut = item.FilePath;
                     fs.MoveFile(item.FilePath, shortcutTarget);
                     d.MoveMetadataSidecarIfPresent?.Invoke(originalPathShortcut, shortcutTarget);
-                    d.Log?.Invoke("Manual rename (non-Steam ID): " + oldName + " -> " + Path.GetFileName(shortcutTarget));
+                    d.LogService.AppendMainLine("Manual rename (non-Steam ID): " + oldName + " -> " + Path.GetFileName(shortcutTarget));
                     item.FilePath = shortcutTarget;
                     item.FileName = Path.GetFileName(shortcutTarget);
                     renamed++;
@@ -702,14 +704,14 @@ namespace PixelVaultNative
                 var originalPath = item.FilePath;
                 fs.MoveFile(item.FilePath, target);
                 d.MoveMetadataSidecarIfPresent?.Invoke(originalPath, target);
-                d.Log?.Invoke("Manual rename: " + oldName + " -> " + Path.GetFileName(target));
+                d.LogService.AppendMainLine("Manual rename: " + oldName + " -> " + Path.GetFileName(target));
                 item.FilePath = target;
                 item.FileName = Path.GetFileName(target);
                 renamed++;
                 if (progress != null) progress(i + 1, total, "Renamed " + (i + 1) + " of " + total + " | " + remaining + " remaining | " + item.FileName);
             }
             if (progress != null) progress(total, total, "Rename step complete: renamed " + renamed + ", skipped " + skipped + ".");
-            if (renamed > 0 || skipped > 0) d.Log?.Invoke("Manual rename summary: renamed " + renamed + ", skipped " + skipped + ".");
+            if (renamed > 0 || skipped > 0) d.LogService.AppendMainLine("Manual rename summary: renamed " + renamed + ", skipped " + skipped + ".");
             return new RenameStepResult { Renamed = renamed, Skipped = skipped };
         }
 
@@ -757,7 +759,7 @@ namespace PixelVaultNative
                 if (!string.IsNullOrWhiteSpace(item.Comment)) notes.Add("comment added");
                 if (item.AddPhotographyTag) notes.Add(photoTag + " tag added");
                 var noteSuffix = notes.Count > 0 ? " [" + string.Join(", ", notes.ToArray()) + "]" : string.Empty;
-                d.Log?.Invoke("Updating metadata: " + item.FileName + " -> " + metadataTarget + (platformTags.Length > 0 ? " [" + string.Join(", ", platformTags) + "]" : " [no platform tag]") + noteSuffix);
+                d.LogService.AppendMainLine("Updating metadata: " + item.FileName + " -> " + metadataTarget + (platformTags.Length > 0 ? " [" + string.Join(", ", platformTags) + "]" : " [no platform tag]") + noteSuffix);
                 var originalCreate = DateTime.MinValue;
                 var originalWrite = DateTime.MinValue;
                 if (item.PreserveFileTimes)
@@ -785,7 +787,7 @@ namespace PixelVaultNative
                 relocated = batch.Failures.Count;
             }
             if (progress != null) progress(total, total, "Metadata step complete: updated " + updated + ", skipped " + skipped + (relocated > 0 ? ", " + relocated + " moved to Errors" : string.Empty) + ".");
-            d.Log?.Invoke("Metadata summary: updated " + updated + ", skipped " + skipped + (relocated > 0 ? ", " + relocated + " moved to Errors folder" : string.Empty) + ".");
+            d.LogService.AppendMainLine("Metadata summary: updated " + updated + ", skipped " + skipped + (relocated > 0 ? ", " + relocated + " moved to Errors folder" : string.Empty) + ".");
             return new MetadataStepResult { Updated = updated, Skipped = skipped, FailedRelocatedToErrors = relocated };
         }
 
@@ -807,11 +809,11 @@ namespace PixelVaultNative
                     var dest = d.UniquePath == null ? combined : d.UniquePath(combined);
                     fs.MoveFile(failure.FilePath, dest);
                     d.MoveMetadataSidecarIfPresent?.Invoke(failure.FilePath, dest);
-                    d.Log?.Invoke("Metadata update failed; moved to Errors: " + (failure.FileName ?? name) + " -> " + dest);
+                    d.LogService.AppendMainLine("Metadata update failed; moved to Errors: " + (failure.FileName ?? name) + " -> " + dest);
                 }
                 catch (Exception ex)
                 {
-                    d.Log?.Invoke("Could not move failed metadata file to Errors: " + failure.FilePath + ". " + ex.Message);
+                    d.LogService.AppendMainLine("Could not move failed metadata file to Errors: " + failure.FilePath + ". " + ex.Message);
                 }
             }
         }
