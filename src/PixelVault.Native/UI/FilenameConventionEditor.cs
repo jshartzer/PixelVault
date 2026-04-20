@@ -98,6 +98,7 @@ namespace PixelVaultNative
             if (string.Equals(normalized, "Xbox", StringComparison.OrdinalIgnoreCase)) return "Xbox";
             if (string.Equals(normalized, "PS5", StringComparison.OrdinalIgnoreCase)) return "PS5;PlayStation";
             if (string.Equals(normalized, "PlayStation", StringComparison.OrdinalIgnoreCase)) return "PlayStation";
+            if (string.Equals(normalized, "Switch", StringComparison.OrdinalIgnoreCase)) return "Switch;Nintendo";
             if (string.Equals(normalized, "PC", StringComparison.OrdinalIgnoreCase)) return "PC";
             return string.IsNullOrWhiteSpace(normalized) || string.Equals(normalized, "Other", StringComparison.OrdinalIgnoreCase)
                 ? string.Empty

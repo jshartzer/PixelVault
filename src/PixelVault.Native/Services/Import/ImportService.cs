@@ -87,7 +87,7 @@ namespace PixelVaultNative
         void EnsureNewManualMetadataMasterRecordsInGameIndex(List<GameIndexEditorRow> gameRows, IEnumerable<ManualMetadataItem> pendingItems);
 
         /// <summary>
-        /// Manual metadata finish: when extra tag text names a platform (Steam, PC, PS5/PlayStation, Xbox), align per-row platform flags the same way as the platform checkboxes (first token wins).
+        /// Manual metadata finish: when extra tag text names a platform (Steam, PC, PS5/PlayStation, Switch/Nintendo, Xbox), align per-row platform flags the same way as the platform checkboxes (first token wins).
         /// </summary>
         void ApplyManualMetadataTagTextToPlatformFlags(IEnumerable<ManualMetadataItem> items);
 
@@ -748,6 +748,11 @@ namespace PixelVaultNative
                     selectedPlatformTags.Add("PS5");
                     selectedPlatformTags.Add("PlayStation");
                 }
+                if (item.TagSwitch)
+                {
+                    selectedPlatformTags.Add("Switch");
+                    selectedPlatformTags.Add("Nintendo");
+                }
                 if (item.TagXbox) selectedPlatformTags.Add("Xbox");
                 if (selectedPlatformTags.Count == 0 && item.PlatformTags != null) selectedPlatformTags.AddRange(item.PlatformTags);
                 var platformTags = selectedPlatformTags.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
@@ -971,6 +976,7 @@ namespace PixelVaultNative
                 else if (tagNames.Contains("PC")) platform = "PC";
                 else if (tagNames.Contains("Emulation")) platform = "Emulation";
                 else if (tagNames.Contains("PS5") || tagNames.Contains("PlayStation")) platform = "PS5";
+                else if (tagNames.Contains("Switch") || tagNames.Contains("Nintendo")) platform = "Switch";
                 else if (tagNames.Contains("Xbox")) platform = "Xbox";
                 if (platform == null) continue;
 
@@ -978,6 +984,7 @@ namespace PixelVaultNative
                 item.TagPc = string.Equals(platform, "PC", StringComparison.OrdinalIgnoreCase);
                 item.TagEmulation = string.Equals(platform, "Emulation", StringComparison.OrdinalIgnoreCase);
                 item.TagPs5 = string.Equals(platform, "PS5", StringComparison.OrdinalIgnoreCase);
+                item.TagSwitch = string.Equals(platform, "Switch", StringComparison.OrdinalIgnoreCase);
                 item.TagXbox = string.Equals(platform, "Xbox", StringComparison.OrdinalIgnoreCase);
                 item.TagOther = false;
                 item.CustomPlatformTag = string.Empty;

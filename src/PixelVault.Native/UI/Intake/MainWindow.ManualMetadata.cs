@@ -190,6 +190,7 @@ namespace PixelVaultNative
                         item.TagPc = false;
                         item.TagEmulation = false;
                         item.TagPs5 = false;
+                        item.TagSwitch = false;
                         item.TagXbox = false;
                         item.TagOther = false;
                         item.CustomPlatformTag = string.Empty;
@@ -264,6 +265,7 @@ namespace PixelVaultNative
                 else if (h.PcBox.IsChecked == true) notes.Add("platform tag: PC");
                 else if (h.EmulationBox.IsChecked == true) notes.Add("platform tag: Emulation");
                 else if (h.Ps5Box.IsChecked == true) notes.Add("platform tag: PS5");
+                else if (h.SwitchBox.IsChecked == true) notes.Add("platform tag: Switch");
                 else if (h.XboxBox.IsChecked == true) notes.Add("platform tag: Xbox");
                 else if (h.OtherBox.IsChecked == true) notes.Add("platform tag: " + CleanTag(h.OtherPlatformBox.Text));
                 if (h.ImportAndEditMode && h.SelectedItems.Count > 0)
@@ -295,6 +297,7 @@ namespace PixelVaultNative
                     h.PhotographyBox.IsChecked = false;
                     h.SteamBox.IsChecked = false;
                     h.Ps5Box.IsChecked = false;
+                    h.SwitchBox.IsChecked = false;
                     h.XboxBox.IsChecked = false;
                     h.PcBox.IsChecked = false;
                     h.EmulationBox.IsChecked = false;
@@ -368,6 +371,7 @@ namespace PixelVaultNative
                 h.PcBox.IsChecked = GetSharedManualMetadataFieldBool(h.SelectedItems, delegate(ManualMetadataItem item) { return item.TagPc; });
                 h.EmulationBox.IsChecked = GetSharedManualMetadataFieldBool(h.SelectedItems, delegate(ManualMetadataItem item) { return item.TagEmulation; });
                 h.Ps5Box.IsChecked = GetSharedManualMetadataFieldBool(h.SelectedItems, delegate(ManualMetadataItem item) { return item.TagPs5; });
+                h.SwitchBox.IsChecked = GetSharedManualMetadataFieldBool(h.SelectedItems, delegate(ManualMetadataItem item) { return item.TagSwitch; });
                 h.XboxBox.IsChecked = GetSharedManualMetadataFieldBool(h.SelectedItems, delegate(ManualMetadataItem item) { return item.TagXbox; });
                 h.OtherBox.IsChecked = GetSharedManualMetadataFieldBool(h.SelectedItems, delegate(ManualMetadataItem item) { return item.TagOther; });
                 h.OtherPlatformBox.Text = GetSharedManualMetadataFieldText(h.SelectedItems, delegate(ManualMetadataItem item) { return item.CustomPlatformTag; });
@@ -564,6 +568,25 @@ namespace PixelVaultNative
                 foreach (var item in h.SelectedItems)
                 {
                     item.TagPs5 = false;
+                    item.ForceTagMetadataWrite = true;
+                }
+                refreshTileBadges();
+                refreshSelectionUi();
+            };
+            h.SwitchBox.Checked += delegate
+            {
+                if (h.SuppressSync || h.SelectedItems.Count == 0) return;
+                ApplyConsolePlatformToManualMetadataItems(h.SelectedItems, "Switch");
+                refreshTileBadges();
+                refreshSelectionUi();
+            };
+            h.SwitchBox.Unchecked += delegate
+            {
+                if (h.SuppressSync || h.SelectedItems.Count == 0) return;
+                if (h.SwitchBox.IsChecked != false) return;
+                foreach (var item in h.SelectedItems)
+                {
+                    item.TagSwitch = false;
                     item.ForceTagMetadataWrite = true;
                 }
                 refreshTileBadges();

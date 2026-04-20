@@ -560,6 +560,9 @@ public sealed class FilenameParserServiceTests
                 if (string.Equals(normalized, "PlayStation", StringComparison.OrdinalIgnoreCase)) return "PlayStation";
                 if (string.Equals(normalized, "Steam", StringComparison.OrdinalIgnoreCase)) return "Steam";
                 if (string.Equals(normalized, "Emulation", StringComparison.OrdinalIgnoreCase)) return "Emulation";
+                if (string.Equals(normalized, "Switch", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(normalized, "Nintendo", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(normalized, "Nintendo Switch", StringComparison.OrdinalIgnoreCase)) return "Switch";
                 if (string.Equals(normalized, "Xbox PC", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(normalized, "Xbox/Windows", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(normalized, "Xbox Windows", StringComparison.OrdinalIgnoreCase)

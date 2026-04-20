@@ -117,12 +117,14 @@ namespace PixelVaultNative
             var photographyBox = new CheckBox { Content = "Add Game Photography tag", Foreground = B("#1F2A30"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0) };
             var steamBox = new CheckBox { Content = "Steam", Foreground = B("#1F2A30"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0) };
             var ps5Box = new CheckBox { Content = "PS5", Foreground = B("#1F2A30"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0) };
+            var switchBox = new CheckBox { Content = "Switch", Foreground = B("#1F2A30"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0) };
             var xboxBox = new CheckBox { Content = "Xbox", Foreground = B("#1F2A30"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0) };
             var deleteBox = new CheckBox { Content = "Delete before processing", Foreground = B("#8B2F2F"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0) };
             var tagToggleRow = new WrapPanel { VerticalAlignment = VerticalAlignment.Center };
             tagToggleRow.Children.Add(photographyBox);
             tagToggleRow.Children.Add(steamBox);
             tagToggleRow.Children.Add(ps5Box);
+            tagToggleRow.Children.Add(switchBox);
             tagToggleRow.Children.Add(xboxBox);
             commentHeader.Children.Add(commentLabel);
             Grid.SetColumn(tagToggleRow, 1);
@@ -185,6 +187,7 @@ namespace PixelVaultNative
                 var consoleTags = new List<string>();
                 if (selectedItem.TagSteam) consoleTags.Add("Steam");
                 if (selectedItem.TagPs5) consoleTags.Add("PS5");
+                if (selectedItem.TagSwitch) consoleTags.Add("Switch");
                 if (selectedItem.TagXbox) consoleTags.Add("Xbox");
                 if (consoleTags.Count > 0) notes.Add("platform tags: " + string.Join(", ", consoleTags.ToArray()));
                 if (selectedItem.DeleteBeforeProcessing) notes.Add("marked for deletion");
@@ -201,6 +204,7 @@ namespace PixelVaultNative
                 photographyBox.IsChecked = item.AddPhotographyTag;
                 steamBox.IsChecked = item.TagSteam;
                 ps5Box.IsChecked = item.TagPs5;
+                switchBox.IsChecked = item.TagSwitch;
                 xboxBox.IsChecked = item.TagXbox;
                 deleteBox.IsChecked = item.DeleteBeforeProcessing;
                 suppressCommentSync = false;
@@ -239,6 +243,8 @@ namespace PixelVaultNative
             steamBox.Unchecked += delegate { if (suppressCommentSync || selectedItem == null) return; selectedItem.TagSteam = false; refreshReviewTile(selectedItem); refreshCommentStatus(); };
             ps5Box.Checked += delegate { if (suppressCommentSync || selectedItem == null) return; selectedItem.TagPs5 = true; refreshReviewTile(selectedItem); refreshCommentStatus(); };
             ps5Box.Unchecked += delegate { if (suppressCommentSync || selectedItem == null) return; selectedItem.TagPs5 = false; refreshReviewTile(selectedItem); refreshCommentStatus(); };
+            switchBox.Checked += delegate { if (suppressCommentSync || selectedItem == null) return; selectedItem.TagSwitch = true; refreshReviewTile(selectedItem); refreshCommentStatus(); };
+            switchBox.Unchecked += delegate { if (suppressCommentSync || selectedItem == null) return; selectedItem.TagSwitch = false; refreshReviewTile(selectedItem); refreshCommentStatus(); };
             xboxBox.Checked += delegate { if (suppressCommentSync || selectedItem == null) return; selectedItem.TagXbox = true; refreshReviewTile(selectedItem); refreshCommentStatus(); };
             xboxBox.Unchecked += delegate { if (suppressCommentSync || selectedItem == null) return; selectedItem.TagXbox = false; refreshReviewTile(selectedItem); refreshCommentStatus(); };
             deleteBox.Checked += delegate { if (suppressCommentSync || selectedItem == null) return; selectedItem.DeleteBeforeProcessing = true; refreshReviewTile(selectedItem); refreshCommentStatus(); };
@@ -251,6 +257,7 @@ namespace PixelVaultNative
                     selectedItem.AddPhotographyTag = photographyBox.IsChecked == true;
                     selectedItem.TagSteam = steamBox.IsChecked == true;
                     selectedItem.TagPs5 = ps5Box.IsChecked == true;
+                    selectedItem.TagSwitch = switchBox.IsChecked == true;
                     selectedItem.TagXbox = xboxBox.IsChecked == true;
                     selectedItem.DeleteBeforeProcessing = deleteBox.IsChecked == true;
                 }

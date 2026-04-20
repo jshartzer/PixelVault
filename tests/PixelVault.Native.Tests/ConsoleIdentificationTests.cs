@@ -77,6 +77,7 @@ public sealed class ConsoleIdentificationTests
             out var tagPc,
             out var tagEmulation,
             out var tagPs5,
+            out var tagSwitch,
             out var tagXbox,
             out var tagOther,
             out var customPlatformTag);
@@ -85,13 +86,14 @@ public sealed class ConsoleIdentificationTests
         Assert.False(tagPc);
         Assert.False(tagEmulation);
         Assert.False(tagPs5);
+        Assert.False(tagSwitch);
         Assert.False(tagXbox);
         Assert.False(tagOther);
         Assert.Equal(string.Empty, customPlatformTag);
     }
 
     [Fact]
-    public void MergePlatformTagsWithFilenamePlatformHint_CustomPlatformAddsPlatformPrefixTag()
+    public void MergePlatformTagsWithFilenamePlatformHint_SwitchParse_AddsSwitchFamilyTags()
     {
         var parsed = new FilenameParseResult
         {
@@ -101,7 +103,8 @@ public sealed class ConsoleIdentificationTests
 
         var merged = MainWindow.MergePlatformTagsWithFilenamePlatformHint(Array.Empty<string>(), parsed);
 
-        Assert.Contains("Platform:Switch", merged);
+        Assert.Contains("Switch", merged);
+        Assert.Contains("Nintendo", merged);
         Assert.Equal("Switch", MainWindow.DetermineConsoleLabelFromTags(merged));
     }
 
@@ -116,7 +119,8 @@ public sealed class ConsoleIdentificationTests
 
         var merged = MainWindow.MergePlatformTagsWithFilenamePlatformHint(new[] { "Steam", "PS5", "PlayStation" }, parsed);
 
-        Assert.DoesNotContain("Platform:Switch", merged);
+        Assert.DoesNotContain("Switch", merged);
+        Assert.DoesNotContain("Nintendo", merged);
         Assert.Equal("Multiple Tags", MainWindow.DetermineConsoleLabelFromTags(merged));
     }
 
@@ -129,6 +133,7 @@ public sealed class ConsoleIdentificationTests
             out var tagPc,
             out var tagEmulation,
             out var tagPs5,
+            out var tagSwitch,
             out var tagXbox,
             out var tagOther,
             out var customPlatformTag);
@@ -137,13 +142,14 @@ public sealed class ConsoleIdentificationTests
         Assert.False(tagPc);
         Assert.False(tagEmulation);
         Assert.True(tagPs5);
+        Assert.False(tagSwitch);
         Assert.False(tagXbox);
         Assert.False(tagOther);
         Assert.Equal(string.Empty, customPlatformTag);
     }
 
     [Fact]
-    public void ApplyFilenameParseResultToManualPlatformFlags_CustomPlatformMapsToOtherWithCustomTag()
+    public void ApplyFilenameParseResultToManualPlatformFlags_SwitchMapsToBuiltInSwitchFlag()
     {
         MainWindow.ApplyFilenameParseResultToManualPlatformFlags(
             new FilenameParseResult { PlatformLabel = "Switch", PlatformTags = Array.Empty<string>() },
@@ -151,6 +157,7 @@ public sealed class ConsoleIdentificationTests
             out var tagPc,
             out var tagEmulation,
             out var tagPs5,
+            out var tagSwitch,
             out var tagXbox,
             out var tagOther,
             out var customPlatformTag);
@@ -159,9 +166,10 @@ public sealed class ConsoleIdentificationTests
         Assert.False(tagPc);
         Assert.False(tagEmulation);
         Assert.False(tagPs5);
+        Assert.True(tagSwitch);
         Assert.False(tagXbox);
-        Assert.True(tagOther);
-        Assert.Equal("Switch", customPlatformTag);
+        Assert.False(tagOther);
+        Assert.Equal(string.Empty, customPlatformTag);
     }
 
     [Fact]
@@ -210,6 +218,7 @@ public sealed class ConsoleIdentificationTests
             out var tagPc,
             out var tagEmulation,
             out var tagPs5,
+            out var tagSwitch,
             out var tagXbox,
             out var tagOther,
             out var customPlatformTag);
@@ -218,6 +227,7 @@ public sealed class ConsoleIdentificationTests
         Assert.False(tagPc);
         Assert.False(tagEmulation);
         Assert.False(tagPs5);
+        Assert.False(tagSwitch);
         Assert.False(tagXbox);
         Assert.False(tagOther);
         Assert.Equal(string.Empty, customPlatformTag);

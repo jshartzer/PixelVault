@@ -549,6 +549,7 @@ namespace PixelVaultNative
                     || string.Equals(normalized, "Emulation", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(normalized, "PS5", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(normalized, "PlayStation", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(normalized, "Switch", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(normalized, "PC", StringComparison.OrdinalIgnoreCase))
                 {
                     return normalized;

@@ -14,6 +14,7 @@ namespace PixelVaultNative
         public string Comment;
         public bool AddPhotographyTag;
         public bool TagSteam;
+        public bool TagSwitch;
         public bool TagPs5;
         public bool TagXbox;
         public bool DeleteBeforeProcessing;
@@ -38,6 +39,7 @@ namespace PixelVaultNative
         public bool TagPc;
         public bool TagEmulation;
         public bool TagPs5;
+        public bool TagSwitch;
         public bool TagXbox;
         public bool TagOther;
         public string CustomPlatformTag;
@@ -54,6 +56,7 @@ namespace PixelVaultNative
         public bool OriginalTagPc;
         public bool OriginalTagEmulation;
         public bool OriginalTagPs5;
+        public bool OriginalTagSwitch;
         public bool OriginalTagXbox;
         public bool OriginalTagOther;
         public string OriginalCustomPlatformTag;

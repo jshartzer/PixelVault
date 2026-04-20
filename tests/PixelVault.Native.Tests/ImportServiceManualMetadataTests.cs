@@ -456,6 +456,17 @@ public sealed class ImportServiceManualMetadataTests
     }
 
     [Fact]
+    public void ApplyManualMetadataTagTextToPlatformFlags_Nintendo_Maps_To_Switch()
+    {
+        var svc = CreateServiceWithManualMetadataDeps(new StubCoverService(), s => s);
+        var item = new ManualMetadataItem { TagText = "Nintendo" };
+        svc.ApplyManualMetadataTagTextToPlatformFlags(new[] { item });
+        Assert.True(item.TagSwitch);
+        Assert.False(item.TagOther);
+        Assert.Equal(string.Empty, item.CustomPlatformTag);
+    }
+
+    [Fact]
     public void ManualMetadataItemsMissingOtherPlatformName_True_When_Other_And_Blank_Custom()
     {
         var svc = CreateServiceWithManualMetadataDeps(new StubCoverService(), s => s);

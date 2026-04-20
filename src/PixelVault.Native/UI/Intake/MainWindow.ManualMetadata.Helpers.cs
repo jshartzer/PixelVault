@@ -17,6 +17,7 @@ namespace PixelVaultNative
             if (item.TagPc) return "PC";
             if (item.TagEmulation) return "Emulation";
             if (item.TagPs5) return "PS5";
+            if (item.TagSwitch) return "Switch";
             if (item.TagXbox) return "Xbox";
             if (item.TagOther && !string.IsNullOrWhiteSpace(item.CustomPlatformTag)) return CleanTag(item.CustomPlatformTag);
             return "Manual";
@@ -29,6 +30,7 @@ namespace PixelVaultNative
             if (string.Equals(label, "PC", StringComparison.OrdinalIgnoreCase)) return Brush("#7F8EA3");
             if (string.Equals(label, "Emulation", StringComparison.OrdinalIgnoreCase)) return Brush("#B8845C");
             if (string.Equals(label, "PS5", StringComparison.OrdinalIgnoreCase)) return Brush("#4F83FF");
+            if (string.Equals(label, "Switch", StringComparison.OrdinalIgnoreCase)) return Brush("#E94B43");
             if (string.Equals(label, "Xbox", StringComparison.OrdinalIgnoreCase)) return Brush("#66C47A");
             return Brush("#D0A15F");
         }
@@ -61,6 +63,7 @@ namespace PixelVaultNative
                 item.TagPc = string.Equals(platform, "PC", StringComparison.OrdinalIgnoreCase);
                 item.TagEmulation = string.Equals(platform, "Emulation", StringComparison.OrdinalIgnoreCase);
                 item.TagPs5 = string.Equals(platform, "PS5", StringComparison.OrdinalIgnoreCase);
+                item.TagSwitch = string.Equals(platform, "Switch", StringComparison.OrdinalIgnoreCase);
                 item.TagXbox = string.Equals(platform, "Xbox", StringComparison.OrdinalIgnoreCase);
                 item.TagOther = string.Equals(platform, "Other", StringComparison.OrdinalIgnoreCase);
                 if (!item.TagOther) item.CustomPlatformTag = string.Empty;
@@ -109,6 +112,7 @@ namespace PixelVaultNative
             to.TagPc = from.TagPc;
             to.TagEmulation = from.TagEmulation;
             to.TagPs5 = from.TagPs5;
+            to.TagSwitch = from.TagSwitch;
             to.TagXbox = from.TagXbox;
             to.TagOther = from.TagOther;
             to.CustomPlatformTag = from.CustomPlatformTag ?? string.Empty;

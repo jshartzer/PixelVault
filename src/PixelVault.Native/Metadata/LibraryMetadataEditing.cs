@@ -89,6 +89,7 @@ namespace PixelVaultNative
                 && !string.Equals(normalizedCustomPlatform, "PC", StringComparison.OrdinalIgnoreCase)
                 && !string.Equals(normalizedCustomPlatform, "Emulation", StringComparison.OrdinalIgnoreCase)
                 && !string.Equals(normalizedCustomPlatform, "PS5", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(normalizedCustomPlatform, "Switch", StringComparison.OrdinalIgnoreCase)
                 && !string.Equals(normalizedCustomPlatform, "Xbox", StringComparison.OrdinalIgnoreCase)
                 && !string.Equals(normalizedCustomPlatform, "Other", StringComparison.OrdinalIgnoreCase)
                 && !string.Equals(normalizedCustomPlatform, "Multiple Tags", StringComparison.OrdinalIgnoreCase);
@@ -103,6 +104,8 @@ namespace PixelVaultNative
                 !string.Equals(tag, "Emulation", StringComparison.OrdinalIgnoreCase) &&
                 !string.Equals(tag, "PS5", StringComparison.OrdinalIgnoreCase) &&
                 !string.Equals(tag, "PlayStation", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(tag, "Switch", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(tag, "Nintendo", StringComparison.OrdinalIgnoreCase) &&
                 !string.Equals(tag, "Xbox", StringComparison.OrdinalIgnoreCase) &&
                 !tag.StartsWith(CustomPlatformPrefix, StringComparison.OrdinalIgnoreCase)));
             var addPhotographyTag = tags.Any(tag => string.Equals(tag, GamePhotographyTag, StringComparison.OrdinalIgnoreCase) || string.Equals(tag, "Photography", StringComparison.OrdinalIgnoreCase));
@@ -110,6 +113,7 @@ namespace PixelVaultNative
             var tagPc = !consoleTags.Contains("Steam") && consoleTags.Contains("PC");
             var tagEmulation = consoleTags.Contains("Emulation");
             var tagPs5 = consoleTags.Contains("PS5");
+            var tagSwitch = consoleTags.Contains("Switch");
             var tagXbox = consoleTags.Contains("Xbox");
             var customPlatformValue = useCustomPlatform ? customPlatformName : string.Empty;
             // Timeline (and similar) passes a synthetic LibraryFolderInfo whose Name is browse chrome ("Timeline") with no real folder path — do not use that as the game title.
@@ -149,6 +153,7 @@ namespace PixelVaultNative
                 TagPc = tagPc,
                 TagEmulation = tagEmulation,
                 TagPs5 = tagPs5,
+                TagSwitch = tagSwitch,
                 TagXbox = tagXbox,
                 TagOther = useCustomPlatform,
                 CustomPlatformTag = customPlatformValue,
@@ -165,6 +170,7 @@ namespace PixelVaultNative
                 OriginalTagPc = tagPc,
                 OriginalTagEmulation = tagEmulation,
                 OriginalTagPs5 = tagPs5,
+                OriginalTagSwitch = tagSwitch,
                 OriginalTagXbox = tagXbox,
                 OriginalTagOther = useCustomPlatform,
                 OriginalCustomPlatformTag = customPlatformValue
