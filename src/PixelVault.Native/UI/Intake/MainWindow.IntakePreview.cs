@@ -106,7 +106,7 @@ namespace PixelVaultNative
 
         Dictionary<string, IntakePreviewFileAnalysis> AnalyzeIntakePreviewFiles(IEnumerable<string> sourceFiles, CancellationToken cancellationToken = default(CancellationToken))
         {
-            return intakeAnalysisService.AnalyzeFiles(sourceFiles, cancellationToken);
+            return intakePipeline.Analysis.AnalyzeFiles(sourceFiles, cancellationToken);
         }
 
         List<ReviewItem> BuildReviewItems()

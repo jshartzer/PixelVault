@@ -22,7 +22,7 @@ namespace PixelVaultNative
             IMetadataService MetadataService,
             ILibraryScanner LibraryScanner,
             IImportService ImportService,
-            IntakeAnalysisService IntakeAnalysisService,
+            IntakePipeline IntakePipeline,
             LibraryWorkspaceContext LibraryWorkspace,
             ILibrarySession LibrarySession,
             IGameIndexService GameIndexService);
@@ -38,7 +38,7 @@ namespace PixelVaultNative
         /// <item><description><see cref="CreateMetadataService"/></description></item>
         /// <item><description><see cref="CreateLibraryScanner"/></description></item>
         /// <item><description><see cref="ImportService"/> + <see cref="BuildImportServiceDependencies"/></description></item>
-        /// <item><description><see cref="IntakeAnalysisService"/></description></item>
+        /// <item><description><see cref="IntakeAnalysisService"/> then <see cref="IntakePipeline"/></description></item>
         /// <item><description><see cref="LibraryWorkspaceContext"/></description></item>
         /// <item><description><see cref="CreateLibrarySessionForStartup"/> then <see cref="IImportService.AttachLibrarySessionAccessor"/></description></item>
         /// <item><description><see cref="CreateGameIndexServiceForStartup"/></description></item>
@@ -67,6 +67,7 @@ namespace PixelVaultNative
                 gameIndexEditorAssignmentService,
                 logService));
             var intakeAnalysisService = new IntakeAnalysisService(host.ParseFilename, IsVideo, host.GetLibraryDate);
+            var intakePipeline = new IntakePipeline(importService, fileSystemService, intakeAnalysisService);
             var libraryWorkspace = new LibraryWorkspaceContext(host);
             var librarySession = CreateLibrarySessionForStartup(
                 host,
@@ -96,7 +97,7 @@ namespace PixelVaultNative
                 metadataService,
                 libraryScanner,
                 importService,
-                intakeAnalysisService,
+                intakePipeline,
                 libraryWorkspace,
                 librarySession,
                 gameIndexService);

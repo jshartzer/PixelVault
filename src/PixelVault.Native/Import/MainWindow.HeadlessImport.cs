@@ -43,9 +43,7 @@ namespace PixelVaultNative
             var manualItems = BuildManualMetadataItems(inventory.TopLevelMediaFiles, recognizedPaths, cancellationToken);
             var manualPaths = new HashSet<string>(manualItems.Select(i => i.FilePath), StringComparer.OrdinalIgnoreCase);
 
-            return await HeadlessImportCoordinator.RunStandardTopLevelSubsetAsync(
-                importService,
-                fileSystemService,
+            return await intakePipeline.RunStandardTopLevelSubsetAsync(
                 destinationRoot,
                 libraryRoot,
                 renameInventory,

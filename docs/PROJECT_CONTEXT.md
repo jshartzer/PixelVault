@@ -77,7 +77,7 @@ Key source areas:
 - `C:\Codex\src\PixelVault.Native\Metadata`: metadata builders, tag helpers, and library edit flows
 - `C:\Codex\src\PixelVault.Native\MediaTools`: `ExifTool` / `FFmpeg` execution helpers
 - `C:\Codex\src\PixelVault.Native\Models`: import, parsing, and index model types
-- `C:\Codex\src\PixelVault.Native\Services`: extracted service seams (subfolders include **`Config`**, **`Covers`**, **`FilenameParsing`**, **`FilenameRules`**, **`Indexing`**, **`Intake`** — import service + headless coordinator + analysis/policy here — **`IO`**, **`Library`**, **`Logging`**, **`Achievements`**, **`Metadata`**)
+- `C:\Codex\src\PixelVault.Native\Services`: extracted service seams (subfolders include **`Config`**, **`Covers`**, **`FilenameParsing`**, **`FilenameRules`**, **`Indexing`**, **`Intake`** — **`IntakePipeline`** facade, **`IImportService`**, headless coordinator, analysis/policy — **`IO`**, **`Library`**, **`Logging`**, **`Achievements`**, **`Metadata`**)
 - `C:\Codex\src\PixelVault.Native\Storage`: SQLite/cache path and persistence helpers
 - `C:\Codex\src\PixelVault.Native\UI`: extracted windows, editor hosts, virtualization helpers, and UI-specific support code
 

@@ -166,7 +166,7 @@ namespace PixelVaultNative
         readonly ILibraryScanner libraryScanner;
         readonly ILibrarySession librarySession;
         readonly IImportService importService;
-        readonly IntakeAnalysisService intakeAnalysisService;
+        readonly IntakePipeline intakePipeline;
         readonly BackgroundIntakeActivitySession _backgroundIntakeActivitySession = new BackgroundIntakeActivitySession();
         readonly IGameIndexEditorAssignmentService gameIndexEditorAssignmentService;
         readonly IGameIndexService gameIndexService;
@@ -205,7 +205,7 @@ namespace PixelVaultNative
             metadataService = services.MetadataService;
             libraryScanner = services.LibraryScanner;
             importService = services.ImportService;
-            intakeAnalysisService = services.IntakeAnalysisService;
+            intakePipeline = services.IntakePipeline;
             libraryWorkspace = services.LibraryWorkspace;
             librarySession = services.LibrarySession;
             gameIndexService = services.GameIndexService;
@@ -554,7 +554,7 @@ namespace PixelVaultNative
         static string Quote(string s) => TextAndPathHelpers.Quote(s);
 
         // GetLibraryDate stays as an instance forwarder so the method group captures in
-        // IntakeAnalysisService, LibraryMetadataEditing, PhotographyAndSteam, LibraryVirtualization,
+        // IntakePipeline (IntakeAnalysisService), LibraryMetadataEditing, PhotographyAndSteam, LibraryVirtualization,
         // ImportWorkflow.Steps still resolve without rewiring.
         DateTime GetLibraryDate(string file) => TextAndPathHelpers.GetLibraryDate(file, ParseFilename(file));
 

@@ -217,7 +217,7 @@ Phase A is “on track” when:
 
 ---
 
-### B.2 — Subsystem facades (optional)
+### B.2 — Subsystem facades (optional) — **landed (v1)**
 
 **Goal:** If **Intake** (coordinator + analysis + policy + stability) has **many** public entry points, introduce **one** **`IntakePipeline`** (or similar) **facade** used by **`MainWindow`**—implementations stay separate classes **behind** the facade.
 
@@ -225,15 +225,21 @@ Phase A is “on track” when:
 
 - Facade is **thin**; **no** business logic aggregation into a god-class.
 
+**Landings:**
+
+| Date | Change |
+|------|--------|
+| **2026-04-18** | **`IntakePipeline`** (`Services/Intake/IntakePipeline.cs`): **`Import`**, **`FileSystem`**, **`Analysis`**; **`RunStandardTopLevelSubsetAsync`** → **`HeadlessImportCoordinator`**. **`MainWindowServiceGraph`** / ctor: **`intakePipeline`** replaces bare **`IntakeAnalysisService`** field; **`MainWindow.IntakePreview`**, **`BackgroundIntake`**, **`HeadlessImport`** use the facade. |
+
 ---
 
-### B.3 — Documentation map
+### B.3 — Documentation map — **landed (diagram slice)**
 
 **Goal:** **`SERVICE_OWNERSHIP_AND_PARALLEL_WORK_MAP.md`** reflects **post–Phase A** reality (remove stale “candidate” rows for shipped types; add **composition** pointer).
 
 **Deliverables:**
 
-- Single **diagram** or table: **UI** → **session/host** → **service** → **persistence**.
+- Single **diagram** or table: **UI** → **session/host** → **service** → **persistence**. *(Composition-at-a-glance table + revision rows shipped earlier; Apr 2026 adds a **mermaid data-flow** chart and Intake facade row.)*
 
 **Landings:**
 
@@ -241,6 +247,7 @@ Phase A is “on track” when:
 |------|--------|
 | **2026-04-18** | **`SERVICE_OWNERSHIP_AND_PARALLEL_WORK_MAP.md`**: “Composition at a glance” table (**`MainWindow.ServiceComposition`** / graph → import, headless, library session, persistence); **`IFileSystemService`** / **`ISettingsService`** notes refreshed. |
 | **2026-04-18** | Same doc: **session log** row (**`ILogService`** / graph **`LogService`**); **`ILogService`** candidate row → shipped v1 notes. |
+| **2026-04-18** | **B.3 (diagram):** **`SERVICE_OWNERSHIP`** — mermaid **Data flow** chart (MainWindow → graph → IntakePipeline / library session → scanner / index persistence). |
 
 ---
 
@@ -290,3 +297,5 @@ Phase A is “on track” when:
 | **2026-04-18** | **A.6:** **`ILogService`** v1 + **`ImportService`** wiring (see A.6 landings). |
 | **2026-04-18** | **B.3:** composition table — **`ILogService`** row; **`ILogService`** candidate note refresh. |
 | **2026-04-18** | **B.1 (slice):** import-domain service files co-located under **`Services/Intake`** (see B.1 landings). |
+| **2026-04-18** | **B.2:** **`IntakePipeline`** facade (see B.2 landings). |
+| **2026-04-18** | **B.3:** mermaid data-flow diagram in **`SERVICE_OWNERSHIP`** (see B.3 landings). |

@@ -449,7 +449,7 @@ namespace PixelVaultNative
                 V("Passed stability: count=" + stable.Count + " " + SummarizePaths(stable));
                 var rules = _host.filenameParserService.GetConventionRules(_host.libraryRoot);
                 V("Loaded convention rules count=" + (rules?.Count ?? 0));
-                var analyses = _host.intakeAnalysisService.AnalyzeFiles(stable, cancellationToken);
+                var analyses = _host.intakePipeline.Analysis.AnalyzeFiles(stable, cancellationToken);
                 var eligible = new List<string>();
                 foreach (var path in stable)
                 {

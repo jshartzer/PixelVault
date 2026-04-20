@@ -67,6 +67,7 @@
     <Compile Include="Services\Intake\ImportService.cs" />
     <Compile Include="Services\Intake\ImportWorkflowOrchestration.cs" />
     <Compile Include="Services\Intake\IntakeAnalysisService.cs" />
+    <Compile Include="Services\Intake\IntakePipeline.cs" />
     <Compile Include="Services\Intake\IntakePreviewFileAnalysis.cs" />
     <Compile Include="Services\Intake\SourceFileStabilityProbe.cs" />
     <Compile Include="Services\Intake\SteamImportRename.cs" />

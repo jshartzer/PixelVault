@@ -24,11 +24,36 @@ This document is based on the current code in `C:\Codex\src\PixelVault.Native` a
 | **Application wiring** | `MainWindow.ServiceComposition.cs` — **`BuildApplicationServiceGraph`** builds a **`MainWindowServiceGraph`**; the **`MainWindow`** ctor assigns the same instances to readonly fields. |
 | **Session log (v1)** | **`Services/Logging/`** — **`ILogService`** / **`TroubleshootingLogService`** (wraps **`TroubleshootingLog.AppendMainLine`**); graph exposes **`LogService`**; **`ImportService`** uses **`ImportServiceDependencies.LogService`**; **`MainWindow.Log`** mirrors the returned line to **`logBox`**. |
 | **Import (foreground)** | `Import/ImportWorkflow.cs`, `Import/MainWindow.ImportWorkflow.Steps.cs` — orchestration partials call **`IImportService`**; progress math lives in **`Services/Intake/ImportWorkflowOrchestration.cs`**. |
-| **Import (headless / background)** | `Import/MainWindow.HeadlessImport.cs`, `Services/Intake/HeadlessImportCoordinator.cs` — same pipeline steps as UI import for explicit path subsets. |
+| **Intake facade (B.2)** | **`Services/Intake/IntakePipeline.cs`** — **`Import`**, **`FileSystem`**, **`Analysis`**; **`RunStandardTopLevelSubsetAsync`** forwards to **`HeadlessImportCoordinator`**. **`MainWindow`** holds **`intakePipeline`** from the graph (preview + background intake + headless import). |
+| **Import (headless / background)** | `Import/MainWindow.HeadlessImport.cs` uses **`IntakePipeline`**; **`Services/Intake/HeadlessImportCoordinator.cs`** runs the shared step sequence. |
 | **Library browser** | `UI/Library/LibraryBrowserHost.cs` → **`ILibraryBrowserShell`** / bridges; data work through **`ILibrarySession`** (**`LibrarySession`**: **`ILibraryScanner`**, **`IFileSystemService`**, **`LibraryRoot`**). |
 | **Library scan** | `Services/Library/LibraryScanner.cs` — **`ILibraryScanHost`** port implemented by **`MainWindow.LibraryScannerBridge`**. |
 | **Persistence** | `Services/Indexing/IndexPersistenceService.cs` — **`IIndexPersistenceService`**. |
 | **Settings** | `Services/Config/SettingsService.cs` — **`ISettingsService`**; window mapping in **`MainWindow.SettingsState.cs`**, load/save in **`MainWindow.SettingsPersistence.cs`**. |
+
+### Data flow (B.3)
+
+```mermaid
+flowchart TB
+  MW[MainWindow shell]
+  G[MainWindowServiceGraph]
+  IP[IntakePipeline]
+  II[IImportService]
+  IA[IntakeAnalysisService]
+  LB[LibraryBrowserHost]
+  LS[ILibrarySession / LibrarySession]
+  SC[ILibraryScanner]
+  IDX[IIndexPersistenceService]
+
+  MW --> G
+  G --> IP
+  G --> LB
+  IP --> II
+  IP --> IA
+  LB --> LS
+  LS --> SC
+  LS --> IDX
+```
 
 ---
 
