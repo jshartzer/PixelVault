@@ -20,7 +20,7 @@ Guiding rules
 
 Recommended folder layout (reference)
 -----------------------------------
-`/Models`, `/Services/Config`, `/Services/Metadata`, `/Services/Library`, `/Services/Import`, `/Services/Covers`, persistence under `Services/Indexing` / `Storage`, `/Services/IO`, UI under `/UI`.
+`/Models`, `/Services/Config`, `/Services/Metadata`, `/Services/Library`, `/Services/Intake` (import pipeline: `ImportService`, orchestration, headless coordinator, analysis), `/Services/Covers`, persistence under `Services/Indexing` / `Storage`, `/Services/IO`, UI under `/UI`.
 
 Suggested service map (implemented shapes)
 ----------------------------------------

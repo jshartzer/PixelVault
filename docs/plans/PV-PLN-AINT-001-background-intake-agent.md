@@ -59,7 +59,7 @@ Existing seams:
   - move into destination
   - sort into game folders
 - The post-LIBST storage model already centralizes where files belong, so the agent can rely on the current placement/sort path instead of inventing folder rules.
-- **Undo today:** [`ImportService`](../../src/PixelVault.Native/Services/Import/ImportService.cs) exposes `LoadUndoManifest`, `SaveUndoManifest`, and `ExecuteUndoImportMoves` with [`UndoImportEntry`](../../src/PixelVault.Native/Models/ImportModels.cs); [`UndoLastImport`](../../src/PixelVault.Native/Import/MainWindow.ImportWorkflow.Steps.cs) moves the **entire** last manifest back. AINT should extend this story for **selective** undo and **visibility** into what the agent did.
+- **Undo today:** [`ImportService`](../../src/PixelVault.Native/Services/Intake/ImportService.cs) exposes `LoadUndoManifest`, `SaveUndoManifest`, and `ExecuteUndoImportMoves` with [`UndoImportEntry`](../../src/PixelVault.Native/Models/ImportModels.cs); [`UndoLastImport`](../../src/PixelVault.Native/Import/MainWindow.ImportWorkflow.Steps.cs) moves the **entire** last manifest back. AINT should extend this story for **selective** undo and **visibility** into what the agent did.
 
 What is missing today:
 - a background watcher / scheduler
@@ -282,7 +282,7 @@ Today’s pipeline **replaces** the undo manifest with the move step’s entries
 ### Files likely touched
 
 - New: e.g. `UI/Intake/BackgroundAutoIntakeSummaryWindow.xaml` + code-behind or small MVVM-lite
-- [`ImportService.cs`](../../src/PixelVault.Native/Services/Import/ImportService.cs) — manifest merge helpers if needed
+- [`ImportService.cs`](../../src/PixelVault.Native/Services/Intake/ImportService.cs) — manifest merge helpers if needed
 - [`MainWindow.ImportWorkflow.Steps.cs`](../../src/PixelVault.Native/Import/MainWindow.ImportWorkflow.Steps.cs) — align messaging with selective undo
 - Background agent host — callback to `Dispatcher` to open summary with model
 
@@ -306,7 +306,7 @@ These functions already encode the distinction between:
 ### Existing import execution
 
 The agent should eventually run the same logic that the import workflow already uses:
-- [`RunSteamRenameAsync`](../../src/PixelVault.Native/Services/Import/ImportService.cs)
+- [`RunSteamRenameAsync`](../../src/PixelVault.Native/Services/Intake/ImportService.cs)
 - rename / metadata / move / sort orchestration in [`ImportWorkflow.cs`](../../src/PixelVault.Native/Import/ImportWorkflow.cs)
 
 ### Existing storage model
@@ -697,7 +697,7 @@ Work:
 
 Target files:
 - `Import/ImportWorkflow.cs`
-- `Services/Import/ImportService.cs` (manifest helpers)
+- `Services/Intake/ImportService.cs` (manifest helpers)
 - possible new `Services/Intake/HeadlessImportCoordinator.cs`
 - `MainWindow.StartupInitialization.cs` for dependency wiring
 

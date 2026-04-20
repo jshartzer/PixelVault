@@ -163,7 +163,7 @@ Good follow-on slices:
 
 Primary ownership:
 
-- `src/PixelVault.Native/Services/Import/ImportService.cs`
+- `src/PixelVault.Native/Services/Intake/ImportService.cs`
 - `src/PixelVault.Native/Import/ImportWorkflow.cs`
 - `src/PixelVault.Native/Services/Covers/CoverService.cs`
 - `src/PixelVault.Native/Services/Metadata/MetadataService.cs`
@@ -244,7 +244,7 @@ When touching these areas, bias toward these goals:
   - network cancellation, timeout behavior, predictable cleanup
 - `src/PixelVault.Native/Import/ImportWorkflow.cs`
   - progress clarity, resumable workflow design, recovery and undo
-- `src/PixelVault.Native/Services/Import/ImportService.cs`
+- `src/PixelVault.Native/Services/Intake/ImportService.cs`
   - durable move/revert behavior and operation journaling
 - `src/PixelVault.Native/PixelVault.Native.cs`
   - avoid adding new orchestration there unless it is truly composition-root work

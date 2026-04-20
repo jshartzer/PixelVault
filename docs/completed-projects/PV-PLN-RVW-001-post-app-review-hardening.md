@@ -135,7 +135,7 @@ Ship **bounded-risk** improvements called out in the **2026-04-12** app review, 
 
 **Goal (as executed):** Land **one** small, test-backed hardening item from refreshed **`docs/NEXT_TRIM_PLAN.md`** rather than a broad MainWindow extraction.
 
-**Choice:** **`SteamAppIdLooksLikeFilenamePrefix`** (`Services/Import/SteamImportRename.cs`) — align with **`CODE_QUALITY_IMPROVEMENT_PLAN.md`** backlog: avoid treating arbitrary digit prefixes as Steam AppIDs when the capture shape is wrong.
+**Choice:** **`SteamAppIdLooksLikeFilenamePrefix`** (`Services/Intake/SteamImportRename.cs`) — align with **`CODE_QUALITY_IMPROVEMENT_PLAN.md`** backlog: avoid treating arbitrary digit prefixes as Steam AppIDs when the capture shape is wrong.
 
 **Shipped (repo):**
 

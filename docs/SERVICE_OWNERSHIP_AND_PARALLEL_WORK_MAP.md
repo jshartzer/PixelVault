@@ -23,7 +23,7 @@ This document is based on the current code in `C:\Codex\src\PixelVault.Native` a
 |-------|---------------------|
 | **Application wiring** | `MainWindow.ServiceComposition.cs` — **`BuildApplicationServiceGraph`** builds a **`MainWindowServiceGraph`**; the **`MainWindow`** ctor assigns the same instances to readonly fields. |
 | **Session log (v1)** | **`Services/Logging/`** — **`ILogService`** / **`TroubleshootingLogService`** (wraps **`TroubleshootingLog.AppendMainLine`**); graph exposes **`LogService`**; **`ImportService`** uses **`ImportServiceDependencies.LogService`**; **`MainWindow.Log`** mirrors the returned line to **`logBox`**. |
-| **Import (foreground)** | `Import/ImportWorkflow.cs`, `Import/MainWindow.ImportWorkflow.Steps.cs` — orchestration partials call **`IImportService`**; progress math lives in **`Services/Import/ImportWorkflowOrchestration.cs`**. |
+| **Import (foreground)** | `Import/ImportWorkflow.cs`, `Import/MainWindow.ImportWorkflow.Steps.cs` — orchestration partials call **`IImportService`**; progress math lives in **`Services/Intake/ImportWorkflowOrchestration.cs`**. |
 | **Import (headless / background)** | `Import/MainWindow.HeadlessImport.cs`, `Services/Intake/HeadlessImportCoordinator.cs` — same pipeline steps as UI import for explicit path subsets. |
 | **Library browser** | `UI/Library/LibraryBrowserHost.cs` → **`ILibraryBrowserShell`** / bridges; data work through **`ILibrarySession`** (**`LibrarySession`**: **`ILibraryScanner`**, **`IFileSystemService`**, **`LibraryRoot`**). |
 | **Library scan** | `Services/Library/LibraryScanner.cs` — **`ILibraryScanHost`** port implemented by **`MainWindow.LibraryScannerBridge`**. |
@@ -83,7 +83,7 @@ These are the best next service seams, ordered by usefulness and risk.
 | Candidate | Why it matters | Suggested file/home | Risk | Notes |
 |----------|----------------|---------------------|------|------|
 | `ISettingsService` / `SettingsService` | Reduces path/config noise and secrets handling in `MainWindow` | `src/PixelVault.Native/Services/Config/SettingsService.cs` | Low | **Shipped:** ini load/save through **`ISettingsService`**; **`MainWindow.SettingsState`** / **`SettingsPersistence`** (see **PV-PLN-EXT-002 A.2**). Further call-site sweeps only when touching nearby code. |
-| `IImportService` / `ImportService` | Converts `ImportWorkflow.cs` from a `MainWindow` partial into a domain service | `src/PixelVault.Native/Services/Import/ImportService.cs` | Medium | Good boundary because the workflow is already clustered in one file |
+| `IImportService` / `ImportService` | Converts `ImportWorkflow.cs` from a `MainWindow` partial into a domain service | `src/PixelVault.Native/Services/Intake/ImportService.cs` | Medium | Good boundary because the workflow is already clustered in one file |
 | `ILibraryScanner` / `LibraryScanner` | Pulls scan/rebuild/group logic out of library UI code | `src/PixelVault.Native/Services/Library/LibraryScanner.cs` | Medium-High | Biggest leverage after settings/import, but touches many helpers |
 | `ILibraryBrowserHost` / `LibraryBrowserHost` | Makes the main library window a host instead of one giant construction method | `src/PixelVault.Native/UI/Library/LibraryBrowserHost.cs` | High | **Apr 2026:** show path is **`LibraryBrowserHost`** → **`ILibraryBrowserShell`** (**`LibraryBrowserShellBridge`**) → **`LibraryBrowserShowOrchestration`**. Still a strong UI extraction target; avoid pairing large host edits with service extraction in the same pass |
 | `ILogService` | Centralizes log writes and operational messages | `src/PixelVault.Native/Services/Logging/ILogService.cs` | Low-Medium | **Apr 2026 (EXT-002 A.6):** **`TroubleshootingLogService`**, **`NullLogService`** (tests); **`MainWindowServiceGraph.LogService`**; **`ImportServiceDependencies.LogService`**. **`MetadataService`** / cover deps still use **`Action<string>`** until those files are touched. |
@@ -166,7 +166,7 @@ These are the slices that are easiest to split between Cursor and Codex without 
 | Cursor focus | Codex focus | Why this pairing is safe |
 |-------------|-------------|--------------------------|
 | Extract more Library UI out of `PixelVault.Native.cs` into `UI/Library/*` | Build `ISettingsService` and tests in new `Services/Config/*` files | Different write sets until final wiring |
-| Continue window/host extraction under `UI/Intake/*` or `UI/Editors/*` | Build `IImportService` skeleton, result models, and unit tests in new `Services/Import/*` files | Service work can happen first without touching the current WPF host |
+| Continue window/host extraction under `UI/Intake/*` or `UI/Editors/*` | Extend **`IImportService`** / intake types under `Services/Intake/*` | Service work can happen first without touching the current WPF host |
 | Clean up toolbar/layout/event-wiring sections in `PixelVault.Native.cs` | Build `ILibraryScanner` models and persistence-facing facade in `Services/Library/*` | Codex can prepare domain objects while Cursor works on the surface |
 | Refine `LibraryBrowserHost` or equivalent UI extraction | Harden `MetadataService` / `IndexPersistenceService` tests and move more pure helpers behind them | Test/service hardening does not need the same UI files |
 

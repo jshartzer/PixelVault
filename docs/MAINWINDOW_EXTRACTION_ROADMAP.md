@@ -48,7 +48,7 @@ This document is the **execution roadmap** for slicing responsibilities off `Mai
 | `UI/Photography/MainWindow.PhotographyAndSteam.cs` | ~340 | Gallery + Steam picker + **`GetTaggedImagesCached`** / inventory stamp / tag scan / cache IO (Phase F2) |
 | `UI/LibraryVirtualization.cs` | ~570 | Virtualized rows / scroll hosts |
 | `Services/Library/LibraryScanner.cs` | — | **`ILibraryScanner`**: metadata index scan, folder grouping, folder cache rebuild/cached load; uses **`IMetadataService`** + **`ILibraryScanHost`**. |
-| `Services/Import/ImportService.cs` | — | **`IImportService`**: move-to-destination, undo manifest, sort destination root, undo moves (`ImportServiceDependencies`). |
+| `Services/Intake/ImportService.cs` | — | **`IImportService`**: move-to-destination, undo manifest, sort destination root, undo moves (`ImportServiceDependencies`). |
 | `Indexing/LibraryMetadataIndexing.cs` | ~500 | Metadata index building (scan/save paths delegate to **`LibraryScanner`** where split) |
 | `Indexing/GameIndexCore.cs` | ~370 | Game index core |
 | `Indexing/LibraryFolderIndexing.cs` | ~290 | Folder inventory / library folders |
@@ -120,7 +120,7 @@ The **priority** is to shrink **`PixelVault.Native.cs`**, not to collapse partia
 
 **C2** — Pre-import **metadata review** (comments, platform tags, delete-before-processing) lives in `UI/Intake/MetadataReviewWindow.cs` (`MetadataReviewWindow.Show` + `MetadataReviewServices`). `MainWindow.ShowMetadataReviewWindow` passes `Btn`, `PreviewBadgeBrush`, `LoadImageSource`, and `GamePhotographyTag`. Note: “Import and comment” currently prefers Import-and-Edit when upload files qualify; `ShowMetadataReviewWindow` is not on the hot path today but remains the home for `List<ReviewItem>` review UI.
 
-**C3** — **Steam rename / move tie-in:** `SteamRenamePathMappingTests` exercises `SteamImportRename` (`ApplySteamRenameMapToReviewItems`, `ApplySteamRenameMapToManualMetadataItems`, `ResolveTopLevelPathsAfterSteamRename`); rename loop is **`IImportService.RunSteamRenameAsync`** (`Services/Import/ImportService.cs`), **`await`**ed from **`ImportWorkflow`**. Manual path: **`docs/MANUAL_GOLDEN_PATH_CHECKLIST.md`** section *Phase C3 — Intake UI extraction + Steam rename / move glue*.
+**C3** — **Steam rename / move tie-in:** `SteamRenamePathMappingTests` exercises `SteamImportRename` (`ApplySteamRenameMapToReviewItems`, `ApplySteamRenameMapToManualMetadataItems`, `ResolveTopLevelPathsAfterSteamRename`); rename loop is **`IImportService.RunSteamRenameAsync`** (`Services/Intake/ImportService.cs`), **`await`**ed from **`ImportWorkflow`**. Manual path: **`docs/MANUAL_GOLDEN_PATH_CHECKLIST.md`** section *Phase C3 — Intake UI extraction + Steam rename / move glue*.
 
 ---
 

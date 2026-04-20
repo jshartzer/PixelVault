@@ -115,7 +115,7 @@ Tests under **`tests/`** create temp ini files for **`PersistentDataMigrator`** 
 - Extract **pure** steps from **`ImportWorkflow`** into **`ImportService`** (or dedicated internal types) where **`MAINWINDOW_EXTRACTION_ROADMAP`** already points.
 - Stable **result DTOs** for progress UI (avoid raw tuple soup).
 
-**Exit:** New import behavior lands in **`Services/Import`** first; **`ImportWorkflow`** only sequences and shows UI.
+**Exit:** New import behavior lands under **`Services/Intake`** (with other intake/import pipeline types) first; **`ImportWorkflow`** only sequences and shows UI.
 
 **Landings:**
 
@@ -209,6 +209,12 @@ Phase A is “on track” when:
 - Rename/move **only** when it **reduces** confusion (e.g. group **Intake** helpers under `Services/Intake` with **no** public API break).
 - Update **`PROJECT_CONTEXT.md`** “Source Layout” if the tree changes.
 
+**Landings:**
+
+| Date | Change |
+|------|--------|
+| **2026-04-18** | **`Services/Import`** → **`Services/Intake`**: **`ImportService`**, **`ImportWorkflowOrchestration`**, **`SteamImportRename`** (namespace unchanged **`PixelVaultNative`**); **`PixelVault.Native.csproj`** compile paths; **`PROJECT_CONTEXT`**, **`SERVICE_OWNERSHIP`**, **`REAL_APP_IMPLEMENTATION_MAP`**, **`pixelvault_service_split_plan.txt`**, **`PV-PLN-AINT-001`** path references. |
+
 ---
 
 ### B.2 — Subsystem facades (optional)
@@ -283,3 +289,4 @@ Phase A is “on track” when:
 | **2026-04-18** | **B.3 (initial slice):** composition table in **`SERVICE_OWNERSHIP_AND_PARALLEL_WORK_MAP.md`**. |
 | **2026-04-18** | **A.6:** **`ILogService`** v1 + **`ImportService`** wiring (see A.6 landings). |
 | **2026-04-18** | **B.3:** composition table — **`ILogService`** row; **`ILogService`** candidate note refresh. |
+| **2026-04-18** | **B.1 (slice):** import-domain service files co-located under **`Services/Intake`** (see B.1 landings). |

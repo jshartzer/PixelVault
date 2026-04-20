@@ -127,14 +127,15 @@ public sealed class LibraryPlatformLabelsTests
     [InlineData("Steam", 0)]
     [InlineData("Emulation", 1)]
     [InlineData("PS5", 2)]
-    [InlineData("Xbox", 3)]
-    [InlineData("PC", 4)]
-    [InlineData("Multiple Tags", 5)]
-    [InlineData("Other", 6)]
-    [InlineData("PlayStation", 7)]
-    [InlineData("", 7)]
-    [InlineData("unknown label", 7)]
-    public void PlatformGroupOrder_CoversAllKnownBucketsAndFallsBackToSeven(string label, int expected)
+    [InlineData("Switch", 3)]
+    [InlineData("Xbox", 4)]
+    [InlineData("PC", 5)]
+    [InlineData("Multiple Tags", 6)]
+    [InlineData("Other", 7)]
+    [InlineData("PlayStation", 8)]
+    [InlineData("", 8)]
+    [InlineData("unknown label", 8)]
+    public void PlatformGroupOrder_CoversAllKnownBucketsAndFallsBackAfterOther(string label, int expected)
     {
         Assert.Equal(expected, LibraryPlatformLabels.PlatformGroupOrder(label));
     }
