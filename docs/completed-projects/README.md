@@ -25,6 +25,7 @@ This folder indexes **finished initiatives** in the **C:\Codex** repo: enough co
 | | | `C:\Codex\docs\completed-projects\MAINWINDOW_EXTRACTION_PHASES_A-F.md` | Short completion record + changelog pointer. |
 | **Single-folder storage model (LIBST)** | Apr 2026 | `C:\Codex\docs\completed-projects\PV-PLN-LIBST-001-single-folder-storage-model.md` | PV-PLN-LIBST-001: storage-group / placement, photo index re-home, SQLite integration tests; Steps 0–9 shipped. |
 | **Post–app-review hardening (RVW)** | Apr 2026 | `C:\Codex\docs\APP_REVIEW_2026-04-12.md` | PV-PLN-RVW-001: regex safety, hero coalesce/cancel, **`NEXT_TRIM`** refresh, **`SteamAppIdLooksLikeFilenamePrefix`** separator + min digit length (long NonSteamId-safe); canonical write-up: `C:\Codex\docs\completed-projects\PV-PLN-RVW-001-post-app-review-hardening.md`. |
+| **Service extraction & organization (EXT-002)** | Apr 2026 | `C:\Codex\docs\plans\PV-PLN-EXT-002-service-extraction-and-organization.md` | **`MainWindowServiceGraph`**, settings/import scan seams, **`IFileSystemService`** / **`ILogService`**, **`Services/Intake`** + **`IntakePipeline`**, **`SERVICE_OWNERSHIP`** composition + mermaid data-flow; Phases A–B complete. |
 
 ---
 

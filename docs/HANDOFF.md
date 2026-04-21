@@ -41,8 +41,9 @@ Before making app changes, read:
 
 Then use these based on the task:
 
+- `C:\Codex\docs\plans\PV-PLN-EXT-002-service-extraction-and-organization.md` — **complete (Apr 2026):** service extraction **A.1–A.6** + organization **B.1–B.3** (`MainWindowServiceGraph`, `ILogService`, `Services/Intake` + **`IntakePipeline`**, **`SERVICE_OWNERSHIP`** composition + diagram). Next structural work: **`docs/NEXT_TRIM_PLAN.md`**, **`PERFORMANCE_TODO.md`**, **`pixelvault_service_split_plan.txt`** Phase **7**.
 - `C:\Codex\docs\LIBRARY_PERFORMANCE_PLAN.md` — library/app **performance** roadmap (folder cache, metadata, detail pane); Notion map under **MainWindow extraction roadmap**
-- `C:\Codex\docs\completed-projects\README.md` for **finished initiatives** (e.g. MainWindow extraction Phases A–F) — not active handoff
+- `C:\Codex\docs\completed-projects\README.md` for **finished initiatives** (e.g. MainWindow extraction Phases A–F, **PV-PLN-EXT-002**) — not active handoff
 - `C:\Codex\docs\ARCHITECTURE_REFACTOR_PLAN.md` for refactor **principles** (tiered MainWindow bar, `ILibraryScanHost` as port, FS/async scope)—pairs with extraction and service docs below
 - `C:\Codex\docs\PROJECT_CONTEXT.md` for architecture and data model
 - `C:\Codex\docs\ROADMAP.md` for sequencing and larger direction
@@ -107,6 +108,7 @@ The app is currently published at `0.076.000`.
 
 Recent extraction progress (repo):
 
+- **PV-PLN-EXT-002 closed (Apr 2026, source):** Composition graph (**`MainWindow.ServiceComposition`** / **`MainWindowServiceGraph`**), settings/import/library scan doc pass, **`IFileSystemService`** import sweep, **`ILogService`**, **`Services/Intake`** consolidation + **`IntakePipeline`** facade, **`SERVICE_OWNERSHIP`** composition table + mermaid data-flow. Plan: **`docs/plans/PV-PLN-EXT-002-service-extraction-and-organization.md`** (status **Complete**). Next: **`docs/NEXT_TRIM_PLAN.md`**, perf todos, **`PV-PLN-DIST-001`** per **Current Direction** below.
 - **Quilt capture layout + continuous timeline flow (0.076.000):** The library screenshot/timeline feed now uses a square-first quilt layout instead of the older justified/day-card approach. **Compact** and **Roomy** now change real quilt cell size, detail tiles crop-fill their frames, and timeline day labels ride on the first capture of each day so the feed flows continuously without isolated date islands. See **`docs/CHANGELOG.md`**.
 - **Auto-intake + metadata editor + photo-exit polish (0.075.017):** Background auto-intake now seeds existing top-level files already present in watched upload roots on startup/restart, so pre-existing captures do not sit idle waiting for a new file event. The library metadata editor now batch-loads embedded metadata only for the selected files and resolves the best visible owner window, which removes the worst single-photo open stalls and tray-hidden modal issues. Exiting **Photo** workspace now waits for the folder pane layout pass before re-rendering covers, preventing the brief skinny multi-column cover flash during the return to folder view. See **`docs/CHANGELOG.md`**.
 - **Tray controls + background imports polish (0.075.016):** Background auto-intake can keep PixelVault running from the **system tray** with separate **Settings** toggles for **minimize to tray** and **ask on close**, a close prompt that can send the app to tray, and a tray status flyout for recent imports. The **Background imports** window is now a single **newest-first** list with more readable headers and reliable **Clear selection**, and undo restores are temporarily suppressed from watcher re-import so files do not loop straight back through auto-intake. See **`docs/CHANGELOG.md`**.

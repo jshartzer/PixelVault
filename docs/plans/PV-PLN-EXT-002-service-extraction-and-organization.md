@@ -1,7 +1,7 @@
 # PV-PLN-EXT-002 — Service extraction & organization (post–MainWindow split)
 
-**Status:** Draft plan (Apr 2026)  
-**Supersedes nothing:** This is a **forward-looking execution sequence**. It complements finished UI extraction (**`MAINWINDOW_EXTRACTION_ROADMAP.md`** Phases A–F) and ongoing **Phase 7** in **`pixelvault_service_split_plan.txt`**.
+**Status:** **Complete (Apr 2026)** — Phase **A** (A.1–A.6) and Phase **B** (B.1–B.3) landings below are shipped in source.  
+**Supersedes nothing:** Historical execution record. It complemented finished UI extraction (**`MAINWINDOW_EXTRACTION_ROADMAP.md`** Phases A–F). Ongoing monolith shrink continues via **`docs/NEXT_TRIM_PLAN.md`**, **`PERFORMANCE_TODO.md`**, and **`pixelvault_service_split_plan.txt`** Phase **7**.
 
 ---
 
@@ -256,6 +256,8 @@ Phase A is “on track” when:
 - A new contributor can answer: **Where is import logic?** **Where is library scan?** **Where is wiring?** in **under five minutes** using this doc + **`PROJECT_CONTEXT.md`**.
 - No **behavior** change from organization PRs alone.
 
+**Closure (2026-04-18):** Exit criteria met; treat this plan as **closed** for new scope unless a follow-up initiative reopens extraction/organization with a new plan id.
+
 ---
 
 ## 6. Explicit non-goals
@@ -299,3 +301,15 @@ Phase A is “on track” when:
 | **2026-04-18** | **B.1 (slice):** import-domain service files co-located under **`Services/Intake`** (see B.1 landings). |
 | **2026-04-18** | **B.2:** **`IntakePipeline`** facade (see B.2 landings). |
 | **2026-04-18** | **B.3:** mermaid data-flow diagram in **`SERVICE_OWNERSHIP`** (see B.3 landings). |
+| **2026-04-18** | **Plan closure:** Phase **A–B** complete; status → **Complete**; §9 follow-on pointers; Phase B exit noted. |
+
+---
+
+## 9. Suggested follow-ons (outside this plan id)
+
+| Track | Where to go next |
+|-------|-------------------|
+| **MainWindow / partial size** | **`docs/NEXT_TRIM_PLAN.md`** — ManualMetadata splits, import shell vs service, optional wiring partial |
+| **Responsiveness** | **`docs/PERFORMANCE_TODO.md`**, **`docs/LIBRARY_PERFORMANCE_PLAN.md`** |
+| **Distribution** | **`docs/plans/PV-PLN-DIST-001-windows-store-and-distribution-roadmap.md`**, **`docs/HANDOFF.md`** current direction |
+| **I/O seam sweeps** | **`IFileSystemService`** on remaining **`System.IO`** call sites when touching nearby code (**A.5** style) |
