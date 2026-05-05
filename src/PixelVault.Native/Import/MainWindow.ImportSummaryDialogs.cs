@@ -9,11 +9,15 @@ namespace PixelVaultNative
 {
     public sealed partial class MainWindow
     {
-        List<string> BuildImportSummaryLines(string workflowLabel, bool usedReview, RenameStepResult renameResult, DeleteStepResult deleteResult, MetadataStepResult metadataResult, MoveStepResult moveResult, SortStepResult sortResult, int manualItemsLeft, bool manualItemsLeftAreUploadSkips = false)
+        List<string> BuildImportSummaryLines(string workflowLabel, bool usedReview, RenameStepResult renameResult, DeleteStepResult deleteResult, MetadataStepResult metadataResult, MoveStepResult moveResult, SortStepResult sortResult, int manualItemsLeft, bool manualItemsLeftAreUploadSkips = false, HdrFallbackMoveResult hdrFallbackResult = null)
         {
             var lines = new List<string>();
             lines.Add("Workflow: " + workflowLabel + (usedReview ? " with review window." : "."));
             lines.Add("Rename summary: renamed " + (renameResult == null ? 0 : renameResult.Renamed) + ", skipped " + (renameResult == null ? 0 : renameResult.Skipped) + ".");
+            if (hdrFallbackResult != null && (hdrFallbackResult.Moved > 0 || hdrFallbackResult.Skipped > 0))
+            {
+                lines.Add("HDR duplicate summary: moved " + hdrFallbackResult.Moved + ", skipped " + hdrFallbackResult.Skipped + " into " + hdrFallbackResult.DestinationRoot + ".");
+            }
             if (deleteResult != null && (usedReview || deleteResult.Deleted > 0 || deleteResult.Skipped > 0))
             {
                 lines.Add("Delete summary: deleted " + deleteResult.Deleted + ", skipped " + deleteResult.Skipped + ".");

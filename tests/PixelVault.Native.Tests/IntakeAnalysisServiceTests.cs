@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using Xunit;
 
@@ -65,6 +66,46 @@ public sealed class IntakeAnalysisServiceTests
 
             var a = Assert.Single(map.Values);
             Assert.False(a.CanUpdateMetadata);
+        }
+        finally
+        {
+            try
+            {
+                File.Delete(temp);
+            }
+            catch
+            {
+                // ignore
+            }
+        }
+    }
+
+    [Fact]
+    public void AnalyzeFiles_NintendoExifMake_MarksSwitchWithoutFilenameConvention()
+    {
+        var temp = Path.Combine(Path.GetTempPath(), "pv_intake_test_" + Guid.NewGuid().ToString("N") + ".jpg");
+        try
+        {
+            File.WriteAllBytes(temp, new byte[] { 0 });
+            var svc = new IntakeAnalysisService(
+                _ => new FilenameParseResult
+                {
+                    PlatformLabel = "Other",
+                    PlatformTags = Array.Empty<string>()
+                },
+                _ => false,
+                _ => DateTime.MinValue,
+                (files, _) => new Dictionary<string, EmbeddedMetadataSnapshot>(StringComparer.OrdinalIgnoreCase)
+                {
+                    [temp] = new EmbeddedMetadataSnapshot { CameraMake = "Nintendo co., ltd" }
+                });
+
+            var map = svc.AnalyzeFiles(new[] { temp });
+
+            var a = Assert.Single(map.Values);
+            Assert.Equal("Switch", a.Parsed.PlatformLabel);
+            Assert.Contains("Switch", a.Parsed.PlatformTags);
+            Assert.Contains("Nintendo", a.Parsed.PlatformTags);
         }
         finally
         {

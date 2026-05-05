@@ -66,7 +66,7 @@ namespace PixelVaultNative
                 coverService,
                 gameIndexEditorAssignmentService,
                 logService));
-            var intakeAnalysisService = new IntakeAnalysisService(host.ParseFilename, IsVideo, host.GetLibraryDate);
+            var intakeAnalysisService = new IntakeAnalysisService(host.ParseFilename, IsVideo, host.GetLibraryDate, metadataService.ReadEmbeddedMetadataBatch);
             var intakePipeline = new IntakePipeline(importService, fileSystemService, intakeAnalysisService);
             var libraryWorkspace = new LibraryWorkspaceContext(host);
             var librarySession = CreateLibrarySessionForStartup(

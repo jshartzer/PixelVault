@@ -21,10 +21,11 @@ namespace PixelVaultNative
             EnsureSourceFolders();
             EnsureExifTool();
             fileSystemService.CreateDirectory(destinationRoot);
-            var renameInventory = importService.BuildSourceInventory(importSearchSubfoldersForRename);
             var inventory = importService.BuildSourceInventory(importSearchSubfoldersForRename);
+            var inventoryCandidates = new HashSet<string>(inventory.TopLevelMediaFiles ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
             var eligible = (eligibleTopLevelPaths ?? Array.Empty<string>())
                 .Where(p => !string.IsNullOrWhiteSpace(p) && fileSystemService.FileExists(p))
+                .Where(p => inventoryCandidates.Contains(p))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
             if (eligible.Count == 0)
@@ -32,24 +33,23 @@ namespace PixelVaultNative
                 return new HeadlessStandardImportOutcome();
             }
 
-            var reviewSubset = BuildReviewItems(eligible, cancellationToken);
+            var prep = BuildIntakePreparation(inventory.TopLevelMediaFiles, false, cancellationToken);
+            var eligibleSet = new HashSet<string>(eligible, StringComparer.OrdinalIgnoreCase);
+            var reviewSubset = prep.ReviewItems
+                .Where(item => item != null && eligibleSet.Contains(item.FilePath))
+                .ToList();
             if (reviewSubset == null || reviewSubset.Count == 0)
             {
                 return new HeadlessStandardImportOutcome();
             }
 
-            var fullReview = BuildReviewItems(inventory.TopLevelMediaFiles, cancellationToken);
-            var recognizedPaths = new HashSet<string>(fullReview.Select(i => i.FilePath), StringComparer.OrdinalIgnoreCase);
-            var manualItems = BuildManualMetadataItems(inventory.TopLevelMediaFiles, recognizedPaths, cancellationToken);
-            var manualPaths = new HashSet<string>(manualItems.Select(i => i.FilePath), StringComparer.OrdinalIgnoreCase);
-
             return await intakePipeline.RunStandardTopLevelSubsetAsync(
                 destinationRoot,
                 libraryRoot,
-                renameInventory,
+                inventory,
                 inventory,
                 reviewSubset,
-                manualPaths,
+                prep.ManualPaths,
                 cancellationToken,
                 progress).ConfigureAwait(false);
         }

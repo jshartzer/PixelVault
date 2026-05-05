@@ -1,8 +1,8 @@
 using System;
-using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Threading;
 
 namespace PixelVaultNative
 {
@@ -11,8 +11,9 @@ namespace PixelVaultNative
     /// </summary>
     public sealed class WorkflowProgressView
     {
-        readonly List<string> _logLines = new List<string>();
-        readonly int _maxLogLines;
+        readonly WorkflowProgressLogBuffer _logBuffer;
+        readonly object _logSync = new object();
+        bool _logFlushQueued;
 
         public WorkflowProgressView(
             Window window,
@@ -27,7 +28,7 @@ namespace PixelVaultNative
             ProgressBar = progressBar;
             LogText = logText;
             ActionButton = actionButton;
-            _maxLogLines = Math.Max(1, maxLogLines);
+            _logBuffer = new WorkflowProgressLogBuffer(maxLogLines);
         }
 
         public Window Window { get; }
@@ -38,10 +39,42 @@ namespace PixelVaultNative
 
         public void AppendLogLine(string line)
         {
-            if (string.IsNullOrWhiteSpace(line) || LogText == null) return;
-            _logLines.Add(line);
-            while (_logLines.Count > _maxLogLines) _logLines.RemoveAt(0);
-            LogText.Text = string.Join(Environment.NewLine, _logLines.ToArray());
+            if (LogText == null) return;
+
+            var shouldQueueFlush = false;
+            lock (_logSync)
+            {
+                if (!_logBuffer.Append(line)) return;
+                if (!_logFlushQueued)
+                {
+                    _logFlushQueued = true;
+                    shouldQueueFlush = true;
+                }
+            }
+
+            if (shouldQueueFlush)
+            {
+                LogText.Dispatcher.BeginInvoke(new Action(FlushLogLines), DispatcherPriority.Background);
+            }
+        }
+
+        public void FlushLogLines()
+        {
+            if (LogText == null) return;
+            if (!LogText.Dispatcher.CheckAccess())
+            {
+                LogText.Dispatcher.Invoke(new Action(FlushLogLines));
+                return;
+            }
+
+            string text;
+            lock (_logSync)
+            {
+                _logFlushQueued = false;
+                if (!_logBuffer.TryRender(out text)) return;
+            }
+
+            LogText.Text = text;
             LogText.ScrollToEnd();
         }
     }

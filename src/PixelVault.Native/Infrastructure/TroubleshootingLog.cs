@@ -1,8 +1,10 @@
 #nullable enable
 
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
 
@@ -75,6 +77,17 @@ namespace PixelVaultNative
             var line = "[" + FormatLogUtcTimestamp() + "] " + (message ?? string.Empty);
             AppendLine(MainLogFilePath(), line);
             return line;
+        }
+
+        /// <summary>Appends timestamped lines to the main log with one disk append operation and returns the formatted lines.</summary>
+        public string[] AppendMainLines(IEnumerable<string?> messages)
+        {
+            var lines = (messages ?? Enumerable.Empty<string?>())
+                .Select(message => "[" + FormatLogUtcTimestamp() + "] " + (message ?? string.Empty))
+                .ToArray();
+            if (lines.Length == 0) return Array.Empty<string>();
+            AppendLines(MainLogFilePath(), lines);
+            return lines;
         }
 
         /// <summary>
@@ -247,7 +260,13 @@ namespace PixelVaultNative
 
         void AppendLine(string? path, string line)
         {
+            AppendLines(path, new[] { line });
+        }
+
+        void AppendLines(string? path, IReadOnlyList<string> lines)
+        {
             if (string.IsNullOrWhiteSpace(path)) return;
+            if (lines == null || lines.Count == 0) return;
             Directory.CreateDirectory(_d.LogsRoot);
             lock (_fileSync)
             {
@@ -260,7 +279,10 @@ namespace PixelVaultNative
                         using (var stream = new FileStream(path!, FileMode.Append, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete))
                         using (var writer = new StreamWriter(stream))
                         {
-                            writer.WriteLine(line);
+                            foreach (var line in lines)
+                            {
+                                writer.WriteLine(line ?? string.Empty);
+                            }
                             writer.Flush();
                             return;
                         }

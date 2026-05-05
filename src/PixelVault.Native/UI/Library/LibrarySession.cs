@@ -216,6 +216,12 @@ namespace PixelVaultNative
             _scanner.RefreshFolderCacheAfterGameIndexChange(LibraryRoot);
         }
 
+        public bool TryUpdateLibraryFolderCacheForTouchedPaths(IEnumerable<string> touchedPaths)
+        {
+            if (string.IsNullOrWhiteSpace(LibraryRoot) || touchedPaths == null) return false;
+            return _scanner.TryUpdateLibraryFolderCacheForTouchedPaths(LibraryRoot, touchedPaths);
+        }
+
         public List<LibraryFolderInfo> EnsureGameIndexFolderContext(Action<string> setUiStatus)
         {
             if (string.IsNullOrWhiteSpace(LibraryRoot)) return new List<LibraryFolderInfo>();

@@ -3,7 +3,7 @@
 | Field | Value |
 |-------|--------|
 | **Plan ID** | `PV-PLN-AINT-001` |
-| **Status** | Implemented (slices 1–9 complete; manual dogfood as needed) |
+| **Status** | **Complete** — slices **1–9** shipped in repo; manual dogfood as needed; long-form spec retained in this file |
 | **Owner** | PixelVault / Codex |
 | **Parent context** | Upload/source folders, intake preview, import workflow, filename rules, single-folder storage model |
 | **Related** | [`docs/FILENAME_PARSING_ARCHITECTURE.txt`](../FILENAME_PARSING_ARCHITECTURE.txt), [`docs/FILENAME_RULES_GUIDED_BUILDER_TEST_HANDOFF.md`](../FILENAME_RULES_GUIDED_BUILDER_TEST_HANDOFF.md), [`docs/MANUAL_GOLDEN_PATH_CHECKLIST.md`](../MANUAL_GOLDEN_PATH_CHECKLIST.md), [`docs/completed-projects/PV-PLN-LIBST-001-single-folder-storage-model.md`](../completed-projects/PV-PLN-LIBST-001-single-folder-storage-model.md), [`docs/plans/PV-PLN-FNRU-001-guided-builder-verification.md`](PV-PLN-FNRU-001-guided-builder-verification.md), [`docs/plans/PV-PLN-UI-001-ui-thin-mainwindow-ios-aligned.md`](PV-PLN-UI-001-ui-thin-mainwindow-ios-aligned.md) |

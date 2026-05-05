@@ -1,5 +1,7 @@
 #nullable enable
 
+using System.Collections.Generic;
+
 namespace PixelVaultNative
 {
     /// <summary>
@@ -10,5 +12,8 @@ namespace PixelVaultNative
     {
         /// <inheritdoc cref="TroubleshootingLog.AppendMainLine"/>
         string AppendMainLine(string? message);
+
+        /// <inheritdoc cref="TroubleshootingLog.AppendMainLines"/>
+        string[] AppendMainLines(IEnumerable<string?> messages);
     }
 }

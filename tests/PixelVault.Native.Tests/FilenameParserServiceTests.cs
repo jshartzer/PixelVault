@@ -87,6 +87,16 @@ public sealed class FilenameParserServiceTests
     }
 
     [Fact]
+    public void Parse_TitleHint_RemovesRegisteredTrademarkSymbols()
+    {
+        var parser = CreateParser();
+
+        var parsed = parser.Parse("Diablo\u00AE IV-2026_05_01-12_00_00.png", string.Empty);
+
+        Assert.Equal("Diablo IV", parsed.GameTitleHint);
+    }
+
+    [Fact]
     public void Parse_XboxCapture_WithHyphenSeparatedTime_WritesFileTimesLikeSteam()
     {
         var parser = CreateParser();

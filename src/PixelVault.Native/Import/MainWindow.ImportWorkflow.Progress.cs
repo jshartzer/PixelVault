@@ -44,6 +44,29 @@ namespace PixelVaultNative
             bool cancellationRequested = false;
             var workflowCancellation = new CancellationTokenSource();
             Action<string> appendProgress = view.AppendLogLine;
+            Action<int, string> applyProgress = delegate(int completed, string detail)
+            {
+                if (progressFinished) return;
+                if (totalWork > 0)
+                {
+                    var safeCompleted = Math.Max(0, Math.Min(completed, effectiveTotalWork));
+                    var remaining = Math.Max(effectiveTotalWork - safeCompleted, 0);
+                    progressBar.IsIndeterminate = false;
+                    progressBar.Maximum = effectiveTotalWork;
+                    progressBar.Value = safeCompleted;
+                    progressMeta.Text = safeCompleted + " of " + effectiveTotalWork + " steps complete | " + remaining + " remaining";
+                }
+                else
+                {
+                    progressBar.IsIndeterminate = true;
+                    progressMeta.Text = detail;
+                }
+                appendProgress(detail);
+            };
+            var progressCoalescer = new WorkflowProgressCoalescer(
+                delegate(Action action) { progressWindow.Dispatcher.BeginInvoke(action); },
+                applyProgress,
+                WorkflowProgressCoalescer.DefaultMinimumInterval);
             closeButton.Click += delegate
             {
                 if (!progressFinished)
@@ -52,8 +75,11 @@ namespace PixelVaultNative
                     cancellationRequested = true;
                     workflowCancellation.Cancel();
                     closeButton.IsEnabled = false;
+                    progressCoalescer.FlushImmediate();
+                    view.FlushLogLines();
                     progressMeta.Text = "Cancelling workflow...";
                     appendProgress("Cancellation requested.");
+                    view.FlushLogLines();
                     return;
                 }
                 progressWindow.Close();
@@ -63,24 +89,7 @@ namespace PixelVaultNative
             appendProgress(startLogLine);
             Action<int, string> reportProgress = delegate(int completed, string detail)
             {
-                progressWindow.Dispatcher.BeginInvoke(new Action(delegate
-                {
-                    if (totalWork > 0)
-                    {
-                        var safeCompleted = Math.Max(0, Math.Min(completed, effectiveTotalWork));
-                        var remaining = Math.Max(effectiveTotalWork - safeCompleted, 0);
-                        progressBar.IsIndeterminate = false;
-                        progressBar.Maximum = effectiveTotalWork;
-                        progressBar.Value = safeCompleted;
-                        progressMeta.Text = safeCompleted + " of " + effectiveTotalWork + " steps complete | " + remaining + " remaining";
-                    }
-                    else
-                    {
-                        progressBar.IsIndeterminate = true;
-                        progressMeta.Text = detail;
-                    }
-                    appendProgress(detail);
-                }));
+                progressCoalescer.Report(completed, detail);
             };
 
             Task.Run(async () =>
@@ -90,31 +99,35 @@ namespace PixelVaultNative
             {
                 progressWindow.Dispatcher.BeginInvoke(new Action(delegate
                 {
-                    progressFinished = true;
-                    closeButton.Content = "Close";
-                    closeButton.IsEnabled = true;
-                    if (workflowTask.IsCanceled || (workflowTask.IsFaulted && workflowTask.Exception != null && workflowTask.Exception.Flatten().InnerExceptions.Any(ex => ex is OperationCanceledException)))
-                    {
-                        status.Text = canceledStatusText;
-                        progressMeta.Text = "Workflow cancelled.";
-                        appendProgress("Workflow cancelled.");
-                        if (onCanceled != null) onCanceled();
-                        return;
-                    }
-                    if (workflowTask.IsFaulted)
-                    {
-                        var flattened = workflowTask.Exception == null ? null : workflowTask.Exception.Flatten();
-                        var error = flattened == null ? new Exception(failureStatusText + ".") : flattened.InnerExceptions.First();
-                        status.Text = failureStatusText;
-                        progressMeta.Text = error.Message;
-                        appendProgress("ERROR: " + error.Message);
-                        LogException("Import workflow", error);
-                        TryLibraryToast(error.Message, MessageBoxImage.Error);
-                        return;
-                    }
-
                     try
                     {
+                        progressCoalescer.FlushImmediate();
+                        view.FlushLogLines();
+                        progressFinished = true;
+                        closeButton.Content = "Close";
+                        closeButton.IsEnabled = true;
+                        if (workflowTask.IsCanceled || (workflowTask.IsFaulted && workflowTask.Exception != null && workflowTask.Exception.Flatten().InnerExceptions.Any(ex => ex is OperationCanceledException)))
+                        {
+                            status.Text = canceledStatusText;
+                            progressMeta.Text = "Workflow cancelled.";
+                            appendProgress("Workflow cancelled.");
+                            view.FlushLogLines();
+                            if (onCanceled != null) onCanceled();
+                            return;
+                        }
+                        if (workflowTask.IsFaulted)
+                        {
+                            var flattened = workflowTask.Exception == null ? null : workflowTask.Exception.Flatten();
+                            var error = flattened == null ? new Exception(failureStatusText + ".") : flattened.InnerExceptions.First();
+                            status.Text = failureStatusText;
+                            progressMeta.Text = error.Message;
+                            appendProgress("ERROR: " + error.Message);
+                            view.FlushLogLines();
+                            LogException("Import workflow", error);
+                            TryLibraryToast(error.Message, MessageBoxImage.Error);
+                            return;
+                        }
+
                         if (totalWork > 0)
                         {
                             progressBar.IsIndeterminate = false;
@@ -129,8 +142,13 @@ namespace PixelVaultNative
                         status.Text = failureStatusText;
                         progressMeta.Text = ex.Message;
                         appendProgress("ERROR: " + ex.Message);
+                        view.FlushLogLines();
                         LogException("Import workflow", ex);
                         TryLibraryToast(ex.Message, MessageBoxImage.Error);
+                    }
+                    finally
+                    {
+                        progressCoalescer.Dispose();
                     }
                 }));
             }, TaskScheduler.Default);

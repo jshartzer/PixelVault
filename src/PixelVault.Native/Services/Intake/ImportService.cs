@@ -26,6 +26,9 @@ namespace PixelVaultNative
             Action<int, int, string> progress = null,
             CancellationToken cancellationToken = default);
 
+        /// <summary>Moves non-selected files from same-stem PNG/JXR HDR pairs into an accessible fallback folder.</summary>
+        HdrFallbackMoveResult MoveHdrPairFallbackFiles(IEnumerable<string> files, Action<int, int, string> progress = null, CancellationToken cancellationToken = default);
+
         SortStepResult SortDestinationRootIntoGameFolders(string destinationRoot, string libraryRoot, CancellationToken cancellationToken = default);
 
         UndoImportExecutionResult ExecuteUndoImportMoves(IEnumerable<UndoImportEntry> entries);
@@ -212,6 +215,9 @@ namespace PixelVaultNative
 
     internal sealed class ImportService : IImportService
     {
+        internal const string HdrDuplicatesFolderName = "HDR Duplicates";
+        internal const string LegacyHdrFallbackFolderName = "PixelVault HDR Fallbacks";
+
         readonly ImportServiceDependencies d;
         readonly IFileSystemService fs;
         Func<ILibrarySession> _getLibrarySession;
@@ -234,6 +240,45 @@ namespace PixelVaultNative
         }
 
         string UndoPath => d.UndoManifestPath == null ? string.Empty : (d.UndoManifestPath() ?? string.Empty);
+
+        void AppendImportDetailLogLines(IEnumerable<string> lines)
+        {
+            var batch = (lines ?? Enumerable.Empty<string>())
+                .Where(line => !string.IsNullOrWhiteSpace(line))
+                .ToList();
+            if (batch.Count == 0) return;
+            d.LogService.AppendMainLines(batch);
+        }
+
+        ImportDetailLogBatch CreateImportDetailLogBatch() => new ImportDetailLogBatch(this);
+
+        sealed class ImportDetailLogBatch : IDisposable
+        {
+            const int FlushThreshold = 100;
+            readonly ImportService _owner;
+            readonly List<string> _lines = new List<string>();
+
+            public ImportDetailLogBatch(ImportService owner)
+            {
+                _owner = owner;
+            }
+
+            public void Add(string line)
+            {
+                if (string.IsNullOrWhiteSpace(line)) return;
+                _lines.Add(line);
+                if (_lines.Count >= FlushThreshold) Flush();
+            }
+
+            public void Flush()
+            {
+                if (_lines.Count == 0) return;
+                _owner.AppendImportDetailLogLines(_lines);
+                _lines.Clear();
+            }
+
+            public void Dispose() => Flush();
+        }
 
         public List<UndoImportEntry> LoadUndoManifest()
         {
@@ -290,6 +335,7 @@ namespace PixelVaultNative
             var entries = new List<UndoImportEntry>();
             var fileList = (files ?? Enumerable.Empty<string>()).Where(fs.FileExists).ToList();
             var total = fileList.Count;
+            using var detailLogLines = CreateImportDetailLogBatch();
             if (progress != null) progress(0, total, "Starting move step for " + total + " file(s).");
             for (int i = 0; i < total; i++)
             {
@@ -319,12 +365,82 @@ namespace PixelVaultNative
                 moved++;
                 entries.Add(new UndoImportEntry { SourceDirectory = sourceDirectory, ImportedFileName = Path.GetFileName(target), CurrentPath = target });
                 d.AddSidecarUndoEntryIfPresent?.Invoke(target, sourceDirectory, entries);
-                d.LogService.AppendMainLine("Moved: " + Path.GetFileName(file) + " -> " + target);
+                detailLogLines.Add("Moved: " + Path.GetFileName(file) + " -> " + target);
                 if (progress != null) progress(i + 1, total, "Moved " + (i + 1) + " of " + total + " | " + remaining + " remaining | " + Path.GetFileName(target));
             }
+            detailLogLines.Flush();
             if (progress != null) progress(total, total, summaryLabel + ": moved " + moved + ", skipped " + skipped + ", renamed-on-conflict " + renamedConflict + ".");
             d.LogService.AppendMainLine(summaryLabel + ": moved " + moved + ", skipped " + skipped + ", renamed-on-conflict " + renamedConflict + ".");
             return new MoveStepResult { Moved = moved, Skipped = skipped, RenamedOnConflict = renamedConflict, Entries = entries };
+        }
+
+        public HdrFallbackMoveResult MoveHdrPairFallbackFiles(
+            IEnumerable<string> files,
+            Action<int, int, string> progress = null,
+            CancellationToken cancellationToken = default)
+        {
+            var result = new HdrFallbackMoveResult();
+            var destinationRoot = d.GetDestinationRoot == null ? string.Empty : d.GetDestinationRoot() ?? string.Empty;
+            var libraryRoot = d.GetLibraryRoot == null ? string.Empty : d.GetLibraryRoot() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(destinationRoot)) return result;
+            var fileList = (files ?? Enumerable.Empty<string>())
+                .Where(file => !string.IsNullOrWhiteSpace(file))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Where(fs.FileExists)
+                .ToList();
+            var total = fileList.Count;
+            if (total == 0) return result;
+            var duplicateRoot = BuildHdrDuplicateRoot(destinationRoot);
+            result.DestinationRoot = duplicateRoot;
+            var indexRows = d.LoadSavedGameIndexRows != null
+                ? d.LoadSavedGameIndexRows(libraryRoot ?? string.Empty) ?? new List<GameIndexEditorRow>()
+                : new List<GameIndexEditorRow>();
+            var titleCounts = d.BuildGameIndexTitleCounts != null
+                ? d.BuildGameIndexTitleCounts(indexRows)
+                : new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var normWithFolder = d.NormalizeGameIndexNameWithFolder
+                ?? ((name, _) => d.NormalizeGameIndexName != null ? d.NormalizeGameIndexName(name ?? string.Empty) : (name ?? string.Empty).Trim());
+            var getSafeName = d.GetSafeGameFolderName ?? SanitizeHdrFallbackFolderName;
+            var getGameName = d.GetGameNameFromFileName ?? (name => Path.GetFileNameWithoutExtension(name ?? string.Empty) ?? string.Empty);
+            var normalizeConsole = d.NormalizeConsoleLabel ?? (label => (label ?? string.Empty).Trim());
+            using var detailLogLines = CreateImportDetailLogBatch();
+            if (progress != null) progress(0, total, "Moving HDR duplicate file(s) out of the upload scan path.");
+            for (int i = 0; i < total; i++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var file = fileList[i];
+                var remaining = total - (i + 1);
+                try
+                {
+                    var targetDir = ResolveHdrDuplicateTargetDirectory(
+                        file,
+                        duplicateRoot,
+                        libraryRoot,
+                        indexRows,
+                        titleCounts,
+                        getSafeName,
+                        getGameName,
+                        normWithFolder,
+                        normalizeConsole);
+                    if (!fs.DirectoryExists(targetDir)) fs.CreateDirectory(targetDir);
+                    var target = Path.Combine(targetDir, Path.GetFileName(file));
+                    if (fs.FileExists(target)) target = d.UniquePath == null ? target : d.UniquePath(target);
+                    fs.MoveFile(file, target);
+                    d.MoveMetadataSidecarIfPresent?.Invoke(file, target);
+                    result.Moved++;
+                    detailLogLines.Add("Moved HDR duplicate: " + Path.GetFileName(file) + " -> " + target);
+                    if (progress != null) progress(i + 1, total, "Moved HDR duplicate " + (i + 1) + " of " + total + " | " + remaining + " remaining | " + Path.GetFileName(target));
+                }
+                catch (Exception ex)
+                {
+                    result.Skipped++;
+                    d.LogService.AppendMainLine("Could not move HDR duplicate: " + file + ". " + ex.Message);
+                    if (progress != null) progress(i + 1, total, "Skipped HDR duplicate " + (i + 1) + " of " + total + " | " + remaining + " remaining | " + Path.GetFileName(file));
+                }
+            }
+            detailLogLines.Flush();
+            d.LogService.AppendMainLine("HDR duplicate summary: moved " + result.Moved + ", skipped " + result.Skipped + ".");
+            return result;
         }
 
         public SortStepResult SortDestinationRootIntoGameFolders(string destinationRoot, string libraryRoot, CancellationToken cancellationToken = default)
@@ -348,6 +464,7 @@ namespace PixelVaultNative
 
             int moved = 0, created = 0, renamedConflict = 0;
             var indexedTargets = new List<string>();
+            using var detailLogLines = CreateImportDetailLogBatch();
             foreach (var file in files)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -395,11 +512,12 @@ namespace PixelVaultNative
                 d.MoveMetadataSidecarIfPresent?.Invoke(file, target);
                 moved++;
                 indexedTargets.Add(target);
-                d.LogService.AppendMainLine("Sorted: " + Path.GetFileName(file) + " -> " + target);
+                detailLogLines.Add("Sorted: " + Path.GetFileName(file) + " -> " + target);
             }
 
             var scanner = d.GetLibraryScanner == null ? null : d.GetLibraryScanner();
             scanner?.UpsertLibraryMetadataIndexEntries(indexedTargets, libraryRoot);
+            detailLogLines.Flush();
             d.LogService.AppendMainLine("Sort summary: sorted " + moved + ", folders created " + created + ", renamed-on-conflict " + renamedConflict + ".");
             return new SortStepResult { Sorted = moved, FoldersCreated = created, RenamedOnConflict = renamedConflict };
         }
@@ -455,12 +573,133 @@ namespace PixelVaultNative
             var isMedia = d.IsMedia;
             if (enumerate == null || isMedia == null) return new SourceInventory();
             var searchOption = includeSubfolders ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
-            var candidateMediaFiles = enumerate(searchOption, isMedia).ToList();
+            var candidateMediaFiles = enumerate(searchOption, isMedia)
+                .Where(file => !IsHdrFallbackPath(file))
+                .ToList();
+            var hdrPairs = BuildHdrCapturePairs(candidateMediaFiles);
+            if (hdrPairs.Count > 0)
+            {
+                var excluded = new HashSet<string>(hdrPairs.Select(pair => pair.AlternateFilePath), StringComparer.OrdinalIgnoreCase);
+                candidateMediaFiles = candidateMediaFiles.Where(file => !excluded.Contains(file)).ToList();
+            }
             return new SourceInventory
             {
                 TopLevelMediaFiles = candidateMediaFiles,
-                RenameScopeFiles = candidateMediaFiles.ToList()
+                RenameScopeFiles = candidateMediaFiles.ToList(),
+                HdrPairs = hdrPairs
             };
+        }
+
+        internal static List<HdrCapturePair> BuildHdrCapturePairs(IEnumerable<string> files)
+        {
+            var pairs = new List<HdrCapturePair>();
+            var media = (files ?? Enumerable.Empty<string>())
+                .Where(file => !string.IsNullOrWhiteSpace(file))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            foreach (var group in media.GroupBy(BuildHdrCapturePairKey, StringComparer.OrdinalIgnoreCase))
+            {
+                if (string.IsNullOrWhiteSpace(group.Key)) continue;
+                var jxr = group.FirstOrDefault(file => string.Equals(Path.GetExtension(file), ".jxr", StringComparison.OrdinalIgnoreCase));
+                var png = group.FirstOrDefault(file => string.Equals(Path.GetExtension(file), ".png", StringComparison.OrdinalIgnoreCase));
+                if (string.IsNullOrWhiteSpace(jxr) || string.IsNullOrWhiteSpace(png)) continue;
+                pairs.Add(new HdrCapturePair
+                {
+                    SelectedFilePath = jxr,
+                    AlternateFilePath = png
+                });
+            }
+            return pairs;
+        }
+
+        static string BuildHdrCapturePairKey(string file)
+        {
+            if (string.IsNullOrWhiteSpace(file)) return string.Empty;
+            var extension = Path.GetExtension(file);
+            if (!string.Equals(extension, ".png", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(extension, ".jxr", StringComparison.OrdinalIgnoreCase))
+                return string.Empty;
+            var directory = Path.GetDirectoryName(file) ?? string.Empty;
+            var stem = Path.GetFileNameWithoutExtension(file) ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(stem)) return string.Empty;
+            return directory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + "|" + stem;
+        }
+
+        string ResolveHdrDuplicateTargetDirectory(
+            string file,
+            string duplicateRoot,
+            string libraryRoot,
+            IReadOnlyList<GameIndexEditorRow> indexRows,
+            IReadOnlyDictionary<string, int> titleCounts,
+            Func<string, string> getSafeName,
+            Func<string, string> getGameName,
+            Func<string, string, string> normalizeGameIndexNameWithFolder,
+            Func<string, string> normalizeConsole)
+        {
+            GameIndexEditorRow resolved = null;
+            if (indexRows != null
+                && indexRows.Count > 0
+                && d.ParseFilenameForImport != null
+                && d.BuildGameIndexIdentity != null
+                && d.NormalizeConsoleLabel != null
+                && d.CleanTag != null)
+            {
+                var parse = d.ParseFilenameForImport(file) ?? new FilenameParseResult();
+                resolved = LibraryPlacementService.TryResolveGameIndexRowForImportSort(
+                    parse,
+                    indexRows,
+                    d.NormalizeConsoleLabel,
+                    d.CleanTag,
+                    d.BuildGameIndexIdentity);
+            }
+
+            var plan = LibraryPlacementService.PlanImportRootSort(
+                file,
+                duplicateRoot,
+                resolved,
+                indexRows,
+                getSafeName,
+                getGameName,
+                normalizeGameIndexNameWithFolder,
+                normalizeConsole,
+                titleCounts);
+            return string.IsNullOrWhiteSpace(plan.TargetDirectory) ? duplicateRoot : plan.TargetDirectory;
+        }
+
+        internal static string BuildHdrDuplicateRoot(string destinationRoot)
+        {
+            var dest = string.IsNullOrWhiteSpace(destinationRoot) ? string.Empty : destinationRoot.Trim();
+            if (string.IsNullOrWhiteSpace(dest)) return HdrDuplicatesFolderName;
+            try
+            {
+                var full = Path.GetFullPath(dest.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+                var root = Path.GetPathRoot(full);
+                if (!string.IsNullOrWhiteSpace(root)
+                    && string.Equals(full.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar), root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar), StringComparison.OrdinalIgnoreCase))
+                    return Path.Combine(full, HdrDuplicatesFolderName);
+                var parent = Path.GetDirectoryName(full);
+                if (!string.IsNullOrWhiteSpace(parent)) return Path.Combine(parent, HdrDuplicatesFolderName);
+            }
+            catch
+            {
+            }
+            return Path.Combine(dest, HdrDuplicatesFolderName);
+        }
+
+        static string SanitizeHdrFallbackFolderName(string value)
+        {
+            var cleaned = string.IsNullOrWhiteSpace(value) ? "Source" : value.Trim();
+            foreach (var c in Path.GetInvalidFileNameChars())
+                cleaned = cleaned.Replace(c, '-');
+            cleaned = Regex.Replace(cleaned, "\\s+", " ").Trim();
+            return string.IsNullOrWhiteSpace(cleaned) ? "Source" : cleaned;
+        }
+
+        internal static bool IsHdrFallbackPath(string file)
+        {
+            if (string.IsNullOrWhiteSpace(file)) return false;
+            return file.IndexOf(HdrDuplicatesFolderName, StringComparison.OrdinalIgnoreCase) >= 0
+                || file.IndexOf(LegacyHdrFallbackFolderName, StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         public ImportWorkflowStandardWorkTotals ComputeStandardImportWorkTotals(SourceInventory renameInventory, IReadOnlyList<ReviewItem> reviewItems, SourceInventory inventory, HashSet<string> manualPaths) =>
@@ -477,6 +716,7 @@ namespace PixelVaultNative
             int deleted = 0, skipped = 0;
             var paths = (filePaths ?? Enumerable.Empty<string>()).Where(p => !string.IsNullOrWhiteSpace(p)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
             var total = paths.Count;
+            using var detailLogLines = CreateImportDetailLogBatch();
             if (progress != null) progress(0, total, "Starting delete step for " + total + " file(s).");
             for (int i = 0; i < total; i++)
             {
@@ -492,9 +732,10 @@ namespace PixelVaultNative
                 fs.DeleteFile(path);
                 deleted++;
                 var name = Path.GetFileName(path);
-                d.LogService.AppendMainLine("Deleted before processing: " + name);
+                detailLogLines.Add("Deleted before processing: " + name);
                 if (progress != null) progress(i + 1, total, "Deleted " + (i + 1) + " of " + total + " | " + remaining + " remaining | " + name);
             }
+            detailLogLines.Flush();
             if (progress != null) progress(total, total, "Delete step complete: deleted " + deleted + ", skipped " + skipped + ".");
             if (deleted > 0 || skipped > 0) d.LogService.AppendMainLine("Delete summary: deleted " + deleted + ", skipped " + skipped + ".");
             return new DeleteStepResult { Deleted = deleted, Skipped = skipped };
@@ -521,6 +762,7 @@ namespace PixelVaultNative
             var files = (sourceFiles ?? Enumerable.Empty<string>()).Where(fs.FileExists).ToList();
             var total = files.Count;
             Dictionary<string, string> nonSteamIdToDisplayName = null;
+            using var detailLogLines = CreateImportDetailLogBatch();
             if (progress != null) progress(0, total, "Starting rename step for " + total + " file(s).");
             for (int i = 0; i < total; i++)
             {
@@ -622,9 +864,10 @@ namespace PixelVaultNative
                 pathMap[file] = target;
                 d.MoveMetadataSidecarIfPresent?.Invoke(file, target);
                 renamed++;
-                d.LogService.AppendMainLine("Renamed: " + Path.GetFileName(file) + " -> " + Path.GetFileName(target));
+                detailLogLines.Add("Renamed: " + Path.GetFileName(file) + " -> " + Path.GetFileName(target));
                 if (progress != null) progress(i + 1, total, "Renamed " + (i + 1) + " of " + total + " | " + remaining + " remaining | " + Path.GetFileName(target));
             }
+            detailLogLines.Flush();
             if (progress != null) progress(total, total, "Rename step complete: renamed " + renamed + ", skipped " + skipped + ".");
             d.LogService.AppendMainLine("Rename summary: renamed " + renamed + ", skipped " + skipped + ".");
             return new RenameStepResult { Renamed = renamed, Skipped = skipped, OldPathToNewPath = pathMap };
@@ -649,6 +892,7 @@ namespace PixelVaultNative
 
             int renamed = 0, skipped = 0;
             var total = items == null ? 0 : items.Count;
+            using var detailLogLines = CreateImportDetailLogBatch();
             if (progress != null) progress(0, total, "Starting rename step for " + total + " image(s).");
             for (int i = 0; i < total; i++)
             {
@@ -685,7 +929,7 @@ namespace PixelVaultNative
                     var originalPathShortcut = item.FilePath;
                     fs.MoveFile(item.FilePath, shortcutTarget);
                     d.MoveMetadataSidecarIfPresent?.Invoke(originalPathShortcut, shortcutTarget);
-                    d.LogService.AppendMainLine("Manual rename (non-Steam ID): " + oldName + " -> " + Path.GetFileName(shortcutTarget));
+                    detailLogLines.Add("Manual rename (non-Steam ID): " + oldName + " -> " + Path.GetFileName(shortcutTarget));
                     item.FilePath = shortcutTarget;
                     item.FileName = Path.GetFileName(shortcutTarget);
                     renamed++;
@@ -704,12 +948,13 @@ namespace PixelVaultNative
                 var originalPath = item.FilePath;
                 fs.MoveFile(item.FilePath, target);
                 d.MoveMetadataSidecarIfPresent?.Invoke(originalPath, target);
-                d.LogService.AppendMainLine("Manual rename: " + oldName + " -> " + Path.GetFileName(target));
+                detailLogLines.Add("Manual rename: " + oldName + " -> " + Path.GetFileName(target));
                 item.FilePath = target;
                 item.FileName = Path.GetFileName(target);
                 renamed++;
                 if (progress != null) progress(i + 1, total, "Renamed " + (i + 1) + " of " + total + " | " + remaining + " remaining | " + item.FileName);
             }
+            detailLogLines.Flush();
             if (progress != null) progress(total, total, "Rename step complete: renamed " + renamed + ", skipped " + skipped + ".");
             if (renamed > 0 || skipped > 0) d.LogService.AppendMainLine("Manual rename summary: renamed " + renamed + ", skipped " + skipped + ".");
             return new RenameStepResult { Renamed = renamed, Skipped = skipped };
@@ -722,6 +967,7 @@ namespace PixelVaultNative
             var requests = new List<ExifWriteRequest>();
             var items = (reviewItems ?? Enumerable.Empty<ReviewItem>()).Where(i => i != null).ToList();
             var total = items.Count;
+            using var detailLogLines = CreateImportDetailLogBatch();
             if (progress != null) progress(0, total, "Starting metadata step for " + total + " file(s).");
             for (int i = 0; i < total; i++)
             {
@@ -743,6 +989,8 @@ namespace PixelVaultNative
                 }
                 var selectedPlatformTags = new List<string>();
                 if (item.TagSteam) selectedPlatformTags.Add("Steam");
+                if (item.TagPc) selectedPlatformTags.Add("PC");
+                if (item.TagEmulation) selectedPlatformTags.Add("Emulation");
                 if (item.TagPs5)
                 {
                     selectedPlatformTags.Add("PS5");
@@ -764,7 +1012,7 @@ namespace PixelVaultNative
                 if (!string.IsNullOrWhiteSpace(item.Comment)) notes.Add("comment added");
                 if (item.AddPhotographyTag) notes.Add(photoTag + " tag added");
                 var noteSuffix = notes.Count > 0 ? " [" + string.Join(", ", notes.ToArray()) + "]" : string.Empty;
-                d.LogService.AppendMainLine("Updating metadata: " + item.FileName + " -> " + metadataTarget + (platformTags.Length > 0 ? " [" + string.Join(", ", platformTags) + "]" : " [no platform tag]") + noteSuffix);
+                detailLogLines.Add("Updating metadata: " + item.FileName + " -> " + metadataTarget + (platformTags.Length > 0 ? " [" + string.Join(", ", platformTags) + "]" : " [no platform tag]") + noteSuffix);
                 var originalCreate = DateTime.MinValue;
                 var originalWrite = DateTime.MinValue;
                 if (item.PreserveFileTimes)
@@ -783,6 +1031,7 @@ namespace PixelVaultNative
                     SuccessDetail = item.FileName
                 });
             }
+            detailLogLines.Flush();
             var batch = d.MetadataService.RunExifWriteRequests(requests, requests.Count + skipped, skipped, progress, cancellationToken);
             updated = batch.SuccessCount;
             var relocated = 0;

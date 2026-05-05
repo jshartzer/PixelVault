@@ -10,7 +10,7 @@
 
 **Topic mnemonic:** `RVW` — **R**e**v**ie**w** (codified follow-up from the dated app review).
 
-**Location:** Canonical **completed** copy under [`docs/completed-projects/`](.) (this file). Redirect stubs: [`docs/plans/PV-PLN-RVW-001-post-app-review-hardening.md`](../plans/PV-PLN-RVW-001-post-app-review-hardening.md), [`docs/plans/open/PV-PLN-RVW-001-post-app-review-hardening.md`](../plans/open/PV-PLN-RVW-001-post-app-review-hardening.md). Plan index: [`docs/plans/README.md`](../plans/README.md).
+**Location:** Canonical **completed** copy under [`docs/completed-projects/`](.) (this file). Short redirect: [`docs/plans/PV-PLN-RVW-001-post-app-review-hardening.md`](../plans/PV-PLN-RVW-001-post-app-review-hardening.md). Retired duplicate `open/` stub: [`docs/archive/PV-PLN-RVW-001-open-folder-stub-superseded.md`](../archive/PV-PLN-RVW-001-open-folder-stub-superseded.md). Plan index: [`docs/plans/README.md`](../plans/README.md).
 
 ---
 

@@ -65,7 +65,7 @@ namespace PixelVaultNative
 
         public string GetSafeGameFolderName(string? name)
         {
-            var n = NormalizeGameFolderCapitalization(name ?? string.Empty);
+            var n = NormalizeGameFolderCapitalization(TextAndPathHelpers.StripTitleLegalMarks(name));
             n = Regex.Replace(n, "[<>:\"/\\\\|?*\\x00-\\x1F]", string.Empty);
             n = n.Trim().TrimEnd('.');
             n = Regex.Replace(n, "\\s{2,}", " ").Trim();

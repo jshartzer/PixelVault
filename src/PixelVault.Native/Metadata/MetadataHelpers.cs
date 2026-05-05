@@ -254,6 +254,45 @@ namespace PixelVaultNative
                 .ToArray();
         }
 
+        internal static bool TryResolveConsolePlatformFromEmbeddedMetadata(EmbeddedMetadataSnapshot snapshot, out string platformLabel, out string[] platformTags)
+        {
+            platformLabel = string.Empty;
+            platformTags = new string[0];
+            if (snapshot == null) return false;
+            var make = CleanTag(snapshot.CameraMake ?? string.Empty);
+            var model = CleanTag(snapshot.CameraModel ?? string.Empty);
+            if (make.IndexOf("Nintendo", StringComparison.OrdinalIgnoreCase) >= 0
+                || model.IndexOf("Nintendo", StringComparison.OrdinalIgnoreCase) >= 0
+                || model.IndexOf("Switch", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                platformLabel = "Switch";
+                platformTags = new[] { "Switch", "Nintendo" };
+                return true;
+            }
+            return false;
+        }
+
+        internal static string[] MergePlatformTagsWithEmbeddedMetadataPlatformHints(IEnumerable<string> tags, EmbeddedMetadataSnapshot snapshot)
+        {
+            var tagArray = (tags ?? Enumerable.Empty<string>())
+                .Where(tag => !string.IsNullOrWhiteSpace(tag))
+                .Select(CleanTag)
+                .Where(tag => !string.IsNullOrWhiteSpace(tag))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            var label = NormalizeConsoleLabel(DetermineConsoleLabelFromTags(tagArray));
+            if (ConsoleLabelBlocksFilenameFallback(label)) return tagArray;
+            string embeddedLabel;
+            string[] embeddedTags;
+            if (!TryResolveConsolePlatformFromEmbeddedMetadata(snapshot, out embeddedLabel, out embeddedTags)) return tagArray;
+            return tagArray
+                .Concat(embeddedTags ?? new string[0])
+                .Select(CleanTag)
+                .Where(tag => !string.IsNullOrWhiteSpace(tag))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+        }
+
         internal static void ApplyFilenameParseResultToManualPlatformFlags(
             FilenameParseResult parsed,
             out bool tagSteam,

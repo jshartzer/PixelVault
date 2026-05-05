@@ -113,17 +113,22 @@ public sealed class PhotoIndexSaveRehomeIntegrationTests
         readonly IFileSystemService _fs;
         Dictionary<string, LibraryMetadataIndexEntry> _index;
         List<GameIndexEditorRow> _gameRows;
+        List<LibraryFolderInfo> _folderCache;
+        bool _hasFolderCacheSnapshot;
         readonly object _sync = new object();
         readonly ReaderWriterLockSlim _rw = new ReaderWriterLockSlim();
 
         public PhotoSaveTestHost(
             IFileSystemService fs,
             Dictionary<string, LibraryMetadataIndexEntry> initialIndex,
-            List<GameIndexEditorRow> initialRows)
+            List<GameIndexEditorRow> initialRows,
+            List<LibraryFolderInfo>? initialFolderCache = null)
         {
             _fs = fs;
             _index = new Dictionary<string, LibraryMetadataIndexEntry>(initialIndex, StringComparer.OrdinalIgnoreCase);
             _gameRows = initialRows.Select(r => CloneRow(r)!).ToList();
+            _folderCache = CloneFolderCache(initialFolderCache);
+            _hasFolderCacheSnapshot = initialFolderCache != null;
         }
 
         static GameIndexEditorRow? CloneRow(GameIndexEditorRow? r)
@@ -147,8 +152,43 @@ public sealed class PhotoIndexSaveRehomeIntegrationTests
             };
         }
 
+        static LibraryFolderInfo? CloneFolder(LibraryFolderInfo? folder)
+        {
+            if (folder == null) return null;
+            return new LibraryFolderInfo
+            {
+                GameId = folder.GameId ?? string.Empty,
+                Name = folder.Name ?? string.Empty,
+                FolderPath = folder.FolderPath ?? string.Empty,
+                FileCount = folder.FileCount,
+                PreviewImagePath = folder.PreviewImagePath ?? string.Empty,
+                PlatformLabel = folder.PlatformLabel ?? string.Empty,
+                FilePaths = folder.FilePaths == null ? Array.Empty<string>() : (string[])folder.FilePaths.Clone(),
+                NewestCaptureUtcTicks = folder.NewestCaptureUtcTicks,
+                NewestRecentSortUtcTicks = folder.NewestRecentSortUtcTicks,
+                SteamAppId = folder.SteamAppId ?? string.Empty,
+                NonSteamId = folder.NonSteamId ?? string.Empty,
+                SteamGridDbId = folder.SteamGridDbId ?? string.Empty,
+                RetroAchievementsGameId = folder.RetroAchievementsGameId ?? string.Empty,
+                SuppressSteamAppIdAutoResolve = folder.SuppressSteamAppIdAutoResolve,
+                SuppressSteamGridDbIdAutoResolve = folder.SuppressSteamGridDbIdAutoResolve,
+                IsCompleted100Percent = folder.IsCompleted100Percent,
+                CompletedUtcTicks = folder.CompletedUtcTicks,
+                IsFavorite = folder.IsFavorite,
+                IsShowcase = folder.IsShowcase,
+                CollectionNotes = folder.CollectionNotes ?? string.Empty,
+                PendingGameAssignment = folder.PendingGameAssignment,
+                StorageGroupId = folder.StorageGroupId ?? string.Empty
+            };
+        }
+
+        static List<LibraryFolderInfo> CloneFolderCache(IEnumerable<LibraryFolderInfo>? folders) =>
+            (folders ?? Array.Empty<LibraryFolderInfo>()).Where(folder => folder != null).Select(folder => CloneFolder(folder)!).ToList();
+
         public object LibraryMaintenanceSync => _sync;
         public ReaderWriterLockSlim LibraryFolderCacheRwLock => _rw;
+        public List<string>? IndexOnlyRefreshFiles { get; set; }
+        public int IndexOnlyRefreshCalls { get; private set; }
 
         public void EnsureLibraryRootExists(string root) => _fs.CreateDirectory(root);
         public void EnsureExifTool() { }
@@ -176,7 +216,43 @@ public sealed class PhotoIndexSaveRehomeIntegrationTests
         public LibraryMetadataIndexEntry BuildResolvedLibraryMetadataIndexEntry(
             string root, string file, string stamp, EmbeddedMetadataSnapshot snapshot, LibraryMetadataIndexEntry existingEntry,
             Dictionary<string, LibraryMetadataIndexEntry> index, List<GameIndexEditorRow> gameRows) =>
-            throw new NotSupportedException();
+            BuildResolvedEntryForTest(file, stamp, existingEntry, gameRows);
+
+        static LibraryMetadataIndexEntry BuildResolvedEntryForTest(
+            string file,
+            string stamp,
+            LibraryMetadataIndexEntry? existingEntry,
+            List<GameIndexEditorRow> gameRows)
+        {
+            var fileDirectory = Path.GetDirectoryName(file) ?? string.Empty;
+            var folderLeaf = Path.GetFileName(fileDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+            var matched = (gameRows ?? new List<GameIndexEditorRow>())
+                .FirstOrDefault(row => row != null
+                    && (LibraryPlacementService.PathsEqualNormalized(row.FolderPath, fileDirectory)
+                        || string.Equals(row.Name ?? string.Empty, folderLeaf, StringComparison.OrdinalIgnoreCase)));
+            var existingGameId = existingEntry == null ? string.Empty : Nid(existingEntry.GameId);
+            var existingGameIdIsValid = !string.IsNullOrWhiteSpace(existingGameId)
+                && (gameRows ?? new List<GameIndexEditorRow>())
+                    .Any(row => row != null && string.Equals(Nid(row.GameId), existingGameId, StringComparison.OrdinalIgnoreCase));
+            var gameId = existingGameIdIsValid ? existingGameId : string.Empty;
+            if (string.IsNullOrWhiteSpace(gameId) && matched != null) gameId = Nid(matched.GameId);
+            if (string.IsNullOrWhiteSpace(gameId)) gameId = "G00001";
+            var console = existingEntry == null ? string.Empty : Plat(existingEntry.ConsoleLabel);
+            if (string.IsNullOrWhiteSpace(console) && matched != null) console = Plat(matched.PlatformLabel);
+            if (string.IsNullOrWhiteSpace(console)) console = "Steam";
+            return new LibraryMetadataIndexEntry
+            {
+                FilePath = file,
+                Stamp = stamp ?? string.Empty,
+                GameId = gameId,
+                ConsoleLabel = console,
+                TagText = console,
+                CaptureUtcTicks = existingEntry != null && existingEntry.CaptureUtcTicks > 0 ? existingEntry.CaptureUtcTicks : DateTime.UtcNow.Ticks,
+                Starred = existingEntry != null && existingEntry.Starred,
+                IndexAddedUtcTicks = existingEntry != null && existingEntry.IndexAddedUtcTicks > 0 ? existingEntry.IndexAddedUtcTicks : DateTime.UtcNow.Ticks,
+                RetroAchievementsGameId = existingEntry == null ? string.Empty : (existingEntry.RetroAchievementsGameId ?? string.Empty)
+            };
+        }
 
         public bool IndexEntryShouldReResolveForNonSteamShortcutMislabel(string root, string file, LibraryMetadataIndexEntry entry) => false;
 
@@ -191,19 +267,38 @@ public sealed class PhotoIndexSaveRehomeIntegrationTests
 
         public int GetLibraryScanWorkerCount(int batchCount, string pathHint) => 1;
         public void LogLibraryScan(string message) { }
-        public void ClearLibraryFolderCache(string root) { }
+        public void ClearLibraryFolderCache(string root)
+        {
+            _folderCache = new List<LibraryFolderInfo>();
+            _hasFolderCacheSnapshot = false;
+        }
         public string BuildLibraryFolderInventoryStamp(string root) => "test";
         public string BuildLibraryFolderStructuralStamp(string root) => "test";
         public string GetLibraryMetadataIndexRevision(string root) => "0";
         public bool TryGetIndexOnlyFolderCacheRefresh(string root, string currentFullStamp, out List<string> mediaFilePathsOneLevelUnderRoot)
         {
-            mediaFilePathsOneLevelUnderRoot = new List<string>();
-            return false;
+            IndexOnlyRefreshCalls++;
+            if (IndexOnlyRefreshFiles == null)
+            {
+                mediaFilePathsOneLevelUnderRoot = new List<string>();
+                return false;
+            }
+
+            mediaFilePathsOneLevelUnderRoot = IndexOnlyRefreshFiles.ToList();
+            return true;
         }
 
-        public List<LibraryFolderInfo> LoadLibraryFolderCache(string root, string stamp) => new List<LibraryFolderInfo>();
+        public List<LibraryFolderInfo> LoadLibraryFolderCache(string root, string stamp) =>
+            _hasFolderCacheSnapshot ? CloneFolderCache(_folderCache) : null!;
 
-        public void SaveLibraryFolderCache(string root, string stamp, List<LibraryFolderInfo> folders) { }
+        public List<LibraryFolderInfo> LoadLibraryFolderCacheSnapshot(string root, bool allowStaleMetadataRevision = false) =>
+            _hasFolderCacheSnapshot ? CloneFolderCache(_folderCache) : null!;
+
+        public void SaveLibraryFolderCache(string root, string stamp, List<LibraryFolderInfo> folders)
+        {
+            _folderCache = CloneFolderCache(folders);
+            _hasFolderCacheSnapshot = true;
+        }
 
         public bool ApplySavedGameIndexRows(string root, List<LibraryFolderInfo> folders) => false;
 
@@ -319,6 +414,53 @@ public sealed class PhotoIndexSaveRehomeIntegrationTests
 
         public Task<Dictionary<string, EmbeddedMetadataSnapshot>> ReadEmbeddedMetadataBatchAsync(IEnumerable<string> files, CancellationToken cancellationToken = default) =>
             Task.FromResult(new Dictionary<string, EmbeddedMetadataSnapshot>(StringComparer.OrdinalIgnoreCase));
+
+        public int? ReadEmbeddedRatingDirect(string file, CancellationToken cancellationToken = default) => null;
+        public string[] BuildStarRatingExifArgs(string file, bool starred) => Array.Empty<string>();
+        public void EnsureExifTool() { }
+        public void RunExifToolBatch(IReadOnlyList<ExifWriteRequest> requests) { }
+
+        public ExifWriteBatchResult RunExifWriteRequests(List<ExifWriteRequest> requests, int totalCount, int alreadyCompleted, Action<int, int, string>? progress = null, CancellationToken cancellationToken = default) =>
+            new ExifWriteBatchResult();
+    }
+
+    sealed class BlockingMetadataRepairService : IMetadataService
+    {
+        readonly ManualResetEventSlim _release = new ManualResetEventSlim(false);
+        public readonly ManualResetEventSlim Started = new ManualResetEventSlim(false);
+
+        public void Release() => _release.Set();
+
+        public string[] BuildExifArgs(string file, DateTime dt, string[] platformTags, bool preserveFileTimes, string comment, bool addPhotographyTag) =>
+            Array.Empty<string>();
+
+        public string[] BuildExifArgs(string file, DateTime dt, string[] platformTags, IEnumerable<string> extraTags, bool preserveFileTimes, string comment, bool addPhotographyTag) =>
+            Array.Empty<string>();
+
+        public string[] BuildExifArgs(string file, DateTime dt, string[] platformTags, IEnumerable<string> extraTags, bool preserveFileTimes, string comment, bool addPhotographyTag, bool writeDateMetadata, bool writeCommentMetadata, bool writeTagMetadata) =>
+            Array.Empty<string>();
+
+        public string[] ReadEmbeddedKeywordTagsDirect(string file, CancellationToken cancellationToken = default) => Array.Empty<string>();
+        public string ReadEmbeddedCommentDirect(string file, CancellationToken cancellationToken = default) => string.Empty;
+        public DateTime? ReadEmbeddedCaptureDateDirect(string file, CancellationToken cancellationToken = default) => null;
+        public Dictionary<string, string[]> ReadEmbeddedKeywordTagsBatch(IEnumerable<string> files, CancellationToken cancellationToken = default) => new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
+
+        public Dictionary<string, EmbeddedMetadataSnapshot> ReadEmbeddedMetadataBatch(IEnumerable<string> files, CancellationToken cancellationToken = default)
+        {
+            var list = (files ?? Array.Empty<string>()).Where(file => !string.IsNullOrWhiteSpace(file)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            Started.Set();
+            Assert.True(_release.Wait(TimeSpan.FromSeconds(5)), "Timed out waiting for test to release background metadata repair.");
+            return list.ToDictionary(
+                file => file,
+                _ => new EmbeddedMetadataSnapshot { CaptureTime = DateTime.UtcNow },
+                StringComparer.OrdinalIgnoreCase);
+        }
+
+        public Task<Dictionary<string, string[]>> ReadEmbeddedKeywordTagsBatchAsync(IEnumerable<string> files, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase));
+
+        public Task<Dictionary<string, EmbeddedMetadataSnapshot>> ReadEmbeddedMetadataBatchAsync(IEnumerable<string> files, CancellationToken cancellationToken = default) =>
+            Task.FromResult(ReadEmbeddedMetadataBatch(files, cancellationToken));
 
         public int? ReadEmbeddedRatingDirect(string file, CancellationToken cancellationToken = default) => null;
         public string[] BuildStarRatingExifArgs(string file, bool starred) => Array.Empty<string>();
@@ -463,6 +605,929 @@ public sealed class PhotoIndexSaveRehomeIntegrationTests
             var folder = Assert.Single(folders, x => string.Equals(x.GameId, "G00001", StringComparison.OrdinalIgnoreCase));
             Assert.Equal(1, folder.FileCount);
             Assert.Contains(filePath, folder.FilePaths);
+        }
+        finally
+        {
+            try
+            {
+                if (Directory.Exists(lib)) Directory.Delete(lib, true);
+            }
+            catch
+            {
+                /* best-effort */
+            }
+        }
+    }
+
+    [Fact]
+    public void LoadLibraryFolders_ExcludesHdrFallbackParkingFolder()
+    {
+        var lib = Path.Combine(Path.GetTempPath(), "pv-hdrfallback-library-" + Guid.NewGuid().ToString("N"));
+        var gameLeaf = Path.Combine(lib, "Portal");
+        var fallbackLeaf = Path.Combine(lib, "HDR Duplicates", "Portal");
+        Directory.CreateDirectory(gameLeaf);
+        Directory.CreateDirectory(fallbackLeaf);
+        var libraryFile = Path.Combine(gameLeaf, "shot.png");
+        var fallbackFile = Path.Combine(fallbackLeaf, "shot.png");
+        File.WriteAllBytes(libraryFile, new byte[] { 137, 80 });
+        File.WriteAllBytes(fallbackFile, new byte[] { 137, 80 });
+        var rows = new List<GameIndexEditorRow>
+        {
+            new()
+            {
+                GameId = "G00001",
+                Name = "Portal",
+                PlatformLabel = "Steam",
+                StorageGroupId = string.Empty,
+                FolderPath = gameLeaf,
+                FilePaths = Array.Empty<string>()
+            }
+        };
+        var index = new Dictionary<string, LibraryMetadataIndexEntry>(StringComparer.OrdinalIgnoreCase)
+        {
+            [libraryFile] = new LibraryMetadataIndexEntry
+            {
+                FilePath = libraryFile,
+                Stamp = "1",
+                GameId = "G00001",
+                ConsoleLabel = "Steam",
+                TagText = "Steam",
+                CaptureUtcTicks = 100,
+                Starred = false,
+                IndexAddedUtcTicks = DateTime.UtcNow.Ticks,
+                RetroAchievementsGameId = string.Empty
+            },
+            [fallbackFile] = new LibraryMetadataIndexEntry
+            {
+                FilePath = fallbackFile,
+                Stamp = "1",
+                GameId = "G00001",
+                ConsoleLabel = "Steam",
+                TagText = "Steam",
+                CaptureUtcTicks = 200,
+                Starred = false,
+                IndexAddedUtcTicks = DateTime.UtcNow.Ticks,
+                RetroAchievementsGameId = string.Empty
+            }
+        };
+        var fs = new FileSystemService();
+        var host = new PhotoSaveTestHost(fs, index, rows);
+        var scanner = new LibraryScanner(host, new NoOpMetadataService(), fs,
+            folderCacheRebuildHook: (_, _) => { });
+        try
+        {
+            var folders = scanner.LoadLibraryFolders(lib, host.LoadLibraryMetadataIndex(lib, true));
+            var folder = Assert.Single(folders, x => string.Equals(x.GameId, "G00001", StringComparison.OrdinalIgnoreCase));
+            Assert.Equal(1, folder.FileCount);
+            Assert.Contains(libraryFile, folder.FilePaths);
+            Assert.DoesNotContain(fallbackFile, folder.FilePaths);
+        }
+        finally
+        {
+            try
+            {
+                if (Directory.Exists(lib)) Directory.Delete(lib, true);
+            }
+            catch
+            {
+                /* best-effort */
+            }
+        }
+    }
+
+    [Fact]
+    public void TryUpdateLibraryFolderCacheForTouchedPaths_UpdatesOnlyTouchedGameRows()
+    {
+        var lib = Path.Combine(Path.GetTempPath(), "pv-incremental-folder-cache-" + Guid.NewGuid().ToString("N"));
+        var hadesDir = Path.Combine(lib, "Hades");
+        var portalDir = Path.Combine(lib, "Portal");
+        Directory.CreateDirectory(hadesDir);
+        Directory.CreateDirectory(portalDir);
+        var hadesOld = Path.Combine(hadesDir, "old.png");
+        var hadesNew = Path.Combine(hadesDir, "new.png");
+        var portalFile = Path.Combine(portalDir, "portal.png");
+        File.WriteAllBytes(hadesOld, new byte[] { 137, 80 });
+        File.WriteAllBytes(hadesNew, new byte[] { 137, 80 });
+        File.WriteAllBytes(portalFile, new byte[] { 137, 80 });
+
+        var rows = new List<GameIndexEditorRow>
+        {
+            new()
+            {
+                GameId = "G00001",
+                Name = "Hades",
+                PlatformLabel = "Steam",
+                StorageGroupId = string.Empty,
+                FolderPath = hadesDir,
+                FilePaths = new[] { hadesOld }
+            },
+            new()
+            {
+                GameId = "G00002",
+                Name = "Portal",
+                PlatformLabel = "Steam",
+                StorageGroupId = string.Empty,
+                FolderPath = portalDir,
+                FilePaths = new[] { portalFile }
+            }
+        };
+
+        var ticks = DateTime.UtcNow.Ticks;
+        var index = new Dictionary<string, LibraryMetadataIndexEntry>(StringComparer.OrdinalIgnoreCase)
+        {
+            [hadesOld] = new LibraryMetadataIndexEntry
+            {
+                FilePath = hadesOld,
+                Stamp = "1",
+                GameId = "G00001",
+                ConsoleLabel = "Steam",
+                TagText = "Steam",
+                CaptureUtcTicks = ticks - 20,
+                Starred = false,
+                IndexAddedUtcTicks = ticks - 20,
+                RetroAchievementsGameId = string.Empty
+            },
+            [hadesNew] = new LibraryMetadataIndexEntry
+            {
+                FilePath = hadesNew,
+                Stamp = "2",
+                GameId = "G00001",
+                ConsoleLabel = "Steam",
+                TagText = "Steam",
+                CaptureUtcTicks = ticks,
+                Starred = false,
+                IndexAddedUtcTicks = ticks,
+                RetroAchievementsGameId = string.Empty
+            },
+            [portalFile] = new LibraryMetadataIndexEntry
+            {
+                FilePath = portalFile,
+                Stamp = "3",
+                GameId = "G00002",
+                ConsoleLabel = "Steam",
+                TagText = "Steam",
+                CaptureUtcTicks = ticks - 10,
+                Starred = false,
+                IndexAddedUtcTicks = ticks - 10,
+                RetroAchievementsGameId = string.Empty
+            }
+        };
+
+        var initialCache = new List<LibraryFolderInfo>
+        {
+            new()
+            {
+                GameId = "G00001",
+                Name = "Hades",
+                FolderPath = hadesDir,
+                FileCount = 1,
+                PreviewImagePath = hadesOld,
+                PlatformLabel = "Steam",
+                FilePaths = new[] { hadesOld },
+                NewestCaptureUtcTicks = ticks - 20,
+                NewestRecentSortUtcTicks = ticks - 20
+            },
+            new()
+            {
+                GameId = "G00002",
+                Name = "Portal",
+                FolderPath = portalDir,
+                FileCount = 1,
+                PreviewImagePath = portalFile,
+                PlatformLabel = "Steam",
+                FilePaths = new[] { portalFile },
+                NewestCaptureUtcTicks = ticks - 10,
+                NewestRecentSortUtcTicks = ticks - 10
+            }
+        };
+
+        var fs = new FileSystemService();
+        var host = new PhotoSaveTestHost(fs, index, rows, initialCache);
+        var fullRebuildCalled = false;
+        var scanner = new LibraryScanner(host, new NoOpMetadataService(), fs,
+            folderCacheRebuildHook: (_, _) => fullRebuildCalled = true);
+
+        try
+        {
+            var updated = scanner.TryUpdateLibraryFolderCacheForTouchedPaths(lib, new[] { hadesNew });
+
+            Assert.True(updated);
+            Assert.False(fullRebuildCalled);
+            var cache = host.LoadLibraryFolderCacheSnapshot(lib);
+            var hades = Assert.Single(cache, folder => string.Equals(folder.GameId, "G00001", StringComparison.OrdinalIgnoreCase));
+            Assert.Equal(2, hades.FileCount);
+            Assert.Contains(hadesOld, hades.FilePaths);
+            Assert.Contains(hadesNew, hades.FilePaths);
+            var portal = Assert.Single(cache, folder => string.Equals(folder.GameId, "G00002", StringComparison.OrdinalIgnoreCase));
+            Assert.Equal(1, portal.FileCount);
+            Assert.Equal(new[] { portalFile }, portal.FilePaths);
+        }
+        finally
+        {
+            try
+            {
+                if (Directory.Exists(lib)) Directory.Delete(lib, true);
+            }
+            catch
+            {
+                /* best-effort */
+            }
+        }
+    }
+
+    [Fact]
+    public void UpsertLibraryMetadataIndexEntries_UsesTouchedFolderCacheUpdate_WhenCacheExists()
+    {
+        var lib = Path.Combine(Path.GetTempPath(), "pv-upsert-incremental-cache-" + Guid.NewGuid().ToString("N"));
+        var hadesDir = Path.Combine(lib, "Hades");
+        var portalDir = Path.Combine(lib, "Portal");
+        Directory.CreateDirectory(hadesDir);
+        Directory.CreateDirectory(portalDir);
+        var hadesOld = Path.Combine(hadesDir, "old.png");
+        var hadesNew = Path.Combine(hadesDir, "new.png");
+        var portalFile = Path.Combine(portalDir, "portal.png");
+        File.WriteAllBytes(hadesOld, new byte[] { 137, 80 });
+        File.WriteAllBytes(hadesNew, new byte[] { 137, 80 });
+        File.WriteAllBytes(portalFile, new byte[] { 137, 80 });
+
+        var rows = new List<GameIndexEditorRow>
+        {
+            new()
+            {
+                GameId = "G00001",
+                Name = "Hades",
+                PlatformLabel = "Steam",
+                StorageGroupId = string.Empty,
+                FolderPath = hadesDir,
+                FilePaths = new[] { hadesOld }
+            },
+            new()
+            {
+                GameId = "G00002",
+                Name = "Portal",
+                PlatformLabel = "Steam",
+                StorageGroupId = string.Empty,
+                FolderPath = portalDir,
+                FilePaths = new[] { portalFile }
+            }
+        };
+
+        var ticks = DateTime.UtcNow.Ticks;
+        var index = new Dictionary<string, LibraryMetadataIndexEntry>(StringComparer.OrdinalIgnoreCase)
+        {
+            [hadesOld] = new LibraryMetadataIndexEntry
+            {
+                FilePath = hadesOld,
+                Stamp = "1",
+                GameId = "G00001",
+                ConsoleLabel = "Steam",
+                TagText = "Steam",
+                CaptureUtcTicks = ticks - 20,
+                Starred = false,
+                IndexAddedUtcTicks = ticks - 20,
+                RetroAchievementsGameId = string.Empty
+            },
+            [portalFile] = new LibraryMetadataIndexEntry
+            {
+                FilePath = portalFile,
+                Stamp = "3",
+                GameId = "G00002",
+                ConsoleLabel = "Steam",
+                TagText = "Steam",
+                CaptureUtcTicks = ticks - 10,
+                Starred = false,
+                IndexAddedUtcTicks = ticks - 10,
+                RetroAchievementsGameId = string.Empty
+            }
+        };
+        var initialCache = new List<LibraryFolderInfo>
+        {
+            new()
+            {
+                GameId = "G00001",
+                Name = "Hades",
+                FolderPath = hadesDir,
+                FileCount = 1,
+                PreviewImagePath = hadesOld,
+                PlatformLabel = "Steam",
+                FilePaths = new[] { hadesOld },
+                NewestCaptureUtcTicks = ticks - 20,
+                NewestRecentSortUtcTicks = ticks - 20
+            },
+            new()
+            {
+                GameId = "G00002",
+                Name = "Portal",
+                FolderPath = portalDir,
+                FileCount = 1,
+                PreviewImagePath = portalFile,
+                PlatformLabel = "Steam",
+                FilePaths = new[] { portalFile },
+                NewestCaptureUtcTicks = ticks - 10,
+                NewestRecentSortUtcTicks = ticks - 10
+            }
+        };
+
+        var fs = new FileSystemService();
+        var host = new PhotoSaveTestHost(fs, index, rows, initialCache);
+        var fullRebuildCalled = false;
+        var scanner = new LibraryScanner(host, new NoOpMetadataService(), fs,
+            folderCacheRebuildHook: (_, _) => fullRebuildCalled = true);
+
+        try
+        {
+            scanner.UpsertLibraryMetadataIndexEntries(new[] { hadesNew }, lib);
+
+            Assert.False(fullRebuildCalled);
+            var cache = host.LoadLibraryFolderCacheSnapshot(lib);
+            var hades = Assert.Single(cache, folder => string.Equals(folder.GameId, "G00001", StringComparison.OrdinalIgnoreCase));
+            Assert.Equal(2, hades.FileCount);
+            Assert.Contains(hadesOld, hades.FilePaths);
+            Assert.Contains(hadesNew, hades.FilePaths);
+            var portal = Assert.Single(cache, folder => string.Equals(folder.GameId, "G00002", StringComparison.OrdinalIgnoreCase));
+            Assert.Equal(new[] { portalFile }, portal.FilePaths);
+        }
+        finally
+        {
+            try
+            {
+                if (Directory.Exists(lib)) Directory.Delete(lib, true);
+            }
+            catch
+            {
+                /* best-effort */
+            }
+        }
+    }
+
+    [Fact]
+    public void RefreshFolderCacheAfterGameIndexChange_UsesExplicitFullRebuild()
+    {
+        var lib = Path.Combine(Path.GetTempPath(), "pv-explicit-cache-rebuild-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(lib);
+        var fs = new FileSystemService();
+        var host = new PhotoSaveTestHost(
+            fs,
+            new Dictionary<string, LibraryMetadataIndexEntry>(StringComparer.OrdinalIgnoreCase),
+            new List<GameIndexEditorRow>());
+        var fullRebuildCalled = false;
+        var scanner = new LibraryScanner(host, new NoOpMetadataService(), fs,
+            folderCacheRebuildHook: (_, _) => fullRebuildCalled = true);
+
+        try
+        {
+            scanner.RefreshFolderCacheAfterGameIndexChange(lib);
+
+            Assert.True(fullRebuildCalled);
+        }
+        finally
+        {
+            try
+            {
+                if (Directory.Exists(lib)) Directory.Delete(lib, true);
+            }
+            catch
+            {
+                /* best-effort */
+            }
+        }
+    }
+
+    [Fact]
+    public void LoadLibraryFoldersCached_ForceRefreshIgnoresCachedSnapshot()
+    {
+        var lib = Path.Combine(Path.GetTempPath(), "pv-force-refresh-cache-" + Guid.NewGuid().ToString("N"));
+        var gameDir = Path.Combine(lib, "Portal");
+        Directory.CreateDirectory(gameDir);
+        var indexedFile = Path.Combine(gameDir, "fresh.png");
+        File.WriteAllBytes(indexedFile, new byte[] { 137, 80 });
+
+        var rows = new List<GameIndexEditorRow>
+        {
+            new()
+            {
+                GameId = "G00001",
+                Name = "Portal",
+                PlatformLabel = "Steam",
+                StorageGroupId = string.Empty,
+                FolderPath = gameDir,
+                FilePaths = new[] { indexedFile }
+            }
+        };
+        var ticks = DateTime.UtcNow.Ticks;
+        var index = new Dictionary<string, LibraryMetadataIndexEntry>(StringComparer.OrdinalIgnoreCase)
+        {
+            [indexedFile] = new LibraryMetadataIndexEntry
+            {
+                FilePath = indexedFile,
+                Stamp = "1",
+                GameId = "G00001",
+                ConsoleLabel = "Steam",
+                TagText = "Steam",
+                CaptureUtcTicks = ticks,
+                Starred = false,
+                IndexAddedUtcTicks = ticks,
+                RetroAchievementsGameId = string.Empty
+            }
+        };
+        var staleCache = new List<LibraryFolderInfo>
+        {
+            new()
+            {
+                GameId = "G99999",
+                Name = "Stale cached row",
+                FolderPath = Path.Combine(lib, "Stale"),
+                FileCount = 0,
+                PreviewImagePath = string.Empty,
+                PlatformLabel = "Steam",
+                FilePaths = Array.Empty<string>()
+            }
+        };
+
+        var fs = new FileSystemService();
+        var host = new PhotoSaveTestHost(fs, index, rows, staleCache);
+        var scanner = new LibraryScanner(host, new NoOpMetadataService(), fs);
+
+        try
+        {
+            var folders = scanner.LoadLibraryFoldersCached(lib, forceRefresh: true);
+
+            var folder = Assert.Single(folders);
+            Assert.Equal("G00001", folder.GameId);
+            Assert.Equal("Portal", folder.Name);
+            Assert.Equal(1, folder.FileCount);
+            Assert.Contains(indexedFile, folder.FilePaths);
+            var savedCache = host.LoadLibraryFolderCacheSnapshot(lib);
+            Assert.Single(savedCache, cached => string.Equals(cached.GameId, "G00001", StringComparison.OrdinalIgnoreCase));
+        }
+        finally
+        {
+            try
+            {
+                if (Directory.Exists(lib)) Directory.Delete(lib, true);
+            }
+            catch
+            {
+                /* best-effort */
+            }
+        }
+    }
+
+    [Fact]
+    public async Task LoadLibraryFoldersCached_MissingCaptureTicksReturnsBeforeMetadataRepairCompletes()
+    {
+        var lib = Path.Combine(Path.GetTempPath(), "pv-fast-projection-repair-" + Guid.NewGuid().ToString("N"));
+        var gameDir = Path.Combine(lib, "Portal");
+        Directory.CreateDirectory(gameDir);
+        var indexedFile = Path.Combine(gameDir, "fresh.png");
+        File.WriteAllBytes(indexedFile, new byte[] { 137, 80 });
+
+        var rows = new List<GameIndexEditorRow>
+        {
+            new()
+            {
+                GameId = "G00001",
+                Name = "Portal",
+                PlatformLabel = "Steam",
+                StorageGroupId = string.Empty,
+                FolderPath = gameDir,
+                FilePaths = new[] { indexedFile }
+            }
+        };
+        var index = new Dictionary<string, LibraryMetadataIndexEntry>(StringComparer.OrdinalIgnoreCase)
+        {
+            [indexedFile] = new LibraryMetadataIndexEntry
+            {
+                FilePath = indexedFile,
+                Stamp = "1",
+                GameId = "G00001",
+                ConsoleLabel = "Steam",
+                TagText = "Steam",
+                CaptureUtcTicks = 0,
+                Starred = false,
+                IndexAddedUtcTicks = DateTime.UtcNow.Ticks,
+                RetroAchievementsGameId = string.Empty
+            }
+        };
+
+        var fs = new FileSystemService();
+        var host = new PhotoSaveTestHost(fs, index, rows);
+        var metadata = new BlockingMetadataRepairService();
+        var scanner = new LibraryScanner(host, metadata, fs);
+
+        try
+        {
+            var loadTask = Task.Run(() => scanner.LoadLibraryFoldersCached(lib, forceRefresh: true));
+            var completed = await Task.WhenAny(loadTask, Task.Delay(TimeSpan.FromSeconds(1)));
+
+            Assert.Same(loadTask, completed);
+            var folders = await loadTask;
+            var folder = Assert.Single(folders);
+            Assert.Equal("G00001", folder.GameId);
+            Assert.Equal(1, folder.FileCount);
+            Assert.Contains(indexedFile, folder.FilePaths);
+            Assert.True(await WaitForSignalAsync(metadata.Started, TimeSpan.FromSeconds(2)), "Background metadata repair should be queued after fast projection.");
+
+            metadata.Release();
+
+            Assert.True(SpinWait.SpinUntil(() =>
+            {
+                var repairedIndex = host.LoadLibraryMetadataIndex(lib, true);
+                if (!repairedIndex.TryGetValue(indexedFile, out var entry) || entry == null || entry.CaptureUtcTicks <= 0)
+                    return false;
+                var cache = host.LoadLibraryFolderCacheSnapshot(lib);
+                var cachedFolder = cache.SingleOrDefault(item => string.Equals(item.GameId, "G00001", StringComparison.OrdinalIgnoreCase));
+                return cachedFolder != null && cachedFolder.NewestCaptureUtcTicks > 0;
+            }, TimeSpan.FromSeconds(3)), "Background metadata repair should update the index and touched cached folder row.");
+        }
+        finally
+        {
+            metadata.Release();
+            try
+            {
+                if (Directory.Exists(lib)) Directory.Delete(lib, true);
+            }
+            catch
+            {
+                /* best-effort */
+            }
+        }
+    }
+
+    [Fact]
+    public async Task LoadLibraryFoldersCached_CacheMissReturnsUsableRowsBeforeMetadataRepairCompletes()
+    {
+        var lib = Path.Combine(Path.GetTempPath(), "pv-cache-miss-fast-projection-" + Guid.NewGuid().ToString("N"));
+        var gameDir = Path.Combine(lib, "Portal");
+        Directory.CreateDirectory(gameDir);
+        var indexedFile = Path.Combine(gameDir, "fresh.png");
+        File.WriteAllBytes(indexedFile, new byte[] { 137, 80 });
+
+        var rows = new List<GameIndexEditorRow>
+        {
+            new()
+            {
+                GameId = "G00001",
+                Name = "Portal",
+                PlatformLabel = "Steam",
+                StorageGroupId = string.Empty,
+                FolderPath = gameDir,
+                FilePaths = new[] { indexedFile }
+            }
+        };
+        var index = new Dictionary<string, LibraryMetadataIndexEntry>(StringComparer.OrdinalIgnoreCase)
+        {
+            [indexedFile] = new LibraryMetadataIndexEntry
+            {
+                FilePath = indexedFile,
+                Stamp = "1",
+                GameId = "G00001",
+                ConsoleLabel = "Steam",
+                TagText = "Steam",
+                CaptureUtcTicks = 0,
+                Starred = false,
+                IndexAddedUtcTicks = DateTime.UtcNow.Ticks,
+                RetroAchievementsGameId = string.Empty
+            }
+        };
+
+        var fs = new FileSystemService();
+        var host = new PhotoSaveTestHost(fs, index, rows);
+        var metadata = new BlockingMetadataRepairService();
+        var scanner = new LibraryScanner(host, metadata, fs);
+
+        try
+        {
+            var loadTask = Task.Run(() => scanner.LoadLibraryFoldersCached(lib, forceRefresh: false));
+            var completed = await Task.WhenAny(loadTask, Task.Delay(TimeSpan.FromSeconds(1)));
+
+            Assert.Same(loadTask, completed);
+            var folders = await loadTask;
+            var folder = Assert.Single(folders);
+            Assert.Equal("G00001", folder.GameId);
+            Assert.Equal("Portal", folder.Name);
+            Assert.Equal(1, folder.FileCount);
+            Assert.Contains(indexedFile, folder.FilePaths);
+            var savedCacheBeforeRepair = host.LoadLibraryFolderCacheSnapshot(lib);
+            var cachedFolderBeforeRepair = Assert.Single(savedCacheBeforeRepair, item => string.Equals(item.GameId, "G00001", StringComparison.OrdinalIgnoreCase));
+            Assert.Equal(0, cachedFolderBeforeRepair.NewestCaptureUtcTicks);
+            Assert.True(await WaitForSignalAsync(metadata.Started, TimeSpan.FromSeconds(2)), "Cache-miss library open should queue background metadata repair after painting usable rows.");
+
+            metadata.Release();
+
+            Assert.True(SpinWait.SpinUntil(() =>
+            {
+                var repairedIndex = host.LoadLibraryMetadataIndex(lib, true);
+                if (!repairedIndex.TryGetValue(indexedFile, out var entry) || entry == null || entry.CaptureUtcTicks <= 0)
+                    return false;
+                var cache = host.LoadLibraryFolderCacheSnapshot(lib);
+                var cachedFolder = cache.SingleOrDefault(item => string.Equals(item.GameId, "G00001", StringComparison.OrdinalIgnoreCase));
+                return cachedFolder != null && cachedFolder.NewestCaptureUtcTicks > 0;
+            }, TimeSpan.FromSeconds(3)), "Background metadata repair should update the cache-miss folder row after initial paint.");
+        }
+        finally
+        {
+            metadata.Release();
+            try
+            {
+                if (Directory.Exists(lib)) Directory.Delete(lib, true);
+            }
+            catch
+            {
+                /* best-effort */
+            }
+        }
+    }
+
+    [Fact]
+    public async Task LoadLibraryFoldersCached_OrphanGameIdReturnsBeforeMetadataRepairCompletes()
+    {
+        var lib = Path.Combine(Path.GetTempPath(), "pv-orphan-gameid-fast-projection-" + Guid.NewGuid().ToString("N"));
+        var gameDir = Path.Combine(lib, "Portal");
+        Directory.CreateDirectory(gameDir);
+        var indexedFile = Path.Combine(gameDir, "fresh.png");
+        File.WriteAllBytes(indexedFile, new byte[] { 137, 80 });
+
+        var rows = new List<GameIndexEditorRow>
+        {
+            new()
+            {
+                GameId = "G00001",
+                Name = "Portal",
+                PlatformLabel = "Steam",
+                StorageGroupId = string.Empty,
+                FolderPath = gameDir,
+                FilePaths = new[] { indexedFile }
+            }
+        };
+        var ticks = DateTime.UtcNow.Ticks;
+        var index = new Dictionary<string, LibraryMetadataIndexEntry>(StringComparer.OrdinalIgnoreCase)
+        {
+            [indexedFile] = new LibraryMetadataIndexEntry
+            {
+                FilePath = indexedFile,
+                Stamp = "1",
+                GameId = "G99999",
+                ConsoleLabel = "Steam",
+                TagText = "Steam",
+                CaptureUtcTicks = ticks,
+                Starred = false,
+                IndexAddedUtcTicks = ticks,
+                RetroAchievementsGameId = string.Empty
+            }
+        };
+
+        var fs = new FileSystemService();
+        var host = new PhotoSaveTestHost(fs, index, rows);
+        var metadata = new BlockingMetadataRepairService();
+        var scanner = new LibraryScanner(host, metadata, fs);
+
+        try
+        {
+            var loadTask = Task.Run(() => scanner.LoadLibraryFoldersCached(lib, forceRefresh: false));
+            var completed = await Task.WhenAny(loadTask, Task.Delay(TimeSpan.FromSeconds(1)));
+
+            Assert.Same(loadTask, completed);
+            var folders = await loadTask;
+            var folder = Assert.Single(folders);
+            Assert.True(folder.PendingGameAssignment);
+            Assert.Equal(string.Empty, folder.GameId);
+            Assert.StartsWith("Needs assignment", folder.Name);
+            Assert.Equal(1, folder.FileCount);
+            Assert.Contains(indexedFile, folder.FilePaths);
+            var savedCacheBeforeRepair = host.LoadLibraryFolderCacheSnapshot(lib);
+            var cachedPendingFolder = Assert.Single(savedCacheBeforeRepair);
+            Assert.True(cachedPendingFolder.PendingGameAssignment);
+            Assert.Equal(string.Empty, cachedPendingFolder.GameId);
+            Assert.True(await WaitForSignalAsync(metadata.Started, TimeSpan.FromSeconds(2)), "Orphan GameId repair should be queued after fast projection.");
+
+            metadata.Release();
+
+            Assert.True(SpinWait.SpinUntil(() =>
+            {
+                var repairedIndex = host.LoadLibraryMetadataIndex(lib, true);
+                if (!repairedIndex.TryGetValue(indexedFile, out var entry) || entry == null)
+                    return false;
+                if (!string.Equals(entry.GameId, "G00001", StringComparison.OrdinalIgnoreCase))
+                    return false;
+
+                var cache = host.LoadLibraryFolderCacheSnapshot(lib);
+                var cachedFolder = cache.SingleOrDefault(item => string.Equals(item.GameId, "G00001", StringComparison.OrdinalIgnoreCase));
+                return cachedFolder != null
+                    && !cachedFolder.PendingGameAssignment
+                    && cachedFolder.FilePaths.Contains(indexedFile, StringComparer.OrdinalIgnoreCase);
+            }, TimeSpan.FromSeconds(3)), "Background metadata repair should resolve orphan GameId rows and update the touched cached folder row.");
+        }
+        finally
+        {
+            metadata.Release();
+            try
+            {
+                if (Directory.Exists(lib)) Directory.Delete(lib, true);
+            }
+            catch
+            {
+                /* best-effort */
+            }
+        }
+    }
+
+    [Fact]
+    public void LoadLibraryFoldersCached_IndexOnlyRefreshProjectsFromSuppliedIndexFileList()
+    {
+        var lib = Path.Combine(Path.GetTempPath(), "pv-index-only-projection-" + Guid.NewGuid().ToString("N"));
+        var gameDir = Path.Combine(lib, "Portal");
+        var nestedDir = Path.Combine(gameDir, "Nested");
+        Directory.CreateDirectory(nestedDir);
+        var indexedFile = Path.Combine(nestedDir, "indexed.png");
+        var excludedFile = Path.Combine(nestedDir, "excluded.png");
+        File.WriteAllBytes(indexedFile, new byte[] { 137, 80 });
+        File.WriteAllBytes(excludedFile, new byte[] { 137, 80 });
+
+        var rows = new List<GameIndexEditorRow>
+        {
+            new()
+            {
+                GameId = "G00001",
+                Name = "Portal",
+                PlatformLabel = "Steam",
+                StorageGroupId = string.Empty,
+                FolderPath = gameDir,
+                FilePaths = new[] { indexedFile, excludedFile }
+            }
+        };
+        var ticks = DateTime.UtcNow.Ticks;
+        var index = new Dictionary<string, LibraryMetadataIndexEntry>(StringComparer.OrdinalIgnoreCase)
+        {
+            [indexedFile] = new LibraryMetadataIndexEntry
+            {
+                FilePath = indexedFile,
+                Stamp = "1",
+                GameId = "G00001",
+                ConsoleLabel = "Steam",
+                TagText = "Steam",
+                CaptureUtcTicks = ticks,
+                Starred = false,
+                IndexAddedUtcTicks = ticks,
+                RetroAchievementsGameId = string.Empty
+            },
+            [excludedFile] = new LibraryMetadataIndexEntry
+            {
+                FilePath = excludedFile,
+                Stamp = "2",
+                GameId = "G00001",
+                ConsoleLabel = "Steam",
+                TagText = "Steam",
+                CaptureUtcTicks = ticks,
+                Starred = false,
+                IndexAddedUtcTicks = ticks,
+                RetroAchievementsGameId = string.Empty
+            }
+        };
+
+        var fs = new FileSystemService();
+        var host = new PhotoSaveTestHost(fs, index, rows)
+        {
+            IndexOnlyRefreshFiles = new List<string> { indexedFile }
+        };
+        var scanner = new LibraryScanner(host, new NoOpMetadataService(), fs);
+
+        try
+        {
+            var folders = scanner.LoadLibraryFoldersCached(lib, forceRefresh: false);
+
+            Assert.Equal(1, host.IndexOnlyRefreshCalls);
+            var folder = Assert.Single(folders);
+            Assert.Equal("G00001", folder.GameId);
+            Assert.Equal(1, folder.FileCount);
+            Assert.Contains(indexedFile, folder.FilePaths);
+            Assert.DoesNotContain(excludedFile, folder.FilePaths);
+            var savedCache = host.LoadLibraryFolderCacheSnapshot(lib);
+            var cachedFolder = Assert.Single(savedCache, item => string.Equals(item.GameId, "G00001", StringComparison.OrdinalIgnoreCase));
+            Assert.Equal(new[] { indexedFile }, cachedFolder.FilePaths);
+        }
+        finally
+        {
+            try
+            {
+                if (Directory.Exists(lib)) Directory.Delete(lib, true);
+            }
+            catch
+            {
+                /* best-effort */
+            }
+        }
+    }
+
+    static Task<bool> WaitForSignalAsync(ManualResetEventSlim signal, TimeSpan timeout) =>
+        Task.Run(() => signal.Wait(timeout));
+
+    [Fact]
+    public void ImportSort_UpdatesFolderCacheForNewFile_WithoutFullLibraryScan()
+    {
+        var lib = Path.Combine(Path.GetTempPath(), "pv-import-sort-incremental-cache-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(lib);
+        var rootFile = Path.Combine(lib, "Portal.png");
+        File.WriteAllBytes(rootFile, new byte[] { 137, 80 });
+        var portalDir = Path.Combine(lib, "Portal");
+        var rows = new List<GameIndexEditorRow>
+        {
+            new()
+            {
+                GameId = "G00001",
+                Name = "Portal",
+                PlatformLabel = "Steam",
+                StorageGroupId = string.Empty,
+                FolderPath = portalDir,
+                FilePaths = Array.Empty<string>()
+            }
+        };
+        var initialCache = new List<LibraryFolderInfo>
+        {
+            new()
+            {
+                GameId = "G00001",
+                Name = "Portal",
+                FolderPath = portalDir,
+                FileCount = 0,
+                PreviewImagePath = string.Empty,
+                PlatformLabel = "Steam",
+                FilePaths = Array.Empty<string>()
+            }
+        };
+
+        var fs = new FileSystemService();
+        var host = new PhotoSaveTestHost(
+            fs,
+            new Dictionary<string, LibraryMetadataIndexEntry>(StringComparer.OrdinalIgnoreCase),
+            rows,
+            initialCache);
+        var fullRebuildCalled = false;
+        var scanner = new LibraryScanner(host, new NoOpMetadataService(), fs,
+            folderCacheRebuildHook: (_, _) => fullRebuildCalled = true);
+        var import = new ImportService(new ImportServiceDependencies
+        {
+            FileSystem = fs,
+            LogService = NullLogService.Instance,
+            MetadataService = new NoOpMetadataService(),
+            GetFileCreationTime = _ => DateTime.MinValue,
+            GetFileLastWriteTime = _ => DateTime.MinValue,
+            CoverService = new StubCoverService(),
+            GetDestinationRoot = () => lib,
+            GetLibraryRoot = () => lib,
+            GetConflictMode = () => "Rename",
+            UniquePath = UniqueFile,
+            MoveMetadataSidecarIfPresent = (_, _) => { },
+            IsMedia = path =>
+            {
+                var ext = Path.GetExtension(path);
+                return string.Equals(ext, ".png", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(ext, ".jpg", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(ext, ".jpeg", StringComparison.OrdinalIgnoreCase);
+            },
+            GetSafeGameFolderName = Safe,
+            GetGameNameFromFileName = path => Path.GetFileNameWithoutExtension(path) ?? string.Empty,
+            EnsureDirectoryExists = (path, _) => fs.CreateDirectory(path),
+            GetLibraryScanner = () => scanner,
+            LoadSavedGameIndexRows = _ => rows.Select(row => new GameIndexEditorRow
+            {
+                GameId = row.GameId,
+                Name = row.Name,
+                PlatformLabel = row.PlatformLabel,
+                FolderPath = row.FolderPath,
+                FilePaths = row.FilePaths,
+                StorageGroupId = row.StorageGroupId
+            }).ToList(),
+            BuildGameIndexTitleCounts = sourceRows => (sourceRows ?? Array.Empty<GameIndexEditorRow>())
+                .Where(row => row != null && !string.IsNullOrWhiteSpace(row.Name))
+                .GroupBy(row => Norm(row.Name, row.FolderPath), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(group => group.Key, group => group.Count(), StringComparer.OrdinalIgnoreCase),
+            NormalizeGameIndexName = name => Norm(name, string.Empty),
+            NormalizeGameIndexNameWithFolder = Norm,
+            NormalizeConsoleLabel = Plat,
+            BuildGameIndexIdentity = (name, platform) => Norm(name, string.Empty) + "|" + Plat(platform),
+            CleanTag = value => (value ?? string.Empty).Trim(),
+            ParseFilenameForImport = _ => new FilenameParseResult
+            {
+                GameTitleHint = "Portal",
+                PlatformLabel = "Steam"
+            }
+        });
+
+        try
+        {
+            var result = import.SortDestinationRootIntoGameFolders(lib, lib);
+
+            var sortedPath = Path.Combine(portalDir, "Portal.png");
+            Assert.Equal(1, result.Sorted);
+            Assert.False(fullRebuildCalled);
+            Assert.False(File.Exists(rootFile));
+            Assert.True(File.Exists(sortedPath));
+            var cache = host.LoadLibraryFolderCacheSnapshot(lib);
+            var folder = Assert.Single(cache, item => string.Equals(item.GameId, "G00001", StringComparison.OrdinalIgnoreCase));
+            Assert.Equal(1, folder.FileCount);
+            Assert.Equal(sortedPath, folder.PreviewImagePath, ignoreCase: true);
+            Assert.Contains(sortedPath, folder.FilePaths);
         }
         finally
         {

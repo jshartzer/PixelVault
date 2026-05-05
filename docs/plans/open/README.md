@@ -1,5 +1,7 @@
 # Open plans (in progress)
 
-No codified plans are registered as **open** in this folder right now. **PV-PLN-RVW-001** finished **2026-04-12** — canonical copy: [`../completed-projects/PV-PLN-RVW-001-post-app-review-hardening.md`](../completed-projects/PV-PLN-RVW-001-post-app-review-hardening.md).
+**Active codified plans** live at the root of [`../`](.) — see [`../README.md`](../README.md). This folder is reserved for **optional** short stubs when execution or backlinks need a stable `…/plans/open/…` path.
 
-The main plan index remains [`../README.md`](../README.md). When a plan is finished, move it to **`../completed-projects/`** (or **`../archive/`**) and remove its row from this README.
+There are **no** stub files here right now.
+
+When a plan finishes, add the narrative under [`../../completed-projects/`](../../completed-projects/) (or [`../../archive/`](../../archive/) for superseded snapshots), update [`../README.md`](../README.md), and **avoid** duplicate redirect files unless you are preserving an external URL.

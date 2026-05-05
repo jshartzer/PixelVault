@@ -94,6 +94,9 @@ namespace PixelVaultNative
         /// <summary>Rebuild folder cache / stamps after game-index edits for <see cref="LibraryRoot"/> (no-op when root unset).</summary>
         void RefreshFolderCacheAfterGameIndexChange();
 
+        /// <summary>Update cached folder rows touched by recent file/folder changes for <see cref="LibraryRoot"/> (false when root/cache missing).</summary>
+        bool TryUpdateLibraryFolderCacheForTouchedPaths(IEnumerable<string> touchedPaths);
+
         /// <summary>Ensure non-empty folder cache for game-index editor flows (empty list when root unset).</summary>
         List<LibraryFolderInfo> EnsureGameIndexFolderContext(Action<string> setUiStatus);
 

@@ -51,13 +51,11 @@ namespace PixelVaultNative
             cancellationToken.ThrowIfCancellationRequested();
             var rename = inventory.RenameScopeFiles;
             var move = inventory.TopLevelMediaFiles;
-            var previewAnalysis = AnalyzeIntakePreviewFiles(move, cancellationToken);
-            var reviewItems = BuildReviewItems(move, previewAnalysis, cancellationToken);
-            var recognizedPaths = new HashSet<string>(reviewItems.Select(i => i.FilePath), StringComparer.OrdinalIgnoreCase);
-            var manualItems = BuildManualMetadataItems(move, recognizedPaths, previewAnalysis, cancellationToken);
+            var prep = BuildIntakePreparation(move, false, cancellationToken);
+            var reviewItems = prep.ReviewItems;
+            var manualItems = prep.ManualItems;
             cancellationToken.ThrowIfCancellationRequested();
-            var manualPaths = new HashSet<string>(manualItems.Select(i => i.FilePath), StringComparer.OrdinalIgnoreCase);
-            var moveCandidates = move.Where(f => !manualPaths.Contains(f)).ToList();
+            var moveCandidates = move.Where(f => !prep.ManualPaths.Contains(f)).ToList();
             return new IntakePreviewSummary
             {
                 SourceRoots = GetSourceRoots(),
@@ -109,6 +107,19 @@ namespace PixelVaultNative
             return intakePipeline.Analysis.AnalyzeFiles(sourceFiles, cancellationToken);
         }
 
+        IntakePreparationResult BuildIntakePreparation(IEnumerable<string> sourceFiles, bool includeImportEditRows, CancellationToken cancellationToken = default(CancellationToken))
+        {
+            return IntakePreparationBuilder.Build(
+                sourceFiles,
+                AnalyzeIntakePreviewFiles,
+                includeImportEditRows,
+                delegate(string fileName, FilenameParseResult parsed)
+                {
+                    indexPersistenceService.RecordFilenameConventionSample(libraryRoot, fileName, parsed);
+                },
+                cancellationToken);
+        }
+
         List<ReviewItem> BuildReviewItems()
         {
             return BuildReviewItems(importService.BuildSourceInventory(importSearchSubfoldersForRename).TopLevelMediaFiles);
@@ -121,37 +132,7 @@ namespace PixelVaultNative
 
         List<ReviewItem> BuildReviewItems(IEnumerable<string> sourceFiles, Dictionary<string, IntakePreviewFileAnalysis> analysis, CancellationToken cancellationToken = default(CancellationToken))
         {
-            var items = new List<ReviewItem>();
-            foreach (var file in (sourceFiles ?? Enumerable.Empty<string>()).Where(File.Exists).Distinct(StringComparer.OrdinalIgnoreCase))
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                IntakePreviewFileAnalysis fileAnalysis;
-                if (analysis == null || !analysis.TryGetValue(file, out fileAnalysis) || fileAnalysis == null || !fileAnalysis.CanUpdateMetadata) continue;
-                var parsed = fileAnalysis.Parsed ?? new FilenameParseResult();
-                var platformTags = parsed.PlatformTags ?? new string[0];
-                var resolvedPlatforms = ExtractConsolePlatformFamilies(platformTags.Concat(new[] { parsed.PlatformLabel }));
-                items.Add(new ReviewItem
-                {
-                    FilePath = file,
-                    FileName = fileAnalysis.FileName,
-                    PlatformLabel = parsed.PlatformLabel,
-                    PlatformTags = platformTags,
-                    CaptureTime = fileAnalysis.CaptureTime,
-                    PreserveFileTimes = fileAnalysis.PreserveFileTimes,
-                    Comment = string.Empty,
-                    AddPhotographyTag = false,
-                    TagSteam = resolvedPlatforms.Contains("Steam"),
-                    TagSwitch = resolvedPlatforms.Contains("Switch"),
-                    TagPs5 = resolvedPlatforms.Contains("PS5"),
-                    TagXbox = resolvedPlatforms.Contains("Xbox"),
-                    DeleteBeforeProcessing = false
-                });
-            }
-            return items
-                .OrderBy(i => PlatformGroupOrder(i.PlatformLabel))
-                .ThenBy(i => i.CaptureTime)
-                .ThenBy(i => i.FileName)
-                .ToList();
+            return IntakePreparationBuilder.BuildReviewItems(sourceFiles, analysis, cancellationToken);
         }
 
         List<ManualMetadataItem> BuildManualMetadataItems(HashSet<string> recognizedPaths)
@@ -166,136 +147,28 @@ namespace PixelVaultNative
 
         List<ManualMetadataItem> BuildManualMetadataItems(IEnumerable<string> sourceFiles, HashSet<string> recognizedPaths, Dictionary<string, IntakePreviewFileAnalysis> analysis, CancellationToken cancellationToken = default(CancellationToken))
         {
-            var items = new List<ManualMetadataItem>();
-            var known = recognizedPaths ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var file in (sourceFiles ?? Enumerable.Empty<string>()).Where(File.Exists).Distinct(StringComparer.OrdinalIgnoreCase))
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (known.Contains(file)) continue;
-                IntakePreviewFileAnalysis fileAnalysis;
-                if (analysis == null || !analysis.TryGetValue(file, out fileAnalysis) || fileAnalysis == null || fileAnalysis.CanUpdateMetadata) continue;
-                var parsed = fileAnalysis.Parsed ?? new FilenameParseResult();
-                var captureTime = fileAnalysis.CaptureTime;
-                if (!parsed.MatchedConvention)
+            return IntakePreparationBuilder.BuildManualMetadataItems(
+                sourceFiles,
+                recognizedPaths,
+                analysis,
+                delegate(string fileName, FilenameParseResult parsed)
                 {
-                    indexPersistenceService.RecordFilenameConventionSample(libraryRoot, fileAnalysis.FileName, parsed);
-                }
-                var titleHint = parsed.GameTitleHint ?? string.Empty;
-                bool tagSteam, tagPc, tagEmulation, tagPs5, tagSwitch, tagXbox, tagOther;
-                string customPlatformTag;
-                ApplyFilenameParseResultToManualPlatformFlags(parsed, out tagSteam, out tagPc, out tagEmulation, out tagPs5, out tagSwitch, out tagXbox, out tagOther, out customPlatformTag);
-                items.Add(new ManualMetadataItem
-                {
-                    GameId = string.Empty,
-                    SteamAppId = parsed.SteamAppId,
-                    NonSteamId = parsed.NonSteamId,
-                    FilePath = file,
-                    FileName = fileAnalysis.FileName,
-                    OriginalFileName = fileAnalysis.FileName,
-                    CaptureTime = captureTime,
-                    UseCustomCaptureTime = false,
-                    GameName = titleHint,
-                    Comment = string.Empty,
-                    TagText = string.Empty,
-                    AddPhotographyTag = false,
-                    TagSteam = tagSteam,
-                    TagPs5 = tagPs5,
-                    TagSwitch = tagSwitch,
-                    TagXbox = tagXbox,
-                    TagPc = tagPc,
-                    TagEmulation = tagEmulation,
-                    TagOther = tagOther,
-                    CustomPlatformTag = customPlatformTag,
-                    OriginalGameId = string.Empty,
-                    OriginalSteamAppId = parsed.SteamAppId,
-                    OriginalNonSteamId = parsed.NonSteamId,
-                    OriginalCaptureTime = captureTime,
-                    OriginalUseCustomCaptureTime = false,
-                    OriginalGameName = titleHint,
-                    OriginalComment = string.Empty,
-                    OriginalTagText = string.Empty,
-                    OriginalAddPhotographyTag = false,
-                    OriginalTagSteam = tagSteam,
-                    OriginalTagPc = tagPc,
-                    OriginalTagPs5 = tagPs5,
-                    OriginalTagSwitch = tagSwitch,
-                    OriginalTagXbox = tagXbox,
-                    OriginalTagEmulation = tagEmulation,
-                    OriginalTagOther = tagOther,
-                    OriginalCustomPlatformTag = customPlatformTag
-                });
-            }
-            return items.OrderBy(i => i.CaptureTime).ThenBy(i => i.FileName).ToList();
+                    indexPersistenceService.RecordFilenameConventionSample(libraryRoot, fileName, parsed);
+                },
+                cancellationToken);
         }
 
         /// <summary>All top-level upload files as manual-editor rows (rule-matched and manual-intake).</summary>
         List<ManualMetadataItem> BuildImportAndEditMetadataItems(IEnumerable<string> sourceFiles, Dictionary<string, IntakePreviewFileAnalysis> analysis, CancellationToken cancellationToken = default(CancellationToken))
         {
-            var items = new List<ManualMetadataItem>();
-            foreach (var file in (sourceFiles ?? Enumerable.Empty<string>()).Where(File.Exists).Distinct(StringComparer.OrdinalIgnoreCase))
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                IntakePreviewFileAnalysis fileAnalysis;
-                if (analysis == null || !analysis.TryGetValue(file, out fileAnalysis) || fileAnalysis == null) continue;
-                var parsed = fileAnalysis.Parsed ?? new FilenameParseResult();
-                var captureTime = fileAnalysis.CaptureTime;
-                if (!parsed.MatchedConvention)
+            return IntakePreparationBuilder.BuildImportAndEditMetadataItems(
+                sourceFiles,
+                analysis,
+                delegate(string fileName, FilenameParseResult parsed)
                 {
-                    indexPersistenceService.RecordFilenameConventionSample(libraryRoot, fileAnalysis.FileName, parsed);
-                }
-                var titleHint = parsed.GameTitleHint ?? string.Empty;
-                bool tagSteam, tagPc, tagEmulation, tagPs5, tagSwitch, tagXbox, tagOther;
-                string customPlatformTag;
-                ApplyFilenameParseResultToManualPlatformFlags(parsed, out tagSteam, out tagPc, out tagEmulation, out tagPs5, out tagSwitch, out tagXbox, out tagOther, out customPlatformTag);
-                var ruleMatched = fileAnalysis.CanUpdateMetadata;
-                items.Add(new ManualMetadataItem
-                {
-                    GameId = string.Empty,
-                    SteamAppId = parsed.SteamAppId,
-                    NonSteamId = parsed.NonSteamId,
-                    FilePath = file,
-                    FileName = fileAnalysis.FileName,
-                    OriginalFileName = fileAnalysis.FileName,
-                    CaptureTime = captureTime,
-                    UseCustomCaptureTime = false,
-                    GameName = titleHint,
-                    Comment = string.Empty,
-                    TagText = string.Empty,
-                    AddPhotographyTag = false,
-                    TagSteam = tagSteam,
-                    TagPs5 = tagPs5,
-                    TagSwitch = tagSwitch,
-                    TagXbox = tagXbox,
-                    TagPc = tagPc,
-                    TagEmulation = tagEmulation,
-                    TagOther = tagOther,
-                    CustomPlatformTag = customPlatformTag,
-                    OriginalGameId = string.Empty,
-                    OriginalSteamAppId = parsed.SteamAppId,
-                    OriginalNonSteamId = parsed.NonSteamId,
-                    OriginalCaptureTime = captureTime,
-                    OriginalUseCustomCaptureTime = false,
-                    OriginalGameName = titleHint,
-                    OriginalComment = string.Empty,
-                    OriginalTagText = string.Empty,
-                    OriginalAddPhotographyTag = false,
-                    OriginalTagSteam = tagSteam,
-                    OriginalTagPc = tagPc,
-                    OriginalTagPs5 = tagPs5,
-                    OriginalTagSwitch = tagSwitch,
-                    OriginalTagXbox = tagXbox,
-                    OriginalTagEmulation = tagEmulation,
-                    OriginalTagOther = tagOther,
-                    OriginalCustomPlatformTag = customPlatformTag,
-                    IntakeRuleMatched = ruleMatched,
-                    DeleteBeforeProcessing = false
-                });
-            }
-            return items
-                .OrderBy(i => PlatformGroupOrder(DetermineManualMetadataPlatformLabel(i)))
-                .ThenBy(i => i.CaptureTime)
-                .ThenBy(i => i.FileName, StringComparer.OrdinalIgnoreCase)
-                .ToList();
+                    indexPersistenceService.RecordFilenameConventionSample(libraryRoot, fileName, parsed);
+                },
+                cancellationToken);
         }
     }
 }

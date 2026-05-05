@@ -143,6 +143,15 @@ namespace PixelVaultNative
         bool HasSteamAppIdEvidence(FilenameParseResult parsed, LibraryMetadataIndexEntry existingEntry, List<GameIndexEditorRow> gameRows)
         {
             if (FilenameParserService.ParsedResultHasSubstantiveSteamAppId(parsed)) return true;
+            if (parsed != null
+                && gameRows != null
+                && string.Equals(NormalizeConsoleLabel(parsed.PlatformLabel), "Steam", StringComparison.OrdinalIgnoreCase)
+                && !string.IsNullOrWhiteSpace(parsed.GameTitleHint))
+            {
+                var knownSteamRow = FindSavedGameIndexRowByIdentity(gameRows, parsed.GameTitleHint, "Steam");
+                var knownDigits = new string(((knownSteamRow == null ? string.Empty : knownSteamRow.SteamAppId) ?? string.Empty).Where(char.IsDigit).ToArray());
+                if (knownDigits.Length > 0) return true;
+            }
             var gid = NormalizeGameId(existingEntry == null ? string.Empty : existingEntry.GameId);
             if (string.IsNullOrWhiteSpace(gid) || gameRows == null) return false;
             var row = FindSavedGameIndexRowById(gameRows, gid);
@@ -187,10 +196,17 @@ namespace PixelVaultNative
         {
             var filenameParseHint = ParseFilename(file, root);
             var tags = ResolveLibraryMetadataTags(snapshot, existingEntry);
+            tags = MergePlatformTagsWithEmbeddedMetadataPlatformHints(tags, snapshot);
             tags = MergePlatformTagsWithFilenamePlatformHint(tags, filenameParseHint);
             tags = StripSteamKeywordWhenNoSteamAppIdEvidence(tags, filenameParseHint, existingEntry, gameRows);
             var platformLabel = ResolveStoredLibraryMetadataConsoleLabel(existingEntry, tags, filenameParseHint, gameRows);
             var preferredGameId = NormalizeGameId(existingEntry == null ? string.Empty : existingEntry.GameId);
+            if (!string.IsNullOrWhiteSpace(preferredGameId)
+                && gameRows != null
+                && FindSavedGameIndexRowById(gameRows, preferredGameId) == null)
+            {
+                preferredGameId = string.Empty;
+            }
             var resolvedGameId = !string.IsNullOrWhiteSpace(preferredGameId)
                 ? preferredGameId
                 : ResolveGameIdForIndexedFile(root, file, platformLabel, tags, index, gameRows, preferredGameId);

@@ -1,5 +1,7 @@
 #nullable enable
 
+using System.Collections.Generic;
+
 namespace PixelVaultNative
 {
     /// <summary>Discards main-log lines (tests and minimal harnesses).</summary>
@@ -10,5 +12,7 @@ namespace PixelVaultNative
         NullLogService() { }
 
         public string AppendMainLine(string? message) => string.Empty;
+
+        public string[] AppendMainLines(IEnumerable<string?> messages) => System.Array.Empty<string>();
     }
 }

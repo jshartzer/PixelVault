@@ -97,6 +97,15 @@ public sealed class TextAndPathHelpersTests : IDisposable
     }
 
     [Fact]
+    public void StripTitleLegalMarks_RemovesUnicodeHtmlAndMojibakeMarks()
+    {
+        Assert.Equal("Diablo IV", TextAndPathHelpers.StripTitleLegalMarks("Diablo\u00AE IV"));
+        Assert.Equal("Halo The Master Chief Collection", TextAndPathHelpers.StripTitleLegalMarks("Halo\u2122 The Master Chief Collection"));
+        Assert.Equal("Forza Horizon 5", TextAndPathHelpers.StripTitleLegalMarks("Forza&#174; Horizon 5"));
+        Assert.Equal("Portal 2", TextAndPathHelpers.StripTitleLegalMarks("Portal\u00C2\u00AE 2"));
+    }
+
+    [Fact]
     public void ParseTagText_SplitsAndDedupesCaseInsensitively()
     {
         var tags = TextAndPathHelpers.ParseTagText("Steam, Emulation;steam\nXbox PC\rSTEAM");
@@ -222,6 +231,13 @@ public sealed class TextAndPathHelpersTests : IDisposable
         var input = "Halo\u00E2\u201E\u00A2: The Master Chief Collection \u00C2\u00AE";
         var result = TextAndPathHelpers.NormalizeTitle(input);
         Assert.Equal("halo the master chief collection", result);
+    }
+
+    [Fact]
+    public void NormalizeTitle_ScrubsUnicodeLegalMarks()
+    {
+        Assert.Equal("diablo iv", TextAndPathHelpers.NormalizeTitle("Diablo\u00AE IV"));
+        Assert.Equal("alan wake 2", TextAndPathHelpers.NormalizeTitle("Alan Wake\u2122 2"));
     }
 
     [Fact]

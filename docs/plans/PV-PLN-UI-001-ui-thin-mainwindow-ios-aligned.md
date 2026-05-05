@@ -7,7 +7,7 @@
 | **Owner** | PixelVault / Codex |
 | **Parent roadmap** | `docs/ROADMAP.md` — **Phase 3: Shrink MainWindow** (A–F extraction **complete**; this plan is **what comes next**) |
 | **Cross-cutting guardrails** | `docs/ios_foundation_guide.md` — prefer **services + plain models** for library/capture/query and **mobile-safe** writes; keep WPF at the shell edge |
-| **Related** | `docs/NEXT_TRIM_PLAN.md`, `docs/MAINWINDOW_EXTRACTION_ROADMAP.md`, `docs/ARCHITECTURE_REFACTOR_PLAN.md`, `docs/PERFORMANCE_TODO.md`, `docs/DOC_SYNC_POLICY.md` |
+| **Related** | `docs/NEXT_TRIM_PLAN.md`, `docs/MAINWINDOW_EXTRACTION_ROADMAP.md`, `docs/ARCHITECTURE_REFACTOR_PLAN.md`, [`docs/plans/PV-PLN-EXT-002-service-extraction-and-organization.md`](PV-PLN-EXT-002-service-extraction-and-organization.md) (**complete** — extraction + `Services/` organization; ongoing thin-out continues here), `docs/PERFORMANCE_TODO.md`, `docs/DOC_SYNC_POLICY.md` |
 
 ## Purpose
 

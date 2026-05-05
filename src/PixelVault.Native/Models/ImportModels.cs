@@ -14,6 +14,8 @@ namespace PixelVaultNative
         public string Comment;
         public bool AddPhotographyTag;
         public bool TagSteam;
+        public bool TagPc;
+        public bool TagEmulation;
         public bool TagSwitch;
         public bool TagPs5;
         public bool TagXbox;
@@ -64,6 +66,8 @@ namespace PixelVaultNative
         public bool DeleteBeforeProcessing;
         /// <summary>True when intake matched an automatic filename rule (for list badge).</summary>
         public bool IntakeRuleMatched;
+        /// <summary>Import-and-edit HDR pair: the same capture in the other PNG/JXR format, if available.</summary>
+        public string HdrAlternateFilePath;
     }
 
     sealed class UndoImportEntry
@@ -116,6 +120,13 @@ namespace PixelVaultNative
         public List<UndoImportEntry> Entries = new List<UndoImportEntry>();
     }
 
+    sealed class HdrFallbackMoveResult
+    {
+        public int Moved;
+        public int Skipped;
+        public string DestinationRoot = string.Empty;
+    }
+
     sealed class SortStepResult
     {
         public int Sorted;
@@ -129,6 +140,14 @@ namespace PixelVaultNative
         public List<string> TopLevelMediaFiles = new List<string>();
         /// <summary>Files considered during the Steam/non-Steam rename prep phase.</summary>
         public List<string> RenameScopeFiles = new List<string>();
+        /// <summary>Detected same-stem PNG/JXR HDR pairs; the selected path is included in import candidates, the alternate is parked after import starts.</summary>
+        public List<HdrCapturePair> HdrPairs = new List<HdrCapturePair>();
+    }
+
+    sealed class HdrCapturePair
+    {
+        public string SelectedFilePath = string.Empty;
+        public string AlternateFilePath = string.Empty;
     }
 
     sealed class IntakePreviewSummary
@@ -163,5 +182,9 @@ namespace PixelVaultNative
         public DateTime? CaptureTime;
         /// <summary>Adobe-style XMP star rating 0–5 when present in the file; null if not set or unreadable.</summary>
         public int? Rating;
+        /// <summary>Camera/device maker from EXIF/IFD metadata when present.</summary>
+        public string CameraMake = string.Empty;
+        /// <summary>Camera/device model from EXIF/IFD metadata when present.</summary>
+        public string CameraModel = string.Empty;
     }
 }

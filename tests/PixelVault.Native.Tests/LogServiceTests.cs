@@ -12,5 +12,6 @@ public sealed class LogServiceTests
         Assert.Same(log, NullLogService.Instance);
         Assert.Equal(string.Empty, log.AppendMainLine("any"));
         Assert.Equal(string.Empty, log.AppendMainLine(null));
+        Assert.Empty(log.AppendMainLines(new string?[] { "any", null }));
     }
 }

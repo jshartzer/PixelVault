@@ -284,7 +284,10 @@ namespace PixelVaultNative
                     folder.RetroAchievementsGameId = saved.RetroAchievementsGameId ?? string.Empty;
                     changed = true;
                 }
-                if (!string.IsNullOrWhiteSpace(saved.PreviewImagePath) && File.Exists(saved.PreviewImagePath) && !string.Equals(folder.PreviewImagePath ?? string.Empty, saved.PreviewImagePath ?? string.Empty, StringComparison.Ordinal))
+                if (!string.IsNullOrWhiteSpace(saved.PreviewImagePath)
+                    && !ImportService.IsHdrFallbackPath(saved.PreviewImagePath)
+                    && File.Exists(saved.PreviewImagePath)
+                    && !string.Equals(folder.PreviewImagePath ?? string.Empty, saved.PreviewImagePath ?? string.Empty, StringComparison.Ordinal))
                 {
                     folder.PreviewImagePath = saved.PreviewImagePath;
                     changed = true;

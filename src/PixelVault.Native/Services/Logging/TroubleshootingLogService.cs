@@ -1,6 +1,7 @@
 #nullable enable
 
 using System;
+using System.Collections.Generic;
 
 namespace PixelVaultNative
 {
@@ -15,5 +16,7 @@ namespace PixelVaultNative
         }
 
         public string AppendMainLine(string? message) => _troubleshootingLog.AppendMainLine(message);
+
+        public string[] AppendMainLines(IEnumerable<string?> messages) => _troubleshootingLog.AppendMainLines(messages);
     }
 }

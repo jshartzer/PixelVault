@@ -763,6 +763,19 @@ namespace PixelVaultNative
             }
         }
 
+        void LogBatch(IEnumerable<string> messages)
+        {
+            var lines = logService.AppendMainLines(messages);
+            if (lines == null || lines.Length == 0 || logBox == null) return;
+            Action append = delegate
+            {
+                logBox.AppendText(string.Join(Environment.NewLine, lines) + Environment.NewLine);
+                logBox.ScrollToEnd();
+            };
+            if (logBox.Dispatcher.CheckAccess()) append();
+            else logBox.Dispatcher.BeginInvoke(append);
+        }
+
         /// <summary>Writes a full exception (including stack trace) to the main log with ERROR prefix and managed thread id.</summary>
         internal void LogException(string context, Exception ex)
         {
@@ -777,7 +790,6 @@ namespace PixelVaultNative
         string FormatViewKeyForTroubleshooting(string viewKey) => troubleshootingLog.FormatViewKey(viewKey);
     }
 }
-
 
 
 

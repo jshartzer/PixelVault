@@ -347,6 +347,22 @@ namespace PixelVaultNative
             return ParseEmbeddedRatingField(line);
         }
 
+        Tuple<string, string> ReadEmbeddedCameraMakeModelDirect(string file, CancellationToken cancellationToken = default(CancellationToken))
+        {
+            if (string.IsNullOrWhiteSpace(file) || !File.Exists(file)) return Tuple.Create(string.Empty, string.Empty);
+            if (string.IsNullOrWhiteSpace(ExifToolPath) || !File.Exists(ExifToolPath)) return Tuple.Create(string.Empty, string.Empty);
+            var readTarget = MetadataReadPath(file);
+            if (string.IsNullOrWhiteSpace(readTarget) || !File.Exists(readTarget)) return Tuple.Create(string.Empty, string.Empty);
+            cancellationToken.ThrowIfCancellationRequested();
+            var output = RunExeCapture(ExifToolPath, new[] { "-T", "-Make", "-Model", readTarget }, Path.GetDirectoryName(ExifToolPath), false, cancellationToken);
+            var line = (output ?? string.Empty).Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+            if (string.IsNullOrWhiteSpace(line)) return Tuple.Create(string.Empty, string.Empty);
+            var parts = line.Split('\t');
+            var make = parts.Length > 0 && parts[0] != "-" ? CleanTag(parts[0]) : string.Empty;
+            var model = parts.Length > 1 && parts[1] != "-" ? CleanTag(parts[1]) : string.Empty;
+            return Tuple.Create(make, model);
+        }
+
         public string[] BuildStarRatingExifArgs(string file, bool starred)
         {
             if (string.IsNullOrWhiteSpace(file) || !File.Exists(file)) return Array.Empty<string>();
@@ -499,7 +515,9 @@ namespace PixelVaultNative
                     "-EXIF:ModifyDate",
                     "-QuickTime:CreateDate",
                     "-QuickTime:ModifyDate",
-                    "-XMP:Rating"
+                    "-XMP:Rating",
+                    "-Make",
+                    "-Model"
                 };
                 argLines.AddRange(orderedReadTargets.Select(pair => pair.Value));
                 File.WriteAllLines(argFile, argLines.ToArray(), Encoding.UTF8);
@@ -551,6 +569,8 @@ namespace PixelVaultNative
                     }
 
                     if (parts.Length > 22) snapshot.Rating = ParseEmbeddedRatingField(parts[22]);
+                    if (parts.Length > 23 && parts[23] != "-") snapshot.CameraMake = CleanTag(parts[23]);
+                    if (parts.Length > 24 && parts[24] != "-") snapshot.CameraModel = CleanTag(parts[24]);
 
                     result[sourceFile] = snapshot;
                     matchedFiles.Add(sourceFile);
@@ -566,6 +586,9 @@ namespace PixelVaultNative
                         CaptureTime = ReadEmbeddedCaptureDateDirect(pair.Key, cancellationToken),
                         Rating = ReadEmbeddedRatingDirect(pair.Key, cancellationToken)
                     };
+                    var camera = ReadEmbeddedCameraMakeModelDirect(pair.Key, cancellationToken);
+                    result[pair.Key].CameraMake = camera.Item1;
+                    result[pair.Key].CameraModel = camera.Item2;
                 }
             }
             finally

@@ -56,6 +56,20 @@ namespace PixelVaultNative
             return string.IsNullOrWhiteSpace(s) ? string.Empty : Regex.Replace(s, "\\s+", " ").Trim();
         }
 
+        public static string StripTitleLegalMarks(string? title)
+        {
+            var value = WebUtility.HtmlDecode(title ?? string.Empty);
+            value = value.Replace("â„¢", " ").Replace("Â®", " ").Replace("Â©", " ");
+            value = value
+                .Replace("\u00AE", " ")
+                .Replace("\u2122", " ")
+                .Replace("\u2120", " ")
+                .Replace("\u00A9", " ")
+                .Replace("\u2117", " ")
+                .Replace("\u24C7", " ");
+            return Regex.Replace(value, "\\s+", " ").Trim();
+        }
+
         public static string[] ParseTagText(string s)
         {
             return (s ?? string.Empty)
@@ -128,8 +142,8 @@ namespace PixelVaultNative
 
         public static string NormalizeTitle(string? title)
         {
-            title = WebUtility.HtmlDecode(title ?? string.Empty);
-            title = title.Replace("â„¢", " ").Replace("Â®", " ").Replace("Â©", " ").Replace("_", " ").Replace("-", " ").Replace(":", " ");
+            title = StripTitleLegalMarks(title);
+            title = title.Replace("_", " ").Replace("-", " ").Replace(":", " ");
             title = Regex.Replace(title, @"[^\p{L}\p{Nd}]+", " ");
             return Regex.Replace(title, @"\s+", " ").Trim().ToLowerInvariant();
         }

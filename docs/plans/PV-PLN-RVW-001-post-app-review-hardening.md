@@ -4,4 +4,4 @@
 
 **[`docs/completed-projects/PV-PLN-RVW-001-post-app-review-hardening.md`](../completed-projects/PV-PLN-RVW-001-post-app-review-hardening.md)**
 
-The **`open/`** stub remains for old links: [`open/PV-PLN-RVW-001-post-app-review-hardening.md`](open/PV-PLN-RVW-001-post-app-review-hardening.md).
+Former duplicate stub under `docs/plans/open/` was retired; see [`docs/archive/PV-PLN-RVW-001-open-folder-stub-superseded.md`](../archive/PV-PLN-RVW-001-open-folder-stub-superseded.md).

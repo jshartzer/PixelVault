@@ -19,6 +19,7 @@ namespace PixelVaultNative
             var total = items == null ? 0 : items.Count;
             var requests = new List<ExifWriteRequest>();
             var itemsToReset = new List<ManualMetadataItem>();
+            var detailLogLines = new List<string>();
             if (progress != null) progress(0, total, "Starting metadata step for " + total + " image(s).");
             for (int i = 0; i < total; i++)
             {
@@ -49,7 +50,7 @@ namespace PixelVaultNative
                 if (writeCommentMetadata) changeNotes.Add("comment");
                 if (writeTagMetadata) changeNotes.Add("tags");
                 var metadataTarget = effectiveTime.ToString("yyyy-MM-dd HH:mm:ss") + (preserveFileTimes ? " (using filesystem timestamp)" : " (custom)");
-                Log("Updating manual metadata: " + item.FileName + " -> " + metadataTarget + " [" + string.Join(", ", changeNotes.ToArray()) + "]");
+                detailLogLines.Add("Updating manual metadata: " + item.FileName + " -> " + metadataTarget + " [" + string.Join(", ", changeNotes.ToArray()) + "]");
                 var originalCreate = DateTime.MinValue;
                 var originalWrite = DateTime.MinValue;
                 var restoreFileTimes = writeDateMetadata && preserveFileTimes;
@@ -70,6 +71,7 @@ namespace PixelVaultNative
                 });
                 itemsToReset.Add(item);
             }
+            LogBatch(detailLogLines);
             var batch = metadataService.RunExifWriteRequests(requests, total, skipped, progress, cancellationToken);
             importService.RelocateExifFailuresToUploadErrors(batch.Failures);
             updated = batch.SuccessCount;

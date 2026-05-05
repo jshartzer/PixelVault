@@ -79,7 +79,7 @@ namespace PixelVaultNative
             if (string.IsNullOrWhiteSpace(file) || !File.Exists(file)) return null;
             var fileName = Path.GetFileName(file);
             var indexEntry = TryGetLibraryMetadataIndexEntry(libraryRoot, file, null);
-            var tags = snapshot == null ? new string[0] : snapshot.Tags ?? new string[0];
+            var tags = MergePlatformTagsWithEmbeddedMetadataPlatformHints(snapshot == null ? new string[0] : snapshot.Tags ?? new string[0], snapshot);
             var consoleTags = ExtractConsolePlatformFamilies(tags);
             var customPlatform = tags.FirstOrDefault(tag => tag.StartsWith(CustomPlatformPrefix, StringComparison.OrdinalIgnoreCase));
             var customPlatformName = string.IsNullOrWhiteSpace(customPlatform) ? string.Empty : CleanTag(customPlatform.Substring(CustomPlatformPrefix.Length));

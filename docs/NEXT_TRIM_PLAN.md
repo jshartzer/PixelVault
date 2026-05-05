@@ -10,7 +10,7 @@
 
 **Small UI / polish backlog (tiered by effort):** [`docs/SMALL_FEATURE_TODO.md`](SMALL_FEATURE_TODO.md) — same items as [PixelVault HQ — Small Feature To-Do](https://www.notion.so/cf63eb7c2524470d9b9a601ab46f4cc6).
 
-**Review-driven hardening (P1–P3):** **PV-PLN-RVW-001** **complete** — [`docs/completed-projects/PV-PLN-RVW-001-post-app-review-hardening.md`](completed-projects/PV-PLN-RVW-001-post-app-review-hardening.md) (from [`docs/APP_REVIEW_2026-04-12.md`](APP_REVIEW_2026-04-12.md)); stubs [`docs/plans/PV-PLN-RVW-001-post-app-review-hardening.md`](plans/PV-PLN-RVW-001-post-app-review-hardening.md) / [`open/…`](plans/open/PV-PLN-RVW-001-post-app-review-hardening.md).
+**Review-driven hardening (P1–P3):** **PV-PLN-RVW-001** **complete** — [`docs/completed-projects/PV-PLN-RVW-001-post-app-review-hardening.md`](completed-projects/PV-PLN-RVW-001-post-app-review-hardening.md) (from [`docs/APP_REVIEW_2026-04-12.md`](APP_REVIEW_2026-04-12.md)); short redirect [`docs/plans/PV-PLN-RVW-001-post-app-review-hardening.md`](plans/PV-PLN-RVW-001-post-app-review-hardening.md) (retired `open/` duplicate: [`docs/archive/PV-PLN-RVW-001-open-folder-stub-superseded.md`](archive/PV-PLN-RVW-001-open-folder-stub-superseded.md)).
 
 ---
 

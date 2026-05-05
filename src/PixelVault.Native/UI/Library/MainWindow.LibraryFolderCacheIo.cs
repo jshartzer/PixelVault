@@ -8,6 +8,8 @@ namespace PixelVaultNative
 {
     public sealed partial class MainWindow
     {
+        internal const string LibraryFolderCacheMetadataRevisionVersion = "scanner-v2";
+
         /// <summary>Returns true when the cached and current full stamps match in folder count and name-hash and differ only in the max child-directory UTC tick field (activity under existing game folders).</summary>
         internal static bool LibraryFolderCacheInventoryStampDiffersOnlyInDirectoryTicks(string cachedFullStamp, string currentFullStamp)
         {
@@ -27,8 +29,12 @@ namespace PixelVaultNative
             if (string.IsNullOrWhiteSpace(line)) return false;
             if (line.IndexOf('\t') >= 0) return false;
             var parts = line.Split('|');
-            return parts.Length == 2
-                && long.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out _);
+            if (parts.Length == 2)
+                return long.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out _);
+            return parts.Length == 3
+                && string.Equals(parts[0], LibraryFolderCacheMetadataRevisionVersion, StringComparison.Ordinal)
+                && !string.IsNullOrWhiteSpace(parts[1])
+                && long.TryParse(parts[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out _);
         }
 
         /// <summary>True when the file sits in <c>libraryRoot\GameFolder\file</c> (one directory under the library root).</summary>
@@ -67,20 +73,24 @@ namespace PixelVaultNative
             try
             {
                 var path = LibraryMetadataIndexPath(root);
-                if (!File.Exists(path)) return "missing|0";
+                if (!File.Exists(path)) return LibraryFolderCacheMetadataRevisionVersion + "|missing|0";
                 var info = new FileInfo(path);
-                return info.Length + "|" + info.LastWriteTimeUtc.Ticks;
+                return LibraryFolderCacheMetadataRevisionVersion + "|" + info.Length + "|" + info.LastWriteTimeUtc.Ticks;
             }
             catch
             {
-                return "err|0";
+                return LibraryFolderCacheMetadataRevisionVersion + "|err|0";
             }
         }
 
-        /// <summary>When folder-cache line 3 matches the metadata index revision and only directory mtimes drifted, rebuild file list from the persisted index (no per-game folder file sweep). New files on disk that are not yet indexed will not appear until a library scan. Paths may live in nested folders under each game directory (same scope as a full library folder rebuild).</summary>
-        internal bool TryGetIndexOnlyFolderCacheRefresh(string root, string currentFullStamp, out List<string> mediaFilePathsOneLevelUnderRoot)
+        /// <summary>
+        /// When folder-cache line 3 matches the metadata-index revision and only child-directory mtimes drifted, return the
+        /// persisted index's media paths for a fast folder-row projection. This intentionally avoids a recursive folder sweep;
+        /// brand-new unindexed files still require a library metadata scan before they can appear.
+        /// </summary>
+        internal bool TryGetIndexOnlyFolderCacheRefresh(string root, string currentFullStamp, out List<string> indexedMediaFilePathsUnderRoot)
         {
-            mediaFilePathsOneLevelUnderRoot = null;
+            indexedMediaFilePathsUnderRoot = null;
             if (string.IsNullOrWhiteSpace(root) || string.IsNullOrWhiteSpace(currentFullStamp)) return false;
             var path = LibraryFolderCachePath(root);
             if (!File.Exists(path)) return false;
@@ -104,13 +114,13 @@ namespace PixelVaultNative
             foreach (var kv in LoadLibraryMetadataIndexViaSessionWhenActive(root, true))
             {
                 var p = kv.Key;
-                if (string.IsNullOrWhiteSpace(p) || !IsMedia(p) || !File.Exists(p)) continue;
+                if (string.IsNullOrWhiteSpace(p) || ImportService.IsHdrFallbackPath(p) || !IsMedia(p) || !File.Exists(p)) continue;
                 if (!IsLibraryMediaFileUnderLibraryRoot(root, p)) continue;
                 files.Add(p);
             }
 
             files.Sort(StringComparer.OrdinalIgnoreCase);
-            mediaFilePathsOneLevelUnderRoot = files;
+            indexedMediaFilePathsUnderRoot = files;
             return true;
         }
 
@@ -213,7 +223,7 @@ namespace PixelVaultNative
                 (folder == null ? 0 : folder.FileCount).ToString(),
                 folder == null ? string.Empty : (folder.PreviewImagePath ?? string.Empty),
                 folder == null ? string.Empty : (folder.PlatformLabel ?? string.Empty),
-                string.Join("|", (folder == null ? new string[0] : (folder.FilePaths ?? new string[0])).Where(File.Exists)),
+                string.Join("|", (folder == null ? new string[0] : (folder.FilePaths ?? new string[0])).Where(path => !ImportService.IsHdrFallbackPath(path)).Where(File.Exists)),
                 folder == null ? string.Empty : (folder.SteamAppId ?? string.Empty),
                 folder == null ? string.Empty : (folder.SteamGridDbId ?? string.Empty),
                 folder != null && folder.NewestCaptureUtcTicks > 0 ? folder.NewestCaptureUtcTicks.ToString() : string.Empty,
@@ -242,7 +252,11 @@ namespace PixelVaultNative
             if (string.IsNullOrWhiteSpace(root) || folders == null || folders.Count != 1) return false;
             try
             {
-                return Directory.Exists(root) && Directory.EnumerateDirectories(root).Skip(1).Any();
+                return Directory.Exists(root)
+                    && Directory.EnumerateDirectories(root)
+                        .Where(dir => !ImportService.IsHdrFallbackPath(dir))
+                        .Skip(1)
+                        .Any();
             }
             catch
             {
@@ -269,14 +283,16 @@ namespace PixelVaultNative
             return parsed;
         }
 
-        List<LibraryFolderInfo> LoadLibraryFolderCacheSnapshot(string root)
+        List<LibraryFolderInfo> LoadLibraryFolderCacheSnapshot(string root, bool allowStaleMetadataRevision = false)
         {
             var path = LibraryFolderCachePath(root);
             if (!File.Exists(path)) return null;
             var lines = File.ReadAllLines(path);
             if (lines.Length < 2) return null;
             if (!string.Equals(lines[0], root, StringComparison.OrdinalIgnoreCase)) return null;
-            if (lines.Length >= 3 && !string.Equals(lines[2], GetLibraryMetadataIndexRevision(root), StringComparison.Ordinal)) return null;
+            if (!allowStaleMetadataRevision
+                && lines.Length >= 3
+                && !string.Equals(lines[2], GetLibraryMetadataIndexRevision(root), StringComparison.Ordinal)) return null;
             var parsed = ParseLibraryFolderCacheLines(root, lines);
             if (LibraryFolderCacheLooksIncomplete(root, parsed))
             {
@@ -297,9 +313,27 @@ namespace PixelVaultNative
             foreach (var line in lines.Skip(dataStart))
             {
                 var parsed = ParseLibraryFolderCacheRecordLine(root, line, aliasMap);
-                if (parsed != null) list.Add(parsed);
+                if (parsed == null) continue;
+                ExcludeHdrFallbackPathsFromLibraryFolderInfo(parsed);
+                if (parsed.FilePaths != null
+                    && parsed.FilePaths.Length == 0
+                    && (ImportService.IsHdrFallbackPath(parsed.FolderPath) || ImportService.IsHdrFallbackPath(parsed.PreviewImagePath)))
+                    continue;
+                list.Add(parsed);
             }
             return list;
+        }
+
+        static void ExcludeHdrFallbackPathsFromLibraryFolderInfo(LibraryFolderInfo folder)
+        {
+            if (folder == null || folder.FilePaths == null) return;
+            folder.FilePaths = folder.FilePaths
+                .Where(path => !ImportService.IsHdrFallbackPath(path))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            folder.FileCount = folder.FilePaths.Length;
+            if (ImportService.IsHdrFallbackPath(folder.PreviewImagePath))
+                folder.PreviewImagePath = folder.FilePaths.FirstOrDefault() ?? string.Empty;
         }
 
         void SaveLibraryFolderCache(string root, string stamp, List<LibraryFolderInfo> folders)
@@ -368,6 +402,7 @@ namespace PixelVaultNative
             {
                 return folder.FilePaths
                     .Where(File.Exists)
+                    .Where(file => !ImportService.IsHdrFallbackPath(file))
                     .Where(file => !imagesOnly || IsImage(file))
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .ToList();
@@ -376,7 +411,10 @@ namespace PixelVaultNative
             IEnumerable<string> filesEnumerable = imagesOnly
                 ? GetCachedFolderImages(folder.FolderPath)
                 : Directory.EnumerateFiles(folder.FolderPath, "*.*", SearchOption.TopDirectoryOnly).Where(IsMedia);
-            var candidates = filesEnumerable.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            var candidates = filesEnumerable
+                .Where(file => !ImportService.IsHdrFallbackPath(file))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
             var desired = NormalizeConsoleLabel(folder.PlatformLabel);
             if (candidates.Count == 0) return candidates;
             Dictionary<string, LibraryMetadataIndexEntry> indexForProbe = null;

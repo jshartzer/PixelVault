@@ -135,6 +135,33 @@ sealed class StubGameIndexEditorAssignmentService : IGameIndexEditorAssignmentSe
 
 public sealed class ImportServiceManualMetadataTests
 {
+    static ImportService CreateMinimalImportService(
+        IEnumerable<string> sourceFiles = null,
+        string destinationRoot = null,
+        string libraryRoot = null)
+    {
+        return new ImportService(new ImportServiceDependencies
+        {
+            FileSystem = new FileSystemService(),
+            LogService = NullLogService.Instance,
+            MetadataService = new StubMetadataService(),
+            GetFileCreationTime = _ => DateTime.MinValue,
+            GetFileLastWriteTime = _ => DateTime.MinValue,
+            CoverService = new StubCoverService(),
+            GetDestinationRoot = () => destinationRoot ?? string.Empty,
+            GetLibraryRoot = () => libraryRoot ?? string.Empty,
+            NormalizeGameIndexName = value => (value ?? string.Empty).Trim(),
+            UniquePath = path => Path.Combine(Path.GetDirectoryName(path) ?? string.Empty, Path.GetFileNameWithoutExtension(path) + " (2)" + Path.GetExtension(path)),
+            MoveMetadataSidecarIfPresent = delegate { },
+            IsMedia = path =>
+            {
+                var ext = Path.GetExtension(path ?? string.Empty).ToLowerInvariant();
+                return ext is ".jpg" or ".jpeg" or ".png" or ".webp" or ".jxr" or ".mp4" or ".mkv" or ".avi" or ".mov" or ".wmv" or ".webm";
+            },
+            EnumerateSourceMediaFiles = (_, predicate) => (sourceFiles ?? Array.Empty<string>()).Where(path => predicate == null || predicate(path))
+        });
+    }
+
     static ImportService CreateServiceWithManualMetadataDeps(
         ICoverService cover,
         Func<string, string> normalizeGameIndexName,
@@ -165,6 +192,121 @@ public sealed class ImportServiceManualMetadataTests
                 .ToArray(),
             CleanTag = s => string.IsNullOrWhiteSpace(s) ? string.Empty : s.Trim()
         });
+    }
+
+    [Fact]
+    public void BuildHdrCapturePairs_PrefersJxrAndMarksPngAsAlternate()
+    {
+        var png = @"E:\Uploads\Game\Capture.png";
+        var jxr = @"E:\Uploads\Game\Capture.jxr";
+
+        var pairs = ImportService.BuildHdrCapturePairs(new[] { png, jxr, @"E:\Uploads\Game\Other.png" });
+
+        var pair = Assert.Single(pairs);
+        Assert.Equal(jxr, pair.SelectedFilePath);
+        Assert.Equal(png, pair.AlternateFilePath);
+    }
+
+    [Fact]
+    public void BuildSourceInventory_FiltersPngFromSameStemHdrPair()
+    {
+        var png = @"E:\Uploads\Game\Capture.png";
+        var jxr = @"E:\Uploads\Game\Capture.jxr";
+        var other = @"E:\Uploads\Game\Other.png";
+        var svc = CreateMinimalImportService(new[] { png, jxr, other });
+
+        var inventory = svc.BuildSourceInventory(false);
+
+        Assert.Contains(jxr, inventory.TopLevelMediaFiles);
+        Assert.Contains(other, inventory.TopLevelMediaFiles);
+        Assert.DoesNotContain(png, inventory.TopLevelMediaFiles);
+        Assert.Contains(jxr, inventory.RenameScopeFiles);
+        Assert.DoesNotContain(png, inventory.RenameScopeFiles);
+        Assert.Equal(png, Assert.Single(inventory.HdrPairs).AlternateFilePath);
+    }
+
+    [Fact]
+    public void MoveHdrPairFallbackFiles_MovesToAccessibleDestinationSubfolder()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "pv-hdr-fallback-" + Guid.NewGuid().ToString("N"));
+        var source = Path.Combine(root, "Upload");
+        var dest = Path.Combine(root, "ImportDestination");
+        Directory.CreateDirectory(source);
+        Directory.CreateDirectory(dest);
+        var png = Path.Combine(source, "Capture.png");
+        File.WriteAllText(png, "png");
+        var svc = CreateMinimalImportService(destinationRoot: dest);
+        try
+        {
+            var result = svc.MoveHdrPairFallbackFiles(new[] { png });
+
+            Assert.Equal(1, result.Moved);
+            Assert.False(File.Exists(png));
+            var duplicateRoot = Path.Combine(root, "HDR Duplicates");
+            Assert.Equal(duplicateRoot, result.DestinationRoot);
+            Assert.True(Directory.Exists(duplicateRoot));
+            Assert.True(File.Exists(Path.Combine(duplicateRoot, "Capture", "Capture.png")));
+        }
+        finally
+        {
+            try
+            {
+                if (Directory.Exists(root)) Directory.Delete(root, true);
+            }
+            catch
+            {
+            }
+        }
+    }
+
+    [Fact]
+    public void MoveHdrPairFallbackFiles_WhenDestinationIsLibraryRoot_MovesToHdrDuplicatesBesideLibraryRoot()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "pv-hdr-fallback-library-" + Guid.NewGuid().ToString("N"));
+        var source = Path.Combine(root, "Upload");
+        var library = Path.Combine(root, "Library");
+        Directory.CreateDirectory(source);
+        Directory.CreateDirectory(library);
+        var png = Path.Combine(source, "Capture.png");
+        File.WriteAllText(png, "png");
+        var svc = CreateMinimalImportService(destinationRoot: library, libraryRoot: library);
+        try
+        {
+            var result = svc.MoveHdrPairFallbackFiles(new[] { png });
+
+            Assert.Equal(1, result.Moved);
+            Assert.False(File.Exists(png));
+            var duplicateRoot = Path.Combine(root, "HDR Duplicates");
+            Assert.Equal(duplicateRoot, result.DestinationRoot);
+            Assert.True(Directory.Exists(duplicateRoot));
+            Assert.True(File.Exists(Path.Combine(duplicateRoot, "Capture", "Capture.png")));
+            Assert.Empty(Directory.GetFiles(library, "Capture.png", SearchOption.AllDirectories));
+        }
+        finally
+        {
+            try
+            {
+                if (Directory.Exists(root)) Directory.Delete(root, true);
+            }
+            catch
+            {
+            }
+        }
+    }
+
+    [Fact]
+    public void BuildHdrDuplicateRoot_UsesDestinationSiblingFolder()
+    {
+        var root = ImportService.BuildHdrDuplicateRoot(@"E:\Game Captures");
+
+        Assert.Equal(@"E:\HDR Duplicates", root);
+    }
+
+    [Fact]
+    public void IsHdrFallbackPath_IgnoresCurrentAndLegacyDuplicateFolders()
+    {
+        Assert.True(ImportService.IsHdrFallbackPath(@"E:\HDR Duplicates\Game\Capture.png"));
+        Assert.True(ImportService.IsHdrFallbackPath(@"E:\Game Captures\PixelVault HDR Fallbacks\Capture.png"));
     }
 
     [Fact]

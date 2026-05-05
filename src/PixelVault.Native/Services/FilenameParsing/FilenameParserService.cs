@@ -107,7 +107,7 @@ namespace PixelVaultNative
             SuppressCaptureHostPlaceholderTitle(result);
 
             if (!string.IsNullOrWhiteSpace(result.GameTitleHint))
-                result.GameTitleHint = NormalizeColonStandinUnderscoresForGameTitle(result.GameTitleHint);
+                result.GameTitleHint = NormalizeGameTitleHint(result.GameTitleHint);
 
             return result;
         }
@@ -142,6 +142,11 @@ namespace PixelVaultNative
             s = Regex.Replace(s, @"(?<=[\p{L}\p{N}])\s+-\s+(?=[\p{L}\p{M}0-9])", ": ", RegexOptions.CultureInvariant);
             s = Regex.Replace(s, @"([\p{L}\p{N}])_ ", "$1: ", RegexOptions.CultureInvariant);
             return s;
+        }
+
+        public static string NormalizeGameTitleHint(string title)
+        {
+            return TextAndPathHelpers.StripTitleLegalMarks(NormalizeColonStandinUnderscoresForGameTitle(title));
         }
 
         void ApplyXboxPcTrailingTimestampParse(FilenameParseResult result, string fileName)
@@ -210,7 +215,7 @@ namespace PixelVaultNative
             DateTime _;
             if (TryParseXboxPcCaptureFromTrailingTimestamp(cleanedBaseName, out xboxPcTitle, out _))
             {
-                return NormalizeColonStandinUnderscoresForGameTitle(xboxPcTitle);
+                return NormalizeGameTitleHint(xboxPcTitle);
             }
 
             var match = Regex.Match(cleanedBaseName, "^(?<game>.+?)_(?<ts>\\d{14})(?:[_-]\\d+)?$");
@@ -219,7 +224,7 @@ namespace PixelVaultNative
                 var game = match.Groups["game"].Value;
                 if (LooksLikeNonSteamShortcutId(CleanNumericId(game))) return string.Empty;
                 if (IsCaptureHostPlaceholderGameTitle(game)) return string.Empty;
-                return NormalizeColonStandinUnderscoresForGameTitle(game);
+                return NormalizeGameTitleHint(game);
             }
 
             match = Regex.Match(cleanedBaseName, "^(?<game>.+?)_(?<ts>\\d{8,})(?:[_-]\\d+)?$");
@@ -228,7 +233,7 @@ namespace PixelVaultNative
                 var game = match.Groups["game"].Value;
                 if (LooksLikeNonSteamShortcutId(CleanNumericId(game))) return string.Empty;
                 if (IsCaptureHostPlaceholderGameTitle(game)) return string.Empty;
-                return NormalizeColonStandinUnderscoresForGameTitle(game);
+                return NormalizeGameTitleHint(game);
             }
 
             match = Regex.Match(cleanedBaseName, "^(?<game>.+?)-(?<year>20\\d{2})[_-](?<mon>\\d{2})[_-](?<day>\\d{2}).*$");
@@ -236,7 +241,7 @@ namespace PixelVaultNative
             {
                 var g = match.Groups["game"].Value;
                 if (IsCaptureHostPlaceholderGameTitle(g)) return string.Empty;
-                return NormalizeColonStandinUnderscoresForGameTitle(g);
+                return NormalizeGameTitleHint(g);
             }
 
             if (cleanedBaseName.Contains("_"))
@@ -244,7 +249,7 @@ namespace PixelVaultNative
                 var first = cleanedBaseName.Split('_')[0];
                 if (LooksLikeNonSteamShortcutId(CleanNumericId(first))) return string.Empty;
                 if (IsCaptureHostPlaceholderGameTitle(first)) return string.Empty;
-                return NormalizeColonStandinUnderscoresForGameTitle(first);
+                return NormalizeGameTitleHint(first);
             }
 
             match = Regex.Match(cleanedBaseName, "^(?<game>.+?)-20\\d{2}.*$");
@@ -252,11 +257,11 @@ namespace PixelVaultNative
             {
                 var g = match.Groups["game"].Value;
                 if (IsCaptureHostPlaceholderGameTitle(g)) return string.Empty;
-                return NormalizeColonStandinUnderscoresForGameTitle(g);
+                return NormalizeGameTitleHint(g);
             }
 
             if (IsCaptureHostPlaceholderGameTitle(cleanedBaseName)) return string.Empty;
-            return NormalizeColonStandinUnderscoresForGameTitle(cleanedBaseName);
+            return NormalizeGameTitleHint(cleanedBaseName);
         }
 
         List<FilenameConventionRule> GetRules(string root)

@@ -72,9 +72,15 @@ namespace PixelVaultNative
 
         string GetLibraryMetadataIndexRevision(string root);
 
-        bool TryGetIndexOnlyFolderCacheRefresh(string root, string currentFullStamp, out List<string> mediaFilePathsOneLevelUnderRoot);
+        /// <summary>
+        /// Returns indexed media paths when the folder-cache snapshot is structurally reusable and only child-directory mtimes changed.
+        /// Scanner can then rebuild folder rows from the metadata index without a recursive library folder sweep.
+        /// </summary>
+        bool TryGetIndexOnlyFolderCacheRefresh(string root, string currentFullStamp, out List<string> indexedMediaFilePathsUnderRoot);
 
         List<LibraryFolderInfo> LoadLibraryFolderCache(string root, string stamp);
+
+        List<LibraryFolderInfo> LoadLibraryFolderCacheSnapshot(string root, bool allowStaleMetadataRevision = false);
 
         void SaveLibraryFolderCache(string root, string stamp, List<LibraryFolderInfo> folders);
 

@@ -15,6 +15,7 @@ namespace PixelVaultNative
                 var names = new List<string>();
                 foreach (var dir in Directory.EnumerateDirectories(root))
                 {
+                    if (ImportService.IsHdrFallbackPath(dir)) continue;
                     folderCount++;
                     names.Add(Path.GetFileName(dir) ?? string.Empty);
                 }
@@ -36,6 +37,7 @@ namespace PixelVaultNative
                 var names = new List<string>();
                 foreach (var dir in Directory.EnumerateDirectories(root))
                 {
+                    if (ImportService.IsHdrFallbackPath(dir)) continue;
                     folderCount++;
                     var dirTicks = Directory.GetLastWriteTimeUtc(dir).Ticks;
                     if (dirTicks > latestDirTicks) latestDirTicks = dirTicks;

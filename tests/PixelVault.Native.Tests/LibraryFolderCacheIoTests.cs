@@ -55,6 +55,8 @@ public sealed class LibraryFolderCacheIoTests
     {
         Assert.True(MainWindow.IsLibraryFolderCacheMetadataRevisionLine("12345|638547890123456789"));
         Assert.True(MainWindow.IsLibraryFolderCacheMetadataRevisionLine("missing|0"));
+        Assert.True(MainWindow.IsLibraryFolderCacheMetadataRevisionLine("scanner-v2|12345|638547890123456789"));
+        Assert.True(MainWindow.IsLibraryFolderCacheMetadataRevisionLine("scanner-v2|missing|0"));
         Assert.False(MainWindow.IsLibraryFolderCacheMetadataRevisionLine("a\tb"));
         Assert.False(MainWindow.IsLibraryFolderCacheMetadataRevisionLine("onlyPart"));
     }

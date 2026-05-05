@@ -38,7 +38,7 @@ namespace PixelVaultNative
         string NormalizeGameIndexName(string name, string folderPath = null)
         {
             var normalized = CleanTag(name);
-            normalized = FilenameParserService.NormalizeColonStandinUnderscoresForGameTitle(normalized);
+            normalized = FilenameParserService.NormalizeGameTitleHint(normalized);
             return StripKnownPlatformSuffixes(normalized);
         }
 

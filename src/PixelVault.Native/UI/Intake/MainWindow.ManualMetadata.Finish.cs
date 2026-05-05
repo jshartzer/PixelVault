@@ -42,12 +42,6 @@ namespace PixelVaultNative
                         MessageBoxButton.OKCancel,
                         MessageBoxImage.Question);
                     if (addChoice != MessageBoxResult.OK) return;
-                    foreach (var title in unresolvedMasterRecords.Distinct(StringComparer.OrdinalIgnoreCase))
-                    {
-                        if (h.KnownGameChoiceSet.Add(title)) h.KnownGameChoices.Add(title);
-                    }
-                    refreshGameTitleChoices();
-                    importService.EnsureNewManualMetadataMasterRecordsInGameIndex(gameRows, pendingItems);
                 }
                 var confirm = MessageBox.Show(
                     importService.GetManualMetadataFinishConfirmBody(pendingItems.Count, h.LibraryMode, h.ImportAndEditMode),
@@ -55,6 +49,8 @@ namespace PixelVaultNative
                     MessageBoxButton.OKCancel,
                     MessageBoxImage.Question);
                 if (confirm != MessageBoxResult.OK) return;
+                if (unresolvedMasterRecords.Count > 0)
+                    importService.EnsureNewManualMetadataMasterRecordsInGameIndex(gameRows, pendingItems);
                 importService.FinalizeManualMetadataItemsAgainstGameIndex(libraryRoot, gameRows, pendingItems);
                 if (h.LibraryMode && !h.ImportAndEditMode)
                 {

@@ -175,8 +175,8 @@ namespace PixelVaultNative
                 LoadManualMetadataGameTitleRowsAsync = (root, ct) => Task.Factory.StartNew(() =>
                 {
                     ct.ThrowIfCancellationRequested();
-                    var rows = mw.GetSavedGameIndexRowsForRoot(root);
-                    if (rows == null || rows.Count == 0) rows = mw.LoadGameIndexEditorRowsCore(root, null);
+                    var rows = mw.LoadGameIndexEditorRowsCore(root, null);
+                    if (rows == null || rows.Count == 0) rows = mw.GetSavedGameIndexRowsForRoot(root);
                     return rows ?? new List<GameIndexEditorRow>();
                 }, ct, TaskCreationOptions.None, TaskScheduler.Default)
             };
@@ -200,7 +200,7 @@ namespace PixelVaultNative
                 mw.SaveLibraryMetadataIndex,
                 mw.LoadLibraryMetadataIndexForFilePaths,
                 mw.MergePersistLibraryMetadataIndexEntries,
-                mw.LoadLibraryFolderCacheSnapshot,
+                root => mw.LoadLibraryFolderCacheSnapshot(root),
                 mw.ResolveIndexedLibraryDate,
                 mw.BuildResolvedLibraryMetadataIndexEntry,
                 mw.RefreshLibraryCoversAsync,

@@ -68,6 +68,7 @@
     <Compile Include="Services\Intake\ImportWorkflowOrchestration.cs" />
     <Compile Include="Services\Intake\IntakeAnalysisService.cs" />
     <Compile Include="Services\Intake\IntakePipeline.cs" />
+    <Compile Include="Services\Intake\IntakePreparationBuilder.cs" />
     <Compile Include="Services\Intake\IntakePreviewFileAnalysis.cs" />
     <Compile Include="Services\Intake\SourceFileStabilityProbe.cs" />
     <Compile Include="Services\Intake\SteamImportRename.cs" />
@@ -95,6 +96,8 @@
     <Compile Include="UI\UiBrushHelper.cs" />
     <Compile Include="UI\Design\DesignTokens.cs" />
     <Compile Include="UI\Diagnostics\HealthDashboardWindow.cs" />
+    <Compile Include="UI\Progress\WorkflowProgressCoalescer.cs" />
+    <Compile Include="UI\Progress\WorkflowProgressLogBuffer.cs" />
     <Compile Include="UI\Progress\WorkflowProgressWindow.cs" />
     <Compile Include="UI\Editors\FilenameConventionEditorWindow.cs" />
     <Compile Include="UI\Editors\GameIndexEditorHost.cs" />

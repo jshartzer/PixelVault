@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -9,6 +10,12 @@ namespace PixelVaultNative
 {
     public sealed partial class MainWindow
     {
+        internal sealed class ManualMetadataFolderGroup
+        {
+            public string FolderPath = string.Empty;
+            public List<ManualMetadataItem> Items = new List<ManualMetadataItem>();
+        }
+
         string GetManualMetadataBadgeLabel(ManualMetadataItem item)
         {
             if (item == null) return "Manual";
@@ -41,10 +48,72 @@ namespace PixelVaultNative
             return values.Length == 1 ? values[0] : string.Empty;
         }
 
+        internal static bool ShouldFlushManualMetadataSharedTextField(IEnumerable<ManualMetadataItem> selection, string fieldText, Func<ManualMetadataItem, string> getter)
+        {
+            var selected = (selection ?? Enumerable.Empty<ManualMetadataItem>()).Where(item => item != null).ToList();
+            if (selected.Count == 0) return false;
+            if (selected.Count == 1) return true;
+            var currentText = (fieldText ?? string.Empty).Trim();
+            if (!string.IsNullOrWhiteSpace(currentText)) return true;
+            var existingValues = selected
+                .Select(getter)
+                .Select(value => (value ?? string.Empty).Trim())
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
+            return existingValues.Length <= 1;
+        }
+
         static bool? GetSharedManualMetadataFieldBool(IEnumerable<ManualMetadataItem> selection, Func<ManualMetadataItem, bool> getter)
         {
             var values = selection.Select(getter).Distinct().ToArray();
             return values.Length == 1 ? (bool?)values[0] : null;
+        }
+
+        internal static List<string> BuildManualMetadataGameTitleChoicesFromGameIndex(
+            IEnumerable<GameIndexEditorRow> rows,
+            Func<string, string, string> normalizeGameIndexName)
+        {
+            if (normalizeGameIndexName == null) throw new ArgumentNullException(nameof(normalizeGameIndexName));
+            return (rows ?? Enumerable.Empty<GameIndexEditorRow>())
+                .Where(row => row != null && !string.IsNullOrWhiteSpace(row.Name))
+                .Select(row => normalizeGameIndexName(row.Name, row.FolderPath))
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        internal static List<ManualMetadataFolderGroup> BuildManualMetadataFolderGroups(IEnumerable<ManualMetadataItem> items)
+        {
+            var groups = new List<ManualMetadataFolderGroup>();
+            var byFolder = new Dictionary<string, ManualMetadataFolderGroup>(StringComparer.OrdinalIgnoreCase);
+            foreach (var item in items ?? Enumerable.Empty<ManualMetadataItem>())
+            {
+                if (item == null) continue;
+                var folder = GetManualMetadataFolderPath(item);
+                ManualMetadataFolderGroup group;
+                if (!byFolder.TryGetValue(folder, out group))
+                {
+                    group = new ManualMetadataFolderGroup { FolderPath = folder };
+                    byFolder[folder] = group;
+                    groups.Add(group);
+                }
+                group.Items.Add(item);
+            }
+            return groups;
+        }
+
+        static string GetManualMetadataFolderPath(ManualMetadataItem item)
+        {
+            try
+            {
+                var folder = Path.GetDirectoryName(item == null ? string.Empty : item.FilePath ?? string.Empty) ?? string.Empty;
+                return string.IsNullOrWhiteSpace(folder) ? "Unknown folder" : folder.Trim();
+            }
+            catch
+            {
+                return "Unknown folder";
+            }
         }
 
         string GetManualMetadataFilenameGuessSummary(IEnumerable<ManualMetadataItem> selection)

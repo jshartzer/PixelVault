@@ -41,6 +41,9 @@ namespace PixelVaultNative
         /// <summary>Rebuild persisted folder-card cache from a metadata index snapshot (locks library maintenance).</summary>
         void RebuildLibraryFolderCache(string root, Dictionary<string, LibraryMetadataIndexEntry> index);
 
+        /// <summary>Update cached folder rows touched by recent file/folder changes without a full recursive folder scan.</summary>
+        bool TryUpdateLibraryFolderCacheForTouchedPaths(string root, IEnumerable<string> touchedPaths);
+
         /// <summary>Reload metadata index from disk and rebuild folder-card cache (e.g. after game-index edits).</summary>
         void RefreshFolderCacheAfterGameIndexChange(string root);
 

@@ -75,6 +75,9 @@ namespace PixelVaultNative
 
             public List<LibraryFolderInfo> LoadLibraryFolderCache(string root, string stamp) => window.LoadLibraryFolderCache(root, stamp);
 
+            public List<LibraryFolderInfo> LoadLibraryFolderCacheSnapshot(string root, bool allowStaleMetadataRevision = false) =>
+                window.LoadLibraryFolderCacheSnapshot(root, allowStaleMetadataRevision);
+
             public void SaveLibraryFolderCache(string root, string stamp, List<LibraryFolderInfo> folders) => window.SaveLibraryFolderCache(root, stamp, folders);
 
             public bool ApplySavedGameIndexRows(string root, List<LibraryFolderInfo> folders) => window.ApplySavedGameIndexRows(root, folders);

@@ -14,6 +14,7 @@ namespace PixelVaultNative
         public MetadataStepResult MetadataResult;
         public MoveStepResult MoveResult;
         public SortStepResult SortResult;
+        public HdrFallbackMoveResult HdrFallbackResult;
     }
 
     /// <summary>
@@ -51,6 +52,13 @@ namespace PixelVaultNative
             var sortOffset = standardTotals.SortOffset;
             var totalWork = standardTotals.TotalWork;
 
+            ImportWorkflowOrchestration.ThrowIfCancellationRequested(cancellationToken, "Headless import");
+            var hdrFallbackResult = import.MoveHdrPairFallbackFiles(
+                (inventory.HdrPairs ?? new List<HdrCapturePair>())
+                .Where(pair => pair != null && !string.IsNullOrWhiteSpace(pair.AlternateFilePath))
+                .Select(pair => pair.AlternateFilePath),
+                null,
+                cancellationToken);
             ImportWorkflowOrchestration.ThrowIfCancellationRequested(cancellationToken, "Headless import");
             var renameResult = await import.RunSteamRenameAsync(
                 renameInventory == null ? new List<string>() : renameInventory.RenameScopeFiles,
@@ -128,7 +136,8 @@ namespace PixelVaultNative
                 DeleteResult = deleteResult,
                 MetadataResult = metadataResult,
                 MoveResult = moveResult,
-                SortResult = sortResult
+                SortResult = sortResult,
+                HdrFallbackResult = hdrFallbackResult
             };
         }
 

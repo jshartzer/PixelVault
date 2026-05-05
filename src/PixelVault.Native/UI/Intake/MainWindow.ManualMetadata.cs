@@ -24,9 +24,76 @@ namespace PixelVaultNative
             tileStack.Children.Add(badge);
             tileStack.Children.Add(new TextBlock { Text = item.FileName, Foreground = Brushes.White, TextWrapping = TextWrapping.Wrap, FontWeight = FontWeights.SemiBold });
             tileStack.Children.Add(new TextBlock { Text = FormatFriendlyTimestamp(item.CaptureTime), Foreground = Brush("#B7C6C0"), Margin = new Thickness(0, 6, 0, 0) });
+            if (!string.IsNullOrWhiteSpace(item.HdrAlternateFilePath))
+            {
+                tileStack.Children.Add(new TextBlock { Text = GetManualMetadataHdrPairLabel(item), Foreground = Brush("#F2C86B"), Margin = new Thickness(0, 6, 0, 0), FontSize = 12, TextWrapping = TextWrapping.Wrap });
+            }
             tileBorder.Child = tileStack;
             tile.Content = tileBorder;
             return tile;
+        }
+
+        ListBoxItem BuildManualMetadataFolderHeader(ManualMetadataFolderGroup group)
+        {
+            var folder = group == null ? "Unknown folder" : group.FolderPath ?? "Unknown folder";
+            var trimmed = folder.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            var folderName = Path.GetFileName(trimmed);
+            if (string.IsNullOrWhiteSpace(folderName)) folderName = folder;
+            var count = group == null || group.Items == null ? 0 : group.Items.Count;
+            var card = new Border { Background = Brush("#0D1317"), BorderBrush = Brush("#2B3A43"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(12), Padding = new Thickness(10, 8, 10, 8), Margin = new Thickness(0, 2, 0, 10) };
+            var stack = new StackPanel();
+            stack.Children.Add(new TextBlock { Text = folderName + " | " + count + " file" + (count == 1 ? string.Empty : "s"), Foreground = Brush("#D9E7EF"), FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap });
+            stack.Children.Add(new TextBlock { Text = folder, Foreground = Brush("#8FA2AD"), FontSize = 11, Margin = new Thickness(0, 3, 0, 0), TextWrapping = TextWrapping.Wrap });
+            card.Child = stack;
+            return new ListBoxItem
+            {
+                Content = card,
+                Padding = new Thickness(0),
+                Margin = new Thickness(0),
+                BorderThickness = new Thickness(0),
+                Background = Brushes.Transparent,
+                Focusable = false,
+                IsHitTestVisible = false,
+                HorizontalContentAlignment = HorizontalAlignment.Stretch
+            };
+        }
+
+        IEnumerable<ListBoxItem> GetManualMetadataSelectableListItems(ManualMetadataDialogHost h)
+        {
+            if (h == null || h.FileList == null) return Enumerable.Empty<ListBoxItem>();
+            return h.FileList.Items.Cast<ListBoxItem>().Where(entry => entry.Tag is ManualMetadataItem).ToList();
+        }
+
+        string GetManualMetadataHdrPairLabel(ManualMetadataItem item)
+        {
+            var selected = (Path.GetExtension(item == null ? string.Empty : item.FilePath) ?? string.Empty).TrimStart('.').ToUpperInvariant();
+            var alternate = (Path.GetExtension(item == null ? string.Empty : item.HdrAlternateFilePath) ?? string.Empty).TrimStart('.').ToUpperInvariant();
+            if (string.IsNullOrWhiteSpace(selected) || string.IsNullOrWhiteSpace(alternate)) return "HDR pair detected";
+            return "HDR pair | using " + selected + " | " + alternate + " will be parked";
+        }
+
+        string GetManualMetadataHdrSwapHeader(List<ManualMetadataItem> items)
+        {
+            var swappable = (items ?? new List<ManualMetadataItem>())
+                .Where(item => item != null && !string.IsNullOrWhiteSpace(item.HdrAlternateFilePath))
+                .ToList();
+            if (swappable.Count == 0) return "Swap HDR pair type";
+            if (swappable.Count > 1) return "Swap HDR pair type for selected";
+            var alternate = (Path.GetExtension(swappable[0].HdrAlternateFilePath) ?? string.Empty).TrimStart('.').ToUpperInvariant();
+            return string.IsNullOrWhiteSpace(alternate) ? "Swap HDR pair type" : "Use " + alternate + " instead for this HDR pair";
+        }
+
+        bool SwapManualMetadataHdrPairSelection(ManualMetadataItem item)
+        {
+            if (item == null || string.IsNullOrWhiteSpace(item.HdrAlternateFilePath)) return false;
+            if (!fileSystemService.FileExists(item.HdrAlternateFilePath)) return false;
+            var currentPath = item.FilePath ?? string.Empty;
+            var alternatePath = item.HdrAlternateFilePath;
+            item.FilePath = alternatePath;
+            item.FileName = Path.GetFileName(alternatePath);
+            item.OriginalFileName = item.FileName;
+            item.HdrAlternateFilePath = currentPath;
+            return true;
         }
 
         void RebuildManualMetadataFileList(ManualMetadataDialogHost h)
@@ -34,8 +101,20 @@ namespace PixelVaultNative
             h.FileList.Items.Clear();
             h.BadgeBlocks.Clear();
             h.TileBorders.Clear();
-            foreach (var item in h.Items)
-                h.FileList.Items.Add(BuildManualMetadataListTile(h, item));
+            if (h.ImportAndEditMode)
+            {
+                foreach (var group in BuildManualMetadataFolderGroups(h.Items))
+                {
+                    h.FileList.Items.Add(BuildManualMetadataFolderHeader(group));
+                    foreach (var item in group.Items)
+                        h.FileList.Items.Add(BuildManualMetadataListTile(h, item));
+                }
+            }
+            else
+            {
+                foreach (var item in h.Items)
+                    h.FileList.Items.Add(BuildManualMetadataListTile(h, item));
+            }
         }
 
         /// <summary>After applying library metadata to a batch: remove those files from the dialog list and keep editing. Returns false if the list is empty (caller should close).</summary>
@@ -56,8 +135,8 @@ namespace PixelVaultNative
             refreshGameTitleChoices();
             refreshTileBadges();
             if (h.Items.Count == 0) return false;
-            foreach (ListBoxItem entry in h.FileList.Items) entry.IsSelected = false;
-            var first = h.FileList.Items.Cast<ListBoxItem>().FirstOrDefault();
+            foreach (var entry in GetManualMetadataSelectableListItems(h)) entry.IsSelected = false;
+            var first = GetManualMetadataSelectableListItems(h).FirstOrDefault();
             if (first != null) first.IsSelected = true;
             refreshSelectionUi();
             return true;
@@ -119,39 +198,11 @@ namespace PixelVaultNative
                             ? loadTask.Result
                             : new List<GameIndexEditorRow>();
                         h.GameTitleIndexRows = rows;
-                        var loadedChoices = rows
-                            .Where(row => row != null && !string.IsNullOrWhiteSpace(row.Name))
-                            .Select(row => NormalizeGameIndexName(row.Name, row.FolderPath))
-                            .Where(name => !string.IsNullOrWhiteSpace(name))
-                            .Distinct(StringComparer.OrdinalIgnoreCase)
-                            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
-                            .ToList();
-                        foreach (var recent in GetManualMetadataRecentTitleLabelsList())
-                        {
-                            var recentName = NormalizeGameIndexName(ExtractGameNameFromChoiceLabel(recent), null);
-                            if (string.IsNullOrWhiteSpace(recentName)) continue;
-                            if (loadedChoices.Contains(recentName, StringComparer.OrdinalIgnoreCase)) continue;
-                            loadedChoices.Insert(0, recentName);
-                        }
-                        foreach (var extraChoice in h.KnownGameChoices.Where(label => !string.IsNullOrWhiteSpace(label)))
-                        {
-                            if (!loadedChoices.Contains(extraChoice, StringComparer.OrdinalIgnoreCase)) loadedChoices.Add(extraChoice);
-                        }
+                        var loadedChoices = BuildManualMetadataGameTitleChoicesFromGameIndex(rows, NormalizeGameIndexName);
                         h.KnownGameChoices = loadedChoices;
                         h.KnownGameChoiceSet = new HashSet<string>(h.KnownGameChoices, StringComparer.OrdinalIgnoreCase);
-                        h.KnownGameChoiceNameMap = rows
-                            .Where(row => row != null && !string.IsNullOrWhiteSpace(row.Name))
-                            .Select(row => NormalizeGameIndexName(row.Name, row.FolderPath))
-                            .Where(name => !string.IsNullOrWhiteSpace(name))
-                            .Distinct(StringComparer.OrdinalIgnoreCase)
+                        h.KnownGameChoiceNameMap = h.KnownGameChoices
                             .ToDictionary(name => CleanTag(name), name => name, StringComparer.OrdinalIgnoreCase);
-                        foreach (var extraChoice in h.KnownGameChoices)
-                        {
-                            var normalizedChoice = CleanTag(extraChoice);
-                            if (h.KnownGameChoiceNameMap.ContainsKey(normalizedChoice)) continue;
-                            var extraName = ExtractGameNameFromChoiceLabel(extraChoice);
-                            if (!string.IsNullOrWhiteSpace(extraName)) h.KnownGameChoiceNameMap[normalizedChoice] = extraName;
-                        }
                         var restoreText = h.GameNameBox.Text;
                         h.GameNameBox.ItemsSource = null;
                         h.GameNameBox.ItemsSource = h.KnownGameChoices;
@@ -391,8 +442,7 @@ namespace PixelVaultNative
                 refreshTileSelectionState();
             };
 
-            foreach (var item in items)
-                h.FileList.Items.Add(BuildManualMetadataListTile(h, item));
+            RebuildManualMetadataFileList(h);
             refreshTileBadges();
 
             var fileListMenu = new ContextMenu();
@@ -419,8 +469,45 @@ namespace PixelVaultNative
                     if (!string.IsNullOrWhiteSpace(dir)) OpenFolder(dir);
                 }
             };
+            var hdrSeparator = new Separator();
+            var swapHdrItem = new MenuItem { Header = "Swap HDR pair type" };
+            swapHdrItem.Click += delegate
+            {
+                var selected = h.FileList.SelectedItems.Cast<ListBoxItem>()
+                    .Select(i => i.Tag as ManualMetadataItem)
+                    .Where(m => m != null && !string.IsNullOrWhiteSpace(m.HdrAlternateFilePath))
+                    .Distinct()
+                    .ToList();
+                if (selected.Count == 0) return;
+                var swapped = selected.Where(SwapManualMetadataHdrPairSelection).ToList();
+                if (swapped.Count == 0)
+                {
+                    TryLibraryToast("The alternate HDR file was not found, so PixelVault could not swap this pair.", MessageBoxImage.Warning);
+                    return;
+                }
+                RebuildManualMetadataFileList(h);
+                foreach (var entry in GetManualMetadataSelectableListItems(h))
+                {
+                    var item = entry.Tag as ManualMetadataItem;
+                    if (item != null && swapped.Contains(item)) entry.IsSelected = true;
+                }
+                refreshTileBadges();
+                refreshSelectionUi();
+            };
+            fileListMenu.Opened += delegate
+            {
+                var selected = h.FileList.SelectedItems.Cast<ListBoxItem>()
+                    .Select(i => i.Tag as ManualMetadataItem)
+                    .Where(m => m != null && !string.IsNullOrWhiteSpace(m.HdrAlternateFilePath))
+                    .ToList();
+                swapHdrItem.Header = GetManualMetadataHdrSwapHeader(selected);
+                swapHdrItem.Visibility = h.ImportAndEditMode && selected.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+                hdrSeparator.Visibility = swapHdrItem.Visibility;
+            };
             fileListMenu.Items.Add(copyPathItem);
             fileListMenu.Items.Add(openFolderItem);
+            fileListMenu.Items.Add(hdrSeparator);
+            fileListMenu.Items.Add(swapHdrItem);
             h.FileList.ContextMenu = fileListMenu;
 
             h.FileList.SelectionChanged += delegate
@@ -689,13 +776,17 @@ namespace PixelVaultNative
                 h.SuppressSync = false;
                 try
                 {
-                    syncSelectedGameNames();
-                    syncSelectedSteamAppIds();
+                    var shouldFlushGameName = ShouldFlushManualMetadataSharedTextField(h.SelectedItems, h.GameNameBox.Text, delegate(ManualMetadataItem item) { return item.GameName; });
+                    var shouldFlushSteamAppId = ShouldFlushManualMetadataSharedTextField(h.SelectedItems, h.SteamAppIdBox.Text, delegate(ManualMetadataItem item) { return item.SteamAppId; });
+                    var shouldFlushTags = ShouldFlushManualMetadataSharedTextField(h.SelectedItems, h.TagsBox.Text, delegate(ManualMetadataItem item) { return item.TagText; });
+                    var shouldFlushComment = ShouldFlushManualMetadataSharedTextField(h.SelectedItems, h.CommentBox.Text, delegate(ManualMetadataItem item) { return item.Comment; });
+                    if (shouldFlushGameName) syncSelectedGameNames();
+                    if (shouldFlushSteamAppId) syncSelectedSteamAppIds();
                     foreach (var item in h.SelectedItems)
                     {
-                        item.TagText = h.TagsBox.Text ?? string.Empty;
-                        item.Comment = h.CommentBox.Text ?? string.Empty;
-                        if (ManualMetadataTouchesTags(item)) item.ForceTagMetadataWrite = true;
+                        if (shouldFlushTags) item.TagText = h.TagsBox.Text ?? string.Empty;
+                        if (shouldFlushComment) item.Comment = h.CommentBox.Text ?? string.Empty;
+                        if (shouldFlushTags && ManualMetadataTouchesTags(item)) item.ForceTagMetadataWrite = true;
                     }
                 }
                 finally
@@ -727,12 +818,12 @@ namespace PixelVaultNative
                 {
                     if (libraryMode && !importAndEditMode)
                     {
-                        var firstEntry = h.FileList.Items.Cast<ListBoxItem>().FirstOrDefault();
+                        var firstEntry = GetManualMetadataSelectableListItems(h).FirstOrDefault();
                         if (firstEntry != null) firstEntry.IsSelected = true;
                     }
                     else
                     {
-                        foreach (ListBoxItem entry in h.FileList.Items) entry.IsSelected = true;
+                        foreach (var entry in GetManualMetadataSelectableListItems(h)) entry.IsSelected = true;
                     }
                 }
                 else

@@ -107,9 +107,6 @@ namespace PixelVaultNative
                         refreshTileBadges();
                         if (!string.IsNullOrWhiteSpace(resolvedTitle))
                         {
-                            var choiceName = NormalizeGameIndexName(resolvedTitle, null);
-                            if (!string.IsNullOrWhiteSpace(choiceName) && h.KnownGameChoiceSet.Add(choiceName)) h.KnownGameChoices.Add(choiceName);
-                            refreshGameTitleChoices();
                             h.SuppressSync = true;
                             h.GameNameBox.Text = resolvedTitle;
                             h.SuppressSync = false;

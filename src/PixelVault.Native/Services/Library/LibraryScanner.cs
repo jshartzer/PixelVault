@@ -15,6 +15,8 @@ namespace PixelVaultNative
         readonly IMetadataService metadataService;
         readonly IFileSystemService fileSystem;
         readonly Action<string, Dictionary<string, LibraryMetadataIndexEntry>> folderCacheRebuildHook;
+        readonly ConcurrentDictionary<string, byte> queuedLibraryFolderMetadataRepairRoots =
+            new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
 
         /// <param name="folderCacheRebuildHook">Optional test hook; when set, replaces full folder cache rebuild (avoids heavy host dependencies).</param>
         public LibraryScanner(
@@ -50,6 +52,7 @@ namespace PixelVaultNative
                 {
                     foreach (var dir in fileSystem.EnumerateDirectories(root))
                     {
+                        if (ImportService.IsHdrFallbackPath(dir)) continue;
                         targets.AddRange(fileSystem.EnumerateFiles(dir, "*.*", SearchOption.AllDirectories).Where(host.IsLibraryMediaFile));
                     }
                 }
@@ -58,7 +61,12 @@ namespace PixelVaultNative
                     targets.AddRange(fileSystem.EnumerateFiles(folderPath, "*.*", SearchOption.AllDirectories).Where(host.IsLibraryMediaFile));
                 }
 
-                var fileList = targets.Where(fileSystem.FileExists).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(p => p, StringComparer.OrdinalIgnoreCase).ToList();
+                var fileList = targets
+                    .Where(file => !ImportService.IsHdrFallbackPath(file))
+                    .Where(fileSystem.FileExists)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
                 var targetSet = new HashSet<string>(fileList, StringComparer.OrdinalIgnoreCase);
                 int updated = 0, unchanged = 0, removed = 0;
                 var scopeLabel = string.IsNullOrWhiteSpace(folderPath) ? "library" : (Path.GetFileName(folderPath) ?? "folder");
@@ -206,11 +214,13 @@ namespace PixelVaultNative
         public void UpsertLibraryMetadataIndexEntries(IEnumerable<string> files, string root)
         {
             var savedMetadataIndex = false;
+            List<string> touchedFiles = null;
             lock (host.LibraryMaintenanceSync)
             {
                 if (string.IsNullOrWhiteSpace(root)) return;
                 var fileList = (files ?? Enumerable.Empty<string>()).Where(f => !string.IsNullOrWhiteSpace(f) && fileSystem.FileExists(f)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
                 if (fileList.Count == 0) return;
+                touchedFiles = fileList;
                 var index = host.LoadLibraryMetadataIndex(root, true);
                 var gameRows = host.LoadSavedGameIndexRows(root);
                 var metadataByFile = metadataService.ReadEmbeddedMetadataBatch(fileList, CancellationToken.None);
@@ -230,12 +240,13 @@ namespace PixelVaultNative
                 savedMetadataIndex = true;
             }
 
-            if (savedMetadataIndex) RebuildLibraryFolderCache(root, null);
+            if (savedMetadataIndex) RefreshFolderCacheForTouchedPathsOrRebuild(root, touchedFiles);
         }
 
         public void UpsertLibraryMetadataIndexEntries(IEnumerable<ManualMetadataItem> items, string root)
         {
             var savedMetadataIndex = false;
+            List<string> touchedFiles = null;
             lock (host.LibraryMaintenanceSync)
             {
                 if (string.IsNullOrWhiteSpace(root)) return;
@@ -245,6 +256,7 @@ namespace PixelVaultNative
                     .Select(group => group.Last())
                     .ToList();
                 if (itemList.Count == 0) return;
+                touchedFiles = itemList.Select(item => item.FilePath).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
                 var index = host.LoadLibraryMetadataIndex(root, true);
                 var gameRows = host.LoadSavedGameIndexRows(root);
                 foreach (var item in itemList)
@@ -278,17 +290,19 @@ namespace PixelVaultNative
                 savedMetadataIndex = true;
             }
 
-            if (savedMetadataIndex) RebuildLibraryFolderCache(root, null);
+            if (savedMetadataIndex) RefreshFolderCacheForTouchedPathsOrRebuild(root, touchedFiles);
         }
 
         public void RemoveLibraryMetadataIndexEntries(IEnumerable<string> files, string root)
         {
             var rebuildFolderCache = false;
+            List<string> touchedFiles = null;
             lock (host.LibraryMaintenanceSync)
             {
                 if (string.IsNullOrWhiteSpace(root)) return;
                 var fileList = (files ?? Enumerable.Empty<string>()).Where(f => !string.IsNullOrWhiteSpace(f)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
                 if (fileList.Count == 0) return;
+                touchedFiles = fileList;
                 var touchedDirectories = new HashSet<string>(
                     fileList
                         .Select(file => Path.GetDirectoryName(file) ?? string.Empty)
@@ -311,12 +325,13 @@ namespace PixelVaultNative
                 }
             }
 
-            if (rebuildFolderCache) RebuildLibraryFolderCache(root, null);
+            if (rebuildFolderCache) RefreshFolderCacheForTouchedPathsOrRebuild(root, touchedFiles);
         }
 
         public void SavePhotoIndexEditorRows(string root, IEnumerable<PhotoIndexEditorRow> rows, IEnumerable<string> removedPaths = null)
         {
             List<string> rehomeAfterGameIdChange = null;
+            List<string> touchedPathsAfterSave = null;
             lock (host.LibraryMaintenanceSync)
             {
                 if (string.IsNullOrWhiteSpace(root) || !fileSystem.DirectoryExists(root))
@@ -336,13 +351,23 @@ namespace PixelVaultNative
                     if (kv.Value == null || string.IsNullOrWhiteSpace(kv.Key)) continue;
                     index[kv.Key] = kv.Value;
                 }
-                foreach (var path in removedPaths ?? Enumerable.Empty<string>())
+                var removedPathList = (removedPaths ?? Enumerable.Empty<string>())
+                    .Where(path => !string.IsNullOrWhiteSpace(path))
+                    .Select(path => path.Trim())
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                foreach (var path in removedPathList)
                 {
-                    if (string.IsNullOrWhiteSpace(path)) continue;
-                    index.Remove(path.Trim());
+                    index.Remove(path);
                 }
                 var ratingWrites = new List<ExifWriteRequest>();
                 rehomeAfterGameIdChange = new List<string>();
+                touchedPathsAfterSave = rowList
+                    .Select(row => row.FilePath)
+                    .Concat(removedPathList)
+                    .Where(path => !string.IsNullOrWhiteSpace(path))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
                 foreach (var row in rowList)
                 {
                     var normalizedTags = string.Join(", ", host.ParseTagText(row.TagText));
@@ -424,11 +449,11 @@ namespace PixelVaultNative
                 host.SaveLibraryMetadataIndex(root, index);
             }
 
-            RebuildLibraryFolderCache(root, null);
+            RefreshFolderCacheForTouchedPathsOrRebuild(root, touchedPathsAfterSave);
             if (rehomeAfterGameIdChange != null && rehomeAfterGameIdChange.Count > 0)
             {
                 var moved = host.RehomeLibraryCapturesTowardCanonicalFolders(root, rehomeAfterGameIdChange);
-                if (moved > 0) RebuildLibraryFolderCache(root, null);
+                if (moved > 0) RefreshFolderCacheForTouchedPathsOrRebuild(root, rehomeAfterGameIdChange);
             }
         }
 
@@ -454,84 +479,25 @@ namespace PixelVaultNative
 
         public List<LibraryFolderInfo> LoadLibraryFolders(string root, Dictionary<string, LibraryMetadataIndexEntry> index)
         {
-            return LoadLibraryFoldersCore(root, index, null);
+            List<string> repairCandidates;
+            return LoadLibraryFoldersCore(root, index, null, out repairCandidates);
         }
 
         /// <summary>
         /// Builds folder-cache rows grouped by photo-index <c>GameId</c> (not by directory). <see cref="LibraryFolderInfo.FolderPath"/> is observed placement
         /// (majority parent of assigned files, or game-index path when set)—never used here to infer game title (LIBST Step 4).
         /// </summary>
-        List<LibraryFolderInfo> LoadLibraryFoldersCore(string root, Dictionary<string, LibraryMetadataIndexEntry> index, List<string> precomputedOneLevelMediaFilesOrNull)
+        List<LibraryFolderInfo> LoadLibraryFoldersCore(
+            string root,
+            Dictionary<string, LibraryMetadataIndexEntry> index,
+            List<string> precomputedOneLevelMediaFilesOrNull,
+            out List<string> repairCandidates)
         {
             var list = new List<LibraryFolderInfo>();
             if (index == null) index = host.LoadLibraryMetadataIndex(root);
             var gameRows = host.LoadSavedGameIndexRows(root);
-            bool indexChanged = false;
-            bool gameRowsChanged = false;
-            List<string> allFiles;
-            if (precomputedOneLevelMediaFilesOrNull == null)
-            {
-                allFiles = fileSystem.EnumerateDirectories(root)
-                    .SelectMany(dir => fileSystem.EnumerateFiles(dir, "*.*", SearchOption.AllDirectories).Where(host.IsLibraryMediaFile))
-                    .Where(fileSystem.FileExists)
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
-                    .ToList();
-            }
-            else
-            {
-                allFiles = precomputedOneLevelMediaFilesOrNull
-                    .Where(path => !string.IsNullOrWhiteSpace(path) && fileSystem.FileExists(path) && host.IsLibraryMediaFile(path))
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
-                    .ToList();
-            }
-            var missingOrIncompleteFiles = allFiles
-                .Where(file =>
-                {
-                    LibraryMetadataIndexEntry entry;
-                    return !index.TryGetValue(file, out entry) || entry == null || entry.CaptureUtcTicks <= 0;
-                })
-                .ToList();
-            var metadataByFile = metadataService.ReadEmbeddedMetadataBatch(missingOrIncompleteFiles, CancellationToken.None);
-            foreach (var file in allFiles)
-            {
-                LibraryMetadataIndexEntry entry;
-                index.TryGetValue(file, out entry);
-                var missingOrIncomplete = entry == null || entry.CaptureUtcTicks <= 0;
-                var shortcutMislabeled = !missingOrIncomplete
-                    && host.IndexEntryShouldReResolveForNonSteamShortcutMislabel(root, file, entry);
-                var steamMislabeled = !missingOrIncomplete
-                    && host.IndexEntryShouldReResolveSteamPlatformWithoutAppId(root, file, entry, gameRows);
-                if (missingOrIncomplete || shortcutMislabeled || steamMislabeled)
-                {
-                    EmbeddedMetadataSnapshot snapshot;
-                    if (!metadataByFile.TryGetValue(file, out snapshot) || snapshot == null) snapshot = new EmbeddedMetadataSnapshot();
-                    var stamp = host.BuildLibraryMetadataStamp(file);
-                    var previousGameId = entry == null ? string.Empty : host.NormalizeGameId(entry.GameId);
-                    var previousConsole = entry == null ? string.Empty : host.NormalizeConsoleLabel(entry.ConsoleLabel);
-                    var rebuiltEntry = host.BuildResolvedLibraryMetadataIndexEntry(root, file, stamp, snapshot, entry, index, gameRows);
-                    index[file] = rebuiltEntry;
-                    entry = rebuiltEntry;
-                    host.SetCachedFileTagsForLibraryScan(file, host.ParseTagText(rebuiltEntry.TagText), host.MetadataCacheStamp(file));
-                    indexChanged = true;
-                    if (!string.Equals(previousGameId, host.NormalizeGameId(rebuiltEntry.GameId), StringComparison.OrdinalIgnoreCase)
-                        || !string.Equals(previousConsole, host.NormalizeConsoleLabel(rebuiltEntry.ConsoleLabel), StringComparison.OrdinalIgnoreCase))
-                    {
-                        gameRowsChanged = true;
-                    }
-                }
-                else if (string.IsNullOrWhiteSpace(entry.GameId))
-                {
-                    var tags = host.ParseTagText(entry.TagText);
-                    var platformLabel = string.IsNullOrWhiteSpace(entry.ConsoleLabel)
-                        ? host.NormalizeConsoleLabel(host.DetermineConsoleLabelFromTags(tags))
-                        : host.NormalizeConsoleLabel(entry.ConsoleLabel);
-                    entry.GameId = host.ResolveGameIdForIndexedFile(root, file, platformLabel, tags, index, gameRows, null);
-                    indexChanged = true;
-                    gameRowsChanged = true;
-                }
-            }
+            var allFiles = BuildLibraryFolderProjectionFileList(root, precomputedOneLevelMediaFilesOrNull);
+            repairCandidates = FindLibraryFolderMetadataRepairCandidates(root, allFiles, index, gameRows);
 
             var groupedFiles = allFiles
                 .Select(file => new
@@ -539,75 +505,326 @@ namespace PixelVaultNative
                     File = file,
                     Entry = index.ContainsKey(file) ? index[file] : null
                 })
-                .Where(item => item.Entry != null && !string.IsNullOrWhiteSpace(item.Entry.GameId))
+                .Where(item => item.Entry != null
+                    && !string.IsNullOrWhiteSpace(item.Entry.GameId)
+                    && !LibraryFolderIndexEntryHasOrphanGameId(item.Entry, gameRows))
                 .GroupBy(item => host.NormalizeGameId(item.Entry.GameId), StringComparer.OrdinalIgnoreCase)
                 .ToList();
             foreach (var group in groupedFiles)
             {
-                var groupFiles = group.Select(item => item.File).OrderByDescending(file => host.ResolveIndexedLibraryDate(root, file, index)).ThenBy(Path.GetFileName).ToArray();
-                var saved = host.FindSavedGameIndexRowById(gameRows, group.Key);
-                var preferredFolderPath = groupFiles
-                    .Select(file => Path.GetDirectoryName(file) ?? string.Empty)
-                    .GroupBy(path => path, StringComparer.OrdinalIgnoreCase)
-                    .OrderByDescending(pathGroup => pathGroup.Count())
-                    .ThenBy(pathGroup => pathGroup.Key, StringComparer.OrdinalIgnoreCase)
-                    .Select(pathGroup => pathGroup.Key)
-                    .FirstOrDefault();
-                var platformLabel = saved == null
-                    ? host.DetermineFolderPlatformForFiles(groupFiles.ToList(), index)
-                    : host.NormalizeConsoleLabel(saved.PlatformLabel);
-                long newestCaptureUtcTicks = 0;
-                long newestRecentSortUtcTicks = 0;
-                if (groupFiles.Length > 0)
+                var row = BuildAssignedLibraryFolderInfo(root, group.Key, group.Select(item => item.File), index, gameRows);
+                if (row != null) list.Add(row);
+            }
+
+            AppendUnassignedGameIdLibraryFolders(root, allFiles, index, gameRows, list);
+
+            var gameRowsChanged = host.SyncGameIndexRowsFromLibraryFolders(gameRows, list);
+            gameRowsChanged = host.PruneObsoleteMultipleTagsRows(gameRows) || gameRowsChanged;
+            if (gameRowsChanged) host.SaveSavedGameIndexRows(root, gameRows);
+            return list;
+        }
+
+        List<string> BuildLibraryFolderProjectionFileList(string root, List<string> precomputedOneLevelMediaFilesOrNull)
+        {
+            if (precomputedOneLevelMediaFilesOrNull == null)
+            {
+                return fileSystem.EnumerateDirectories(root)
+                    .Where(dir => !ImportService.IsHdrFallbackPath(dir))
+                    .SelectMany(dir => fileSystem.EnumerateFiles(dir, "*.*", SearchOption.AllDirectories).Where(host.IsLibraryMediaFile))
+                    .Where(file => !ImportService.IsHdrFallbackPath(file))
+                    .Where(fileSystem.FileExists)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+            }
+
+            return precomputedOneLevelMediaFilesOrNull
+                .Where(path => !string.IsNullOrWhiteSpace(path) && fileSystem.FileExists(path) && host.IsLibraryMediaFile(path))
+                .Where(path => !ImportService.IsHdrFallbackPath(path))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        List<string> FindLibraryFolderMetadataRepairCandidates(
+            string root,
+            IEnumerable<string> files,
+            Dictionary<string, LibraryMetadataIndexEntry> index,
+            List<GameIndexEditorRow> gameRows)
+        {
+            return (files ?? Enumerable.Empty<string>())
+                .Where(file =>
                 {
-                    LibraryMetadataIndexEntry newestEntry;
-                    if (index.TryGetValue(groupFiles[0], out newestEntry) && newestEntry != null)
-                    {
-                        newestCaptureUtcTicks = newestEntry.CaptureUtcTicks;
-                    }
+                    LibraryMetadataIndexEntry entry;
+                    index.TryGetValue(file, out entry);
+                    return LibraryFolderIndexEntryNeedsRepair(root, file, entry, gameRows);
+                })
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(file => file, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
 
-                    if (newestCaptureUtcTicks <= 0)
-                    {
-                        newestCaptureUtcTicks = host.ToCaptureUtcTicks(host.ResolveIndexedLibraryDate(root, groupFiles[0], index));
-                    }
+        bool LibraryFolderIndexEntryNeedsRepair(string root, string file, LibraryMetadataIndexEntry entry, List<GameIndexEditorRow> gameRows)
+        {
+            if (entry == null || entry.CaptureUtcTicks <= 0) return true;
+            if (LibraryFolderIndexEntryHasOrphanGameId(entry, gameRows)) return true;
+            if (string.IsNullOrWhiteSpace(entry.GameId)) return true;
+            if (host.IndexEntryShouldReResolveForNonSteamShortcutMislabel(root, file, entry)) return true;
+            return host.IndexEntryShouldReResolveSteamPlatformWithoutAppId(root, file, entry, gameRows);
+        }
 
-                    foreach (var file in groupFiles)
+        bool LibraryFolderIndexEntryNeedsMetadataRead(string root, string file, LibraryMetadataIndexEntry entry, List<GameIndexEditorRow> gameRows)
+        {
+            if (entry == null || entry.CaptureUtcTicks <= 0) return true;
+            if (LibraryFolderIndexEntryHasOrphanGameId(entry, gameRows)) return true;
+            if (host.IndexEntryShouldReResolveForNonSteamShortcutMislabel(root, file, entry)) return true;
+            return host.IndexEntryShouldReResolveSteamPlatformWithoutAppId(root, file, entry, gameRows);
+        }
+
+        bool LibraryFolderIndexEntryHasOrphanGameId(LibraryMetadataIndexEntry entry, List<GameIndexEditorRow> gameRows)
+        {
+            var gameId = host.NormalizeGameId(entry == null ? string.Empty : entry.GameId);
+            return !string.IsNullOrWhiteSpace(gameId)
+                && host.FindSavedGameIndexRowById(gameRows, gameId) == null;
+        }
+
+        void QueueLibraryFolderMetadataRepair(string root, IEnumerable<string> candidates)
+        {
+            if (folderCacheRebuildHook != null) return;
+            if (string.IsNullOrWhiteSpace(root)) return;
+            var files = (candidates ?? Enumerable.Empty<string>())
+                .Where(file => !string.IsNullOrWhiteSpace(file) && fileSystem.FileExists(file) && host.IsLibraryMediaFile(file))
+                .Where(file => !ImportService.IsHdrFallbackPath(file))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(file => file, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (files.Count == 0) return;
+
+            var key = NormalizeLibraryPath(root);
+            if (string.IsNullOrWhiteSpace(key)) key = root;
+            if (!queuedLibraryFolderMetadataRepairRoots.TryAdd(key, 0))
+            {
+                host.LogLibraryScan("Library folder metadata repair already queued for " + files.Count + " candidate(s).");
+                return;
+            }
+
+            host.LogLibraryScan("Queued library folder metadata repair for " + files.Count + " candidate file(s).");
+            Task.Run(() =>
+            {
+                try
+                {
+                    RunLibraryFolderMetadataRepair(root, files);
+                }
+                catch (Exception ex)
+                {
+                    host.LogLibraryScan("Library folder metadata repair failed: " + ex.Message);
+                }
+                finally
+                {
+                    byte ignored;
+                    queuedLibraryFolderMetadataRepairRoots.TryRemove(key, out ignored);
+                }
+            });
+        }
+
+        void RunLibraryFolderMetadataRepair(string root, List<string> candidateFiles)
+        {
+            if (string.IsNullOrWhiteSpace(root) || candidateFiles == null || candidateFiles.Count == 0) return;
+            if (!fileSystem.DirectoryExists(root)) return;
+
+            var stopwatch = Stopwatch.StartNew();
+            var repairedFiles = new List<string>();
+            var indexChanged = false;
+            var gameRowsChanged = false;
+            lock (host.LibraryMaintenanceSync)
+            {
+                var index = host.LoadLibraryMetadataIndex(root, true);
+                var gameRows = host.LoadSavedGameIndexRows(root);
+                var repairFiles = FindLibraryFolderMetadataRepairCandidates(root, candidateFiles, index, gameRows)
+                    .Where(file => fileSystem.FileExists(file))
+                    .ToList();
+                if (repairFiles.Count == 0) return;
+
+                var metadataReadFiles = repairFiles
+                    .Where(file =>
                     {
-                        var r = host.ResolveLibraryFileRecentSortUtcTicks(root, file, index);
-                        if (r > newestRecentSortUtcTicks) newestRecentSortUtcTicks = r;
+                        LibraryMetadataIndexEntry entry;
+                        index.TryGetValue(file, out entry);
+                        return LibraryFolderIndexEntryNeedsMetadataRead(root, file, entry, gameRows);
+                    })
+                    .ToList();
+                var metadataByFile = metadataService.ReadEmbeddedMetadataBatch(metadataReadFiles, CancellationToken.None);
+
+                foreach (var file in repairFiles)
+                {
+                    LibraryMetadataIndexEntry entry;
+                    index.TryGetValue(file, out entry);
+                    if (LibraryFolderIndexEntryNeedsMetadataRead(root, file, entry, gameRows))
+                    {
+                        EmbeddedMetadataSnapshot snapshot;
+                        if (!metadataByFile.TryGetValue(file, out snapshot) || snapshot == null) snapshot = new EmbeddedMetadataSnapshot();
+                        var stamp = host.BuildLibraryMetadataStamp(file);
+                        var previousGameId = entry == null ? string.Empty : host.NormalizeGameId(entry.GameId);
+                        var previousConsole = entry == null ? string.Empty : host.NormalizeConsoleLabel(entry.ConsoleLabel);
+                        var rebuiltEntry = host.BuildResolvedLibraryMetadataIndexEntry(root, file, stamp, snapshot, entry, index, gameRows);
+                        index[file] = rebuiltEntry;
+                        host.SetCachedFileTagsForLibraryScan(file, host.ParseTagText(rebuiltEntry.TagText), host.MetadataCacheStamp(file));
+                        indexChanged = true;
+                        repairedFiles.Add(file);
+                        if (!string.Equals(previousGameId, host.NormalizeGameId(rebuiltEntry.GameId), StringComparison.OrdinalIgnoreCase)
+                            || !string.Equals(previousConsole, host.NormalizeConsoleLabel(rebuiltEntry.ConsoleLabel), StringComparison.OrdinalIgnoreCase))
+                        {
+                            gameRowsChanged = true;
+                        }
+                    }
+                    else if (entry != null && string.IsNullOrWhiteSpace(entry.GameId))
+                    {
+                        var tags = host.ParseTagText(entry.TagText);
+                        var platformLabel = string.IsNullOrWhiteSpace(entry.ConsoleLabel)
+                            ? host.NormalizeConsoleLabel(host.DetermineConsoleLabelFromTags(tags))
+                            : host.NormalizeConsoleLabel(entry.ConsoleLabel);
+                        entry.GameId = host.ResolveGameIdForIndexedFile(root, file, platformLabel, tags, index, gameRows, null);
+                        indexChanged = true;
+                        gameRowsChanged = true;
+                        repairedFiles.Add(file);
                     }
                 }
 
-                list.Add(new LibraryFolderInfo
-                {
-                    GameId = group.Key,
-                    Name = saved == null ? host.GuessGameIndexNameForFile(groupFiles[0]) : saved.Name,
-                    FolderPath = string.IsNullOrWhiteSpace(saved == null ? string.Empty : saved.FolderPath) ? preferredFolderPath : saved.FolderPath,
-                    FileCount = groupFiles.Length,
-                    PreviewImagePath = groupFiles.FirstOrDefault(host.IsLibraryImageFile) ?? groupFiles.FirstOrDefault(),
-                    PlatformLabel = platformLabel,
-                    FilePaths = groupFiles,
-                    NewestCaptureUtcTicks = newestCaptureUtcTicks,
-                    NewestRecentSortUtcTicks = newestRecentSortUtcTicks,
-                    SteamAppId = saved != null && (saved.SuppressSteamAppIdAutoResolve || !string.IsNullOrWhiteSpace(saved.SteamAppId))
-                        ? (saved.SteamAppId ?? string.Empty)
-                        : host.ResolveLibraryFolderSteamAppId(platformLabel, groupFiles),
-                    NonSteamId = saved == null ? string.Empty : (saved.NonSteamId ?? string.Empty),
-                    SteamGridDbId = saved == null ? string.Empty : (saved.SteamGridDbId ?? string.Empty),
-                    RetroAchievementsGameId = saved == null ? string.Empty : (saved.RetroAchievementsGameId ?? string.Empty),
-                    SuppressSteamAppIdAutoResolve = saved != null && saved.SuppressSteamAppIdAutoResolve,
-                    SuppressSteamGridDbIdAutoResolve = saved != null && saved.SuppressSteamGridDbIdAutoResolve,
-                    StorageGroupId = saved == null ? string.Empty : (saved.StorageGroupId ?? string.Empty)
-                });
+                if (gameRowsChanged) host.SaveSavedGameIndexRows(root, gameRows);
+                if (indexChanged) host.SaveLibraryMetadataIndex(root, index);
             }
 
-            AppendUnassignedGameIdLibraryFolders(root, allFiles, index, list);
+            stopwatch.Stop();
+            host.LogPerformanceSample(
+                "LibraryFolderMetadataRepair",
+                stopwatch,
+                "files=" + repairedFiles.Count,
+                40);
+            if (repairedFiles.Count > 0)
+                RefreshFolderCacheForTouchedPathsOrRebuild(root, repairedFiles);
+        }
 
-            gameRowsChanged = host.SyncGameIndexRowsFromLibraryFolders(gameRows, list) || gameRowsChanged;
-            gameRowsChanged = host.PruneObsoleteMultipleTagsRows(gameRows) || gameRowsChanged;
-            if (gameRowsChanged) host.SaveSavedGameIndexRows(root, gameRows);
-            if (indexChanged) host.SaveLibraryMetadataIndex(root, index);
-            return list;
+        LibraryFolderInfo BuildAssignedLibraryFolderInfo(
+            string root,
+            string gameId,
+            IEnumerable<string> files,
+            Dictionary<string, LibraryMetadataIndexEntry> index,
+            List<GameIndexEditorRow> gameRows)
+        {
+            var groupFiles = (files ?? Enumerable.Empty<string>())
+                .Where(file => !string.IsNullOrWhiteSpace(file) && fileSystem.FileExists(file) && host.IsLibraryMediaFile(file))
+                .Where(file => !ImportService.IsHdrFallbackPath(file))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderByDescending(file => host.ResolveIndexedLibraryDate(root, file, index))
+                .ThenBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            if (groupFiles.Length == 0) return null;
+
+            var normalizedGameId = host.NormalizeGameId(gameId);
+            var saved = host.FindSavedGameIndexRowById(gameRows, normalizedGameId);
+            var preferredFolderPath = groupFiles
+                .Select(file => Path.GetDirectoryName(file) ?? string.Empty)
+                .GroupBy(path => path, StringComparer.OrdinalIgnoreCase)
+                .OrderByDescending(pathGroup => pathGroup.Count())
+                .ThenBy(pathGroup => pathGroup.Key, StringComparer.OrdinalIgnoreCase)
+                .Select(pathGroup => pathGroup.Key)
+                .FirstOrDefault();
+            var platformLabel = saved == null
+                ? host.DetermineFolderPlatformForFiles(groupFiles.ToList(), index)
+                : host.NormalizeConsoleLabel(saved.PlatformLabel);
+            long newestCaptureUtcTicks = 0;
+            long newestRecentSortUtcTicks = 0;
+            LibraryMetadataIndexEntry newestEntry;
+            if (index.TryGetValue(groupFiles[0], out newestEntry) && newestEntry != null)
+            {
+                newestCaptureUtcTicks = newestEntry.CaptureUtcTicks;
+            }
+
+            if (newestCaptureUtcTicks <= 0)
+            {
+                newestCaptureUtcTicks = host.ToCaptureUtcTicks(host.ResolveIndexedLibraryDate(root, groupFiles[0], index));
+            }
+
+            foreach (var file in groupFiles)
+            {
+                var r = host.ResolveLibraryFileRecentSortUtcTicks(root, file, index);
+                if (r > newestRecentSortUtcTicks) newestRecentSortUtcTicks = r;
+            }
+
+            return new LibraryFolderInfo
+            {
+                GameId = normalizedGameId,
+                Name = saved == null ? host.GuessGameIndexNameForFile(groupFiles[0]) : saved.Name,
+                FolderPath = string.IsNullOrWhiteSpace(saved == null ? string.Empty : saved.FolderPath) ? preferredFolderPath : saved.FolderPath,
+                FileCount = groupFiles.Length,
+                PreviewImagePath = groupFiles.FirstOrDefault(host.IsLibraryImageFile) ?? groupFiles.FirstOrDefault(),
+                PlatformLabel = platformLabel,
+                FilePaths = groupFiles,
+                NewestCaptureUtcTicks = newestCaptureUtcTicks,
+                NewestRecentSortUtcTicks = newestRecentSortUtcTicks,
+                SteamAppId = saved != null && (saved.SuppressSteamAppIdAutoResolve || !string.IsNullOrWhiteSpace(saved.SteamAppId))
+                    ? (saved.SteamAppId ?? string.Empty)
+                    : host.ResolveLibraryFolderSteamAppId(platformLabel, groupFiles),
+                NonSteamId = saved == null ? string.Empty : (saved.NonSteamId ?? string.Empty),
+                SteamGridDbId = saved == null ? string.Empty : (saved.SteamGridDbId ?? string.Empty),
+                RetroAchievementsGameId = saved == null ? string.Empty : (saved.RetroAchievementsGameId ?? string.Empty),
+                SuppressSteamAppIdAutoResolve = saved != null && saved.SuppressSteamAppIdAutoResolve,
+                SuppressSteamGridDbIdAutoResolve = saved != null && saved.SuppressSteamGridDbIdAutoResolve,
+                StorageGroupId = saved == null ? string.Empty : (saved.StorageGroupId ?? string.Empty)
+            };
+        }
+
+        LibraryFolderInfo BuildUnassignedLibraryFolderInfo(
+            string root,
+            string folderPath,
+            IEnumerable<string> files,
+            Dictionary<string, LibraryMetadataIndexEntry> index)
+        {
+            var groupFiles = (files ?? Enumerable.Empty<string>())
+                .Where(file => !string.IsNullOrWhiteSpace(file) && fileSystem.FileExists(file) && host.IsLibraryMediaFile(file))
+                .Where(file => !ImportService.IsHdrFallbackPath(file))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderByDescending(file => host.ResolveIndexedLibraryDate(root, file, index))
+                .ThenBy(f => Path.GetFileName(f), StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            if (groupFiles.Length == 0) return null;
+
+            var platformLabel = host.DetermineFolderPlatformForFiles(groupFiles.ToList(), index);
+            long newestCaptureUtcTicks = 0;
+            long newestRecentSortUtcTicks = 0;
+            LibraryMetadataIndexEntry newestEntry;
+            if (index.TryGetValue(groupFiles[0], out newestEntry) && newestEntry != null)
+                newestCaptureUtcTicks = newestEntry.CaptureUtcTicks;
+            if (newestCaptureUtcTicks <= 0)
+                newestCaptureUtcTicks = host.ToCaptureUtcTicks(host.ResolveIndexedLibraryDate(root, groupFiles[0], index));
+            foreach (var file in groupFiles)
+            {
+                var r = host.ResolveLibraryFileRecentSortUtcTicks(root, file, index);
+                if (r > newestRecentSortUtcTicks) newestRecentSortUtcTicks = r;
+            }
+
+            var dir = folderPath ?? string.Empty;
+            var leaf = Path.GetFileName(dir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+            if (string.IsNullOrWhiteSpace(leaf)) leaf = "folder";
+
+            return new LibraryFolderInfo
+            {
+                GameId = string.Empty,
+                Name = "Needs assignment · " + leaf,
+                FolderPath = dir,
+                FileCount = groupFiles.Length,
+                PreviewImagePath = groupFiles.FirstOrDefault(host.IsLibraryImageFile) ?? groupFiles.FirstOrDefault(),
+                PlatformLabel = platformLabel,
+                FilePaths = groupFiles,
+                NewestCaptureUtcTicks = newestCaptureUtcTicks,
+                NewestRecentSortUtcTicks = newestRecentSortUtcTicks,
+                SteamAppId = string.Empty,
+                NonSteamId = string.Empty,
+                SteamGridDbId = string.Empty,
+                RetroAchievementsGameId = string.Empty,
+                PendingGameAssignment = true,
+                StorageGroupId = string.Empty
+            };
         }
 
         public void RebuildLibraryFolderCache(string root, Dictionary<string, LibraryMetadataIndexEntry> index)
@@ -629,11 +846,13 @@ namespace PixelVaultNative
                 var indexSnapshot = index ?? host.LoadLibraryMetadataIndex(root, true);
                 var stopwatch = Stopwatch.StartNew();
                 host.LogLibraryScan("Rebuilding library folder cache.");
-                var fresh = LoadLibraryFoldersCore(root, indexSnapshot, null);
+                List<string> repairCandidates;
+                var fresh = LoadLibraryFoldersCore(root, indexSnapshot, null, out repairCandidates);
                 host.ApplySavedGameIndexRows(root, fresh);
                 host.SaveLibraryFolderCache(root, host.BuildLibraryFolderInventoryStamp(root), fresh);
                 stopwatch.Stop();
                 host.LogLibraryScan("Library folder cache rebuild complete in " + stopwatch.ElapsedMilliseconds + " ms for " + fresh.Count + " folder(s).");
+                QueueLibraryFolderMetadataRepair(root, repairCandidates);
             }
             finally
             {
@@ -645,6 +864,198 @@ namespace PixelVaultNative
         {
             if (string.IsNullOrWhiteSpace(root) || !fileSystem.DirectoryExists(root)) return;
             RebuildLibraryFolderCache(root, null);
+        }
+
+        void RefreshFolderCacheForTouchedPathsOrRebuild(string root, IEnumerable<string> touchedPaths)
+        {
+            var touchedList = (touchedPaths ?? Enumerable.Empty<string>())
+                .Where(path => !string.IsNullOrWhiteSpace(path))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (touchedList.Count > 0 && TryUpdateLibraryFolderCacheForTouchedPaths(root, touchedList))
+                return;
+            RebuildLibraryFolderCache(root, null);
+        }
+
+        public bool TryUpdateLibraryFolderCacheForTouchedPaths(string root, IEnumerable<string> touchedPaths)
+        {
+            if (string.IsNullOrWhiteSpace(root) || !fileSystem.DirectoryExists(root)) return false;
+            var touched = NormalizeTouchedLibraryPaths(touchedPaths);
+            if (touched.Count == 0) return false;
+
+            host.LibraryFolderCacheRwLock.EnterWriteLock();
+            try
+            {
+                var cached = host.LoadLibraryFolderCacheSnapshot(root, allowStaleMetadataRevision: true);
+                if (cached == null || cached.Count == 0) return false;
+
+                var stopwatch = Stopwatch.StartNew();
+                var index = host.LoadLibraryMetadataIndex(root, true);
+                var gameRows = host.LoadSavedGameIndexRows(root);
+                var affectedGameIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var affectedOrphanDirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                foreach (var row in cached.Where(row => row != null))
+                {
+                    if (!LibraryFolderRowTouches(row, touched)) continue;
+                    var gameId = host.NormalizeGameId(row.GameId);
+                    if (string.IsNullOrWhiteSpace(gameId))
+                    {
+                        if (!string.IsNullOrWhiteSpace(row.FolderPath)) affectedOrphanDirs.Add(row.FolderPath);
+                    }
+                    else
+                    {
+                        affectedGameIds.Add(gameId);
+                    }
+                }
+
+                foreach (var entry in index.Values.Where(entry => entry != null && !string.IsNullOrWhiteSpace(entry.FilePath)))
+                {
+                    if (!LibraryPathTouches(entry.FilePath, touched)) continue;
+                    var gameId = host.NormalizeGameId(entry.GameId);
+                    if (string.IsNullOrWhiteSpace(gameId))
+                    {
+                        var dir = Path.GetDirectoryName(entry.FilePath) ?? string.Empty;
+                        if (!string.IsNullOrWhiteSpace(dir)) affectedOrphanDirs.Add(dir);
+                    }
+                    else
+                    {
+                        affectedGameIds.Add(gameId);
+                    }
+                }
+
+                if (affectedGameIds.Count == 0 && affectedOrphanDirs.Count == 0) return false;
+
+                var updated = cached
+                    .Where(row => row != null)
+                    .Where(row =>
+                    {
+                        var gameId = host.NormalizeGameId(row.GameId);
+                        if (!string.IsNullOrWhiteSpace(gameId)) return !affectedGameIds.Contains(gameId);
+                        return !LibraryFolderRowTouches(row, touched);
+                    })
+                    .ToList();
+
+                foreach (var gameId in affectedGameIds.OrderBy(value => value, StringComparer.OrdinalIgnoreCase))
+                {
+                    var files = index.Values
+                        .Where(entry => entry != null && string.Equals(host.NormalizeGameId(entry.GameId), gameId, StringComparison.OrdinalIgnoreCase))
+                        .Select(entry => entry.FilePath)
+                        .Where(file => !string.IsNullOrWhiteSpace(file) && fileSystem.FileExists(file) && host.IsLibraryMediaFile(file))
+                        .Where(file => !ImportService.IsHdrFallbackPath(file))
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .ToList();
+                    var row = BuildAssignedLibraryFolderInfo(root, gameId, files, index, gameRows);
+                    if (row != null) updated.Add(row);
+                }
+
+                foreach (var dir in affectedOrphanDirs.OrderBy(value => value, StringComparer.OrdinalIgnoreCase))
+                {
+                    var files = index.Values
+                        .Where(entry => entry != null && string.IsNullOrWhiteSpace(host.NormalizeGameId(entry.GameId)))
+                        .Select(entry => entry.FilePath)
+                        .Where(file => !string.IsNullOrWhiteSpace(file) && fileSystem.FileExists(file) && host.IsLibraryMediaFile(file))
+                        .Where(file => !ImportService.IsHdrFallbackPath(file))
+                        .Where(file => LibraryPlacementService.PathsEqualNormalized(Path.GetDirectoryName(file) ?? string.Empty, dir))
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .ToList();
+                    var row = BuildUnassignedLibraryFolderInfo(root, dir, files, index);
+                    if (row != null) updated.Add(row);
+                }
+
+                var gameRowsChanged = host.SyncGameIndexRowsFromLibraryFolders(gameRows, updated);
+                gameRowsChanged = host.PruneObsoleteMultipleTagsRows(gameRows) || gameRowsChanged;
+                if (gameRowsChanged) host.SaveSavedGameIndexRows(root, gameRows);
+                host.ApplySavedGameIndexRows(root, updated);
+                host.PopulateMissingLibraryFolderSortKeys(updated);
+                host.SaveLibraryFolderCache(root, host.BuildLibraryFolderInventoryStamp(root), updated);
+                stopwatch.Stop();
+                host.LogPerformanceSample(
+                    "LibraryFolderCache",
+                    stopwatch,
+                    "mode=incremental; touched=" + touched.Count + "; gameIds=" + affectedGameIds.Count + "; orphanDirs=" + affectedOrphanDirs.Count + "; folders=" + updated.Count,
+                    0);
+                host.LogLibraryScan("Library folder cache incremental update complete for " + touched.Count + " touched path(s).");
+                return true;
+            }
+            finally
+            {
+                host.LibraryFolderCacheRwLock.ExitWriteLock();
+            }
+        }
+
+        sealed class TouchedLibraryPath
+        {
+            public string Path;
+            public bool IsDirectory;
+        }
+
+        List<TouchedLibraryPath> NormalizeTouchedLibraryPaths(IEnumerable<string> paths)
+        {
+            return (paths ?? Enumerable.Empty<string>())
+                .Where(path => !string.IsNullOrWhiteSpace(path))
+                .Select(path => NormalizeTouchedLibraryPath(path))
+                .Where(path => path != null && !string.IsNullOrWhiteSpace(path.Path))
+                .GroupBy(path => path.Path, StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.First())
+                .ToList();
+        }
+
+        TouchedLibraryPath NormalizeTouchedLibraryPath(string path)
+        {
+            var normalized = NormalizeLibraryPath(path);
+            if (string.IsNullOrWhiteSpace(normalized)) return null;
+            var isDirectory = fileSystem.DirectoryExists(normalized)
+                || (!fileSystem.FileExists(normalized) && string.IsNullOrWhiteSpace(Path.GetExtension(normalized)));
+            return new TouchedLibraryPath
+            {
+                Path = isDirectory
+                    ? normalized.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                    : normalized,
+                IsDirectory = isDirectory
+            };
+        }
+
+        static string NormalizeLibraryPath(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path)) return string.Empty;
+            try
+            {
+                return Path.GetFullPath(path.Trim());
+            }
+            catch
+            {
+                return path.Trim();
+            }
+        }
+
+        bool LibraryFolderRowTouches(LibraryFolderInfo row, IReadOnlyList<TouchedLibraryPath> touched)
+        {
+            if (row == null || touched == null || touched.Count == 0) return false;
+            if (LibraryPathTouches(row.FolderPath, touched)) return true;
+            if (LibraryPathTouches(row.PreviewImagePath, touched)) return true;
+            return (row.FilePaths ?? Array.Empty<string>()).Any(file => LibraryPathTouches(file, touched));
+        }
+
+        bool LibraryPathTouches(string candidatePath, IReadOnlyList<TouchedLibraryPath> touched)
+        {
+            if (string.IsNullOrWhiteSpace(candidatePath) || touched == null || touched.Count == 0) return false;
+            var candidate = NormalizeLibraryPath(candidatePath);
+            if (string.IsNullOrWhiteSpace(candidate)) return false;
+            foreach (var item in touched)
+            {
+                if (item == null || string.IsNullOrWhiteSpace(item.Path)) continue;
+                if (LibraryPlacementService.PathsEqualNormalized(candidate, item.Path)) return true;
+                if (!item.IsDirectory) continue;
+                var candidateDirectory = fileSystem.DirectoryExists(candidate)
+                    ? candidate
+                    : (Path.GetDirectoryName(candidate) ?? string.Empty);
+                if (!string.IsNullOrWhiteSpace(candidateDirectory)
+                    && LibraryPlacementService.IsDirectoryWithinCanonicalStorage(candidateDirectory, item.Path))
+                    return true;
+            }
+
+            return false;
         }
 
         public List<LibraryFolderInfo> LoadLibraryFoldersCached(string root, bool forceRefresh)
@@ -700,23 +1111,27 @@ namespace PixelVaultNative
                 }
 
                 List<LibraryFolderInfo> fresh;
-                if (!forceRefresh && host.TryGetIndexOnlyFolderCacheRefresh(root, stamp, out var indexOnlyFiles))
+                if (!forceRefresh && host.TryGetIndexOnlyFolderCacheRefresh(root, stamp, out var indexOnlyProjectionFiles))
                 {
-                    host.LogLibraryScan("Library folder cache index-only refresh (metadata index revision matches; child-folder mtimes changed).");
-                    fresh = LoadLibraryFoldersCore(root, null, indexOnlyFiles);
+                    host.LogLibraryScan("Library folder cache index-only projection refresh (metadata index revision matches; child-folder mtimes changed; no recursive folder sweep).");
+                    List<string> repairCandidates;
+                    fresh = LoadLibraryFoldersCore(root, null, indexOnlyProjectionFiles, out repairCandidates);
                     host.ApplySavedGameIndexRows(root, fresh);
                     host.SaveLibraryFolderCache(root, stamp, fresh);
                     stopwatch.Stop();
-                    host.LogPerformanceSample("LibraryFolderCache", stopwatch, "mode=indexOnlyRefresh; folders=" + fresh.Count + "; forceRefresh=" + forceRefresh, 40);
+                    host.LogPerformanceSample("LibraryFolderCache", stopwatch, "mode=indexOnlyProjection; folders=" + fresh.Count + "; files=" + indexOnlyProjectionFiles.Count + "; forceRefresh=" + forceRefresh, 40);
+                    QueueLibraryFolderMetadataRepair(root, repairCandidates);
                     return fresh;
                 }
 
                 host.LogLibraryScan("Refreshing library folder cache.");
-                fresh = LoadLibraryFoldersCore(root, null, null);
+                List<string> rebuildRepairCandidates;
+                fresh = LoadLibraryFoldersCore(root, null, null, out rebuildRepairCandidates);
                 host.ApplySavedGameIndexRows(root, fresh);
                 host.SaveLibraryFolderCache(root, stamp, fresh);
                 stopwatch.Stop();
                 host.LogPerformanceSample("LibraryFolderCache", stopwatch, "mode=rebuild; folders=" + fresh.Count + "; forceRefresh=" + forceRefresh, 40);
+                QueueLibraryFolderMetadataRepair(root, rebuildRepairCandidates);
                 return fresh;
             }
             finally
@@ -742,13 +1157,16 @@ namespace PixelVaultNative
             string root,
             IReadOnlyList<string> allFiles,
             Dictionary<string, LibraryMetadataIndexEntry> index,
+            List<GameIndexEditorRow> gameRows,
             List<LibraryFolderInfo> list)
         {
             if (string.IsNullOrWhiteSpace(root) || allFiles == null || index == null || list == null) return;
             var orphans = allFiles
                 .Where(file => !string.IsNullOrWhiteSpace(file) && fileSystem.FileExists(file))
                 .Select(file => new { File = file, Entry = index.TryGetValue(file, out var e) ? e : null })
-                .Where(x => x.Entry != null && string.IsNullOrWhiteSpace(host.NormalizeGameId(x.Entry.GameId)))
+                .Where(x => x.Entry != null
+                    && (string.IsNullOrWhiteSpace(host.NormalizeGameId(x.Entry.GameId))
+                        || LibraryFolderIndexEntryHasOrphanGameId(x.Entry, gameRows)))
                 .ToList();
             if (orphans.Count == 0) return;
 
@@ -756,49 +1174,8 @@ namespace PixelVaultNative
             {
                 var dir = g.Key;
                 if (string.IsNullOrWhiteSpace(dir)) continue;
-
-                var groupFiles = g.Select(x => x.File)
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .OrderByDescending(file => host.ResolveIndexedLibraryDate(root, file, index))
-                    .ThenBy(f => Path.GetFileName(f), StringComparer.OrdinalIgnoreCase)
-                    .ToArray();
-                if (groupFiles.Length == 0) continue;
-
-                var platformLabel = host.DetermineFolderPlatformForFiles(groupFiles.ToList(), index);
-                long newestCaptureUtcTicks = 0;
-                long newestRecentSortUtcTicks = 0;
-                LibraryMetadataIndexEntry newestEntry;
-                if (index.TryGetValue(groupFiles[0], out newestEntry) && newestEntry != null)
-                    newestCaptureUtcTicks = newestEntry.CaptureUtcTicks;
-                if (newestCaptureUtcTicks <= 0)
-                    newestCaptureUtcTicks = host.ToCaptureUtcTicks(host.ResolveIndexedLibraryDate(root, groupFiles[0], index));
-                foreach (var file in groupFiles)
-                {
-                    var r = host.ResolveLibraryFileRecentSortUtcTicks(root, file, index);
-                    if (r > newestRecentSortUtcTicks) newestRecentSortUtcTicks = r;
-                }
-
-                var leaf = Path.GetFileName(dir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
-                if (string.IsNullOrWhiteSpace(leaf)) leaf = "folder";
-
-                list.Add(new LibraryFolderInfo
-                {
-                    GameId = string.Empty,
-                    Name = "Needs assignment · " + leaf,
-                    FolderPath = dir,
-                    FileCount = groupFiles.Length,
-                    PreviewImagePath = groupFiles.FirstOrDefault(host.IsLibraryImageFile) ?? groupFiles.FirstOrDefault(),
-                    PlatformLabel = platformLabel,
-                    FilePaths = groupFiles,
-                    NewestCaptureUtcTicks = newestCaptureUtcTicks,
-                    NewestRecentSortUtcTicks = newestRecentSortUtcTicks,
-                    SteamAppId = string.Empty,
-                    NonSteamId = string.Empty,
-                    SteamGridDbId = string.Empty,
-                    RetroAchievementsGameId = string.Empty,
-                    PendingGameAssignment = true,
-                    StorageGroupId = string.Empty
-                });
+                var row = BuildUnassignedLibraryFolderInfo(root, dir, g.Select(x => x.File), index);
+                if (row != null) list.Add(row);
             }
         }
     }

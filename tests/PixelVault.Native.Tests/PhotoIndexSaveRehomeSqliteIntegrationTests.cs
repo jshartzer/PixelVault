@@ -83,6 +83,8 @@ public sealed class PhotoIndexSaveRehomeSqliteIntegrationTests
 
         public List<LibraryFolderInfo> LoadLibraryFolderCache(string root, string stamp) => new List<LibraryFolderInfo>();
 
+        public List<LibraryFolderInfo> LoadLibraryFolderCacheSnapshot(string root, bool allowStaleMetadataRevision = false) => new List<LibraryFolderInfo>();
+
         public void SaveLibraryFolderCache(string root, string stamp, List<LibraryFolderInfo> folders) { }
 
         public bool ApplySavedGameIndexRows(string root, List<LibraryFolderInfo> folders) => false;

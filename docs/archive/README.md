@@ -4,6 +4,7 @@ This folder keeps **full snapshots** of planning documents that were mostly exec
 
 | Archive file | Replaced / narrowed by (active) |
 |--------------|-----------------------------------|
+| `PV-PLN-RVW-001-open-folder-stub-superseded.md` | Former duplicate redirect at `docs/plans/open/PV-PLN-RVW-001-post-app-review-hardening.md` — use [`docs/completed-projects/PV-PLN-RVW-001-post-app-review-hardening.md`](../completed-projects/PV-PLN-RVW-001-post-app-review-hardening.md) or [`docs/plans/PV-PLN-RVW-001-post-app-review-hardening.md`](../plans/PV-PLN-RVW-001-post-app-review-hardening.md) |
 | `PV-PLN-LIBWS-001-library-workspace-modes.md` | Initiative **done**; library workspace behavior lives in code under `src/PixelVault.Native/UI/Library/`; regression matrix remains in the archived doc |
 | `PERFORMANCE_FIX_PLAN_HISTORICAL_2026-03.txt` | `PERFORMANCE_TODO.md`, slim `PERFORMANCE_FIX_PLAN.txt` |
 | `pixelvault_service_split_plan_HISTORICAL.txt` | Slim `pixelvault_service_split_plan.txt` + `HANDOFF.md` |
