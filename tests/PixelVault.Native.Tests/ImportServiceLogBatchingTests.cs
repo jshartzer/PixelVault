@@ -50,6 +50,47 @@ public sealed class ImportServiceLogBatchingTests
     }
 
     [Fact]
+    public void MoveFilesToLibraryDestination_FlushesLargePerFileLogBatchesInChunks()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "pv-import-log-batch-large-move-" + Guid.NewGuid().ToString("n"));
+        var source = Path.Combine(root, "source");
+        var destination = Path.Combine(root, "destination");
+        Directory.CreateDirectory(source);
+        Directory.CreateDirectory(destination);
+        var files = Enumerable.Range(1, 101)
+            .Select(i => Path.Combine(source, "clip" + i.ToString("000") + ".png"))
+            .ToList();
+        foreach (var file in files) File.WriteAllText(file, "x");
+
+        var log = new CapturingLogService();
+        var service = CreateService(log, destination);
+
+        try
+        {
+            var result = service.MoveFilesToLibraryDestination(files, "Move summary");
+
+            Assert.Equal(101, result.Moved);
+            Assert.Equal(2, log.BatchAppendCalls);
+            Assert.Equal(1, log.SingleAppendCalls);
+            Assert.Equal(101, log.BatchedMessages.Count);
+            Assert.Single(log.BatchSizes, size => size == 100);
+            Assert.Single(log.BatchSizes, size => size == 1);
+            Assert.Single(log.SingleMessages, message => message.StartsWith("Move summary:", StringComparison.Ordinal));
+        }
+        finally
+        {
+            try
+            {
+                if (Directory.Exists(root)) Directory.Delete(root, true);
+            }
+            catch
+            {
+                /* best-effort */
+            }
+        }
+    }
+
+    [Fact]
     public void WriteMetadataForReviewItems_BatchesPerFilePreparationLogsAndKeepsSummaryImmediate()
     {
         var root = Path.Combine(Path.GetTempPath(), "pv-import-log-batch-metadata-" + Guid.NewGuid().ToString("n"));
@@ -116,6 +157,7 @@ public sealed class ImportServiceLogBatchingTests
     {
         public readonly List<string> SingleMessages = new();
         public readonly List<string> BatchedMessages = new();
+        public readonly List<int> BatchSizes = new();
         public int SingleAppendCalls { get; private set; }
         public int BatchAppendCalls { get; private set; }
 
@@ -133,6 +175,7 @@ public sealed class ImportServiceLogBatchingTests
             var lines = (messages ?? Array.Empty<string?>())
                 .Select(message => message ?? string.Empty)
                 .ToArray();
+            BatchSizes.Add(lines.Length);
             BatchedMessages.AddRange(lines);
             return lines;
         }

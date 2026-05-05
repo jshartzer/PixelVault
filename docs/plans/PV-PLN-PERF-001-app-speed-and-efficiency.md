@@ -3,7 +3,7 @@
 | Field | Value |
 |-------|--------|
 | **Plan ID** | `PV-PLN-PERF-001` |
-| **Status** | Active (Phase E step 18 complete; step 19 next) |
+| **Status** | Active (Phase E complete; Phase F next) |
 | **Owner** | PixelVault / Codex |
 | **Source brief** | Codex full-app performance review, 2026-05-03 |
 | **Parent roadmap** | `docs/ROADMAP.md` - performance, polish, reliability |
@@ -106,6 +106,7 @@ Use these stable IDs in commits, tests, and follow-up notes.
 18. Batch disk log appends for high-volume import steps or make per-file logging troubleshooting-only.
    - Added batched main-log append support (`ILogService.AppendMainLines` / `TroubleshootingLog.AppendMainLines`) and routed routine per-file import detail logs through disposable 100-line batches. Move, HDR duplicate parking, sort, delete, rename, manual rename, and metadata prep now keep summaries/errors immediate while reducing disk opens for bulk detail lines.
 19. Add tests for coalescer behavior where practical; otherwise add manual checklist rows for large imports.
+   - Closed Phase E with final automated and manual guardrails: large import log batching now proves 100-line chunk flushes, `TroubleshootingLog.AppendMainLines` is covered, and `docs/MANUAL_GOLDEN_PATH_CHECKLIST.md` records progress-window cancel/log-completeness checks for 100-file and 500-file imports.
 
 ### Phase F - Detail pane cancellation and viewport-first metadata
 
@@ -167,6 +168,7 @@ When execution starts or completes a slice, reference **`PV-PLN-PERF-001`** in c
 
 | Date | Change |
 |------|--------|
+| 2026-05-05 | Completed Phase E step 19 with final coalescer/logging guardrails and manual large-import checklist updates; Phase E is complete. |
 | 2026-05-05 | Completed Phase E step 18 by batching high-volume import detail log writes while preserving immediate summaries and errors. |
 | 2026-05-04 | Completed Phase E step 17 by batching shared progress-window log text rendering and adding buffer tests. |
 | 2026-05-04 | Completed Phase E step 16 by adding a workflow progress coalescer with deterministic tests and routing import workflow progress through it. |

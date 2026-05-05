@@ -66,6 +66,12 @@ Run this section for PixelVault speed/efficiency slices, especially import, libr
 | Large game folder photo view | Open a large folder such as Diablo IV or Timeline and switch thumbnail sizes once. | `LibraryDetailRender` details, especially `quickMediaMapMs`, file count, row count. | Pass if the first usable view appears promptly and later cached renders avoid repeated 10s+ `quickMediaMapMs` spikes; fail if selection becomes stale or UI updates after moving away. |
 | Fast-scroll detail pane | Scroll a large detail pane quickly, then change selection while thumbnails/metadata are still settling. | Visual jank notes, stale render behavior, `LibraryDetailRender` spikes. | Pass if scrolling stays coherent, selection follows the current folder, and stale work does not overwrite the new selection. |
 
+### Progress and log responsiveness notes
+
+- During the 100-file and 500-file import flows, try moving the progress window and pressing **Cancel** once on a copied throwaway batch. Pass if the window responds quickly, the cancel/final status line appears, and the log pane shows the latest useful detail without multi-second per-file stalls.
+- With troubleshooting logging enabled, confirm `PixelVault-native.log` still contains per-file import detail plus final summary/error lines after a large import. Pass if the log is complete and the app does not visibly freeze while those lines are written.
+- Automated guardrails for this area: `WorkflowProgressCoalescerTests`, `WorkflowProgressLogBufferTests`, `ImportServiceLogBatchingTests`, and `TroubleshootingLogRedactionTests.AppendMainLines_ReturnsFormattedTimestampedLinesAndWritesAllMessages`.
+
 ### Performance reading rules
 
 - Treat the first run after a rebuild, cache clear, or major library change as a warm-up unless the slice specifically targets cold start.

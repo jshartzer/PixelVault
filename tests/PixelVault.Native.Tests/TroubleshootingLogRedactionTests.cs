@@ -217,4 +217,23 @@ public sealed class TroubleshootingLogRedactionTests : IDisposable
         var content = File.ReadAllText(mainPath);
         Assert.Contains("hello world", content);
     }
+
+    [Fact]
+    public void AppendMainLines_ReturnsFormattedTimestampedLinesAndWritesAllMessages()
+    {
+        var log = NewLog(redact: false);
+
+        var lines = log.AppendMainLines(new[] { "first", "second" });
+
+        Assert.Equal(2, lines.Length);
+        Assert.All(lines, line => Assert.StartsWith("[", line));
+        Assert.Contains(lines, line => line.Contains("] first"));
+        Assert.Contains(lines, line => line.Contains("] second"));
+
+        var mainPath = Path.Combine(_logsRoot, "PixelVault-native.log");
+        Assert.True(File.Exists(mainPath));
+        var content = File.ReadAllText(mainPath);
+        Assert.Contains("first", content);
+        Assert.Contains("second", content);
+    }
 }
