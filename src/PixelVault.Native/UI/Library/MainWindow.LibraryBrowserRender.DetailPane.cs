@@ -28,6 +28,7 @@ namespace PixelVaultNative
             var panes = ws.Panes;
             var renderStopwatch = Stopwatch.StartNew();
             var renderVersion = ++ws.DetailRenderSequence;
+            var detailRenderCancellationToken = ws.DetailRenderCancellation.BeginRender(renderVersion);
             if (ws.Current != null && panes?.ThumbScroll != null && !ws.PreserveDetailScrollOnNextRender)
             {
                 var liveDetailScroll = panes.ThumbScroll.VerticalOffset;
@@ -120,6 +121,13 @@ namespace PixelVaultNative
             Task.Run(async delegate
             {
                 LibraryDetailQuickSnapshotPerf? quickSnapshotPerf = null;
+                Action throwIfDetailRenderCancelled = delegate
+                {
+                    if (!ws.DetailRenderCancellation.IsCurrent(renderVersion, detailRenderCancellationToken))
+                    {
+                        throw new OperationCanceledException(detailRenderCancellationToken);
+                    }
+                };
                 Action<string, string> traceStep = delegate(string area, string details)
                 {
                     LogTroubleshooting(area,
@@ -170,6 +178,14 @@ namespace PixelVaultNative
                         restoreDetailScrollPending = false;
                     };
                     var snapshotStage = logCompletion ? "initial" : "refined";
+                    if (!ws.DetailRenderCancellation.IsCurrent(renderVersion, detailRenderCancellationToken))
+                    {
+                        LogTroubleshooting("LibraryDetailRenderSkipped",
+                            "renderVersion=" + renderVersion
+                            + "; stage=" + snapshotStage
+                            + "; reason=cancelled-render");
+                        return;
+                    }
                     if (renderVersion != ws.DetailRenderSequence)
                     {
                         LogTroubleshooting("LibraryDetailRenderSkipped",
@@ -299,19 +315,23 @@ namespace PixelVaultNative
 
                 try
                 {
+                    throwIfDetailRenderCancelled();
                     traceStep("LibraryDetailBackgroundStart", "thread=" + Environment.CurrentManagedThreadId);
                     List<GameIndexEditorRow> savedGameRows = null;
                     if (timelineView)
                     {
                         savedGameRows = librarySession.LoadSavedGameIndexRows();
+                        throwIfDetailRenderCancelled();
                         traceStep("LibraryDetailTimelineGameRowsLoaded", "savedGameRows=" + savedGameRows.Count);
                     }
                     var detailFiles = GetFilesForLibraryFolderEntry(displayFolder, false)
                         .Where(file => !string.IsNullOrWhiteSpace(file) && File.Exists(file))
                         .Distinct(StringComparer.OrdinalIgnoreCase)
                         .ToList();
+                    throwIfDetailRenderCancelled();
                     traceStep("LibraryDetailFilesEnumerated", "files=" + detailFiles.Count);
                     var metadataIndex = librarySession.LoadLibraryMetadataIndexForFilePaths(detailFiles);
+                    throwIfDetailRenderCancelled();
                     traceStep("LibraryDetailMetadataIndexLoaded", "entries=" + metadataIndex.Count + "; scope=detailFiles");
                     var filesMissingCaptureTicks = new List<string>();
                     if (librarySession.HasLibraryRoot && detailFiles.Count > 0)
@@ -325,6 +345,7 @@ namespace PixelVaultNative
                             })
                             .ToList();
                     }
+                    throwIfDetailRenderCancelled();
                     traceStep("LibraryDetailFilesClassified",
                         "files=" + detailFiles.Count
                         + "; missingCaptureTicks=" + filesMissingCaptureTicks.Count
@@ -425,24 +446,31 @@ namespace PixelVaultNative
                     };
 
                     traceStep("LibraryDetailQuickSnapshotBuildStart", "files=" + detailFiles.Count);
+                    throwIfDetailRenderCancelled();
                     var quickSnapshot = buildSnapshot(null, null);
+                    throwIfDetailRenderCancelled();
                     traceStep("LibraryDetailQuickSnapshotBuilt",
                         "groups=" + quickSnapshot.Groups.Count
                         + "; visibleFiles=" + quickSnapshot.VisibleFiles.Count);
                     traceStep("LibraryDetailQuickSnapshotDispatchStart", "stage=initial");
                     var dispatcherWallSw = Stopwatch.StartNew();
                     var quickVirtualRows = buildVirtualRowsForSnapshot(quickSnapshot);
+                    throwIfDetailRenderCancelled();
                     await libraryWindow.Dispatcher.InvokeAsync((Action)(delegate { applyDetailSnapshot(quickSnapshot, true, quickVirtualRows); }));
+                    throwIfDetailRenderCancelled();
                     traceStep("LibraryDetailQuickSnapshotDispatchComplete", "stage=initial; dispatcherWallMs=" + dispatcherWallSw.ElapsedMilliseconds);
                     Dictionary<string, EmbeddedMetadataSnapshot> timelineMetadataSnapshots = null;
                     if (quickSnapshot.VisibleFiles.Count > 0)
                     {
                         try
                         {
+                            throwIfDetailRenderCancelled();
                             traceStep("LibraryDetailMetadataReadStart", "files=" + quickSnapshot.VisibleFiles.Count);
-                            timelineMetadataSnapshots = await metadataService.ReadEmbeddedMetadataBatchAsync(quickSnapshot.VisibleFiles, CancellationToken.None).ConfigureAwait(false);
+                            timelineMetadataSnapshots = await metadataService.ReadEmbeddedMetadataBatchAsync(quickSnapshot.VisibleFiles, detailRenderCancellationToken).ConfigureAwait(false);
+                            throwIfDetailRenderCancelled();
                             traceStep("LibraryDetailMetadataReadComplete", "metadataResults=" + timelineMetadataSnapshots.Count);
                             var commentSnapshot = buildSnapshot(timelineMetadataSnapshots, quickSnapshot);
+                            throwIfDetailRenderCancelled();
                             var commentsChanged = commentSnapshot.TimelineContextByFile.Count != quickSnapshot.TimelineContextByFile.Count;
                             if (!commentsChanged)
                             {
@@ -470,10 +498,16 @@ namespace PixelVaultNative
                                 traceStep("LibraryDetailMetadataDispatchStart",
                                     "stage=metadata-refresh; commentsChanged=" + commentsChanged + "; dayGroupingChanged=" + dayGroupingChanged);
                                 var commentVirtualRows = buildVirtualRowsForSnapshot(commentSnapshot);
+                                throwIfDetailRenderCancelled();
                                 await libraryWindow.Dispatcher.InvokeAsync((Action)(delegate { applyDetailSnapshot(commentSnapshot, false, commentVirtualRows); }));
+                                throwIfDetailRenderCancelled();
                                 traceStep("LibraryDetailMetadataDispatchComplete", "stage=metadata-refresh");
                                 quickSnapshot = commentSnapshot;
                             }
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            throw;
                         }
                         catch (Exception timelineMetadataEx)
                         {
@@ -508,9 +542,12 @@ namespace PixelVaultNative
                             + "; " + BuildLibraryBrowserTroubleshootingLabel(renderFolder));
                         try
                         {
+                            throwIfDetailRenderCancelled();
                             if (savedGameRows == null) savedGameRows = librarySession.LoadSavedGameIndexRows();
                             traceStep("LibraryDetailMetadataRepairRowsLoaded", "savedGameRows=" + savedGameRows.Count);
-                            var metadataByFile = await metadataService.ReadEmbeddedMetadataBatchAsync(repairTargets, CancellationToken.None).ConfigureAwait(false);
+                            throwIfDetailRenderCancelled();
+                            var metadataByFile = await metadataService.ReadEmbeddedMetadataBatchAsync(repairTargets, detailRenderCancellationToken).ConfigureAwait(false);
+                            throwIfDetailRenderCancelled();
                             traceStep("LibraryDetailMetadataRepairBatchRead", "metadataResults=" + metadataByFile.Count);
                             var indexChanged = false;
                             var gameRowsChanged = false;
@@ -551,6 +588,10 @@ namespace PixelVaultNative
                                 + "; indexChanged=" + indexChanged
                                 + "; gameRowsChanged=" + gameRowsChanged);
                         }
+                        catch (OperationCanceledException)
+                        {
+                            throw;
+                        }
                         catch (Exception repairEx)
                         {
                             LogException("Library detail metadata repair | " + (renderFolder.Name ?? renderFolder.PrimaryFolderPath ?? "(unknown)"), repairEx);
@@ -563,7 +604,9 @@ namespace PixelVaultNative
                         }
 
                         traceStep("LibraryDetailRefinedSnapshotBuildStart", "files=" + detailFiles.Count);
+                        throwIfDetailRenderCancelled();
                         var refinedSnapshot = buildSnapshot(timelineMetadataSnapshots, quickSnapshot);
+                        throwIfDetailRenderCancelled();
                         traceStep("LibraryDetailRefinedSnapshotBuilt",
                             "groups=" + refinedSnapshot.Groups.Count
                             + "; visibleFiles=" + refinedSnapshot.VisibleFiles.Count);
@@ -599,7 +642,9 @@ namespace PixelVaultNative
                         {
                             traceStep("LibraryDetailRefinedSnapshotDispatchStart", "stage=refined");
                             var refinedVirtualRows = buildVirtualRowsForSnapshot(refinedSnapshot);
+                            throwIfDetailRenderCancelled();
                             await libraryWindow.Dispatcher.InvokeAsync((Action)(delegate { applyDetailSnapshot(refinedSnapshot, false, refinedVirtualRows); }));
+                            throwIfDetailRenderCancelled();
                             traceStep("LibraryDetailRefinedSnapshotDispatchComplete", "stage=refined");
                         }
 
@@ -610,15 +655,21 @@ namespace PixelVaultNative
                                 ws,
                                 renderFolder,
                                 libraryWindow,
+                                detailRenderCancellationToken,
                                 redrawSelectedFolderDetail);
                         }
                     }
                     traceStep("LibraryDetailBackgroundComplete", "done=true");
                 }
+                catch (OperationCanceledException) when (!ws.DetailRenderCancellation.IsCurrent(renderVersion, detailRenderCancellationToken))
+                {
+                    traceStep("LibraryDetailBackgroundCancelled", "reason=detail-render-cancelled");
+                }
                 catch (Exception ex)
                 {
                     await libraryWindow.Dispatcher.InvokeAsync((Action)(delegate
                     {
+                        if (!ws.DetailRenderCancellation.IsCurrent(renderVersion, detailRenderCancellationToken)) return;
                         if (renderVersion != ws.DetailRenderSequence) return;
                         if (!SameLibraryBrowserSelection(ws.Current, renderFolder)) return;
                         ws.DetailFilesDisplayOrder.Clear();
@@ -644,7 +695,7 @@ namespace PixelVaultNative
                         renderStopwatch.Stop();
                     }));
                 }
-            });
+            }, detailRenderCancellationToken);
         }
 
         List<VirtualizedRowDefinition> BuildLibraryContinuousMosaicRowDefinitions(
@@ -858,9 +909,11 @@ namespace PixelVaultNative
             LibraryBrowserWorkingSet ws,
             LibraryBrowserFolderView renderFolder,
             Window libraryWindow,
+            CancellationToken detailRenderCancellationToken,
             Action redrawSelectedFolderDetail)
         {
             if (deferredFiles == null || deferredFiles.Count == 0) return;
+            if (detailRenderCancellationToken.IsCancellationRequested) return;
             var root = libraryRoot;
             if (string.IsNullOrWhiteSpace(root) || librarySession == null || !librarySession.HasLibraryRoot) return;
             if (!string.Equals(root, librarySession.LibraryRoot, StringComparison.OrdinalIgnoreCase)) return;
@@ -883,14 +936,20 @@ namespace PixelVaultNative
                         ws,
                         renderFolder,
                         libraryWindow,
+                        detailRenderCancellationToken,
                         redrawSelectedFolderDetail,
                         folderLabel).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (detailRenderCancellationToken.IsCancellationRequested)
+                {
+                    LogTroubleshooting("LibraryDetailMetadataRepairDeferredCancelled",
+                        "expectedGen=" + sessionGen + "; reason=detail-render-cancelled; " + folderLabel);
                 }
                 catch (Exception ex)
                 {
                     LogException("Deferred library metadata repair | " + folderLabel, ex);
                 }
-            });
+            }, detailRenderCancellationToken);
         }
 
         async Task RunDeferredLibraryDetailMetadataRepairCoreAsync(
@@ -900,17 +959,21 @@ namespace PixelVaultNative
             LibraryBrowserWorkingSet ws,
             LibraryBrowserFolderView renderFolder,
             Window libraryWindow,
+            CancellationToken detailRenderCancellationToken,
             Action redrawSelectedFolderDetail,
             string folderLabelForLog)
         {
             const int deferredChunkSize = 36;
             if (string.IsNullOrWhiteSpace(root) || deferredFiles == null || deferredFiles.Count == 0) return;
+            detailRenderCancellationToken.ThrowIfCancellationRequested();
 
             var metadataIndex = librarySession.LoadLibraryMetadataIndexForFilePaths(deferredFiles);
+            detailRenderCancellationToken.ThrowIfCancellationRequested();
             var savedGameRows = librarySession.LoadSavedGameIndexRows();
 
             for (var i = 0; i < deferredFiles.Count; i += deferredChunkSize)
             {
+                detailRenderCancellationToken.ThrowIfCancellationRequested();
                 if (Volatile.Read(ref _libraryDeferredMetadataRepairGeneration) != sessionGen)
                 {
                     LogTroubleshooting("LibraryDetailMetadataRepairDeferredCancelled", "expectedGen=" + sessionGen + "; " + folderLabelForLog);
@@ -930,12 +993,17 @@ namespace PixelVaultNative
                 Dictionary<string, EmbeddedMetadataSnapshot> metadataByFile;
                 try
                 {
-                    metadataByFile = await metadataService.ReadEmbeddedMetadataBatchAsync(chunk, CancellationToken.None).ConfigureAwait(false);
+                    metadataByFile = await metadataService.ReadEmbeddedMetadataBatchAsync(chunk, detailRenderCancellationToken).ConfigureAwait(false);
+                    detailRenderCancellationToken.ThrowIfCancellationRequested();
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
                 }
                 catch (Exception ex)
                 {
                     LogException("Deferred library metadata repair batch | " + folderLabelForLog, ex);
-                    await Task.Delay(120).ConfigureAwait(false);
+                    await Task.Delay(120, detailRenderCancellationToken).ConfigureAwait(false);
                     continue;
                 }
 
@@ -974,9 +1042,10 @@ namespace PixelVaultNative
                     if (repaired.Count > 0) librarySession.MergePersistLibraryMetadataIndexEntries(repaired);
                 }
 
-                await Task.Delay(100).ConfigureAwait(false);
+                await Task.Delay(100, detailRenderCancellationToken).ConfigureAwait(false);
             }
 
+            detailRenderCancellationToken.ThrowIfCancellationRequested();
             if (Volatile.Read(ref _libraryDeferredMetadataRepairGeneration) != sessionGen) return;
 
             LogTroubleshooting("LibraryDetailMetadataRepairDeferredComplete",

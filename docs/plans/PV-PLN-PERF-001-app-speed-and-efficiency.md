@@ -3,7 +3,7 @@
 | Field | Value |
 |-------|--------|
 | **Plan ID** | `PV-PLN-PERF-001` |
-| **Status** | Active (Phase E complete; Phase F next) |
+| **Status** | Active (Phase F step 21 complete; step 22 next) |
 | **Owner** | PixelVault / Codex |
 | **Source brief** | Codex full-app performance review, 2026-05-03 |
 | **Parent roadmap** | `docs/ROADMAP.md` - performance, polish, reliability |
@@ -111,7 +111,9 @@ Use these stable IDs in commits, tests, and follow-up notes.
 ### Phase F - Detail pane cancellation and viewport-first metadata
 
 20. Add a per-detail-render cancellation token tied to `LibraryDetailRenderVersion` or a dedicated CTS.
+   - Added `LibraryDetailRenderCancellationController`, owned by each library browser working set. Every detail render now cancels the prior render token, background detail work checks the active token at stage boundaries, deferred metadata repair observes the same render token, and controller tests prove previous/current tokens are canceled as expected.
 21. Replace `CancellationToken.None` in selection-dependent detail metadata reads with that token.
+   - The initial detail metadata refresh, immediate missing-capture repair read, and deferred repair chunk reads now pass the active detail-render token into `ReadEmbeddedMetadataBatchAsync`. Stale selection changes can now interrupt the metadata process itself instead of only skipping the eventual UI apply.
 22. Read metadata first for visible/overscan files; defer the rest in small cancelable chunks.
 23. Ensure stale detail renders do not update UI after selection changes.
 
@@ -168,6 +170,8 @@ When execution starts or completes a slice, reference **`PV-PLN-PERF-001`** in c
 
 | Date | Change |
 |------|--------|
+| 2026-05-05 | Completed Phase F step 21 by replacing detail-pane metadata `CancellationToken.None` calls with the active render token. |
+| 2026-05-05 | Completed Phase F step 20 by adding per-detail-render cancellation ownership and guardrail tests; step 21 will thread the token into embedded metadata reads. |
 | 2026-05-05 | Completed Phase E step 19 with final coalescer/logging guardrails and manual large-import checklist updates; Phase E is complete. |
 | 2026-05-05 | Completed Phase E step 18 by batching high-volume import detail log writes while preserving immediate summaries and errors. |
 | 2026-05-04 | Completed Phase E step 17 by batching shared progress-window log text rendering and adding buffer tests. |
