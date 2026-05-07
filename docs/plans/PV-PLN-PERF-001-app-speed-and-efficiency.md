@@ -3,7 +3,7 @@
 | Field | Value |
 |-------|--------|
 | **Plan ID** | `PV-PLN-PERF-001` |
-| **Status** | Active (Phase F step 21 complete; step 22 next) |
+| **Status** | Complete (2026-05-07; isolated WPF manual smoke passed, RC follow-ups noted) |
 | **Owner** | PixelVault / Codex |
 | **Source brief** | Codex full-app performance review, 2026-05-03 |
 | **Parent roadmap** | `docs/ROADMAP.md` - performance, polish, reliability |
@@ -115,20 +115,29 @@ Use these stable IDs in commits, tests, and follow-up notes.
 21. Replace `CancellationToken.None` in selection-dependent detail metadata reads with that token.
    - The initial detail metadata refresh, immediate missing-capture repair read, and deferred repair chunk reads now pass the active detail-render token into `ReadEmbeddedMetadataBatchAsync`. Stale selection changes can now interrupt the metadata process itself instead of only skipping the eventual UI apply.
 22. Read metadata first for visible/overscan files; defer the rest in small cancelable chunks.
+   - Virtualized detail rows now carry their file membership, and detail metadata builds a viewport-first file order from the active scroll offset plus overscan. Initial embedded metadata reads target that primary set first; non-primary files are processed afterward in 36-file cancelable chunks. Missing-capture repair reads use the same viewport-first ordering before deferring the rest.
 23. Ensure stale detail renders do not update UI after selection changes.
+   - Added a shared `LibraryDetailRenderGuard` so detail UI apply paths use one rule: active render token, active render version, and matching selection. Deferred metadata repair now carries the originating render version through scheduling/core execution and re-checks the guard before chunk work, final completion, and the idle redraw callback.
 
 ### Phase G - Scroll/render polish
 
 24. Tune virtualized row refresh to use render-priority coalescing where it improves perceived scroll response.
+   - Replaced the ordinary scroll debounce timer with a one-per-render-pass `DispatcherPriority.Render` refresh queue. Page-sized scroll jumps still refresh immediately, viewport/resize changes keep the slower resize debounce, and queued stale scroll refreshes are invalidated when rows are reset or a resize/immediate refresh takes over.
 25. Preserve row recycling and existing image decode prioritization.
+   - Added guardrail helpers/tests for row recycling and decode priority. Virtual row element cache pruning now preserves the inclusive visible row range, and detail image decode priority remains tied to row/viewport intersection so visible rows keep using the priority image-load lane.
 26. Re-run large-folder scroll checks with troubleshooting logging on.
+   - Added troubleshooting-only scroll diagnostics for virtualized hosts (`VirtualizedRowHostScroll` and `VirtualizedRowHostRowsRebuilt`) and labeled folder/detail hosts in logs. The manual golden path now includes a repeatable large-folder scroll pass that captures render-coalesced scroll refreshes, immediate page jumps, row rebuild ranges, and stale detail render skip/apply behavior.
 
 ### Phase H - Optional cleanup and final verification
 
 27. Review remote asset picker previews for UI-thread image decode/download jank.
+   - Reworked SteamGridDB asset picker thumbnails/previews so remote images download through `TimeoutWebClient.DownloadBytesAsync` off the UI thread, decode from memory with `BitmapCacheOption.OnLoad`, freeze before UI apply, and ignore stale image requests via per-image tokens. Picker previews now prefer SteamGridDB preview URLs for browsing and only download the full selected asset when the user confirms.
 28. Review remaining synchronous file/log operations that can run during active UI flows.
+   - Reviewed active UI file/log hotspots and moved custom cover/banner/logo save operations for SteamGridDB picker selections plus manual right-click art menus behind background task wrappers. Picker temp-file cleanup also runs off the dispatcher; file dialogs remain UI-modal by design, and the remaining clear/delete paths are small, explicit user actions.
 29. Run unit tests and manual golden path.
+   - Automated verification passed on 2026-05-07: `dotnet test C:\Codex\tests\PixelVault.Native.Tests\PixelVault.Native.Tests.csproj --no-restore` (549/549), `dotnet build C:\Codex\src\PixelVault.Native\PixelVault.Native.csproj --no-restore`, and `git diff --check` (CRLF normalization warnings only). The isolated WPF manual smoke also passed for app launch, 25/100/500-file foreground imports, large-folder detail open, fast detail scroll, and selection switch diagnostics; see `docs/perf/PV-PLN-PERF-001-step-29-manual-run.md` and `docs/perf/PV-PLN-PERF-001-step-29-manual-results.md`. HDR PNG/JXR and SteamGridDB/custom-art live checks remain RC follow-ups because the isolated sandbox did not include a valid throwaway JXR writer or SteamGridDB token.
 30. Update `docs/CHANGELOG.md`, `docs/HANDOFF.md`, and this plan's revision history when slices ship.
+   - Final doc sync completed on 2026-05-07: `docs/CHANGELOG.md` records the shipped PV-PLN-PERF-001 speed/reliability changes, `docs/HANDOFF.md` points to the completed status and manual evidence, this plan's revision history is current, and `docs/perf/PV-PLN-PERF-001-step-29-manual-results.md` captures the isolated WPF close-out. The manual smoke also noted a residual synthetic-title grouping artifact (`Perf Game 100` / `Perf Game 500`) for future review if numbered real titles ever appear to merge too aggressively.
 
 ## Acceptance criteria
 
@@ -156,7 +165,7 @@ Use these stable IDs in commits, tests, and follow-up notes.
 | Incremental cache update misses an edge case and shows stale folder counts. | Keep force refresh, add tests for touched folders, and fall back to coalesced full rebuild when structural ambiguity is detected. |
 | Background repair causes confusing delayed changes. | Use existing status/toast/log patterns sparingly; prefer silent repair unless user initiated scan. |
 | Progress coalescing hides useful diagnostics. | Keep final counts and troubleshooting logs; optionally expose verbose mode when troubleshooting logging is enabled. |
-| Cancellation changes drop legitimate updates. | Generation-gate UI application and flush final selected render only when `SameLibraryBrowserSelection` still matches. |
+| Cancellation changes drop legitimate updates. | Gate UI application by active render token, render version, and `SameLibraryBrowserSelection`; deferred repair redraws carry the original render version. |
 
 ## Doc sync
 
@@ -170,6 +179,17 @@ When execution starts or completes a slice, reference **`PV-PLN-PERF-001`** in c
 
 | Date | Change |
 |------|--------|
+| 2026-05-07 | Marked PV-PLN-PERF-001 complete after isolated WPF manual smoke passed for launch, 25/100/500-file imports, large-folder detail render, fast detail scroll, and selection-switch diagnostics; HDR/JXR and SteamGridDB/custom-art live checks remain RC follow-ups. |
+| 2026-05-07 | Completed Phase H step 30 doc sync across changelog, handoff, plan status, and revision history. |
+| 2026-05-07 | Added the Phase H step 29 manual run sheet for live WPF import, large-folder, scroll, SteamGridDB picker, and custom-art save checks. |
+| 2026-05-07 | Completed the automated verification portion of Phase H step 29 and exported the latest performance-baseline artifact; live manual golden-path checks remain pending. |
+| 2026-05-07 | Completed Phase H step 28 by moving custom art save/copy and picker temp-file cleanup work off the UI thread for SteamGridDB picker and right-click art menu flows. |
+| 2026-05-06 | Completed Phase H step 27 by moving SteamGridDB picker preview image download/decode off the UI thread and adding URL/cache-key guardrail tests. |
+| 2026-05-06 | Completed Phase G step 26 by adding troubleshooting scroll diagnostics and documenting the large-folder scroll pass/log markers. |
+| 2026-05-06 | Completed Phase G step 25 by adding guardrail coverage for virtual row recycling and visible-row image decode prioritization. |
+| 2026-05-06 | Completed Phase G step 24 by switching ordinary virtualized row scroll refreshes from timer debounce to render-priority coalescing while keeping page-sized jumps immediate. |
+| 2026-05-06 | Completed Phase F step 23 by centralizing stale detail-render apply checks and carrying render-version guardrails through deferred metadata repair redraws; Phase F is complete. |
+| 2026-05-05 | Completed Phase F step 22 by prioritizing visible/overscan detail metadata reads and deferring the rest in cancelable chunks. |
 | 2026-05-05 | Completed Phase F step 21 by replacing detail-pane metadata `CancellationToken.None` calls with the active render token. |
 | 2026-05-05 | Completed Phase F step 20 by adding per-detail-render cancellation ownership and guardrail tests; step 21 will thread the token into embedded metadata reads. |
 | 2026-05-05 | Completed Phase E step 19 with final coalescer/logging guardrails and manual large-import checklist updates; Phase E is complete. |

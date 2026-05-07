@@ -138,16 +138,24 @@ namespace PixelVaultNative
             openMyCoversItem.Click += delegate { OpenSavedCoversFolder(); };
 
             var setCoverItem = new MenuItem { Header = "Set Custom Cover...", IsEnabled = actionFolders.Count > 0 };
-            setCoverItem.Click += delegate
+            setCoverItem.Click += async delegate
             {
                 Directory.CreateDirectory(savedCoversRoot);
                 var pickedCover = PickFile(string.Empty, "Image Files|*.jpg;*.jpeg;*.png;*.jxr;*.bmp;*.gif|All Files|*.*", savedCoversRoot);
                 if (string.IsNullOrWhiteSpace(pickedCover)) return;
-                foreach (var targetFolder in actionFolders) SaveCustomCover(targetFolder, pickedCover);
-                showFolder(folder);
-                renderTiles?.Invoke();
-                libraryToast?.Invoke("Cover saved");
-                Log("Custom cover set for " + BuildLibraryBrowserActionScopeLabel(folder) + ".");
+                try
+                {
+                    await SaveCustomCoverAsync(actionFolders, pickedCover).ConfigureAwait(true);
+                    showFolder(folder);
+                    renderTiles?.Invoke();
+                    libraryToast?.Invoke("Cover saved");
+                    Log("Custom cover set for " + BuildLibraryBrowserActionScopeLabel(folder) + ".");
+                }
+                catch (Exception ex)
+                {
+                    LogException("Set custom cover | " + BuildLibraryBrowserActionScopeLabel(folder), ex);
+                    libraryToast?.Invoke("Cover save failed");
+                }
             };
 
             var clearCoverItem = new MenuItem
@@ -187,29 +195,45 @@ namespace PixelVaultNative
             };
 
             var setBannerItem = new MenuItem { Header = "Set Custom Banner...", IsEnabled = actionFolders.Count > 0 };
-            setBannerItem.Click += delegate
+            setBannerItem.Click += async delegate
             {
                 Directory.CreateDirectory(savedCoversRoot);
                 var picked = PickFile(string.Empty, "Image Files|*.jpg;*.jpeg;*.png;*.jxr;*.bmp;*.gif|All Files|*.*", savedCoversRoot);
                 if (string.IsNullOrWhiteSpace(picked)) return;
-                foreach (var targetFolder in actionFolders) SaveCustomHero(targetFolder, picked);
-                showFolder(folder);
-                refreshPhotoWorkspaceHeroBanner?.Invoke();
-                libraryToast?.Invoke("Banner saved");
-                Log("Custom banner set for " + BuildLibraryBrowserActionScopeLabel(folder) + ".");
+                try
+                {
+                    await SaveCustomHeroAsync(actionFolders, picked).ConfigureAwait(true);
+                    showFolder(folder);
+                    refreshPhotoWorkspaceHeroBanner?.Invoke();
+                    libraryToast?.Invoke("Banner saved");
+                    Log("Custom banner set for " + BuildLibraryBrowserActionScopeLabel(folder) + ".");
+                }
+                catch (Exception ex)
+                {
+                    LogException("Set custom banner | " + BuildLibraryBrowserActionScopeLabel(folder), ex);
+                    libraryToast?.Invoke("Banner save failed");
+                }
             };
 
             var setLogoItem = new MenuItem { Header = "Set Custom Logo...", IsEnabled = actionFolders.Count > 0 };
-            setLogoItem.Click += delegate
+            setLogoItem.Click += async delegate
             {
                 Directory.CreateDirectory(savedCoversRoot);
                 var picked = PickFile(string.Empty, "Image Files|*.png;*.jpg;*.jpeg;*.jxr;*.bmp;*.gif;*.ico|All Files|*.*", savedCoversRoot);
                 if (string.IsNullOrWhiteSpace(picked)) return;
-                foreach (var targetFolder in actionFolders) SaveCustomLogo(targetFolder, picked);
-                showFolder(folder);
-                refreshPhotoWorkspaceHeroBanner?.Invoke();
-                libraryToast?.Invoke("Logo saved");
-                Log("Custom logo set for " + BuildLibraryBrowserActionScopeLabel(folder) + ".");
+                try
+                {
+                    await SaveCustomLogoAsync(actionFolders, picked).ConfigureAwait(true);
+                    showFolder(folder);
+                    refreshPhotoWorkspaceHeroBanner?.Invoke();
+                    libraryToast?.Invoke("Logo saved");
+                    Log("Custom logo set for " + BuildLibraryBrowserActionScopeLabel(folder) + ".");
+                }
+                catch (Exception ex)
+                {
+                    LogException("Set custom logo | " + BuildLibraryBrowserActionScopeLabel(folder), ex);
+                    libraryToast?.Invoke("Logo save failed");
+                }
             };
 
             var chooseBannerItem = new MenuItem { Header = "Choose Banner...", IsEnabled = actionFolders.Count > 0 && HasSteamGridDbApiToken() };

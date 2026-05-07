@@ -14,6 +14,13 @@ namespace PixelVaultNative
 {
     public sealed partial class MainWindow
     {
+        const int SteamGridDbPickerPreviewImageCacheLimit = 80;
+        const long SteamGridDbPickerPreviewMaxBytes = 12L * 1024L * 1024L;
+        readonly object steamGridDbPickerPreviewImageCacheGate = new object();
+        readonly Dictionary<string, BitmapImage> steamGridDbPickerPreviewImageCache = new Dictionary<string, BitmapImage>(StringComparer.OrdinalIgnoreCase);
+        readonly Queue<string> steamGridDbPickerPreviewImageCacheOrder = new Queue<string>();
+        readonly SemaphoreSlim steamGridDbPickerPreviewLoadLimiter = new SemaphoreSlim(4, 4);
+
         enum LibraryAssetPickerKind
         {
             Cover,
@@ -67,21 +74,7 @@ namespace PixelVaultNative
                     return;
                 }
 
-                foreach (var folder in targetFolders.Where(folder => folder != null))
-                {
-                    switch (pickerKind)
-                    {
-                        case LibraryAssetPickerKind.Cover:
-                            SaveCustomCover(folder, tempPath);
-                            break;
-                        case LibraryAssetPickerKind.Banner:
-                            SaveCustomHero(folder, tempPath);
-                            break;
-                        default:
-                            SaveCustomLogo(folder, tempPath);
-                            break;
-                    }
-                }
+                await SaveSteamGridDbAssetSelectionAsync(targetFolders, tempPath, pickerKind).ConfigureAwait(true);
 
                 showFolder?.Invoke(view);
                 if (pickerKind == LibraryAssetPickerKind.Cover)
@@ -117,13 +110,48 @@ namespace PixelVaultNative
                 {
                     try
                     {
-                        File.Delete(tempPath);
+                        await DeleteLibraryTempFileIfExistsAsync(tempPath).ConfigureAwait(false);
                     }
                     catch
                     {
                     }
                 }
             }
+        }
+
+        Task SaveSteamGridDbAssetSelectionAsync(List<LibraryFolderInfo> targetFolders, string sourcePath, LibraryAssetPickerKind pickerKind)
+        {
+            var folders = (targetFolders ?? new List<LibraryFolderInfo>())
+                .Where(folder => folder != null)
+                .ToList();
+            if (folders.Count == 0 || string.IsNullOrWhiteSpace(sourcePath)) return Task.CompletedTask;
+            return Task.Run(delegate
+            {
+                foreach (var folder in folders)
+                {
+                    switch (pickerKind)
+                    {
+                        case LibraryAssetPickerKind.Cover:
+                            SaveCustomCover(folder, sourcePath);
+                            break;
+                        case LibraryAssetPickerKind.Banner:
+                            SaveCustomHero(folder, sourcePath);
+                            break;
+                        default:
+                            SaveCustomLogo(folder, sourcePath);
+                            break;
+                    }
+                }
+            });
+        }
+
+        static Task DeleteLibraryTempFileIfExistsAsync(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path)) return Task.CompletedTask;
+            return Task.Run(delegate
+            {
+                if (File.Exists(path)) File.Delete(path);
+            });
         }
 
         async Task<List<SteamGridDbAssetChoice>> LoadSteamGridDbAssetChoicesForPickerAsync(LibraryFolderInfo lookupFolder, LibraryAssetPickerKind pickerKind, CancellationToken cancellationToken)
@@ -582,7 +610,7 @@ namespace PixelVaultNative
                 authorBits.Add("Score " + choice.Score);
                 if (choice.Upvotes > 0 || choice.Downvotes > 0) authorBits.Add("+" + choice.Upvotes + " / -" + choice.Downvotes);
                 previewDetail.Text = string.Join(" · ", authorBits.Where(bit => !string.IsNullOrWhiteSpace(bit)));
-                SetRemoteImageSource(previewImage, string.IsNullOrWhiteSpace(choice.DownloadUrl) ? choice.PreviewUrl : choice.DownloadUrl, 900);
+                SetRemoteImageSource(previewImage, string.IsNullOrWhiteSpace(choice.PreviewUrl) ? choice.DownloadUrl : choice.PreviewUrl, 900);
             }
 
             void RenderChoicePage(SteamGridDbAssetChoice preferredSelection = null)
@@ -903,21 +931,130 @@ namespace PixelVaultNative
         void SetRemoteImageSource(Image image, string url, int decodePixelWidth)
         {
             if (image == null) return;
+            var requestToken = Guid.NewGuid().ToString("N");
+            image.Uid = requestToken;
             image.Source = null;
             if (string.IsNullOrWhiteSpace(url)) return;
+            if (!IsSteamGridDbPickerRemoteImageUrl(url)) return;
+            var cacheKey = BuildSteamGridDbPickerPreviewImageCacheKey(url, decodePixelWidth);
+            var cached = TryGetSteamGridDbPickerPreviewImage(cacheKey);
+            if (cached != null)
+            {
+                image.Source = cached;
+                return;
+            }
+
+            var dispatcher = image.Dispatcher;
+            _ = LoadSteamGridDbPickerPreviewImageAsync(image, dispatcher, url.Trim(), decodePixelWidth, requestToken, cacheKey);
+        }
+
+        async Task LoadSteamGridDbPickerPreviewImageAsync(Image image, System.Windows.Threading.Dispatcher dispatcher, string url, int decodePixelWidth, string requestToken, string cacheKey)
+        {
             try
             {
-                var bitmap = new BitmapImage();
-                bitmap.BeginInit();
-                bitmap.UriSource = new Uri(url, UriKind.Absolute);
-                if (decodePixelWidth > 0) bitmap.DecodePixelWidth = decodePixelWidth;
-                bitmap.CacheOption = BitmapCacheOption.OnDemand;
-                bitmap.CreateOptions = BitmapCreateOptions.IgnoreColorProfile;
-                bitmap.EndInit();
-                image.Source = bitmap;
+                await steamGridDbPickerPreviewLoadLimiter.WaitAsync().ConfigureAwait(false);
+                BitmapImage bitmap;
+                try
+                {
+                    bitmap = TryGetSteamGridDbPickerPreviewImage(cacheKey);
+                    if (bitmap == null)
+                    {
+                        using (var wc = new TimeoutWebClient())
+                        {
+                            wc.Encoding = System.Text.Encoding.UTF8;
+                            wc.TimeoutMilliseconds = Math.Max(10000, Math.Min(20000, SteamRequestTimeoutMilliseconds));
+                            try
+                            {
+                                wc.Headers[System.Net.HttpRequestHeader.UserAgent] = "PixelVault/" + AppVersion;
+                            }
+                            catch
+                            {
+                            }
+                            var bytes = await wc.DownloadBytesAsync(url, SteamGridDbPickerPreviewMaxBytes).ConfigureAwait(false);
+                            bitmap = DecodeSteamGridDbPickerPreviewBitmap(bytes, decodePixelWidth);
+                        }
+                        StoreSteamGridDbPickerPreviewImage(cacheKey, bitmap);
+                    }
+                }
+                finally
+                {
+                    steamGridDbPickerPreviewLoadLimiter.Release();
+                }
+
+                if (dispatcher == null || dispatcher.HasShutdownStarted || dispatcher.HasShutdownFinished) return;
+                await dispatcher.InvokeAsync(new Action(delegate
+                {
+                    if (image == null) return;
+                    if (!string.Equals(image.Uid, requestToken, StringComparison.Ordinal)) return;
+                    image.Source = bitmap;
+                }), System.Windows.Threading.DispatcherPriority.Background);
+            }
+            catch (OperationCanceledException)
+            {
             }
             catch
             {
+            }
+        }
+
+        static BitmapImage DecodeSteamGridDbPickerPreviewBitmap(byte[] bytes, int decodePixelWidth)
+        {
+            if (bytes == null || bytes.Length == 0) return null;
+            using (var stream = new MemoryStream(bytes))
+            {
+                var bitmap = new BitmapImage();
+                bitmap.BeginInit();
+                bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                bitmap.CreateOptions = BitmapCreateOptions.IgnoreColorProfile;
+                if (decodePixelWidth > 0) bitmap.DecodePixelWidth = decodePixelWidth;
+                bitmap.StreamSource = stream;
+                bitmap.EndInit();
+                bitmap.Freeze();
+                return bitmap;
+            }
+        }
+
+        internal static bool IsSteamGridDbPickerRemoteImageUrl(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url)) return false;
+            Uri parsed;
+            if (!Uri.TryCreate(url.Trim(), UriKind.Absolute, out parsed)) return false;
+            return string.Equals(parsed.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(parsed.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase);
+        }
+
+        internal static string BuildSteamGridDbPickerPreviewImageCacheKey(string url, int decodePixelWidth)
+        {
+            if (string.IsNullOrWhiteSpace(url)) return string.Empty;
+            return url.Trim() + "|decode=" + Math.Max(0, decodePixelWidth);
+        }
+
+        BitmapImage TryGetSteamGridDbPickerPreviewImage(string cacheKey)
+        {
+            if (string.IsNullOrWhiteSpace(cacheKey)) return null;
+            lock (steamGridDbPickerPreviewImageCacheGate)
+            {
+                BitmapImage image;
+                return steamGridDbPickerPreviewImageCache.TryGetValue(cacheKey, out image) ? image : null;
+            }
+        }
+
+        void StoreSteamGridDbPickerPreviewImage(string cacheKey, BitmapImage image)
+        {
+            if (string.IsNullOrWhiteSpace(cacheKey) || image == null) return;
+            lock (steamGridDbPickerPreviewImageCacheGate)
+            {
+                if (!steamGridDbPickerPreviewImageCache.ContainsKey(cacheKey))
+                {
+                    steamGridDbPickerPreviewImageCacheOrder.Enqueue(cacheKey);
+                }
+                steamGridDbPickerPreviewImageCache[cacheKey] = image;
+                while (steamGridDbPickerPreviewImageCache.Count > SteamGridDbPickerPreviewImageCacheLimit
+                    && steamGridDbPickerPreviewImageCacheOrder.Count > 0)
+                {
+                    var oldKey = steamGridDbPickerPreviewImageCacheOrder.Dequeue();
+                    steamGridDbPickerPreviewImageCache.Remove(oldKey);
+                }
             }
         }
 

@@ -512,16 +512,24 @@ namespace PixelVaultNative
             var openMyCoversItem = new MenuItem { Header = "Open My Covers Folder" };
             openMyCoversItem.Click += delegate { OpenSavedCoversFolder(); };
             var setCoverItem = new MenuItem { Header = "Set Custom Cover...", IsEnabled = actionFolders.Count > 0 };
-            setCoverItem.Click += delegate
+            setCoverItem.Click += async delegate
             {
                 Directory.CreateDirectory(savedCoversRoot);
                 var pickedCover = PickFile(string.Empty, "Image Files|*.jpg;*.jpeg;*.png;*.jxr;*.bmp;*.gif|All Files|*.*", savedCoversRoot);
                 if (string.IsNullOrWhiteSpace(pickedCover)) return;
-                foreach (var targetFolder in actionFolders) SaveCustomCover(targetFolder, pickedCover);
-                showFolder(folder);
-                if (renderTiles != null) renderTiles();
-                libraryToast?.Invoke("Cover saved");
-                Log("Custom cover set for " + BuildLibraryBrowserActionScopeLabel(folder) + ".");
+                try
+                {
+                    await SaveCustomCoverAsync(actionFolders, pickedCover).ConfigureAwait(true);
+                    showFolder(folder);
+                    if (renderTiles != null) renderTiles();
+                    libraryToast?.Invoke("Cover saved");
+                    Log("Custom cover set for " + BuildLibraryBrowserActionScopeLabel(folder) + ".");
+                }
+                catch (Exception ex)
+                {
+                    LogException("Set custom cover | " + BuildLibraryBrowserActionScopeLabel(folder), ex);
+                    libraryToast?.Invoke("Cover save failed");
+                }
             };
             var clearCoverItem = new MenuItem
             {

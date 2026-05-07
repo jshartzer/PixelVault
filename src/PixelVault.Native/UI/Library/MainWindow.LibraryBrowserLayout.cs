@@ -205,6 +205,7 @@ namespace PixelVaultNative
             leftGrid.Children.Add(filterShell);
 
             panes.TileRows = CreateVirtualizedRowHost(new Thickness(0, 12, 0, 0), null);
+            panes.TileRows.DiagnosticName = "FolderRows";
             panes.TileRows.RecycleVisibleRowElements = true;
             panes.TileScroll = panes.TileRows.ScrollViewer;
             panes.TileScroll.Padding = new Thickness(0, 4, 0, 0);
@@ -700,6 +701,7 @@ namespace PixelVaultNative
             rightGrid.Children.Add(controls);
 
             panes.DetailRows = CreateVirtualizedRowHost(new Thickness(0), Brush("#0F151A"));
+            panes.DetailRows.DiagnosticName = "DetailRows";
             panes.DetailRows.RecycleVisibleRowElements = true;
             panes.ThumbScroll = panes.DetailRows.ScrollViewer;
             panes.ThumbScroll.HorizontalScrollBarVisibility = ScrollBarVisibility.Auto;

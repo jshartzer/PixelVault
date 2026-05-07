@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -86,12 +87,28 @@ namespace PixelVaultNative
         // LibraryBrowserShellBridge) keep the same MainWindow-level call sites.
         string CustomCoverPath(LibraryFolderInfo folder) => coverService.CustomCoverPath(folder);
         void SaveCustomCover(LibraryFolderInfo folder, string sourcePath) => coverService.SaveCustomCover(folder, sourcePath);
+        Task SaveCustomCoverAsync(IEnumerable<LibraryFolderInfo> folders, string sourcePath) => SaveCustomAssetAsync(folders, sourcePath, SaveCustomCover);
         void ClearCustomCover(LibraryFolderInfo folder) => coverService.ClearCustomCover(folder);
         string CustomHeroPath(LibraryFolderInfo folder) => coverService.CustomHeroPath(folder);
         void SaveCustomHero(LibraryFolderInfo folder, string sourcePath) => coverService.SaveCustomHero(folder, sourcePath);
+        Task SaveCustomHeroAsync(IEnumerable<LibraryFolderInfo> folders, string sourcePath) => SaveCustomAssetAsync(folders, sourcePath, SaveCustomHero);
         void ClearCustomHero(LibraryFolderInfo folder) => coverService.ClearCustomHero(folder);
         string CustomLogoPath(LibraryFolderInfo folder) => coverService.CustomLogoPath(folder);
         void SaveCustomLogo(LibraryFolderInfo folder, string sourcePath) => coverService.SaveCustomLogo(folder, sourcePath);
+        Task SaveCustomLogoAsync(IEnumerable<LibraryFolderInfo> folders, string sourcePath) => SaveCustomAssetAsync(folders, sourcePath, SaveCustomLogo);
         void ClearCustomLogo(LibraryFolderInfo folder) => coverService.ClearCustomLogo(folder);
+
+        static Task SaveCustomAssetAsync(IEnumerable<LibraryFolderInfo> folders, string sourcePath, Action<LibraryFolderInfo, string> save)
+        {
+            if (save == null || string.IsNullOrWhiteSpace(sourcePath)) return Task.CompletedTask;
+            var targets = (folders ?? new List<LibraryFolderInfo>())
+                .Where(folder => folder != null)
+                .ToList();
+            if (targets.Count == 0) return Task.CompletedTask;
+            return Task.Run(delegate
+            {
+                foreach (var folder in targets) save(folder, sourcePath);
+            });
+        }
     }
 }

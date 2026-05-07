@@ -69,4 +69,20 @@ namespace PixelVaultNative
             }
         }
     }
+
+    internal static class LibraryDetailRenderGuard
+    {
+        public static bool CanApply(
+            LibraryDetailRenderCancellationController cancellation,
+            int renderVersion,
+            CancellationToken cancellationToken,
+            int activeRenderVersion,
+            bool selectionMatches)
+        {
+            if (!selectionMatches) return false;
+            if (renderVersion != activeRenderVersion) return false;
+            if (cancellation == null) return false;
+            return cancellation.IsCurrent(renderVersion, cancellationToken);
+        }
+    }
 }

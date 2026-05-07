@@ -83,6 +83,15 @@ namespace PixelVaultNative
                 FileLength = fileInfo.Length,
                 IsVideo = IsVideo(fullPath)
             };
+            if (ShouldUseFastLibraryDetailAspectFallback(fullPath, resolved.IsVideo))
+            {
+                ApplyFastLibraryDetailAspectFallback(resolved);
+                lock (_libraryDetailMediaLayoutInfoSync)
+                {
+                    _libraryDetailMediaLayoutInfoCache[fullPath] = resolved;
+                }
+                return resolved;
+            }
 
             try
             {
@@ -121,6 +130,21 @@ namespace PixelVaultNative
                 _libraryDetailMediaLayoutInfoCache[fullPath] = resolved;
             }
             return resolved;
+        }
+
+        internal static bool ShouldUseFastLibraryDetailAspectFallback(string file, bool isVideo)
+        {
+            if (isVideo || string.IsNullOrWhiteSpace(file)) return false;
+            return string.Equals(Path.GetExtension(file), ".jxr", StringComparison.OrdinalIgnoreCase);
+        }
+
+        internal static void ApplyFastLibraryDetailAspectFallback(LibraryDetailMediaLayoutInfo info)
+        {
+            if (info == null) return;
+            // WIC's JPEG XR dimension probe can cost hundreds of ms per file; keep folder paint fast
+            // and let the async thumbnail decode load the real pixels for visible captures.
+            info.PixelWidth = 1920;
+            info.PixelHeight = 1080;
         }
 
         const int LibraryDetailMediaLayoutParallelThreshold = 16;

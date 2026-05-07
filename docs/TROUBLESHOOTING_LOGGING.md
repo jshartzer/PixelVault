@@ -33,6 +33,8 @@ Current Library entries include:
 - embedded metadata repair start, completion, diff outcome, and failure
 - banner art resolve failures
 - first detail snapshot dispatch wall time (`LibraryDetailQuickSnapshotDispatchComplete` → `dispatcherWallMs`)
+- virtualized folder/detail scroll refreshes (`VirtualizedRowHostScroll`) showing whether the refresh was render-coalesced or an immediate page-sized jump
+- virtualized visible row rebuilds (`VirtualizedRowHostRowsRebuilt`) showing host name, row range, recycler state, scroll offset, and whether measured row height changed
 
 When a folder’s first detail paint is slow enough, the main app log also emits **`PERF | LibraryDetailRender`** with a breakdown of the **background quick snapshot** (prep vs media-dimension map vs timeline/groups tail), whether the media map was **reused** from an earlier snapshot pass, and **`uiApplyMs`** (time inside the first UI-thread apply that builds virtual rows).
 
@@ -62,3 +64,16 @@ Turn this on when you are trying to reproduce or explain behavior such as:
 5. Turn troubleshooting logging back off when you are done
 
 Keeping it opt-in helps the log stay focused and easier to read during a real bug chase.
+
+## Large-folder scroll check
+
+For `PV-PLN-PERF-001` scroll/render polish, use a large folder such as `Diablo IV`, Timeline, or any folder with hundreds of captures.
+
+1. Turn troubleshooting logging on.
+2. Open the Library and select the large folder.
+3. Wait for the first usable detail pane.
+4. Fast-scroll the right-hand detail pane down and back up for 10-15 seconds.
+5. Switch to another folder while thumbnails or metadata are still settling.
+6. Review `PixelVault-troubleshooting.log` for `VirtualizedRowHostScroll`, `VirtualizedRowHostRowsRebuilt`, `LibraryDetailRenderSkipped`, and `LibraryDetailRenderApplied`.
+
+Pass if `DetailRows` emits render-coalesced scroll refreshes, page-sized jumps are rare/immediate, row rebuild ranges follow the current scroll offset, and stale detail renders are skipped instead of repainting over the new selection.

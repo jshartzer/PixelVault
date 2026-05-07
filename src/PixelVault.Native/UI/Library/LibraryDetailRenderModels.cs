@@ -34,4 +34,24 @@ namespace PixelVaultNative
         internal DateTime CaptureDate;
         internal string Comment;
     }
+
+    internal sealed class LibraryDetailViewportFileOrder
+    {
+        internal readonly List<string> PrimaryFiles;
+        internal readonly List<string> DeferredFiles;
+
+        internal LibraryDetailViewportFileOrder(List<string> primaryFiles, List<string> deferredFiles)
+        {
+            PrimaryFiles = primaryFiles ?? new List<string>();
+            DeferredFiles = deferredFiles ?? new List<string>();
+        }
+
+        internal List<string> AllFiles()
+        {
+            var all = new List<string>(PrimaryFiles.Count + DeferredFiles.Count);
+            all.AddRange(PrimaryFiles);
+            all.AddRange(DeferredFiles);
+            return all;
+        }
+    }
 }

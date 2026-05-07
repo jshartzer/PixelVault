@@ -32,12 +32,14 @@ namespace PixelVaultNative
         internal sealed class VirtualizedRowDefinition
         {
             public double Height;
+            public List<string> Files = new List<string>();
             public Func<FrameworkElement> Build;
         }
 
         internal sealed class VirtualizedRowHost
         {
             public ScrollViewer ScrollViewer;
+            public string DiagnosticName;
             public Border TopSpacer;
             public StackPanel VisibleRowsPanel;
             public Border BottomSpacer;
@@ -52,21 +54,108 @@ namespace PixelVaultNative
             public readonly Dictionary<int, FrameworkElement> RecycledRowElements = new Dictionary<int, FrameworkElement>();
             /// <summary>Batches <see cref="RefreshVirtualizedRowHost"/> during window/pane resize so ScrollViewer layout storms do not queue hundreds of full virtual passes.</summary>
             internal DispatcherTimer ViewportResizeCoalesceTimer;
-            /// <summary>Batches virtual row rebuilds during ScrollViewer offset changes so wheel/trackpad scrolling does not remeasure visible rows every tick (jitter).</summary>
-            internal DispatcherTimer ScrollRefreshDebounceTimer;
+            /// <summary>Queues at most one scroll-driven refresh for the next render pass, keeping rows responsive without rebuilding for every wheel tick.</summary>
+            internal bool ScrollRefreshRenderQueued;
+            internal int ScrollRefreshRequestVersion;
         }
 
         const int VirtualizedRowHostViewportRefreshDebounceMs = 85;
-        const int VirtualizedRowHostScrollRefreshDebounceMs = 48;
+
+        internal static bool ShouldRefreshVirtualizedRowHostImmediatelyForScroll(
+            double verticalChange,
+            double horizontalChange,
+            double viewportHeight,
+            double viewportWidth)
+        {
+            var vh = Math.Max(0d, viewportHeight);
+            var vw = Math.Max(0d, viewportWidth);
+            return vh > 1d && Math.Abs(verticalChange) >= vh * 0.88d
+                || vw > 1d && Math.Abs(horizontalChange) >= vw * 0.88d;
+        }
 
         static bool LibraryDetailTileRowIntersectsViewport(ScrollViewer scroll, double rowDocumentTop, double rowHeight)
         {
             if (scroll == null) return true;
-            var v0 = scroll.VerticalOffset;
-            var v1 = v0 + Math.Max(1, scroll.ViewportHeight);
+            return LibraryDetailRowShouldPrioritizeDecode(
+                rowDocumentTop,
+                rowHeight,
+                scroll.VerticalOffset,
+                scroll.ViewportHeight);
+        }
+
+        internal static bool LibraryDetailRowShouldPrioritizeDecode(
+            double rowDocumentTop,
+            double rowHeight,
+            double viewportOffset,
+            double viewportHeight)
+        {
+            var v0 = viewportOffset;
+            var v1 = v0 + Math.Max(1, viewportHeight);
             var top = rowDocumentTop;
             var bottom = rowDocumentTop + Math.Max(1, rowHeight);
             return bottom > v0 && top < v1;
+        }
+
+        internal static List<int> SelectVirtualizedRowElementCacheKeysToPrune(
+            IEnumerable<int> keys,
+            int firstVisibleIndex,
+            int lastVisibleIndex)
+        {
+            if (keys == null) return new List<int>();
+            return keys
+                .Where(key => key < firstVisibleIndex || key > lastVisibleIndex)
+                .ToList();
+        }
+
+        internal static LibraryDetailViewportFileOrder BuildLibraryDetailViewportFileOrder(
+            IList<VirtualizedRowDefinition> rows,
+            IEnumerable<string> fallbackFiles,
+            double scrollOffset,
+            double viewportHeight,
+            double overscanMultiplier = 0.9d,
+            double minimumOverscan = 480d)
+        {
+            var fallback = (fallbackFiles ?? Enumerable.Empty<string>())
+                .Where(file => !string.IsNullOrWhiteSpace(file))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            var primary = new List<string>();
+            var deferred = new List<string>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            var safeViewportHeight = viewportHeight <= 0d ? 720d : viewportHeight;
+            var overscan = Math.Max(0d, Math.Max(minimumOverscan, safeViewportHeight * Math.Max(0d, overscanMultiplier)));
+            var minY = Math.Max(0d, Math.Max(0d, scrollOffset) - overscan);
+            var maxY = Math.Max(0d, scrollOffset) + safeViewportHeight + overscan;
+
+            if (rows != null && rows.Count > 0)
+            {
+                var cursor = 0d;
+                foreach (var row in rows)
+                {
+                    var rowHeight = Math.Max(1d, row == null ? 1d : row.Height);
+                    var rowTop = cursor;
+                    var rowBottom = cursor + rowHeight;
+                    var target = rowBottom > minY && rowTop < maxY ? primary : deferred;
+                    var rowFiles = row == null ? null : row.Files;
+                    if (rowFiles != null)
+                    {
+                        foreach (var file in rowFiles)
+                        {
+                            if (string.IsNullOrWhiteSpace(file) || !seen.Add(file)) continue;
+                            target.Add(file);
+                        }
+                    }
+                    cursor = rowBottom;
+                }
+            }
+
+            foreach (var file in fallback)
+            {
+                if (seen.Add(file)) deferred.Add(file);
+            }
+
+            return new LibraryDetailViewportFileOrder(primary, deferred);
         }
 
         static void RepopulateLibraryDetailTilesFromVisibleRows(LibraryBrowserWorkingSet ws, VirtualizedRowHost host)
@@ -90,29 +179,36 @@ namespace PixelVaultNative
         void ScheduleVirtualizedRowHostScrollRefresh(VirtualizedRowHost host)
         {
             if (host == null || host.ScrollViewer == null) return;
-            if (host.ScrollRefreshDebounceTimer == null)
+            if (host.ScrollRefreshRenderQueued) return;
+            host.ScrollRefreshRenderQueued = true;
+            var requestVersion = ++host.ScrollRefreshRequestVersion;
+            host.ScrollViewer.Dispatcher.BeginInvoke(new Action(delegate
             {
-                host.ScrollRefreshDebounceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(VirtualizedRowHostScrollRefreshDebounceMs) };
-                host.ScrollRefreshDebounceTimer.Tick += delegate
-                {
-                    host.ScrollRefreshDebounceTimer.Stop();
-                    RefreshVirtualizedRowHost(host);
-                };
-            }
-            host.ScrollRefreshDebounceTimer.Stop();
-            host.ScrollRefreshDebounceTimer.Start();
+                if (requestVersion != host.ScrollRefreshRequestVersion) return;
+                host.ScrollRefreshRenderQueued = false;
+                LogVirtualizedRowHostScrollDiagnostic(host, "render-coalesced", 0d, 0d);
+                RefreshVirtualizedRowHost(host);
+            }), DispatcherPriority.Render);
+        }
+
+        static void CancelQueuedVirtualizedRowHostScrollRefresh(VirtualizedRowHost host)
+        {
+            if (host == null) return;
+            host.ScrollRefreshRenderQueued = false;
+            host.ScrollRefreshRequestVersion++;
         }
 
         void ScheduleVirtualizedRowHostViewportRefresh(VirtualizedRowHost host)
         {
             if (host == null || host.ScrollViewer == null) return;
+            CancelQueuedVirtualizedRowHostScrollRefresh(host);
             if (host.ViewportResizeCoalesceTimer == null)
             {
                 host.ViewportResizeCoalesceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(VirtualizedRowHostViewportRefreshDebounceMs) };
                 host.ViewportResizeCoalesceTimer.Tick += delegate
                 {
                     host.ViewportResizeCoalesceTimer.Stop();
-                    host.ScrollRefreshDebounceTimer?.Stop();
+                    CancelQueuedVirtualizedRowHostScrollRefresh(host);
                     RefreshVirtualizedRowHost(host);
                 };
             }
@@ -142,10 +238,14 @@ namespace PixelVaultNative
                 if (Math.Abs(e.VerticalChange) > 0.1 || Math.Abs(e.HorizontalChange) > 0.1)
                 {
                     host.ViewportResizeCoalesceTimer?.Stop();
-                    var vh = host.ScrollViewer.ViewportHeight;
-                    if (vh > 1 && (Math.Abs(e.VerticalChange) >= vh * 0.88 || Math.Abs(e.HorizontalChange) >= host.ScrollViewer.ViewportWidth * 0.88))
+                    if (ShouldRefreshVirtualizedRowHostImmediatelyForScroll(
+                        e.VerticalChange,
+                        e.HorizontalChange,
+                        host.ScrollViewer.ViewportHeight,
+                        host.ScrollViewer.ViewportWidth))
                     {
-                        host.ScrollRefreshDebounceTimer?.Stop();
+                        CancelQueuedVirtualizedRowHostScrollRefresh(host);
+                        LogVirtualizedRowHostScrollDiagnostic(host, "immediate-page-jump", e.VerticalChange, e.HorizontalChange);
                         RefreshVirtualizedRowHost(host);
                     }
                     else
@@ -163,7 +263,7 @@ namespace PixelVaultNative
         {
             if (host == null) return;
             host.ViewportResizeCoalesceTimer?.Stop();
-            host.ScrollRefreshDebounceTimer?.Stop();
+            CancelQueuedVirtualizedRowHostScrollRefresh(host);
             host.Rows = rows == null ? new List<VirtualizedRowDefinition>() : new List<VirtualizedRowDefinition>(rows);
             host.FirstVisibleIndex = -1;
             host.LastVisibleIndex = -1;
@@ -284,15 +384,23 @@ namespace PixelVaultNative
 
             if (host.RecycleVisibleRowElements)
             {
-                foreach (var key in host.RecycledRowElements.Keys.ToList())
+                foreach (var key in SelectVirtualizedRowElementCacheKeysToPrune(host.RecycledRowElements.Keys, firstIndex, lastIndex))
                 {
-                    if (key < firstIndex || key > lastIndex) host.RecycledRowElements.Remove(key);
+                    host.RecycledRowElements.Remove(key);
                 }
             }
 
             host.TopSpacer.Height = topHeight;
             host.BottomSpacer.Height = Math.Max(0, totalHeight - topHeight - renderedHeight);
             if (host.AfterVisibleRowsRebuilt != null) host.AfterVisibleRowsRebuilt();
+            LogVirtualizedRowHostRowsRebuiltDiagnostic(
+                host,
+                firstIndex,
+                lastIndex,
+                rows.Count,
+                topHeight,
+                renderedHeight,
+                rowHeightChanged);
             if (rowHeightChanged)
             {
                 host.FirstVisibleIndex = -1;
@@ -302,6 +410,48 @@ namespace PixelVaultNative
                     RefreshVirtualizedRowHost(host);
                 }), DispatcherPriority.Background);
             }
+        }
+
+        void LogVirtualizedRowHostScrollDiagnostic(
+            VirtualizedRowHost host,
+            string mode,
+            double verticalChange,
+            double horizontalChange)
+        {
+            if (!troubleshootingLoggingEnabled || host == null || host.ScrollViewer == null) return;
+            LogTroubleshooting("VirtualizedRowHostScroll",
+                "host=" + (string.IsNullOrWhiteSpace(host.DiagnosticName) ? "(unnamed)" : host.DiagnosticName)
+                + "; mode=" + (mode ?? string.Empty)
+                + "; offset=" + Math.Round(host.ScrollViewer.VerticalOffset)
+                + "; viewport=" + Math.Round(host.ScrollViewer.ViewportHeight)
+                + "; rows=" + (host.Rows == null ? 0 : host.Rows.Count)
+                + "; visible=" + host.FirstVisibleIndex + ".." + host.LastVisibleIndex
+                + "; verticalChange=" + Math.Round(verticalChange)
+                + "; horizontalChange=" + Math.Round(horizontalChange));
+        }
+
+        void LogVirtualizedRowHostRowsRebuiltDiagnostic(
+            VirtualizedRowHost host,
+            int firstIndex,
+            int lastIndex,
+            int rowCount,
+            double topHeight,
+            double renderedHeight,
+            bool rowHeightChanged)
+        {
+            if (!troubleshootingLoggingEnabled || host == null || host.ScrollViewer == null) return;
+            LogTroubleshooting("VirtualizedRowHostRowsRebuilt",
+                "host=" + (string.IsNullOrWhiteSpace(host.DiagnosticName) ? "(unnamed)" : host.DiagnosticName)
+                + "; first=" + firstIndex
+                + "; last=" + lastIndex
+                + "; rows=" + rowCount
+                + "; recycled=" + host.RecycleVisibleRowElements
+                + "; recycledCache=" + (host.RecycledRowElements == null ? 0 : host.RecycledRowElements.Count)
+                + "; offset=" + Math.Round(host.ScrollViewer.VerticalOffset)
+                + "; viewport=" + Math.Round(host.ScrollViewer.ViewportHeight)
+                + "; topSpacer=" + Math.Round(topHeight)
+                + "; renderedHeight=" + Math.Round(renderedHeight)
+                + "; rowHeightChanged=" + rowHeightChanged);
         }
 
         int CalculateVirtualizedTileColumns(ScrollViewer scrollViewer, int tileWidth, double horizontalGap, double widthAllowance)
