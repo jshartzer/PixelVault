@@ -27,6 +27,7 @@ This folder indexes **finished initiatives** in the **C:\Codex** repo: enough co
 | **Post–app-review hardening (RVW)** | Apr 2026 | `C:\Codex\docs\APP_REVIEW_2026-04-12.md` | PV-PLN-RVW-001: regex safety, hero coalesce/cancel, **`NEXT_TRIM`** refresh, **`SteamAppIdLooksLikeFilenamePrefix`** separator + min digit length (long NonSteamId-safe); canonical write-up: `C:\Codex\docs\completed-projects\PV-PLN-RVW-001-post-app-review-hardening.md`. |
 | **Service extraction & organization (EXT-002)** | Apr 2026 | `C:\Codex\docs\plans\PV-PLN-EXT-002-service-extraction-and-organization.md` | **`MainWindowServiceGraph`**, settings/import scan seams, **`IFileSystemService`** / **`ILogService`**, **`Services/Intake`** + **`IntakePipeline`**, **`SERVICE_OWNERSHIP`** composition + mermaid data-flow; Phases A–B complete. |
 | **Background Intake Agent (AINT-001)** | Apr 2026 | `C:\Codex\docs\plans\PV-PLN-AINT-001-background-intake-agent.md` | Slices **1–9** shipped; long-form architecture + prerequisites retained in-plan; optional manual dogfood. |
+| **App speed and efficiency pass (PERF-001)** | May 2026 | `C:\Codex\docs\plans\PV-PLN-PERF-001-app-speed-and-efficiency.md` | Import analysis reuse, touched-folder cache refresh, fast folder projection, coalesced progress/logging, cancelable viewport-first detail metadata, virtualized scroll diagnostics, and off-thread asset picker/custom-art saves; shipped in **0.077.000**. Short completion record: `C:\Codex\docs\completed-projects\PV-PLN-PERF-001-app-speed-and-efficiency.md`. |
 
 ---
 

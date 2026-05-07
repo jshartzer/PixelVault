@@ -1,3 +1,13 @@
+## 0.077.000
+- **Release:** Version **0.077.000** — **`PV-PLN-PERF-001`** app speed and efficiency release.
+- **Import performance:** Standard import, manual intake, import-and-edit, and headless import now share one source inventory / intake-analysis pass where possible, reducing repeated file scans before work starts.
+- **Post-import refresh:** Import and metadata edits now prefer touched-folder cache updates instead of full recursive library refreshes, while explicit manual refresh still keeps the full rebuild path available.
+- **Library responsiveness:** Folder lists can paint from cached/indexed data before deeper embedded-metadata repair finishes; large detail panes prioritize viewport/overscan metadata before deferred background chunks.
+- **Progress / logging:** Import progress windows coalesce high-volume UI updates, progress log rendering is batched, and routine per-file import log lines are written in batches to reduce dispatcher and disk churn.
+- **Detail pane stability:** Selection-dependent metadata work is cancelable, stale render applies are guarded by active token/version/selection checks, and virtualized row scrolling coalesces ordinary scroll refreshes at render priority while keeping large jumps immediate.
+- **Asset picker responsiveness:** SteamGridDB picker thumbnails/previews download and decode off the UI thread, and custom cover/banner/logo saves from picker selections plus right-click art menus run disk copy/temp cleanup work off the dispatcher.
+- **Diagnostics / QA:** Troubleshooting logs now include virtualized folder/detail scroll diagnostics. Automated tests pass, and an isolated WPF smoke covered launch, 25/100/500-file imports, large-folder detail open, fast detail scroll, and selection-switch diagnostics. RC follow-ups remain for live HDR PNG/JXR pairs and SteamGridDB/custom-art saves with real credentials/captures.
+
 ## 0.076.000
 - **Release:** Version **0.076.000** — feature-sized refresh for the library capture mosaic with a new square-first quilt layout and continuous timeline flow.
 - **Architecture (PV-PLN-EXT-002 A.1):** **`MainWindow.ServiceComposition.cs`** centralizes application service construction (**`BuildApplicationServiceGraph`**) so the **`MainWindow`** ctor only assigns readonly fields from a **`MainWindowServiceGraph`** record.
