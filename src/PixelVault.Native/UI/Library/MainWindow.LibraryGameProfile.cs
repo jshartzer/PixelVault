@@ -450,6 +450,7 @@ namespace PixelVaultNative
             openFoldersBtn.Height = 30;
             openFoldersBtn.MinWidth = 110;
             openFoldersBtn.FontSize = 12;
+            openFoldersBtn.Margin = new Thickness(0, 0, 8, 0);
             ApplyLibraryPillChrome(openFoldersBtn, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
             openFoldersBtn.IsEnabled = folderPaths.Count > 0;
             openFoldersBtn.ToolTip = folderPaths.Count == 0
@@ -463,8 +464,136 @@ namespace PixelVaultNative
             };
             pillsRow.Children.Add(openFoldersBtn);
 
+            var changeArtBtn = BuildLibraryGameProfileChangeArtPill(view, folder, refreshHero);
+            if (changeArtBtn != null) pillsRow.Children.Add(changeArtBtn);
+
             cluster.Children.Add(pillsRow);
             return cluster;
+        }
+
+        // Change Art dropdown pill (PV-PLN-GPRO-001 step C.4). Single button + attached
+        // ContextMenu so users can swap covers/banners from SteamGridDB or a local
+        // file without leaving the profile window. Each item routes through the
+        // existing helpers (ChooseLibraryAssetFromSteamGridDbAsync, SaveCustomCoverAsync,
+        // OpenSavedCoversFolder) and asks refreshHero to rebuild the hero so the new
+        // art shows up immediately.
+        FrameworkElement BuildLibraryGameProfileChangeArtPill(LibraryBrowserFolderView view, LibraryFolderInfo folder, Action refreshHero)
+        {
+            if (view == null || folder == null) return null;
+            var btn = Btn("Change Art \u25BE", null, "#1F3340", Brushes.White);
+            btn.Height = 30;
+            btn.MinWidth = 110;
+            btn.FontSize = 12;
+            ApplyLibraryPillChrome(btn, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
+            btn.ToolTip = "Choose a cover or banner from SteamGridDB or a local file";
+
+            var menu = new ContextMenu { Placement = PlacementMode.Bottom };
+            var hasToken = HasSteamGridDbApiToken();
+            var actionFolders = GetLibraryBrowserActionFolders(view);
+            if (actionFolders == null || actionFolders.Count == 0)
+            {
+                actionFolders = new List<LibraryFolderInfo> { folder };
+            }
+            var lookupFolder = GetLibraryBrowserPrimaryFolder(view) ?? folder;
+
+            Action<LibraryBrowserFolderView> showFolderRefresh = delegate(LibraryBrowserFolderView _) { refreshHero?.Invoke(); };
+            Action refreshHeroBanner = delegate { refreshHero?.Invoke(); };
+            Action<string> toast = delegate(string msg)
+            {
+                if (!string.IsNullOrWhiteSpace(msg)) TryLibraryToast(msg, MessageBoxImage.Information);
+            };
+
+            var coverItem = new MenuItem
+            {
+                Header = "Choose Cover from SteamGridDB...",
+                IsEnabled = hasToken && actionFolders.Count > 0
+            };
+            if (!hasToken) coverItem.ToolTip = "Add a SteamGridDB API token in Settings to enable.";
+            coverItem.Click += async delegate
+            {
+                try
+                {
+                    await ChooseLibraryAssetFromSteamGridDbAsync(
+                        Window.GetWindow(btn) ?? this,
+                        view,
+                        lookupFolder,
+                        actionFolders,
+                        LibraryAssetPickerKind.Cover,
+                        showFolderRefresh,
+                        null,
+                        refreshHeroBanner,
+                        toast).ConfigureAwait(true);
+                }
+                catch (Exception ex)
+                {
+                    LogException("Game profile | Choose cover", ex);
+                    TryLibraryToast("Could not open cover picker: " + ex.Message, MessageBoxImage.Warning);
+                }
+            };
+
+            var bannerItem = new MenuItem
+            {
+                Header = "Choose Banner from SteamGridDB...",
+                IsEnabled = hasToken && actionFolders.Count > 0
+            };
+            if (!hasToken) bannerItem.ToolTip = "Add a SteamGridDB API token in Settings to enable.";
+            bannerItem.Click += async delegate
+            {
+                try
+                {
+                    await ChooseLibraryAssetFromSteamGridDbAsync(
+                        Window.GetWindow(btn) ?? this,
+                        view,
+                        lookupFolder,
+                        actionFolders,
+                        LibraryAssetPickerKind.Banner,
+                        showFolderRefresh,
+                        null,
+                        refreshHeroBanner,
+                        toast).ConfigureAwait(true);
+                }
+                catch (Exception ex)
+                {
+                    LogException("Game profile | Choose banner", ex);
+                    TryLibraryToast("Could not open banner picker: " + ex.Message, MessageBoxImage.Warning);
+                }
+            };
+
+            var localCoverItem = new MenuItem { Header = "Set Custom Cover...", IsEnabled = actionFolders.Count > 0 };
+            localCoverItem.Click += async delegate
+            {
+                try
+                {
+                    Directory.CreateDirectory(savedCoversRoot);
+                    var picked = PickFile(string.Empty, "Image Files|*.jpg;*.jpeg;*.png;*.jxr;*.bmp;*.gif|All Files|*.*", savedCoversRoot);
+                    if (string.IsNullOrWhiteSpace(picked)) return;
+                    await SaveCustomCoverAsync(actionFolders, picked).ConfigureAwait(true);
+                    refreshHero?.Invoke();
+                    TryLibraryToast("Cover saved.", MessageBoxImage.Information);
+                    Log("Custom cover set for " + (folder.Name ?? "folder") + " (game profile).");
+                }
+                catch (Exception ex)
+                {
+                    LogException("Game profile | Set custom cover", ex);
+                    TryLibraryToast("Cover save failed: " + ex.Message, MessageBoxImage.Warning);
+                }
+            };
+
+            var openMyCoversItem = new MenuItem { Header = "Open My Covers Folder" };
+            openMyCoversItem.Click += delegate { OpenSavedCoversFolder(); };
+
+            menu.Items.Add(coverItem);
+            menu.Items.Add(bannerItem);
+            menu.Items.Add(new Separator());
+            menu.Items.Add(localCoverItem);
+            menu.Items.Add(openMyCoversItem);
+
+            btn.Click += delegate
+            {
+                menu.PlacementTarget = btn;
+                menu.IsOpen = true;
+            };
+            return btn;
         }
 
         Border BuildLibraryGameProfileHeroToggleButton(string glyph, string activeColorHex, string activeBgHex, bool isOn, string tooltipOn, string tooltipOff)
