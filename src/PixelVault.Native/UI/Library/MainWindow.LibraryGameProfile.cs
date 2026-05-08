@@ -89,10 +89,12 @@ namespace PixelVaultNative
                 win.Close();
             };
 
-            // Compute the per-profile metrics up front so the hero summary line and the
-            // stat strip share a single snapshot (PV-POL-GPRO-DATA-001). The session count
-            // here is a Phase A placeholder using the shared session-threshold setting; the
-            // full session-grouping helper from PV-PLN-GPRO-001 Phase D will replace it.
+            // Snapshot the file list + metadata index ONCE per open (PV-POL-GPRO-DATA-001).
+            // The hero summary, stat strip, sessions section and Recent Captures all share
+            // these inputs. Building the LibraryGameProfileSessionEntry list eagerly means
+            // the session helper (Phase D.1) and the Sessions section (Phase D.2) consume a
+            // single resolved-date snapshot - changing the threshold only re-buckets, never
+            // re-reads metadata.
             var files = GetFilesForLibraryFolderEntry(folder, false)
                 .Where(file => !string.IsNullOrWhiteSpace(file) && File.Exists(file))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -106,6 +108,9 @@ namespace PixelVaultNative
                 .ThenBy(row => row.File, StringComparer.OrdinalIgnoreCase)
                 .ToList();
             var orderedFilePaths = orderedFiles.Select(row => row.File).ToList();
+            var sessionEntries = orderedFiles
+                .Select(row => new LibraryGameProfileSessionEntry(row.File, row.Date, IsVideo(row.File)))
+                .ToList();
             var metrics = ComputeLibraryGameProfileMetrics(orderedFilePaths, metadataIndex, librarySessionThresholdMinutes);
 
             var root = new Grid();
@@ -117,8 +122,18 @@ namespace PixelVaultNative
             // place (PV-PLN-GPRO-001 step C.3 + L3 follow-up). We rebuild the hero
             // and re-pull the Game Notes card text from the now-mutated folder so
             // renamed / re-IDed / re-noted games update without reopening the window.
+            //
+            // Phase D.3 adds the threshold picker, which mutates
+            // librarySessionThresholdMinutes. The Sessions stat card and the new
+            // Sessions section both depend on the picker's current value, so we
+            // slot them into ContentControl hosts and re-render only those slots
+            // (plus the hero summary line) on threshold change instead of doing a
+            // full body rebuild.
             Action refreshHero = null;
             Action refreshNotesCard = null;
+            Action refreshStatsSection = null;
+            Action refreshSessionsSection = null;
+            Action<int> applyThreshold = null;
             refreshHero = delegate
             {
                 if (root.Children.Count == 0) return;
@@ -148,13 +163,47 @@ namespace PixelVaultNative
             Grid.SetRow(scroll, 1);
             var body = new StackPanel();
             scroll.Content = body;
-            body.Children.Add(BuildLibraryGameProfileStats(metrics));
+            var statsHost = new ContentControl { Content = BuildLibraryGameProfileStats(metrics) };
+            body.Children.Add(statsHost);
             body.Children.Add(BuildLibraryGameProfileNotesCard(win, view, folder, out refreshNotesCard));
+            var sessionsHost = new ContentControl
+            {
+                Content = BuildLibraryGameProfileSessionsSection(win, view, sessionEntries, librarySessionThresholdMinutes, mins => applyThreshold(mins))
+            };
+            body.Children.Add(sessionsHost);
             body.Children.Add(BuildLibraryGameProfileCaptureFilmstrip(win, view, orderedFilePaths));
             var achievementHost = new StackPanel { Margin = new Thickness(0, 24, 0, 0) };
             body.Children.Add(achievementHost);
             BeginLoadLibraryGameProfileAchievements(win, achievementHost, view, lifetimeCts.Token);
             root.Children.Add(scroll);
+
+            refreshStatsSection = delegate
+            {
+                statsHost.Content = BuildLibraryGameProfileStats(metrics);
+            };
+            refreshSessionsSection = delegate
+            {
+                sessionsHost.Content = BuildLibraryGameProfileSessionsSection(win, view, sessionEntries, librarySessionThresholdMinutes, mins => applyThreshold(mins));
+            };
+            applyThreshold = delegate(int requestedMinutes)
+            {
+                var normalized = SettingsService.NormalizeLibrarySessionThresholdMinutes(requestedMinutes);
+                if (librarySessionThresholdMinutes != normalized)
+                {
+                    librarySessionThresholdMinutes = normalized;
+                    SaveSettings();
+                }
+                metrics = ComputeLibraryGameProfileMetrics(orderedFilePaths, metadataIndex, librarySessionThresholdMinutes);
+                refreshStatsSection();
+                refreshSessionsSection();
+                refreshHero();
+                // PV-POL-GPRO-SESSION-001: writing the same setting key the main
+                // browser uses; if the browser is open in Sessions mode it needs
+                // to re-render so its own grouping respects the new threshold.
+                try { _libraryBrowserLiveWorkingSet?.RerenderFolderList?.Invoke(); }
+                catch (Exception ex) { LogException("LibraryGameProfile.applyThreshold rerenderFolderList", ex); }
+            };
+
             win.Content = root;
             if (!string.IsNullOrEmpty(key)) _libraryGameProfileWindows[key] = win;
             win.Show();
@@ -1294,6 +1343,342 @@ namespace PixelVaultNative
                 Margin = new Thickness(0, 8, 0, 0)
             });
             return stack;
+        }
+
+        // PV-PLN-GPRO-001 Phase D.2-D.4: Sessions section. Walks the per-window
+        // LibraryGameProfileSessionEntry snapshot built in ShowLibraryGameProfileWindow
+        // through LibraryGameProfileSessionMath, renders a header (with the threshold
+        // picker pill) + up to 6 inline session cards + a "View all sessions" CTA.
+        // The threshold picker pill writes the shared librarySessionThresholdMinutes
+        // setting via applyThreshold (Phase D.3) so the main browser's Sessions
+        // grouping mode and the profile stay in sync (PV-POL-GPRO-SESSION-001).
+        FrameworkElement BuildLibraryGameProfileSessionsSection(
+            Window profileWindow,
+            LibraryBrowserFolderView view,
+            IReadOnlyList<LibraryGameProfileSessionEntry> entries,
+            int thresholdMinutes,
+            Action<int> applyThreshold)
+        {
+            const int previewLimit = 6;
+            var section = new StackPanel { Margin = new Thickness(0, 24, 0, 0) };
+            var sessions = LibraryGameProfileSessionMath.BuildSessions(entries, thresholdMinutes);
+            section.Children.Add(BuildLibraryGameProfileSessionsHeader(thresholdMinutes, applyThreshold));
+            if (sessions.Count == 0)
+            {
+                section.Children.Add(BuildLibraryGameProfileEmptyCard(
+                    "No sessions yet - captures will be grouped here once we know when they were taken."));
+                return section;
+            }
+            for (var i = 0; i < sessions.Count && i < previewLimit; i++)
+                section.Children.Add(BuildLibraryGameProfileSessionCard(sessions[i]));
+            if (sessions.Count > previewLimit)
+            {
+                section.Children.Add(BuildLibraryGameProfileViewAllSessionsButton(
+                    profileWindow, view, sessions, thresholdMinutes));
+            }
+            return section;
+        }
+
+        FrameworkElement BuildLibraryGameProfileSessionsHeader(int thresholdMinutes, Action<int> applyThreshold)
+        {
+            var grid = new Grid { Margin = new Thickness(0, 0, 0, 4) };
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            var titleStack = BuildLibraryGameProfileSectionTitle(
+                "Sessions",
+                "Captures grouped by gameplay gaps. Adjust the threshold to merge bursts or split them apart.");
+            grid.Children.Add(titleStack);
+            var thresholdPill = BuildLibraryGameProfileSessionThresholdPill(thresholdMinutes, applyThreshold);
+            Grid.SetColumn(thresholdPill, 1);
+            grid.Children.Add(thresholdPill);
+            return grid;
+        }
+
+        // Threshold picker pill. The five preset values (30/60/90/120/180) match the
+        // main browser's Sessions-mode threshold buttons in
+        // MainWindow.LibraryBrowserShowOrchestration.cs:706-710 so changing the
+        // threshold from either surface keeps the same set of options.
+        Button BuildLibraryGameProfileSessionThresholdPill(int thresholdMinutes, Action<int> applyThreshold)
+        {
+            var current = SettingsService.NormalizeLibrarySessionThresholdMinutes(thresholdMinutes);
+            var pill = Btn(
+                "Threshold: " + FormatLibraryGameProfileThresholdLabel(current) + "  \u25BE",
+                null,
+                "#15242D",
+                Brushes.White);
+            pill.Height = 30;
+            pill.MinWidth = 148;
+            pill.FontSize = 12;
+            pill.Padding = new Thickness(12, 0, 12, 0);
+            pill.VerticalAlignment = VerticalAlignment.Top;
+            pill.Margin = new Thickness(0, 4, 0, 0);
+            ApplyLibraryPillChrome(pill, "#15242D", "#26404E", "#1F3340", "#0F1B22", "#D7E2EA");
+            AutomationProperties.SetName(pill, "Session threshold (currently " + FormatLibraryGameProfileThresholdLabel(current) + ")");
+            var menu = new ContextMenu { Placement = PlacementMode.Bottom };
+            foreach (var preset in new[] { 30, 60, 90, 120, 180 })
+            {
+                var item = new MenuItem
+                {
+                    Header = FormatLibraryGameProfileThresholdLabel(preset),
+                    IsCheckable = true,
+                    IsChecked = preset == current
+                };
+                var capturedPreset = preset;
+                item.Click += delegate
+                {
+                    if (applyThreshold != null) applyThreshold(capturedPreset);
+                };
+                menu.Items.Add(item);
+            }
+            pill.Click += delegate
+            {
+                menu.PlacementTarget = pill;
+                menu.IsOpen = true;
+            };
+            return pill;
+        }
+
+        FrameworkElement BuildLibraryGameProfileSessionCard(LibraryGameProfileSession session)
+        {
+            var card = new Border
+            {
+                Margin = new Thickness(0, 10, 0, 0),
+                Padding = new Thickness(12),
+                CornerRadius = new CornerRadius(14),
+                Background = Brush("#111A21")
+            };
+            var grid = new Grid();
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var thumb = BuildLibraryGameProfileSessionThumbnail(session);
+            Grid.SetColumn(thumb, 0);
+            grid.Children.Add(thumb);
+
+            var info = new StackPanel
+            {
+                Margin = new Thickness(14, 0, 12, 0),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            var localStart = session.StartUtc.Kind == DateTimeKind.Utc ? session.StartUtc.ToLocalTime() : session.StartUtc;
+            var localEnd = session.EndUtc.Kind == DateTimeKind.Utc ? session.EndUtc.ToLocalTime() : session.EndUtc;
+            info.Children.Add(new TextBlock
+            {
+                Text = localStart.ToString("ddd, MMM d, yyyy", CultureInfo.CurrentCulture),
+                Foreground = Brushes.White,
+                FontSize = 14,
+                FontWeight = FontWeights.SemiBold,
+                TextTrimming = TextTrimming.CharacterEllipsis
+            });
+            var durationText = FormatLibraryGameProfileSessionDuration(session.Duration);
+            var rangeText = localStart.ToString("h:mm tt", CultureInfo.CurrentCulture)
+                + " \u2192 "
+                + localEnd.ToString("h:mm tt", CultureInfo.CurrentCulture);
+            if (!string.IsNullOrEmpty(durationText)) rangeText += "  \u00B7  " + durationText;
+            info.Children.Add(new TextBlock
+            {
+                Text = rangeText,
+                Foreground = Brush("#9DB1BD"),
+                FontSize = 12,
+                Margin = new Thickness(0, 2, 0, 0),
+                TextTrimming = TextTrimming.CharacterEllipsis
+            });
+            var relative = FormatLibraryGameProfileRelative(localStart);
+            if (!string.IsNullOrEmpty(relative))
+            {
+                info.Children.Add(new TextBlock
+                {
+                    Text = relative,
+                    Foreground = Brush("#62768A"),
+                    FontSize = 11,
+                    Margin = new Thickness(0, 2, 0, 0),
+                    TextTrimming = TextTrimming.CharacterEllipsis
+                });
+            }
+            Grid.SetColumn(info, 1);
+            grid.Children.Add(info);
+
+            var stats = new StackPanel
+            {
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Right
+            };
+            stats.Children.Add(new TextBlock
+            {
+                Text = session.Count.ToString(CultureInfo.CurrentCulture) + (session.Count == 1 ? " capture" : " captures"),
+                Foreground = Brushes.White,
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold,
+                TextAlignment = TextAlignment.Right
+            });
+            if (session.VideoCount > 0)
+            {
+                stats.Children.Add(new TextBlock
+                {
+                    Text = session.VideoCount.ToString(CultureInfo.CurrentCulture) + (session.VideoCount == 1 ? " video" : " videos"),
+                    Foreground = Brush("#86A0AE"),
+                    FontSize = 11,
+                    TextAlignment = TextAlignment.Right,
+                    Margin = new Thickness(0, 2, 0, 0)
+                });
+            }
+            Grid.SetColumn(stats, 2);
+            grid.Children.Add(stats);
+
+            card.Child = grid;
+            return card;
+        }
+
+        // First image-like entry wins (newest-first traversal); a session that is
+        // entirely videos or has no resolvable image falls back to the first entry
+        // and lets CreateAsyncImageTile show its "CLIP" / filename text fallback.
+        FrameworkElement BuildLibraryGameProfileSessionThumbnail(LibraryGameProfileSession session)
+        {
+            const double thumbWidth = 96;
+            const double thumbHeight = 70;
+            string previewPath = null;
+            for (var i = 0; i < session.Entries.Count; i++)
+            {
+                var entry = session.Entries[i];
+                if (entry == null || string.IsNullOrWhiteSpace(entry.FilePath)) continue;
+                if (IsImage(entry.FilePath)) { previewPath = entry.FilePath; break; }
+            }
+            if (previewPath == null && session.Entries.Count > 0)
+            {
+                for (var i = 0; i < session.Entries.Count; i++)
+                {
+                    var entry = session.Entries[i];
+                    if (entry != null && !string.IsNullOrWhiteSpace(entry.FilePath)) { previewPath = entry.FilePath; break; }
+                }
+            }
+            var fallbackText = string.Empty;
+            if (!string.IsNullOrWhiteSpace(previewPath))
+                fallbackText = IsVideo(previewPath) ? "CLIP" : Path.GetFileName(previewPath);
+            return CreateAsyncImageTile(
+                previewPath,
+                CalculateLibraryDetailTileDecodeWidth((int)thumbWidth, ResolveLibraryDpiScale()),
+                thumbWidth,
+                thumbHeight,
+                Stretch.UniformToFill,
+                fallbackText,
+                Brushes.White,
+                new Thickness(0),
+                new Thickness(0),
+                Brush("#0E1418"),
+                new CornerRadius(8),
+                Brush("#263640"),
+                new Thickness(1));
+        }
+
+        Button BuildLibraryGameProfileViewAllSessionsButton(
+            Window profileWindow,
+            LibraryBrowserFolderView view,
+            IReadOnlyList<LibraryGameProfileSession> sessions,
+            int thresholdMinutes)
+        {
+            var btn = Btn("View all sessions", null, "#15242D", Brushes.White);
+            btn.Height = 30;
+            btn.MinWidth = 156;
+            btn.FontSize = 12;
+            btn.Padding = new Thickness(14, 0, 14, 0);
+            btn.HorizontalAlignment = HorizontalAlignment.Left;
+            btn.Margin = new Thickness(0, 12, 0, 0);
+            ApplyLibraryPillChrome(btn, "#15242D", "#26404E", "#1F3340", "#0F1B22", "#D7E2EA");
+            btn.ToolTip = sessions.Count.ToString(CultureInfo.CurrentCulture)
+                + (sessions.Count == 1 ? " session" : " sessions")
+                + " at " + FormatLibraryGameProfileThresholdLabel(thresholdMinutes) + " threshold";
+            AutomationProperties.SetName(btn, "View all sessions");
+            btn.Click += delegate
+            {
+                ShowLibraryGameProfileViewAllSessionsDialog(profileWindow, view, sessions, thresholdMinutes);
+            };
+            return btn;
+        }
+
+        void ShowLibraryGameProfileViewAllSessionsDialog(
+            Window owner,
+            LibraryBrowserFolderView view,
+            IReadOnlyList<LibraryGameProfileSession> sessions,
+            int thresholdMinutes)
+        {
+            var dialog = new Window
+            {
+                Title = "Sessions - " + (view == null || string.IsNullOrWhiteSpace(view.Name) ? "Game Profile" : view.Name),
+                Width = 720,
+                Height = 720,
+                MinWidth = 520,
+                MinHeight = 420,
+                Owner = owner,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Background = Brush("#0B1116"),
+                ResizeMode = ResizeMode.CanResize
+            };
+            dialog.PreviewKeyDown += delegate(object _, KeyEventArgs e)
+            {
+                if (e.Key != Key.Escape) return;
+                e.Handled = true;
+                dialog.Close();
+            };
+            var scroll = new ScrollViewer
+            {
+                Padding = new Thickness(20, 18, 20, 22),
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+            };
+            var stack = new StackPanel();
+            stack.Children.Add(new TextBlock
+            {
+                Text = sessions.Count.ToString(CultureInfo.CurrentCulture)
+                    + (sessions.Count == 1 ? " session" : " sessions")
+                    + " at " + FormatLibraryGameProfileThresholdLabel(thresholdMinutes) + " threshold",
+                Foreground = Brushes.White,
+                FontSize = 18,
+                FontWeight = FontWeights.SemiBold,
+                Margin = new Thickness(0, 0, 0, 8)
+            });
+            stack.Children.Add(new TextBlock
+            {
+                Text = "Newest first. Change the threshold from the profile to re-bucket.",
+                Foreground = Brush("#8FA4B0"),
+                FontSize = 12,
+                Margin = new Thickness(0, 0, 0, 6)
+            });
+            for (var i = 0; i < sessions.Count; i++)
+                stack.Children.Add(BuildLibraryGameProfileSessionCard(sessions[i]));
+            scroll.Content = stack;
+            dialog.Content = scroll;
+            dialog.ShowDialog();
+        }
+
+        // 30 -> "30 min", 60 -> "1 hr", 90 -> "1.5 hr", 120 -> "2 hr", 180 -> "3 hr".
+        // Anything off the preset grid clamps to the nearest preset by virtue of
+        // SettingsService.NormalizeLibrarySessionThresholdMinutes upstream.
+        static string FormatLibraryGameProfileThresholdLabel(int minutes)
+        {
+            if (minutes < 60) return minutes.ToString(CultureInfo.CurrentCulture) + " min";
+            if (minutes % 60 == 0) return (minutes / 60).ToString(CultureInfo.CurrentCulture) + " hr";
+            return (minutes / 60.0).ToString("0.0", CultureInfo.CurrentCulture) + " hr";
+        }
+
+        // Same-second sessions render as "instant" so the card still has a meaningful
+        // sub-line. Otherwise: minutes only when < 1 hour, else "Xh Ym" (Y suppressed
+        // when 0).
+        static string FormatLibraryGameProfileSessionDuration(TimeSpan duration)
+        {
+            if (duration.Ticks <= 0) return "instant";
+            if (duration.TotalMinutes < 1) return "instant";
+            if (duration.TotalMinutes < 60)
+            {
+                var minutes = (int)Math.Round(duration.TotalMinutes);
+                if (minutes <= 0) minutes = 1;
+                return minutes.ToString(CultureInfo.CurrentCulture) + " min";
+            }
+            var hours = (int)Math.Floor(duration.TotalHours);
+            var remainder = (int)Math.Round(duration.TotalMinutes - (hours * 60));
+            if (remainder >= 60) { hours++; remainder = 0; }
+            if (remainder == 0) return hours.ToString(CultureInfo.CurrentCulture) + "h";
+            return hours.ToString(CultureInfo.CurrentCulture) + "h " + remainder.ToString(CultureInfo.CurrentCulture) + "m";
         }
 
         FrameworkElement BuildLibraryGameProfileCaptureFilmstrip(Window profileWindow, LibraryBrowserFolderView view, IReadOnlyList<string> orderedFiles)
