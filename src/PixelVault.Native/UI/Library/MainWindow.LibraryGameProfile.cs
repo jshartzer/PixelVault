@@ -291,18 +291,8 @@ namespace PixelVaultNative
                 badges.Children.Add(badge);
             }
             if (badges.Children.Count > 0) copy.Children.Add(badges);
-            var ids = BuildLibraryGameProfileIdLine(folder);
-            if (!string.IsNullOrWhiteSpace(ids))
-            {
-                copy.Children.Add(new TextBlock
-                {
-                    Text = ids,
-                    Foreground = Brush("#A9BAC4"),
-                    FontSize = 13,
-                    TextWrapping = TextWrapping.Wrap,
-                    Margin = new Thickness(0, 4, 0, 0)
-                });
-            }
+            var idPills = BuildLibraryGameProfileIdPills(folder);
+            if (idPills != null) copy.Children.Add(idPills);
             // The hero used to render a clipped CollectionNotes preview here. As of
             // PV-PLN-GPRO-001 step B.1 the dedicated Game Notes card in the body owns
             // the notes surface end-to-end (display + edit), so we let the hero focus
@@ -326,15 +316,131 @@ namespace PixelVaultNative
             return labels.Count == 0 ? new[] { "Other" } : labels;
         }
 
-        string BuildLibraryGameProfileIdLine(LibraryFolderInfo folder)
+        // External-ID pills (PV-PLN-GPRO-001 step B.3). Returns null when no IDs are
+        // available so the hero just collapses the row. Steam / SteamGridDB /
+        // RetroAchievements pills are clickable and open the matching external page;
+        // Non-Steam stays informational because there is no canonical destination.
+        FrameworkElement BuildLibraryGameProfileIdPills(LibraryFolderInfo folder)
         {
-            if (folder == null) return string.Empty;
-            var parts = new List<string>();
-            if (!string.IsNullOrWhiteSpace(folder.SteamAppId)) parts.Add("Steam " + folder.SteamAppId.Trim());
-            if (!string.IsNullOrWhiteSpace(folder.SteamGridDbId)) parts.Add("STID " + folder.SteamGridDbId.Trim());
-            if (!string.IsNullOrWhiteSpace(folder.RetroAchievementsGameId)) parts.Add("RA " + folder.RetroAchievementsGameId.Trim());
-            if (!string.IsNullOrWhiteSpace(folder.NonSteamId)) parts.Add("Non-Steam " + folder.NonSteamId.Trim());
-            return string.Join("  |  ", parts);
+            if (folder == null) return null;
+            var panel = new WrapPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Margin = new Thickness(0, 6, 0, 0)
+            };
+            if (!string.IsNullOrWhiteSpace(folder.SteamAppId))
+            {
+                var id = folder.SteamAppId.Trim();
+                var url = BuildLibraryGameProfileSteamUrl(id);
+                panel.Children.Add(BuildLibraryGameProfileIdPill(
+                    "Steam " + id,
+                    url,
+                    string.IsNullOrEmpty(url) ? "Steam App ID" : "Open in Steam"));
+            }
+            if (!string.IsNullOrWhiteSpace(folder.SteamGridDbId))
+            {
+                var id = folder.SteamGridDbId.Trim();
+                var url = BuildLibraryGameProfileSteamGridDbUrl(id);
+                panel.Children.Add(BuildLibraryGameProfileIdPill(
+                    "SteamGridDB " + id,
+                    url,
+                    string.IsNullOrEmpty(url) ? "SteamGridDB ID" : "Open SteamGridDB page"));
+            }
+            if (!string.IsNullOrWhiteSpace(folder.RetroAchievementsGameId))
+            {
+                var id = folder.RetroAchievementsGameId.Trim();
+                var url = BuildLibraryGameProfileRetroAchievementsUrl(id);
+                panel.Children.Add(BuildLibraryGameProfileIdPill(
+                    "RetroAchievements " + id,
+                    url,
+                    string.IsNullOrEmpty(url) ? "RetroAchievements ID" : "Open RetroAchievements page"));
+            }
+            if (!string.IsNullOrWhiteSpace(folder.NonSteamId))
+            {
+                panel.Children.Add(BuildLibraryGameProfileIdPill(
+                    "Non-Steam " + folder.NonSteamId.Trim(),
+                    null,
+                    "Non-Steam shortcut ID"));
+            }
+            return panel.Children.Count == 0 ? null : panel;
+        }
+
+        FrameworkElement BuildLibraryGameProfileIdPill(string label, string url, string tooltip)
+        {
+            var clickable = !string.IsNullOrEmpty(url);
+            var pill = new Border
+            {
+                Padding = new Thickness(10, 4, 10, 5),
+                CornerRadius = new CornerRadius(8),
+                Background = Brush(clickable ? "#1B2C3B" : "#162028"),
+                Margin = new Thickness(0, 0, 6, 6),
+                Cursor = clickable ? System.Windows.Input.Cursors.Hand : null
+            };
+            pill.Child = new TextBlock
+            {
+                Text = label ?? string.Empty,
+                Foreground = Brush(clickable ? "#D7E2EA" : "#9EAEB7"),
+                FontSize = 12,
+                FontWeight = FontWeights.SemiBold
+            };
+            if (!string.IsNullOrEmpty(tooltip)) pill.ToolTip = tooltip;
+            if (clickable)
+            {
+                AutomationProperties.SetName(pill, label + " (link)");
+                pill.MouseLeftButtonUp += delegate(object _, MouseButtonEventArgs e)
+                {
+                    e.Handled = true;
+                    TryOpenLibraryGameProfileExternalUrl(url);
+                };
+                pill.MouseEnter += delegate { pill.Background = Brush("#264358"); };
+                pill.MouseLeave += delegate { pill.Background = Brush("#1B2C3B"); };
+            }
+            else
+            {
+                AutomationProperties.SetName(pill, label);
+            }
+            return pill;
+        }
+
+        // Numeric-only validators; we never feed user-supplied free-form text into the
+        // shell. Returns empty when the ID does not look like a Steam-style integer so
+        // the pill renders as informational rather than clickable.
+        static string BuildLibraryGameProfileSteamUrl(string appId)
+        {
+            var trimmed = (appId ?? string.Empty).Trim();
+            if (trimmed.Length == 0) return string.Empty;
+            for (var i = 0; i < trimmed.Length; i++) if (!char.IsDigit(trimmed[i])) return string.Empty;
+            return "steam://nav/games/details/" + trimmed;
+        }
+
+        static string BuildLibraryGameProfileSteamGridDbUrl(string id)
+        {
+            var trimmed = (id ?? string.Empty).Trim();
+            if (trimmed.Length == 0) return string.Empty;
+            for (var i = 0; i < trimmed.Length; i++) if (!char.IsDigit(trimmed[i])) return string.Empty;
+            return "https://www.steamgriddb.com/game/" + trimmed;
+        }
+
+        static string BuildLibraryGameProfileRetroAchievementsUrl(string id)
+        {
+            var trimmed = (id ?? string.Empty).Trim();
+            if (trimmed.Length == 0) return string.Empty;
+            for (var i = 0; i < trimmed.Length; i++) if (!char.IsDigit(trimmed[i])) return string.Empty;
+            return "https://retroachievements.org/game/" + trimmed;
+        }
+
+        void TryOpenLibraryGameProfileExternalUrl(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url)) return;
+            try
+            {
+                Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                LogException("Game profile | open external URL: " + url, ex);
+                TryLibraryToast("Couldn't open external link.", MessageBoxImage.Warning);
+            }
         }
 
         FrameworkElement BuildLibraryGameProfileHeroSummaryLine(LibraryGameProfileMetrics metrics)
