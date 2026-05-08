@@ -179,35 +179,42 @@ namespace PixelVaultNative
             int sessionThresholdMinutes)
         {
             var safeFiles = orderedFiles ?? Array.Empty<string>();
-            var ascendingDates = safeFiles
-                .Select(file => ResolveLibraryProfileCaptureDate(file, metadataIndex))
-                .Where(date => date > DateTime.MinValue)
-                .OrderBy(date => date)
-                .ToList();
+            var entries = new List<LibraryGameProfileSessionEntry>(safeFiles.Count);
+            var videoCount = 0;
+            foreach (var file in safeFiles)
+            {
+                var isVideo = IsVideo(file);
+                if (isVideo) videoCount++;
+                var captured = ResolveLibraryProfileCaptureDate(file, metadataIndex);
+                if (captured > DateTime.MinValue)
+                    entries.Add(new LibraryGameProfileSessionEntry(file, captured, isVideo));
+            }
+            // PV-PLN-GPRO-001 Phase D.1: route session counting through the pure
+            // LibraryGameProfileSessionMath helper so the Phase A stat card and
+            // the Phase D Sessions section can never disagree about what "1
+            // session" means at a given threshold (PV-POL-GPRO-SESSION-001).
+            var sessionCount = LibraryGameProfileSessionMath.CountSessions(entries, sessionThresholdMinutes);
+            DateTime first = DateTime.MinValue;
+            DateTime latest = DateTime.MinValue;
+            if (entries.Count > 0)
+            {
+                first = entries[0].CapturedUtc;
+                latest = first;
+                for (var i = 1; i < entries.Count; i++)
+                {
+                    var captured = entries[i].CapturedUtc;
+                    if (captured < first) first = captured;
+                    if (captured > latest) latest = captured;
+                }
+            }
             return new LibraryGameProfileMetrics
             {
                 CaptureCount = safeFiles.Count,
-                VideoCount = safeFiles.Count(IsVideo),
-                SessionCount = CountLibraryGameProfileSessions(ascendingDates, sessionThresholdMinutes),
-                FirstCaptureDate = ascendingDates.Count == 0 ? DateTime.MinValue : ascendingDates[0],
-                LatestCaptureDate = ascendingDates.Count == 0 ? DateTime.MinValue : ascendingDates[ascendingDates.Count - 1]
+                VideoCount = videoCount,
+                SessionCount = sessionCount,
+                FirstCaptureDate = first,
+                LatestCaptureDate = latest
             };
-        }
-
-        // Phase A placeholder: counts gameplay sessions by walking an ascending date list and
-        // starting a new session whenever the gap exceeds the shared session-threshold setting
-        // (PV-POL-GPRO-SESSION-001). Phase D will replace this with the full session-grouping
-        // helper that returns the per-session file slices the Sessions section needs.
-        static int CountLibraryGameProfileSessions(IReadOnlyList<DateTime> sortedAscendingDates, int thresholdMinutes)
-        {
-            if (sortedAscendingDates == null || sortedAscendingDates.Count == 0) return 0;
-            var threshold = TimeSpan.FromMinutes(SettingsService.NormalizeLibrarySessionThresholdMinutes(thresholdMinutes));
-            var count = 1;
-            for (var i = 1; i < sortedAscendingDates.Count; i++)
-            {
-                if (sortedAscendingDates[i] - sortedAscendingDates[i - 1] > threshold) count++;
-            }
-            return count;
         }
 
         FrameworkElement BuildLibraryGameProfileHero(Window window, LibraryBrowserFolderView view, LibraryFolderInfo folder, LibraryGameProfileMetrics metrics, Action refreshHero)

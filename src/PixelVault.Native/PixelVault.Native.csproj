@@ -139,6 +139,7 @@
     <Compile Include="UI\Library\LibraryBrowseFolderSummary.cs" />
     <Compile Include="UI\Library\LibraryBrowserFolderView.cs" />
     <Compile Include="UI\Library\LibraryBrowserViewModelMath.cs" />
+    <Compile Include="UI\Library\LibraryGameProfileSessions.cs" />
     <Compile Include="UI\Library\LibraryBrowserProjectionCache.cs" />
     <Compile Include="UI\Library\ILibraryBrowserViewModelHost.cs" />
     <Compile Include="UI\Library\LibraryBrowserViewModel.cs" />
