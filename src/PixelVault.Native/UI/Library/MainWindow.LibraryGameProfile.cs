@@ -56,10 +56,11 @@ namespace PixelVaultNative
             {
                 Title = "PixelVault Game Profile - " + title,
                 Width = 1180,
-                // Sized for the Phase B dashboard layout (hero + summary line + 5 stat
-                // cards + filmstrip + notes card + achievements). 980 fits comfortably on
-                // 1080p displays after the OS chrome / taskbar.
-                Height = 980,
+                // Sized for the Phase B/C dashboard layout (hero + action cluster +
+                // summary line + 5 stat cards + filmstrip + notes card + achievements).
+                // 1040 still fits comfortably on 1080p displays after the OS chrome /
+                // taskbar (typical usable height ~1032-1040px on a 1920x1080 monitor).
+                Height = 1040,
                 MinWidth = 900,
                 MinHeight = 640,
                 Owner = owner,

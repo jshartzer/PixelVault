@@ -37,6 +37,8 @@ namespace PixelVaultNative
         internal bool SuppressSteamGridDbIdAutoResolve;
         internal bool IsCompleted100Percent;
         internal long CompletedUtcTicks;
+        internal bool IsFavorite;
+        internal bool IsShowcase;
         internal bool IsMergedAcrossPlatforms;
         internal bool IsTimelineProjection;
         internal bool IsSessionProjection;

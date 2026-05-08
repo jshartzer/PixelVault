@@ -90,6 +90,118 @@ namespace PixelVaultNative
             return true;
         }
 
+        // PV-PLN-GPRO-001 step C.1 — boolean game-flag toggle (Favorite, Showcase, ...)
+        // mirroring SetLibraryBrowserCompletionState's load/find/persist/propagate
+        // shape. We extract the common skeleton so future flags only have to supply
+        // the field-level read/write delegates and a noun for the "pending assignment"
+        // toast. Returns true when at least one row actually changed (and was
+        // persisted), false otherwise (no-op repeat or pending-assignment guard).
+        bool SetLibraryBrowserBooleanGameFlag(
+            LibraryBrowserFolderView view,
+            bool desired,
+            string flagNoun,
+            Func<LibraryFolderInfo, bool> readFolder,
+            Action<LibraryFolderInfo, bool> writeFolder,
+            Func<GameIndexEditorRow, bool> readRow,
+            Action<GameIndexEditorRow, bool> writeRow,
+            Action<LibraryBrowserFolderView, bool> applyAggregateToView)
+        {
+            if (view == null || librarySession == null || !librarySession.HasLibraryRoot) return false;
+            if (readFolder == null || writeFolder == null || readRow == null || writeRow == null || applyAggregateToView == null)
+            {
+                LogException("SetLibraryBrowserBooleanGameFlag", new ArgumentException("Delegates must all be non-null."));
+                return false;
+            }
+            var rows = librarySession.LoadSavedGameIndexRows();
+            var targetFolders = GetLibraryBrowserActionFolders(view);
+            if (targetFolders.Count == 0)
+            {
+                var primary = GetLibraryBrowserPrimaryFolder(view) ?? BuildLibraryBrowserDisplayFolder(view);
+                if (primary != null) targetFolders.Add(primary);
+            }
+            if (targetFolders.Count == 0) return false;
+
+            var changed = false;
+            foreach (var folder in targetFolders.Where(folder => folder != null))
+            {
+                if (folder.PendingGameAssignment)
+                {
+                    TryLibraryToast(
+                        "Assign a game title before changing " + (string.IsNullOrWhiteSpace(flagNoun) ? "this flag" : flagNoun) + ".",
+                        MessageBoxImage.Information);
+                    return false;
+                }
+                var row = FindSavedGameIndexRowById(rows, folder.GameId)
+                    ?? FindSavedGameIndexRowByIdentity(rows, folder.Name, folder.PlatformLabel);
+                if (row == null)
+                {
+                    row = new GameIndexEditorRow
+                    {
+                        GameId = !string.IsNullOrWhiteSpace(NormalizeGameId(folder.GameId))
+                            ? NormalizeGameId(folder.GameId)
+                            : CreateGameId(rows.Select(existing => existing == null ? string.Empty : existing.GameId)),
+                        FolderPath = folder.FolderPath ?? string.Empty,
+                        Name = folder.Name ?? string.Empty,
+                        PlatformLabel = folder.PlatformLabel ?? string.Empty,
+                        SteamAppId = folder.SteamAppId ?? string.Empty,
+                        SteamGridDbId = folder.SteamGridDbId ?? string.Empty,
+                        RetroAchievementsGameId = folder.RetroAchievementsGameId ?? string.Empty,
+                        SuppressSteamAppIdAutoResolve = folder.SuppressSteamAppIdAutoResolve,
+                        SuppressSteamGridDbIdAutoResolve = folder.SuppressSteamGridDbIdAutoResolve,
+                        FileCount = folder.FileCount,
+                        PreviewImagePath = folder.PreviewImagePath ?? string.Empty,
+                        FilePaths = folder.FilePaths ?? new string[0],
+                        IsCompleted100Percent = folder.IsCompleted100Percent,
+                        CompletedUtcTicks = folder.CompletedUtcTicks,
+                        IsFavorite = folder.IsFavorite,
+                        IsShowcase = folder.IsShowcase,
+                        CollectionNotes = folder.CollectionNotes ?? string.Empty,
+                        IndexAddedUtcTicks = DateTime.UtcNow.Ticks
+                    };
+                    rows.Add(row);
+                }
+
+                if (readRow(row) != desired
+                    || !string.Equals(folder.GameId ?? string.Empty, row.GameId ?? string.Empty, StringComparison.Ordinal))
+                {
+                    writeRow(row, desired);
+                    if (string.IsNullOrWhiteSpace(folder.GameId) && !string.IsNullOrWhiteSpace(row.GameId)) folder.GameId = row.GameId;
+                    changed = true;
+                }
+                writeFolder(folder, desired);
+            }
+
+            if (!changed) return false;
+
+            librarySession.PersistGameIndexRows(rows);
+            var aggregate = targetFolders.Any(folder => folder != null && readFolder(folder));
+            applyAggregateToView(view, aggregate);
+            if (view.PrimaryFolder != null) writeFolder(view.PrimaryFolder, aggregate);
+            return true;
+        }
+
+        bool SetLibraryBrowserFavoriteState(LibraryBrowserFolderView view, bool isFavorite)
+            => SetLibraryBrowserBooleanGameFlag(
+                view,
+                isFavorite,
+                "Favorite",
+                folder => folder.IsFavorite,
+                (folder, value) => folder.IsFavorite = value,
+                row => row.IsFavorite,
+                (row, value) => row.IsFavorite = value,
+                (v, value) => v.IsFavorite = value);
+
+        bool SetLibraryBrowserShowcaseState(LibraryBrowserFolderView view, bool isShowcase)
+            => SetLibraryBrowserBooleanGameFlag(
+                view,
+                isShowcase,
+                "Showcase",
+                folder => folder.IsShowcase,
+                (folder, value) => folder.IsShowcase = value,
+                row => row.IsShowcase,
+                (row, value) => row.IsShowcase = value,
+                (v, value) => v.IsShowcase = value);
+
         FrameworkElement BuildLibraryBrowserDetailTitlePlatformBadge(string platformLabel)
         {
             var resolvedLabel = NormalizeConsoleLabel(platformLabel);
