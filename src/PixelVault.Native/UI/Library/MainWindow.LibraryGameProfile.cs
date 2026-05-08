@@ -111,7 +111,29 @@ namespace PixelVaultNative
             var root = new Grid();
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-            root.Children.Add(BuildLibraryGameProfileHero(win, view, folder, metrics));
+
+            // The Edit Game pill in the action cluster mutates folder.SteamAppId etc.
+            // and then asks us to refresh the hero in place (PV-PLN-GPRO-001 step C.3).
+            // We rebuild the hero from the now-mutated folder + view and swap it for
+            // the old child so renamed/re-IDed games update without reopening the
+            // window. Captured by reference so the cluster can call back in.
+            Action refreshHero = null;
+            refreshHero = delegate
+            {
+                if (root.Children.Count == 0) return;
+                FrameworkElement existingHero = null;
+                foreach (UIElement child in root.Children)
+                {
+                    if (child is FrameworkElement fe && Grid.GetRow(fe) == 0) { existingHero = fe; break; }
+                }
+                if (existingHero == null) return;
+                var freshHero = BuildLibraryGameProfileHero(win, view, folder, metrics, refreshHero);
+                var idx = root.Children.IndexOf(existingHero);
+                root.Children.Remove(existingHero);
+                if (idx >= 0) root.Children.Insert(idx, freshHero); else root.Children.Add(freshHero);
+                win.Title = "PixelVault Game Profile - " + (string.IsNullOrWhiteSpace(folder.Name) ? "Game Profile" : folder.Name);
+            };
+            root.Children.Add(BuildLibraryGameProfileHero(win, view, folder, metrics, refreshHero));
 
             var scroll = new ScrollViewer
             {
@@ -184,7 +206,7 @@ namespace PixelVaultNative
             return count;
         }
 
-        FrameworkElement BuildLibraryGameProfileHero(Window window, LibraryBrowserFolderView view, LibraryFolderInfo folder, LibraryGameProfileMetrics metrics)
+        FrameworkElement BuildLibraryGameProfileHero(Window window, LibraryBrowserFolderView view, LibraryFolderInfo folder, LibraryGameProfileMetrics metrics, Action refreshHero)
         {
             var hero = new Grid
             {
@@ -234,6 +256,7 @@ namespace PixelVaultNative
             var content = new Grid { Margin = new Thickness(26, 22, 26, 24) };
             content.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = 0 });
+            content.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             var cover = CreateAsyncImageTile(
                 GetLibraryArtPathForDisplayOnly(folder),
                 420,
@@ -300,6 +323,13 @@ namespace PixelVaultNative
             // on identity (title / summary line / badges / IDs).
             Grid.SetColumn(copy, 1);
             content.Children.Add(copy);
+
+            var actionCluster = BuildLibraryGameProfileHeroActionCluster(view, folder, refreshHero);
+            if (actionCluster != null)
+            {
+                Grid.SetColumn(actionCluster, 2);
+                content.Children.Add(actionCluster);
+            }
             hero.Children.Add(content);
             return hero;
         }
@@ -315,6 +345,164 @@ namespace PixelVaultNative
                 .ThenBy(label => label, StringComparer.OrdinalIgnoreCase)
                 .ToList();
             return labels.Count == 0 ? new[] { "Other" } : labels;
+        }
+
+        // Hero action cluster (PV-PLN-GPRO-001 steps C.2 + C.3). Two stacked rows in
+        // the right-hand column of the hero `content` grid: three round icon toggles
+        // (Favorite / Showcase / 100% Complete) on top, then Edit Game and Open
+        // Folders pill buttons. Each toggle writes through the matching helper from
+        // C.1 / SetLibraryBrowserCompletionState; the Edit Game pill calls
+        // OpenLibraryFolderIdEditor and asks the profile orchestrator to rebuild the
+        // hero so renamed/re-IDed games update without reopening the window.
+        FrameworkElement BuildLibraryGameProfileHeroActionCluster(LibraryBrowserFolderView view, LibraryFolderInfo folder, Action refreshHero)
+        {
+            if (view == null || folder == null) return null;
+            var cluster = new StackPanel
+            {
+                Orientation = Orientation.Vertical,
+                VerticalAlignment = VerticalAlignment.Bottom,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Margin = new Thickness(20, 0, 0, 0)
+            };
+
+            var togglesRow = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Margin = new Thickness(0, 0, 0, 12)
+            };
+
+            Border favBtn = null;
+            favBtn = BuildLibraryGameProfileHeroToggleButton(
+                "\uEB52", "#FF6B81", "#3A1C25",
+                view.IsFavorite, "Remove from favorites", "Mark as favorite");
+            favBtn.MouseLeftButtonUp += delegate(object _, MouseButtonEventArgs e)
+            {
+                e.Handled = true;
+                if (SetLibraryBrowserFavoriteState(view, !view.IsFavorite))
+                {
+                    ApplyLibraryGameProfileHeroToggleState(favBtn, "\uEB52", "#FF6B81", "#3A1C25",
+                        view.IsFavorite, "Remove from favorites", "Mark as favorite");
+                    TryLibraryToast(view.IsFavorite ? "Added to favorites." : "Removed from favorites.", MessageBoxImage.Information);
+                }
+            };
+            togglesRow.Children.Add(favBtn);
+
+            Border showcaseBtn = null;
+            showcaseBtn = BuildLibraryGameProfileHeroToggleButton(
+                "\uE735", "#F4C657", "#332608",
+                view.IsShowcase, "Remove from showcase", "Add to showcase");
+            showcaseBtn.MouseLeftButtonUp += delegate(object _, MouseButtonEventArgs e)
+            {
+                e.Handled = true;
+                if (SetLibraryBrowserShowcaseState(view, !view.IsShowcase))
+                {
+                    ApplyLibraryGameProfileHeroToggleState(showcaseBtn, "\uE735", "#F4C657", "#332608",
+                        view.IsShowcase, "Remove from showcase", "Add to showcase");
+                    TryLibraryToast(view.IsShowcase ? "Added to showcase." : "Removed from showcase.", MessageBoxImage.Information);
+                }
+            };
+            togglesRow.Children.Add(showcaseBtn);
+
+            Border completeBtn = null;
+            completeBtn = BuildLibraryGameProfileHeroToggleButton(
+                "\uED15", "#5DD68B", "#0D2E1A",
+                view.IsCompleted100Percent, "Cleared 100% complete", "Mark 100% complete");
+            completeBtn.MouseLeftButtonUp += delegate(object _, MouseButtonEventArgs e)
+            {
+                e.Handled = true;
+                if (SetLibraryBrowserCompletionState(view, !view.IsCompleted100Percent))
+                {
+                    ApplyLibraryGameProfileHeroToggleState(completeBtn, "\uED15", "#5DD68B", "#0D2E1A",
+                        view.IsCompleted100Percent, "Cleared 100% complete", "Mark 100% complete");
+                    TryLibraryToast(view.IsCompleted100Percent ? "Marked 100% complete." : "Cleared 100% complete.", MessageBoxImage.Information);
+                }
+            };
+            togglesRow.Children.Add(completeBtn);
+            cluster.Children.Add(togglesRow);
+
+            var pillsRow = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Right
+            };
+
+            var editBtn = Btn("Edit Game", null, "#1F3340", Brushes.White);
+            editBtn.Height = 30;
+            editBtn.MinWidth = 96;
+            editBtn.FontSize = 12;
+            editBtn.Margin = new Thickness(0, 0, 8, 0);
+            ApplyLibraryPillChrome(editBtn, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
+            editBtn.IsEnabled = !view.IsMergedAcrossPlatforms;
+            editBtn.ToolTip = editBtn.IsEnabled
+                ? "Edit Steam / SteamGridDB / RetroAchievements / Non-Steam IDs"
+                : "Editing IDs is disabled when this game is merged across platforms.";
+            editBtn.Click += delegate
+            {
+                OpenLibraryFolderIdEditor(folder, refreshHero);
+            };
+            pillsRow.Children.Add(editBtn);
+
+            var folderPaths = GetLibraryBrowserSourceFolderPaths(view) ?? new List<string>();
+            var openFoldersBtn = Btn(
+                folderPaths.Count > 1 ? "Open Folders (" + folderPaths.Count + ")" : "Open Folder",
+                null, "#1F3340", Brushes.White);
+            openFoldersBtn.Height = 30;
+            openFoldersBtn.MinWidth = 110;
+            openFoldersBtn.FontSize = 12;
+            ApplyLibraryPillChrome(openFoldersBtn, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
+            openFoldersBtn.IsEnabled = folderPaths.Count > 0;
+            openFoldersBtn.ToolTip = folderPaths.Count == 0
+                ? "No source folders to open"
+                : (folderPaths.Count == 1
+                    ? "Open " + Path.GetFileName(folderPaths[0]) + " in File Explorer"
+                    : "Open " + folderPaths.Count + " source folders in File Explorer");
+            openFoldersBtn.Click += delegate
+            {
+                foreach (var path in folderPaths) OpenFolder(path);
+            };
+            pillsRow.Children.Add(openFoldersBtn);
+
+            cluster.Children.Add(pillsRow);
+            return cluster;
+        }
+
+        Border BuildLibraryGameProfileHeroToggleButton(string glyph, string activeColorHex, string activeBgHex, bool isOn, string tooltipOn, string tooltipOff)
+        {
+            var btn = new Border
+            {
+                Width = 36,
+                Height = 36,
+                CornerRadius = new CornerRadius(18),
+                BorderThickness = new Thickness(1.4),
+                Cursor = System.Windows.Input.Cursors.Hand,
+                Margin = new Thickness(0, 0, 8, 0),
+                SnapsToDevicePixels = true
+            };
+            btn.Child = new TextBlock
+            {
+                FontFamily = new FontFamily("Segoe MDL2 Assets"),
+                FontSize = 16,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            ApplyLibraryGameProfileHeroToggleState(btn, glyph, activeColorHex, activeBgHex, isOn, tooltipOn, tooltipOff);
+            return btn;
+        }
+
+        void ApplyLibraryGameProfileHeroToggleState(Border btn, string glyph, string activeColorHex, string activeBgHex, bool isOn, string tooltipOn, string tooltipOff)
+        {
+            if (btn == null) return;
+            btn.Background = Brush(isOn ? activeBgHex : "#1A2530");
+            btn.BorderBrush = Brush(isOn ? activeColorHex : "#2C3D4A");
+            if (btn.Child is TextBlock tb)
+            {
+                tb.Text = glyph;
+                tb.Foreground = Brush(isOn ? activeColorHex : "#7E94A2");
+            }
+            var label = isOn ? tooltipOn : tooltipOff;
+            btn.ToolTip = label;
+            AutomationProperties.SetName(btn, label ?? string.Empty);
         }
 
         // External-ID pills (PV-PLN-GPRO-001 step B.3). Returns null when no IDs are
