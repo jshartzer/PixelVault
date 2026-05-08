@@ -261,22 +261,54 @@ namespace PixelVaultNative
             content.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = 0 });
             content.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            var cover = CreateAsyncImageTile(
+            const double profileCoverWidth = 138d;
+            const double profileCoverHeight = 207d;
+            var profileCoverCorner = new CornerRadius(16);
+            var coverArt = CreateAsyncImageTile(
                 GetLibraryArtPathForDisplayOnly(folder),
                 420,
-                138,
-                207,
+                profileCoverWidth,
+                profileCoverHeight,
                 Stretch.UniformToFill,
                 folder.Name ?? string.Empty,
                 Brushes.White,
                 new Thickness(0),
                 new Thickness(0),
                 Brush("#151F27"),
-                new CornerRadius(16),
+                profileCoverCorner,
                 Brush("#3E5665"),
                 new Thickness(1));
-            cover.Effect = new DropShadowEffect { BlurRadius = 22, ShadowDepth = 7, Direction = 270, Color = Color.FromArgb(120, 0, 0, 0), Opacity = 0.75 };
-            content.Children.Add(cover);
+            // PV-PLN-GPRO-001 step C.2 follow-up: when the 100% complete toggle is on,
+            // mirror the library tile's holofoil + gold-frame overlays on top of the
+            // profile cover so the toggle has visible feedback right next to the
+            // button. We reuse the BuildLibraryTileCompletionFoilOverlay /
+            // BuildLibraryTileCompletionFrameOverlay helpers from the folder tile
+            // path (PV-POL-GPRO-REUSE-001) instead of building a parallel surface.
+            // Animation is hover-driven here (the profile hero doesn't scroll like the
+            // tile rail does), with a centered idle state on first layout.
+            FrameworkElement coverHost = coverArt;
+            if (view != null && view.IsCompleted100Percent)
+            {
+                var foilWrap = new Grid { Width = profileCoverWidth, Height = profileCoverHeight };
+                foilWrap.Children.Add(coverArt);
+                var foilVisual = BuildLibraryTileCompletionFoilOverlay(profileCoverWidth, profileCoverHeight, profileCoverCorner.TopLeft);
+                foilWrap.Children.Add(foilVisual.Root);
+                foilWrap.Children.Add(BuildLibraryTileCompletionFrameOverlay(profileCoverWidth, profileCoverHeight, profileCoverCorner));
+                foilWrap.Loaded += delegate { foilVisual.Update(0.5, 0.5, false); };
+                foilWrap.MouseMove += delegate(object _, MouseEventArgs e)
+                {
+                    if (foilWrap.ActualWidth <= 0 || foilWrap.ActualHeight <= 0) return;
+                    var pt = e.GetPosition(foilWrap);
+                    foilVisual.Update(
+                        Math.Max(0, Math.Min(1, pt.X / foilWrap.ActualWidth)),
+                        Math.Max(0, Math.Min(1, pt.Y / foilWrap.ActualHeight)),
+                        true);
+                };
+                foilWrap.MouseLeave += delegate { foilVisual.Update(0.5, 0.5, true); };
+                coverHost = foilWrap;
+            }
+            coverHost.Effect = new DropShadowEffect { BlurRadius = 22, ShadowDepth = 7, Direction = 270, Color = Color.FromArgb(120, 0, 0, 0), Opacity = 0.75 };
+            content.Children.Add(coverHost);
 
             var copy = new StackPanel { Margin = new Thickness(24, 14, 0, 0), VerticalAlignment = VerticalAlignment.Top };
             copy.Children.Add(new TextBlock
@@ -449,12 +481,17 @@ namespace PixelVaultNative
             completeBtn.MouseLeftButtonUp += delegate(object _, MouseButtonEventArgs e)
             {
                 e.Handled = true;
-                if (SetLibraryBrowserCompletionState(view, !view.IsCompleted100Percent))
-                {
-                    ApplyLibraryGameProfileHeroToggleState(completeBtn, "\uED15", "#5DD68B", "#0D2E1A",
-                        view.IsCompleted100Percent, "Cleared 100% complete", "Mark 100% complete");
-                    TryLibraryToast(view.IsCompleted100Percent ? "Marked 100% complete." : "Cleared 100% complete.", MessageBoxImage.Information);
-                }
+                if (!SetLibraryBrowserCompletionState(view, !view.IsCompleted100Percent)) return;
+                TryLibraryToast(view.IsCompleted100Percent ? "Marked 100% complete." : "Cleared 100% complete.", MessageBoxImage.Information);
+                // Toggling 100% complete drives the holofoil + gold-frame treatment on
+                // the profile hero cover and on the library tile cover. Rebuild the
+                // hero so the new cover treatment renders, and ping the live folder
+                // grid the same way the folder-tile context menu's "100% Achievements"
+                // item does (renderTiles()) so tiles behind the profile update in
+                // place instead of staying stale until the user reopens the library.
+                if (refreshHero != null) refreshHero();
+                try { _libraryBrowserLiveWorkingSet?.RerenderFolderList?.Invoke(); }
+                catch (Exception ex) { LogException("LibraryGameProfile.completeBtn rerenderFolderList", ex); }
             };
             cluster.Children.Add(completeBtn);
 
