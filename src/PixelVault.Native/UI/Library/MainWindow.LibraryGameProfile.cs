@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Automation;
@@ -18,6 +19,8 @@ namespace PixelVaultNative
 {
     public sealed partial class MainWindow
     {
+        readonly Dictionary<string, Window> _libraryGameProfileWindows = new Dictionary<string, Window>(StringComparer.OrdinalIgnoreCase);
+
         internal void LibraryBrowserOpenGameProfile(Window owner, LibraryBrowserFolderView view)
         {
             if (view == null || IsLibraryBrowserTimeProjectionView(view)) return;
@@ -26,8 +29,28 @@ namespace PixelVaultNative
             ShowLibraryGameProfileWindow(owner ?? this, view, folder);
         }
 
+        static string LibraryGameProfileWindowKey(LibraryFolderInfo folder)
+        {
+            if (folder == null) return string.Empty;
+            if (!string.IsNullOrWhiteSpace(folder.GameId)) return "id:" + folder.GameId.Trim();
+            if (!string.IsNullOrWhiteSpace(folder.FolderPath)) return "path:" + folder.FolderPath.Trim();
+            if (!string.IsNullOrWhiteSpace(folder.Name)) return "name:" + folder.Name.Trim();
+            return string.Empty;
+        }
+
         void ShowLibraryGameProfileWindow(Window owner, LibraryBrowserFolderView view, LibraryFolderInfo folder)
         {
+            var key = LibraryGameProfileWindowKey(folder);
+            if (!string.IsNullOrEmpty(key)
+                && _libraryGameProfileWindows.TryGetValue(key, out var existing)
+                && existing != null
+                && existing.IsLoaded)
+            {
+                if (existing.WindowState == WindowState.Minimized) existing.WindowState = WindowState.Normal;
+                existing.Activate();
+                return;
+            }
+
             var title = string.IsNullOrWhiteSpace(folder.Name) ? "Game Profile" : folder.Name.Trim();
             var win = new Window
             {
@@ -42,20 +65,30 @@ namespace PixelVaultNative
             };
             AutomationProperties.SetName(win, "Game Profile - " + title);
 
-            var root = new Grid();
-            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-            root.Children.Add(BuildLibraryGameProfileHero(win, view, folder));
-
-            var scroll = new ScrollViewer
+            // Cancels any in-flight async loads (achievements fetch, etc.) when the user closes the profile mid-load.
+            var lifetimeCts = new CancellationTokenSource();
+            win.Closed += delegate
             {
-                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
-                Padding = new Thickness(22, 18, 22, 24)
+                try { lifetimeCts.Cancel(); } catch { }
+                try { lifetimeCts.Dispose(); } catch { }
+                if (!string.IsNullOrEmpty(key)
+                    && _libraryGameProfileWindows.TryGetValue(key, out var tracked)
+                    && ReferenceEquals(tracked, win))
+                {
+                    _libraryGameProfileWindows.Remove(key);
+                }
             };
-            Grid.SetRow(scroll, 1);
-            var body = new StackPanel();
-            scroll.Content = body;
+            win.PreviewKeyDown += delegate(object _, KeyEventArgs e)
+            {
+                if (e.Key != Key.Escape) return;
+                e.Handled = true;
+                win.Close();
+            };
+
+            // Compute the per-profile metrics up front so the hero summary line and the
+            // stat strip share a single snapshot (PV-POL-GPRO-DATA-001). The session count
+            // here is a Phase A placeholder using the shared session-threshold setting; the
+            // full session-grouping helper from PV-PLN-GPRO-001 Phase D will replace it.
             var files = GetFilesForLibraryFolderEntry(folder, false)
                 .Where(file => !string.IsNullOrWhiteSpace(file) && File.Exists(file))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -69,22 +102,88 @@ namespace PixelVaultNative
                 .ThenBy(row => row.File, StringComparer.OrdinalIgnoreCase)
                 .ToList();
             var orderedFilePaths = orderedFiles.Select(row => row.File).ToList();
-            body.Children.Add(BuildLibraryGameProfileStats(folder, orderedFilePaths, metadataIndex));
+            var metrics = ComputeLibraryGameProfileMetrics(orderedFilePaths, metadataIndex, librarySessionThresholdMinutes);
+
+            var root = new Grid();
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            root.Children.Add(BuildLibraryGameProfileHero(win, view, folder, metrics));
+
+            var scroll = new ScrollViewer
+            {
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                Padding = new Thickness(22, 18, 22, 24)
+            };
+            Grid.SetRow(scroll, 1);
+            var body = new StackPanel();
+            scroll.Content = body;
+            body.Children.Add(BuildLibraryGameProfileStats(metrics));
             body.Children.Add(BuildLibraryGameProfileCaptureFilmstrip(win, view, orderedFilePaths));
             var achievementHost = new StackPanel { Margin = new Thickness(0, 24, 0, 0) };
             body.Children.Add(achievementHost);
-            BuildLibraryGameProfileAchievementsAsync(win, achievementHost, view);
+            BeginLoadLibraryGameProfileAchievements(win, achievementHost, view, lifetimeCts.Token);
             root.Children.Add(scroll);
             win.Content = root;
+            if (!string.IsNullOrEmpty(key)) _libraryGameProfileWindows[key] = win;
             win.Show();
             win.Activate();
         }
 
-        FrameworkElement BuildLibraryGameProfileHero(Window window, LibraryBrowserFolderView view, LibraryFolderInfo folder)
+        // Snapshot of the numbers the dashboard top-strip and hero summary line share.
+        // Computed once per profile open from the same metadata-index read the rest of the
+        // window already uses (PV-POL-GPRO-DATA-001).
+        sealed class LibraryGameProfileMetrics
+        {
+            public int CaptureCount;
+            public int VideoCount;
+            public int SessionCount;
+            public DateTime FirstCaptureDate;
+            public DateTime LatestCaptureDate;
+        }
+
+        LibraryGameProfileMetrics ComputeLibraryGameProfileMetrics(
+            IReadOnlyList<string> orderedFiles,
+            IReadOnlyDictionary<string, LibraryMetadataIndexEntry> metadataIndex,
+            int sessionThresholdMinutes)
+        {
+            var safeFiles = orderedFiles ?? Array.Empty<string>();
+            var ascendingDates = safeFiles
+                .Select(file => ResolveLibraryProfileCaptureDate(file, metadataIndex))
+                .Where(date => date > DateTime.MinValue)
+                .OrderBy(date => date)
+                .ToList();
+            return new LibraryGameProfileMetrics
+            {
+                CaptureCount = safeFiles.Count,
+                VideoCount = safeFiles.Count(IsVideo),
+                SessionCount = CountLibraryGameProfileSessions(ascendingDates, sessionThresholdMinutes),
+                FirstCaptureDate = ascendingDates.Count == 0 ? DateTime.MinValue : ascendingDates[0],
+                LatestCaptureDate = ascendingDates.Count == 0 ? DateTime.MinValue : ascendingDates[ascendingDates.Count - 1]
+            };
+        }
+
+        // Phase A placeholder: counts gameplay sessions by walking an ascending date list and
+        // starting a new session whenever the gap exceeds the shared session-threshold setting
+        // (PV-POL-GPRO-SESSION-001). Phase D will replace this with the full session-grouping
+        // helper that returns the per-session file slices the Sessions section needs.
+        static int CountLibraryGameProfileSessions(IReadOnlyList<DateTime> sortedAscendingDates, int thresholdMinutes)
+        {
+            if (sortedAscendingDates == null || sortedAscendingDates.Count == 0) return 0;
+            var threshold = TimeSpan.FromMinutes(SettingsService.NormalizeLibrarySessionThresholdMinutes(thresholdMinutes));
+            var count = 1;
+            for (var i = 1; i < sortedAscendingDates.Count; i++)
+            {
+                if (sortedAscendingDates[i] - sortedAscendingDates[i - 1] > threshold) count++;
+            }
+            return count;
+        }
+
+        FrameworkElement BuildLibraryGameProfileHero(Window window, LibraryBrowserFolderView view, LibraryFolderInfo folder, LibraryGameProfileMetrics metrics)
         {
             var hero = new Grid
             {
-                Height = 275,
+                MinHeight = 275,
                 Background = Brush("#111A21"),
                 ClipToBounds = true
             };
@@ -176,11 +275,14 @@ namespace PixelVaultNative
                 TextWrapping = TextWrapping.Wrap,
                 TextTrimming = TextTrimming.CharacterEllipsis
             });
+            var summaryLine = BuildLibraryGameProfileHeroSummaryLine(metrics);
+            if (summaryLine != null) copy.Children.Add(summaryLine);
             var badges = new WrapPanel { Margin = new Thickness(0, 14, 0, 0) };
             foreach (var label in ResolveLibraryGameProfilePlatformLabels(view, folder))
             {
                 var badge = BuildLibraryBrowserDetailTitlePlatformBadge(label);
                 if (badge == null) continue;
+                ApplyLibraryGameProfileHeroBadgeChrome(badge);
                 if (badge is FrameworkElement fe) fe.Margin = new Thickness(0, 0, 8, 8);
                 badges.Children.Add(badge);
             }
@@ -240,40 +342,76 @@ namespace PixelVaultNative
             return string.Join("  |  ", parts);
         }
 
-        FrameworkElement BuildLibraryGameProfileStats(LibraryFolderInfo folder, IReadOnlyList<string> files, IReadOnlyDictionary<string, LibraryMetadataIndexEntry> metadataIndex)
+        FrameworkElement BuildLibraryGameProfileHeroSummaryLine(LibraryGameProfileMetrics metrics)
         {
-            var root = new UniformGrid { Columns = 4 };
-            var safeFiles = files ?? Array.Empty<string>();
-            var captureDates = safeFiles
-                .Select(file => ResolveLibraryProfileCaptureDate(file, metadataIndex))
-                .Where(date => date > DateTime.MinValue)
-                .OrderBy(date => date)
-                .ToList();
-            var dateRange = captureDates.Count == 0
-                ? "No capture dates"
-                : FormatLibraryGameProfileDate(captureDates.First()) + " - " + FormatLibraryGameProfileDate(captureDates.Last());
-            var starred = safeFiles.Count(file =>
+            if (metrics == null) return null;
+            var parts = new List<string>();
+            if (metrics.CaptureCount > 0) parts.Add(metrics.CaptureCount.ToString(CultureInfo.CurrentCulture) + (metrics.CaptureCount == 1 ? " capture" : " captures"));
+            if (metrics.VideoCount > 0) parts.Add(metrics.VideoCount.ToString(CultureInfo.CurrentCulture) + (metrics.VideoCount == 1 ? " video" : " videos"));
+            if (metrics.SessionCount > 0) parts.Add(metrics.SessionCount.ToString(CultureInfo.CurrentCulture) + (metrics.SessionCount == 1 ? " session" : " sessions"));
+            if (metrics.FirstCaptureDate > DateTime.MinValue && metrics.LatestCaptureDate > DateTime.MinValue)
             {
-                LibraryMetadataIndexEntry entry;
-                return metadataIndex != null && metadataIndex.TryGetValue(file, out entry) && entry != null && entry.Starred;
-            });
-            root.Children.Add(BuildLibraryGameProfileStatCard("Captures", safeFiles.Count.ToString(CultureInfo.CurrentCulture)));
-            root.Children.Add(BuildLibraryGameProfileStatCard("Date range", dateRange));
-            root.Children.Add(BuildLibraryGameProfileStatCard("Videos", safeFiles.Count(IsVideo).ToString(CultureInfo.CurrentCulture)));
-            root.Children.Add(BuildLibraryGameProfileStatCard("Starred", starred.ToString(CultureInfo.CurrentCulture)));
+                parts.Add(metrics.FirstCaptureDate.Date == metrics.LatestCaptureDate.Date
+                    ? FormatLibraryGameProfileDate(metrics.FirstCaptureDate)
+                    : FormatLibraryGameProfileDate(metrics.FirstCaptureDate) + " \u2192 " + FormatLibraryGameProfileDate(metrics.LatestCaptureDate));
+            }
+            if (parts.Count == 0) return null;
+            return new TextBlock
+            {
+                Text = string.Join(" \u00B7 ", parts),
+                Foreground = Brush("#A9BAC4"),
+                FontSize = 13,
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 8, 0, 0)
+            };
+        }
+
+        // The folder-tile platform badge is intentionally bright (#F4F8FB at 1.15px) for tile
+        // contrast; in the profile hero the same chrome reads as a hard outline against the
+        // 38pt title. Tone the border down only for the hero so other surfaces are unchanged.
+        static void ApplyLibraryGameProfileHeroBadgeChrome(FrameworkElement badge)
+        {
+            if (badge is not Border border) return;
+            border.BorderBrush = UiBrushHelper.FromHex("#3E5665");
+            border.BorderThickness = new Thickness(1);
+        }
+
+        FrameworkElement BuildLibraryGameProfileStats(LibraryGameProfileMetrics metrics)
+        {
+            var root = new UniformGrid { Columns = 5 };
+            var safe = metrics ?? new LibraryGameProfileMetrics();
+            var firstCaptureText = safe.FirstCaptureDate > DateTime.MinValue
+                ? FormatLibraryGameProfileDate(safe.FirstCaptureDate)
+                : "\u2014";
+            var latestCaptureText = safe.LatestCaptureDate > DateTime.MinValue
+                ? FormatLibraryGameProfileDate(safe.LatestCaptureDate)
+                : "\u2014";
+            var cards = new[]
+            {
+                BuildLibraryGameProfileStatCard("Captures", safe.CaptureCount.ToString(CultureInfo.CurrentCulture)),
+                BuildLibraryGameProfileStatCard("Videos", safe.VideoCount.ToString(CultureInfo.CurrentCulture)),
+                BuildLibraryGameProfileStatCard("Sessions", safe.SessionCount.ToString(CultureInfo.CurrentCulture)),
+                BuildLibraryGameProfileStatCard("First Capture", firstCaptureText),
+                BuildLibraryGameProfileStatCard("Latest Capture", latestCaptureText)
+            };
+            for (var i = 0; i < cards.Length; i++)
+            {
+                if (cards[i] is FrameworkElement fe)
+                    fe.Margin = new Thickness(0, 0, i == cards.Length - 1 ? 0 : 12, 0);
+                root.Children.Add(cards[i]);
+            }
             return root;
         }
 
         FrameworkElement BuildLibraryGameProfileStatCard(string label, string value)
         {
+            // Phase A: drop the 1px border and rely on background contrast for separation
+            // (PV-PLN-GPRO-001 step A.4) so the strip reads as a dashboard rather than a form.
             var card = new Border
             {
-                Margin = new Thickness(0, 0, 12, 0),
                 Padding = new Thickness(16, 14, 16, 12),
                 CornerRadius = new CornerRadius(16),
                 Background = Brush("#111A21"),
-                BorderBrush = Brush("#263640"),
-                BorderThickness = new Thickness(1),
                 MinHeight = 86
             };
             var stack = new StackPanel();
@@ -284,11 +422,19 @@ namespace PixelVaultNative
                 FontSize = 12,
                 FontWeight = FontWeights.SemiBold
             });
+            // Length-based scaling lets short integer values stay punchy ("12") while
+            // longer values like a formatted date ("Mar 11, 2026") still fit on the
+            // narrower 5-column strip without wrapping awkwardly mid-token.
+            var length = value == null ? 0 : value.Length;
+            double valueFontSize;
+            if (length > 22) valueFontSize = 16;
+            else if (length > 14) valueFontSize = 18;
+            else valueFontSize = 26;
             stack.Children.Add(new TextBlock
             {
                 Text = value,
                 Foreground = Brushes.White,
-                FontSize = value != null && value.Length > 18 ? 18 : 26,
+                FontSize = valueFontSize,
                 FontWeight = FontWeights.SemiBold,
                 TextWrapping = TextWrapping.Wrap,
                 Margin = new Thickness(0, 8, 0, 0)
@@ -297,7 +443,10 @@ namespace PixelVaultNative
             return card;
         }
 
-        void BuildLibraryGameProfileAchievementsAsync(Window owner, StackPanel host, LibraryBrowserFolderView view)
+        // Fire-and-forget: kicks off the achievements fetch on a worker thread and marshals
+        // the result back to the UI. Tied to <paramref name="cancellation"/> so closing the
+        // profile window before the network call returns short-circuits the dispatcher work.
+        void BeginLoadLibraryGameProfileAchievements(Window owner, StackPanel host, LibraryBrowserFolderView view, CancellationToken cancellation)
         {
             host.Children.Add(BuildLibraryGameProfileSectionTitle("Achievements", "Collected achievements are grouped first; hover any badge for details."));
             var loading = new TextBlock
@@ -325,15 +474,22 @@ namespace PixelVaultNative
                         CurrentSteamUserId64(),
                         CurrentRetroAchievementsUsername(),
                         userAgent,
-                        default).ConfigureAwait(false);
+                        cancellation).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
                 }
                 catch (Exception ex)
                 {
                     result = new GameAchievementsFetchService.FetchResult { ErrorMessage = ex.Message };
                 }
 
+                if (cancellation.IsCancellationRequested) return;
+
                 await owner.Dispatcher.InvokeAsync(() =>
                 {
+                    if (cancellation.IsCancellationRequested || !owner.IsLoaded) return;
                     host.Children.Remove(loading);
                     if (result == null || result.IsError)
                     {
@@ -381,20 +537,50 @@ namespace PixelVaultNative
                     {
                         Padding = new Thickness(12),
                         CornerRadius = new CornerRadius(16),
-                        Background = Brush("#101820"),
-                        BorderBrush = Brush("#263640"),
-                        BorderThickness = new Thickness(1)
+                        Background = Brush("#101820")
                     };
                     var grid = new WrapPanel { Orientation = Orientation.Horizontal };
+                    var palette = LibraryGameProfileAchievementPalette.Default;
                     foreach (var row in displayRows)
-                        grid.Children.Add(BuildLibraryGameProfileAchievementCard(row, userAgent, progressKnown));
+                        grid.Children.Add(BuildLibraryGameProfileAchievementCard(row, userAgent, progressKnown, palette));
                     container.Child = grid;
                     host.Children.Add(container);
                 }, DispatcherPriority.Background);
             });
         }
 
-        FrameworkElement BuildLibraryGameProfileAchievementCard(GameAchievementsFetchService.AchievementRow row, string userAgent, bool progressKnown)
+        // Cached, frozen brushes for the achievement grid. Profiles can render hundreds
+        // of cards at once; the previous code allocated 5 fresh SolidColorBrush instances
+        // per card via Brush(hex), which adds up under the dispatcher.
+        sealed class LibraryGameProfileAchievementPalette
+        {
+            internal static readonly LibraryGameProfileAchievementPalette Default = new LibraryGameProfileAchievementPalette();
+
+            internal SolidColorBrush UnlockedCardBackground { get; }
+            internal SolidColorBrush LockedCardBackground { get; }
+            internal SolidColorBrush UnlockedCardBorder { get; }
+            internal SolidColorBrush LockedCardBorder { get; }
+            internal SolidColorBrush IconBackground { get; }
+            internal SolidColorBrush IconBorder { get; }
+
+            LibraryGameProfileAchievementPalette()
+            {
+                UnlockedCardBackground = Freeze(UiBrushHelper.FromHex("#192316"));
+                LockedCardBackground = Freeze(UiBrushHelper.FromHex("#111A21"));
+                UnlockedCardBorder = Freeze(UiBrushHelper.FromHex("#C7A245"));
+                LockedCardBorder = Freeze(UiBrushHelper.FromHex("#31414C"));
+                IconBackground = Freeze(UiBrushHelper.FromHex("#18242B"));
+                IconBorder = Freeze(UiBrushHelper.FromHex("#30404C"));
+            }
+
+            static SolidColorBrush Freeze(SolidColorBrush brush)
+            {
+                if (brush != null && brush.CanFreeze && !brush.IsFrozen) brush.Freeze();
+                return brush;
+            }
+        }
+
+        FrameworkElement BuildLibraryGameProfileAchievementCard(GameAchievementsFetchService.AchievementRow row, string userAgent, bool progressKnown, LibraryGameProfileAchievementPalette palette)
         {
             var unlocked = row != null && row.ProgressKnown && row.Unlocked;
             var muted = progressKnown && !unlocked;
@@ -405,8 +591,8 @@ namespace PixelVaultNative
                 Margin = new Thickness(0, 0, 8, 8),
                 Padding = new Thickness(3),
                 CornerRadius = new CornerRadius(10),
-                Background = Brush(unlocked ? "#192316" : "#111A21"),
-                BorderBrush = Brush(unlocked ? "#C7A245" : "#31414C"),
+                Background = unlocked ? palette.UnlockedCardBackground : palette.LockedCardBackground,
+                BorderBrush = unlocked ? palette.UnlockedCardBorder : palette.LockedCardBorder,
                 BorderThickness = new Thickness(unlocked ? 1.25 : 1),
                 Opacity = muted ? 0.46 : 1,
                 SnapsToDevicePixels = true
@@ -415,8 +601,8 @@ namespace PixelVaultNative
             {
                 CornerRadius = new CornerRadius(7),
                 ClipToBounds = true,
-                Background = Brush("#18242B"),
-                BorderBrush = Brush("#30404C"),
+                Background = palette.IconBackground,
+                BorderBrush = palette.IconBorder,
                 BorderThickness = new Thickness(1)
             };
             var img = new Image { Stretch = Stretch.UniformToFill };
@@ -512,7 +698,12 @@ namespace PixelVaultNative
                 Cursor = Cursors.Hand
             };
             var grid = new Grid();
-            if (IsImage(file))
+            var isVideo = IsVideo(file);
+            // Routing through CreateAsyncImageTile for both images and videos lets the
+            // thumbnail pipeline kick off ffmpeg poster generation for clips so they
+            // render with a real frame thumbnail (with the "CLIP" text as fallback while
+            // the poster is being created or if FFmpeg is not configured).
+            if (IsImage(file) || isVideo)
             {
                 grid.Children.Add(CreateAsyncImageTile(
                     file,
@@ -520,7 +711,7 @@ namespace PixelVaultNative
                     width,
                     height,
                     Stretch.UniformToFill,
-                    Path.GetFileName(file),
+                    isVideo ? "CLIP" : Path.GetFileName(file),
                     Brushes.White,
                     new Thickness(0),
                     new Thickness(0),
@@ -528,38 +719,53 @@ namespace PixelVaultNative
                     new CornerRadius(0),
                     Brushes.Transparent,
                     new Thickness(0)));
+                if (isVideo) grid.Children.Add(BuildLibraryGameProfileVideoPlayIndicator());
                 tile.ToolTip = Path.GetFileName(file);
                 ToolTipService.SetShowDuration(tile, 90000);
                 tile.MouseLeftButtonDown += delegate
                 {
-                    OpenLibraryCaptureViewer(profileWindow, tempWs, file);
-                };
-            }
-            else
-            {
-                grid.Children.Add(new TextBlock
-                {
-                    Text = "CLIP",
-                    Foreground = Brushes.White,
-                    FontWeight = FontWeights.SemiBold,
-                    FontSize = 18,
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Center
-                });
-                tile.MouseLeftButtonDown += delegate
-                {
-                    try
+                    if (isVideo)
                     {
-                        Process.Start(new ProcessStartInfo(file) { UseShellExecute = true });
+                        try
+                        {
+                            Process.Start(new ProcessStartInfo(file) { UseShellExecute = true });
+                        }
+                        catch (Exception ex)
+                        {
+                            Log("Open video failed: " + ex.Message);
+                        }
                     }
-                    catch (Exception ex)
+                    else
                     {
-                        Log("Open video failed: " + ex.Message);
+                        OpenLibraryCaptureViewer(profileWindow, tempWs, file);
                     }
                 };
             }
             tile.Child = grid;
             return tile;
+        }
+
+        static FrameworkElement BuildLibraryGameProfileVideoPlayIndicator()
+        {
+            var badge = new Border
+            {
+                Width = 28,
+                Height = 28,
+                CornerRadius = new CornerRadius(14),
+                Background = new SolidColorBrush(Color.FromArgb(170, 0, 0, 0)),
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Bottom,
+                Margin = new Thickness(0, 0, 6, 6),
+                Child = new System.Windows.Shapes.Polygon
+                {
+                    Points = new PointCollection { new Point(0, 0), new Point(10, 6), new Point(0, 12) },
+                    Fill = Brushes.White,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(2, 0, 0, 0)
+                }
+            };
+            return badge;
         }
 
         FrameworkElement BuildLibraryGameProfileOpenPhotoViewTile(Window profileWindow, LibraryBrowserFolderView view, int captureCount)
@@ -592,7 +798,7 @@ namespace PixelVaultNative
             });
             stack.Children.Add(new TextBlock
             {
-                Text = captureCount.ToString(CultureInfo.CurrentCulture) + " captures",
+                Text = captureCount.ToString(CultureInfo.CurrentCulture) + (captureCount == 1 ? " capture" : " captures"),
                 Foreground = Brush("#9DC7E8"),
                 FontSize = 11,
                 TextAlignment = TextAlignment.Center,
@@ -611,11 +817,22 @@ namespace PixelVaultNative
         void OpenLibraryGameProfilePhotoWorkspace(Window profileWindow, LibraryBrowserFolderView view)
         {
             if (view == null) return;
+            // ShowLibraryBrowser(true) sets _libraryBrowserLiveWorkingSet synchronously
+            // inside LibraryBrowserShowOrchestration.Run when reuseMainWindow=true
+            // (RegisterLibraryBrowserLiveWorkingSet on this thread). The defensive null
+            // check below catches the edge case where the orchestration throws before
+            // the registration line runs - which is logged to LogException by the host
+            // - so we surface a toast instead of silently dropping the click.
             if (_libraryBrowserLiveWorkingSet == null || _libraryBrowserLiveWorkingSet.Panes == null)
                 ShowLibraryBrowser(true);
 
             var ws = _libraryBrowserLiveWorkingSet;
-            if (ws == null || ws.OpenPhotoWorkspaceForFolder == null) return;
+            if (ws == null || ws.Panes == null || ws.OpenPhotoWorkspaceForFolder == null)
+            {
+                Log("Game profile: Photo View unavailable - library browser working set not initialized.");
+                TryLibraryToast("Photo View is unavailable right now. Try reopening the Library window.", MessageBoxImage.Warning);
+                return;
+            }
             if (IsLibraryBrowserTimelineMode())
             {
                 libraryGroupingMode = "all";
@@ -661,8 +878,6 @@ namespace PixelVaultNative
                 Padding = new Thickness(16),
                 CornerRadius = new CornerRadius(14),
                 Background = Brush("#101820"),
-                BorderBrush = Brush("#263640"),
-                BorderThickness = new Thickness(1),
                 Child = new TextBlock
                 {
                     Text = string.IsNullOrWhiteSpace(message) ? "Nothing to show yet." : message,
