@@ -148,7 +148,6 @@ namespace PixelVaultNative
             Grid.SetRow(scroll, 1);
             var body = new StackPanel();
             scroll.Content = body;
-            body.Children.Add(BuildLibraryGameProfileActionToolbar(win, view, folder, refreshHero));
             body.Children.Add(BuildLibraryGameProfileStats(metrics));
             body.Children.Add(BuildLibraryGameProfileNotesCard(win, view, folder, out refreshNotesCard));
             body.Children.Add(BuildLibraryGameProfileCaptureFilmstrip(win, view, orderedFilePaths));
@@ -280,25 +279,6 @@ namespace PixelVaultNative
             content.Children.Add(cover);
 
             var copy = new StackPanel { Margin = new Thickness(24, 14, 0, 0), VerticalAlignment = VerticalAlignment.Top };
-            var logoPath = GetLibraryHeroLogoPathForDisplayOnly(folder);
-            if (!string.IsNullOrWhiteSpace(logoPath) && File.Exists(logoPath))
-            {
-                var logo = new Image
-                {
-                    MaxWidth = 420,
-                    MaxHeight = 94,
-                    Stretch = Stretch.Uniform,
-                    HorizontalAlignment = HorizontalAlignment.Left,
-                    Visibility = Visibility.Collapsed,
-                    Margin = new Thickness(0, 0, 0, 12)
-                };
-                QueueImageLoad(logo, logoPath, 720, loaded =>
-                {
-                    logo.Source = loaded;
-                    logo.Visibility = Visibility.Visible;
-                }, true);
-                copy.Children.Add(logo);
-            }
             copy.Children.Add(new TextBlock
             {
                 Text = folder.Name ?? "Game Profile",
@@ -320,23 +300,79 @@ namespace PixelVaultNative
                 badges.Children.Add(badge);
             }
             if (badges.Children.Count > 0) copy.Children.Add(badges);
-            var idPills = BuildLibraryGameProfileIdPills(folder);
-            if (idPills != null) copy.Children.Add(idPills);
+            // IDs on the left, circle action cluster (toggles + edit/open/art) on the
+            // right of the same row so the bottom of the hero has a single, coherent
+            // strip of IDs + actions instead of two competing surfaces.
+            var idActionRow = BuildLibraryGameProfileHeroIdActionRow(win: window, view: view, folder: folder, refreshHero: refreshHero);
+            if (idActionRow != null) copy.Children.Add(idActionRow);
             // The hero used to render a clipped CollectionNotes preview here. As of
             // PV-PLN-GPRO-001 step B.1 the dedicated Game Notes card in the body owns
             // the notes surface end-to-end (display + edit), so we let the hero focus
-            // on identity (title / summary line / badges / IDs).
+            // on identity (title / summary line / badges / IDs / actions).
             Grid.SetColumn(copy, 1);
             content.Children.Add(copy);
 
-            var actionCluster = BuildLibraryGameProfileHeroActionCluster(view, folder, refreshHero);
-            if (actionCluster != null)
+            // Right column: large game logo (wordmark/emblem). Replaced the old
+            // toggle cluster - the toggles now live next to the IDs in the copy
+            // column so the right side of the hero can showcase the logo.
+            var logoElement = BuildLibraryGameProfileHeroLogo(window, folder);
+            if (logoElement != null)
             {
-                Grid.SetColumn(actionCluster, 2);
-                content.Children.Add(actionCluster);
+                Grid.SetColumn(logoElement, 2);
+                content.Children.Add(logoElement);
             }
             hero.Children.Add(content);
             return hero;
+        }
+
+        // Right-column logo used by BuildLibraryGameProfileHero. Returns null when no
+        // logo asset is available so column 2 collapses to 0 width and the copy
+        // column gets the room. Logos render up to 320x200, vertical-centered, and
+        // fade in once the bitmap has decoded so we don't flash a placeholder.
+        FrameworkElement BuildLibraryGameProfileHeroLogo(Window window, LibraryFolderInfo folder)
+        {
+            var logoPath = GetLibraryHeroLogoPathForDisplayOnly(folder);
+            if (string.IsNullOrWhiteSpace(logoPath) || !File.Exists(logoPath)) return null;
+            var logo = new Image
+            {
+                MaxWidth = 320,
+                MaxHeight = 200,
+                Stretch = Stretch.Uniform,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(20, 0, 0, 0),
+                Visibility = Visibility.Collapsed
+            };
+            QueueImageLoad(logo, logoPath, 720, loaded =>
+            {
+                logo.Source = loaded;
+                logo.Visibility = Visibility.Visible;
+            }, true);
+            return logo;
+        }
+
+        // Combined row that places the external-ID pills on the left and the circle
+        // action cluster (3 toggles + Edit / Open / Change Art) on the right. Used
+        // by BuildLibraryGameProfileHero to keep the hero's bottom strip coherent.
+        FrameworkElement BuildLibraryGameProfileHeroIdActionRow(Window win, LibraryBrowserFolderView view, LibraryFolderInfo folder, Action refreshHero)
+        {
+            var row = new Grid { Margin = new Thickness(0, 4, 0, 0) };
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = 0 });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            var idPills = BuildLibraryGameProfileIdPills(folder);
+            if (idPills != null)
+            {
+                if (idPills is FrameworkElement idFe) idFe.VerticalAlignment = VerticalAlignment.Center;
+                Grid.SetColumn(idPills, 0);
+                row.Children.Add(idPills);
+            }
+            var circles = BuildLibraryGameProfileHeroActionCluster(win, view, folder, refreshHero);
+            if (circles != null)
+            {
+                Grid.SetColumn(circles, 1);
+                row.Children.Add(circles);
+            }
+            return row;
         }
 
         IEnumerable<string> ResolveLibraryGameProfilePlatformLabels(LibraryBrowserFolderView view, LibraryFolderInfo folder)
@@ -352,15 +388,17 @@ namespace PixelVaultNative
             return labels.Count == 0 ? new[] { "Other" } : labels;
         }
 
-        // Hero toggle cluster (PV-PLN-GPRO-001 step C.2). Three round icon toggles
-        // (Favorite / Showcase / 100% Complete) right-aligned in the hero's third
-        // column. The Edit Game / Open Folder / Change Art pills used to live below
-        // these toggles but were moved out into BuildLibraryGameProfileActionToolbar
-        // to give the toggles room to breathe and to keep the hero focused on
-        // identity. Each toggle writes through the matching helper from C.1 /
-        // SetLibraryBrowserCompletionState and only refreshes its own chrome; no
-        // full hero rebuild is needed for a state change.
-        FrameworkElement BuildLibraryGameProfileHeroActionCluster(LibraryBrowserFolderView view, LibraryFolderInfo folder, Action refreshHero)
+        // Combined hero action cluster: three round state toggles (Favorite /
+        // Showcase / 100% Complete) followed by three round action circles (Edit
+        // Game / Open Folder / Change Art). Toggles and actions share identical
+        // chrome (40px round Border, Segoe MDL2 glyph) so the row reads as one
+        // cohesive icon strip instead of mixed-shape buttons. State toggles flip
+        // their own chrome on click; action circles route to the same helpers
+        // that used to back the text pills (OpenLibraryFolderIdEditor,
+        // OpenFolder, ChooseLibraryAssetFromSteamGridDbAsync) and ask
+        // refreshHero to rebuild the hero so renamed/re-IDed/re-art games
+        // update without reopening the window.
+        FrameworkElement BuildLibraryGameProfileHeroActionCluster(Window profileWindow, LibraryBrowserFolderView view, LibraryFolderInfo folder, Action refreshHero)
         {
             if (view == null || folder == null) return null;
             var cluster = new StackPanel
@@ -368,9 +406,10 @@ namespace PixelVaultNative
                 Orientation = Orientation.Horizontal,
                 VerticalAlignment = VerticalAlignment.Center,
                 HorizontalAlignment = HorizontalAlignment.Right,
-                Margin = new Thickness(20, 0, 0, 0)
+                Margin = new Thickness(16, 0, 0, 0)
             };
 
+            // --- State toggles (Favorite / Showcase / 100% Complete) ---
             Border favBtn = null;
             favBtn = BuildLibraryGameProfileHeroToggleButton(
                 "\uEB52", "#FF6B81", "#3A1C25",
@@ -418,133 +457,143 @@ namespace PixelVaultNative
                 }
             };
             cluster.Children.Add(completeBtn);
-            return cluster;
-        }
 
-        // Slim action toolbar that sits above the stat strip (PV-PLN-GPRO-001 step C.3
-        // refined). Hosts the Edit Game / Open Folder / Change Art pills that used to
-        // crowd the bottom-right of the hero. Pills are compact (28px tall, 11.5pt)
-        // so the strip reads as a secondary action row, not a hero element.
-        FrameworkElement BuildLibraryGameProfileActionToolbar(Window profileWindow, LibraryBrowserFolderView view, LibraryFolderInfo folder, Action refreshHero)
-        {
-            if (view == null || folder == null) return new StackPanel();
-            var bar = new StackPanel
-            {
-                Orientation = Orientation.Horizontal,
-                HorizontalAlignment = HorizontalAlignment.Right,
-                Margin = new Thickness(0, 0, 0, 14)
-            };
+            // Visual gap between state toggles and the action circles so they read
+            // as related-but-distinct groups (state vs. do).
+            cluster.Children.Add(new Border { Width = 10 });
 
-            var editBtn = BuildLibraryGameProfileEditGameButton(profileWindow, view, folder, refreshHero);
-            if (editBtn != null) bar.Children.Add(editBtn);
-
-            var folderPaths = GetLibraryBrowserSourceFolderPaths(view) ?? new List<string>();
-            var openFoldersBtn = Btn(
-                folderPaths.Count > 1 ? "Open Folders (" + folderPaths.Count + ")" : "Open Folder",
-                null, "#1F3340", Brushes.White);
-            ApplyLibraryGameProfileActionPillChrome(openFoldersBtn);
-            openFoldersBtn.Margin = new Thickness(8, 0, 0, 0);
-            openFoldersBtn.IsEnabled = folderPaths.Count > 0;
-            openFoldersBtn.ToolTip = folderPaths.Count == 0
-                ? "No source folders to open"
-                : (folderPaths.Count == 1
-                    ? "Open " + Path.GetFileName(folderPaths[0]) + " in File Explorer"
-                    : "Open " + folderPaths.Count + " source folders in File Explorer");
-            openFoldersBtn.Click += delegate
-            {
-                foreach (var path in folderPaths) OpenFolder(path);
-            };
-            bar.Children.Add(openFoldersBtn);
-
-            var changeArtBtn = BuildLibraryGameProfileChangeArtPill(view, folder, refreshHero);
-            if (changeArtBtn != null)
-            {
-                if (changeArtBtn is FrameworkElement caFe) caFe.Margin = new Thickness(8, 0, 0, 0);
-                bar.Children.Add(changeArtBtn);
-            }
-            return bar;
-        }
-
-        // Edit Game pill: when the view is merged across platforms (Diablo IV on
-        // Steam + Xbox + PC, etc.) the existing single-folder IDs editor cannot
-        // express which row to edit, so we replace the disabled pill with a
-        // "Edit Game (3) v" dropdown listing each source platform; clicking an
-        // entry opens the IDs editor for that specific folder. Single-platform
-        // entries get the regular pill that opens the editor directly.
-        FrameworkElement BuildLibraryGameProfileEditGameButton(Window profileWindow, LibraryBrowserFolderView view, LibraryFolderInfo folder, Action refreshHero)
-        {
-            if (view == null || folder == null) return null;
+            // --- Action circles (Edit Game / Open Folder / Change Art) ---
             var sources = view.SourceFolders == null
                 ? new List<LibraryFolderInfo>()
                 : view.SourceFolders.Where(f => f != null).ToList();
-            var multi = view.IsMergedAcrossPlatforms && sources.Count > 1;
-
-            var btn = Btn(multi ? "Edit Game (" + sources.Count + ") \u25BE" : "Edit Game", null, "#1F3340", Brushes.White);
-            ApplyLibraryGameProfileActionPillChrome(btn);
-            if (multi)
+            var multiConsole = view.IsMergedAcrossPlatforms && sources.Count > 1;
+            var editTooltip = multiConsole
+                ? "Edit Game - pick a platform (" + sources.Count + ")"
+                : "Edit Game - name, notes, and external IDs";
+            var editCircle = BuildLibraryGameProfileHeroActionCircle("\uE70F", editTooltip);
+            if (multiConsole)
             {
-                btn.ToolTip = "Pick a platform to edit Steam / SteamGridDB / RetroAchievements / Non-Steam IDs";
-                btn.MinWidth = 130;
-                var menu = new ContextMenu { Placement = PlacementMode.Bottom };
+                var editMenu = new ContextMenu { Placement = PlacementMode.Bottom };
                 foreach (var source in sources)
                 {
-                    var label = string.IsNullOrWhiteSpace(source.PlatformLabel)
+                    var platform = string.IsNullOrWhiteSpace(source.PlatformLabel)
                         ? (string.IsNullOrWhiteSpace(source.Name) ? "(unlabeled)" : source.Name.Trim())
                         : NormalizeConsoleLabel(source.PlatformLabel);
-                    var subtitle = !string.IsNullOrWhiteSpace(source.Name)
-                        && !string.Equals((source.Name ?? string.Empty).Trim(), label, StringComparison.OrdinalIgnoreCase)
+                    var sub = !string.IsNullOrWhiteSpace(source.Name)
+                        && !string.Equals((source.Name ?? string.Empty).Trim(), platform, StringComparison.OrdinalIgnoreCase)
                             ? source.Name.Trim()
                             : null;
-                    var item = new MenuItem { Header = subtitle == null ? label : label + " - " + subtitle };
-                    item.Click += delegate
-                    {
-                        OpenLibraryFolderIdEditor(source, refreshHero, profileWindow);
-                    };
-                    menu.Items.Add(item);
+                    var item = new MenuItem { Header = sub == null ? platform : platform + " - " + sub };
+                    item.Click += delegate { OpenLibraryFolderIdEditor(source, refreshHero, profileWindow); };
+                    editMenu.Items.Add(item);
                 }
-                btn.Click += delegate
+                editCircle.MouseLeftButtonUp += delegate(object _, MouseButtonEventArgs e)
                 {
-                    menu.PlacementTarget = btn;
-                    menu.IsOpen = true;
+                    e.Handled = true;
+                    editMenu.PlacementTarget = editCircle;
+                    editMenu.IsOpen = true;
                 };
             }
             else
             {
-                btn.ToolTip = "Edit Steam / SteamGridDB / RetroAchievements / Non-Steam IDs";
-                btn.Click += delegate
+                editCircle.MouseLeftButtonUp += delegate(object _, MouseButtonEventArgs e)
                 {
+                    e.Handled = true;
                     OpenLibraryFolderIdEditor(folder, refreshHero, profileWindow);
                 };
             }
-            return btn;
+            cluster.Children.Add(editCircle);
+
+            var folderPaths = GetLibraryBrowserSourceFolderPaths(view) ?? new List<string>();
+            var openTooltip = folderPaths.Count == 0
+                ? "Open Folder - no source folders to open"
+                : (folderPaths.Count == 1
+                    ? "Open Folder - " + Path.GetFileName(folderPaths[0])
+                    : "Open Folders - " + folderPaths.Count + " source folders in File Explorer");
+            var openCircle = BuildLibraryGameProfileHeroActionCircle("\uE8DA", openTooltip);
+            if (folderPaths.Count == 0)
+            {
+                openCircle.Opacity = 0.4;
+                openCircle.Cursor = null;
+            }
+            else
+            {
+                openCircle.MouseLeftButtonUp += delegate(object _, MouseButtonEventArgs e)
+                {
+                    e.Handled = true;
+                    foreach (var path in folderPaths) OpenFolder(path);
+                };
+            }
+            cluster.Children.Add(openCircle);
+
+            var artCircle = BuildLibraryGameProfileHeroActionCircle("\uE8B9", "Change Art - cover, banner, or local file");
+            var artMenu = BuildLibraryGameProfileChangeArtMenu(profileWindow, view, folder, refreshHero);
+            if (artMenu != null)
+            {
+                artCircle.MouseLeftButtonUp += delegate(object _, MouseButtonEventArgs e)
+                {
+                    e.Handled = true;
+                    artMenu.PlacementTarget = artCircle;
+                    artMenu.IsOpen = true;
+                };
+            }
+            else
+            {
+                artCircle.Opacity = 0.4;
+                artCircle.Cursor = null;
+            }
+            cluster.Children.Add(artCircle);
+
+            return cluster;
         }
 
-        // Common chrome for the slim secondary action pills (Edit Game, Open Folder,
-        // Change Art). Centralized so future additions stay visually consistent.
-        void ApplyLibraryGameProfileActionPillChrome(Button btn)
+        // Stateless circular action button used by the hero action cluster (Edit
+        // Game / Open Folder / Change Art). Visually parallel to the toggle
+        // buttons but always uses the muted "off" palette so it reads as an
+        // action rather than a state. The caller wires MouseLeftButtonUp.
+        Border BuildLibraryGameProfileHeroActionCircle(string glyph, string tooltip)
         {
-            if (btn == null) return;
-            btn.Height = 28;
-            btn.MinWidth = 92;
-            btn.FontSize = 11.5;
-            btn.Padding = new Thickness(12, 0, 12, 0);
-            ApplyLibraryPillChrome(btn, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
+            var circle = new Border
+            {
+                Width = 40,
+                Height = 40,
+                CornerRadius = new CornerRadius(20),
+                Background = Brush("#1B2C3B"),
+                BorderBrush = Brush("#33424D"),
+                BorderThickness = new Thickness(1.4),
+                Cursor = System.Windows.Input.Cursors.Hand,
+                Margin = new Thickness(0, 0, 10, 0),
+                SnapsToDevicePixels = true
+            };
+            circle.Child = new TextBlock
+            {
+                Text = glyph,
+                FontFamily = new FontFamily("Segoe MDL2 Assets"),
+                FontSize = 17,
+                Foreground = Brush("#D7E2EA"),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            if (!string.IsNullOrWhiteSpace(tooltip))
+            {
+                circle.ToolTip = tooltip;
+                AutomationProperties.SetName(circle, tooltip);
+            }
+            circle.MouseEnter += delegate { circle.Background = Brush("#264358"); };
+            circle.MouseLeave += delegate { circle.Background = Brush("#1B2C3B"); };
+            return circle;
         }
 
-        // Change Art dropdown pill (PV-PLN-GPRO-001 step C.4). Single button + attached
-        // ContextMenu so users can swap covers/banners from SteamGridDB or a local
-        // file without leaving the profile window. Each item routes through the
-        // existing helpers (ChooseLibraryAssetFromSteamGridDbAsync, SaveCustomCoverAsync,
-        // OpenSavedCoversFolder) and asks refreshHero to rebuild the hero so the new
+        // Change Art dropdown menu (PV-PLN-GPRO-001 step C.4 + circle refactor). The
+        // hero's Change Art action circle attaches this menu so users can swap
+        // covers/banners from SteamGridDB or a local file without leaving the
+        // profile window. Each item routes through an existing helper
+        // (ChooseLibraryAssetFromSteamGridDbAsync, SaveCustomCoverAsync,
+        // OpenSavedCoversFolder) and asks refreshHero to rebuild the hero so new
         // art shows up immediately.
-        FrameworkElement BuildLibraryGameProfileChangeArtPill(LibraryBrowserFolderView view, LibraryFolderInfo folder, Action refreshHero)
+        ContextMenu BuildLibraryGameProfileChangeArtMenu(Window profileWindow, LibraryBrowserFolderView view, LibraryFolderInfo folder, Action refreshHero)
         {
             if (view == null || folder == null) return null;
-            var btn = Btn("Change Art \u25BE", null, "#1F3340", Brushes.White);
-            ApplyLibraryGameProfileActionPillChrome(btn);
-            btn.MinWidth = 100;
-            btn.ToolTip = "Choose a cover or banner from SteamGridDB or a local file";
-
             var menu = new ContextMenu { Placement = PlacementMode.Bottom };
             var hasToken = HasSteamGridDbApiToken();
             var actionFolders = GetLibraryBrowserActionFolders(view);
@@ -572,7 +621,7 @@ namespace PixelVaultNative
                 try
                 {
                     await ChooseLibraryAssetFromSteamGridDbAsync(
-                        Window.GetWindow(btn) ?? this,
+                        profileWindow ?? this,
                         view,
                         lookupFolder,
                         actionFolders,
@@ -600,7 +649,7 @@ namespace PixelVaultNative
                 try
                 {
                     await ChooseLibraryAssetFromSteamGridDbAsync(
-                        Window.GetWindow(btn) ?? this,
+                        profileWindow ?? this,
                         view,
                         lookupFolder,
                         actionFolders,
@@ -645,13 +694,7 @@ namespace PixelVaultNative
             menu.Items.Add(new Separator());
             menu.Items.Add(localCoverItem);
             menu.Items.Add(openMyCoversItem);
-
-            btn.Click += delegate
-            {
-                menu.PlacementTarget = btn;
-                menu.IsOpen = true;
-            };
-            return btn;
+            return menu;
         }
 
         Border BuildLibraryGameProfileHeroToggleButton(string glyph, string activeColorHex, string activeBgHex, bool isOn, string tooltipOn, string tooltipOff)
