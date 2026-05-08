@@ -25,6 +25,8 @@ namespace PixelVaultNative
         /// <summary>Preview/apply merging captures into shared storage folders (storage groups). Owner is used for modal dialogs.</summary>
         public Action<Window> OpenLibraryStorageMergeTool { get; set; }
         public Action<Window> ShowPhotographyGallery { get; set; }
+        /// <summary>Copy starred captures to the configured starred export folder.</summary>
+        public Action<Window> ExportStarredLibraryCaptures { get; set; }
         /// <summary>Library full cover refresh with confirmation; pass the active settings (or other) dialog as owner for modal dialogs.</summary>
         public Action<Window> PromptFetchCoversForLibrary { get; set; }
 

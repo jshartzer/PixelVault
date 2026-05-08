@@ -91,6 +91,93 @@ public sealed class ImportServiceLogBatchingTests
     }
 
     [Fact]
+    public void MoveFilesToLibraryDestination_ParksDuplicateWhenFileNameAndSizeMatchLibraryFile()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "pv-import-duplicate-move-" + Guid.NewGuid().ToString("n"));
+        var source = Path.Combine(root, "source");
+        var destination = Path.Combine(root, "destination");
+        var gameFolder = Path.Combine(destination, "Diablo IV");
+        Directory.CreateDirectory(source);
+        Directory.CreateDirectory(gameFolder);
+        var existing = Path.Combine(gameFolder, "clip.png");
+        var duplicate = Path.Combine(source, "clip.png");
+        File.WriteAllText(existing, "same-bytes");
+        File.WriteAllText(duplicate, "same-bytes");
+
+        var log = new CapturingLogService();
+        var service = CreateService(log, destination);
+
+        try
+        {
+            var result = service.MoveFilesToLibraryDestination(new[] { duplicate }, "Move summary");
+            var parked = Path.Combine(root, "Import Duplicates", "Diablo IV", "clip.png");
+
+            Assert.Equal(0, result.Moved);
+            Assert.Equal(1, result.Skipped);
+            Assert.Equal(1, result.ParkedDuplicates);
+            Assert.Equal(Path.Combine(root, "Import Duplicates"), result.DuplicateDestinationRoot);
+            Assert.True(File.Exists(existing));
+            Assert.False(File.Exists(duplicate));
+            Assert.True(File.Exists(parked));
+            Assert.Contains(log.BatchedMessages, message => message.StartsWith("Parked import duplicate: clip.png", StringComparison.Ordinal));
+            Assert.Contains(log.SingleMessages, message => message.Contains("duplicates parked 1", StringComparison.Ordinal));
+        }
+        finally
+        {
+            try
+            {
+                if (Directory.Exists(root)) Directory.Delete(root, true);
+            }
+            catch
+            {
+                /* best-effort */
+            }
+        }
+    }
+
+    [Fact]
+    public void MoveFilesToLibraryDestination_DoesNotParkSameNameWhenSizeDiffers()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "pv-import-nonduplicate-move-" + Guid.NewGuid().ToString("n"));
+        var source = Path.Combine(root, "source");
+        var destination = Path.Combine(root, "destination");
+        var gameFolder = Path.Combine(destination, "Diablo IV");
+        Directory.CreateDirectory(source);
+        Directory.CreateDirectory(gameFolder);
+        var existing = Path.Combine(gameFolder, "clip.png");
+        var candidate = Path.Combine(source, "clip.png");
+        File.WriteAllText(existing, "short");
+        File.WriteAllText(candidate, "longer");
+
+        var log = new CapturingLogService();
+        var service = CreateService(log, destination);
+
+        try
+        {
+            var result = service.MoveFilesToLibraryDestination(new[] { candidate }, "Move summary");
+            var imported = Path.Combine(destination, "clip.png");
+
+            Assert.Equal(1, result.Moved);
+            Assert.Equal(0, result.Skipped);
+            Assert.Equal(0, result.ParkedDuplicates);
+            Assert.True(File.Exists(existing));
+            Assert.True(File.Exists(imported));
+            Assert.False(Directory.Exists(Path.Combine(root, "Import Duplicates")));
+        }
+        finally
+        {
+            try
+            {
+                if (Directory.Exists(root)) Directory.Delete(root, true);
+            }
+            catch
+            {
+                /* best-effort */
+            }
+        }
+    }
+
+    [Fact]
     public void WriteMetadataForReviewItems_BatchesPerFilePreparationLogsAndKeepsSummaryImmediate()
     {
         var root = Path.Combine(Path.GetTempPath(), "pv-import-log-batch-metadata-" + Guid.NewGuid().ToString("n"));
@@ -149,6 +236,7 @@ public sealed class ImportServiceLogBatchingTests
             GetConflictMode = () => "Rename",
             UniquePath = path => Path.Combine(Path.GetDirectoryName(path) ?? string.Empty, Path.GetFileNameWithoutExtension(path) + " (1)" + Path.GetExtension(path)),
             MoveMetadataSidecarIfPresent = (_, _) => { },
+            IsMedia = path => Path.GetExtension(path ?? string.Empty).ToLowerInvariant() is ".jpg" or ".jpeg" or ".png" or ".webp" or ".jxr" or ".mp4" or ".mkv" or ".avi" or ".mov" or ".wmv" or ".webm",
             NormalizeGameIndexName = value => (value ?? string.Empty).Trim()
         });
     }

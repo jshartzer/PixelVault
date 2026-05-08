@@ -88,7 +88,11 @@ namespace PixelVaultNative.Tests
                 return FileCaptureDates.TryGetValue(file, out var dt) ? dt : DateTime.MinValue;
             }
 
-            public LibraryMetadataIndexEntry TryGetLibraryMetadataIndexEntry(string libraryRoot, string file, Dictionary<string, LibraryMetadataIndexEntry> index) => null!;
+            public LibraryMetadataIndexEntry TryGetLibraryMetadataIndexEntry(string libraryRoot, string file, Dictionary<string, LibraryMetadataIndexEntry> index)
+            {
+                if (index != null && !string.IsNullOrWhiteSpace(file) && index.TryGetValue(file, out var entry)) return entry;
+                return null!;
+            }
 
             public long ResolveLibraryFileRecentSortUtcTicks(string libraryRoot, string file, Dictionary<string, LibraryMetadataIndexEntry> index = null!)
             {
@@ -194,6 +198,8 @@ namespace PixelVaultNative.Tests
             Assert.False(vm.IsLibraryBrowserTimelineMode());
             host.LibraryGroupingMode = "timeline";
             Assert.True(vm.IsLibraryBrowserTimelineMode());
+            host.LibraryGroupingMode = "sessions";
+            Assert.True(vm.IsLibraryBrowserTimelineMode());
         }
 
         [Fact]
@@ -217,6 +223,70 @@ namespace PixelVaultNative.Tests
             Assert.Equal(2, timeline.FileCount);
             Assert.Equal(new[] { "C:/lib/b/new.png", "C:/lib/a/old.png" }, timeline.FilePaths);
             Assert.Equal("C:/lib/b/new.png", timeline.PreviewImagePath);
+        }
+
+        [Fact]
+        public void SessionView_FlattensImagesAndCarriesThreshold()
+        {
+            var host = new StubHost();
+            var oldest = new DateTime(2025, 6, 1, 19, 0, 0, DateTimeKind.Utc);
+            var newest = new DateTime(2025, 6, 1, 21, 0, 0, DateTimeKind.Utc);
+            host.FileCaptureDates["C:/lib/a/old.png"] = oldest;
+            host.FileCaptureDates["C:/lib/b/new.png"] = newest;
+
+            var vm = new LibraryBrowserViewModel(host);
+            var folderA = MakeFolder("Game A", "Steam", "C:/lib/a", files: new[] { "C:/lib/a/old.png" });
+            var folderB = MakeFolder("Game B", "PC", "C:/lib/b", files: new[] { "C:/lib/b/new.png" });
+            var baseViews = vm.BuildLibraryBrowserFolderViews(new[] { folderA, folderB }, "all");
+
+            var sessions = vm.BuildLibraryBrowserSessionView(baseViews, 90);
+
+            Assert.True(sessions.IsSessionProjection);
+            Assert.False(sessions.IsTimelineProjection);
+            Assert.Equal(90, sessions.SessionThresholdMinutes);
+            Assert.Equal("sessions|capture-feed|90", sessions.ViewKey);
+            Assert.Equal(new[] { "C:/lib/b/new.png", "C:/lib/a/old.png" }, sessions.FilePaths);
+        }
+
+        [Fact]
+        public void TimelineCaptureContext_PrefersPhotoConsoleLabelAndMatchingExternalIds()
+        {
+            var host = new StubHost();
+            var vm = new LibraryBrowserViewModel(host);
+            var file = "C:/lib/Diablo IV/recent.png";
+            host.FileCaptureDates[file] = new DateTime(2026, 5, 8, 1, 0, 0, DateTimeKind.Local);
+            var metadataIndex = new Dictionary<string, LibraryMetadataIndexEntry>(StringComparer.OrdinalIgnoreCase)
+            {
+                [file] = new LibraryMetadataIndexEntry
+                {
+                    FilePath = file,
+                    GameId = "pc-row",
+                    ConsoleLabel = "Steam",
+                    TagText = "Game Capture, Steam"
+                }
+            };
+            var rows = new List<GameIndexEditorRow>
+            {
+                new GameIndexEditorRow
+                {
+                    GameId = "pc-row",
+                    Name = "Diablo IV",
+                    PlatformLabel = "PC",
+                    SteamAppId = "__PV_CLEARED__"
+                },
+                new GameIndexEditorRow
+                {
+                    GameId = "steam-row",
+                    Name = "Diablo IV",
+                    PlatformLabel = "Steam",
+                    SteamAppId = "2344520"
+                }
+            };
+
+            var contexts = vm.BuildLibraryTimelineCaptureContextMap(new[] { file }, metadataIndex, rows);
+
+            Assert.Equal("Steam", contexts[file].PlatformLabel);
+            Assert.Equal("2344520", contexts[file].SteamAppId);
         }
 
         [Fact]

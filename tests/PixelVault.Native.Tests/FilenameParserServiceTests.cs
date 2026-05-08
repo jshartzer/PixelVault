@@ -130,6 +130,22 @@ public sealed class FilenameParserServiceTests
     }
 
     [Fact]
+    public void Parse_XboxGameBarRecording_WithIsoTimestamp_UsesPcRecordingRule()
+    {
+        var parser = CreateParser();
+
+        var parsed = parser.Parse("Diablo IV 2026-05-07 19-54-29.mp4", string.Empty);
+
+        Assert.Equal("PC", parsed.PlatformLabel);
+        Assert.Contains("PC", parsed.PlatformTags);
+        Assert.True(parsed.PreserveFileTimes);
+        Assert.Equal("Diablo IV", parsed.GameTitleHint);
+        Assert.Equal(new DateTime(2026, 5, 7, 19, 54, 29), parsed.CaptureTime);
+        Assert.Equal(DateTimeKind.Local, parsed.CaptureTime!.Value.Kind);
+        Assert.Equal("xbox_pc_recording_iso24h", parsed.ConventionId);
+    }
+
+    [Fact]
     public void Parse_XboxPcCapture_WithTrailingDigitInTitle_KeepsDigitAsPartOfGameName()
     {
         var parser = CreateParser();
@@ -187,6 +203,16 @@ public sealed class FilenameParserServiceTests
         var title = parser.GetGameTitleHint("PowerWash Simulator 4_4_2026 7_16_35 PM", string.Empty);
 
         Assert.Equal("PowerWash Simulator", title);
+    }
+
+    [Fact]
+    public void GetGameTitleHint_XboxGameBarRecordingBaseName_UsesTrailingTimestamp()
+    {
+        var parser = CreateParser();
+
+        var title = parser.GetGameTitleHint("Diablo IV 2026-05-07 19-54-29", string.Empty);
+
+        Assert.Equal("Diablo IV", title);
     }
 
     [Fact]
@@ -279,6 +305,64 @@ public sealed class FilenameParserServiceTests
         Assert.Equal(new DateTime(2023, 10, 13, 11, 5, 48), parsed.CaptureTime);
         Assert.Equal(DateTimeKind.Local, parsed.CaptureTime!.Value.Kind);
         Assert.Equal("ps5_share_segmented_fractional", parsed.ConventionId);
+    }
+
+    [Fact]
+    public void Parse_SwitchAlbumHash_UsesSwitchRuleAndKeepsTitleEmpty()
+    {
+        var parser = CreateParser();
+
+        var parsed = parser.Parse("2026050719542900-8AEDFF741E2D23FBED39474178692DAF.jpg", string.Empty);
+
+        Assert.Equal("Switch", parsed.PlatformLabel);
+        Assert.Contains("Switch", parsed.PlatformTags);
+        Assert.Contains("Nintendo", parsed.PlatformTags);
+        Assert.Equal(string.Empty, parsed.GameTitleHint);
+        Assert.Equal(new DateTime(2026, 5, 7, 19, 54, 29), parsed.CaptureTime);
+        Assert.Equal(DateTimeKind.Local, parsed.CaptureTime!.Value.Kind);
+        Assert.Equal("switch_album_hash", parsed.ConventionId);
+    }
+
+    [Fact]
+    public void Parse_SwitchAlbumHash_WithFolderTitlePrefix_UsesPrefixAsTitle()
+    {
+        var parser = CreateParser();
+
+        var parsed = parser.Parse("Mario Kart World_2026050719542900-8AEDFF741E2D23FBED39474178692DAF.jpg", string.Empty);
+
+        Assert.Equal("Switch", parsed.PlatformLabel);
+        Assert.Equal("Mario Kart World", parsed.GameTitleHint);
+        Assert.Equal(new DateTime(2026, 5, 7, 19, 54, 29), parsed.CaptureTime);
+        Assert.Equal("switch_album_titled_hash", parsed.ConventionId);
+    }
+
+    [Fact]
+    public void Parse_SwitchAlbumCaptureSuffix_UsesSwitchRuleAndKeepsTitleEmpty()
+    {
+        var parser = CreateParser();
+
+        var parsed = parser.Parse("2018032120305000_c.jpg", string.Empty);
+
+        Assert.Equal("Switch", parsed.PlatformLabel);
+        Assert.Contains("Switch", parsed.PlatformTags);
+        Assert.Contains("Nintendo", parsed.PlatformTags);
+        Assert.Equal(string.Empty, parsed.GameTitleHint);
+        Assert.Equal(new DateTime(2018, 3, 21, 20, 30, 50), parsed.CaptureTime);
+        Assert.Equal(DateTimeKind.Local, parsed.CaptureTime!.Value.Kind);
+        Assert.Equal("switch_album_capture_suffix", parsed.ConventionId);
+    }
+
+    [Fact]
+    public void Parse_SwitchAlbumCaptureSuffix_WithFolderTitlePrefix_UsesPrefixAsTitle()
+    {
+        var parser = CreateParser();
+
+        var parsed = parser.Parse("Mario Kart World_2018032120305000_c.jpg", string.Empty);
+
+        Assert.Equal("Switch", parsed.PlatformLabel);
+        Assert.Equal("Mario Kart World", parsed.GameTitleHint);
+        Assert.Equal(new DateTime(2018, 3, 21, 20, 30, 50), parsed.CaptureTime);
+        Assert.Equal("switch_album_titled_capture_suffix", parsed.ConventionId);
     }
 
     [Fact]
@@ -536,6 +620,16 @@ public sealed class FilenameParserServiceTests
         var xboxPcRule = parser.GetConventionRules(string.Empty).First(rule => rule.ConventionId == "xbox_pc_capture_ampm");
 
         Assert.Equal("[title] [M]_[d]_[yyyy] [h]_[mm]_[ss] [tt].[ext:media]", xboxPcRule.PatternText);
+    }
+
+    [Fact]
+    public void GetConventionRules_XboxGameBarRecordingBuiltIn_ExposesReadablePatternText()
+    {
+        var parser = CreateParser();
+
+        var rule = parser.GetConventionRules(string.Empty).First(r => r.ConventionId == "xbox_pc_recording_iso24h");
+
+        Assert.Equal("[title] [yyyy]-[MM]-[dd] [HH]-[mm]-[ss].[ext:video]", rule.PatternText);
     }
 
     [Fact]

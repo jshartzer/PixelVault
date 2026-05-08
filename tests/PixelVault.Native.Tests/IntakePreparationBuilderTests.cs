@@ -92,6 +92,42 @@ public sealed class IntakePreparationBuilderTests : IDisposable
         Assert.False(result.ImportEditItems.Single(item => item.FilePath == manualFile).IntakeRuleMatched);
     }
 
+    [Fact]
+    public void Build_TitlelessSwitchCaptureSuffixWithFolderTitle_IsReviewItemNotManual()
+    {
+        var gameFolder = Path.Combine(_root, "Mario Kart World");
+        Directory.CreateDirectory(gameFolder);
+        var switchFile = Path.Combine(gameFolder, "2018032120305000_c.jpg");
+        File.WriteAllBytes(switchFile, new byte[] { 0 });
+        var parser = new FilenameParserService(new FilenameParserServiceDependencies
+        {
+            LoadCustomConventions = _ => new List<FilenameConventionRule>(),
+            LoadSavedGameIndexRows = _ => new List<GameIndexEditorRow>(),
+            NormalizeGameIndexName = value => (value ?? string.Empty).Trim(),
+            ParseTagText = value => (value ?? string.Empty).Split(new[] { ',', ';', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries),
+            IsVideo = _ => false,
+            NormalizeConsoleLabel = MainWindow.NormalizeConsoleLabel
+        });
+        var analyzer = new IntakeAnalysisService(
+            file => parser.Parse(file, string.Empty),
+            _ => false,
+            _ => DateTime.MinValue,
+            null,
+            file => string.Equals(file, switchFile, StringComparison.OrdinalIgnoreCase) ? "Mario Kart World" : string.Empty);
+
+        var result = IntakePreparationBuilder.Build(
+            new[] { switchFile },
+            (files, cancellationToken) => analyzer.AnalyzeFiles(files, cancellationToken),
+            includeImportEditRows: false);
+
+        var item = Assert.Single(result.ReviewItems);
+        Assert.Equal(switchFile, item.FilePath);
+        Assert.Equal("Switch", item.PlatformLabel);
+        Assert.True(item.TagSwitch);
+        Assert.Empty(result.ManualItems);
+        Assert.DoesNotContain(switchFile, result.ManualPaths);
+    }
+
     string CreateFile(string name)
     {
         var path = Path.Combine(_root, name);

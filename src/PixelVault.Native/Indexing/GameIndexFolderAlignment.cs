@@ -285,7 +285,7 @@ namespace PixelVaultNative
                     changed = true;
                 }
                 if (!string.IsNullOrWhiteSpace(saved.PreviewImagePath)
-                    && !ImportService.IsHdrFallbackPath(saved.PreviewImagePath)
+                    && !ImportService.IsImportParkingPath(saved.PreviewImagePath)
                     && File.Exists(saved.PreviewImagePath)
                     && !string.Equals(folder.PreviewImagePath ?? string.Empty, saved.PreviewImagePath ?? string.Empty, StringComparison.Ordinal))
                 {

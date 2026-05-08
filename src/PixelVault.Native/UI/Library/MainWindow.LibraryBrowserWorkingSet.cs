@@ -79,6 +79,9 @@ namespace PixelVaultNative
             /// <summary>Re-renders the library detail / photo pane (applies console badge filters in Photo workspace).</summary>
             internal Action RefreshDetailPaneForPhotoFilters;
 
+            /// <summary>Allows profile/secondary surfaces to select a game and enter the main Photo workspace.</summary>
+            internal Action<LibraryBrowserFolderView> OpenPhotoWorkspaceForFolder;
+
             /// <summary>When true, next folder rail render scrolls so <see cref="Current"/> is at the top (Photo workspace).</summary>
             internal bool ScrollPhotoRailSelectionToTopPending;
 

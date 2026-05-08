@@ -897,7 +897,7 @@ namespace PixelVaultNative
                         FontSize = 12.5,
                         FontWeight = FontWeights.SemiBold,
                         TextTrimming = TextTrimming.CharacterEllipsis,
-                        MaxWidth = 160
+                        MaxWidth = 230
                     }
                 });
             }

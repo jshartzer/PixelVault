@@ -51,7 +51,7 @@ namespace PixelVaultNative
             // Photo rail: column toggle is only 1 or 2; unset (0) behaves like two-up.
             var fixedCols = photoWorkspaceRail && fixedColsRaw == 0 ? 2 : fixedColsRaw;
             var userCap = NormalizeLibraryFolderTileSize(photoWorkspaceRail ? libraryPhotoRailFolderTileSize : libraryFolderTileSize);
-            if (photoWorkspaceRail && fixedCols > 0)
+            if (fixedCols > 0)
                 userCap = layoutMaxTile;
             int TileWidthForColumns(int c, int rawEqualSplit, int floorTile)
             {

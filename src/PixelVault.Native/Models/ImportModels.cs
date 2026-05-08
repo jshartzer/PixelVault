@@ -117,6 +117,8 @@ namespace PixelVaultNative
         public int Moved;
         public int Skipped;
         public int RenamedOnConflict;
+        public int ParkedDuplicates;
+        public string DuplicateDestinationRoot = string.Empty;
         public List<UndoImportEntry> Entries = new List<UndoImportEntry>();
     }
 

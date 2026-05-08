@@ -81,6 +81,10 @@ namespace PixelVaultNative
 
         bool IsLibraryBrowserTimelineView(LibraryBrowserFolderView view) => LibraryBrowserVm.IsLibraryBrowserTimelineView(view);
 
+        bool IsLibraryBrowserSessionView(LibraryBrowserFolderView view) => LibraryBrowserVm.IsLibraryBrowserSessionView(view);
+
+        bool IsLibraryBrowserTimeProjectionView(LibraryBrowserFolderView view) => LibraryBrowserVm.IsLibraryBrowserTimeProjectionView(view);
+
         Dictionary<string, LibraryTimelineCaptureContext> BuildLibraryTimelineCaptureContextMap(
             IEnumerable<string> files,
             Dictionary<string, LibraryMetadataIndexEntry> metadataIndex,
@@ -133,6 +137,9 @@ namespace PixelVaultNative
         LibraryBrowserFolderView BuildLibraryBrowserTimelineView(IEnumerable<LibraryBrowserFolderView> visibleFolders)
             => LibraryBrowserVm.BuildLibraryBrowserTimelineView(visibleFolders);
 
+        LibraryBrowserFolderView BuildLibraryBrowserSessionView(IEnumerable<LibraryBrowserFolderView> visibleFolders, int thresholdMinutes)
+            => LibraryBrowserVm.BuildLibraryBrowserSessionView(visibleFolders, thresholdMinutes);
+
         void ApplyRemovedFilesToLibraryBrowserState(MainWindow.LibraryBrowserWorkingSet ws, IEnumerable<string> removedFiles)
             => LibraryBrowserVm.ApplyRemovedFilesToLibraryBrowserState(ws, removedFiles);
 
@@ -180,6 +187,15 @@ namespace PixelVaultNative
 
         internal static string BuildLibraryTimelineDayCardTitle(DateTime captureDate, DateTime referenceDate)
             => LibraryBrowserViewModelMath.BuildLibraryTimelineDayCardTitle(captureDate, referenceDate);
+
+        internal static string BuildLibrarySessionCardTitle(DateTime newestCapture, DateTime oldestCapture, DateTime referenceDate)
+            => LibraryBrowserViewModelMath.BuildLibrarySessionCardTitle(newestCapture, oldestCapture, referenceDate);
+
+        internal static string BuildLibrarySessionCardSubtitle(int captureCount, DateTime newestCapture, DateTime oldestCapture)
+            => LibraryBrowserViewModelMath.BuildLibrarySessionCardSubtitle(captureCount, newestCapture, oldestCapture);
+
+        internal static string BuildLibrarySessionSummaryText(int captureCount, int sessionCount, int gameCount, int platformCount, DateTime newestCapture, DateTime oldestCapture, int thresholdMinutes)
+            => LibraryBrowserViewModelMath.BuildLibrarySessionSummaryText(captureCount, sessionCount, gameCount, platformCount, newestCapture, oldestCapture, thresholdMinutes);
 
         internal static int CalculateLibraryTimelinePackedTileSize(int detailTileSize, double availableWidth)
             => LibraryBrowserViewModelMath.CalculateLibraryTimelinePackedTileSize(detailTileSize, availableWidth);

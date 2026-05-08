@@ -59,6 +59,7 @@ public class LibraryCommandPaletteRegistryTests
             GroupFoldersAllGames = () => { },
             GroupFoldersByConsole = () => { },
             GroupFoldersTimeline = () => { },
+            GroupFoldersSessions = () => { },
             GroupFoldersFolderGrid = () => { },
             EnterPhotoWorkspace = () => { },
             ExitPhotoWorkspace = () => { }

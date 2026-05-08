@@ -139,6 +139,65 @@ namespace PixelVaultNative
             return captureDay.ToString("ddd, MMM d, yyyy");
         }
 
+        public static string BuildLibrarySessionCardTitle(DateTime newestCapture, DateTime oldestCapture, DateTime referenceDate)
+        {
+            if (newestCapture <= DateTime.MinValue && oldestCapture <= DateTime.MinValue) return "Undated session";
+            if (newestCapture <= DateTime.MinValue) newestCapture = oldestCapture;
+            if (oldestCapture <= DateTime.MinValue) oldestCapture = newestCapture;
+            if (oldestCapture > newestCapture)
+            {
+                var swap = oldestCapture;
+                oldestCapture = newestCapture;
+                newestCapture = swap;
+            }
+
+            var dayLabel = BuildLibraryTimelineDayCardTitle(newestCapture, referenceDate);
+            if (string.IsNullOrWhiteSpace(dayLabel)) dayLabel = newestCapture.ToString("MMM d, yyyy");
+            if (newestCapture.Date == oldestCapture.Date)
+            {
+                var timeText = oldestCapture == newestCapture
+                    ? newestCapture.ToString("h:mm tt")
+                    : oldestCapture.ToString("h:mm tt") + " - " + newestCapture.ToString("h:mm tt");
+                return dayLabel + ", " + timeText;
+            }
+
+            return oldestCapture.ToString("MMM d, h:mm tt") + " - " + newestCapture.ToString("MMM d, h:mm tt");
+        }
+
+        public static string BuildLibrarySessionCardSubtitle(int captureCount, DateTime newestCapture, DateTime oldestCapture)
+        {
+            var parts = new List<string>
+            {
+                captureCount + " capture" + (captureCount == 1 ? string.Empty : "s")
+            };
+            if (newestCapture > DateTime.MinValue && oldestCapture > DateTime.MinValue)
+            {
+                var durationMinutes = Math.Max(0, (int)Math.Round((newestCapture - oldestCapture).TotalMinutes));
+                if (durationMinutes > 0) parts.Add(durationMinutes + " min");
+            }
+            return string.Join(" | ", parts);
+        }
+
+        public static string BuildLibrarySessionSummaryText(int captureCount, int sessionCount, int gameCount, int platformCount, DateTime newestCapture, DateTime oldestCapture, int thresholdMinutes)
+        {
+            var parts = new List<string>
+            {
+                captureCount + " photo" + (captureCount == 1 ? string.Empty : "s"),
+                sessionCount + " session" + (sessionCount == 1 ? string.Empty : "s")
+            };
+            if (gameCount > 0) parts.Add(gameCount + " game" + (gameCount == 1 ? string.Empty : "s"));
+            if (platformCount > 0) parts.Add(platformCount + " platform" + (platformCount == 1 ? string.Empty : "s"));
+            parts.Add(SettingsService.NormalizeLibrarySessionThresholdMinutes(thresholdMinutes) + " min threshold");
+            if (newestCapture > DateTime.MinValue && oldestCapture > DateTime.MinValue)
+            {
+                var rangeText = newestCapture.Date == oldestCapture.Date
+                    ? newestCapture.ToString("MMMM d, yyyy")
+                    : oldestCapture.ToString("MMMM d, yyyy") + " - " + newestCapture.ToString("MMMM d, yyyy");
+                parts.Add(rangeText);
+            }
+            return string.Join(" | ", parts.Where(part => !string.IsNullOrWhiteSpace(part)));
+        }
+
         public static int CalculateLibraryTimelinePackedTileSize(int detailTileSize, double availableWidth)
         {
             const double scale = 1.75d;

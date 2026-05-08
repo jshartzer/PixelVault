@@ -71,10 +71,18 @@ namespace PixelVaultNative
                 if ((Keyboard.Modifiers & ModifierKeys.Control) == 0) return;
                 e.Handled = true;
                 if (ws.WorkspaceMode == LibraryWorkspaceMode.Photo) return;
-                libraryFolderTileSize = NormalizeLibraryFolderTileSize(libraryFolderTileSize + (e.Delta > 0 ? 16 : -16));
+                var currentColumns = NormalizeLibraryFolderGridColumnCount(libraryFolderGridColumnCount);
+                if (currentColumns <= 0) currentColumns = ws.LastFolderColumns > 0 ? ws.LastFolderColumns : 4;
+                var nextColumns = Math.Max(1, Math.Min(12, currentColumns + (e.Delta > 0 ? -1 : 1)));
+                if (nextColumns == currentColumns)
+                {
+                    ShowLibraryBrowserToast(ws, currentColumns <= 1 ? "Cover columns: minimum is 1" : "Cover columns: maximum is 12");
+                    return;
+                }
+                libraryFolderGridColumnCount = nextColumns;
                 SaveSettings();
                 if (renderTiles != null) renderTiles();
-                ShowLibraryBrowserToast(ws, "Covers: " + libraryFolderTileSize + " px");
+                ShowLibraryBrowserToast(ws, "Cover columns: " + nextColumns);
             };
             if (panes.ScrollPersistDebounceTimer != null)
             {

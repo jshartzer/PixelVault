@@ -38,6 +38,7 @@ namespace PixelVaultNative
                 LibraryFolderSortMode = libraryFolderSortMode ?? "alpha",
                 LibraryFolderFilterMode = libraryFolderFilterMode ?? "all",
                 LibraryGroupingMode = libraryGroupingMode ?? "all",
+                LibrarySessionThresholdMinutes = librarySessionThresholdMinutes,
                 LibraryBrowserSearchText = _libraryBrowserPersistedSearch ?? string.Empty,
                 LibraryBrowserLastViewKey = _libraryBrowserPersistedLastViewKey ?? string.Empty,
                 LibraryBrowserFolderScroll = Math.Max(0, _libraryBrowserPersistedFolderScroll),
@@ -87,6 +88,7 @@ namespace PixelVaultNative
             libraryFolderSortMode = s.LibraryFolderSortMode ?? "alpha";
             libraryFolderFilterMode = s.LibraryFolderFilterMode ?? "all";
             libraryGroupingMode = s.LibraryGroupingMode ?? "all";
+            librarySessionThresholdMinutes = SettingsService.NormalizeLibrarySessionThresholdMinutes(s.LibrarySessionThresholdMinutes);
             _libraryBrowserPersistedSearch = s.LibraryBrowserSearchText ?? string.Empty;
             _libraryBrowserPersistedLastViewKey = s.LibraryBrowserLastViewKey ?? string.Empty;
             _libraryBrowserPersistedFolderScroll = Math.Max(0, s.LibraryBrowserFolderScroll);

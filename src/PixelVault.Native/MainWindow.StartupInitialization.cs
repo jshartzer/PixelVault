@@ -149,6 +149,7 @@ namespace PixelVaultNative
                 EnsureDirectoryExists = MainWindow.EnsureDir,
                 GetLibraryScanner = () => libraryScanner,
                 EnumerateSourceMediaFiles = mw.EnumerateSourceFiles,
+                GetImportFolderTitleHint = mw.GetImportFolderTitleHint,
                 ParseFilenameForImport = mw.ParseFilename,
                 EnsureSteamAppIdInGameIndex = mw.EnsureSteamAppIdInGameIndex,
                 EnsureNonSteamIdInGameIndex = mw.EnsureNonSteamIdInGameIndex,

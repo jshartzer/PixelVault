@@ -29,6 +29,9 @@ namespace PixelVaultNative
             var isTimeline = workspaceMode == LibraryWorkspaceMode.Timeline;
             var isPhoto = workspaceMode == LibraryWorkspaceMode.Photo;
             var isFolder = workspaceMode == LibraryWorkspaceMode.Folder;
+            var groupingMode = SettingsService.NormalizeLibraryGroupingMode(libraryGroupingMode);
+            var isCalendarTimeline = string.Equals(groupingMode, "timeline", StringComparison.OrdinalIgnoreCase);
+            var isSessions = string.Equals(groupingMode, "sessions", StringComparison.OrdinalIgnoreCase);
             var hideGameChrome = isTimeline;
             var hideDetailCoverPreview = isTimeline || isPhoto;
 
@@ -54,11 +57,15 @@ namespace PixelVaultNative
                 panes.PhotoAchievementsRecentPanel.Visibility = Visibility.Collapsed;
             }
             if (panes.ExitTimelineButton != null) panes.ExitTimelineButton.Visibility = isTimeline ? Visibility.Visible : Visibility.Collapsed;
-            if (panes.TimelineFilterPanel != null) panes.TimelineFilterPanel.Visibility = isTimeline ? Visibility.Visible : Visibility.Collapsed;
+            if (panes.TimelineFilterPanel != null) panes.TimelineFilterPanel.Visibility = isCalendarTimeline ? Visibility.Visible : Visibility.Collapsed;
+            if (panes.SessionsFilterPanel != null)
+                panes.SessionsFilterPanel.Visibility = isSessions ? Visibility.Visible : Visibility.Collapsed;
             if (panes.GroupAllButton != null) panes.GroupAllButton.Visibility = isPhoto ? Visibility.Collapsed : Visibility.Visible;
             if (panes.GroupConsoleButton != null) panes.GroupConsoleButton.Visibility = isPhoto ? Visibility.Collapsed : Visibility.Visible;
             if (panes.GroupTimelineButton != null)
                 panes.GroupTimelineButton.Visibility = isPhoto ? Visibility.Collapsed : Visibility.Visible;
+            if (panes.GroupSessionsButton != null)
+                panes.GroupSessionsButton.Visibility = isPhoto ? Visibility.Collapsed : Visibility.Visible;
             if (panes.PhotoWorkspaceHeroBannerStrip != null)
                 panes.PhotoWorkspaceHeroBannerStrip.Visibility = isPhoto ? Visibility.Visible : Visibility.Collapsed;
             if (panes.PhotoWorkspaceHeroLogoHost != null && !isPhoto)
@@ -100,7 +107,7 @@ namespace PixelVaultNative
                 if (panes.SortFilterMenuButton != null)
                 {
                     Grid.SetColumn(panes.SortFilterMenuButton, 0);
-                    Grid.SetColumnSpan(panes.SortFilterMenuButton, 6);
+                    Grid.SetColumnSpan(panes.SortFilterMenuButton, 7);
                     panes.SortFilterMenuButton.HorizontalAlignment = HorizontalAlignment.Center;
                     panes.SortFilterMenuButton.Margin = new Thickness(0, 0, 0, 0);
                 }
@@ -132,6 +139,8 @@ namespace PixelVaultNative
                 ApplyLibraryPhotoDetailChromeLayout(panes, false);
                 if (panes.GroupAllButton != null) panes.GroupAllButton.Visibility = Visibility.Visible;
                 if (panes.GroupConsoleButton != null) panes.GroupConsoleButton.Visibility = Visibility.Visible;
+                if (panes.GroupTimelineButton != null) panes.GroupTimelineButton.Visibility = Visibility.Visible;
+                if (panes.GroupSessionsButton != null) panes.GroupSessionsButton.Visibility = Visibility.Visible;
             }
 
             LibraryBrowserSyncOpenCapturesToolbarButton(panes);

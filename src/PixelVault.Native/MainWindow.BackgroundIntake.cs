@@ -66,18 +66,19 @@ namespace PixelVaultNative
 
             void V(string message) => _host.LogBackgroundIntakeVerbose(message);
 
-            internal static IReadOnlyList<string> EnumerateExistingTopLevelMediaFiles(IEnumerable<string> sourceRoots, Func<string, bool> isMedia)
+            internal static IReadOnlyList<string> EnumerateExistingTopLevelMediaFiles(IEnumerable<string> sourceRoots, Func<string, bool> isMedia, bool includeSubfolders = false)
             {
                 var result = new List<string>();
                 var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 if (sourceRoots == null || isMedia == null) return result;
+                var searchOption = includeSubfolders ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
                 foreach (var root in sourceRoots)
                 {
                     if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root)) continue;
                     IEnumerable<string> files;
                     try
                     {
-                        files = Directory.EnumerateFiles(root, "*", SearchOption.TopDirectoryOnly);
+                        files = Directory.EnumerateFiles(root, "*", searchOption);
                     }
                     catch
                     {
@@ -87,6 +88,8 @@ namespace PixelVaultNative
                     foreach (var file in files)
                     {
                         if (!isMedia(file)) continue;
+                        if (ImportService.IsImportParkingPath(file)) continue;
+                        if (ImportService.IsHiddenFileOrInsideHiddenDirectory(file)) continue;
                         string fullPath;
                         try
                         {
@@ -191,6 +194,7 @@ namespace PixelVaultNative
                 if (_host.backgroundAutoIntakeVerboseLogging)
                     _host.Log("Background intake: verbose logging on — filter the main log for [BGINT].");
 
+                var includeSubfolders = _host.importSearchSubfoldersForRename;
                 _debounceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(DebounceMilliseconds) };
                 _debounceTimer.Tick += (_, __) =>
                 {
@@ -209,11 +213,11 @@ namespace PixelVaultNative
                     }
                     try
                     {
-                        V("Attaching watcher TopDirectoryOnly filter=* path=" + root);
+                        V("Attaching watcher " + (includeSubfolders ? "AllDirectories" : "TopDirectoryOnly") + " filter=* path=" + root);
                         var w = new FileSystemWatcher(root)
                         {
                             NotifyFilter = NotifyFilters.FileName | NotifyFilters.Size | NotifyFilters.LastWrite,
-                            IncludeSubdirectories = false,
+                            IncludeSubdirectories = includeSubfolders,
                             Filter = "*",
                             EnableRaisingEvents = true
                         };
@@ -255,22 +259,22 @@ namespace PixelVaultNative
                 if (_watchers.Count > 0)
                 {
                     _host.Log("Background auto-intake: watching " + _watchers.Count + " source folder(s).");
-                    QueueExistingTopLevelMediaFiles(sourceRoots);
+                    QueueExistingTopLevelMediaFiles(sourceRoots, includeSubfolders);
                 }
                 else
                     V("No FileSystemWatchers started (check source folders exist and are configured).");
             }
 
-            void QueueExistingTopLevelMediaFiles(IReadOnlyList<string> sourceRoots)
+            void QueueExistingTopLevelMediaFiles(IReadOnlyList<string> sourceRoots, bool includeSubfolders)
             {
-                var existing = EnumerateExistingTopLevelMediaFiles(sourceRoots, IsMedia);
+                var existing = EnumerateExistingTopLevelMediaFiles(sourceRoots, IsMedia, includeSubfolders);
                 if (existing.Count == 0)
                 {
-                    V("Startup seed found no existing top-level media files.");
+                    V("Startup seed found no existing " + (includeSubfolders ? "recursive" : "top-level") + " media files.");
                     return;
                 }
 
-                V("Startup seed queuing existing top-level media count=" + existing.Count + " files=" + SummarizePaths(existing));
+                V("Startup seed queuing existing " + (includeSubfolders ? "recursive" : "top-level") + " media count=" + existing.Count + " files=" + SummarizePaths(existing));
                 foreach (var path in existing)
                     SchedulePathCore(path);
             }
@@ -305,6 +309,16 @@ namespace PixelVaultNative
                 if (!IsMedia(Path.GetFileName(path)))
                 {
                     V("SchedulePath ignored (not a media extension): " + path);
+                    return;
+                }
+                if (ImportService.IsImportParkingPath(path))
+                {
+                    V("SchedulePath ignored (import parking folder): " + path);
+                    return;
+                }
+                if (ImportService.IsHiddenFileOrInsideHiddenDirectory(path))
+                {
+                    V("SchedulePath ignored (hidden file/folder): " + path);
                     return;
                 }
                 lock (_pendingSync)

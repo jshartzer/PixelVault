@@ -24,13 +24,20 @@ namespace PixelVaultNative
     internal sealed class LibraryDetailRenderGroup
     {
         public DateTime CaptureDate;
+        public DateTime SessionStartDate;
+        public DateTime SessionEndDate;
+        public string HeaderText;
+        public string SubtitleText;
         public List<string> Files = new List<string>();
     }
 
     internal sealed class LibraryTimelineCaptureContext
     {
+        internal string GameId;
         internal string GameTitle;
         internal string PlatformLabel;
+        internal string SteamAppId;
+        internal string RetroAchievementsGameId;
         internal DateTime CaptureDate;
         internal string Comment;
     }

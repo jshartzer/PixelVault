@@ -42,7 +42,9 @@ namespace PixelVaultNative
         internal static void LibraryBrowserSyncWorkspaceModeWithGrouping(LibraryBrowserWorkingSet ws, string normalizedGroupingMode)
         {
             if (ws == null) return;
-            if (string.Equals(SettingsService.NormalizeLibraryGroupingMode(normalizedGroupingMode), "timeline", StringComparison.OrdinalIgnoreCase))
+            var grouping = SettingsService.NormalizeLibraryGroupingMode(normalizedGroupingMode);
+            if (string.Equals(grouping, "timeline", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(grouping, "sessions", StringComparison.OrdinalIgnoreCase))
             {
                 ws.WorkspaceMode = LibraryWorkspaceMode.Timeline;
                 return;

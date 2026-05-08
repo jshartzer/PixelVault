@@ -37,6 +37,7 @@ namespace PixelVaultNative
                 OpenFilenameConventionEditor = OpenFilenameConventionEditor,
                 OpenLibraryStorageMergeTool = owner => OpenLibraryStorageMergeTool(owner ?? this),
                 ShowPhotographyGallery = ShowPhotographyGallery,
+                ExportStarredLibraryCaptures = owner => ExportStarredLibraryCapturesToFolder(owner ?? this),
                 SourceRootsSummary = SourceRootsSummary,
                 GetDestinationRoot = () => destinationRoot,
                 GetLibraryRoot = () => libraryRoot,

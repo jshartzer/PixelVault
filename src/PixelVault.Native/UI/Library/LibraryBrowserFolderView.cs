@@ -39,6 +39,8 @@ namespace PixelVaultNative
         internal long CompletedUtcTicks;
         internal bool IsMergedAcrossPlatforms;
         internal bool IsTimelineProjection;
+        internal bool IsSessionProjection;
+        internal int SessionThresholdMinutes;
         internal bool PendingGameAssignment;
         /// <summary>Lowercase, newline-separated tokens for library search (name, paths, ids, platforms).</summary>
         internal string SearchBlob;

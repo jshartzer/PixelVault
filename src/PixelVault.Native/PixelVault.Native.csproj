@@ -130,6 +130,7 @@
     <Compile Include="UI\Library\MainWindow.LibraryBrowserWorkingSet.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserWorkspaceMode.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserAchievements.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryGameProfile.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserLayout.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryCoverResolution.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryBrowserViewModel.cs" />

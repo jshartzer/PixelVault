@@ -77,6 +77,13 @@ namespace PixelVaultNative
             return value;
         }
 
+        public static int NormalizeLibrarySessionThresholdMinutes(int value)
+        {
+            if (value < 15) return 15;
+            if (value > 720) return 720;
+            return value;
+        }
+
         public static string NormalizeLibraryFolderSortMode(string value)
         {
             var normalized = (value ?? string.Empty).Trim().ToLowerInvariant();
@@ -102,6 +109,7 @@ namespace PixelVaultNative
         {
             var normalized = (value ?? string.Empty).Trim().ToLowerInvariant();
             if (normalized == "timeline" || normalized == "photo timeline" || normalized == "capture timeline") return "timeline";
+            if (normalized == "sessions" || normalized == "session" || normalized == "photo sessions" || normalized == "capture sessions") return "sessions";
             if (normalized == "console" || normalized == "by console" || normalized == "platform" || normalized == "by platform") return "console";
             return "all";
         }
@@ -248,6 +256,10 @@ namespace PixelVaultNative
                 else if (key == "library_folder_sort_mode") s.LibraryFolderSortMode = NormalizeLibraryFolderSortMode(value);
                 else if (key == "library_grouping_mode") s.LibraryGroupingMode = NormalizeLibraryGroupingMode(value);
                 else if (key == "library_folder_filter_mode") s.LibraryFolderFilterMode = NormalizeLibraryFolderFilterMode(value);
+                else if (key == "library_session_threshold_minutes")
+                {
+                    if (int.TryParse(value, out var stm)) s.LibrarySessionThresholdMinutes = NormalizeLibrarySessionThresholdMinutes(stm);
+                }
                 else if (key == "library_browser_search") s.LibraryBrowserSearchText = value ?? string.Empty;
                 else if (key == "library_browser_last_view_key") s.LibraryBrowserLastViewKey = value ?? string.Empty;
                 else if (key == "library_browser_folder_scroll")
@@ -440,6 +452,7 @@ namespace PixelVaultNative
                 "library_folder_sort_mode=" + NormalizeLibraryFolderSortMode(state.LibraryFolderSortMode),
                 "library_grouping_mode=" + NormalizeLibraryGroupingMode(state.LibraryGroupingMode),
                 "library_folder_filter_mode=" + NormalizeLibraryFolderFilterMode(state.LibraryFolderFilterMode),
+                "library_session_threshold_minutes=" + NormalizeLibrarySessionThresholdMinutes(state.LibrarySessionThresholdMinutes).ToString(CultureInfo.InvariantCulture),
                 "library_browser_search=" + (state.LibraryBrowserSearchText ?? string.Empty).Replace("\r", " ").Replace("\n", " "),
                 "library_browser_last_view_key=" + (state.LibraryBrowserLastViewKey ?? string.Empty).Replace("\r", " ").Replace("\n", " "),
                 "library_browser_folder_scroll=" + Math.Max(0, state.LibraryBrowserFolderScroll).ToString(CultureInfo.InvariantCulture),

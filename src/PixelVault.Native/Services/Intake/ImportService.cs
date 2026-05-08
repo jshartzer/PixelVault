@@ -138,6 +138,9 @@ namespace PixelVaultNative
         /// <summary>Enumerate files under all configured source roots (deduped, full paths).</summary>
         public Func<SearchOption, Func<string, bool>, IEnumerable<string>> EnumerateSourceMediaFiles;
 
+        /// <summary>Returns the game-title folder segment for a nested upload file, usually the first folder under the source root.</summary>
+        public Func<string, string> GetImportFolderTitleHint;
+
         /// <summary>Parse filename for intake (Steam AppID, title hint).</summary>
         public Func<string, FilenameParseResult> ParseFilenameForImport;
 
@@ -217,6 +220,7 @@ namespace PixelVaultNative
     {
         internal const string HdrDuplicatesFolderName = "HDR Duplicates";
         internal const string LegacyHdrFallbackFolderName = "PixelVault HDR Fallbacks";
+        internal const string ImportDuplicatesFolderName = "Import Duplicates";
 
         readonly ImportServiceDependencies d;
         readonly IFileSystemService fs;
@@ -331,10 +335,15 @@ namespace PixelVaultNative
             CancellationToken cancellationToken = default)
         {
             var destinationRoot = d.GetDestinationRoot == null ? string.Empty : d.GetDestinationRoot() ?? string.Empty;
-            int moved = 0, skipped = 0, renamedConflict = 0;
+            var libraryRoot = d.GetLibraryRoot == null ? string.Empty : d.GetLibraryRoot() ?? string.Empty;
+            int moved = 0, skipped = 0, renamedConflict = 0, parkedDuplicates = 0;
             var entries = new List<UndoImportEntry>();
             var fileList = (files ?? Enumerable.Empty<string>()).Where(fs.FileExists).ToList();
             var total = fileList.Count;
+            if (progress != null) progress(0, total, "Checking library for duplicate imports...");
+            var duplicateRoot = BuildImportDuplicateRoot(destinationRoot);
+            var existingDuplicates = BuildExistingImportDuplicateIndex(destinationRoot, libraryRoot, fileList);
+            var duplicatePlacement = CreateDuplicateParkingPlacementContext(libraryRoot);
             using var detailLogLines = CreateImportDetailLogBatch();
             if (progress != null) progress(0, total, "Starting move step for " + total + " file(s).");
             for (int i = 0; i < total; i++)
@@ -344,6 +353,29 @@ namespace PixelVaultNative
                 var remaining = total - (i + 1);
                 var sourceDirectory = Path.GetDirectoryName(file);
                 var target = Path.Combine(destinationRoot, Path.GetFileName(file));
+                if (TryGetFileLength(file, out var sourceLength)
+                    && existingDuplicates.TryGetValue(BuildImportDuplicateKey(Path.GetFileName(file), sourceLength), out var duplicateMatch))
+                {
+                    skipped++;
+                    try
+                    {
+                        var duplicateTargetDirectory = ResolveImportDuplicateTargetDirectory(file, duplicateMatch, duplicateRoot, destinationRoot, libraryRoot, duplicatePlacement);
+                        if (!fs.DirectoryExists(duplicateTargetDirectory)) fs.CreateDirectory(duplicateTargetDirectory);
+                        var duplicateTarget = Path.Combine(duplicateTargetDirectory, Path.GetFileName(file));
+                        if (fs.FileExists(duplicateTarget)) duplicateTarget = d.UniquePath == null ? BuildFallbackUniquePath(duplicateTarget) : d.UniquePath(duplicateTarget);
+                        fs.MoveFile(file, duplicateTarget);
+                        d.MoveMetadataSidecarIfPresent?.Invoke(file, duplicateTarget);
+                        parkedDuplicates++;
+                        detailLogLines.Add("Parked import duplicate: " + Path.GetFileName(file) + " -> " + duplicateTarget + " (matches " + duplicateMatch + ")");
+                        if (progress != null) progress(i + 1, total, "Skipped duplicate " + (i + 1) + " of " + total + " | " + remaining + " remaining | " + Path.GetFileName(file));
+                    }
+                    catch (Exception ex)
+                    {
+                        d.LogService.AppendMainLine("Could not park import duplicate: " + file + ". " + ex.Message);
+                        if (progress != null) progress(i + 1, total, "Skipped duplicate " + (i + 1) + " of " + total + " | " + remaining + " remaining | parking failed | " + Path.GetFileName(file));
+                    }
+                    continue;
+                }
                 if (fs.FileExists(target))
                 {
                     var mode = d.GetConflictMode == null ? "Rename" : (d.GetConflictMode() ?? "Rename");
@@ -363,15 +395,198 @@ namespace PixelVaultNative
                 fs.MoveFile(file, target);
                 d.MoveMetadataSidecarIfPresent?.Invoke(file, target);
                 moved++;
+                if (TryGetFileLength(target, out var targetLength))
+                    existingDuplicates.TryAdd(BuildImportDuplicateKey(Path.GetFileName(target), targetLength), target);
                 entries.Add(new UndoImportEntry { SourceDirectory = sourceDirectory, ImportedFileName = Path.GetFileName(target), CurrentPath = target });
                 d.AddSidecarUndoEntryIfPresent?.Invoke(target, sourceDirectory, entries);
                 detailLogLines.Add("Moved: " + Path.GetFileName(file) + " -> " + target);
                 if (progress != null) progress(i + 1, total, "Moved " + (i + 1) + " of " + total + " | " + remaining + " remaining | " + Path.GetFileName(target));
             }
             detailLogLines.Flush();
-            if (progress != null) progress(total, total, summaryLabel + ": moved " + moved + ", skipped " + skipped + ", renamed-on-conflict " + renamedConflict + ".");
-            d.LogService.AppendMainLine(summaryLabel + ": moved " + moved + ", skipped " + skipped + ", renamed-on-conflict " + renamedConflict + ".");
-            return new MoveStepResult { Moved = moved, Skipped = skipped, RenamedOnConflict = renamedConflict, Entries = entries };
+            var duplicateSuffix = parkedDuplicates > 0 ? ", duplicates parked " + parkedDuplicates : string.Empty;
+            if (progress != null) progress(total, total, summaryLabel + ": moved " + moved + ", skipped " + skipped + ", renamed-on-conflict " + renamedConflict + duplicateSuffix + ".");
+            d.LogService.AppendMainLine(summaryLabel + ": moved " + moved + ", skipped " + skipped + ", renamed-on-conflict " + renamedConflict + duplicateSuffix + ".");
+            return new MoveStepResult { Moved = moved, Skipped = skipped, RenamedOnConflict = renamedConflict, ParkedDuplicates = parkedDuplicates, DuplicateDestinationRoot = duplicateRoot, Entries = entries };
+        }
+
+        Dictionary<string, string> BuildExistingImportDuplicateIndex(string destinationRoot, string libraryRoot, IReadOnlyList<string> sourceFiles)
+        {
+            var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var sourcePathSet = new HashSet<string>(
+                (sourceFiles ?? new List<string>()).Select(NormalizePathKey).Where(path => !string.IsNullOrWhiteSpace(path)),
+                StringComparer.OrdinalIgnoreCase);
+            var importFileNames = new HashSet<string>(
+                (sourceFiles ?? new List<string>())
+                .Select(Path.GetFileName)
+                .Where(name => !string.IsNullOrWhiteSpace(name)),
+                StringComparer.OrdinalIgnoreCase);
+            if (importFileNames.Count == 0) return result;
+
+            var roots = new[] { destinationRoot, libraryRoot }
+                .Where(root => !string.IsNullOrWhiteSpace(root))
+                .Select(NormalizePathKey)
+                .Where(root => !string.IsNullOrWhiteSpace(root))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            foreach (var root in roots)
+            {
+                if (!fs.DirectoryExists(root)) continue;
+                List<string> existingFiles;
+                try
+                {
+                    existingFiles = fs.EnumerateFiles(root, "*", SearchOption.AllDirectories).ToList();
+                }
+                catch (Exception ex)
+                {
+                    d.LogService.AppendMainLine("Duplicate import scan skipped '" + root + "': " + ex.Message);
+                    continue;
+                }
+
+                foreach (var file in existingFiles)
+                {
+                    if (string.IsNullOrWhiteSpace(file)) continue;
+                    var fullPath = NormalizePathKey(file);
+                    if (string.IsNullOrWhiteSpace(fullPath) || sourcePathSet.Contains(fullPath)) continue;
+                    if (IsImportParkingPath(fullPath)) continue;
+                    if (IsHiddenFileOrInsideHiddenDirectory(fullPath)) continue;
+                    var fileName = Path.GetFileName(fullPath);
+                    if (!importFileNames.Contains(fileName)) continue;
+                    if (d.IsMedia != null && !d.IsMedia(fullPath)) continue;
+                    if (!TryGetFileLength(fullPath, out var length)) continue;
+                    var key = BuildImportDuplicateKey(fileName, length);
+                    if (!result.ContainsKey(key)) result[key] = fullPath;
+                }
+            }
+
+            return result;
+        }
+
+        sealed class DuplicateParkingPlacementContext
+        {
+            public IReadOnlyList<GameIndexEditorRow> IndexRows = new List<GameIndexEditorRow>();
+            public IReadOnlyDictionary<string, int> TitleCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            public Func<string, string> GetSafeName;
+            public Func<string, string> GetGameName;
+            public Func<string, string, string> NormalizeGameIndexNameWithFolder;
+            public Func<string, string> NormalizeConsole;
+        }
+
+        DuplicateParkingPlacementContext CreateDuplicateParkingPlacementContext(string libraryRoot)
+        {
+            var indexRows = d.LoadSavedGameIndexRows != null
+                ? d.LoadSavedGameIndexRows(libraryRoot ?? string.Empty) ?? new List<GameIndexEditorRow>()
+                : new List<GameIndexEditorRow>();
+            return new DuplicateParkingPlacementContext
+            {
+                IndexRows = indexRows,
+                TitleCounts = d.BuildGameIndexTitleCounts != null
+                    ? d.BuildGameIndexTitleCounts(indexRows)
+                    : new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase),
+                NormalizeGameIndexNameWithFolder = d.NormalizeGameIndexNameWithFolder
+                    ?? ((name, _) => d.NormalizeGameIndexName != null ? d.NormalizeGameIndexName(name ?? string.Empty) : (name ?? string.Empty).Trim()),
+                GetSafeName = d.GetSafeGameFolderName ?? SanitizeHdrFallbackFolderName,
+                GetGameName = d.GetGameNameFromFileName ?? (name => Path.GetFileNameWithoutExtension(name ?? string.Empty) ?? string.Empty),
+                NormalizeConsole = d.NormalizeConsoleLabel ?? (label => (label ?? string.Empty).Trim())
+            };
+        }
+
+        string ResolveImportDuplicateTargetDirectory(
+            string sourceFile,
+            string duplicateMatch,
+            string duplicateRoot,
+            string destinationRoot,
+            string libraryRoot,
+            DuplicateParkingPlacementContext placement)
+        {
+            if (TryGetRelativeDirectory(duplicateMatch, libraryRoot, out var libraryRelativeDirectory)
+                && !string.IsNullOrWhiteSpace(libraryRelativeDirectory))
+                return Path.Combine(duplicateRoot, libraryRelativeDirectory);
+            if (TryGetRelativeDirectory(duplicateMatch, destinationRoot, out var destinationRelativeDirectory)
+                && !string.IsNullOrWhiteSpace(destinationRelativeDirectory))
+                return Path.Combine(duplicateRoot, destinationRelativeDirectory);
+
+            placement ??= CreateDuplicateParkingPlacementContext(libraryRoot);
+            return ResolveHdrDuplicateTargetDirectory(
+                sourceFile,
+                duplicateRoot,
+                libraryRoot,
+                placement.IndexRows,
+                placement.TitleCounts,
+                placement.GetSafeName,
+                placement.GetGameName,
+                placement.NormalizeGameIndexNameWithFolder,
+                placement.NormalizeConsole);
+        }
+
+        static bool TryGetRelativeDirectory(string file, string root, out string relativeDirectory)
+        {
+            relativeDirectory = string.Empty;
+            if (string.IsNullOrWhiteSpace(file) || string.IsNullOrWhiteSpace(root)) return false;
+            try
+            {
+                var rootPath = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                var fileDirectory = Path.GetFullPath(Path.GetDirectoryName(file) ?? string.Empty).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                if (string.IsNullOrWhiteSpace(rootPath) || string.IsNullOrWhiteSpace(fileDirectory)) return false;
+                if (string.Equals(fileDirectory, rootPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    relativeDirectory = string.Empty;
+                    return true;
+                }
+
+                var rootWithSeparator = rootPath + Path.DirectorySeparatorChar;
+                if (!fileDirectory.StartsWith(rootWithSeparator, StringComparison.OrdinalIgnoreCase)) return false;
+                relativeDirectory = fileDirectory.Substring(rootWithSeparator.Length).Trim(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        static bool TryGetFileLength(string file, out long length)
+        {
+            length = 0;
+            if (string.IsNullOrWhiteSpace(file)) return false;
+            try
+            {
+                if (!File.Exists(file)) return false;
+                length = new FileInfo(file).Length;
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        static string BuildImportDuplicateKey(string fileName, long length) => (fileName ?? string.Empty) + "\t" + length;
+
+        static string NormalizePathKey(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path)) return string.Empty;
+            try
+            {
+                return Path.GetFullPath(path);
+            }
+            catch
+            {
+                return path;
+            }
+        }
+
+        static string BuildFallbackUniquePath(string path)
+        {
+            var directory = Path.GetDirectoryName(path) ?? string.Empty;
+            var name = Path.GetFileNameWithoutExtension(path);
+            var extension = Path.GetExtension(path);
+            for (var i = 1; i < 10000; i++)
+            {
+                var candidate = Path.Combine(directory, name + " (" + i + ")" + extension);
+                if (!File.Exists(candidate)) return candidate;
+            }
+            return Path.Combine(directory, name + " (" + Guid.NewGuid().ToString("N") + ")" + extension);
         }
 
         public HdrFallbackMoveResult MoveHdrPairFallbackFiles(
@@ -574,7 +789,8 @@ namespace PixelVaultNative
             if (enumerate == null || isMedia == null) return new SourceInventory();
             var searchOption = includeSubfolders ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
             var candidateMediaFiles = enumerate(searchOption, isMedia)
-                .Where(file => !IsHdrFallbackPath(file))
+                .Where(file => !IsImportParkingPath(file))
+                .Where(file => !IsHiddenFileOrInsideHiddenDirectory(file))
                 .ToList();
             var hdrPairs = BuildHdrCapturePairs(candidateMediaFiles);
             if (hdrPairs.Count > 0)
@@ -668,22 +884,32 @@ namespace PixelVaultNative
 
         internal static string BuildHdrDuplicateRoot(string destinationRoot)
         {
+            return BuildDestinationDriveParkingRoot(destinationRoot, HdrDuplicatesFolderName);
+        }
+
+        internal static string BuildImportDuplicateRoot(string destinationRoot)
+        {
+            return BuildDestinationDriveParkingRoot(destinationRoot, ImportDuplicatesFolderName);
+        }
+
+        static string BuildDestinationDriveParkingRoot(string destinationRoot, string folderName)
+        {
             var dest = string.IsNullOrWhiteSpace(destinationRoot) ? string.Empty : destinationRoot.Trim();
-            if (string.IsNullOrWhiteSpace(dest)) return HdrDuplicatesFolderName;
+            if (string.IsNullOrWhiteSpace(dest)) return folderName;
             try
             {
                 var full = Path.GetFullPath(dest.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
                 var root = Path.GetPathRoot(full);
                 if (!string.IsNullOrWhiteSpace(root)
                     && string.Equals(full.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar), root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar), StringComparison.OrdinalIgnoreCase))
-                    return Path.Combine(full, HdrDuplicatesFolderName);
+                    return Path.Combine(full, folderName);
                 var parent = Path.GetDirectoryName(full);
-                if (!string.IsNullOrWhiteSpace(parent)) return Path.Combine(parent, HdrDuplicatesFolderName);
+                if (!string.IsNullOrWhiteSpace(parent)) return Path.Combine(parent, folderName);
             }
             catch
             {
             }
-            return Path.Combine(dest, HdrDuplicatesFolderName);
+            return Path.Combine(dest, folderName);
         }
 
         static string SanitizeHdrFallbackFolderName(string value)
@@ -700,6 +926,47 @@ namespace PixelVaultNative
             if (string.IsNullOrWhiteSpace(file)) return false;
             return file.IndexOf(HdrDuplicatesFolderName, StringComparison.OrdinalIgnoreCase) >= 0
                 || file.IndexOf(LegacyHdrFallbackFolderName, StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        internal static bool IsImportDuplicatePath(string file)
+        {
+            if (string.IsNullOrWhiteSpace(file)) return false;
+            return file.IndexOf(ImportDuplicatesFolderName, StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        internal static bool IsImportParkingPath(string file)
+        {
+            return IsHdrFallbackPath(file) || IsImportDuplicatePath(file);
+        }
+
+        internal static bool IsHiddenFileOrInsideHiddenDirectory(string file)
+        {
+            if (string.IsNullOrWhiteSpace(file)) return false;
+            try
+            {
+                var fullPath = Path.GetFullPath(file);
+                if (HasHiddenAttribute(fullPath)) return true;
+                var directory = Path.GetDirectoryName(fullPath);
+                if (!string.IsNullOrWhiteSpace(directory) && HasHiddenAttribute(directory)) return true;
+            }
+            catch
+            {
+            }
+            return false;
+        }
+
+        static bool HasHiddenAttribute(string path)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(path)) return false;
+                if (!File.Exists(path) && !Directory.Exists(path)) return false;
+                return (File.GetAttributes(path) & FileAttributes.Hidden) != 0;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         public ImportWorkflowStandardWorkTotals ComputeStandardImportWorkTotals(SourceInventory renameInventory, IReadOnlyList<ReviewItem> reviewItems, SourceInventory inventory, HashSet<string> manualPaths) =>
@@ -772,6 +1039,7 @@ namespace PixelVaultNative
                 var parsed = parse(file);
                 var appId = parsed == null ? null : parsed.SteamAppId;
                 var nonSteamId = parsed == null ? null : parsed.NonSteamId;
+                string folderTitleRenameBase;
                 var canonicalGame = string.Empty;
                 var idForRename = string.Empty;
                 if (!string.IsNullOrWhiteSpace(appId))
@@ -792,6 +1060,28 @@ namespace PixelVaultNative
                         if (nonSteamIdToDisplayName.TryGetValue(idKey, out fromIndex) && !string.IsNullOrWhiteSpace(fromIndex))
                             canonicalGame = fromIndex;
                     }
+                }
+                else if (TryBuildImportFolderTitleRenameBase(file, parsed, out folderTitleRenameBase))
+                {
+                    var folderTitleCombined = Path.Combine(Path.GetDirectoryName(file) ?? string.Empty, folderTitleRenameBase + Path.GetExtension(file));
+                    var folderTitleTarget = d.UniquePath == null ? folderTitleCombined : d.UniquePath(folderTitleCombined);
+                    try
+                    {
+                        fs.MoveFile(file, folderTitleTarget);
+                    }
+                    catch (Exception ex)
+                    {
+                        skipped++;
+                        d.LogService.AppendMainLine("ERROR: Import folder-title rename failed | " + Path.GetFileName(file) + " -> " + Path.GetFileName(folderTitleTarget) + " | " + ex.Message);
+                        if (progress != null) progress(i + 1, total, "Skipped rename " + (i + 1) + " of " + total + " | " + remaining + " remaining | " + ex.Message + " | " + Path.GetFileName(file));
+                        continue;
+                    }
+                    pathMap[file] = folderTitleTarget;
+                    d.MoveMetadataSidecarIfPresent?.Invoke(file, folderTitleTarget);
+                    renamed++;
+                    detailLogLines.Add("Renamed from upload folder title: " + Path.GetFileName(file) + " -> " + Path.GetFileName(folderTitleTarget));
+                    if (progress != null) progress(i + 1, total, "Renamed " + (i + 1) + " of " + total + " | " + remaining + " remaining | " + Path.GetFileName(folderTitleTarget));
+                    continue;
                 }
                 else
                 {
@@ -871,6 +1161,39 @@ namespace PixelVaultNative
             if (progress != null) progress(total, total, "Rename step complete: renamed " + renamed + ", skipped " + skipped + ".");
             d.LogService.AppendMainLine("Rename summary: renamed " + renamed + ", skipped " + skipped + ".");
             return new RenameStepResult { Renamed = renamed, Skipped = skipped, OldPathToNewPath = pathMap };
+        }
+
+        internal static bool CanUseImportFolderTitleHint(FilenameParseResult parsed)
+        {
+            if (parsed == null) return false;
+            if (!string.IsNullOrWhiteSpace(parsed.GameTitleHint)) return false;
+            if (parsed.RoutesToManualWhenMissingSteamAppId) return false;
+            var platform = MainWindow.NormalizeConsoleLabel(parsed.PlatformLabel ?? string.Empty);
+            if (string.Equals(platform, "Switch", StringComparison.OrdinalIgnoreCase)) return true;
+            return (parsed.PlatformTags ?? new string[0]).Any(tag =>
+                string.Equals(MainWindow.NormalizeConsoleLabel(tag), "Switch", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(tag, "Nintendo", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(tag, "Nintendo Switch", StringComparison.OrdinalIgnoreCase));
+        }
+
+        bool TryBuildImportFolderTitleRenameBase(string file, FilenameParseResult parsed, out string newBase)
+        {
+            newBase = string.Empty;
+            if (!CanUseImportFolderTitleHint(parsed)) return false;
+            var folderTitle = d.GetImportFolderTitleHint == null ? string.Empty : d.GetImportFolderTitleHint(file);
+            folderTitle = FilenameParserService.NormalizeGameTitleHint(folderTitle ?? string.Empty);
+            if (string.IsNullOrWhiteSpace(folderTitle)) return false;
+
+            var safeTitle = d.SanitizeManualRenameGameTitle == null
+                ? folderTitle.Trim()
+                : d.SanitizeManualRenameGameTitle(folderTitle);
+            if (string.IsNullOrWhiteSpace(safeTitle)) return false;
+
+            var baseName = Path.GetFileNameWithoutExtension(file) ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(baseName)) return false;
+            if (baseName.StartsWith(safeTitle + "_", StringComparison.OrdinalIgnoreCase)) return false;
+            newBase = safeTitle + "_" + baseName;
+            return true;
         }
 
         public Task<List<GameIndexEditorRow>> LoadManualMetadataGameTitleRowsAsync(string libraryRoot, CancellationToken cancellationToken = default)

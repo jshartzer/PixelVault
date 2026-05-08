@@ -85,7 +85,8 @@ namespace PixelVaultNative
             ApplyNonSteamShortcutFallback(result, fileName, root);
             ResolveNonSteamTitleFromGameIndex(result, root);
 
-            if (string.IsNullOrWhiteSpace(result.GameTitleHint))
+            if (string.IsNullOrWhiteSpace(result.GameTitleHint)
+                && !KeepsEmptyTitleForImportFolderHint(result.ConventionId))
             {
                 result.GameTitleHint = GetGameTitleHint(baseName, root);
             }
@@ -152,15 +153,19 @@ namespace PixelVaultNative
         void ApplyXboxPcTrailingTimestampParse(FilenameParseResult result, string fileName)
         {
             if (result == null) return;
-            if (result.MatchedConvention && !string.Equals(result.ConventionId, "xbox_pc_capture_ampm", StringComparison.OrdinalIgnoreCase)) return;
+            if (result.MatchedConvention
+                && !string.Equals(result.ConventionId, "xbox_pc_capture_ampm", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(result.ConventionId, "xbox_pc_recording_iso24h", StringComparison.OrdinalIgnoreCase)) return;
 
             string title;
             DateTime captureTime;
-            if (!TryParseXboxPcCaptureFromTrailingTimestamp(fileName, out title, out captureTime)) return;
+            string conventionId;
+            string conventionName;
+            if (!TryParseXboxPcCaptureFromTrailingTimestamp(fileName, out title, out captureTime, out conventionId, out conventionName)) return;
 
             result.MatchedConvention = true;
-            result.ConventionId = "xbox_pc_capture_ampm";
-            result.ConventionName = "PC Capture (Windows Xbox App)";
+            result.ConventionId = conventionId;
+            result.ConventionName = conventionName;
             result.ConfidenceLabel = "ExplicitPattern";
             result.PlatformTags = ParseTagText("PC");
             result.PlatformLabel = ResolvePrimaryPlatformLabel("PC", result.PlatformTags);
@@ -212,8 +217,10 @@ namespace PixelVaultNative
             if (string.IsNullOrWhiteSpace(cleanedBaseName)) return string.Empty;
 
             string xboxPcTitle;
-            DateTime _;
-            if (TryParseXboxPcCaptureFromTrailingTimestamp(cleanedBaseName, out xboxPcTitle, out _))
+            DateTime unusedCaptureTime;
+            string unusedConventionId;
+            string unusedConventionName;
+            if (TryParseXboxPcCaptureFromTrailingTimestamp(cleanedBaseName, out xboxPcTitle, out unusedCaptureTime, out unusedConventionId, out unusedConventionName))
             {
                 return NormalizeGameTitleHint(xboxPcTitle);
             }
@@ -427,6 +434,64 @@ namespace PixelVaultNative
                 },
                 new FilenameConventionRule
                 {
+                    ConventionId = "switch_album_titled_hash",
+                    Name = "Switch Album (Folder Title + Timestamp)",
+                    Priority = 855,
+                    Pattern = @"^(?<title>.+?)_(?<stamp>\d{14})(?:\d{2})?-[0-9A-Fa-f]{32}\.(png|jpe?g|mp4|mov)$",
+                    PatternText = @"^(?<title>.+?)_(?<stamp>\d{14})(?:\d{2})?-[0-9A-Fa-f]{32}\.(png|jpe?g|mp4|mov)$",
+                    PlatformLabel = "Switch",
+                    PlatformTagsText = "Switch;Nintendo",
+                    TitleGroup = "title",
+                    TimestampGroup = "stamp",
+                    TimestampFormat = "yyyyMMddHHmmss",
+                    ConfidenceLabel = "ExplicitPattern",
+                    IsBuiltIn = true
+                },
+                new FilenameConventionRule
+                {
+                    ConventionId = "switch_album_titled_capture_suffix",
+                    Name = "Switch Album (Folder Title + Capture suffix)",
+                    Priority = 857,
+                    Pattern = @"^(?<title>.+?)_(?<stamp>\d{14})(?:\d{2})?_c\.(png|jpe?g|mp4|mov)$",
+                    PatternText = @"^(?<title>.+?)_(?<stamp>\d{14})(?:\d{2})?_c\.(png|jpe?g|mp4|mov)$",
+                    PlatformLabel = "Switch",
+                    PlatformTagsText = "Switch;Nintendo",
+                    TitleGroup = "title",
+                    TimestampGroup = "stamp",
+                    TimestampFormat = "yyyyMMddHHmmss",
+                    ConfidenceLabel = "ExplicitPattern",
+                    IsBuiltIn = true
+                },
+                new FilenameConventionRule
+                {
+                    ConventionId = "switch_album_capture_suffix",
+                    Name = "Switch Album (Timestamp + Capture suffix)",
+                    Priority = 856,
+                    Pattern = @"^(?<stamp>\d{14})(?:\d{2})?_c\.(png|jpe?g|mp4|mov)$",
+                    PatternText = @"^(?<stamp>\d{14})(?:\d{2})?_c\.(png|jpe?g|mp4|mov)$",
+                    PlatformLabel = "Switch",
+                    PlatformTagsText = "Switch;Nintendo",
+                    TimestampGroup = "stamp",
+                    TimestampFormat = "yyyyMMddHHmmss",
+                    ConfidenceLabel = "ExplicitPattern",
+                    IsBuiltIn = true
+                },
+                new FilenameConventionRule
+                {
+                    ConventionId = "switch_album_hash",
+                    Name = "Switch Album (Timestamp + Game ID Hash)",
+                    Priority = 854,
+                    Pattern = @"^(?<stamp>\d{14})(?:\d{2})?-[0-9A-Fa-f]{32}\.(png|jpe?g|mp4|mov)$",
+                    PatternText = @"^(?<stamp>\d{14})(?:\d{2})?-[0-9A-Fa-f]{32}\.(png|jpe?g|mp4|mov)$",
+                    PlatformLabel = "Switch",
+                    PlatformTagsText = "Switch;Nintendo",
+                    TimestampGroup = "stamp",
+                    TimestampFormat = "yyyyMMddHHmmss",
+                    ConfidenceLabel = "ExplicitPattern",
+                    IsBuiltIn = true
+                },
+                new FilenameConventionRule
+                {
                     ConventionId = "ps5_share",
                     Name = "PS5 Share",
                     Priority = 850,
@@ -484,6 +549,22 @@ namespace PixelVaultNative
                     TimestampGroup = "stamp",
                     TimestampFormat = "yyyy_MM_dd-HH-mm-ss",
                     PreserveFileTimes = false,
+                    ConfidenceLabel = "ExplicitPattern",
+                    IsBuiltIn = true
+                },
+                new FilenameConventionRule
+                {
+                    ConventionId = "xbox_pc_recording_iso24h",
+                    Name = "PC Recording (Xbox Game Bar)",
+                    Priority = 837,
+                    Pattern = "[title] [yyyy]-[MM]-[dd] [HH]-[mm]-[ss].[ext:video]",
+                    PatternText = "[title] [yyyy]-[MM]-[dd] [HH]-[mm]-[ss].[ext:video]",
+                    PlatformLabel = "PC",
+                    PlatformTagsText = "PC",
+                    TitleGroup = "title",
+                    TimestampGroup = "stamp",
+                    TimestampFormat = "yyyy-MM-dd HH-mm-ss",
+                    PreserveFileTimes = true,
                     ConfidenceLabel = "ExplicitPattern",
                     IsBuiltIn = true
                 },
@@ -783,6 +864,12 @@ namespace PixelVaultNative
             return (value ?? string.Empty).Trim();
         }
 
+        static bool KeepsEmptyTitleForImportFolderHint(string conventionId)
+        {
+            return string.Equals(conventionId ?? string.Empty, "switch_album_hash", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(conventionId ?? string.Empty, "switch_album_capture_suffix", StringComparison.OrdinalIgnoreCase);
+        }
+
         static bool LooksLikeRenamedSteamScreenshot(string fileName)
         {
             var baseName = Path.GetFileNameWithoutExtension(fileName ?? string.Empty);
@@ -836,10 +923,17 @@ namespace PixelVaultNative
                 : (DateTime?)null;
         }
 
-        static bool TryParseXboxPcCaptureFromTrailingTimestamp(string fileName, out string title, out DateTime captureTime)
+        static bool TryParseXboxPcCaptureFromTrailingTimestamp(
+            string fileName,
+            out string title,
+            out DateTime captureTime,
+            out string conventionId,
+            out string conventionName)
         {
             title = string.Empty;
             captureTime = default;
+            conventionId = string.Empty;
+            conventionName = string.Empty;
 
             var candidate = fileName ?? string.Empty;
             var extension = Path.GetExtension(candidate);
@@ -852,13 +946,39 @@ namespace PixelVaultNative
             var baseName = string.IsNullOrWhiteSpace(extension)
                 ? Path.GetFileName(candidate)
                 : Path.GetFileNameWithoutExtension(candidate);
-            var stampMatch = Regex.Match(
+            Match stampMatch;
+            DateTime? parsed;
+            if (string.IsNullOrWhiteSpace(extension) || Regex.IsMatch(extension, @"^\.(mp4|mkv|avi|mov|wmv|webm)$", RegexOptions.IgnoreCase))
+            {
+                stampMatch = Regex.Match(
+                    baseName ?? string.Empty,
+                    @"(?<stamp>\d{4}-\d{2}-\d{2}\s+\d{2}-\d{2}-\d{2})$",
+                    RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+                if (stampMatch.Success)
+                {
+                    parsed = ParseTimestamp(stampMatch.Groups["stamp"].Value, "yyyy-MM-dd HH-mm-ss");
+                    if (parsed.HasValue)
+                    {
+                        var recordingTitle = (baseName ?? string.Empty).Substring(0, stampMatch.Index).TrimEnd();
+                        if (!string.IsNullOrWhiteSpace(recordingTitle))
+                        {
+                            title = recordingTitle;
+                            captureTime = parsed.Value;
+                            conventionId = "xbox_pc_recording_iso24h";
+                            conventionName = "PC Recording (Xbox Game Bar)";
+                            return true;
+                        }
+                    }
+                }
+            }
+
+            stampMatch = Regex.Match(
                 baseName ?? string.Empty,
                 @"(?<stamp>\d{1,2}_\d{1,2}_\d{4}\s+\d{1,2}_\d{2}_\d{2}\s+[AP]M)$",
                 RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
             if (!stampMatch.Success) return false;
 
-            var parsed = ParseTimestamp(stampMatch.Groups["stamp"].Value, "M_d_yyyy h_mm_ss tt");
+            parsed = ParseTimestamp(stampMatch.Groups["stamp"].Value, "M_d_yyyy h_mm_ss tt");
             if (!parsed.HasValue) return false;
 
             var derivedTitle = (baseName ?? string.Empty).Substring(0, stampMatch.Index).TrimEnd();
@@ -866,6 +986,8 @@ namespace PixelVaultNative
 
             title = derivedTitle;
             captureTime = parsed.Value;
+            conventionId = "xbox_pc_capture_ampm";
+            conventionName = "PC Capture (Windows Xbox App)";
             return true;
         }
 
@@ -1277,6 +1399,7 @@ namespace PixelVaultNative
             { @"^clip_(?<stamp>[\d,]{13,17})\.(mp4|mkv|avi|mov|wmv|webm)$", "clip_[unixms].[ext:video]" },
             { @"^(?<title>.+?)_(?<stamp>\d{14})\.(png|jpe?g|jxr|mp4|mkv|avi|mov|wmv|webm)$", "[title]_[yyyy][MM][dd][HH][mm][ss].[ext:media]" },
             { @"^(?<title>.+?)[-–—](?<stamp>\d{4}_\d{2}_\d{2}[-_]\d{2}[-_]\d{2}[-_]\d{2})\.(png|jpe?g|jxr|mp4|mkv|avi|mov|wmv|webm)$", "[title]-[yyyy]_[MM]_[dd]-[HH]_[mm]_[ss].[ext:media]" },
+            { @"^(?<title>.+?)\s+(?<stamp>\d{4}-\d{2}-\d{2}\s+\d{2}-\d{2}-\d{2})\.(mp4|mkv|avi|mov|wmv|webm)$", "[title] [yyyy]-[MM]-[dd] [HH]-[mm]-[ss].[ext:video]" },
             { @"^(?<title>.+?)\s+(?<stamp>\d{1,2}_\d{1,2}_\d{4}\s+\d{1,2}_\d{2}_\d{2}\s+[AP]M)\.(png|jpe?g|jxr|mp4|mkv|avi|mov|wmv|webm)$", "[title] [M]_[d]_[yyyy] [h]_[mm]_[ss] [tt].[ext:media]" },
             { @".*PS5.*", "[contains:PS5]" },
             { @".*PlayStation.*", "[contains:PlayStation]" }

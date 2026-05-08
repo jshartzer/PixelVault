@@ -27,7 +27,12 @@ namespace PixelVaultNative
             {
                 lines.Add("Metadata errors: " + metadataResult.FailedRelocatedToErrors + " file(s) could not be updated with ExifTool and were moved into the Errors subfolder under the same upload directory.");
             }
-            lines.Add("Move summary: moved " + (moveResult == null ? 0 : moveResult.Moved) + ", skipped " + (moveResult == null ? 0 : moveResult.Skipped) + ", renamed-on-conflict " + (moveResult == null ? 0 : moveResult.RenamedOnConflict) + ".");
+            var duplicateImportsParked = moveResult == null ? 0 : moveResult.ParkedDuplicates;
+            lines.Add("Move summary: moved " + (moveResult == null ? 0 : moveResult.Moved) + ", skipped " + (moveResult == null ? 0 : moveResult.Skipped) + ", renamed-on-conflict " + (moveResult == null ? 0 : moveResult.RenamedOnConflict) + (duplicateImportsParked > 0 ? ", duplicate imports parked " + duplicateImportsParked : string.Empty) + ".");
+            if (moveResult != null && moveResult.ParkedDuplicates > 0)
+            {
+                lines.Add("Duplicate imports: parked " + moveResult.ParkedDuplicates + " file(s) in " + moveResult.DuplicateDestinationRoot + " because matching filename and byte size already exist in the library.");
+            }
             if (sortResult == null)
             {
                 lines.Add("Sort summary: skipped because no files were imported into the destination root.");

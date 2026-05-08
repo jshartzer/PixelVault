@@ -22,6 +22,7 @@ namespace PixelVaultNative
         string LibraryFolderSortMode { get; set; }
         string LibraryFolderFilterMode { get; set; }
         string LibraryGroupingMode { get; set; }
+        int LibrarySessionThresholdMinutes { get; set; }
         int LibraryFolderTileSize { get; set; }
         int LibraryFolderGridColumnCount { get; set; }
         bool LibraryFolderFillPaneWidth { get; set; }
@@ -94,6 +95,7 @@ namespace PixelVaultNative
         void ShowLibraryCommandPalette(Window owner, LibraryBrowserPaletteContext context, string initialSearch);
 
         void LibraryBrowserShowAchievementsInfo(Window owner, LibraryBrowserFolderView view);
+        void LibraryBrowserOpenGameProfile(Window owner, LibraryBrowserFolderView view);
 
         void LibraryBrowserPaletteOpenSettings();
         void LibraryBrowserPaletteOpenHealthDashboard(Window owner);

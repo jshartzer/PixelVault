@@ -26,8 +26,10 @@ namespace PixelVaultNative
             var renderStopwatch = Stopwatch.StartNew();
             var groupingMode = NormalizeLibraryGroupingMode(libraryGroupingMode);
             var timelineMode = string.Equals(groupingMode, "timeline", StringComparison.OrdinalIgnoreCase);
+            var sessionsMode = string.Equals(groupingMode, "sessions", StringComparison.OrdinalIgnoreCase);
+            var timeProjectionMode = timelineMode || sessionsMode;
             var photoWorkspaceRail = ws.WorkspaceMode == LibraryWorkspaceMode.Photo;
-            if (!timelineMode && panes?.TileScroll != null && !ws.PreserveFolderScrollOnNextRender)
+            if (!timeProjectionMode && panes?.TileScroll != null && !ws.PreserveFolderScrollOnNextRender)
             {
                 var liveFolderScroll = panes.TileScroll.VerticalOffset;
                 if (liveFolderScroll > 0.1d)
@@ -45,7 +47,7 @@ namespace PixelVaultNative
             var searchText = ws.AppliedLibrarySearchText;
             var searchNormalized = string.IsNullOrWhiteSpace(searchText) ? null : searchText.Trim().ToLowerInvariant();
             var projectionStopwatch = Stopwatch.StartNew();
-            var browserFolders = GetOrBuildLibraryBrowserFolderViews(folders, timelineMode ? "all" : groupingMode);
+            var browserFolders = GetOrBuildLibraryBrowserFolderViews(folders, timeProjectionMode ? "all" : groupingMode);
             projectionStopwatch.Stop();
             ws.ViewFolders.Clear();
             ws.ViewFolders.AddRange(browserFolders);
@@ -65,17 +67,19 @@ namespace PixelVaultNative
                         NormalizeConsoleLabel))
                 .ToList();
             filterSortStopwatch.Stop();
-            if (timelineMode)
+            if (timeProjectionMode)
             {
-                var timelineView = BuildLibraryBrowserTimelineView(visibleFolders);
+                var projectionView = sessionsMode
+                    ? BuildLibraryBrowserSessionView(visibleFolders, librarySessionThresholdMinutes)
+                    : BuildLibraryBrowserTimelineView(visibleFolders);
                 ws.PendingSessionRestore = false;
                 ws.PendingRestoreViewKey = null;
                 ws.PendingRestoreDetailScrollAfterShow = 0;
                 SetVirtualizedRows(panes.TileRows, new List<VirtualizedRowDefinition>(), true, null);
-                showFolder(timelineView);
+                showFolder(projectionView);
                 renderStopwatch.Stop();
-                LogPerformanceSample("LibraryFolderRender", renderStopwatch, "mode=timeline; foldersLoaded=" + folders.Count + "; views=" + browserFolders.Count + "; visible=" + visibleFolders.Count + "; files=" + timelineView.FileCount + "; search=" + (string.IsNullOrWhiteSpace(searchText) ? "(none)" : searchText) + "; projectMs=" + projectionStopwatch.ElapsedMilliseconds + "; filterMs=" + filterSortStopwatch.ElapsedMilliseconds, 40);
-                LogLibraryBrowserFirstFolderListPaintOnce("mode=timeline; visible=" + visibleFolders.Count + "; files=" + timelineView.FileCount);
+                LogPerformanceSample("LibraryFolderRender", renderStopwatch, "mode=" + (sessionsMode ? "sessions" : "timeline") + "; foldersLoaded=" + folders.Count + "; views=" + browserFolders.Count + "; visible=" + visibleFolders.Count + "; files=" + projectionView.FileCount + (sessionsMode ? "; thresholdMin=" + SettingsService.NormalizeLibrarySessionThresholdMinutes(librarySessionThresholdMinutes) : string.Empty) + "; search=" + (string.IsNullOrWhiteSpace(searchText) ? "(none)" : searchText) + "; projectMs=" + projectionStopwatch.ElapsedMilliseconds + "; filterMs=" + filterSortStopwatch.ElapsedMilliseconds, 40);
+                LogLibraryBrowserFirstFolderListPaintOnce("mode=" + (sessionsMode ? "sessions" : "timeline") + "; visible=" + visibleFolders.Count + "; files=" + projectionView.FileCount);
                 return;
             }
             var orderedVisibleFolders = visibleFolders

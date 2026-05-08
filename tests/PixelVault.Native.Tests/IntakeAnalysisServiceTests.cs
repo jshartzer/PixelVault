@@ -121,6 +121,148 @@ public sealed class IntakeAnalysisServiceTests
     }
 
     [Fact]
+    public void AnalyzeFiles_XboxGameBarRecording_UsesFilenameDateAndPcTag()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "pv_intake_test_" + Guid.NewGuid().ToString("N"));
+        var temp = Path.Combine(root, "Diablo IV 2026-05-07 19-54-29.mp4");
+        try
+        {
+            Directory.CreateDirectory(root);
+            File.WriteAllBytes(temp, new byte[] { 0 });
+            var parser = new FilenameParserService(new FilenameParserServiceDependencies
+            {
+                LoadCustomConventions = _ => new List<FilenameConventionRule>(),
+                LoadSavedGameIndexRows = _ => new List<GameIndexEditorRow>(),
+                NormalizeGameIndexName = value => (value ?? string.Empty).Trim(),
+                ParseTagText = value => (value ?? string.Empty).Split(new[] { ',', ';', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries),
+                IsVideo = file => string.Equals(Path.GetExtension(file), ".mp4", StringComparison.OrdinalIgnoreCase),
+                NormalizeConsoleLabel = MainWindow.NormalizeConsoleLabel
+            });
+            var svc = new IntakeAnalysisService(
+                file => parser.Parse(file, string.Empty),
+                file => string.Equals(Path.GetExtension(file), ".mp4", StringComparison.OrdinalIgnoreCase),
+                _ => DateTime.MinValue);
+
+            var map = svc.AnalyzeFiles(new[] { temp });
+
+            var a = Assert.Single(map.Values);
+            Assert.True(a.CanUpdateMetadata);
+            Assert.True(a.PreserveFileTimes);
+            Assert.Equal("PC", a.Parsed.PlatformLabel);
+            Assert.Contains("PC", a.Parsed.PlatformTags);
+            Assert.Equal("Diablo IV", a.Parsed.GameTitleHint);
+            Assert.Equal(new DateTime(2026, 5, 7, 19, 54, 29), a.CaptureTime);
+        }
+        finally
+        {
+            try
+            {
+                if (Directory.Exists(root)) Directory.Delete(root, true);
+            }
+            catch
+            {
+                // ignore
+            }
+        }
+    }
+
+    [Fact]
+    public void AnalyzeFiles_TitlelessSwitchAlbumCapture_UsesUploadFolderTitleHint()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "pv_intake_test_" + Guid.NewGuid().ToString("N"));
+        var gameFolder = Path.Combine(root, "Mario Kart World");
+        var temp = Path.Combine(gameFolder, "2026050719542900-8AEDFF741E2D23FBED39474178692DAF.jpg");
+        try
+        {
+            Directory.CreateDirectory(gameFolder);
+            File.WriteAllBytes(temp, new byte[] { 0 });
+            var parser = new FilenameParserService(new FilenameParserServiceDependencies
+            {
+                LoadCustomConventions = _ => new List<FilenameConventionRule>(),
+                LoadSavedGameIndexRows = _ => new List<GameIndexEditorRow>(),
+                NormalizeGameIndexName = value => (value ?? string.Empty).Trim(),
+                ParseTagText = value => (value ?? string.Empty).Split(new[] { ',', ';', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries),
+                IsVideo = _ => false,
+                NormalizeConsoleLabel = MainWindow.NormalizeConsoleLabel
+            });
+            var svc = new IntakeAnalysisService(
+                file => parser.Parse(file, string.Empty),
+                _ => false,
+                _ => DateTime.MinValue,
+                null,
+                file => string.Equals(file, temp, StringComparison.OrdinalIgnoreCase) ? "Mario Kart World" : string.Empty);
+
+            var map = svc.AnalyzeFiles(new[] { temp });
+
+            var a = Assert.Single(map.Values);
+            Assert.True(a.CanUpdateMetadata);
+            Assert.Equal("Switch", a.Parsed.PlatformLabel);
+            Assert.Contains("Switch", a.Parsed.PlatformTags);
+            Assert.Equal("Mario Kart World", a.Parsed.GameTitleHint);
+            Assert.Equal(new DateTime(2026, 5, 7, 19, 54, 29), a.CaptureTime);
+        }
+        finally
+        {
+            try
+            {
+                if (Directory.Exists(root)) Directory.Delete(root, true);
+            }
+            catch
+            {
+                // ignore
+            }
+        }
+    }
+
+    [Fact]
+    public void AnalyzeFiles_TitlelessSwitchCaptureSuffix_UsesUploadFolderTitleHint()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "pv_intake_test_" + Guid.NewGuid().ToString("N"));
+        var gameFolder = Path.Combine(root, "Mario Kart World");
+        var temp = Path.Combine(gameFolder, "2018032120305000_c.jpg");
+        try
+        {
+            Directory.CreateDirectory(gameFolder);
+            File.WriteAllBytes(temp, new byte[] { 0 });
+            var parser = new FilenameParserService(new FilenameParserServiceDependencies
+            {
+                LoadCustomConventions = _ => new List<FilenameConventionRule>(),
+                LoadSavedGameIndexRows = _ => new List<GameIndexEditorRow>(),
+                NormalizeGameIndexName = value => (value ?? string.Empty).Trim(),
+                ParseTagText = value => (value ?? string.Empty).Split(new[] { ',', ';', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries),
+                IsVideo = _ => false,
+                NormalizeConsoleLabel = MainWindow.NormalizeConsoleLabel
+            });
+            var svc = new IntakeAnalysisService(
+                file => parser.Parse(file, string.Empty),
+                _ => false,
+                _ => DateTime.MinValue,
+                null,
+                file => string.Equals(file, temp, StringComparison.OrdinalIgnoreCase) ? "Mario Kart World" : string.Empty);
+
+            var map = svc.AnalyzeFiles(new[] { temp });
+
+            var a = Assert.Single(map.Values);
+            Assert.True(a.CanUpdateMetadata);
+            Assert.Equal("Switch", a.Parsed.PlatformLabel);
+            Assert.Contains("Switch", a.Parsed.PlatformTags);
+            Assert.Equal("Mario Kart World", a.Parsed.GameTitleHint);
+            Assert.Equal(new DateTime(2018, 3, 21, 20, 30, 50), a.CaptureTime);
+        }
+        finally
+        {
+            try
+            {
+                if (Directory.Exists(root)) Directory.Delete(root, true);
+            }
+            catch
+            {
+                // ignore
+            }
+        }
+    }
+
+    [Fact]
     public void FilenameAutoIntakeModes_Normalize_UnknownDefaultsToManualOnly()
     {
         Assert.Equal(FilenameAutoIntakeModes.ManualOnly, FilenameAutoIntakeModes.Normalize(null));

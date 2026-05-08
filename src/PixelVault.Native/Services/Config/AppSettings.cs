@@ -44,6 +44,7 @@ namespace PixelVaultNative
         public string LibraryFolderSortMode = "alpha";
         public string LibraryFolderFilterMode = "all";
         public string LibraryGroupingMode = "all";
+        public int LibrarySessionThresholdMinutes = 60;
         /// <summary>Committed library search box text (persists across sessions).</summary>
         public string LibraryBrowserSearchText = string.Empty;
         /// <summary><see cref="LibraryBrowserFolderView.ViewKey"/> of last selected folder.</summary>
@@ -107,6 +108,7 @@ namespace PixelVaultNative
                 LibraryFolderSortMode = s.LibraryFolderSortMode ?? "alpha",
                 LibraryFolderFilterMode = s.LibraryFolderFilterMode ?? "all",
                 LibraryGroupingMode = s.LibraryGroupingMode ?? "all",
+                LibrarySessionThresholdMinutes = SettingsService.NormalizeLibrarySessionThresholdMinutes(s.LibrarySessionThresholdMinutes),
                 LibraryBrowserSearchText = s.LibraryBrowserSearchText ?? string.Empty,
                 LibraryBrowserLastViewKey = s.LibraryBrowserLastViewKey ?? string.Empty,
                 LibraryBrowserFolderScroll = s.LibraryBrowserFolderScroll,

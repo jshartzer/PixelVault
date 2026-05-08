@@ -238,6 +238,7 @@ namespace PixelVaultNative
             var actionFolder = GetLibraryBrowserPrimaryFolder(folder) ?? displayFolder;
             var actionFolders = GetLibraryBrowserActionFolders(folder);
             var badgePlatformLabel = folder == null ? string.Empty : folder.PrimaryPlatformLabel;
+            var canOpenProfile = folder != null && !IsLibraryBrowserTimeProjectionView(folder);
             var showPlatformContext = ShouldShowLibraryBrowserPlatformContext();
             var showPlatformBadgeOnTile = showPlatformBadge && showPlatformContext && !string.IsNullOrWhiteSpace(badgePlatformLabel);
             var tileFallbackText = string.IsNullOrWhiteSpace(folder == null ? string.Empty : folder.Name)
@@ -290,8 +291,19 @@ namespace PixelVaultNative
                 FontWeight = FontWeights.SemiBold,
                 FontSize = 12,
                 MaxHeight = 30,
-                LineHeight = 15
+                LineHeight = 15,
+                Cursor = canOpenProfile ? Cursors.Hand : Cursors.Arrow,
+                ToolTip = canOpenProfile ? "Open game profile" : null
             };
+            if (canOpenProfile)
+            {
+                titleBlock.MouseLeftButtonDown += delegate(object _, MouseButtonEventArgs e)
+                {
+                    if (e.ChangedButton != MouseButton.Left) return;
+                    e.Handled = true;
+                    LibraryBrowserOpenGameProfile(Window.GetWindow(tile) ?? this, folder);
+                };
+            }
             var subtitleBlock = new TextBlock
             {
                 Text = BuildLibraryBrowserFolderTileSubtitle(folder),
@@ -509,6 +521,8 @@ namespace PixelVaultNative
                 LibraryBrowserEnterPhotoWorkspace(ws, folder, showFolder);
             };
             var contextMenu = new ContextMenu();
+            var openProfileItem = new MenuItem { Header = "Open Game Profile", IsEnabled = canOpenProfile };
+            openProfileItem.Click += delegate { LibraryBrowserOpenGameProfile(Window.GetWindow(tile) ?? this, folder); };
             var openMyCoversItem = new MenuItem { Header = "Open My Covers Folder" };
             openMyCoversItem.Click += delegate { OpenSavedCoversFolder(); };
             var setCoverItem = new MenuItem { Header = "Set Custom Cover...", IsEnabled = actionFolders.Count > 0 };
@@ -623,6 +637,8 @@ namespace PixelVaultNative
                     null,
                     libraryToast).ConfigureAwait(true);
             };
+            contextMenu.Items.Add(openProfileItem);
+            contextMenu.Items.Add(new Separator());
             contextMenu.Items.Add(openFolderItem);
             contextMenu.Items.Add(copyFolderPathItem);
             contextMenu.Items.Add(editMetadataItem);
@@ -711,16 +727,20 @@ namespace PixelVaultNative
             var displayFolder = BuildLibraryBrowserDisplayFolder(info);
             var actionFolder = GetLibraryBrowserPrimaryFolder(info) ?? displayFolder;
             var timelineView = IsLibraryBrowserTimelineView(info);
-            activeSelectedLibraryFolder = timelineView ? null : CloneLibraryFolderInfo(actionFolder);
-            panes.DetailTitle.Text = timelineView ? "Timeline" : info.Name;
+            var sessionView = IsLibraryBrowserSessionView(info);
+            var timeProjectionView = IsLibraryBrowserTimeProjectionView(info);
+            activeSelectedLibraryFolder = timeProjectionView ? null : CloneLibraryFolderInfo(actionFolder);
+            panes.DetailTitle.Text = sessionView ? "Sessions" : (timelineView ? "Timeline" : info.Name);
             panes.DetailTitle.Visibility = Visibility.Visible;
+            panes.DetailTitle.Cursor = timeProjectionView ? Cursors.Arrow : Cursors.Hand;
+            panes.DetailTitle.ToolTip = timeProjectionView ? null : "Open game profile";
             if (ws.WorkspaceMode != LibraryWorkspaceMode.Photo)
-                UpdateLibraryBrowserDetailTitleBadges(panes, timelineView ? null : info);
+                UpdateLibraryBrowserDetailTitleBadges(panes, timeProjectionView ? null : info);
             panes.DetailMeta.Text = BuildLibraryBrowserDetailMetaText(info, actionFolder);
             var openFolderLabel = BuildLibraryBrowserOpenFoldersLabel(info);
             panes.OpenFolderButton.ToolTip = openFolderLabel;
             AccessibilityUi.TrySetAutomationName(panes.OpenFolderButton, openFolderLabel);
-            if (timelineView)
+            if (timeProjectionView)
             {
                 panes.PreviewImage.Source = null;
                 panes.PreviewImage.Visibility = Visibility.Collapsed;

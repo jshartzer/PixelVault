@@ -4,7 +4,6 @@ using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 
 namespace PixelVaultNative
@@ -93,8 +92,12 @@ namespace PixelVaultNative
                 Action refreshTimelineRangeUi = null;
                 Action<string> applyTimelinePreset = null;
                 Action applyTimelineDatePickerRange = null;
+                Action refreshSessionsThresholdUi = null;
+                Action<int> applySessionsThreshold = null;
+                Action refreshFolderColumnPickerUi = null;
                 var lastFolderGroupingMode = _shell.NormalizeLibraryGroupingMode(_shell.LibraryGroupingMode);
-                if (string.Equals(lastFolderGroupingMode, "timeline", StringComparison.OrdinalIgnoreCase)) lastFolderGroupingMode = "all";
+                if (string.Equals(lastFolderGroupingMode, "timeline", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(lastFolderGroupingMode, "sessions", StringComparison.OrdinalIgnoreCase)) lastFolderGroupingMode = "all";
                 Func<LibraryBrowserFolderView, LibraryFolderInfo> getDisplayFolder = delegate(LibraryBrowserFolderView view)
                 {
                     return _shell.BuildLibraryBrowserDisplayFolder(view);
@@ -130,7 +133,9 @@ namespace PixelVaultNative
 
                 refreshSortButtons = delegate
                 {
-                    var timelineMode = string.Equals(_shell.NormalizeLibraryGroupingMode(_shell.LibraryGroupingMode), "timeline", StringComparison.OrdinalIgnoreCase);
+                    var grouping = _shell.NormalizeLibraryGroupingMode(_shell.LibraryGroupingMode);
+                    var timelineMode = string.Equals(grouping, "timeline", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(grouping, "sessions", StringComparison.OrdinalIgnoreCase);
                     var sortMode = _shell.NormalizeLibraryFolderSortMode(_shell.LibraryFolderSortMode);
                     var filterMode = _shell.NormalizeLibraryFolderFilterMode(_shell.LibraryFolderFilterMode);
                     var sortActive = !timelineMode && !string.Equals(sortMode, "alpha", StringComparison.OrdinalIgnoreCase);
@@ -158,6 +163,23 @@ namespace PixelVaultNative
                     _shell.LibraryBrowserApplySortGroupPillState(panes.PhotoRailColumnOneButton, effective == 1);
                     _shell.LibraryBrowserApplySortGroupPillState(panes.PhotoRailColumnTwoButton, effective == 2);
                 };
+                int resolveFolderColumnPickerCount()
+                {
+                    var rendered = ws.LastFolderColumns > 0 ? ws.LastFolderColumns : 0;
+                    if (rendered > 0) return Math.Max(1, Math.Min(12, rendered));
+                    var saved = _shell.NormalizeLibraryFolderGridColumnCountValue(_shell.LibraryFolderGridColumnCount);
+                    if (saved > 0) return Math.Max(1, Math.Min(12, saved));
+                    return 4;
+                }
+                refreshFolderColumnPickerUi = delegate
+                {
+                    if (panes.FolderCoverLayoutButton == null) return;
+                    var count = resolveFolderColumnPickerCount();
+                    panes.FolderCoverLayoutButton.Content = count + (count == 1 ? " column" : " columns");
+                    panes.FolderCoverLayoutButton.ToolTip = "Folder cover columns: " + count + ". Use the arrows to change the count.";
+                    if (panes.FolderColumnDecreaseButton != null) panes.FolderColumnDecreaseButton.ToolTip = count <= 1 ? "Already at the minimum column count" : "Show fewer cover columns";
+                    if (panes.FolderColumnIncreaseButton != null) panes.FolderColumnIncreaseButton.ToolTip = count >= 12 ? "Already at the maximum column count" : "Show more cover columns";
+                };
 
                 refreshGroupingButtons = delegate
                 {
@@ -165,7 +187,9 @@ namespace PixelVaultNative
                     _shell.LibraryBrowserApplySortGroupPillState(panes.GroupAllButton, string.Equals(normalized, "all", StringComparison.OrdinalIgnoreCase));
                     _shell.LibraryBrowserApplySortGroupPillState(panes.GroupConsoleButton, string.Equals(normalized, "console", StringComparison.OrdinalIgnoreCase));
                     _shell.LibraryBrowserApplySortGroupPillState(panes.GroupTimelineButton, string.Equals(normalized, "timeline", StringComparison.OrdinalIgnoreCase));
+                    _shell.LibraryBrowserApplySortGroupPillState(panes.GroupSessionsButton, string.Equals(normalized, "sessions", StringComparison.OrdinalIgnoreCase));
                     refreshTimelineRangeUi?.Invoke();
+                    refreshSessionsThresholdUi?.Invoke();
                 };
 
                 var suppressTimelineRangeSync = false;
@@ -187,6 +211,18 @@ namespace PixelVaultNative
                     if (panes.TimelineStartDatePicker != null) panes.TimelineStartDatePicker.SelectedDate = rangeStart;
                     if (panes.TimelineEndDatePicker != null) panes.TimelineEndDatePicker.SelectedDate = rangeEnd;
                     suppressTimelineRangeSync = false;
+                };
+                refreshSessionsThresholdUi = delegate
+                {
+                    if (panes.SessionsFilterPanel == null) return;
+                    var sessionsMode = string.Equals(_shell.NormalizeLibraryGroupingMode(_shell.LibraryGroupingMode), "sessions", StringComparison.OrdinalIgnoreCase);
+                    panes.SessionsFilterPanel.Visibility = sessionsMode ? Visibility.Visible : Visibility.Collapsed;
+                    var threshold = SettingsService.NormalizeLibrarySessionThresholdMinutes(_shell.LibrarySessionThresholdMinutes);
+                    _shell.LibraryBrowserApplySortGroupPillState(panes.SessionThresholdThirtyButton, threshold == 30);
+                    _shell.LibraryBrowserApplySortGroupPillState(panes.SessionThresholdSixtyButton, threshold == 60);
+                    _shell.LibraryBrowserApplySortGroupPillState(panes.SessionThresholdNinetyButton, threshold == 90);
+                    _shell.LibraryBrowserApplySortGroupPillState(panes.SessionThresholdOneTwentyButton, threshold == 120);
+                    _shell.LibraryBrowserApplySortGroupPillState(panes.SessionThresholdOneEightyButton, threshold == 180);
                 };
                 Action<DateTime, DateTime, bool> applyTimelineDateRange = delegate(DateTime startDate, DateTime endDate, bool rerender)
                 {
@@ -215,6 +251,19 @@ namespace PixelVaultNative
                     if (panes.TimelineStartDatePicker == null || panes.TimelineEndDatePicker == null) return;
                     if (!panes.TimelineStartDatePicker.SelectedDate.HasValue || !panes.TimelineEndDatePicker.SelectedDate.HasValue) return;
                     applyTimelineDateRange(panes.TimelineStartDatePicker.SelectedDate.Value, panes.TimelineEndDatePicker.SelectedDate.Value, true);
+                };
+                applySessionsThreshold = delegate(int minutes)
+                {
+                    var normalized = SettingsService.NormalizeLibrarySessionThresholdMinutes(minutes);
+                    if (_shell.LibrarySessionThresholdMinutes != normalized)
+                    {
+                        _shell.LibrarySessionThresholdMinutes = normalized;
+                        _shell.SaveSettings();
+                    }
+                    refreshSessionsThresholdUi?.Invoke();
+                    if (!string.Equals(_shell.NormalizeLibraryGroupingMode(_shell.LibraryGroupingMode), "sessions", StringComparison.OrdinalIgnoreCase)) return;
+                    if (ws.Current != null && renderTiles != null) renderTiles();
+                    _shell.LibraryBrowserShowToast(ws, "Session threshold: " + normalized + " minutes");
                 };
 
                 setLibrarySortMode = delegate(string mode)
@@ -248,7 +297,8 @@ namespace PixelVaultNative
                     var normalized = string.Equals((mode ?? string.Empty).Trim(), "folders", StringComparison.OrdinalIgnoreCase)
                         ? lastFolderGroupingMode
                         : _shell.NormalizeLibraryGroupingMode(mode);
-                    if (!string.Equals(normalized, "timeline", StringComparison.OrdinalIgnoreCase))
+                    if (!string.Equals(normalized, "timeline", StringComparison.OrdinalIgnoreCase)
+                        && !string.Equals(normalized, "sessions", StringComparison.OrdinalIgnoreCase))
                     {
                         lastFolderGroupingMode = normalized;
                     }
@@ -328,10 +378,17 @@ namespace PixelVaultNative
                 renderFolderTilesCore = delegate
                 {
                     _shell.LibraryBrowserRenderFolderList(ws, buildFolderTile, showFolder, renderSelectedFolder, renderFolderTilesCore, clearLibrarySearchAndRerender, refreshLibraryFoldersLoose);
+                    refreshFolderColumnPickerUi?.Invoke();
                 };
                 renderTiles = renderFolderTilesCore;
                 ws.RerenderFolderList = renderFolderTilesCore;
                 ws.RefreshDetailPaneForPhotoFilters = renderSelectedFolder;
+                ws.OpenPhotoWorkspaceForFolder = delegate(LibraryBrowserFolderView target)
+                {
+                    if (target == null) return;
+                    showFolder(target);
+                    _shell.LibraryBrowserEnterPhotoWorkspaceFromSelection(ws, showFolder);
+                };
 
                 refreshLibraryFoldersAsync = delegate(bool forceRefresh)
                 {
@@ -360,12 +417,13 @@ namespace PixelVaultNative
                     if (panes.OpenCapturesButton != null && isBusy) panes.OpenCapturesButton.IsEnabled = false;
                     if (panes.PhotoWorkspaceDividerToggleButton != null) panes.PhotoWorkspaceDividerToggleButton.IsEnabled = !isBusy;
                     panes.FolderCoverLayoutButton.IsEnabled = !isBusy;
+                    if (panes.FolderColumnDecreaseButton != null) panes.FolderColumnDecreaseButton.IsEnabled = !isBusy;
+                    if (panes.FolderColumnIncreaseButton != null) panes.FolderColumnIncreaseButton.IsEnabled = !isBusy;
                     if (panes.PhotoAchievementsButton != null) panes.PhotoAchievementsButton.IsEnabled = !isBusy && ws.Current != null;
                     if (panes.PhotoRailColumnOneButton != null) panes.PhotoRailColumnOneButton.IsEnabled = !isBusy;
                     if (panes.PhotoRailColumnTwoButton != null) panes.PhotoRailColumnTwoButton.IsEnabled = !isBusy;
                     panes.ShortcutsHelpButton.IsEnabled = !isBusy;
                     if (panes.CommandPaletteButton != null) panes.CommandPaletteButton.IsEnabled = !isBusy;
-                    navChrome.ExportStarredButton.IsEnabled = !isBusy;
                     navChrome.ImportButton.IsEnabled = !isBusy;
                     navChrome.ImportCommentsButton.IsEnabled = !isBusy;
                     navChrome.ManualImportButton.IsEnabled = !isBusy;
@@ -548,6 +606,7 @@ namespace PixelVaultNative
                     GroupFoldersAllGames = () => setLibraryGroupingMode("all"),
                     GroupFoldersByConsole = () => setLibraryGroupingMode("console"),
                     GroupFoldersTimeline = () => setLibraryGroupingMode("timeline"),
+                    GroupFoldersSessions = () => setLibraryGroupingMode("sessions"),
                     GroupFoldersFolderGrid = () => setLibraryGroupingMode("folders"),
                     EnterPhotoWorkspace = () => _shell.LibraryBrowserEnterPhotoWorkspaceFromSelection(ws, showFolder),
                     ExitPhotoWorkspace = () => _shell.LibraryBrowserExitPhotoWorkspace(ws, renderTiles)
@@ -588,72 +647,37 @@ namespace PixelVaultNative
                         _shell.LibraryBrowserToggleQuickEditDrawer(ws);
                     }
                 };
-                var folderCoverLayoutMenu = new ContextMenu();
+                void ApplyFolderColumnCount(int columns)
+                {
+                    if (ws.WorkspaceMode == LibraryWorkspaceMode.Photo) return;
+                    var normalized = _shell.NormalizeLibraryFolderGridColumnCountValue(columns);
+                    if (normalized <= 0) normalized = 1;
+                    _shell.LibraryFolderGridColumnCount = normalized;
+                    _shell.SaveSettings();
+                    if (renderTiles != null) renderTiles();
+                    refreshFolderColumnPickerUi?.Invoke();
+                    _shell.LibraryBrowserShowToast(ws, "Cover columns: " + normalized);
+                }
+                void AdjustFolderColumnCount(int delta)
+                {
+                    var current = resolveFolderColumnPickerCount();
+                    var next = Math.Max(1, Math.Min(12, current + delta));
+                    if (next == current)
+                    {
+                        _shell.LibraryBrowserShowToast(ws, current <= 1 ? "Cover columns: minimum is 1" : "Cover columns: maximum is 12");
+                        return;
+                    }
+                    ApplyFolderColumnCount(next);
+                }
                 panes.FolderCoverLayoutButton.Click += delegate
                 {
                     if (ws.WorkspaceMode == LibraryWorkspaceMode.Photo) return;
-                    folderCoverLayoutMenu.Items.Clear();
-                    void AddFolderCoverPreset(string label, int px)
-                    {
-                        var item = new MenuItem { Header = label };
-                        item.Click += delegate
-                        {
-                            var norm = _shell.NormalizeLibraryFolderTileSizeValue(px);
-                            _shell.LibraryFolderTileSize = norm;
-                            _shell.SaveSettings();
-                            if (renderTiles != null) renderTiles();
-                            _shell.LibraryBrowserShowToast(ws, "Cover size: " + label + " (" + norm + " px)");
-                        };
-                        folderCoverLayoutMenu.Items.Add(item);
-                    }
-                    AddFolderCoverPreset("Compact", 52);
-                    AddFolderCoverPreset("Medium", 220);
-                    AddFolderCoverPreset("Comfortable", 380);
-                    AddFolderCoverPreset("Roomy", 560);
-                    AddFolderCoverPreset("Large (max)", 1000);
-                    var fillPaneItem = new MenuItem
-                    {
-                        Header = "Fill pane width (auto columns)",
-                        IsCheckable = true,
-                        ToolTip = "When Columns is Auto, add more columns on wide windows so rows use the full folder pane (still respects Cover size)."
-                    };
-                    fillPaneItem.IsChecked = _shell.LibraryFolderFillPaneWidth;
-                    fillPaneItem.Click += delegate
-                    {
-                        _shell.LibraryFolderFillPaneWidth = fillPaneItem.IsChecked == true;
-                        _shell.SaveSettings();
-                        if (renderTiles != null) renderTiles();
-                        _shell.LibraryBrowserShowToast(
-                            ws,
-                            _shell.LibraryFolderFillPaneWidth
-                                ? "Folder grid fills pane width (auto)"
-                                : "Folder grid: compact auto rows (max 4 columns)");
-                    };
-                    folderCoverLayoutMenu.Items.Add(fillPaneItem);
-                    var folderColumnsMenu = new MenuItem { Header = "Columns" };
-                    void AddFolderColumnChoice(string label, int cols)
-                    {
-                        var colItem = new MenuItem { Header = label };
-                        colItem.Click += delegate
-                        {
-                            _shell.LibraryFolderGridColumnCount = _shell.NormalizeLibraryFolderGridColumnCountValue(cols);
-                            _shell.SaveSettings();
-                            if (renderTiles != null) renderTiles();
-                            _shell.LibraryBrowserShowToast(ws, cols <= 0 ? "Cover columns: auto" : "Cover columns: " + cols);
-                        };
-                        folderColumnsMenu.Items.Add(colItem);
-                    }
-                    AddFolderColumnChoice("Auto", 0);
-                    for (var colN = 1; colN <= 12; colN++)
-                    {
-                        var captured = colN;
-                        AddFolderColumnChoice(captured.ToString(), captured);
-                    }
-                    folderCoverLayoutMenu.Items.Add(folderColumnsMenu);
-                    folderCoverLayoutMenu.PlacementTarget = panes.FolderCoverLayoutButton;
-                    folderCoverLayoutMenu.Placement = PlacementMode.Bottom;
-                    folderCoverLayoutMenu.IsOpen = true;
+                    ApplyFolderColumnCount(resolveFolderColumnPickerCount());
                 };
+                if (panes.FolderColumnDecreaseButton != null)
+                    panes.FolderColumnDecreaseButton.Click += delegate { AdjustFolderColumnCount(-1); };
+                if (panes.FolderColumnIncreaseButton != null)
+                    panes.FolderColumnIncreaseButton.Click += delegate { AdjustFolderColumnCount(1); };
                 if (panes.PhotoRailColumnOneButton != null)
                 {
                     panes.PhotoRailColumnOneButton.Click += delegate
@@ -679,6 +703,11 @@ namespace PixelVaultNative
                 panes.TimelinePresetThirtyDaysButton.Click += delegate { applyTimelinePreset("30d"); };
                 panes.TimelineStartDatePicker.SelectedDateChanged += delegate { applyTimelineDatePickerRange(); };
                 panes.TimelineEndDatePicker.SelectedDateChanged += delegate { applyTimelineDatePickerRange(); };
+                panes.SessionThresholdThirtyButton.Click += delegate { applySessionsThreshold(30); };
+                panes.SessionThresholdSixtyButton.Click += delegate { applySessionsThreshold(60); };
+                panes.SessionThresholdNinetyButton.Click += delegate { applySessionsThreshold(90); };
+                panes.SessionThresholdOneTwentyButton.Click += delegate { applySessionsThreshold(120); };
+                panes.SessionThresholdOneEightyButton.Click += delegate { applySessionsThreshold(180); };
                 panes.RefreshThisFolderButton.Click += delegate
                 {
                     if (ws.Current == null) return;
@@ -692,6 +721,15 @@ namespace PixelVaultNative
                         _shell.LibraryBrowserShowAchievementsInfo(libraryWindow, ws.Current);
                     };
                 }
+                if (panes.DetailTitle != null)
+                {
+                    panes.DetailTitle.MouseLeftButtonDown += delegate(object _, MouseButtonEventArgs e)
+                    {
+                        if (e.ChangedButton != MouseButton.Left || ws.Current == null) return;
+                        e.Handled = true;
+                        _shell.LibraryBrowserOpenGameProfile(libraryWindow, ws.Current);
+                    };
+                }
                 libraryWindow.Activated += delegate
                 {
                     if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge();
@@ -700,6 +738,7 @@ namespace PixelVaultNative
                 refreshSortButtons();
                 refreshGroupingButtons();
                 refreshTimelineRangeUi();
+                refreshSessionsThresholdUi();
                 if (reuseMainWindow) _shell.RegisterLibraryBrowserLiveWorkingSet(ws);
                 if (!reuseMainWindow) libraryWindow.Show();
                 if (renderTiles != null) renderTiles();

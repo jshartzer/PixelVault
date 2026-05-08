@@ -23,6 +23,7 @@ namespace PixelVaultNative
             internal Button GroupAllButton;
             internal Button GroupConsoleButton;
             internal Button GroupTimelineButton;
+            internal Button GroupSessionsButton;
             internal Button OpenCapturesButton;
             internal Button SortFilterMenuButton;
             internal VirtualizedRowHost TileRows;
@@ -46,8 +47,16 @@ namespace PixelVaultNative
             internal Button TimelinePresetThirtyDaysButton;
             internal DatePicker TimelineStartDatePicker;
             internal DatePicker TimelineEndDatePicker;
+            internal WrapPanel SessionsFilterPanel;
+            internal Button SessionThresholdThirtyButton;
+            internal Button SessionThresholdSixtyButton;
+            internal Button SessionThresholdNinetyButton;
+            internal Button SessionThresholdOneTwentyButton;
+            internal Button SessionThresholdOneEightyButton;
             internal Button DeleteSelectedButton;
+            internal Button FolderColumnDecreaseButton;
             internal Button FolderCoverLayoutButton;
+            internal Button FolderColumnIncreaseButton;
             internal StackPanel PhotoRailColumnPickerHost;
             internal Button PhotoRailColumnOneButton;
             internal Button PhotoRailColumnTwoButton;
@@ -174,14 +183,24 @@ namespace PixelVaultNative
             panes.GroupTimelineButton.Width = 82;
             panes.GroupTimelineButton.Height = 32;
             panes.GroupTimelineButton.FontSize = 11.5;
-            panes.GroupTimelineButton.Margin = new Thickness(0);
+            panes.GroupTimelineButton.Margin = new Thickness(0, 0, 8, 0);
             ApplyLibraryPillChrome(panes.GroupTimelineButton, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
+            browserToolbar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            panes.GroupSessionsButton = Btn("Sessions", null, "#20343A", Brushes.White);
+            panes.GroupSessionsButton.Width = 86;
+            panes.GroupSessionsButton.Height = 32;
+            panes.GroupSessionsButton.FontSize = 11.5;
+            panes.GroupSessionsButton.Margin = new Thickness(0);
+            panes.GroupSessionsButton.ToolTip = "Group captures into play/photo sessions by time gap";
+            ApplyLibraryPillChrome(panes.GroupSessionsButton, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
             Grid.SetColumn(panes.GroupAllButton, 2);
             browserToolbar.Children.Add(panes.GroupAllButton);
             Grid.SetColumn(panes.GroupConsoleButton, 3);
             browserToolbar.Children.Add(panes.GroupConsoleButton);
             Grid.SetColumn(panes.GroupTimelineButton, 4);
             browserToolbar.Children.Add(panes.GroupTimelineButton);
+            Grid.SetColumn(panes.GroupSessionsButton, 5);
+            browserToolbar.Children.Add(panes.GroupSessionsButton);
             browserToolbar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             panes.OpenCapturesButton = Btn("Captures", null, "#1F3340", Brushes.White);
             panes.OpenCapturesButton.Height = 32;
@@ -189,7 +208,7 @@ namespace PixelVaultNative
             panes.OpenCapturesButton.Margin = new Thickness(10, 0, 0, 0);
             panes.OpenCapturesButton.ToolTip = "Open captures view (double-click a cover)";
             ApplyLibraryPillChrome(panes.OpenCapturesButton, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
-            Grid.SetColumn(panes.OpenCapturesButton, 5);
+            Grid.SetColumn(panes.OpenCapturesButton, 6);
             browserToolbar.Children.Add(panes.OpenCapturesButton);
             var toolbarScroll = new ScrollViewer
             {
@@ -235,18 +254,38 @@ namespace PixelVaultNative
             panes.ShortcutsHelpButton.ToolTip = "Keyboard shortcuts (F1) · Command palette (Ctrl+Shift+P)";
             ApplyLibraryPillChrome(panes.ShortcutsHelpButton, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
             panes.ShortcutsHelpButton.Height = 32;
-            panes.FolderCoverLayoutButton = Btn("Cover size ▾", null, "#20343A", Brushes.White);
-            panes.FolderCoverLayoutButton.MinWidth = 108;
+            panes.FolderColumnDecreaseButton = Btn("<", null, "#20343A", Brushes.White);
+            panes.FolderColumnDecreaseButton.Width = 32;
+            panes.FolderColumnDecreaseButton.Height = 32;
+            panes.FolderColumnDecreaseButton.FontSize = 13;
+            panes.FolderColumnDecreaseButton.Padding = new Thickness(0);
+            panes.FolderColumnDecreaseButton.Margin = new Thickness(0, 0, 4, 0);
+            panes.FolderColumnDecreaseButton.ToolTip = "Show fewer cover columns";
+            ApplyLibraryPillChrome(panes.FolderColumnDecreaseButton, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
+            panes.FolderColumnDecreaseButton.VerticalAlignment = VerticalAlignment.Center;
+            panes.FolderCoverLayoutButton = Btn("Columns", null, "#20343A", Brushes.White);
+            panes.FolderCoverLayoutButton.MinWidth = 92;
             panes.FolderCoverLayoutButton.Height = 32;
             panes.FolderCoverLayoutButton.FontSize = 11;
             panes.FolderCoverLayoutButton.Padding = new Thickness(10, 0, 10, 0);
-            panes.FolderCoverLayoutButton.Margin = new Thickness(0, 0, 6, 0);
-            panes.FolderCoverLayoutButton.ToolTip = "Folder cover size and layout (saved). Use Fill pane width + Columns → Auto to span wide panes. Ctrl+scroll on the cover list to fine-tune size.";
+            panes.FolderCoverLayoutButton.Margin = new Thickness(0, 0, 4, 0);
+            panes.FolderCoverLayoutButton.ToolTip = "Folder cover columns. Use the arrows to change the count.";
             ApplyLibraryPillChrome(panes.FolderCoverLayoutButton, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
             panes.FolderCoverLayoutButton.VerticalAlignment = VerticalAlignment.Center;
+            panes.FolderColumnIncreaseButton = Btn(">", null, "#20343A", Brushes.White);
+            panes.FolderColumnIncreaseButton.Width = 32;
+            panes.FolderColumnIncreaseButton.Height = 32;
+            panes.FolderColumnIncreaseButton.FontSize = 13;
+            panes.FolderColumnIncreaseButton.Padding = new Thickness(0);
+            panes.FolderColumnIncreaseButton.Margin = new Thickness(0, 0, 6, 0);
+            panes.FolderColumnIncreaseButton.ToolTip = "Show more cover columns";
+            ApplyLibraryPillChrome(panes.FolderColumnIncreaseButton, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
+            panes.FolderColumnIncreaseButton.VerticalAlignment = VerticalAlignment.Center;
             footerButtons.Children.Add(panes.CommandPaletteButton);
             footerButtons.Children.Add(panes.ShortcutsHelpButton);
+            footerButtons.Children.Add(panes.FolderColumnDecreaseButton);
             footerButtons.Children.Add(panes.FolderCoverLayoutButton);
+            footerButtons.Children.Add(panes.FolderColumnIncreaseButton);
             footerGrid.Children.Add(footerButtons);
             status.VerticalAlignment = VerticalAlignment.Center;
             status.Margin = new Thickness(12, 0, 0, 0);
@@ -670,6 +709,52 @@ namespace PixelVaultNative
             };
             panes.TimelineFilterPanel.Children.Add(panes.TimelineEndDatePicker);
             sliderPanel.Children.Add(panes.TimelineFilterPanel);
+            panes.SessionsFilterPanel = new WrapPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Margin = new Thickness(0, 0, 12, 0),
+                Visibility = Visibility.Collapsed
+            };
+            panes.SessionsFilterPanel.Children.Add(new TextBlock
+            {
+                Text = "New session after",
+                Foreground = Brush("#8FA4B0"),
+                FontSize = 11.5,
+                FontWeight = FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 10, 0)
+            });
+            Button BuildSessionThresholdButton(string label)
+            {
+                var button = Btn(label, null, "#20343A", Brushes.White);
+                button.Width = 54;
+                button.Height = 30;
+                button.FontSize = 11;
+                button.Margin = new Thickness(0, 0, 8, 0);
+                ApplyLibraryPillChrome(button, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
+                return button;
+            }
+            panes.SessionThresholdThirtyButton = BuildSessionThresholdButton("30");
+            panes.SessionThresholdSixtyButton = BuildSessionThresholdButton("60");
+            panes.SessionThresholdNinetyButton = BuildSessionThresholdButton("90");
+            panes.SessionThresholdOneTwentyButton = BuildSessionThresholdButton("120");
+            panes.SessionThresholdOneEightyButton = BuildSessionThresholdButton("180");
+            panes.SessionsFilterPanel.Children.Add(panes.SessionThresholdThirtyButton);
+            panes.SessionsFilterPanel.Children.Add(panes.SessionThresholdSixtyButton);
+            panes.SessionsFilterPanel.Children.Add(panes.SessionThresholdNinetyButton);
+            panes.SessionsFilterPanel.Children.Add(panes.SessionThresholdOneTwentyButton);
+            panes.SessionsFilterPanel.Children.Add(panes.SessionThresholdOneEightyButton);
+            panes.SessionsFilterPanel.Children.Add(new TextBlock
+            {
+                Text = "min",
+                Foreground = Brush("#8FA4B0"),
+                FontSize = 11.5,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 0, 0)
+            });
+            sliderPanel.Children.Add(panes.SessionsFilterPanel);
             panes.DeleteSelectedButton = new Button
             {
                 Width = 28,

@@ -20,7 +20,6 @@ namespace PixelVaultNative
             internal Button PhotoIndexButton;
             internal Button PhotographyGalleryButton;
             internal Button MyCoversButton;
-            internal Button ExportStarredButton;
             internal Button RefreshButton;
             internal Button IntakeReviewButton;
             internal Border IntakeReviewBadge;
@@ -103,7 +102,7 @@ namespace PixelVaultNative
             chrome.SettingsButton.Margin = new Thickness(0, 0, 12, 0);
             ApplyLibraryToolbarChrome(chrome.SettingsButton, "#18242B", "#24353F", "#22323C", "#131D23");
             chrome.SettingsButton.Content = BuildToolbarIconButtonContent("\uE713");
-            chrome.SettingsButton.ToolTip = "Settings and library actions";
+            chrome.SettingsButton.ToolTip = "Settings";
             AutomationProperties.SetName(chrome.SettingsButton, "Settings");
             chrome.GameIndexButton = Btn("Game Index", null, "#20343A", Brushes.White);
             chrome.GameIndexButton.Width = 122;
@@ -137,15 +136,6 @@ namespace PixelVaultNative
             chrome.MyCoversButton.Content = BuildToolbarIconButtonContent("\uEB9F");
             chrome.MyCoversButton.ToolTip = "Open the saved custom covers folder on disk";
             AutomationProperties.SetName(chrome.MyCoversButton, "My Covers");
-            chrome.ExportStarredButton = Btn("Export Starred", null, "#20343A", Brushes.White);
-            chrome.ExportStarredButton.Width = 150;
-            chrome.ExportStarredButton.Height = 42;
-            chrome.ExportStarredButton.FontSize = 13;
-            chrome.ExportStarredButton.Margin = new Thickness(0, 0, 12, 0);
-            chrome.ExportStarredButton.ToolTip = "Copy starred captures to the folder set in Path Settings, mirroring subfolders under the library root. Only new files or those with changed metadata are copied again; state is tracked per library in the index database. Existing files are replaced; read-only targets are cleared when possible.";
-            ApplyLibraryToolbarChrome(chrome.ExportStarredButton, "#18242B", "#24353F", "#22323C", "#131D23");
-            chrome.ExportStarredButton.Content = BuildToolbarButtonContent("\uE81E", "Export Starred");
-            chrome.ExportStarredButton.Visibility = Visibility.Collapsed;
             chrome.RefreshButton = Btn("Refresh", null, "#20343A", Brushes.White);
             chrome.RefreshButton.Width = 44;
             chrome.RefreshButton.Height = 42;

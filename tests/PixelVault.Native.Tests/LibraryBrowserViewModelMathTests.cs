@@ -110,6 +110,20 @@ namespace PixelVaultNative.Tests
         }
 
         [Fact]
+        public void BuildLibrarySessionLabels_IncludeTimeRangeAndThreshold()
+        {
+            var reference = new DateTime(2025, 7, 4);
+            var oldest = new DateTime(2025, 7, 4, 19, 10, 0);
+            var newest = new DateTime(2025, 7, 4, 20, 2, 0);
+
+            Assert.Equal("Today, 7:10 PM - 8:02 PM", LibraryBrowserViewModelMath.BuildLibrarySessionCardTitle(newest, oldest, reference));
+            Assert.Equal("12 captures | 52 min", LibraryBrowserViewModelMath.BuildLibrarySessionCardSubtitle(12, newest, oldest));
+            Assert.Equal(
+                "12 photos | 2 sessions | 3 games | 2 platforms | 90 min threshold | July 4, 2025",
+                LibraryBrowserViewModelMath.BuildLibrarySessionSummaryText(12, 2, 3, 2, newest, oldest, 90));
+        }
+
+        [Fact]
         public void CalculateLibraryTimelinePackedTileSize_ClampsToScaledRange()
         {
             var smallScreen = LibraryBrowserViewModelMath.CalculateLibraryTimelinePackedTileSize(0, 480d);

@@ -67,6 +67,8 @@ namespace PixelVaultNative
                 CompletedUtcTicks = view.CompletedUtcTicks,
                 IsMergedAcrossPlatforms = view.IsMergedAcrossPlatforms,
                 IsTimelineProjection = view.IsTimelineProjection,
+                IsSessionProjection = view.IsSessionProjection,
+                SessionThresholdMinutes = view.SessionThresholdMinutes,
                 PendingGameAssignment = view.PendingGameAssignment,
                 SearchBlob = view.SearchBlob
             };
@@ -145,12 +147,24 @@ namespace PixelVaultNative
 
         public bool IsLibraryBrowserTimelineMode()
         {
-            return string.Equals(NormalizeLibraryGroupingMode(_host.LibraryGroupingMode), "timeline", StringComparison.OrdinalIgnoreCase);
+            var mode = NormalizeLibraryGroupingMode(_host.LibraryGroupingMode);
+            return string.Equals(mode, "timeline", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(mode, "sessions", StringComparison.OrdinalIgnoreCase);
         }
 
         public bool IsLibraryBrowserTimelineView(LibraryBrowserFolderView view)
         {
             return view != null && view.IsTimelineProjection;
+        }
+
+        public bool IsLibraryBrowserSessionView(LibraryBrowserFolderView view)
+        {
+            return view != null && view.IsSessionProjection;
+        }
+
+        public bool IsLibraryBrowserTimeProjectionView(LibraryBrowserFolderView view)
+        {
+            return view != null && (view.IsTimelineProjection || view.IsSessionProjection);
         }
 
         public Dictionary<string, LibraryTimelineCaptureContext> BuildLibraryTimelineCaptureContextMap(
@@ -164,6 +178,10 @@ namespace PixelVaultNative
             var rowsByGameId = (savedGameRows ?? Enumerable.Empty<GameIndexEditorRow>())
                 .Where(row => row != null && !string.IsNullOrWhiteSpace(_host.NormalizeGameId(row.GameId)))
                 .GroupBy(row => _host.NormalizeGameId(row.GameId), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+            var rowsByTitlePlatform = (savedGameRows ?? Enumerable.Empty<GameIndexEditorRow>())
+                .Where(row => row != null && !string.IsNullOrWhiteSpace(_host.NormalizeGameIndexName(row.Name)))
+                .GroupBy(row => _host.NormalizeGameIndexName(row.Name) + "|" + MainWindow.NormalizeConsoleLabel(row.PlatformLabel), StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
             foreach (var file in (files ?? Enumerable.Empty<string>()).Where(path => !string.IsNullOrWhiteSpace(path)))
             {
@@ -179,19 +197,35 @@ namespace PixelVaultNative
                 var gameTitle = _host.NormalizeGameIndexName(savedRow == null ? string.Empty : savedRow.Name);
                 if (string.IsNullOrWhiteSpace(gameTitle)) gameTitle = _host.NormalizeGameIndexName(_host.GuessGameIndexNameForFile(file));
                 if (string.IsNullOrWhiteSpace(gameTitle)) gameTitle = "Unknown Game";
-                var platformLabel = MainWindow.NormalizeConsoleLabel(savedRow == null ? (entry == null ? string.Empty : entry.ConsoleLabel) : savedRow.PlatformLabel);
-                if (string.IsNullOrWhiteSpace(platformLabel) || string.Equals(platformLabel, "Other", StringComparison.OrdinalIgnoreCase))
+                var photoPlatformLabel = MainWindow.NormalizeConsoleLabel(entry == null ? string.Empty : entry.ConsoleLabel);
+                var rowPlatformLabel = MainWindow.NormalizeConsoleLabel(savedRow == null ? string.Empty : savedRow.PlatformLabel);
+                var platformLabel = MainWindow.ConsoleLabelBlocksFilenameFallback(photoPlatformLabel)
+                    ? photoPlatformLabel
+                    : rowPlatformLabel;
+                if (!MainWindow.ConsoleLabelBlocksFilenameFallback(platformLabel))
                 {
-                    platformLabel = MainWindow.NormalizeConsoleLabel(entry == null ? string.Empty : entry.ConsoleLabel);
+                    platformLabel = photoPlatformLabel;
                 }
-                if (string.IsNullOrWhiteSpace(platformLabel) || string.Equals(platformLabel, "Other", StringComparison.OrdinalIgnoreCase))
+                if (!MainWindow.ConsoleLabelBlocksFilenameFallback(platformLabel))
                 {
                     platformLabel = MainWindow.NormalizeConsoleLabel(_host.PrimaryPlatformLabel(file));
                 }
+                GameIndexEditorRow platformMatchedRow = null;
+                if (MainWindow.ConsoleLabelBlocksFilenameFallback(platformLabel))
+                {
+                    rowsByTitlePlatform.TryGetValue(gameTitle + "|" + platformLabel, out platformMatchedRow);
+                }
+                var externalIdRow = platformMatchedRow ?? savedRow;
                 contexts[file] = new LibraryTimelineCaptureContext
                 {
+                    GameId = normalizedGameId,
                     GameTitle = gameTitle,
                     PlatformLabel = platformLabel,
+                    SteamAppId = TextAndPathHelpers.CleanTag(externalIdRow == null ? string.Empty : externalIdRow.SteamAppId ?? string.Empty),
+                    RetroAchievementsGameId = TextAndPathHelpers.CleanTag(
+                        externalIdRow != null && !string.IsNullOrWhiteSpace(externalIdRow.RetroAchievementsGameId)
+                            ? externalIdRow.RetroAchievementsGameId
+                            : (entry == null ? string.Empty : entry.RetroAchievementsGameId ?? string.Empty)),
                     CaptureDate = captureDate,
                     Comment = metadataSnapshot == null ? string.Empty : TextAndPathHelpers.CleanComment(metadataSnapshot.Comment ?? string.Empty)
                 };
@@ -307,6 +341,11 @@ namespace PixelVaultNative
         {
             var itemCount = view == null ? 0 : Math.Max(view.FileCount, 0);
             var itemText = itemCount + " item" + (itemCount == 1 ? string.Empty : "s");
+            if (IsLibraryBrowserSessionView(view))
+            {
+                var threshold = SettingsService.NormalizeLibrarySessionThresholdMinutes(view == null ? 60 : view.SessionThresholdMinutes);
+                return itemText + " | photo sessions | " + threshold + " min threshold";
+            }
             if (IsLibraryBrowserTimelineView(view))
             {
                 return itemText + " | photo timeline";
@@ -348,7 +387,7 @@ namespace PixelVaultNative
 
         public string BuildLibraryBrowserOpenFoldersLabel(LibraryBrowserFolderView view)
         {
-            if (IsLibraryBrowserTimelineView(view)) return "Open Source Folders";
+            if (IsLibraryBrowserTimeProjectionView(view)) return "Open Source Folders";
             return CountLibraryBrowserSourceFolders(view) > 1 ? "Open Folders" : "Open Folder";
         }
 
@@ -380,6 +419,7 @@ namespace PixelVaultNative
                 + "; files=" + Math.Max(view.FileCount, 0)
                 + "; sourceFolders=" + CountLibraryBrowserSourceFolders(view)
                 + "; timeline=" + (view.IsTimelineProjection ? "1" : "0")
+                + "; sessions=" + (view.IsSessionProjection ? "1" : "0")
                 + "; platforms=" + platformText
                 + "; primaryFolder=" + _host.FormatPathForTroubleshooting(view.PrimaryFolderPath ?? string.Empty)
                 + "; grouping=" + NormalizeLibraryGroupingMode(_host.LibraryGroupingMode);
@@ -430,6 +470,55 @@ namespace PixelVaultNative
                 .OrderBy(folder => folder.Name ?? string.Empty, StringComparer.OrdinalIgnoreCase));
             PopulateLibraryBrowserFolderViewSearchBlob(timelineView);
             return timelineView;
+        }
+
+        public LibraryBrowserFolderView BuildLibraryBrowserSessionView(IEnumerable<LibraryBrowserFolderView> visibleFolders, int thresholdMinutes)
+        {
+            var libraryRoot = _host.LibraryRoot;
+            var normalizedThreshold = SettingsService.NormalizeLibrarySessionThresholdMinutes(thresholdMinutes);
+            var sourceViews = (visibleFolders ?? Enumerable.Empty<LibraryBrowserFolderView>())
+                .Where(view => view != null)
+                .ToList();
+            var orderedImagePaths = sourceViews
+                .SelectMany(view => view.FilePaths ?? new string[0])
+                .Where(path => !string.IsNullOrWhiteSpace(path) && TextAndPathHelpers.IsImage(path))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderByDescending(path => _host.ResolveIndexedLibraryDate(libraryRoot, path))
+                .ThenBy(path => path, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            var newest = orderedImagePaths.Length == 0 ? DateTime.MinValue : _host.ResolveIndexedLibraryDate(libraryRoot, orderedImagePaths[0]);
+            var sessionView = new LibraryBrowserFolderView
+            {
+                ViewKey = "sessions|capture-feed|" + normalizedThreshold,
+                Name = "Sessions",
+                PrimaryFolderPath = string.Empty,
+                PrimaryFolder = null,
+                PrimaryPlatformLabel = string.Empty,
+                PlatformLabels = new string[0],
+                PlatformSummaryText = "Photo sessions",
+                FileCount = orderedImagePaths.Length,
+                PreviewImagePath = orderedImagePaths.FirstOrDefault() ?? string.Empty,
+                FilePaths = orderedImagePaths,
+                NewestCaptureUtcTicks = newest <= DateTime.MinValue ? 0 : newest.ToUniversalTime().Ticks,
+                NewestRecentSortUtcTicks = newest <= DateTime.MinValue ? 0 : newest.ToUniversalTime().Ticks,
+                SteamAppId = string.Empty,
+                NonSteamId = string.Empty,
+                SteamGridDbId = string.Empty,
+                RetroAchievementsGameId = string.Empty,
+                SuppressSteamAppIdAutoResolve = true,
+                SuppressSteamGridDbIdAutoResolve = true,
+                IsMergedAcrossPlatforms = true,
+                IsSessionProjection = true,
+                SessionThresholdMinutes = normalizedThreshold
+            };
+            sessionView.SourceFolders.AddRange(sourceViews
+                .SelectMany(view => view.SourceFolders)
+                .Where(folder => folder != null)
+                .GroupBy(folder => folder.FolderPath ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.First())
+                .OrderBy(folder => folder.Name ?? string.Empty, StringComparer.OrdinalIgnoreCase));
+            PopulateLibraryBrowserFolderViewSearchBlob(sessionView);
+            return sessionView;
         }
 
         public void ApplyRemovedFilesToLibraryBrowserState(MainWindow.LibraryBrowserWorkingSet ws, IEnumerable<string> removedFiles)

@@ -52,7 +52,7 @@ namespace PixelVaultNative
                 {
                     foreach (var dir in fileSystem.EnumerateDirectories(root))
                     {
-                        if (ImportService.IsHdrFallbackPath(dir)) continue;
+                        if (ImportService.IsImportParkingPath(dir)) continue;
                         targets.AddRange(fileSystem.EnumerateFiles(dir, "*.*", SearchOption.AllDirectories).Where(host.IsLibraryMediaFile));
                     }
                 }
@@ -62,7 +62,7 @@ namespace PixelVaultNative
                 }
 
                 var fileList = targets
-                    .Where(file => !ImportService.IsHdrFallbackPath(file))
+                    .Where(file => !ImportService.IsImportParkingPath(file))
                     .Where(fileSystem.FileExists)
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
@@ -529,9 +529,9 @@ namespace PixelVaultNative
             if (precomputedOneLevelMediaFilesOrNull == null)
             {
                 return fileSystem.EnumerateDirectories(root)
-                    .Where(dir => !ImportService.IsHdrFallbackPath(dir))
+                    .Where(dir => !ImportService.IsImportParkingPath(dir))
                     .SelectMany(dir => fileSystem.EnumerateFiles(dir, "*.*", SearchOption.AllDirectories).Where(host.IsLibraryMediaFile))
-                    .Where(file => !ImportService.IsHdrFallbackPath(file))
+                    .Where(file => !ImportService.IsImportParkingPath(file))
                     .Where(fileSystem.FileExists)
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
@@ -540,7 +540,7 @@ namespace PixelVaultNative
 
             return precomputedOneLevelMediaFilesOrNull
                 .Where(path => !string.IsNullOrWhiteSpace(path) && fileSystem.FileExists(path) && host.IsLibraryMediaFile(path))
-                .Where(path => !ImportService.IsHdrFallbackPath(path))
+                .Where(path => !ImportService.IsImportParkingPath(path))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
                 .ToList();
@@ -594,7 +594,7 @@ namespace PixelVaultNative
             if (string.IsNullOrWhiteSpace(root)) return;
             var files = (candidates ?? Enumerable.Empty<string>())
                 .Where(file => !string.IsNullOrWhiteSpace(file) && fileSystem.FileExists(file) && host.IsLibraryMediaFile(file))
-                .Where(file => !ImportService.IsHdrFallbackPath(file))
+                .Where(file => !ImportService.IsImportParkingPath(file))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(file => file, StringComparer.OrdinalIgnoreCase)
                 .ToList();
@@ -713,7 +713,7 @@ namespace PixelVaultNative
         {
             var groupFiles = (files ?? Enumerable.Empty<string>())
                 .Where(file => !string.IsNullOrWhiteSpace(file) && fileSystem.FileExists(file) && host.IsLibraryMediaFile(file))
-                .Where(file => !ImportService.IsHdrFallbackPath(file))
+                .Where(file => !ImportService.IsImportParkingPath(file))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderByDescending(file => host.ResolveIndexedLibraryDate(root, file, index))
                 .ThenBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase)
@@ -782,7 +782,7 @@ namespace PixelVaultNative
         {
             var groupFiles = (files ?? Enumerable.Empty<string>())
                 .Where(file => !string.IsNullOrWhiteSpace(file) && fileSystem.FileExists(file) && host.IsLibraryMediaFile(file))
-                .Where(file => !ImportService.IsHdrFallbackPath(file))
+                .Where(file => !ImportService.IsImportParkingPath(file))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderByDescending(file => host.ResolveIndexedLibraryDate(root, file, index))
                 .ThenBy(f => Path.GetFileName(f), StringComparer.OrdinalIgnoreCase)
@@ -942,7 +942,7 @@ namespace PixelVaultNative
                         .Where(entry => entry != null && string.Equals(host.NormalizeGameId(entry.GameId), gameId, StringComparison.OrdinalIgnoreCase))
                         .Select(entry => entry.FilePath)
                         .Where(file => !string.IsNullOrWhiteSpace(file) && fileSystem.FileExists(file) && host.IsLibraryMediaFile(file))
-                        .Where(file => !ImportService.IsHdrFallbackPath(file))
+                        .Where(file => !ImportService.IsImportParkingPath(file))
                         .Distinct(StringComparer.OrdinalIgnoreCase)
                         .ToList();
                     var row = BuildAssignedLibraryFolderInfo(root, gameId, files, index, gameRows);
@@ -955,7 +955,7 @@ namespace PixelVaultNative
                         .Where(entry => entry != null && string.IsNullOrWhiteSpace(host.NormalizeGameId(entry.GameId)))
                         .Select(entry => entry.FilePath)
                         .Where(file => !string.IsNullOrWhiteSpace(file) && fileSystem.FileExists(file) && host.IsLibraryMediaFile(file))
-                        .Where(file => !ImportService.IsHdrFallbackPath(file))
+                        .Where(file => !ImportService.IsImportParkingPath(file))
                         .Where(file => LibraryPlacementService.PathsEqualNormalized(Path.GetDirectoryName(file) ?? string.Empty, dir))
                         .Distinct(StringComparer.OrdinalIgnoreCase)
                         .ToList();

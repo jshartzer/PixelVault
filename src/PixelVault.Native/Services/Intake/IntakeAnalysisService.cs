@@ -13,17 +13,20 @@ namespace PixelVaultNative
         readonly Func<string, bool> _isVideo;
         readonly Func<string, DateTime> _getLibraryDate;
         readonly Func<IEnumerable<string>, CancellationToken, Dictionary<string, EmbeddedMetadataSnapshot>> _readEmbeddedMetadataBatch;
+        readonly Func<string, string> _getImportFolderTitleHint;
 
         public IntakeAnalysisService(
             Func<string, FilenameParseResult> parseFilename,
             Func<string, bool> isVideo,
             Func<string, DateTime> getLibraryDate,
-            Func<IEnumerable<string>, CancellationToken, Dictionary<string, EmbeddedMetadataSnapshot>> readEmbeddedMetadataBatch = null)
+            Func<IEnumerable<string>, CancellationToken, Dictionary<string, EmbeddedMetadataSnapshot>> readEmbeddedMetadataBatch = null,
+            Func<string, string> getImportFolderTitleHint = null)
         {
             _parseFilename = parseFilename ?? throw new ArgumentNullException(nameof(parseFilename));
             _isVideo = isVideo ?? throw new ArgumentNullException(nameof(isVideo));
             _getLibraryDate = getLibraryDate ?? throw new ArgumentNullException(nameof(getLibraryDate));
             _readEmbeddedMetadataBatch = readEmbeddedMetadataBatch;
+            _getImportFolderTitleHint = getImportFolderTitleHint;
         }
 
         public Dictionary<string, IntakePreviewFileAnalysis> AnalyzeFiles(
@@ -70,6 +73,7 @@ namespace PixelVaultNative
                 EmbeddedMetadataSnapshot metadata;
                 if (metadataByFile.TryGetValue(file, out metadata))
                     parsed = ApplyEmbeddedMetadataConsoleHint(parsed, metadata);
+                parsed = ApplyImportFolderTitleHint(parsed, file, _getImportFolderTitleHint);
                 var platformTags = parsed.PlatformTags ?? new string[0];
                 var isVideo = _isVideo(file);
                 var preserveFileTimes = parsed.PreserveFileTimes || isVideo;
@@ -118,6 +122,33 @@ namespace PixelVaultNative
                 SteamAppId = parsed.SteamAppId ?? string.Empty,
                 NonSteamId = parsed.NonSteamId ?? string.Empty,
                 GameTitleHint = parsed.GameTitleHint ?? string.Empty,
+                CaptureTime = parsed.CaptureTime,
+                PreserveFileTimes = parsed.PreserveFileTimes,
+                RoutesToManualWhenMissingSteamAppId = parsed.RoutesToManualWhenMissingSteamAppId,
+                MatchedConvention = parsed.MatchedConvention
+            };
+        }
+
+        static FilenameParseResult ApplyImportFolderTitleHint(
+            FilenameParseResult parsed,
+            string file,
+            Func<string, string> getImportFolderTitleHint)
+        {
+            if (parsed == null) parsed = new FilenameParseResult();
+            if (getImportFolderTitleHint == null) return parsed;
+            if (!ImportService.CanUseImportFolderTitleHint(parsed)) return parsed;
+            var folderTitle = FilenameParserService.NormalizeGameTitleHint(getImportFolderTitleHint(file) ?? string.Empty);
+            if (string.IsNullOrWhiteSpace(folderTitle)) return parsed;
+            return new FilenameParseResult
+            {
+                ConventionId = parsed.ConventionId ?? string.Empty,
+                ConventionName = parsed.ConventionName ?? string.Empty,
+                ConfidenceLabel = parsed.ConfidenceLabel ?? string.Empty,
+                PlatformLabel = parsed.PlatformLabel ?? string.Empty,
+                PlatformTags = parsed.PlatformTags ?? new string[0],
+                SteamAppId = parsed.SteamAppId ?? string.Empty,
+                NonSteamId = parsed.NonSteamId ?? string.Empty,
+                GameTitleHint = folderTitle,
                 CaptureTime = parsed.CaptureTime,
                 PreserveFileTimes = parsed.PreserveFileTimes,
                 RoutesToManualWhenMissingSteamAppId = parsed.RoutesToManualWhenMissingSteamAppId,

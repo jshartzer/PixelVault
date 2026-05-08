@@ -61,7 +61,10 @@ namespace PixelVaultNative
                 return;
             }
             var renderFolder = ws.Current;
-            var timelineView = IsLibraryBrowserTimelineView(renderFolder);
+            var calendarTimelineView = IsLibraryBrowserTimelineView(renderFolder);
+            var sessionView = IsLibraryBrowserSessionView(renderFolder);
+            var timelineView = calendarTimelineView || sessionView;
+            var sessionThresholdMinutes = SettingsService.NormalizeLibrarySessionThresholdMinutes(renderFolder == null ? librarySessionThresholdMinutes : (renderFolder.SessionThresholdMinutes <= 0 ? librarySessionThresholdMinutes : renderFolder.SessionThresholdMinutes));
             var detailLayout = CalculateResponsiveLibraryDetailLayout(panes.ThumbScroll, true, timelineView);
             var size = detailLayout.TileSize;
             ws.LastDetailViewportWidth = ResolveScrollViewerLayoutWidth(panes == null ? null : panes.ThumbScroll);
@@ -90,7 +93,7 @@ namespace PixelVaultNative
             ws.EstimatedDetailRowHeight = EstimateLibraryVariableDetailRowHeight(
                 new List<(string File, int Width)> { (string.Empty, effectiveTileSize) },
                 timelineView);
-            if (timelineView && TryAlignLibraryTimelineRollingPresetToToday(ws))
+            if (calendarTimelineView && TryAlignLibraryTimelineRollingPresetToToday(ws))
             {
                 if (panes.TimelineStartDatePicker != null) panes.TimelineStartDatePicker.SelectedDate = ws.TimelineStartDate;
                 if (panes.TimelineEndDatePicker != null) panes.TimelineEndDatePicker.SelectedDate = ws.TimelineEndDate;
@@ -104,7 +107,8 @@ namespace PixelVaultNative
                 + "; restoreScroll=" + shouldRestoreDetailScroll
                 + "; detailColumns=" + targetDetailColumns
                 + "; detailSize=" + effectiveTileSize
-                + (timelineView ? "; timelineRange=" + timelineRangeStart.ToString("yyyy-MM-dd") + ".." + timelineRangeEnd.ToString("yyyy-MM-dd") : string.Empty)
+                + (calendarTimelineView ? "; timelineRange=" + timelineRangeStart.ToString("yyyy-MM-dd") + ".." + timelineRangeEnd.ToString("yyyy-MM-dd") : string.Empty)
+                + (sessionView ? "; sessionThresholdMin=" + sessionThresholdMinutes : string.Empty)
                 + "; " + BuildLibraryBrowserTroubleshootingLabel(renderFolder));
             var displayFolder = BuildLibraryBrowserDisplayFolder(renderFolder);
             if (resetRowsToLoading || panes.DetailRows.Rows == null || panes.DetailRows.Rows.Count == 0)
@@ -152,6 +156,25 @@ namespace PixelVaultNative
                     if (snapshot == null || snapshot.Groups == null || snapshot.Groups.Count == 0) return null;
                     var timelineCtx = snapshot.TimelineContextByFile ?? new Dictionary<string, LibraryTimelineCaptureContext>(StringComparer.OrdinalIgnoreCase);
                     var mediaMap = snapshot.MediaLayoutByFile ?? new Dictionary<string, LibraryDetailMediaLayoutInfo>(StringComparer.OrdinalIgnoreCase);
+                    if (sessionView)
+                    {
+                        return BuildLibrarySessionCardRowDefinitions(
+                            ws,
+                            renderFolder,
+                            snapshot.Groups,
+                            timelineCtx,
+                            mediaMap,
+                            panes == null ? null : panes.ThumbScroll,
+                            detailViewportWidth,
+                            effectiveTileSize,
+                            detailDpiScaleForBackground,
+                            libraryWindow,
+                            openSingleFileMetadataEditor,
+                            updateDetailSelection,
+                            refreshDetailSelectionUi,
+                            redrawSelectedFolderDetail);
+                    }
+
                     return BuildLibraryContinuousMosaicRowDefinitions(
                         ws,
                         renderFolder,
@@ -247,7 +270,9 @@ namespace PixelVaultNative
                             .ToList();
                         var newestCapture = captureDates.Count == 0 ? DateTime.MinValue : captureDates.Max();
                         var oldestCapture = captureDates.Count == 0 ? DateTime.MinValue : captureDates.Min();
-                        panes.DetailMeta.Text = BuildLibraryTimelineSummaryText(visibleFiles.Count, distinctGames, distinctPlatforms, newestCapture, oldestCapture);
+                        panes.DetailMeta.Text = sessionView
+                            ? BuildLibrarySessionSummaryText(visibleFiles.Count, snapshot.Groups == null ? 0 : snapshot.Groups.Count, distinctGames, distinctPlatforms, newestCapture, oldestCapture, sessionThresholdMinutes)
+                            : BuildLibraryTimelineSummaryText(visibleFiles.Count, distinctGames, distinctPlatforms, newestCapture, oldestCapture);
                     }
                     ws.DetailTiles.Clear();
                     if (snapshot == null || snapshot.Groups == null || snapshot.Groups.Count == 0)
@@ -261,7 +286,8 @@ namespace PixelVaultNative
                                 Build = delegate
                                 {
                                     return BuildLibraryDetailEmptyCapturesPlaceholder(
-                                        timelineView,
+                                        calendarTimelineView,
+                                        sessionView,
                                         timelineRangeStart,
                                         timelineRangeEnd,
                                         redrawSelectedFolderDetail);
@@ -390,9 +416,9 @@ namespace PixelVaultNative
                                         captureDate = embedded.CaptureTime.Value;
                                     }
                                 }
-                                return new { FilePath = file, CaptureDate = captureDate };
+                                return (FilePath: file, CaptureDate: captureDate);
                             })
-                            .Where(entry => !timelineView || LibraryTimelineRangeContainsCapture(entry.CaptureDate, timelineRangeStart, timelineRangeEnd))
+                            .Where(entry => !calendarTimelineView || LibraryTimelineRangeContainsCapture(entry.CaptureDate, timelineRangeStart, timelineRangeEnd))
                             .Where(entry => !PhotoWorkspaceShouldHideCapture(entry.FilePath))
                             .OrderByDescending(entry => entry.CaptureDate)
                             .ThenBy(entry => entry.FilePath, StringComparer.OrdinalIgnoreCase)
@@ -428,22 +454,72 @@ namespace PixelVaultNative
                         var mediaLayoutMs = segmentSw.ElapsedMilliseconds;
                         segmentSw.Restart();
                         snapshot.TimelineContextByFile = BuildLibraryTimelineCaptureContextMap(snapshot.VisibleFiles, metadataIndex, savedGameRows, timelineMetadataSnapshots);
-                        foreach (var group in datedFiles
-                            .GroupBy(entry => entry.CaptureDate.Date)
-                            .OrderByDescending(group => group.Key))
+                        if (sessionView)
                         {
-                            // Per calendar day: newest capture first so index 0 is always the chronologically
-                            // last shot that day (the day-badge anchor), regardless of GroupBy iteration quirks.
-                            var dayFilesOrdered = group
-                                .OrderByDescending(entry => entry.CaptureDate)
-                                .ThenBy(entry => entry.FilePath, StringComparer.OrdinalIgnoreCase)
-                                .Select(entry => entry.FilePath)
-                                .ToList();
-                            snapshot.Groups.Add(new LibraryDetailRenderGroup
+                            var threshold = TimeSpan.FromMinutes(sessionThresholdMinutes);
+                            var currentSession = new List<(string FilePath, DateTime CaptureDate)>();
+                            DateTime? previousNewerCapture = null;
+                            Action flushSession = delegate
                             {
-                                CaptureDate = group.Key,
-                                Files = dayFilesOrdered
-                            });
+                                if (currentSession.Count == 0) return;
+                                var sessionNewest = currentSession
+                                    .Select(entry => entry.CaptureDate)
+                                    .DefaultIfEmpty(DateTime.MinValue)
+                                    .Max();
+                                var sessionOldest = currentSession
+                                    .Select(entry => entry.CaptureDate)
+                                    .DefaultIfEmpty(DateTime.MinValue)
+                                    .Min();
+                                var sessionFiles = currentSession
+                                    .OrderByDescending(entry => entry.CaptureDate)
+                                    .ThenBy(entry => entry.FilePath, StringComparer.OrdinalIgnoreCase)
+                                    .Select(entry => entry.FilePath)
+                                    .ToList();
+                                snapshot.Groups.Add(new LibraryDetailRenderGroup
+                                {
+                                    CaptureDate = sessionNewest <= DateTime.MinValue ? DateTime.MinValue : sessionNewest.Date,
+                                    HeaderText = BuildLibrarySessionCardTitle(sessionNewest, sessionOldest, DateTime.Today),
+                                    SubtitleText = BuildLibrarySessionCardSubtitle(sessionFiles.Count, sessionNewest, sessionOldest),
+                                    SessionStartDate = sessionOldest,
+                                    SessionEndDate = sessionNewest,
+                                    Files = sessionFiles
+                                });
+                                currentSession.Clear();
+                            };
+                            foreach (var entry in datedFiles)
+                            {
+                                var capture = entry.CaptureDate;
+                                if (previousNewerCapture.HasValue
+                                    && capture > DateTime.MinValue
+                                    && previousNewerCapture.Value > DateTime.MinValue
+                                    && previousNewerCapture.Value - capture > threshold)
+                                {
+                                    flushSession();
+                                }
+                                currentSession.Add(entry);
+                                previousNewerCapture = capture;
+                            }
+                            flushSession();
+                        }
+                        else
+                        {
+                            foreach (var group in datedFiles
+                                .GroupBy(entry => entry.CaptureDate.Date)
+                                .OrderByDescending(group => group.Key))
+                            {
+                                // Per calendar day: newest capture first so index 0 is always the chronologically
+                                // last shot that day (the day-badge anchor), regardless of GroupBy iteration quirks.
+                                var dayFilesOrdered = group
+                                    .OrderByDescending(entry => entry.CaptureDate)
+                                    .ThenBy(entry => entry.FilePath, StringComparer.OrdinalIgnoreCase)
+                                    .Select(entry => entry.FilePath)
+                                    .ToList();
+                                snapshot.Groups.Add(new LibraryDetailRenderGroup
+                                {
+                                    CaptureDate = group.Key,
+                                    Files = dayFilesOrdered
+                                });
+                            }
                         }
 
                         var tailMs = segmentSw.ElapsedMilliseconds;
@@ -846,7 +922,8 @@ namespace PixelVaultNative
             Action<string, ModifierKeys> updateDetailSelection,
             Action refreshDetailSelectionUi,
             Action redrawSelectedFolderDetail,
-            Action renderFolderTiles)
+            Action renderFolderTiles,
+            Action<string> openCaptureViewerOverride = null)
         {
             var safeGroups = (groups ?? new List<LibraryDetailRenderGroup>())
                 .Where(group => group != null && (group.Files ?? new List<string>()).Count > 0)
@@ -947,7 +1024,7 @@ namespace PixelVaultNative
                                 timelineContext,
                                 prioritizeDecodes,
                                 captureDateLabel,
-                                path => OpenLibraryCaptureViewer(this, ws, path),
+                                openCaptureViewerOverride ?? (path => OpenLibraryCaptureViewer(this, ws, path)),
                                 timelineView);
                             Canvas.SetLeft(tile, placement.X);
                             Canvas.SetTop(tile, placement.Y);
@@ -974,7 +1051,9 @@ namespace PixelVaultNative
                     .Where(file => !string.IsNullOrWhiteSpace(file))
                     .ToList();
                 if (groupFiles.Count == 0) continue;
-                var label = BuildLibraryTimelineDayCardTitle(group.CaptureDate, referenceDate);
+                var label = string.IsNullOrWhiteSpace(group.HeaderText)
+                    ? BuildLibraryTimelineDayCardTitle(group.CaptureDate, referenceDate)
+                    : group.HeaderText;
                 if (string.IsNullOrWhiteSpace(label)) continue;
                 if (attachToLastFileOnly)
                 {
@@ -1004,7 +1083,12 @@ namespace PixelVaultNative
                 }
                 var files = g.Files ?? new List<string>();
                 var anchor = files.Count == 0 ? string.Empty : files[0];
-                parts[i] = g.CaptureDate.Ticks + ":" + files.Count + ":" + anchor;
+                parts[i] = g.CaptureDate.Ticks
+                    + ":" + g.SessionStartDate.Ticks
+                    + ":" + g.SessionEndDate.Ticks
+                    + ":" + (g.HeaderText ?? string.Empty)
+                    + ":" + files.Count
+                    + ":" + anchor;
             }
             return string.Join("|", parts);
         }
@@ -1028,7 +1112,9 @@ namespace PixelVaultNative
                     .ToList();
                 if (groupFiles.Count == 0) continue;
 
-                var label = BuildLibraryTimelineDayCardTitle(renderGroup.CaptureDate, referenceDate);
+                var label = string.IsNullOrWhiteSpace(renderGroup.HeaderText)
+                    ? BuildLibraryTimelineDayCardTitle(renderGroup.CaptureDate, referenceDate)
+                    : renderGroup.HeaderText;
                 if (string.IsNullOrWhiteSpace(label)) continue;
 
                 labels[groupFiles[0]] = label;
@@ -1245,6 +1331,898 @@ namespace PixelVaultNative
             }
         }
 
+        readonly object _librarySessionAchievementCacheLock = new object();
+        readonly Dictionary<string, Task<GameAchievementsFetchService.FetchResult>> _librarySessionAchievementFetchTasks =
+            new Dictionary<string, Task<GameAchievementsFetchService.FetchResult>>(StringComparer.OrdinalIgnoreCase);
+
+        sealed class LibrarySessionAchievementTarget
+        {
+            public string SourceLabel;
+            public string GameTitle;
+            public string PlatformLabel;
+            public string SteamAppId;
+            public string RetroAchievementsGameId;
+
+            public string CacheIdentity
+            {
+                get
+                {
+                    if (string.Equals(SourceLabel, "Steam", StringComparison.OrdinalIgnoreCase))
+                        return "steam|" + (SteamAppId ?? string.Empty).Trim();
+                    if (string.Equals(SourceLabel, "RetroAchievements", StringComparison.OrdinalIgnoreCase))
+                        return "ra|" + (RetroAchievementsGameId ?? string.Empty).Trim();
+                    return (SourceLabel ?? string.Empty).Trim() + "|" + (GameTitle ?? string.Empty).Trim();
+                }
+            }
+        }
+
+        sealed class LibrarySessionAchievementMetricResult
+        {
+            public string Label;
+            public string ToolTip;
+        }
+
+        sealed class LibrarySessionCardLayout
+        {
+            public LibraryDetailRenderGroup Group;
+            public double Width;
+            public double Height;
+            public int PreviewColumns;
+            public int PreviewRows;
+            public int PreviewTileWidth;
+            public int PreviewTileHeight;
+            public List<string> PreviewFiles = new List<string>();
+        }
+
+        List<VirtualizedRowDefinition> BuildLibrarySessionCardRowDefinitions(
+            LibraryBrowserWorkingSet ws,
+            LibraryBrowserFolderView renderFolder,
+            IList<LibraryDetailRenderGroup> groups,
+            IDictionary<string, LibraryTimelineCaptureContext> timelineContexts,
+            IReadOnlyDictionary<string, LibraryDetailMediaLayoutInfo> mediaLayoutByFile,
+            ScrollViewer detailScroll,
+            double viewportWidth,
+            int detailTileSize,
+            double dpiScale,
+            Window libraryWindow,
+            Action<string> openSingleFileMetadataEditor,
+            Action<string, ModifierKeys> updateDetailSelection,
+            Action refreshDetailSelectionUi,
+            Action redrawSelectedFolderDetail)
+        {
+            var safeGroups = (groups ?? new List<LibraryDetailRenderGroup>())
+                .Where(group => group != null && (group.Files ?? new List<string>()).Any(file => !string.IsNullOrWhiteSpace(file)))
+                .ToList();
+            if (safeGroups.Count == 0) return new List<VirtualizedRowDefinition>();
+
+            const double cardGap = 18d;
+            var availableWidth = viewportWidth <= 0d ? 1100d : Math.Max(320d, viewportWidth - 6d);
+            var cardColumns = availableWidth >= 1500d ? 3 : (availableWidth >= 900d ? 2 : 1);
+            while (cardColumns > 1 && (availableWidth - ((cardColumns - 1) * cardGap)) / cardColumns < 380d)
+                cardColumns--;
+
+            var cardWidth = Math.Floor((availableWidth - ((cardColumns - 1) * cardGap)) / cardColumns);
+            cardWidth = Math.Max(320d, cardWidth);
+            var layouts = safeGroups
+                .Select(group => BuildLibrarySessionCardLayout(group, cardWidth, detailTileSize))
+                .Where(layout => layout != null)
+                .ToList();
+            var rows = new List<VirtualizedRowDefinition>();
+            var nextRowDocumentTop = 0d;
+            for (var start = 0; start < layouts.Count; start += cardColumns)
+            {
+                var rowCards = layouts.Skip(start).Take(cardColumns).ToList();
+                if (rowCards.Count == 0) continue;
+                var rowHeight = (int)Math.Ceiling(rowCards.Select(card => card.Height).DefaultIfEmpty(420d).Max() + cardGap);
+                var capturedDocTop = nextRowDocumentTop;
+                nextRowDocumentTop += rowHeight;
+                var rowFiles = rowCards
+                    .SelectMany(card => card.PreviewFiles ?? new List<string>())
+                    .Where(file => !string.IsNullOrWhiteSpace(file))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                rows.Add(new VirtualizedRowDefinition
+                {
+                    Height = rowHeight,
+                    Files = rowFiles,
+                    Build = delegate
+                    {
+                        var prioritizeDecodes = LibraryDetailTileRowIntersectsViewport(detailScroll, capturedDocTop, rowHeight);
+                        var panel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, cardGap) };
+                        for (var i = 0; i < rowCards.Count; i++)
+                        {
+                            var card = BuildLibrarySessionCard(
+                                ws,
+                                renderFolder,
+                                rowCards[i],
+                                timelineContexts,
+                                mediaLayoutByFile,
+                                dpiScale,
+                                prioritizeDecodes,
+                                libraryWindow,
+                                openSingleFileMetadataEditor,
+                                updateDetailSelection,
+                                refreshDetailSelectionUi,
+                                redrawSelectedFolderDetail);
+                            if (card == null) continue;
+                            card.Margin = new Thickness(0, 0, i < rowCards.Count - 1 ? cardGap : 0, 0);
+                            panel.Children.Add(card);
+                        }
+                        return panel;
+                    }
+                });
+            }
+
+            return rows;
+        }
+
+        LibrarySessionCardLayout BuildLibrarySessionCardLayout(
+            LibraryDetailRenderGroup group,
+            double cardWidth,
+            int detailTileSize)
+        {
+            if (group == null) return null;
+            var groupFiles = (group.Files ?? new List<string>())
+                .Where(file => !string.IsNullOrWhiteSpace(file))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (groupFiles.Count == 0) return null;
+
+            const double horizontalPadding = 16d;
+            const double tileGap = 6d;
+            const int previewColumns = 3;
+            const int previewRowsWanted = 2;
+            const int previewLimit = previewColumns * previewRowsWanted;
+            const double bannerHeight = 142d;
+            var previewFiles = groupFiles.Take(previewLimit).ToList();
+            var innerWidth = Math.Max(240d, cardWidth - (horizontalPadding * 2d));
+            var previewTileWidth = (int)Math.Floor((innerWidth - ((previewColumns - 1) * tileGap)) / previewColumns);
+            previewTileWidth = Math.Max(82, previewTileWidth);
+            var previewTileHeight = Math.Max(70, (int)Math.Round(previewTileWidth * 0.62d));
+            var thumbnailHeight = (previewRowsWanted * previewTileHeight) + ((previewRowsWanted - 1) * tileGap);
+            var cardHeight = bannerHeight + thumbnailHeight + 30d;
+
+            return new LibrarySessionCardLayout
+            {
+                Group = group,
+                Width = Math.Ceiling(cardWidth),
+                Height = Math.Ceiling(cardHeight),
+                PreviewColumns = previewColumns,
+                PreviewRows = previewRowsWanted,
+                PreviewTileWidth = previewTileWidth,
+                PreviewTileHeight = previewTileHeight,
+                PreviewFiles = previewFiles
+            };
+        }
+
+        FrameworkElement BuildLibrarySessionCard(
+            LibraryBrowserWorkingSet ws,
+            LibraryBrowserFolderView renderFolder,
+            LibrarySessionCardLayout layout,
+            IDictionary<string, LibraryTimelineCaptureContext> timelineContexts,
+            IReadOnlyDictionary<string, LibraryDetailMediaLayoutInfo> mediaLayoutByFile,
+            double dpiScale,
+            bool prioritizeRowDecodes,
+            Window libraryWindow,
+            Action<string> openSingleFileMetadataEditor,
+            Action<string, ModifierKeys> updateDetailSelection,
+            Action refreshDetailSelectionUi,
+            Action redrawSelectedFolderDetail)
+        {
+            if (layout == null || layout.Group == null) return null;
+            var group = layout.Group;
+            var groupFiles = (group.Files ?? new List<string>())
+                .Where(file => !string.IsNullOrWhiteSpace(file))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (groupFiles.Count == 0) return null;
+
+            var title = !string.IsNullOrWhiteSpace(group.HeaderText)
+                ? group.HeaderText
+                : BuildLibrarySessionCardTitle(group.SessionEndDate, group.SessionStartDate, DateTime.Today);
+            var subtitle = !string.IsNullOrWhiteSpace(group.SubtitleText)
+                ? group.SubtitleText
+                : BuildLibrarySessionCardSubtitle(groupFiles.Count, group.SessionEndDate, group.SessionStartDate);
+            var gameText = BuildLibrarySessionDistinctContextLabel(groupFiles, timelineContexts, true);
+            var platformText = BuildLibrarySessionDistinctContextLabel(groupFiles, timelineContexts, false);
+            var remainingCount = Math.Max(0, groupFiles.Count - (layout.PreviewFiles == null ? 0 : layout.PreviewFiles.Count));
+
+            var root = new Border
+            {
+                Width = layout.Width,
+                MinHeight = layout.Height,
+                Background = Brush("#10191F"),
+                BorderBrush = Brush("#2E414D"),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(18),
+                ClipToBounds = true,
+                Cursor = Cursors.Hand,
+                ToolTip = "Open this session"
+            };
+            root.MouseLeftButtonDown += delegate(object sender, MouseButtonEventArgs e)
+            {
+                if (!LibrarySessionCardClickShouldOpen(e.OriginalSource as DependencyObject, root)) return;
+                OpenLibrarySessionWindow(
+                    libraryWindow,
+                    renderFolder,
+                    group,
+                    timelineContexts,
+                    mediaLayoutByFile,
+                    dpiScale,
+                    openSingleFileMetadataEditor,
+                    redrawSelectedFolderDetail);
+                e.Handled = true;
+            };
+
+            var stack = new StackPanel();
+            var bannerBrush = new LinearGradientBrush
+            {
+                StartPoint = new Point(0, 0),
+                EndPoint = new Point(1, 1)
+            };
+            bannerBrush.GradientStops.Add(new GradientStop(Color.FromRgb(26, 45, 58), 0));
+            bannerBrush.GradientStops.Add(new GradientStop(Color.FromRgb(16, 28, 36), 0.56));
+            bannerBrush.GradientStops.Add(new GradientStop(Color.FromRgb(12, 20, 26), 1));
+
+            var banner = new Border
+            {
+                Height = 142,
+                Background = bannerBrush,
+                BorderBrush = Brush("#375061"),
+                BorderThickness = new Thickness(0, 0, 0, 1),
+                CornerRadius = new CornerRadius(17, 17, 0, 0),
+                Padding = new Thickness(16, 13, 16, 13)
+            };
+            var bannerDock = new DockPanel { LastChildFill = true };
+            var openButton = Btn("Open session", null, "#213A49", Brushes.White);
+            openButton.Padding = new Thickness(12, 7, 12, 7);
+            openButton.FontSize = 12.5;
+            openButton.Margin = new Thickness(12, 0, 0, 0);
+            ApplyLibraryPillChrome(openButton, "#213A49", "#3D5D6D", "#294858", "#172B35", "#F2FBFF");
+            openButton.Click += delegate
+            {
+                OpenLibrarySessionWindow(
+                    libraryWindow,
+                    renderFolder,
+                    group,
+                    timelineContexts,
+                    mediaLayoutByFile,
+                    dpiScale,
+                    openSingleFileMetadataEditor,
+                    redrawSelectedFolderDetail);
+            };
+            DockPanel.SetDock(openButton, Dock.Right);
+            bannerDock.Children.Add(openButton);
+
+            var titleStack = new StackPanel();
+            titleStack.Children.Add(new TextBlock
+            {
+                Text = title,
+                Foreground = Brush("#F4FAFF"),
+                FontSize = 18,
+                FontWeight = FontWeights.SemiBold,
+                TextTrimming = TextTrimming.CharacterEllipsis
+            });
+            titleStack.Children.Add(new TextBlock
+            {
+                Text = subtitle,
+                Foreground = Brush("#A8BAC5"),
+                FontSize = 12.5,
+                FontWeight = FontWeights.Medium,
+                Margin = new Thickness(0, 4, 0, 0),
+                TextTrimming = TextTrimming.CharacterEllipsis
+            });
+            var metrics = new WrapPanel { Margin = new Thickness(0, 10, 0, 0) };
+            metrics.Children.Add(BuildLibrarySessionMetricPill("Photos", groupFiles.Count.ToString()));
+            metrics.Children.Add(BuildLibrarySessionAchievementMetricPill(groupFiles, group, timelineContexts));
+            metrics.Children.Add(BuildLibrarySessionMetricPill("Games", gameText));
+            metrics.Children.Add(BuildLibrarySessionMetricPill("Platforms", platformText));
+            if (remainingCount > 0) metrics.Children.Add(BuildLibrarySessionMetricPill("More", "+" + remainingCount));
+            titleStack.Children.Add(metrics);
+            bannerDock.Children.Add(titleStack);
+            banner.Child = bannerDock;
+            stack.Children.Add(banner);
+
+            var previewPanel = new Grid
+            {
+                Width = Math.Max(240d, layout.Width - 32d),
+                Height = (layout.PreviewRows * layout.PreviewTileHeight) + (Math.Max(0, layout.PreviewRows - 1) * 6d),
+                Margin = new Thickness(16, 14, 16, 16)
+            };
+            for (var col = 0; col < layout.PreviewColumns; col++)
+                previewPanel.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(layout.PreviewTileWidth + (col < layout.PreviewColumns - 1 ? 6d : 0d)) });
+            for (var row = 0; row < layout.PreviewRows; row++)
+                previewPanel.RowDefinitions.Add(new RowDefinition { Height = new GridLength(layout.PreviewTileHeight + (row < layout.PreviewRows - 1 ? 6d : 0d)) });
+            var previewFiles = layout.PreviewFiles ?? new List<string>();
+            for (var i = 0; i < previewFiles.Count; i++)
+            {
+                var file = previewFiles[i];
+                var row = i / layout.PreviewColumns;
+                var column = i % layout.PreviewColumns;
+                LibraryTimelineCaptureContext timelineContext;
+                if (timelineContexts == null || !timelineContexts.TryGetValue(file, out timelineContext)) timelineContext = null;
+                var tile = CreateLibraryDetailTile(
+                    file,
+                    layout.PreviewTileWidth,
+                    CalculateLibraryDetailTileDecodeWidth(layout.PreviewTileWidth, dpiScale),
+                    delegate { return ws != null && SameLibraryBrowserSelection(ws.Current, renderFolder); },
+                    openSingleFileMetadataEditor,
+                    updateDetailSelection,
+                    ws == null ? new HashSet<string>(StringComparer.OrdinalIgnoreCase) : ws.SelectedDetailFiles,
+                    refreshDetailSelectionUi,
+                    redrawSelectedFolderDetail,
+                    null,
+                    layout.PreviewTileHeight,
+                    timelineContext,
+                    prioritizeRowDecodes,
+                    null,
+                    path => OpenLibrarySessionCaptureViewer(libraryWindow, groupFiles, path),
+                    false);
+                tile.Margin = new Thickness(0, 0, column < layout.PreviewColumns - 1 ? 6 : 0, row < layout.PreviewRows - 1 ? 6 : 0);
+                FrameworkElement previewChild = tile;
+                if (i == previewFiles.Count - 1 && remainingCount > 0)
+                {
+                    var overlayGrid = new Grid
+                    {
+                        Width = layout.PreviewTileWidth,
+                        Height = layout.PreviewTileHeight,
+                        Margin = tile.Margin
+                    };
+                    tile.Margin = new Thickness(0);
+                    overlayGrid.Children.Add(tile);
+                    overlayGrid.Children.Add(new Border
+                    {
+                        IsHitTestVisible = false,
+                        Background = Brush("#AA071017"),
+                        CornerRadius = new CornerRadius(10),
+                        Child = new TextBlock
+                        {
+                            Text = "+" + remainingCount,
+                            Foreground = Brushes.White,
+                            FontSize = 24,
+                            FontWeight = FontWeights.Bold,
+                            HorizontalAlignment = HorizontalAlignment.Center,
+                            VerticalAlignment = VerticalAlignment.Center
+                        }
+                    });
+                    previewChild = overlayGrid;
+                }
+                Grid.SetColumn(previewChild, column);
+                Grid.SetRow(previewChild, row);
+                previewPanel.Children.Add(previewChild);
+            }
+            stack.Children.Add(previewPanel);
+            root.Child = stack;
+            return root;
+        }
+
+        Border BuildLibrarySessionMetricPill(string label, string value)
+        {
+            TextBlock valueBlock;
+            return BuildLibrarySessionMetricPill(label, value, out valueBlock);
+        }
+
+        Border BuildLibrarySessionMetricPill(string label, string value, out TextBlock valueBlock)
+        {
+            var stack = new StackPanel { Orientation = Orientation.Horizontal };
+            stack.Children.Add(new TextBlock
+            {
+                Text = label + ": ",
+                Foreground = Brush("#8FA6B3"),
+                FontSize = 11.5,
+                FontWeight = FontWeights.Medium
+            });
+            valueBlock = new TextBlock
+            {
+                Text = string.IsNullOrWhiteSpace(value) ? "Unknown" : value,
+                Foreground = Brush("#E9F4FA"),
+                FontSize = 11.5,
+                FontWeight = FontWeights.SemiBold,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                MaxWidth = 130
+            };
+            stack.Children.Add(valueBlock);
+            return new Border
+            {
+                Background = Brush("#8020333E"),
+                BorderBrush = Brush("#355464"),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(12),
+                Padding = new Thickness(9, 4, 9, 4),
+                Margin = new Thickness(0, 0, 6, 6),
+                Child = stack
+            };
+        }
+
+        Border BuildLibrarySessionAchievementMetricPill(
+            IReadOnlyList<string> groupFiles,
+            LibraryDetailRenderGroup group,
+            IDictionary<string, LibraryTimelineCaptureContext> timelineContexts)
+        {
+            var targets = BuildLibrarySessionAchievementTargets(groupFiles, timelineContexts);
+            var initialLabel = targets.Count == 0 ? "Not tracked" : "Loading...";
+            TextBlock valueBlock;
+            var pill = BuildLibrarySessionMetricPill("Achievements", initialLabel, out valueBlock);
+            if (targets.Count == 0)
+            {
+                pill.ToolTip = "No Steam App ID or RetroAchievements game ID was found for this session.";
+                return pill;
+            }
+
+            pill.ToolTip = "Checking tracked achievement sources for this session.";
+            ScheduleLibrarySessionAchievementMetricUpdate(valueBlock, pill, group, targets);
+            return pill;
+        }
+
+        static bool LibrarySessionCardClickShouldOpen(DependencyObject source, Border cardRoot)
+        {
+            for (var node = source; node != null; node = VisualTreeHelper.GetParent(node))
+            {
+                if (ReferenceEquals(node, cardRoot)) return true;
+                if (node is System.Windows.Controls.Primitives.ButtonBase) return false;
+                if (node is TextBox) return false;
+                var fe = node as FrameworkElement;
+                var tag = fe == null ? null : fe.Tag as string;
+                if (!string.IsNullOrWhiteSpace(tag)) return false;
+            }
+            return true;
+        }
+
+        string BuildLibrarySessionDistinctContextLabel(
+            IReadOnlyList<string> groupFiles,
+            IDictionary<string, LibraryTimelineCaptureContext> timelineContexts,
+            bool gameTitle)
+        {
+            var values = new List<string>();
+            foreach (var file in groupFiles ?? new List<string>())
+            {
+                LibraryTimelineCaptureContext context;
+                if (timelineContexts == null || !timelineContexts.TryGetValue(file, out context) || context == null) continue;
+                var value = gameTitle
+                    ? NormalizeGameIndexName(context.GameTitle ?? string.Empty)
+                    : NormalizeConsoleLabel(context.PlatformLabel ?? string.Empty);
+                if (string.IsNullOrWhiteSpace(value) || string.Equals(value, "Other", StringComparison.OrdinalIgnoreCase)) continue;
+                values.Add(value);
+            }
+            var distinct = values.Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(value => value, StringComparer.OrdinalIgnoreCase).ToList();
+            if (distinct.Count == 0) return "Unknown";
+            if (distinct.Count <= 2) return string.Join(", ", distinct);
+            return distinct.Count + (gameTitle ? " games" : " platforms");
+        }
+
+        List<LibrarySessionAchievementTarget> BuildLibrarySessionAchievementTargets(
+            IReadOnlyList<string> groupFiles,
+            IDictionary<string, LibraryTimelineCaptureContext> timelineContexts)
+        {
+            var targets = new Dictionary<string, LibrarySessionAchievementTarget>(StringComparer.OrdinalIgnoreCase);
+            foreach (var file in groupFiles ?? new List<string>())
+            {
+                LibraryTimelineCaptureContext context;
+                if (timelineContexts == null || !timelineContexts.TryGetValue(file, out context) || context == null) continue;
+                var gameTitle = NormalizeGameIndexName(context.GameTitle ?? string.Empty);
+                if (string.IsNullOrWhiteSpace(gameTitle)) gameTitle = "Unknown Game";
+                var platform = NormalizeConsoleLabel(context.PlatformLabel ?? string.Empty);
+                var steamAppId = CleanTag(context.SteamAppId ?? string.Empty);
+                if (LibrarySessionAchievementIdLooksNumeric(steamAppId))
+                {
+                    var target = new LibrarySessionAchievementTarget
+                    {
+                        SourceLabel = "Steam",
+                        GameTitle = gameTitle,
+                        PlatformLabel = string.IsNullOrWhiteSpace(platform) || string.Equals(platform, "Other", StringComparison.OrdinalIgnoreCase) ? "Steam" : platform,
+                        SteamAppId = steamAppId
+                    };
+                    targets[target.CacheIdentity] = target;
+                    continue;
+                }
+
+                var retroAchievementsGameId = CleanTag(context.RetroAchievementsGameId ?? string.Empty);
+                if (LibrarySessionAchievementIdLooksNumeric(retroAchievementsGameId))
+                {
+                    var target = new LibrarySessionAchievementTarget
+                    {
+                        SourceLabel = "RetroAchievements",
+                        GameTitle = gameTitle,
+                        PlatformLabel = string.IsNullOrWhiteSpace(platform) || string.Equals(platform, "Other", StringComparison.OrdinalIgnoreCase) ? "Emulation" : platform,
+                        RetroAchievementsGameId = retroAchievementsGameId
+                    };
+                    targets[target.CacheIdentity] = target;
+                }
+            }
+            return targets.Values
+                .OrderBy(target => target.GameTitle ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(target => target.SourceLabel ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        static bool LibrarySessionAchievementIdLooksNumeric(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return false;
+            return value.Any(char.IsDigit);
+        }
+
+        void ScheduleLibrarySessionAchievementMetricUpdate(
+            TextBlock valueBlock,
+            Border pill,
+            LibraryDetailRenderGroup group,
+            List<LibrarySessionAchievementTarget> targets)
+        {
+            if (valueBlock == null || group == null || targets == null || targets.Count == 0) return;
+            _ = ResolveLibrarySessionAchievementMetricAsync(group, targets)
+                .ContinueWith(task =>
+                {
+                    LibrarySessionAchievementMetricResult metric;
+                    if (task.IsFaulted)
+                    {
+                        metric = new LibrarySessionAchievementMetricResult
+                        {
+                            Label = "Unavailable",
+                            ToolTip = task.Exception == null ? "Achievement lookup failed." : task.Exception.GetBaseException().Message
+                        };
+                    }
+                    else
+                    {
+                        metric = task.Result ?? new LibrarySessionAchievementMetricResult { Label = "Unavailable", ToolTip = "Achievement lookup returned no result." };
+                    }
+
+                    try
+                    {
+                        valueBlock.Dispatcher.BeginInvoke((Action)delegate
+                        {
+                            valueBlock.Text = string.IsNullOrWhiteSpace(metric.Label) ? "Unavailable" : metric.Label;
+                            valueBlock.ToolTip = metric.ToolTip;
+                            if (pill != null) pill.ToolTip = metric.ToolTip;
+                        }, DispatcherPriority.Background);
+                    }
+                    catch
+                    {
+                    }
+                }, TaskScheduler.Default);
+        }
+
+        async Task<LibrarySessionAchievementMetricResult> ResolveLibrarySessionAchievementMetricAsync(
+            LibraryDetailRenderGroup group,
+            List<LibrarySessionAchievementTarget> targets)
+        {
+            var fetchTasks = targets
+                .Select(target => GetLibrarySessionAchievementFetchTask(target))
+                .ToArray();
+            var results = await Task.WhenAll(fetchTasks).ConfigureAwait(false);
+            return BuildLibrarySessionAchievementMetricResult(group, targets, results);
+        }
+
+        Task<GameAchievementsFetchService.FetchResult> GetLibrarySessionAchievementFetchTask(LibrarySessionAchievementTarget target)
+        {
+            if (target == null)
+                return Task.FromResult(new GameAchievementsFetchService.FetchResult { ErrorMessage = "Missing achievement target." });
+
+            var steamKey = CurrentSteamWebApiKey();
+            var steamUser = CurrentSteamUserId64();
+            var retroKey = CurrentRetroAchievementsApiKey();
+            var retroUser = CurrentRetroAchievementsUsername();
+            var source = target.SourceLabel ?? string.Empty;
+            var credentialKey = string.Equals(source, "Steam", StringComparison.OrdinalIgnoreCase)
+                ? "|steamUser=" + (steamUser ?? string.Empty).Trim() + "|steamKey=" + ((steamKey ?? string.Empty).Trim().GetHashCode()).ToString()
+                : "|raUser=" + (retroUser ?? string.Empty).Trim() + "|raKey=" + ((retroKey ?? string.Empty).Trim().GetHashCode()).ToString();
+            var cacheKey = target.CacheIdentity + credentialKey;
+
+            lock (_librarySessionAchievementCacheLock)
+            {
+                Task<GameAchievementsFetchService.FetchResult> cachedTask;
+                if (_librarySessionAchievementFetchTasks.TryGetValue(cacheKey, out cachedTask)) return cachedTask;
+                if (_librarySessionAchievementFetchTasks.Count > 128) _librarySessionAchievementFetchTasks.Clear();
+
+                var folder = new LibraryFolderInfo
+                {
+                    Name = target.GameTitle ?? string.Empty,
+                    PlatformLabel = target.PlatformLabel ?? string.Empty,
+                    SteamAppId = target.SteamAppId ?? string.Empty,
+                    RetroAchievementsGameId = target.RetroAchievementsGameId ?? string.Empty
+                };
+                var task = GameAchievementsFetchService.FetchAsync(
+                    target.PlatformLabel ?? string.Empty,
+                    folder,
+                    steamKey,
+                    retroKey,
+                    steamUser,
+                    retroUser,
+                    "PixelVault/" + AppVersion,
+                    CancellationToken.None);
+                _librarySessionAchievementFetchTasks[cacheKey] = task;
+                return task;
+            }
+        }
+
+        LibrarySessionAchievementMetricResult BuildLibrarySessionAchievementMetricResult(
+            LibraryDetailRenderGroup group,
+            List<LibrarySessionAchievementTarget> targets,
+            GameAchievementsFetchService.FetchResult[] results)
+        {
+            if (targets == null || targets.Count == 0)
+                return new LibrarySessionAchievementMetricResult { Label = "Not tracked", ToolTip = "No tracked achievement source was found for this session." };
+
+            var startLocal = group.SessionStartDate;
+            var endLocal = group.SessionEndDate;
+            if (startLocal <= DateTime.MinValue || endLocal <= DateTime.MinValue)
+            {
+                startLocal = group.CaptureDate;
+                endLocal = group.CaptureDate;
+            }
+            if (startLocal > endLocal)
+            {
+                var swap = startLocal;
+                startLocal = endLocal;
+                endLocal = swap;
+            }
+            var startUtcTicks = startLocal <= DateTime.MinValue ? 0L : startLocal.ToUniversalTime().Ticks;
+            var endUtcTicks = endLocal <= DateTime.MinValue ? long.MaxValue : endLocal.ToUniversalTime().Ticks;
+            if (startUtcTicks > 0 && endUtcTicks < long.MaxValue && startUtcTicks == endUtcTicks)
+            {
+                startUtcTicks = startLocal.AddMinutes(-5).ToUniversalTime().Ticks;
+                endUtcTicks = endLocal.AddMinutes(5).ToUniversalTime().Ticks;
+            }
+
+            var earnedInSession = 0;
+            var unlockedTotal = 0;
+            var progressKnownGames = 0;
+            var progressUnknownGames = 0;
+            var unavailableGames = 0;
+            var totalAchievements = 0;
+            var tooltipLines = new List<string>();
+            for (var i = 0; i < targets.Count; i++)
+            {
+                var target = targets[i];
+                var result = results != null && i < results.Length ? results[i] : null;
+                if (result == null || result.IsError || result.Rows == null)
+                {
+                    unavailableGames++;
+                    tooltipLines.Add((target.GameTitle ?? target.SourceLabel ?? "Game") + ": unavailable" + (result == null || string.IsNullOrWhiteSpace(result.ErrorMessage) ? string.Empty : " (" + result.ErrorMessage + ")"));
+                    continue;
+                }
+
+                var rows = result.Rows ?? new List<GameAchievementsFetchService.AchievementRow>();
+                totalAchievements += rows.Count;
+                var progressKnown = rows.Any(row => row != null && row.ProgressKnown);
+                if (!progressKnown)
+                {
+                    progressUnknownGames++;
+                    tooltipLines.Add((result.GameTitle ?? target.GameTitle ?? "Game") + ": achievement list found, unlock progress unknown");
+                    continue;
+                }
+
+                progressKnownGames++;
+                var gameUnlocked = rows.Count(row => row != null && row.ProgressKnown && row.Unlocked);
+                var gameEarnedInSession = rows.Count(row =>
+                    row != null
+                    && row.ProgressKnown
+                    && row.Unlocked
+                    && row.UnlockUtcTicks > 0
+                    && row.UnlockUtcTicks >= startUtcTicks
+                    && row.UnlockUtcTicks <= endUtcTicks);
+                unlockedTotal += gameUnlocked;
+                earnedInSession += gameEarnedInSession;
+                tooltipLines.Add((result.GameTitle ?? target.GameTitle ?? "Game") + ": " + gameEarnedInSession + " earned in session, " + gameUnlocked + " unlocked total");
+            }
+
+            string label;
+            if (progressKnownGames > 0)
+            {
+                label = earnedInSession + " earned";
+                if (targets.Count > 1) label += " (" + progressKnownGames + "/" + targets.Count + ")";
+            }
+            else if (progressUnknownGames > 0)
+            {
+                label = "Progress unknown";
+            }
+            else
+            {
+                label = "Unavailable";
+            }
+
+            var toolTip = new List<string>
+            {
+                "Tracked achievement sources: " + targets.Count,
+                "Session window: " + (startLocal <= DateTime.MinValue ? "Unknown" : startLocal.ToString("g")) + " - " + (endLocal <= DateTime.MinValue ? "Unknown" : endLocal.ToString("g"))
+            };
+            if (progressKnownGames > 0)
+                toolTip.Add("Unlocked total across tracked games: " + unlockedTotal + " of " + totalAchievements);
+            if (progressUnknownGames > 0)
+                toolTip.Add(progressUnknownGames + " tracked game" + (progressUnknownGames == 1 ? string.Empty : "s") + " need unlock progress credentials/privacy.");
+            if (unavailableGames > 0)
+                toolTip.Add(unavailableGames + " tracked source" + (unavailableGames == 1 ? string.Empty : "s") + " could not be loaded.");
+            toolTip.AddRange(tooltipLines.Take(8));
+            return new LibrarySessionAchievementMetricResult
+            {
+                Label = label,
+                ToolTip = string.Join(Environment.NewLine, toolTip.Where(line => !string.IsNullOrWhiteSpace(line)).ToArray())
+            };
+        }
+
+        void OpenLibrarySessionWindow(
+            Window ownerWindow,
+            LibraryBrowserFolderView renderFolder,
+            LibraryDetailRenderGroup group,
+            IDictionary<string, LibraryTimelineCaptureContext> timelineContexts,
+            IReadOnlyDictionary<string, LibraryDetailMediaLayoutInfo> mediaLayoutByFile,
+            double dpiScale,
+            Action<string> openSingleFileMetadataEditor,
+            Action redrawSelectedFolderDetail)
+        {
+            if (group == null) return;
+            var sessionFiles = (group.Files ?? new List<string>())
+                .Where(file => !string.IsNullOrWhiteSpace(file) && File.Exists(file))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (sessionFiles.Count == 0) return;
+
+            var title = !string.IsNullOrWhiteSpace(group.HeaderText)
+                ? group.HeaderText
+                : BuildLibrarySessionCardTitle(group.SessionEndDate, group.SessionStartDate, DateTime.Today);
+            var subtitle = !string.IsNullOrWhiteSpace(group.SubtitleText)
+                ? group.SubtitleText
+                : BuildLibrarySessionCardSubtitle(sessionFiles.Count, group.SessionEndDate, group.SessionStartDate);
+            var gameText = BuildLibrarySessionDistinctContextLabel(sessionFiles, timelineContexts, true);
+            var platformText = BuildLibrarySessionDistinctContextLabel(sessionFiles, timelineContexts, false);
+
+            var workArea = SystemParameters.WorkArea;
+            var initialWidth = Math.Min(workArea.Width - 96d, Math.Max(900d, ownerWindow == null ? 1120d : ownerWindow.ActualWidth * 0.88d));
+            var initialHeight = Math.Min(workArea.Height - 96d, Math.Max(620d, ownerWindow == null ? 780d : ownerWindow.ActualHeight * 0.86d));
+            var window = new Window
+            {
+                Title = title + " - PixelVault Session",
+                Width = initialWidth,
+                Height = initialHeight,
+                MinWidth = 720,
+                MinHeight = 520,
+                Background = Brush("#0F151A"),
+                WindowStartupLocation = ownerWindow == null ? WindowStartupLocation.CenterScreen : WindowStartupLocation.CenterOwner,
+                Owner = ownerWindow,
+                ResizeMode = ResizeMode.CanResize,
+                ShowInTaskbar = true
+            };
+
+            var root = new DockPanel { LastChildFill = true };
+            var header = new Border
+            {
+                Background = Brush("#121F28"),
+                BorderBrush = Brush("#2E414D"),
+                BorderThickness = new Thickness(0, 0, 0, 1),
+                Padding = new Thickness(22, 18, 22, 16)
+            };
+            DockPanel.SetDock(header, Dock.Top);
+            var headerStack = new StackPanel();
+            headerStack.Children.Add(new TextBlock
+            {
+                Text = title,
+                Foreground = Brushes.White,
+                FontSize = 24,
+                FontWeight = FontWeights.SemiBold,
+                TextWrapping = TextWrapping.Wrap
+            });
+            headerStack.Children.Add(new TextBlock
+            {
+                Text = subtitle,
+                Foreground = Brush("#AFC0CA"),
+                FontSize = 13.5,
+                Margin = new Thickness(0, 6, 0, 0),
+                TextWrapping = TextWrapping.Wrap
+            });
+            var metricRow = new WrapPanel { Margin = new Thickness(0, 12, 0, 0) };
+            metricRow.Children.Add(BuildLibrarySessionMetricPill("Photos", sessionFiles.Count.ToString()));
+            metricRow.Children.Add(BuildLibrarySessionAchievementMetricPill(sessionFiles, group, timelineContexts));
+            metricRow.Children.Add(BuildLibrarySessionMetricPill("Games", gameText));
+            metricRow.Children.Add(BuildLibrarySessionMetricPill("Platforms", platformText));
+            headerStack.Children.Add(metricRow);
+            header.Child = headerStack;
+            root.Children.Add(header);
+
+            var host = CreateVirtualizedRowHost(new Thickness(18, 16, 18, 18), Brush("#0F151A"));
+            host.DiagnosticName = "SessionWindowRows";
+            host.RecycleVisibleRowElements = true;
+            root.Children.Add(host.ScrollViewer);
+            window.Content = root;
+
+            var sessionWs = new LibraryBrowserWorkingSet { Current = renderFolder };
+            sessionWs.DetailFilesDisplayOrder.AddRange(sessionFiles.Where(file => IsImage(file)));
+            Func<List<string>> visibleSessionFiles = delegate
+            {
+                return sessionFiles.Where(file => !string.IsNullOrWhiteSpace(file) && File.Exists(file)).ToList();
+            };
+            Action refreshSessionSelectionUi = null;
+            refreshSessionSelectionUi = delegate
+            {
+                foreach (var tile in sessionWs.DetailTiles)
+                {
+                    var file = tile == null ? string.Empty : tile.Tag as string;
+                    var selected = !string.IsNullOrWhiteSpace(file) && sessionWs.SelectedDetailFiles.Contains(file);
+                    tile.Background = selected ? Brush("#1D2730") : Brush("#10181D");
+                    tile.BorderBrush = selected ? Brush("#D46C63") : Brush("#2B3A44");
+                    tile.BorderThickness = selected ? new Thickness(2) : new Thickness(1);
+                }
+            };
+            Action<string, ModifierKeys> updateSessionSelection = delegate(string file, ModifierKeys mods)
+            {
+                LibraryBrowserApplyDetailSelectionChange(sessionWs, file, mods, visibleSessionFiles, refreshSessionSelectionUi);
+            };
+            host.BeforeVisibleRowsRebuilt = delegate
+            {
+                sessionWs.DetailTiles.Clear();
+            };
+            host.AfterVisibleRowsRebuilt = delegate
+            {
+                RepopulateLibraryDetailTilesFromVisibleRows(sessionWs, host);
+                refreshSessionSelectionUi();
+            };
+
+            Action rebuildRows = delegate
+            {
+                var viewport = host.ScrollViewer == null ? 0d : host.ScrollViewer.ActualWidth;
+                if (viewport <= 0d) viewport = window.ActualWidth - 42d;
+                if (viewport <= 0d) viewport = initialWidth - 42d;
+                viewport = Math.Max(420d, viewport - 8d);
+                var tileSize = Math.Max(180, Math.Min(260, (int)Math.Round(viewport / 4.4d)));
+                var rows = BuildLibraryContinuousMosaicRowDefinitions(
+                    sessionWs,
+                    renderFolder,
+                    new[] { group },
+                    timelineContexts,
+                    mediaLayoutByFile,
+                    host.ScrollViewer,
+                    viewport,
+                    tileSize,
+                    dpiScale,
+                    true,
+                    openSingleFileMetadataEditor,
+                    updateSessionSelection,
+                    refreshSessionSelectionUi,
+                    redrawSelectedFolderDetail,
+                    null,
+                    path => OpenLibrarySessionCaptureViewer(window, sessionFiles, path));
+                SetVirtualizedRows(host, rows, true, null);
+            };
+
+            DispatcherTimer resizeTimer = null;
+            resizeTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(140) };
+            resizeTimer.Tick += delegate
+            {
+                resizeTimer.Stop();
+                rebuildRows();
+            };
+            window.Loaded += delegate
+            {
+                rebuildRows();
+            };
+            window.SizeChanged += delegate
+            {
+                resizeTimer.Stop();
+                resizeTimer.Start();
+            };
+            window.Closing += delegate
+            {
+                resizeTimer.Stop();
+                sessionWs.DetailTiles.Clear();
+            };
+            window.Show();
+            window.Activate();
+        }
+
+        void OpenLibrarySessionCaptureViewer(Window ownerWindow, IList<string> sessionFiles, string filePath)
+        {
+            if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath) || !IsImage(filePath)) return;
+            var paths = (sessionFiles ?? new List<string>())
+                .Where(path => !string.IsNullOrWhiteSpace(path) && File.Exists(path) && IsImage(path))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (paths.Count == 0) paths.Add(filePath);
+            if (!paths.Any(path => string.Equals(path, filePath, StringComparison.OrdinalIgnoreCase)))
+                paths.Insert(0, filePath);
+            var idx = paths.FindIndex(path => string.Equals(path, filePath, StringComparison.OrdinalIgnoreCase));
+            if (idx < 0) idx = 0;
+            var viewer = new LibraryCaptureViewerWindow(this, ownerWindow, paths, idx);
+            viewer.Show();
+            viewer.Activate();
+        }
+
         sealed class LibraryPackedDayCardLayout
         {
             public LibraryDetailRenderGroup Group;
@@ -1433,11 +2411,13 @@ namespace PixelVaultNative
                 .Where(file => !string.IsNullOrWhiteSpace(file))
                 .ToList();
             if (groupFiles.Count == 0) return null;
-            var labelText = group.CaptureDate <= DateTime.MinValue
-                ? string.Empty
-                : (group.CaptureDate.Year == DateTime.Today.Year
-                    ? group.CaptureDate.ToString("ddd, MMM d")
-                    : group.CaptureDate.ToString("ddd, MMM d, yyyy"));
+            var labelText = !string.IsNullOrWhiteSpace(group.HeaderText)
+                ? group.HeaderText
+                : (group.CaptureDate <= DateTime.MinValue
+                    ? string.Empty
+                    : (group.CaptureDate.Year == DateTime.Today.Year
+                        ? group.CaptureDate.ToString("ddd, MMM d")
+                        : group.CaptureDate.ToString("ddd, MMM d, yyyy")));
             var captureDateLabels = BuildLibraryCaptureDateLabelMapForPlacements(
                 new[] { group },
                 cardLayout.Chunks,
@@ -1453,6 +2433,17 @@ namespace PixelVaultNative
                     FontWeight = timelineView ? FontWeights.SemiBold : FontWeights.Medium,
                     Margin = new Thickness(2, 0, 0, timelineView ? 10 : 6)
                 });
+                if (!string.IsNullOrWhiteSpace(group.SubtitleText))
+                {
+                    stack.Children.Add(new TextBlock
+                    {
+                        Text = group.SubtitleText,
+                        Foreground = Brush(DesignTokens.TextLabelMuted),
+                        FontSize = 11.5,
+                        FontWeight = FontWeights.Medium,
+                        Margin = new Thickness(2, -6, 0, timelineView ? 10 : 6)
+                    });
+                }
             }
 
             foreach (var chunk in cardLayout.Chunks)
@@ -1574,13 +2565,15 @@ namespace PixelVaultNative
             return root;
         }
 
-        FrameworkElement BuildLibraryDetailEmptyCapturesPlaceholder(bool timelineView, DateTime rangeStart, DateTime rangeEnd, Action redrawDetail)
+        FrameworkElement BuildLibraryDetailEmptyCapturesPlaceholder(bool timelineView, bool sessionView, DateTime rangeStart, DateTime rangeEnd, Action redrawDetail)
         {
             var root = new StackPanel { Margin = new Thickness(8, 12, 12, 16), MaxWidth = 480 };
-            var title = timelineView ? "No captures in this range" : "No captures in this folder";
-            var body = timelineView
+            var title = sessionView ? "No captures to group into sessions" : (timelineView ? "No captures in this range" : "No captures in this folder");
+            var body = sessionView
+                ? "No captures match the current search/filter set. Clear search or switch grouping to browse folders."
+                : (timelineView
                 ? "Nothing falls between " + (rangeStart > DateTime.MinValue ? rangeStart.ToString("yyyy-MM-dd") : "start") + " and " + (rangeEnd > DateTime.MinValue ? rangeEnd.ToString("yyyy-MM-dd") : "end") + ". Widen the range or switch grouping."
-                : "This game folder has no screenshots or clips yet. Import captures or pick another folder.";
+                : "This game folder has no screenshots or clips yet. Import captures or pick another folder.");
             root.Children.Add(new TextBlock
             {
                 Text = title,

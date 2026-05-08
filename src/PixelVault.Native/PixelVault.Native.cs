@@ -117,6 +117,7 @@ namespace PixelVaultNative
         string libraryFolderSortMode = "alpha";
         string libraryFolderFilterMode = "all";
         string libraryGroupingMode = "all";
+        int librarySessionThresholdMinutes = 60;
         bool troubleshootingLoggingEnabled;
         bool troubleshootingLogRedactPaths;
         bool libraryDoubleClickSetsFolderCover;
@@ -368,13 +369,86 @@ namespace PixelVaultNative
             foreach (var root in GetSourceRoots())
             {
                 if (!Directory.Exists(root)) continue;
-                foreach (var file in Directory.EnumerateFiles(root, "*", option))
+                foreach (var file in EnumerateVisibleFiles(root, option))
                 {
                     if (!predicate(file)) continue;
                     var fullPath = Path.GetFullPath(file);
                     if (seen.Add(fullPath)) yield return fullPath;
                 }
             }
+        }
+
+        static IEnumerable<string> EnumerateVisibleFiles(string root, SearchOption option)
+        {
+            if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root)) yield break;
+            var pending = new Queue<string>();
+            pending.Enqueue(root);
+            while (pending.Count > 0)
+            {
+                var current = pending.Dequeue();
+                IEnumerable<string> files;
+                try
+                {
+                    files = Directory.EnumerateFiles(current, "*", SearchOption.TopDirectoryOnly).ToList();
+                }
+                catch
+                {
+                    continue;
+                }
+                foreach (var file in files)
+                {
+                    if (!ImportService.IsHiddenFileOrInsideHiddenDirectory(file)) yield return file;
+                }
+                if (option != SearchOption.AllDirectories) continue;
+                IEnumerable<string> dirs;
+                try
+                {
+                    dirs = Directory.EnumerateDirectories(current, "*", SearchOption.TopDirectoryOnly).ToList();
+                }
+                catch
+                {
+                    continue;
+                }
+                foreach (var dir in dirs)
+                {
+                    if (!ImportService.IsHiddenFileOrInsideHiddenDirectory(dir)) pending.Enqueue(dir);
+                }
+            }
+        }
+
+        string GetImportFolderTitleHint(string file)
+        {
+            if (string.IsNullOrWhiteSpace(file)) return string.Empty;
+            string fullFile;
+            try
+            {
+                fullFile = Path.GetFullPath(file);
+            }
+            catch
+            {
+                return string.Empty;
+            }
+            foreach (var root in GetSourceRoots())
+            {
+                if (string.IsNullOrWhiteSpace(root)) continue;
+                string fullRoot;
+                try
+                {
+                    fullRoot = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                }
+                catch
+                {
+                    continue;
+                }
+                var prefix = fullRoot + Path.DirectorySeparatorChar;
+                if (!fullFile.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) continue;
+                var relative = fullFile.Substring(prefix.Length);
+                var separators = new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar };
+                var parts = relative.Split(separators, StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length < 2) return string.Empty;
+                return parts[0];
+            }
+            return string.Empty;
         }
 
         string FindExecutableOnPath(string executableName)
@@ -790,8 +864,6 @@ namespace PixelVaultNative
         string FormatViewKeyForTroubleshooting(string viewKey) => troubleshootingLog.FormatViewKey(viewKey);
     }
 }
-
-
 
 
 

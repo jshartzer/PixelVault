@@ -64,9 +64,9 @@ namespace PixelVaultNative
         }
 
         /// <summary>
-        /// Picks Steam vs RetroAchievements using the normalized platform label when unambiguous, then falls back to
-        /// which external ids are present so <c>Multiple Tags</c> / merged-console rows still load achievements.
-        /// When both ids exist, Steam is preferred (common for PC + emulation library entries).
+        /// Picks Steam vs RetroAchievements using the normalized platform label when unambiguous. Steam-labeled
+        /// folders only use Steam IDs, Emulation-labeled folders only use RetroAchievements IDs; merged/other
+        /// rows may infer from the one achievement-capable ID that is present.
         /// </summary>
         static bool TryPickAchievementsBackend(string normalizedPlatform, LibraryFolderInfo folder, out bool useSteam)
         {
@@ -77,32 +77,14 @@ namespace PixelVaultNative
 
             if (string.Equals(norm, "Steam", StringComparison.OrdinalIgnoreCase))
             {
-                if (steamReady)
-                {
-                    useSteam = true;
-                    return true;
-                }
-                if (retroReady)
-                {
-                    useSteam = false;
-                    return true;
-                }
-                return false;
+                useSteam = true;
+                return steamReady;
             }
 
             if (string.Equals(norm, "Emulation", StringComparison.OrdinalIgnoreCase))
             {
-                if (retroReady)
-                {
-                    useSteam = false;
-                    return true;
-                }
-                if (steamReady)
-                {
-                    useSteam = true;
-                    return true;
-                }
-                return false;
+                useSteam = false;
+                return retroReady;
             }
 
             // "Multiple Tags", PC, Other, PS5, etc.: infer from ids

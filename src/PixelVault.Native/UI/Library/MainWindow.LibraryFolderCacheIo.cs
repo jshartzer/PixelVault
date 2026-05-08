@@ -114,7 +114,7 @@ namespace PixelVaultNative
             foreach (var kv in LoadLibraryMetadataIndexViaSessionWhenActive(root, true))
             {
                 var p = kv.Key;
-                if (string.IsNullOrWhiteSpace(p) || ImportService.IsHdrFallbackPath(p) || !IsMedia(p) || !File.Exists(p)) continue;
+                if (string.IsNullOrWhiteSpace(p) || ImportService.IsImportParkingPath(p) || !IsMedia(p) || !File.Exists(p)) continue;
                 if (!IsLibraryMediaFileUnderLibraryRoot(root, p)) continue;
                 files.Add(p);
             }
@@ -223,7 +223,7 @@ namespace PixelVaultNative
                 (folder == null ? 0 : folder.FileCount).ToString(),
                 folder == null ? string.Empty : (folder.PreviewImagePath ?? string.Empty),
                 folder == null ? string.Empty : (folder.PlatformLabel ?? string.Empty),
-                string.Join("|", (folder == null ? new string[0] : (folder.FilePaths ?? new string[0])).Where(path => !ImportService.IsHdrFallbackPath(path)).Where(File.Exists)),
+                string.Join("|", (folder == null ? new string[0] : (folder.FilePaths ?? new string[0])).Where(path => !ImportService.IsImportParkingPath(path)).Where(File.Exists)),
                 folder == null ? string.Empty : (folder.SteamAppId ?? string.Empty),
                 folder == null ? string.Empty : (folder.SteamGridDbId ?? string.Empty),
                 folder != null && folder.NewestCaptureUtcTicks > 0 ? folder.NewestCaptureUtcTicks.ToString() : string.Empty,
@@ -254,7 +254,7 @@ namespace PixelVaultNative
             {
                 return Directory.Exists(root)
                     && Directory.EnumerateDirectories(root)
-                        .Where(dir => !ImportService.IsHdrFallbackPath(dir))
+                        .Where(dir => !ImportService.IsImportParkingPath(dir))
                         .Skip(1)
                         .Any();
             }
@@ -317,7 +317,7 @@ namespace PixelVaultNative
                 ExcludeHdrFallbackPathsFromLibraryFolderInfo(parsed);
                 if (parsed.FilePaths != null
                     && parsed.FilePaths.Length == 0
-                    && (ImportService.IsHdrFallbackPath(parsed.FolderPath) || ImportService.IsHdrFallbackPath(parsed.PreviewImagePath)))
+                    && (ImportService.IsImportParkingPath(parsed.FolderPath) || ImportService.IsImportParkingPath(parsed.PreviewImagePath)))
                     continue;
                 list.Add(parsed);
             }
@@ -328,11 +328,11 @@ namespace PixelVaultNative
         {
             if (folder == null || folder.FilePaths == null) return;
             folder.FilePaths = folder.FilePaths
-                .Where(path => !ImportService.IsHdrFallbackPath(path))
+                .Where(path => !ImportService.IsImportParkingPath(path))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
             folder.FileCount = folder.FilePaths.Length;
-            if (ImportService.IsHdrFallbackPath(folder.PreviewImagePath))
+            if (ImportService.IsImportParkingPath(folder.PreviewImagePath))
                 folder.PreviewImagePath = folder.FilePaths.FirstOrDefault() ?? string.Empty;
         }
 
@@ -402,7 +402,7 @@ namespace PixelVaultNative
             {
                 return folder.FilePaths
                     .Where(File.Exists)
-                    .Where(file => !ImportService.IsHdrFallbackPath(file))
+                    .Where(file => !ImportService.IsImportParkingPath(file))
                     .Where(file => !imagesOnly || IsImage(file))
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .ToList();
@@ -412,7 +412,7 @@ namespace PixelVaultNative
                 ? GetCachedFolderImages(folder.FolderPath)
                 : Directory.EnumerateFiles(folder.FolderPath, "*.*", SearchOption.TopDirectoryOnly).Where(IsMedia);
             var candidates = filesEnumerable
-                .Where(file => !ImportService.IsHdrFallbackPath(file))
+                .Where(file => !ImportService.IsImportParkingPath(file))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
             var desired = NormalizeConsoleLabel(folder.PlatformLabel);

@@ -45,6 +45,7 @@ namespace PixelVaultNative
             new("group_all", "Group · All games", "Single folder list", "grouping flat"),
             new("group_console", "Group · By console", "Platform sections", "grouping xbox playstation"),
             new("group_timeline", "Group · Timeline", "Calendar view", "grouping dates"),
+            new("group_sessions", "Group · Sessions", "Time-gap sessions view", "grouping play sessions time gaps"),
             new("group_folders", "Group · Folders", "Exit timeline to folder cards", "grouping grid"),
             new("workspace_open_captures", "Workspace · Open captures", "Photo view for the selected game (double-click a cover)", "photos screenshots game workspace"),
             new("workspace_back_to_folders", "Workspace · Back to folder list", "Leave captures view (Esc also works)", "folders grid close photos")
@@ -107,6 +108,7 @@ namespace PixelVaultNative
             Bind("group_all", ctx.GroupFoldersAllGames);
             Bind("group_console", ctx.GroupFoldersByConsole);
             Bind("group_timeline", ctx.GroupFoldersTimeline);
+            Bind("group_sessions", ctx.GroupFoldersSessions);
             Bind("group_folders", ctx.GroupFoldersFolderGrid);
             Bind("workspace_open_captures", ctx.EnterPhotoWorkspace);
             Bind("workspace_back_to_folders", ctx.ExitPhotoWorkspace);

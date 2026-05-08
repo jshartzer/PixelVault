@@ -15,7 +15,7 @@ namespace PixelVaultNative
         internal void LibraryBrowserShowAchievementsInfo(Window owner, LibraryBrowserFolderView view)
         {
             if (owner == null || view == null) return;
-            var folder = BuildLibraryBrowserDisplayFolder(view);
+            var folder = ResolveLibraryBrowserAchievementLookupFolder(view);
             var normalized = NormalizeConsoleLabel(folder == null ? string.Empty : folder.PlatformLabel);
             AchievementsInfoWindow.ShowModal(
                 owner,
@@ -26,6 +26,100 @@ namespace PixelVaultNative
                 CurrentSteamUserId64(),
                 CurrentRetroAchievementsUsername(),
                 "PixelVault/" + AppVersion);
+        }
+
+        LibraryFolderInfo ResolveLibraryBrowserAchievementLookupFolder(LibraryBrowserFolderView view)
+        {
+            var displayFolder = BuildLibraryBrowserDisplayFolder(view);
+            if (view == null) return displayFolder;
+
+            var candidates = new List<LibraryFolderInfo>();
+            foreach (var folder in view.SourceFolders ?? Enumerable.Empty<LibraryFolderInfo>())
+            {
+                if (folder != null) candidates.Add(folder);
+            }
+            if (view.PrimaryFolder != null) candidates.Add(view.PrimaryFolder);
+            if (displayFolder != null) candidates.Add(displayFolder);
+
+            LibraryFolderInfo PickByPlatformAndId(string platform, Func<LibraryFolderInfo, string> pickId)
+            {
+                return candidates.FirstOrDefault(folder =>
+                    folder != null
+                    && string.Equals(NormalizeConsoleLabel(folder.PlatformLabel), platform, StringComparison.OrdinalIgnoreCase)
+                    && HasLibraryBrowserAchievementId(pickId(folder)));
+            }
+
+            var steam = PickByPlatformAndId("Steam", folder => folder.SteamAppId);
+            if (steam != null) return BuildLibraryBrowserAchievementLookupFolder(steam, displayFolder, "Steam");
+
+            var retro = PickByPlatformAndId("Emulation", folder => folder.RetroAchievementsGameId);
+            if (retro != null) return BuildLibraryBrowserAchievementLookupFolder(retro, displayFolder, "Emulation");
+
+            var steamById = candidates
+                .Where(folder => folder != null && HasLibraryBrowserAchievementId(folder.SteamAppId))
+                .GroupBy(folder => CleanTag(folder.SteamAppId ?? string.Empty), StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.First())
+                .ToList();
+            if (steamById.Count == 1) return BuildLibraryBrowserAchievementLookupFolder(steamById[0], displayFolder, "Steam");
+
+            var retroById = candidates
+                .Where(folder => folder != null && HasLibraryBrowserAchievementId(folder.RetroAchievementsGameId))
+                .GroupBy(folder => CleanTag(folder.RetroAchievementsGameId ?? string.Empty), StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.First())
+                .ToList();
+            if (retroById.Count == 1) return BuildLibraryBrowserAchievementLookupFolder(retroById[0], displayFolder, "Emulation");
+
+            return displayFolder;
+        }
+
+        LibraryFolderInfo BuildLibraryBrowserAchievementLookupFolder(LibraryFolderInfo source, LibraryFolderInfo displayFolder, string platform)
+        {
+            var folder = CloneLibraryFolderInfo(source) ?? CloneLibraryFolderInfo(displayFolder) ?? new LibraryFolderInfo();
+            if (displayFolder != null)
+            {
+                folder.Name = displayFolder.Name ?? folder.Name;
+                folder.FileCount = displayFolder.FileCount;
+                folder.FilePaths = displayFolder.FilePaths == null ? folder.FilePaths : displayFolder.FilePaths.ToArray();
+                folder.PreviewImagePath = string.IsNullOrWhiteSpace(displayFolder.PreviewImagePath) ? folder.PreviewImagePath : displayFolder.PreviewImagePath;
+            }
+            folder.PlatformLabel = platform ?? string.Empty;
+            if (string.Equals(platform, "Steam", StringComparison.OrdinalIgnoreCase))
+                folder.RetroAchievementsGameId = string.Empty;
+            else if (string.Equals(platform, "Emulation", StringComparison.OrdinalIgnoreCase))
+                folder.SteamAppId = string.Empty;
+            return folder;
+        }
+
+        static bool HasLibraryBrowserAchievementId(string raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw)) return false;
+            return raw.Any(char.IsDigit);
+        }
+
+        bool IsLibraryBrowserSteamAchievementLookupFromNonSteamEntry(LibraryBrowserFolderView view, LibraryFolderInfo lookupFolder)
+        {
+            if (view == null || lookupFolder == null) return false;
+            if (!string.Equals(NormalizeConsoleLabel(lookupFolder.PlatformLabel), "Steam", StringComparison.OrdinalIgnoreCase)) return false;
+
+            var lookupSteamAppId = CleanTag(lookupFolder.SteamAppId ?? string.Empty);
+            if (string.IsNullOrWhiteSpace(lookupSteamAppId)) return false;
+
+            var candidates = new List<LibraryFolderInfo>();
+            foreach (var folder in view.SourceFolders ?? Enumerable.Empty<LibraryFolderInfo>())
+            {
+                if (folder != null) candidates.Add(folder);
+            }
+            if (view.PrimaryFolder != null) candidates.Add(view.PrimaryFolder);
+
+            foreach (var candidate in candidates)
+            {
+                if (candidate == null) continue;
+                if (!string.Equals(CleanTag(candidate.SteamAppId ?? string.Empty), lookupSteamAppId, StringComparison.OrdinalIgnoreCase)) continue;
+                if (string.Equals(NormalizeConsoleLabel(candidate.PlatformLabel), "Steam", StringComparison.OrdinalIgnoreCase))
+                    return false;
+            }
+
+            return true;
         }
 
         internal void LibraryBrowserClearAchievementsSummary(LibraryBrowserPaneRefs panes)
@@ -190,7 +284,7 @@ namespace PixelVaultNative
                 panes.PhotoAchievementsRecentPanel.Visibility = Visibility.Collapsed;
             }
 
-            var folder = BuildLibraryBrowserDisplayFolder(info);
+            var folder = ResolveLibraryBrowserAchievementLookupFolder(info);
             var normalized = NormalizeConsoleLabel(folder == null ? string.Empty : folder.PlatformLabel);
             var captureInfo = info;
             var userAgent = "PixelVault/" + AppVersion;

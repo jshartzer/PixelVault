@@ -100,7 +100,7 @@ namespace PixelVaultNative
             var retroUserBox = SettingsTextBox(panel, 9, "RetroAchievements username (optional)", d.GetRetroAchievementsUsername?.Invoke() ?? string.Empty, labelFg, boxBg, boxFg, borderBrush, boxFg);
             retroUserBox.ToolTip = "retro_user on RetroAchievements.org — required for unlock/progress in the achievements viewer (retroachievements_username). Env: PIXELVAULT_RETROACHIEVEMENTS_USERNAME / RA_USERNAME.";
             var starredExportBox = SettingsTextBox(panel, 10, "Starred export folder (optional)", d.GetStarredExportFolder(), labelFg, boxBg, boxFg, borderBrush, boxFg);
-            starredExportBox.ToolTip = "Library → Export Starred copies starred files here (mirrored paths under the library root). Only files that are new to the export or whose metadata/file stamp changed are copied again; tracking lives in that library’s SQLite index. Replaces existing files when needed.";
+            starredExportBox.ToolTip = "Settings → Export Starred copies starred files here (mirrored paths under the library root). Only files that are new to the export or whose metadata/file stamp changed are copied again; tracking lives in that library’s SQLite index. Replaces existing files when needed.";
 
             SettingsBrowseButton(panel, 0, delegate { var picked = d.PickFolder(d.PrimarySourceRoot()); if (!string.IsNullOrWhiteSpace(picked)) sourceBox.Text = d.AppendSourceRoot(sourceBox.Text, picked); }, "Add Folder");
             SettingsBrowseButton(panel, 1, delegate { var picked = d.PickFolder(destinationBox.Text); if (!string.IsNullOrWhiteSpace(picked)) destinationBox.Text = picked; });
@@ -324,11 +324,17 @@ namespace PixelVaultNative
             Action<Button> styleHeaderBtn = delegate(Button b) { b.Margin = new Thickness(0, 0, 10, 8); };
             var pathSettingsTopButton = d.Btn("Path Settings", delegate { d.OpenPathSettingsDialog?.Invoke(); }, DesignTokens.ActionPrimaryFill, Brushes.White);
             styleHeaderBtn(pathSettingsTopButton);
+            Button exportStarredTopButton = null;
+            exportStarredTopButton = d.Btn("Export Starred", delegate { d.ExportStarredLibraryCaptures?.Invoke(Window.GetWindow(exportStarredTopButton) ?? d.OwnerWindow); }, DesignTokens.ActionSecondaryFill, Brushes.White);
+            exportStarredTopButton.ToolTip = "Copy starred captures to the folder configured in Path Settings.";
+            exportStarredTopButton.IsEnabled = d.ExportStarredLibraryCaptures != null;
+            styleHeaderBtn(exportStarredTopButton);
             var healthTopButton = d.Btn("Setup & health", delegate { ShowHealthDashboardDialog(); }, DesignTokens.ActionSecondaryFill, Brushes.White);
             styleHeaderBtn(healthTopButton);
             var viewLogsTopButton = d.Btn("View Logs", delegate { d.OpenFolder(d.LogsRoot); }, DesignTokens.ActionSecondaryFill, Brushes.White);
             styleHeaderBtn(viewLogsTopButton);
             quickActions.Children.Add(pathSettingsTopButton);
+            quickActions.Children.Add(exportStarredTopButton);
             quickActions.Children.Add(healthTopButton);
             quickActions.Children.Add(viewLogsTopButton);
             var statusBar = new Border

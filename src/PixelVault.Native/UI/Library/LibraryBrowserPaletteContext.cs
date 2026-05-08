@@ -45,6 +45,7 @@ namespace PixelVaultNative
         public Action GroupFoldersAllGames { get; init; }
         public Action GroupFoldersByConsole { get; init; }
         public Action GroupFoldersTimeline { get; init; }
+        public Action GroupFoldersSessions { get; init; }
         public Action GroupFoldersFolderGrid { get; init; }
 
         /// <summary>Open Photo workspace for the current folder selection (<c>PV-PLN-LIBWS-001</c>).</summary>

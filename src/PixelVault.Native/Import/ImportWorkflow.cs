@@ -186,7 +186,7 @@ namespace PixelVaultNative
 
         static string BuildMovePerfDetail(MoveStepResult result)
         {
-            return "moved=" + (result == null ? 0 : result.Moved) + "; skipped=" + (result == null ? 0 : result.Skipped) + "; renamedOnConflict=" + (result == null ? 0 : result.RenamedOnConflict);
+            return "moved=" + (result == null ? 0 : result.Moved) + "; skipped=" + (result == null ? 0 : result.Skipped) + "; renamedOnConflict=" + (result == null ? 0 : result.RenamedOnConflict) + "; duplicatesParked=" + (result == null ? 0 : result.ParkedDuplicates);
         }
 
         static string BuildSortPerfDetail(SortStepResult result)
@@ -219,6 +219,7 @@ namespace PixelVaultNative
                 + "; deleted=" + (deleteResult == null ? 0 : deleteResult.Deleted)
                 + "; metadataUpdated=" + (metadataResult == null ? 0 : metadataResult.Updated)
                 + "; moved=" + (moveResult == null ? 0 : moveResult.Moved)
+                + "; duplicatesParked=" + (moveResult == null ? 0 : moveResult.ParkedDuplicates)
                 + "; sorted=" + (sortResult == null ? 0 : sortResult.Sorted)
                 + "; hdrMoved=" + (hdrFallbackResult == null ? 0 : hdrFallbackResult.Moved)
                 + "; manualItemsLeft=" + manualItemsLeft
@@ -240,6 +241,7 @@ namespace PixelVaultNative
                 + "; renamed=" + (renameResult == null ? 0 : renameResult.Renamed)
                 + "; metadataUpdated=" + (metadataResult == null ? 0 : metadataResult.Updated)
                 + "; moved=" + (moveResult == null ? 0 : moveResult.Moved)
+                + "; duplicatesParked=" + (moveResult == null ? 0 : moveResult.ParkedDuplicates)
                 + "; sorted=" + (sortResult == null ? 0 : sortResult.Sorted)
                 + "; hdrMoved=" + (hdrFallbackResult == null ? 0 : hdrFallbackResult.Moved),
                 0);
@@ -450,11 +452,13 @@ namespace PixelVaultNative
                     var movedCount = result.MoveResult == null ? 0 : result.MoveResult.Moved;
                     var metadataUpdated = result.MetadataResult == null ? 0 : result.MetadataResult.Updated;
                     var hdrMoved = result.HdrFallbackResult == null ? 0 : result.HdrFallbackResult.Moved;
+                    var duplicatesParked = result.MoveResult == null ? 0 : result.MoveResult.ParkedDuplicates;
                     var leftSuffix = result.ManualItemsLeft > 0
                         ? (result.ManualItemsLeftAreUploadSkips ? " | " + result.ManualItemsLeft + " not selected (still in upload)" : " | " + result.ManualItemsLeft + " unmatched left")
                         : string.Empty;
                     var hdrSuffix = hdrMoved > 0 ? " | " + hdrMoved + " HDR duplicate(s) parked" : string.Empty;
-                    var summaryMeta = movedCount + " file(s) imported | " + metadataUpdated + " metadata update(s)" + hdrSuffix + leftSuffix;
+                    var duplicateSuffix = duplicatesParked > 0 ? " | " + duplicatesParked + " duplicate import(s) parked" : string.Empty;
+                    var summaryMeta = movedCount + " file(s) imported | " + metadataUpdated + " metadata update(s)" + hdrSuffix + duplicateSuffix + leftSuffix;
                     ShowImportSummaryWindow(withReview ? "Import and Comment Summary" : "Import Summary", summaryMeta, summaryLines);
                 },
                 delegate
@@ -533,8 +537,10 @@ namespace PixelVaultNative
                     var movedCount = result.MoveResult == null ? 0 : result.MoveResult.Moved;
                     var metadataUpdated = result.MetadataResult == null ? 0 : result.MetadataResult.Updated;
                     var hdrMoved = result.HdrFallbackResult == null ? 0 : result.HdrFallbackResult.Moved;
+                    var duplicatesParked = result.MoveResult == null ? 0 : result.MoveResult.ParkedDuplicates;
                     var hdrSuffix = hdrMoved > 0 ? " | " + hdrMoved + " HDR duplicate(s) parked" : string.Empty;
-                    var summaryMeta = movedCount + " file(s) imported | " + metadataUpdated + " metadata update(s)" + hdrSuffix;
+                    var duplicateSuffix = duplicatesParked > 0 ? " | " + duplicatesParked + " duplicate import(s) parked" : string.Empty;
+                    var summaryMeta = movedCount + " file(s) imported | " + metadataUpdated + " metadata update(s)" + hdrSuffix + duplicateSuffix;
                     ShowImportSummaryWindow("Manual Intake Summary", summaryMeta, summaryLines);
                 },
                 delegate

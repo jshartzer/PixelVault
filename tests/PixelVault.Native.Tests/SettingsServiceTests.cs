@@ -16,6 +16,25 @@ public sealed class SettingsServiceTests
     }
 
     [Theory]
+    [InlineData("sessions")]
+    [InlineData("session")]
+    [InlineData("photo sessions")]
+    [InlineData("capture sessions")]
+    public void NormalizeLibraryGroupingMode_SupportsSessionAliases(string raw)
+    {
+        Assert.Equal("sessions", SettingsService.NormalizeLibraryGroupingMode(raw));
+    }
+
+    [Theory]
+    [InlineData(1, 15)]
+    [InlineData(60, 60)]
+    [InlineData(900, 720)]
+    public void NormalizeLibrarySessionThresholdMinutes_Clamps(int input, int expected)
+    {
+        Assert.Equal(expected, SettingsService.NormalizeLibrarySessionThresholdMinutes(input));
+    }
+
+    [Theory]
     [InlineData("Rename", "Rename")]
     [InlineData("rename", "Rename")]
     [InlineData("Skip", "Skip")]
@@ -329,6 +348,32 @@ public sealed class SettingsServiceTests
             var loaded = svc.LoadFromIni(path, new AppSettings(), Path.GetTempPath(), () => string.Empty, () => string.Empty);
 
             Assert.Equal("timeline", loaded.LibraryGroupingMode);
+        }
+        finally
+        {
+            try { if (File.Exists(path)) File.Delete(path); } catch { /* ignore */ }
+        }
+    }
+
+    [Fact]
+    public void SaveToIni_ThenLoadFromIni_RoundTripsSessionsGroupingAndThreshold()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "PixelVault-settings-sessions-" + Guid.NewGuid().ToString("N") + ".ini");
+        try
+        {
+            var svc = new SettingsService();
+            svc.SaveToIni(path, new AppSettings
+            {
+                LibraryRoot = @"D:\lib",
+                LibraryGroupingMode = "sessions",
+                LibrarySessionThresholdMinutes = 90,
+                LibraryFolderTileSize = 220
+            });
+
+            var loaded = svc.LoadFromIni(path, new AppSettings(), Path.GetTempPath(), () => string.Empty, () => string.Empty);
+
+            Assert.Equal("sessions", loaded.LibraryGroupingMode);
+            Assert.Equal(90, loaded.LibrarySessionThresholdMinutes);
         }
         finally
         {

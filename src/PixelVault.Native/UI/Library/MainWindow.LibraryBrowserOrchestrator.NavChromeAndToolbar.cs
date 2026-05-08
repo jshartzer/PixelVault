@@ -45,21 +45,8 @@ namespace PixelVaultNative
             };
             navChrome.SettingsButton.Click += delegate
             {
-                var settingsItem = new MenuItem { Header = "Settings..." };
-                settingsItem.Click += delegate
-                {
-                    ShowSettingsWindow();
-                    if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge();
-                };
-
-                var exportStarredItem = new MenuItem
-                {
-                    Header = "Export Starred",
-                    IsEnabled = navChrome.ExportStarredButton == null || navChrome.ExportStarredButton.IsEnabled
-                };
-                exportStarredItem.Click += delegate { ExportStarredLibraryCapturesToFolder(libraryWindow); };
-
-                OpenLibraryButtonMenu(navChrome.SettingsButton, settingsItem, exportStarredItem);
+                ShowSettingsWindow();
+                if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge();
             };
             navChrome.GameIndexButton.Click += delegate { OpenGameIndexEditor(); };
             navChrome.PhotoIndexButton.Click += delegate { OpenPhotoIndexEditor(); };
@@ -68,7 +55,6 @@ namespace PixelVaultNative
             navChrome.ImportButton.Click += delegate { RunWorkflow(false); if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge(); };
             navChrome.ImportCommentsButton.Click += delegate { RunWorkflow(true); if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge(); };
             navChrome.ManualImportButton.Click += delegate { OpenManualIntakeWindow(); if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge(); };
-            navChrome.ExportStarredButton.Click += delegate { ExportStarredLibraryCapturesToFolder(libraryWindow); };
             navChrome.IntakeReviewButton.Click += delegate
             {
                 ShowIntakePreviewWindow(importSearchSubfoldersForRename);
@@ -83,6 +69,7 @@ namespace PixelVaultNative
             panes.GroupAllButton.Click += delegate { setLibraryGroupingMode("all"); };
             panes.GroupConsoleButton.Click += delegate { setLibraryGroupingMode("console"); };
             panes.GroupTimelineButton.Click += delegate { setLibraryGroupingMode("timeline"); };
+            panes.GroupSessionsButton.Click += delegate { setLibraryGroupingMode("sessions"); };
             panes.ExitTimelineButton.Click += delegate { setLibraryGroupingMode("folders"); };
             panes.SortFilterMenuButton.Click += delegate
             {

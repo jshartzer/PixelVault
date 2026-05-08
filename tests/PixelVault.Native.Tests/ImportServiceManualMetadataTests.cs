@@ -226,6 +226,102 @@ public sealed class ImportServiceManualMetadataTests
     }
 
     [Fact]
+    public void BuildSourceInventory_IgnoresHiddenFilesAndHiddenFolders()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "pv-hidden-import-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(root);
+            var visible = Path.Combine(root, "visible.jpg");
+            var hiddenFile = Path.Combine(root, "hidden.jpg");
+            var hiddenDir = Path.Combine(root, "HiddenFolder");
+            var hiddenDirFile = Path.Combine(hiddenDir, "nested.jpg");
+            File.WriteAllBytes(visible, new byte[] { 0 });
+            File.WriteAllBytes(hiddenFile, new byte[] { 0 });
+            Directory.CreateDirectory(hiddenDir);
+            File.WriteAllBytes(hiddenDirFile, new byte[] { 0 });
+            File.SetAttributes(hiddenFile, File.GetAttributes(hiddenFile) | FileAttributes.Hidden);
+            File.SetAttributes(hiddenDir, File.GetAttributes(hiddenDir) | FileAttributes.Hidden);
+            var sourceFiles = Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories).ToArray();
+            var svc = CreateMinimalImportService(sourceFiles);
+
+            var inventory = svc.BuildSourceInventory(true);
+
+            Assert.Contains(visible, inventory.TopLevelMediaFiles);
+            Assert.DoesNotContain(hiddenFile, inventory.TopLevelMediaFiles);
+            Assert.DoesNotContain(hiddenDirFile, inventory.TopLevelMediaFiles);
+        }
+        finally
+        {
+            try
+            {
+                if (Directory.Exists(root)) Directory.Delete(root, true);
+            }
+            catch
+            {
+            }
+        }
+    }
+
+    [Fact]
+    public async Task RunSteamRenameAsync_TitlelessSwitchCapture_UsesUploadFolderTitle()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "pv-switch-folder-rename-" + Guid.NewGuid().ToString("N"));
+        var upload = Path.Combine(root, "Upload");
+        var gameFolder = Path.Combine(upload, "Mario Kart World");
+        var file = Path.Combine(gameFolder, "2026050719542900-8AEDFF741E2D23FBED39474178692DAF.jpg");
+        try
+        {
+            Directory.CreateDirectory(gameFolder);
+            File.WriteAllBytes(file, new byte[] { 0 });
+            var parser = new FilenameParserService(new FilenameParserServiceDependencies
+            {
+                LoadCustomConventions = _ => new List<FilenameConventionRule>(),
+                LoadSavedGameIndexRows = _ => new List<GameIndexEditorRow>(),
+                NormalizeGameIndexName = value => (value ?? string.Empty).Trim(),
+                ParseTagText = value => (value ?? string.Empty)
+                    .Split(new[] { ',', ';', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                    .Select(tag => tag.Trim()),
+                IsVideo = _ => false,
+                NormalizeConsoleLabel = MainWindow.NormalizeConsoleLabel
+            });
+            var svc = new ImportService(new ImportServiceDependencies
+            {
+                FileSystem = new FileSystemService(),
+                LogService = NullLogService.Instance,
+                MetadataService = new StubMetadataService(),
+                GetFileCreationTime = _ => DateTime.MinValue,
+                GetFileLastWriteTime = _ => DateTime.MinValue,
+                CoverService = new StubCoverService(),
+                NormalizeGameIndexName = value => (value ?? string.Empty).Trim(),
+                UniquePath = path => path,
+                MoveMetadataSidecarIfPresent = delegate { },
+                ParseFilenameForImport = path => parser.Parse(path, string.Empty),
+                GetImportFolderTitleHint = path => path.StartsWith(gameFolder, StringComparison.OrdinalIgnoreCase) ? "Mario Kart World" : string.Empty,
+                SanitizeManualRenameGameTitle = value => Regex.Replace((value ?? string.Empty).Trim(), @"[\\/:*?""<>|]", "-")
+            });
+
+            var result = await svc.RunSteamRenameAsync(new[] { file });
+
+            var target = Path.Combine(gameFolder, "Mario Kart World_2026050719542900-8AEDFF741E2D23FBED39474178692DAF.jpg");
+            Assert.Equal(1, result.Renamed);
+            Assert.True(File.Exists(target));
+            Assert.False(File.Exists(file));
+            Assert.Equal(target, result.OldPathToNewPath[file]);
+        }
+        finally
+        {
+            try
+            {
+                if (Directory.Exists(root)) Directory.Delete(root, true);
+            }
+            catch
+            {
+            }
+        }
+    }
+
+    [Fact]
     public void MoveHdrPairFallbackFiles_MovesToAccessibleDestinationSubfolder()
     {
         var root = Path.Combine(Path.GetTempPath(), "pv-hdr-fallback-" + Guid.NewGuid().ToString("N"));

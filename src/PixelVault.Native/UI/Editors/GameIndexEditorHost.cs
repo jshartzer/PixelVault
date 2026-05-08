@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -174,7 +175,7 @@ namespace PixelVaultNative
                 CanUserAddRows = false,
                 CanUserDeleteRows = false,
                 CanUserResizeRows = false,
-                SelectionMode = DataGridSelectionMode.Single,
+                SelectionMode = DataGridSelectionMode.Extended,
                 SelectionUnit = DataGridSelectionUnit.FullRow,
                 GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
                 HeadersVisibility = DataGridHeadersVisibility.Column,
@@ -229,6 +230,58 @@ namespace PixelVaultNative
             Action refreshStatus = null;
             Action refreshGrid = null;
 
+            string ColumnSortMemberPath(DataGridColumn column)
+            {
+                if (column == null) return string.Empty;
+                if (!string.IsNullOrWhiteSpace(column.SortMemberPath)) return column.SortMemberPath;
+                var boundColumn = column as DataGridBoundColumn;
+                var binding = boundColumn == null ? null : boundColumn.Binding as System.Windows.Data.Binding;
+                return binding == null || binding.Path == null ? string.Empty : binding.Path.Path ?? string.Empty;
+            }
+
+            List<SortDescription> DefaultGameIndexSortDescriptions()
+            {
+                return new List<SortDescription>
+                {
+                    new SortDescription("Name", ListSortDirection.Ascending),
+                    new SortDescription("PlatformLabel", ListSortDirection.Ascending),
+                    new SortDescription("GameId", ListSortDirection.Ascending)
+                };
+            }
+
+            List<SortDescription> CaptureGridSortDescriptions()
+            {
+                if (grid.ItemsSource == null) return DefaultGameIndexSortDescriptions();
+                var sorts = grid.Items.SortDescriptions
+                    .Where(sort => !string.IsNullOrWhiteSpace(sort.PropertyName))
+                    .ToList();
+                return sorts.Count == 0 ? DefaultGameIndexSortDescriptions() : sorts;
+            }
+
+            void ApplyGridSortDescriptions(IReadOnlyList<SortDescription> sorts)
+            {
+                foreach (var column in grid.Columns)
+                    column.SortDirection = null;
+                grid.Items.SortDescriptions.Clear();
+                var effectiveSorts = sorts == null || sorts.Count == 0 ? DefaultGameIndexSortDescriptions() : sorts.ToList();
+                foreach (var sort in effectiveSorts.Where(sort => !string.IsNullOrWhiteSpace(sort.PropertyName)))
+                {
+                    grid.Items.SortDescriptions.Add(sort);
+                    var column = grid.Columns.FirstOrDefault(c => string.Equals(ColumnSortMemberPath(c), sort.PropertyName, StringComparison.OrdinalIgnoreCase));
+                    if (column != null) column.SortDirection = sort.Direction;
+                }
+                grid.Items.Refresh();
+            }
+
+            List<GameIndexEditorRow> GetSelectedRows()
+            {
+                return grid.SelectedItems
+                    .OfType<GameIndexEditorRow>()
+                    .Where(row => row != null)
+                    .Distinct()
+                    .ToList();
+            }
+
             void RecomputeEditorPlacementColumns()
             {
                 var snapshot = allRows.Where(row => row != null).ToList();
@@ -282,15 +335,25 @@ namespace PixelVaultNative
             refreshStatus = delegate
             {
                 var visibleCount = grid.Items.Count;
-                var selected = grid.SelectedItem as GameIndexEditorRow;
+                var selectedRows = GetSelectedRows();
+                var selected = selectedRows.Count == 1 ? selectedRows[0] : null;
                 openFolderButton.IsEnabled = selected != null && !string.IsNullOrWhiteSpace(selected.FolderPath) && Directory.Exists(selected.FolderPath);
-                deleteRowButton.IsEnabled = selected != null;
-                var selectionText = selected == null ? "No row selected" : selected.Name + " | " + selected.PlatformLabel + " | " + (selected.GameId ?? string.Empty);
+                deleteRowButton.IsEnabled = selectedRows.Count > 0;
+                var selectionText = selectedRows.Count == 0
+                    ? "No row selected"
+                    : selectedRows.Count == 1
+                        ? selected.Name + " | " + selected.PlatformLabel + " | " + (selected.GameId ?? string.Empty)
+                        : selectedRows.Count + " rows selected";
                 statusText.Text = visibleCount + " visible row(s) | " + allRows.Count + " total | " + (dirty ? "Unsaved changes" : "Saved") + " | " + selectionText;
             };
 
             refreshGrid = delegate
             {
+                var preservedSorts = CaptureGridSortDescriptions();
+                var selectedRows = GetSelectedRows();
+                var selectedIds = new HashSet<string>(
+                    selectedRows.Select(row => row.GameId).Where(id => !string.IsNullOrWhiteSpace(id)),
+                    StringComparer.OrdinalIgnoreCase);
                 RecomputeEditorPlacementColumns();
                 var query = (searchBox.Text ?? string.Empty).Trim();
                 IEnumerable<GameIndexEditorRow> rows = allRows;
@@ -309,10 +372,15 @@ namespace PixelVaultNative
                         (!string.IsNullOrWhiteSpace(row.EditorStoragePlacementNote) && row.EditorStoragePlacementNote.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0) ||
                         (!string.IsNullOrWhiteSpace(row.FolderPath) && row.FolderPath.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0));
                 }
-                grid.ItemsSource = rows
-                    .OrderBy(row => row.Name ?? string.Empty, StringComparer.OrdinalIgnoreCase)
-                    .ThenBy(row => row.PlatformLabel ?? string.Empty, StringComparer.OrdinalIgnoreCase)
-                    .ToList();
+                var visibleRows = rows.ToList();
+                grid.ItemsSource = visibleRows;
+                ApplyGridSortDescriptions(preservedSorts);
+                grid.SelectedItems.Clear();
+                foreach (var row in visibleRows)
+                {
+                    if (selectedRows.Contains(row) || (!string.IsNullOrWhiteSpace(row.GameId) && selectedIds.Contains(row.GameId)))
+                        grid.SelectedItems.Add(row);
+                }
                 refreshStatus();
             };
 
@@ -394,14 +462,18 @@ namespace PixelVaultNative
             };
             deleteRowButton.Click += delegate
             {
-                var selected = grid.SelectedItem as GameIndexEditorRow;
-                if (selected == null) return;
-                var choice = MessageBox.Show("Remove the selected row from the game index?\n\nThis only deletes the master record row.", "Delete Game Index Row", MessageBoxButton.OKCancel, MessageBoxImage.Warning);
+                var selectedRows = GetSelectedRows();
+                if (selectedRows.Count == 0) return;
+                var prompt = selectedRows.Count == 1
+                    ? "Remove the selected row from the game index?\n\nThis only deletes the master record row."
+                    : "Remove " + selectedRows.Count + " selected rows from the game index?\n\nThis only deletes the master record rows.";
+                var choice = MessageBox.Show(prompt, selectedRows.Count == 1 ? "Delete Game Index Row" : "Delete Game Index Rows", MessageBoxButton.OKCancel, MessageBoxImage.Warning);
                 if (choice != MessageBoxResult.OK) return;
-                allRows.Remove(selected);
+                foreach (var row in selectedRows)
+                    allRows.Remove(row);
                 dirty = true;
                 refreshGrid();
-                services.SetStatus("Game index row removed");
+                services.SetStatus(selectedRows.Count == 1 ? "Game index row removed" : selectedRows.Count + " game index rows removed");
             };
             resolveIdsButton.Click += delegate
             {

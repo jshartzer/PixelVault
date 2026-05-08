@@ -46,6 +46,12 @@ namespace PixelVaultNative
                 set => _m.libraryGroupingMode = value;
             }
 
+            public int LibrarySessionThresholdMinutes
+            {
+                get => _m.librarySessionThresholdMinutes;
+                set => _m.librarySessionThresholdMinutes = SettingsService.NormalizeLibrarySessionThresholdMinutes(value);
+            }
+
             public int LibraryFolderTileSize
             {
                 get => _m.libraryFolderTileSize;
@@ -203,6 +209,9 @@ namespace PixelVaultNative
 
             public void LibraryBrowserShowAchievementsInfo(Window owner, LibraryBrowserFolderView view) =>
                 _m.LibraryBrowserShowAchievementsInfo(owner, view);
+
+            public void LibraryBrowserOpenGameProfile(Window owner, LibraryBrowserFolderView view) =>
+                _m.LibraryBrowserOpenGameProfile(owner, view);
 
             public void LibraryBrowserPaletteOpenSettings() => _m.LibraryBrowserPaletteOpenSettings();
 
