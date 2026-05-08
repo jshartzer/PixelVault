@@ -112,12 +112,13 @@ namespace PixelVaultNative
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
 
-            // The Edit Game pill in the action cluster mutates folder.SteamAppId etc.
-            // and then asks us to refresh the hero in place (PV-PLN-GPRO-001 step C.3).
-            // We rebuild the hero from the now-mutated folder + view and swap it for
-            // the old child so renamed/re-IDed games update without reopening the
-            // window. Captured by reference so the cluster can call back in.
+            // The Edit Game pill in the action toolbar mutates folder.Name /
+            // .CollectionNotes / IDs etc. and then asks us to refresh the profile in
+            // place (PV-PLN-GPRO-001 step C.3 + L3 follow-up). We rebuild the hero
+            // and re-pull the Game Notes card text from the now-mutated folder so
+            // renamed / re-IDed / re-noted games update without reopening the window.
             Action refreshHero = null;
+            Action refreshNotesCard = null;
             refreshHero = delegate
             {
                 if (root.Children.Count == 0) return;
@@ -126,11 +127,14 @@ namespace PixelVaultNative
                 {
                     if (child is FrameworkElement fe && Grid.GetRow(fe) == 0) { existingHero = fe; break; }
                 }
-                if (existingHero == null) return;
-                var freshHero = BuildLibraryGameProfileHero(win, view, folder, metrics, refreshHero);
-                var idx = root.Children.IndexOf(existingHero);
-                root.Children.Remove(existingHero);
-                if (idx >= 0) root.Children.Insert(idx, freshHero); else root.Children.Add(freshHero);
+                if (existingHero != null)
+                {
+                    var freshHero = BuildLibraryGameProfileHero(win, view, folder, metrics, refreshHero);
+                    var idx = root.Children.IndexOf(existingHero);
+                    root.Children.Remove(existingHero);
+                    if (idx >= 0) root.Children.Insert(idx, freshHero); else root.Children.Add(freshHero);
+                }
+                if (refreshNotesCard != null) refreshNotesCard();
                 win.Title = "PixelVault Game Profile - " + (string.IsNullOrWhiteSpace(folder.Name) ? "Game Profile" : folder.Name);
             };
             root.Children.Add(BuildLibraryGameProfileHero(win, view, folder, metrics, refreshHero));
@@ -146,7 +150,7 @@ namespace PixelVaultNative
             scroll.Content = body;
             body.Children.Add(BuildLibraryGameProfileActionToolbar(win, view, folder, refreshHero));
             body.Children.Add(BuildLibraryGameProfileStats(metrics));
-            body.Children.Add(BuildLibraryGameProfileNotesCard(win, view, folder));
+            body.Children.Add(BuildLibraryGameProfileNotesCard(win, view, folder, out refreshNotesCard));
             body.Children.Add(BuildLibraryGameProfileCaptureFilmstrip(win, view, orderedFilePaths));
             var achievementHost = new StackPanel { Margin = new Thickness(0, 24, 0, 0) };
             body.Children.Add(achievementHost);
@@ -1445,7 +1449,10 @@ namespace PixelVaultNative
         // when present, otherwise an empty-state prompt; the Edit notes button opens
         // a small modal that writes through the same UpsertSavedGameIndexRow path the
         // Quick Edit Drawer uses, so the profile and the main browser stay in lockstep.
-        FrameworkElement BuildLibraryGameProfileNotesCard(Window profileWindow, LibraryBrowserFolderView view, LibraryFolderInfo folder)
+        // The out-parameter <paramref name="refreshFromFolder"/> lets the orchestrator
+        // re-pull notes from <paramref name="folder"/> after sibling surfaces (e.g.
+        // the Edit Game form) mutate them, so the card and the editor stay in sync.
+        FrameworkElement BuildLibraryGameProfileNotesCard(Window profileWindow, LibraryBrowserFolderView view, LibraryFolderInfo folder, out Action refreshFromFolder)
         {
             var card = new Border
             {
@@ -1497,6 +1504,11 @@ namespace PixelVaultNative
                     {
                         ApplyLibraryGameProfileNotesText(notesText, updated);
                     });
+            };
+
+            refreshFromFolder = delegate
+            {
+                ApplyLibraryGameProfileNotesText(notesText, folder == null ? string.Empty : folder.CollectionNotes);
             };
             return card;
         }
