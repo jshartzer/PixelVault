@@ -166,15 +166,19 @@ namespace PixelVaultNative
             var statsHost = new ContentControl { Content = BuildLibraryGameProfileStats(metrics) };
             body.Children.Add(statsHost);
             body.Children.Add(BuildLibraryGameProfileNotesCard(win, view, folder, out refreshNotesCard));
-            var sessionsHost = new ContentControl
-            {
-                Content = BuildLibraryGameProfileSessionsSection(win, view, sessionEntries, librarySessionThresholdMinutes, mins => applyThreshold(mins))
-            };
-            body.Children.Add(sessionsHost);
             body.Children.Add(BuildLibraryGameProfileCaptureFilmstrip(win, view, orderedFilePaths));
             var achievementHost = new StackPanel { Margin = new Thickness(0, 24, 0, 0) };
             body.Children.Add(achievementHost);
             BeginLoadLibraryGameProfileAchievements(win, achievementHost, view, lifetimeCts.Token);
+            // Sessions live at the bottom of the body so achievements (the highest-
+            // signal "did I beat this thing" surface) sits directly under the
+            // recent-captures filmstrip. The Sessions ContentControl is still
+            // refreshed in place when the threshold changes (refreshSessionsSection).
+            var sessionsHost = new ContentControl
+            {
+                Content = BuildLibraryGameProfileSessionsSection(win, view, folder, sessionEntries, librarySessionThresholdMinutes, mins => applyThreshold(mins))
+            };
+            body.Children.Add(sessionsHost);
             root.Children.Add(scroll);
 
             refreshStatsSection = delegate
@@ -183,7 +187,7 @@ namespace PixelVaultNative
             };
             refreshSessionsSection = delegate
             {
-                sessionsHost.Content = BuildLibraryGameProfileSessionsSection(win, view, sessionEntries, librarySessionThresholdMinutes, mins => applyThreshold(mins));
+                sessionsHost.Content = BuildLibraryGameProfileSessionsSection(win, view, folder, sessionEntries, librarySessionThresholdMinutes, mins => applyThreshold(mins));
             };
             applyThreshold = delegate(int requestedMinutes)
             {
@@ -270,7 +274,11 @@ namespace PixelVaultNative
         {
             var hero = new Grid
             {
-                MinHeight = 275,
+                // Hero is sized to fit a larger cover (184x276) with tight top/bottom
+                // padding so the banner reads as a focused header instead of empty
+                // space wrapping the cover. Content drives final height; MinHeight
+                // is just a floor for very short titles.
+                MinHeight = 292,
                 Background = Brush("#111A21"),
                 ClipToBounds = true
             };
@@ -313,16 +321,16 @@ namespace PixelVaultNative
                 Background = new LinearGradientBrush(Color.FromArgb(0, 11, 17, 22), Color.FromArgb(255, 11, 17, 22), new Point(0, 0), new Point(0, 1))
             });
 
-            var content = new Grid { Margin = new Thickness(26, 22, 26, 24) };
+            var content = new Grid { Margin = new Thickness(26, 12, 26, 12) };
             content.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = 0 });
             content.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            const double profileCoverWidth = 138d;
-            const double profileCoverHeight = 207d;
-            var profileCoverCorner = new CornerRadius(16);
+            const double profileCoverWidth = 184d;
+            const double profileCoverHeight = 276d;
+            var profileCoverCorner = new CornerRadius(18);
             var coverArt = CreateAsyncImageTile(
                 GetLibraryArtPathForDisplayOnly(folder),
-                420,
+                540,
                 profileCoverWidth,
                 profileCoverHeight,
                 Stretch.UniformToFill,
@@ -334,6 +342,18 @@ namespace PixelVaultNative
                 profileCoverCorner,
                 Brush("#3E5665"),
                 new Thickness(1));
+            // WPF's Border doesn't auto-clip its child to the CornerRadius - the
+            // inner Image (Stretch=UniformToFill) was painting past the rounded
+            // corners and looked like a square photo punched into a rounded frame.
+            // Apply an explicit RectangleGeometry clip matching the cover's outer
+            // rounded rect so the image, foil, and frame all respect the rounded
+            // edge. Frozen for cheap reuse across hero rebuilds.
+            var coverClipGeometry = new RectangleGeometry(
+                new Rect(0, 0, profileCoverWidth, profileCoverHeight),
+                profileCoverCorner.TopLeft,
+                profileCoverCorner.TopLeft);
+            if (coverClipGeometry.CanFreeze) coverClipGeometry.Freeze();
+            coverArt.Clip = coverClipGeometry;
             // PV-PLN-GPRO-001 step C.2 follow-up: when the 100% complete toggle is on,
             // mirror the library tile's holofoil + gold-frame overlays on top of the
             // profile cover so the toggle has visible feedback right next to the
@@ -345,7 +365,12 @@ namespace PixelVaultNative
             FrameworkElement coverHost = coverArt;
             if (view != null && view.IsCompleted100Percent)
             {
-                var foilWrap = new Grid { Width = profileCoverWidth, Height = profileCoverHeight };
+                var foilWrap = new Grid
+                {
+                    Width = profileCoverWidth,
+                    Height = profileCoverHeight,
+                    Clip = coverClipGeometry
+                };
                 foilWrap.Children.Add(coverArt);
                 var foilVisual = BuildLibraryTileCompletionFoilOverlay(profileCoverWidth, profileCoverHeight, profileCoverCorner.TopLeft);
                 foilWrap.Children.Add(foilVisual.Root);
@@ -366,7 +391,10 @@ namespace PixelVaultNative
             coverHost.Effect = new DropShadowEffect { BlurRadius = 22, ShadowDepth = 7, Direction = 270, Color = Color.FromArgb(120, 0, 0, 0), Opacity = 0.75 };
             content.Children.Add(coverHost);
 
-            var copy = new StackPanel { Margin = new Thickness(24, 14, 0, 0), VerticalAlignment = VerticalAlignment.Top };
+            // Copy column is vertically centered against the larger cover so the
+            // title + identity strip sits at the same eye line as the cover instead
+            // of pinning to the top with empty space below it.
+            var copy = new StackPanel { Margin = new Thickness(24, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
             copy.Children.Add(new TextBlock
             {
                 Text = folder.Name ?? "Game Profile",
@@ -388,11 +416,25 @@ namespace PixelVaultNative
                 badges.Children.Add(badge);
             }
             if (badges.Children.Count > 0) copy.Children.Add(badges);
-            // IDs on the left, circle action cluster (toggles + edit/open/art) on the
-            // right of the same row so the bottom of the hero has a single, coherent
-            // strip of IDs + actions instead of two competing surfaces.
-            var idActionRow = BuildLibraryGameProfileHeroIdActionRow(win: window, view: view, folder: folder, refreshHero: refreshHero);
-            if (idActionRow != null) copy.Children.Add(idActionRow);
+            // Two-row identity strip: ID number pills on the first line, action
+            // circles (toggles + edit/open/art) on the row directly below. Splitting
+            // these used to share a row is what gives the toggles room to breathe
+            // and keeps long ID stacks from wrestling with the action cluster on
+            // narrow windows.
+            var idPills = BuildLibraryGameProfileIdPills(folder);
+            if (idPills is FrameworkElement idFe)
+            {
+                idFe.HorizontalAlignment = HorizontalAlignment.Left;
+                idFe.Margin = new Thickness(0, 6, 0, 0);
+                copy.Children.Add(idFe);
+            }
+            var actionCircles = BuildLibraryGameProfileHeroActionCluster(window, view, folder, refreshHero);
+            if (actionCircles is FrameworkElement actionFe)
+            {
+                actionFe.HorizontalAlignment = HorizontalAlignment.Left;
+                actionFe.Margin = new Thickness(0, 8, 0, 0);
+                copy.Children.Add(actionFe);
+            }
             // The hero used to render a clipped CollectionNotes preview here. As of
             // PV-PLN-GPRO-001 step B.1 the dedicated Game Notes card in the body owns
             // the notes surface end-to-end (display + edit), so we let the hero focus
@@ -437,30 +479,6 @@ namespace PixelVaultNative
                 logo.Visibility = Visibility.Visible;
             }, true);
             return logo;
-        }
-
-        // Combined row that places the external-ID pills on the left and the circle
-        // action cluster (3 toggles + Edit / Open / Change Art) on the right. Used
-        // by BuildLibraryGameProfileHero to keep the hero's bottom strip coherent.
-        FrameworkElement BuildLibraryGameProfileHeroIdActionRow(Window win, LibraryBrowserFolderView view, LibraryFolderInfo folder, Action refreshHero)
-        {
-            var row = new Grid { Margin = new Thickness(0, 4, 0, 0) };
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = 0 });
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            var idPills = BuildLibraryGameProfileIdPills(folder);
-            if (idPills != null)
-            {
-                if (idPills is FrameworkElement idFe) idFe.VerticalAlignment = VerticalAlignment.Center;
-                Grid.SetColumn(idPills, 0);
-                row.Children.Add(idPills);
-            }
-            var circles = BuildLibraryGameProfileHeroActionCluster(win, view, folder, refreshHero);
-            if (circles != null)
-            {
-                Grid.SetColumn(circles, 1);
-                row.Children.Add(circles);
-            }
-            return row;
         }
 
         IEnumerable<string> ResolveLibraryGameProfilePlatformLabels(LibraryBrowserFolderView view, LibraryFolderInfo folder)
@@ -1355,6 +1373,7 @@ namespace PixelVaultNative
         FrameworkElement BuildLibraryGameProfileSessionsSection(
             Window profileWindow,
             LibraryBrowserFolderView view,
+            LibraryFolderInfo folder,
             IReadOnlyList<LibraryGameProfileSessionEntry> entries,
             int thresholdMinutes,
             Action<int> applyThreshold)
@@ -1370,11 +1389,11 @@ namespace PixelVaultNative
                 return section;
             }
             for (var i = 0; i < sessions.Count && i < previewLimit; i++)
-                section.Children.Add(BuildLibraryGameProfileSessionCard(sessions[i]));
+                section.Children.Add(BuildLibraryGameProfileSessionCard(profileWindow, view, folder, sessions[i]));
             if (sessions.Count > previewLimit)
             {
                 section.Children.Add(BuildLibraryGameProfileViewAllSessionsButton(
-                    profileWindow, view, sessions, thresholdMinutes));
+                    profileWindow, view, folder, sessions, thresholdMinutes));
             }
             return section;
         }
@@ -1438,15 +1457,39 @@ namespace PixelVaultNative
             return pill;
         }
 
-        FrameworkElement BuildLibraryGameProfileSessionCard(LibraryGameProfileSession session)
+        // Session card. Clicking the card opens the same browser-style session
+        // window used in the main library's Sessions grouping mode (see
+        // OpenLibrarySessionWindow in MainWindow.LibraryBrowserRender.DetailPane.cs)
+        // so users get the same browse + select + per-file editor experience
+        // they're used to. Hover chrome (background lift + cursor) communicates
+        // the click affordance.
+        FrameworkElement BuildLibraryGameProfileSessionCard(
+            Window profileWindow,
+            LibraryBrowserFolderView view,
+            LibraryFolderInfo folder,
+            LibraryGameProfileSession session)
         {
+            var idleBg = Brush("#111A21");
+            var hoverBg = Brush("#172430");
             var card = new Border
             {
                 Margin = new Thickness(0, 10, 0, 0),
                 Padding = new Thickness(12),
                 CornerRadius = new CornerRadius(14),
-                Background = Brush("#111A21")
+                Background = idleBg,
+                Cursor = Cursors.Hand,
+                ToolTip = "Open this session"
             };
+            card.MouseEnter += delegate { card.Background = hoverBg; };
+            card.MouseLeave += delegate { card.Background = idleBg; };
+            card.MouseLeftButtonUp += delegate(object _, MouseButtonEventArgs e)
+            {
+                if (e.ChangedButton != MouseButton.Left) return;
+                e.Handled = true;
+                OpenLibraryGameProfileSessionWindow(profileWindow, view, folder, session);
+            };
+            AutomationProperties.SetName(card,
+                "Open session of " + session.Count + (session.Count == 1 ? " capture" : " captures"));
             var grid = new Grid();
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -1574,6 +1617,7 @@ namespace PixelVaultNative
         Button BuildLibraryGameProfileViewAllSessionsButton(
             Window profileWindow,
             LibraryBrowserFolderView view,
+            LibraryFolderInfo folder,
             IReadOnlyList<LibraryGameProfileSession> sessions,
             int thresholdMinutes)
         {
@@ -1591,7 +1635,7 @@ namespace PixelVaultNative
             AutomationProperties.SetName(btn, "View all sessions");
             btn.Click += delegate
             {
-                ShowLibraryGameProfileViewAllSessionsDialog(profileWindow, view, sessions, thresholdMinutes);
+                ShowLibraryGameProfileViewAllSessionsDialog(profileWindow, view, folder, sessions, thresholdMinutes);
             };
             return btn;
         }
@@ -1599,6 +1643,7 @@ namespace PixelVaultNative
         void ShowLibraryGameProfileViewAllSessionsDialog(
             Window owner,
             LibraryBrowserFolderView view,
+            LibraryFolderInfo folder,
             IReadOnlyList<LibraryGameProfileSession> sessions,
             int thresholdMinutes)
         {
@@ -1645,10 +1690,83 @@ namespace PixelVaultNative
                 Margin = new Thickness(0, 0, 0, 6)
             });
             for (var i = 0; i < sessions.Count; i++)
-                stack.Children.Add(BuildLibraryGameProfileSessionCard(sessions[i]));
+                stack.Children.Add(BuildLibraryGameProfileSessionCard(dialog, view, folder, sessions[i]));
             scroll.Content = stack;
             dialog.Content = scroll;
             dialog.ShowDialog();
+        }
+
+        // Click handler for an individual session card on the profile. Reuses the
+        // main browser's OpenLibrarySessionWindow (the same window the Sessions
+        // grouping mode opens when a session card is clicked there) so the visual
+        // and interaction model is identical from both surfaces. We synthesize the
+        // LibraryDetailRenderGroup the main browser builds from its day-bucketed
+        // pipeline; timeline contexts and per-file media layout caches stay null /
+        // empty because they're optimization-only inputs (BuildLibraryDetailMasonryChunks
+        // and BuildLibrarySessionDistinctContextLabel both null-check). Per-file
+        // metadata edit is rerouted through a toast - the deeper "edit metadata"
+        // path needs the live working set's selection plumbing, which the profile
+        // doesn't own; users can do that from the main library if they need it.
+        void OpenLibraryGameProfileSessionWindow(
+            Window profileWindow,
+            LibraryBrowserFolderView view,
+            LibraryFolderInfo folder,
+            LibraryGameProfileSession session)
+        {
+            if (session == null || session.Entries == null) return;
+            var sessionFiles = new List<string>(session.Entries.Count);
+            for (var i = session.Entries.Count - 1; i >= 0; i--)
+            {
+                var entry = session.Entries[i];
+                if (entry == null || string.IsNullOrWhiteSpace(entry.FilePath)) continue;
+                if (!File.Exists(entry.FilePath)) continue;
+                sessionFiles.Add(entry.FilePath);
+            }
+            if (sessionFiles.Count == 0)
+            {
+                TryLibraryToast("No captures from this session are still on disk.", MessageBoxImage.Information);
+                return;
+            }
+            var localStart = session.StartUtc.Kind == DateTimeKind.Utc ? session.StartUtc.ToLocalTime() : session.StartUtc;
+            var localEnd = session.EndUtc.Kind == DateTimeKind.Utc ? session.EndUtc.ToLocalTime() : session.EndUtc;
+            var headerText = localStart.ToString("ddd, MMM d, yyyy", CultureInfo.CurrentCulture);
+            var rangeText = localStart.ToString("h:mm tt", CultureInfo.CurrentCulture)
+                + " \u2192 " + localEnd.ToString("h:mm tt", CultureInfo.CurrentCulture);
+            var durationText = FormatLibraryGameProfileSessionDuration(session.Duration);
+            var subtitle = string.IsNullOrEmpty(durationText) ? rangeText : rangeText + "  \u00B7  " + durationText;
+            var group = new LibraryDetailRenderGroup
+            {
+                CaptureDate = localStart.Date,
+                SessionStartDate = localStart,
+                SessionEndDate = localEnd,
+                HeaderText = headerText,
+                SubtitleText = subtitle,
+                Files = sessionFiles
+            };
+            var emptyLayout = new Dictionary<string, LibraryDetailMediaLayoutInfo>(StringComparer.OrdinalIgnoreCase);
+            Action<string> openSingleFileMetadataEditor = delegate
+            {
+                TryLibraryToast(
+                    "Open the capture from the main library to edit its per-file metadata.",
+                    MessageBoxImage.Information);
+            };
+            try
+            {
+                OpenLibrarySessionWindow(
+                    profileWindow,
+                    view,
+                    group,
+                    null,
+                    emptyLayout,
+                    ResolveLibraryDpiScale(),
+                    openSingleFileMetadataEditor,
+                    delegate { });
+            }
+            catch (Exception ex)
+            {
+                LogException("LibraryGameProfile.OpenLibraryGameProfileSessionWindow", ex);
+                TryLibraryToast("Couldn't open session window: " + ex.Message, MessageBoxImage.Warning);
+            }
         }
 
         // 30 -> "30 min", 60 -> "1 hr", 90 -> "1.5 hr", 120 -> "2 hr", 180 -> "3 hr".
