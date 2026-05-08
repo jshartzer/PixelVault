@@ -56,7 +56,10 @@ namespace PixelVaultNative
             {
                 Title = "PixelVault Game Profile - " + title,
                 Width = 1180,
-                Height = 860,
+                // Sized for the Phase B dashboard layout (hero + summary line + 5 stat
+                // cards + filmstrip + notes card + achievements). 980 fits comfortably on
+                // 1080p displays after the OS chrome / taskbar.
+                Height = 980,
                 MinWidth = 900,
                 MinHeight = 640,
                 Owner = owner,
@@ -119,6 +122,7 @@ namespace PixelVaultNative
             var body = new StackPanel();
             scroll.Content = body;
             body.Children.Add(BuildLibraryGameProfileStats(metrics));
+            body.Children.Add(BuildLibraryGameProfileNotesCard(win, view, folder));
             body.Children.Add(BuildLibraryGameProfileCaptureFilmstrip(win, view, orderedFilePaths));
             var achievementHost = new StackPanel { Margin = new Thickness(0, 24, 0, 0) };
             body.Children.Add(achievementHost);
@@ -299,19 +303,10 @@ namespace PixelVaultNative
                     Margin = new Thickness(0, 4, 0, 0)
                 });
             }
-            if (!string.IsNullOrWhiteSpace(folder.CollectionNotes))
-            {
-                copy.Children.Add(new TextBlock
-                {
-                    Text = folder.CollectionNotes.Trim(),
-                    Foreground = Brush("#D2DFE7"),
-                    FontSize = 14,
-                    TextWrapping = TextWrapping.Wrap,
-                    MaxHeight = 54,
-                    Margin = new Thickness(0, 12, 0, 0),
-                    Opacity = 0.92
-                });
-            }
+            // The hero used to render a clipped CollectionNotes preview here. As of
+            // PV-PLN-GPRO-001 step B.1 the dedicated Game Notes card in the body owns
+            // the notes surface end-to-end (display + edit), so we let the hero focus
+            // on identity (title / summary line / badges / IDs).
             Grid.SetColumn(copy, 1);
             content.Children.Add(copy);
             hero.Children.Add(content);
@@ -386,13 +381,14 @@ namespace PixelVaultNative
             var latestCaptureText = safe.LatestCaptureDate > DateTime.MinValue
                 ? FormatLibraryGameProfileDate(safe.LatestCaptureDate)
                 : "\u2014";
+            var latestCaptureRelative = FormatLibraryGameProfileRelative(safe.LatestCaptureDate);
             var cards = new[]
             {
                 BuildLibraryGameProfileStatCard("Captures", safe.CaptureCount.ToString(CultureInfo.CurrentCulture)),
                 BuildLibraryGameProfileStatCard("Videos", safe.VideoCount.ToString(CultureInfo.CurrentCulture)),
                 BuildLibraryGameProfileStatCard("Sessions", safe.SessionCount.ToString(CultureInfo.CurrentCulture)),
                 BuildLibraryGameProfileStatCard("First Capture", firstCaptureText),
-                BuildLibraryGameProfileStatCard("Latest Capture", latestCaptureText)
+                BuildLibraryGameProfileStatCard("Latest Capture", latestCaptureText, latestCaptureRelative)
             };
             for (var i = 0; i < cards.Length; i++)
             {
@@ -403,7 +399,7 @@ namespace PixelVaultNative
             return root;
         }
 
-        FrameworkElement BuildLibraryGameProfileStatCard(string label, string value)
+        FrameworkElement BuildLibraryGameProfileStatCard(string label, string value, string subText = null)
         {
             // Phase A: drop the 1px border and rely on background contrast for separation
             // (PV-PLN-GPRO-001 step A.4) so the strip reads as a dashboard rather than a form.
@@ -439,8 +435,46 @@ namespace PixelVaultNative
                 TextWrapping = TextWrapping.Wrap,
                 Margin = new Thickness(0, 8, 0, 0)
             });
+            if (!string.IsNullOrWhiteSpace(subText))
+            {
+                stack.Children.Add(new TextBlock
+                {
+                    Text = subText,
+                    Foreground = Brush("#7E94A2"),
+                    FontSize = 11,
+                    Margin = new Thickness(0, 4, 0, 0),
+                    TextWrapping = TextWrapping.Wrap
+                });
+            }
             card.Child = stack;
             return card;
+        }
+
+        // Human-readable "time ago" used as the Latest Capture sub-line. Returns empty
+        // string for unset dates (the stat card hides the sub-line when empty).
+        static string FormatLibraryGameProfileRelative(DateTime date)
+        {
+            if (date <= DateTime.MinValue) return string.Empty;
+            var today = DateTime.Now.Date;
+            var when = date.Date;
+            if (when == today) return "Today";
+            if (when == today.AddDays(-1)) return "Yesterday";
+            var deltaDays = (int)Math.Round((today - when).TotalDays);
+            if (deltaDays > 0 && deltaDays < 14) return deltaDays + " days ago";
+            if (deltaDays >= 14 && deltaDays < 60) return (deltaDays / 7) + " weeks ago";
+            if (deltaDays >= 60 && deltaDays < 365)
+            {
+                var months = (int)Math.Round(deltaDays / 30.44);
+                if (months <= 1) months = 2;
+                return months + " months ago";
+            }
+            if (deltaDays >= 365)
+            {
+                var years = (int)Math.Round(deltaDays / 365.25);
+                if (years <= 1) return "1 year ago";
+                return years + " years ago";
+            }
+            return string.Empty;
         }
 
         // Fire-and-forget: kicks off the achievements fetch on a worker thread and marshals
@@ -511,10 +545,19 @@ namespace PixelVaultNative
                         .ThenBy(row => row.SortKey)
                         .ThenBy(row => row.Title ?? string.Empty, StringComparer.OrdinalIgnoreCase)
                         .ToList();
+                    var totalRows = rows.Count;
+                    var earnedCount = earned.Count;
+                    var percentText = string.Empty;
+                    double? percent = null;
+                    if (progressKnown && totalRows > 0 && !hideSteamDefinitionsForEmptyNonSteamEntry)
+                    {
+                        percent = (double)earnedCount / totalRows;
+                        percentText = " \u00B7 " + ((int)Math.Round(percent.Value * 100)).ToString(CultureInfo.CurrentCulture) + "%";
+                    }
                     var summary = hideSteamDefinitionsForEmptyNonSteamEntry
                         ? "No Steam achievements have been obtained for this non-Steam entry"
                         : (progressKnown
-                            ? earned.Count + " of " + rows.Count + " earned"
+                            ? earnedCount + " of " + totalRows + " earned" + percentText
                             : "Progress unknown - showing achievement definitions");
                     host.Children.Add(new TextBlock
                     {
@@ -522,8 +565,10 @@ namespace PixelVaultNative
                         Foreground = Brush("#B8C9D4"),
                         FontSize = 13,
                         FontWeight = FontWeights.SemiBold,
-                        Margin = new Thickness(0, 8, 0, 10)
+                        Margin = new Thickness(0, 8, 0, 6)
                     });
+                    if (percent.HasValue)
+                        host.Children.Add(BuildLibraryGameProfileAchievementProgressBar(percent.Value));
                     if (hideSteamDefinitionsForEmptyNonSteamEntry)
                         return;
 
@@ -547,6 +592,36 @@ namespace PixelVaultNative
                     host.Children.Add(container);
                 }, DispatcherPriority.Background);
             });
+        }
+
+        // Thin progress bar shown under the achievement summary line when the source
+        // reports per-user unlock data (PV-PLN-GPRO-001 step B.2). Stays muted so it
+        // does not compete with the badge grid.
+        FrameworkElement BuildLibraryGameProfileAchievementProgressBar(double fraction)
+        {
+            var clamped = double.IsNaN(fraction) ? 0 : Math.Max(0.0, Math.Min(1.0, fraction));
+            var track = new Border
+            {
+                Height = 6,
+                CornerRadius = new CornerRadius(3),
+                Background = Brush("#1A2530"),
+                Margin = new Thickness(0, 0, 0, 12),
+                ClipToBounds = true,
+                HorizontalAlignment = HorizontalAlignment.Stretch
+            };
+            var fill = new Border
+            {
+                CornerRadius = new CornerRadius(3),
+                HorizontalAlignment = HorizontalAlignment.Left,
+                VerticalAlignment = VerticalAlignment.Stretch,
+                Background = Brush(clamped >= 0.999 ? "#C7A245" : "#4A9FE8")
+            };
+            track.SizeChanged += delegate(object _, SizeChangedEventArgs e)
+            {
+                fill.Width = Math.Max(0, e.NewSize.Width * clamped);
+            };
+            track.Child = fill;
+            return track;
         }
 
         // Cached, frozen brushes for the achievement grid. Profiles can render hundreds
@@ -886,6 +961,234 @@ namespace PixelVaultNative
                     TextWrapping = TextWrapping.Wrap
                 }
             };
+        }
+
+        // Game Notes card (PV-PLN-GPRO-001 step B.1). Renders folder.CollectionNotes
+        // when present, otherwise an empty-state prompt; the Edit notes button opens
+        // a small modal that writes through the same UpsertSavedGameIndexRow path the
+        // Quick Edit Drawer uses, so the profile and the main browser stay in lockstep.
+        FrameworkElement BuildLibraryGameProfileNotesCard(Window profileWindow, LibraryBrowserFolderView view, LibraryFolderInfo folder)
+        {
+            var card = new Border
+            {
+                Margin = new Thickness(0, 18, 0, 0),
+                Padding = new Thickness(18, 14, 18, 16),
+                CornerRadius = new CornerRadius(16),
+                Background = Brush("#111A21")
+            };
+            var stack = new StackPanel();
+            var headerRow = new Grid();
+            headerRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            headerRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            var headerLabel = new TextBlock
+            {
+                Text = "Game Notes",
+                Foreground = Brush("#86A0AE"),
+                FontSize = 12,
+                FontWeight = FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            headerRow.Children.Add(headerLabel);
+            var editButton = Btn("Edit notes", null, "#1F3340", Brushes.White);
+            editButton.Height = 28;
+            editButton.MinWidth = 96;
+            editButton.FontSize = 11.5;
+            editButton.Padding = new Thickness(12, 0, 12, 0);
+            ApplyLibraryPillChrome(editButton, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
+            Grid.SetColumn(editButton, 1);
+            headerRow.Children.Add(editButton);
+            stack.Children.Add(headerRow);
+
+            var notesText = new TextBlock
+            {
+                FontSize = 14,
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 10, 0, 0)
+            };
+            stack.Children.Add(notesText);
+            ApplyLibraryGameProfileNotesText(notesText, folder == null ? string.Empty : folder.CollectionNotes);
+            card.Child = stack;
+
+            editButton.Click += delegate
+            {
+                ShowLibraryGameProfileNotesEditor(
+                    profileWindow,
+                    view,
+                    folder,
+                    delegate(string updated)
+                    {
+                        ApplyLibraryGameProfileNotesText(notesText, updated);
+                    });
+            };
+            return card;
+        }
+
+        static void ApplyLibraryGameProfileNotesText(TextBlock target, string notes)
+        {
+            if (target == null) return;
+            var trimmed = (notes ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(trimmed))
+            {
+                target.Text = "No notes yet \u2014 add one to remember mods, settings, or run rules.";
+                target.Foreground = UiBrushHelper.FromHex("#7E94A2");
+                target.FontStyle = FontStyles.Italic;
+            }
+            else
+            {
+                target.Text = trimmed;
+                target.Foreground = UiBrushHelper.FromHex("#D2DFE7");
+                target.FontStyle = FontStyles.Normal;
+            }
+        }
+
+        void ShowLibraryGameProfileNotesEditor(Window profileWindow, LibraryBrowserFolderView view, LibraryFolderInfo folder, Action<string> onSaved)
+        {
+            var dlg = new Window
+            {
+                Title = "Edit Game Notes",
+                Width = 460,
+                Height = 340,
+                MinWidth = 380,
+                MinHeight = 260,
+                Owner = profileWindow,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Background = Brush("#0F1820"),
+                ShowInTaskbar = false
+            };
+            AutomationProperties.SetName(dlg, "Edit Game Notes");
+            var root = new Grid { Margin = new Thickness(20, 18, 20, 16) };
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+            var heading = new TextBlock
+            {
+                Text = "Notes for " + (folder == null || string.IsNullOrWhiteSpace(folder.Name) ? "this game" : folder.Name.Trim()),
+                Foreground = Brushes.White,
+                FontSize = 15,
+                FontWeight = FontWeights.SemiBold,
+                Margin = new Thickness(0, 0, 0, 10),
+                TextWrapping = TextWrapping.Wrap
+            };
+            Grid.SetRow(heading, 0);
+            root.Children.Add(heading);
+
+            var notesBox = new TextBox
+            {
+                Text = folder == null ? string.Empty : (folder.CollectionNotes ?? string.Empty),
+                AcceptsReturn = true,
+                AcceptsTab = false,
+                TextWrapping = TextWrapping.Wrap,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                Background = Brush("#162028"),
+                Foreground = Brushes.White,
+                BorderBrush = Brush("#2C3D4A"),
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(10, 8, 10, 8),
+                FontSize = 13
+            };
+            Grid.SetRow(notesBox, 1);
+            root.Children.Add(notesBox);
+
+            var buttonRow = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Margin = new Thickness(0, 14, 0, 0)
+            };
+            var cancelButton = Btn("Cancel", null, "#1F2832", Brushes.White);
+            cancelButton.Height = 32;
+            cancelButton.MinWidth = 88;
+            cancelButton.FontSize = 12;
+            cancelButton.Margin = new Thickness(0, 0, 8, 0);
+            ApplyLibraryPillChrome(cancelButton, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
+            cancelButton.Click += delegate { dlg.Close(); };
+            buttonRow.Children.Add(cancelButton);
+
+            var saveButton = Btn("Save", null, "#2A4A5E", Brushes.White);
+            saveButton.Height = 32;
+            saveButton.MinWidth = 96;
+            saveButton.FontSize = 12;
+            ApplyLibraryPillChrome(saveButton, "#2A4A5E", "#3A5F78", "#355A72", "#243A4A", "#D7E2EA");
+            buttonRow.Children.Add(saveButton);
+            Grid.SetRow(buttonRow, 2);
+            root.Children.Add(buttonRow);
+
+            saveButton.Click += delegate
+            {
+                var newText = (notesBox.Text ?? string.Empty).Trim();
+                if (TryPersistLibraryGameProfileNotes(view, folder, newText))
+                {
+                    onSaved?.Invoke(newText);
+                    dlg.Close();
+                }
+            };
+            dlg.PreviewKeyDown += delegate(object _, KeyEventArgs e)
+            {
+                if (e.Key == Key.Escape)
+                {
+                    e.Handled = true;
+                    dlg.Close();
+                }
+            };
+            dlg.Loaded += delegate
+            {
+                notesBox.Focus();
+                notesBox.CaretIndex = notesBox.Text == null ? 0 : notesBox.Text.Length;
+            };
+            dlg.Content = root;
+            dlg.ShowDialog();
+        }
+
+        // Mirrors LibraryBrowserApplyQuickEditDrawerFields (notes branch only): writes
+        // through the saved game-index rows, refreshes the folder cache, then propagates
+        // to the live view + primary/source folders so the rest of the UI sees the change.
+        bool TryPersistLibraryGameProfileNotes(LibraryBrowserFolderView view, LibraryFolderInfo folder, string newNotes)
+        {
+            try
+            {
+                if (folder == null || librarySession == null || !librarySession.HasLibraryRoot)
+                {
+                    TryLibraryToast("Notes are unavailable until the library is loaded.", MessageBoxImage.Warning);
+                    return false;
+                }
+                if (folder.PendingGameAssignment)
+                {
+                    TryLibraryToast("Assign a game title first (pending resolution).", MessageBoxImage.Information);
+                    return false;
+                }
+                var root = librarySession.LibraryRoot;
+                if (string.IsNullOrWhiteSpace(root)) return false;
+
+                var display = view == null ? folder : (BuildLibraryBrowserDisplayFolder(view) ?? folder);
+                display.CollectionNotes = newNotes ?? string.Empty;
+                UpsertSavedGameIndexRow(root, display);
+                librarySession.RefreshFolderCacheAfterGameIndexChange();
+
+                folder.CollectionNotes = display.CollectionNotes;
+                if (view != null)
+                {
+                    view.CollectionNotes = display.CollectionNotes;
+                    if (view.PrimaryFolder != null) view.PrimaryFolder.CollectionNotes = display.CollectionNotes;
+                    if (view.SourceFolders != null)
+                    {
+                        foreach (var sf in view.SourceFolders)
+                        {
+                            if (sf != null) sf.CollectionNotes = display.CollectionNotes;
+                        }
+                    }
+                    PopulateLibraryBrowserFolderViewSearchBlob(view);
+                }
+
+                TryLibraryToast("Notes saved.", MessageBoxImage.Information);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                LogException("Game profile | Save notes", ex);
+                TryLibraryToast("Could not save notes: " + ex.Message, MessageBoxImage.Warning);
+                return false;
+            }
         }
 
         DateTime ResolveLibraryProfileCaptureDate(string file, IReadOnlyDictionary<string, LibraryMetadataIndexEntry> metadataIndex)
