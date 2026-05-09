@@ -152,7 +152,9 @@ namespace PixelVaultNative
                 if (refreshNotesCard != null) refreshNotesCard();
                 win.Title = "PixelVault Game Profile - " + (string.IsNullOrWhiteSpace(folder.Name) ? "Game Profile" : folder.Name);
             };
-            root.Children.Add(BuildLibraryGameProfileHero(win, view, folder, metrics, refreshHero));
+            var heroElement = BuildLibraryGameProfileHero(win, view, folder, metrics, refreshHero);
+            heroElement.VerticalAlignment = VerticalAlignment.Top;
+            root.Children.Add(heroElement);
 
             var scroll = new ScrollViewer
             {
@@ -272,13 +274,18 @@ namespace PixelVaultNative
 
         FrameworkElement BuildLibraryGameProfileHero(Window window, LibraryBrowserFolderView view, LibraryFolderInfo folder, LibraryGameProfileMetrics metrics, Action refreshHero)
         {
+            const double profileCoverHeight = 276d;
+            const double contentMarginV = 12d;
+            const double heroBottomChromeGap = 8d;
+            const double heroBottomChromeHeight = 42d;
+            // Fixed header height: main row matches cover; second row holds Edit/Open/Art
+            // (left) vs Favorite/Showcase/100% (right). Window resize cannot grow this chrome.
+            var heroFixedHeight = contentMarginV + profileCoverHeight + heroBottomChromeGap + heroBottomChromeHeight + contentMarginV;
             var hero = new Grid
             {
-                // Hero is sized to fit a larger cover (184x276) with tight top/bottom
-                // padding so the banner reads as a focused header instead of empty
-                // space wrapping the cover. Content drives final height; MinHeight
-                // is just a floor for very short titles.
-                MinHeight = 292,
+                Height = heroFixedHeight,
+                MinHeight = heroFixedHeight,
+                MaxHeight = heroFixedHeight,
                 Background = Brush("#111A21"),
                 ClipToBounds = true
             };
@@ -321,12 +328,13 @@ namespace PixelVaultNative
                 Background = new LinearGradientBrush(Color.FromArgb(0, 11, 17, 22), Color.FromArgb(255, 11, 17, 22), new Point(0, 0), new Point(0, 1))
             });
 
-            var content = new Grid { Margin = new Thickness(26, 12, 26, 12) };
+            var content = new Grid { Margin = new Thickness(26, contentMarginV, 26, contentMarginV), ClipToBounds = true };
+            content.RowDefinitions.Add(new RowDefinition { Height = new GridLength(profileCoverHeight) });
+            content.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             content.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = 0 });
             content.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             const double profileCoverWidth = 184d;
-            const double profileCoverHeight = 276d;
             var profileCoverCorner = new CornerRadius(18);
             var coverArt = CreateAsyncImageTile(
                 GetLibraryArtPathForDisplayOnly(folder),
@@ -389,24 +397,31 @@ namespace PixelVaultNative
                 coverHost = foilWrap;
             }
             coverHost.Effect = new DropShadowEffect { BlurRadius = 22, ShadowDepth = 7, Direction = 270, Color = Color.FromArgb(120, 0, 0, 0), Opacity = 0.75 };
+            Grid.SetRow(coverHost, 0);
+            Grid.SetColumn(coverHost, 0);
             content.Children.Add(coverHost);
 
-            // Copy column is vertically centered against the larger cover so the
-            // title + identity strip sits at the same eye line as the cover instead
-            // of pinning to the top with empty space below it.
-            var copy = new StackPanel { Margin = new Thickness(24, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+            // Copy column top-aligned inside fixed-height hero so long titles ellipsize
+            // instead of growing the header when the window is resized wider.
+            var copy = new StackPanel { Margin = new Thickness(24, 0, 8, 0), VerticalAlignment = VerticalAlignment.Top };
             copy.Children.Add(new TextBlock
             {
                 Text = folder.Name ?? "Game Profile",
                 Foreground = Brushes.White,
                 FontSize = 38,
                 FontWeight = FontWeights.SemiBold,
-                TextWrapping = TextWrapping.Wrap,
-                TextTrimming = TextTrimming.CharacterEllipsis
+                TextWrapping = TextWrapping.NoWrap,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                ToolTip = folder.Name ?? "Game Profile"
             });
             var summaryLine = BuildLibraryGameProfileHeroSummaryLine(metrics);
+            if (summaryLine is TextBlock sumTb)
+            {
+                sumTb.TextWrapping = TextWrapping.NoWrap;
+                sumTb.TextTrimming = TextTrimming.CharacterEllipsis;
+            }
             if (summaryLine != null) copy.Children.Add(summaryLine);
-            var badges = new WrapPanel { Margin = new Thickness(0, 14, 0, 0) };
+            var badges = new WrapPanel { Margin = new Thickness(0, 10, 0, 0) };
             foreach (var label in ResolveLibraryGameProfilePlatformLabels(view, folder))
             {
                 var badge = BuildLibraryBrowserDetailTitlePlatformBadge(label);
@@ -416,11 +431,8 @@ namespace PixelVaultNative
                 badges.Children.Add(badge);
             }
             if (badges.Children.Count > 0) copy.Children.Add(badges);
-            // Two-row identity strip: ID number pills on the first line, action
-            // circles (toggles + edit/open/art) on the row directly below. Splitting
-            // these used to share a row is what gives the toggles room to breathe
-            // and keeps long ID stacks from wrestling with the action cluster on
-            // narrow windows.
+            // Row 0 only: identity text + platform badges + external-ID pills. Edit /
+            // Open / Change Art live on row 1 (left); Favorite / Showcase / 100% on row 1 (right).
             var idPills = BuildLibraryGameProfileIdPills(folder);
             if (idPills is FrameworkElement idFe)
             {
@@ -428,29 +440,43 @@ namespace PixelVaultNative
                 idFe.Margin = new Thickness(0, 6, 0, 0);
                 copy.Children.Add(idFe);
             }
-            var actionCircles = BuildLibraryGameProfileHeroActionCluster(window, view, folder, refreshHero);
-            if (actionCircles is FrameworkElement actionFe)
-            {
-                actionFe.HorizontalAlignment = HorizontalAlignment.Left;
-                actionFe.Margin = new Thickness(0, 8, 0, 0);
-                copy.Children.Add(actionFe);
-            }
-            // The hero used to render a clipped CollectionNotes preview here. As of
-            // PV-PLN-GPRO-001 step B.1 the dedicated Game Notes card in the body owns
-            // the notes surface end-to-end (display + edit), so we let the hero focus
-            // on identity (title / summary line / badges / IDs / actions).
+            Grid.SetRow(copy, 0);
             Grid.SetColumn(copy, 1);
             content.Children.Add(copy);
 
-            // Right column: large game logo (wordmark/emblem). Replaced the old
-            // toggle cluster - the toggles now live next to the IDs in the copy
-            // column so the right side of the hero can showcase the logo.
             var logoElement = BuildLibraryGameProfileHeroLogo(window, folder);
             if (logoElement != null)
             {
+                Grid.SetRow(logoElement, 0);
                 Grid.SetColumn(logoElement, 2);
+                logoElement.VerticalAlignment = VerticalAlignment.Center;
                 content.Children.Add(logoElement);
             }
+
+            var bottomChrome = new Grid { Margin = new Thickness(0, heroBottomChromeGap, 0, 0) };
+            bottomChrome.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            bottomChrome.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var editCircles = BuildLibraryGameProfileHeroEditActionCluster(window, view, folder, refreshHero);
+            if (editCircles != null)
+            {
+                Grid.SetColumn(editCircles, 0);
+                if (editCircles is FrameworkElement editFe) editFe.HorizontalAlignment = HorizontalAlignment.Left;
+                bottomChrome.Children.Add(editCircles);
+            }
+
+            var stateStrip = BuildLibraryGameProfileHeroStateToggleCluster(window, view, folder, refreshHero);
+            if (stateStrip != null)
+            {
+                Grid.SetColumn(stateStrip, 1);
+                if (stateStrip is FrameworkElement stateFe) stateFe.HorizontalAlignment = HorizontalAlignment.Right;
+                bottomChrome.Children.Add(stateStrip);
+            }
+
+            Grid.SetRow(bottomChrome, 1);
+            Grid.SetColumnSpan(bottomChrome, 3);
+            content.Children.Add(bottomChrome);
+
             hero.Children.Add(content);
             return hero;
         }
@@ -494,30 +520,19 @@ namespace PixelVaultNative
             return labels.Count == 0 ? new[] { "Other" } : labels;
         }
 
-        // Combined hero action cluster: three round state toggles (Favorite /
-        // Showcase / 100% Complete) followed by three round action circles (Edit
-        // Game / Open Folder / Change Art). Toggles and actions share identical
-        // chrome (40px round Border, Segoe MDL2 glyph) so the row reads as one
-        // cohesive icon strip instead of mixed-shape buttons. State toggles flip
-        // their own chrome on click; action circles route to the same helpers
-        // that used to back the text pills (OpenLibraryFolderIdEditor,
-        // OpenFolder, ChooseLibraryAssetFromSteamGridDbAsync) and ask
-        // refreshHero to rebuild the hero so renamed/re-IDed/re-art games
-        // update without reopening the window.
-        FrameworkElement BuildLibraryGameProfileHeroActionCluster(Window profileWindow, LibraryBrowserFolderView view, LibraryFolderInfo folder, Action refreshHero)
+        // Favorite / Showcase / 100% round toggles — anchored to the bottom-right of
+        // the profile hero on their own row (separate from Edit / Open / Change Art).
+        FrameworkElement BuildLibraryGameProfileHeroStateToggleCluster(Window profileWindow, LibraryBrowserFolderView view, LibraryFolderInfo folder, Action refreshHero)
         {
             if (view == null || folder == null) return null;
             var cluster = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
                 VerticalAlignment = VerticalAlignment.Center,
-                HorizontalAlignment = HorizontalAlignment.Right,
-                Margin = new Thickness(16, 0, 0, 0)
+                HorizontalAlignment = HorizontalAlignment.Right
             };
 
-            // --- State toggles (Favorite / Showcase / 100% Complete) ---
-            Border favBtn = null;
-            favBtn = BuildLibraryGameProfileHeroToggleButton(
+            Border favBtn = BuildLibraryGameProfileHeroToggleButton(
                 "\uEB52", "#FF6B81", "#3A1C25",
                 view.IsFavorite, "Remove from favorites", "Mark as favorite");
             favBtn.MouseLeftButtonUp += delegate(object _, MouseButtonEventArgs e)
@@ -532,8 +547,7 @@ namespace PixelVaultNative
             };
             cluster.Children.Add(favBtn);
 
-            Border showcaseBtn = null;
-            showcaseBtn = BuildLibraryGameProfileHeroToggleButton(
+            Border showcaseBtn = BuildLibraryGameProfileHeroToggleButton(
                 "\uE735", "#F4C657", "#332608",
                 view.IsShowcase, "Remove from showcase", "Add to showcase");
             showcaseBtn.MouseLeftButtonUp += delegate(object _, MouseButtonEventArgs e)
@@ -548,32 +562,35 @@ namespace PixelVaultNative
             };
             cluster.Children.Add(showcaseBtn);
 
-            Border completeBtn = null;
-            completeBtn = BuildLibraryGameProfileHeroToggleButton(
+            Border completeBtn = BuildLibraryGameProfileHeroToggleButton(
                 "\uED15", "#5DD68B", "#0D2E1A",
                 view.IsCompleted100Percent, "Cleared 100% complete", "Mark 100% complete");
+            completeBtn.Margin = new Thickness(0);
             completeBtn.MouseLeftButtonUp += delegate(object _, MouseButtonEventArgs e)
             {
                 e.Handled = true;
                 if (!SetLibraryBrowserCompletionState(view, !view.IsCompleted100Percent)) return;
                 TryLibraryToast(view.IsCompleted100Percent ? "Marked 100% complete." : "Cleared 100% complete.", MessageBoxImage.Information);
-                // Toggling 100% complete drives the holofoil + gold-frame treatment on
-                // the profile hero cover and on the library tile cover. Rebuild the
-                // hero so the new cover treatment renders, and ping the live folder
-                // grid the same way the folder-tile context menu's "100% Achievements"
-                // item does (renderTiles()) so tiles behind the profile update in
-                // place instead of staying stale until the user reopens the library.
                 if (refreshHero != null) refreshHero();
                 try { _libraryBrowserLiveWorkingSet?.RerenderFolderList?.Invoke(); }
                 catch (Exception ex) { LogException("LibraryGameProfile.completeBtn rerenderFolderList", ex); }
             };
             cluster.Children.Add(completeBtn);
 
-            // Visual gap between state toggles and the action circles so they read
-            // as related-but-distinct groups (state vs. do).
-            cluster.Children.Add(new Border { Width = 10 });
+            return cluster;
+        }
 
-            // --- Action circles (Edit Game / Open Folder / Change Art) ---
+        // Edit Game / Open Folder / Change Art circles — bottom-left of hero chrome.
+        FrameworkElement BuildLibraryGameProfileHeroEditActionCluster(Window profileWindow, LibraryBrowserFolderView view, LibraryFolderInfo folder, Action refreshHero)
+        {
+            if (view == null || folder == null) return null;
+            var cluster = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Left
+            };
+
             var sources = view.SourceFolders == null
                 ? new List<LibraryFolderInfo>()
                 : view.SourceFolders.Where(f => f != null).ToList();
