@@ -1,0 +1,42 @@
+refactor(gpro-001): action pills become circle icons next to IDs; logo moves to right of hero
+
+User-facing layout changes:
+
+1. Edit Game / Open Folder / Change Art switched from text pills in a body
+   toolbar to round 40px circle icon buttons (Segoe MDL2 Edit / FolderFill /
+   Photo glyphs) and now sit on the same row as the external-ID pills,
+   right-aligned. The Favorite / Showcase / 100% Complete toggles join the
+   same row with a 10px gap so the bottom of the hero reads as one unified
+   strip of icons (state group + action group) instead of two competing
+   surfaces.
+2. The Game Profile hero gains a third Auto column for the game logo on the
+   right side. Previously the logo rendered as a 420x94 wordmark above the
+   title; now BuildLibraryGameProfileHeroLogo returns a centered 320x200
+   image that fills the right column. Falls back to null when no logo asset
+   is available so the column collapses and the copy column gets the room.
+
+Refactor:
+- BuildLibraryGameProfileHeroActionCluster now renders all six circles
+  (3 state toggles + 3 action circles) and lives in
+  BuildLibraryGameProfileHeroIdActionRow, a Grid that hosts IDs on the left
+  (Star) and the cluster on the right (Auto).
+- BuildLibraryGameProfileHeroActionCircle is the stateless circle helper
+  used by Edit / Open / Art. Same chrome as the toggle "off" state but with
+  a brighter glyph + hover so it reads as an action rather than a state.
+- BuildLibraryGameProfileChangeArtMenu replaces the deleted
+  BuildLibraryGameProfileChangeArtPill, returning a ContextMenu that the
+  Change Art circle attaches to. Identical menu items
+  (Choose Cover / Banner from SteamGridDB, Set Custom Cover, Open My Covers
+  Folder).
+- The body's BuildLibraryGameProfileActionToolbar was removed (its three
+  pills became hero circles). BuildLibraryGameProfileEditGameButton and
+  ApplyLibraryGameProfileActionPillChrome went away with it.
+- Multi-console Edit Game still routes through OpenLibraryFolderIdEditor
+  per source folder via the same per-platform ContextMenu, attached to the
+  Edit circle now.
+- Open Folder dims (Opacity 0.4) when the view has no source folder paths;
+  hover/click are inert in that state.
+
+Net effect: the hero now reads "Cover | Title + summary + badges + (IDs +
+icons row) | Logo" with a single coherent action strip and a real logo
+slot.

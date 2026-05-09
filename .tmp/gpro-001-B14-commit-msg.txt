@@ -1,0 +1,27 @@
+feat(gpro-001 B.1/B.2/B.4): Game Notes card + achievement progress + last captured sub-line
+
+PV-PLN-GPRO-001 Phase B (read-only data + single-write-path notes commit; B.3
+external-link pills land separately so the URL handling can be reviewed on its
+own).
+
+- Bumped the Game Profile window default height from 860 to 980 so the new
+  dashboard layout (hero + summary line + 5 stat cards + filmstrip + notes +
+  achievements) fits comfortably on a 1080p display without scrolling.
+- B.4: Latest Capture stat card now shows a "Today" / "Yesterday" /
+  "N days/weeks/months/years ago" sub-line under the date so users can read
+  recency at a glance. BuildLibraryGameProfileStatCard accepts an optional
+  subText; FormatLibraryGameProfileRelative provides the bucketed phrasing.
+- B.2: Achievement summary line is now "<source>: N of M earned * pct%" plus
+  a thin track-and-fill progress bar (BuildLibraryGameProfileAchievementProgressBar).
+  The bar turns gold at 100% and stays muted blue otherwise. Falls back to the
+  existing "Progress unknown" line when the source can't report per-user data.
+- B.1: New BuildLibraryGameProfileNotesCard renders folder.CollectionNotes (or
+  an empty-state prompt) with an Edit notes pill. The editor is a small modal
+  (ShowLibraryGameProfileNotesEditor) with a multiline TextBox, Save / Cancel
+  buttons, and Esc-to-close. TryPersistLibraryGameProfileNotes mirrors the
+  Quick Edit Drawer notes branch: BuildLibraryBrowserDisplayFolder ->
+  UpsertSavedGameIndexRow -> librarySession.RefreshFolderCacheAfterGameIndexChange
+  -> propagate CollectionNotes to view + PrimaryFolder + SourceFolders +
+  search blob, then refresh the in-place TextBlock via the onSaved callback.
+  The hero's clipped CollectionNotes preview was removed so the dedicated card
+  owns the notes surface end-to-end.

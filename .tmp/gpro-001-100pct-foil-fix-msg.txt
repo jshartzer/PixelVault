@@ -1,0 +1,50 @@
+fix(gpro-001): 100% Complete toggle now applies the holofoil cover treatment
+
+Bug: clicking the green 100% Complete toggle in the Game Profile hero
+flipped the persisted state and reskinned the toggle button, but
+nothing else changed visually - the cover did not turn into a
+holofoil. From the user's POV the toggle "wasn't working".
+
+Root cause was two halves:
+
+1. The holofoil + gold-frame overlays only ever lived on the library
+   tile cover (BuildLibraryTileCompletionFoilOverlay /
+   BuildLibraryTileCompletionFrameOverlay, mounted by
+   LibraryBrowserOrchestrator.FolderTile when folder.IsCompleted100Percent).
+   The Game Profile hero cover was a plain CreateAsyncImageTile call
+   with no foil treatment regardless of completion state, so toggling
+   inside the profile never decorated the cover next to the toggle.
+2. The profile's complete-toggle click handler called
+   SetLibraryBrowserCompletionState (which mutates the row + folder +
+   view) and then only re-skinned its own button via
+   ApplyLibraryGameProfileHeroToggleState. It did not rebuild the hero
+   (so the cover stayed plain even after I added foil support) and did
+   not ping the live folder grid (so the library tile behind the
+   profile also stayed stale until the user reopened the library).
+
+Fix:
+
+- BuildLibraryGameProfileHero now wraps the cover in a Grid and layers
+  BuildLibraryTileCompletionFoilOverlay + BuildLibraryTileCompletionFrameOverlay
+  on top whenever view.IsCompleted100Percent is true, mirroring the
+  tile structure (PV-POL-GPRO-REUSE-001). Animation is hover-driven
+  with a centered idle state on Loaded - the profile hero doesn't
+  scroll like the tile rail does, so the rail's ScrollViewer-bias
+  animation path is intentionally not wired here. The DropShadowEffect
+  is now applied to the wrapping element so the shadow encompasses
+  the foil + frame, not just the inner cover image.
+- The completeBtn click handler in BuildLibraryGameProfileHeroActionCluster
+  now invokes refreshHero() after a successful state change. The hero
+  rebuild produces a fresh toggle button with the right chrome and a
+  fresh cover with (or without) the foil overlays, so the explicit
+  ApplyLibraryGameProfileHeroToggleState call is no longer needed.
+- The same handler also calls _libraryBrowserLiveWorkingSet?.RerenderFolderList?.Invoke()
+  inside try/catch so the library tile behind the profile picks up the
+  new foil state immediately, matching what the folder-tile context
+  menu's "100% Achievements" item already does via renderTiles().
+
+Net effect: clicking the 100% toggle in the Game Profile now gives
+immediate, obvious feedback - the cover gains the holofoil sheen and
+gold completion frame right next to the toggle, the library tile
+behind the profile updates without reopening, and toggling back off
+removes the treatment cleanly.

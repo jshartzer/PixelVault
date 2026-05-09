@@ -1,0 +1,26 @@
+refactor(gpro-001): hero polish + sessions clickable + body reorder
+
+- Reorder profile body: Achievements now sits above Sessions, with
+  Sessions anchored at the bottom of the page. Recent Captures stays in
+  its slot directly under Notes so the page reads stats -> notes ->
+  captures -> achievements -> sessions.
+- Sessions are clickable: each session card opens the same browser-style
+  session window the main library's Sessions grouping mode opens (via
+  OpenLibrarySessionWindow). Cards now have hover chrome + cursor + a
+  tooltip so the affordance is obvious. Per-file metadata edits inside
+  that window are routed to a toast directing users to the main library
+  for now (the full editor needs the live working set's selection
+  plumbing, which the profile doesn't own).
+- Fix cover photo clipping: the rounded Border + UniformToFill image was
+  letting the photo paint past the rounded corners. Apply an explicit
+  RectangleGeometry clip on both the cover Border and the foil wrapper
+  so image, foil, and gold frame all respect the rounded edge.
+- Hero polish: cover is bigger (138x207 -> 184x276), hero padding is
+  tighter (top/bottom 22/24 -> 12/12), and the copy column is now
+  vertical-center aligned with the cover instead of pinning to the top
+  with empty space below. Banner reads as a focused header rather than
+  empty space wrapping the cover.
+- Two-row identity strip: the action circles (Favorite / Showcase / 100%
+  + Edit / Open / Change Art) drop to their own row directly under the
+  ID number pills instead of sharing a row with them. Removed the
+  now-dead BuildLibraryGameProfileHeroIdActionRow helper.

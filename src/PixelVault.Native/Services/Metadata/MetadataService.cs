@@ -49,6 +49,8 @@ namespace PixelVaultNative
 
     sealed class MetadataService : IMetadataService
     {
+        internal const string ExifToolTempSuffix = "_exiftool_tmp";
+
         readonly MetadataServiceDependencies dependencies;
 
         public MetadataService(MetadataServiceDependencies dependencies)
@@ -113,6 +115,67 @@ namespace PixelVaultNative
             {
                 return normalized;
             }
+        }
+
+        internal static bool IsExifToolTempPath(string path)
+        {
+            return !string.IsNullOrWhiteSpace(path)
+                && path.EndsWith(ExifToolTempSuffix, StringComparison.OrdinalIgnoreCase);
+        }
+
+        internal static string BuildExifToolTempPath(string targetPath)
+        {
+            return string.IsNullOrWhiteSpace(targetPath) ? string.Empty : targetPath + ExifToolTempSuffix;
+        }
+
+        internal static string ResolveExifWriteTargetPathForCleanup(ExifWriteRequest request)
+        {
+            if (request != null && request.Arguments != null)
+            {
+                for (var i = request.Arguments.Length - 1; i >= 0; i--)
+                {
+                    var candidate = request.Arguments[i];
+                    if (string.IsNullOrWhiteSpace(candidate)) continue;
+                    if (candidate.StartsWith("-", StringComparison.Ordinal)) continue;
+                    return candidate;
+                }
+            }
+            return request == null ? string.Empty : request.FilePath ?? string.Empty;
+        }
+
+        internal static bool TryDeleteExifToolTempFile(string tempPath, Action<string> log = null)
+        {
+            if (!IsExifToolTempPath(tempPath)) return false;
+            try
+            {
+                if (!File.Exists(tempPath)) return false;
+                File.Delete(tempPath);
+                log?.Invoke("Removed ExifTool temp file: " + tempPath);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                log?.Invoke("Could not remove ExifTool temp file: " + tempPath + ". " + ex.Message);
+                return false;
+            }
+        }
+
+        internal static bool TryDeleteExifToolTempForTarget(string targetPath, Action<string> log = null)
+        {
+            return TryDeleteExifToolTempFile(BuildExifToolTempPath(targetPath), log);
+        }
+
+        internal static bool TryDeleteExifToolTempForRequest(ExifWriteRequest request, Action<string> log = null)
+        {
+            if (request == null) return false;
+            var deleted = false;
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var target in new[] { ResolveExifWriteTargetPathForCleanup(request), request.FilePath ?? string.Empty })
+            {
+                if (string.IsNullOrWhiteSpace(target) || !seen.Add(target)) continue;
+                deleted |= TryDeleteExifToolTempForTarget(target, log);
+            }
+            return deleted;
         }
 
         public string[] BuildExifArgs(string file, DateTime dt, string[] platformTags, bool preserveFileTimes, string comment, bool addPhotographyTag)
@@ -649,6 +712,8 @@ namespace PixelVaultNative
             }
             finally
             {
+                foreach (var request in requests)
+                    TryDeleteExifToolTempForRequest(request, Log);
                 if (File.Exists(argFile)) File.Delete(argFile);
             }
         }
@@ -684,7 +749,14 @@ namespace PixelVaultNative
             Action<ExifWriteRequest> runSingleRequest = delegate(ExifWriteRequest request)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                RunExe(ExifToolPath, request.Arguments, Path.GetDirectoryName(ExifToolPath), false);
+                try
+                {
+                    RunExe(ExifToolPath, request.Arguments, Path.GetDirectoryName(ExifToolPath), false);
+                }
+                finally
+                {
+                    TryDeleteExifToolTempForRequest(request, Log);
+                }
                 finalizeRequest(request);
             };
 

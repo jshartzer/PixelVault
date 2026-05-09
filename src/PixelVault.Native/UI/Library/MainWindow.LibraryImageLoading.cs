@@ -142,6 +142,31 @@ namespace PixelVaultNative
 
         Border CreateAsyncImageTile(string sourcePath, int decodePixelWidth, double tileWidth, double tileHeight, Stretch stretch, string fallbackText, Brush fallbackForeground, Thickness margin, Thickness padding, Brush background, CornerRadius cornerRadius, Brush borderBrush, Thickness borderThickness)
         {
+            static bool CornerRadiusHasRounding(CornerRadius cr) =>
+                cr.TopLeft > 0 || cr.TopRight > 0 || cr.BottomRight > 0 || cr.BottomLeft > 0;
+
+            void ApplyPresenterRoundedClip(Grid presenter)
+            {
+                if (!CornerRadiusHasRounding(cornerRadius)) return;
+                var innerW = Math.Max(0,
+                    tileWidth - borderThickness.Left - borderThickness.Right - padding.Left - padding.Right);
+                var innerH = Math.Max(0,
+                    tileHeight - borderThickness.Top - borderThickness.Bottom - padding.Top - padding.Bottom);
+                if (innerW <= 0 || innerH <= 0) return;
+                var insetForRadius = Math.Min(
+                    Math.Min(borderThickness.Left + padding.Left, borderThickness.Right + padding.Right),
+                    Math.Min(borderThickness.Top + padding.Top, borderThickness.Bottom + padding.Bottom));
+                var minCorner = Math.Min(
+                    Math.Min(cornerRadius.TopLeft, cornerRadius.TopRight),
+                    Math.Min(cornerRadius.BottomLeft, cornerRadius.BottomRight));
+                var rx = Math.Max(0, minCorner - insetForRadius);
+                rx = Math.Min(rx, innerW * 0.5);
+                rx = Math.Min(rx, innerH * 0.5);
+                var geom = new RectangleGeometry(new Rect(0, 0, innerW, innerH), rx, rx);
+                if (geom.CanFreeze) geom.Freeze();
+                presenter.Clip = geom;
+            }
+
             var tile = new Border
             {
                 Width = tileWidth,
@@ -151,9 +176,12 @@ namespace PixelVaultNative
                 Background = background,
                 CornerRadius = cornerRadius,
                 BorderBrush = borderBrush,
-                BorderThickness = borderThickness
+                BorderThickness = borderThickness,
+                SnapsToDevicePixels = true,
+                UseLayoutRounding = true
             };
-            var presenter = new Grid();
+            var presenter = new Grid { SnapsToDevicePixels = true, UseLayoutRounding = true };
+            ApplyPresenterRoundedClip(presenter);
             var placeholder = new TextBlock
             {
                 Text = fallbackText,
@@ -166,11 +194,9 @@ namespace PixelVaultNative
             };
             var image = new Image
             {
-                Width = tileWidth,
-                Height = tileHeight,
                 Stretch = stretch,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                VerticalAlignment = VerticalAlignment.Stretch,
                 Visibility = Visibility.Collapsed
             };
             RenderOptions.SetBitmapScalingMode(image, BitmapScalingMode.LowQuality);

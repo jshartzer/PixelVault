@@ -1,0 +1,27 @@
+refactor(gpro-001): hero toggles get their own column; pills move to slim toolbar; multi-console Edit Game
+
+User-facing fixes for the Phase C action cluster:
+
+1. Layout - hero toggle cluster vs. pills were crowding each other (Edit Game /
+   Open Folder / Change Art under three small toggles in the same column). The
+   pills now live in a new slim "action toolbar" above the stat strip
+   (BuildLibraryGameProfileActionToolbar, first child of body), so the hero's
+   third column hosts only the toggles - vertical-centered and bumped from 36px
+   to 40px (CornerRadius / glyph / margin tracked accordingly) so they read as
+   the headline action surface.
+   Pills shrank from 30px tall / 12pt to 28px / 11.5pt via the new shared
+   ApplyLibraryGameProfileActionPillChrome helper so the toolbar reads as a
+   secondary action row, not a hero element.
+
+2. Multi-console Edit Game - the pill used to be disabled with a tooltip when
+   view.IsMergedAcrossPlatforms (e.g., Diablo IV registered on Steam + Xbox +
+   PC), which meant users could not edit IDs at all from the profile. Now
+   BuildLibraryGameProfileEditGameButton renders "Edit Game (N) v" and opens a
+   ContextMenu of platform entries; clicking one opens
+   OpenLibraryFolderIdEditor for that exact source folder, with the
+   pre-existing refreshHero callback hooked in so the hero updates without
+   reopening. Single-platform games still get the regular pill that opens the
+   editor directly.
+
+No persistence-layer changes - the Edit Game routes still go through the
+existing OpenLibraryFolderIdEditor.

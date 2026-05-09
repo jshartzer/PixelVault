@@ -1,0 +1,41 @@
+feat(gpro-001): Edit Game form gains editable Game name + Notes
+
+User asked to "beef up" the Edit Game form. The IDs editor only let users
+change the four external IDs even though renaming the game and editing notes
+were the most-asked-for fields not yet exposed from the Game Profile
+dashboard. (Other obvious candidates - Favorite, Showcase, 100% Complete -
+already have toggles in the hero.)
+
+OpenLibraryFolderIdEditor changes:
+- Editor window grew (760x580 -> 760x760) and the title is now
+  "Edit Game" instead of "Edit IDs"; header subtitle reflects the same.
+- New "Game name" TextBox at form row 0 prefilled from row.Name (or
+  folder.Name fallback), with helper copy explaining the field is the
+  display name shown in the library / Game Profile / search.
+- New multi-line "Notes" TextBox at form row 1 prefilled from
+  row.CollectionNotes (or folder.CollectionNotes), wired to the same
+  GameIndexEditorRow.CollectionNotes the Notes card and Quick Edit Drawer
+  write to, so the three surfaces stay in lockstep.
+- Lookup-disable / re-enable list extended to cover the two new boxes so
+  the form is fully locked during async ID resolution.
+- Save handler:
+  - Computes nameChanged / notesChanged against the initial values so the
+    "all blank, no edits, just close" early-out still works.
+  - row.Name resolves to the new input when present, else preserves the
+    existing row.Name, else falls back to folder.Name (NormalizeGameIndexName
+    runs on the resolved value as before).
+  - row.CollectionNotes always tracks the trimmed input.
+  - Mirrors row.Name and row.CollectionNotes onto folder.* so callers see
+    fresh data without a reload.
+  - Status bar / Log line updated to mention rename + notes mutations
+    alongside the ID summary.
+
+Notes-card refresh wiring (so the on-screen Game Notes card on the Game
+Profile reflects edits made from this form):
+- BuildLibraryGameProfileNotesCard now exposes an out Action
+  refreshFromFolder that re-applies folder.CollectionNotes to its
+  TextBlock.
+- ShowLibraryGameProfileWindow stores that delegate and the existing
+  refreshHero closure invokes it after rebuilding the hero, so the Edit
+  Game form -> save -> hero rebuild -> notes card re-render flow updates
+  every notes surface in one shot.

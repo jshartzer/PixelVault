@@ -1,0 +1,22 @@
+fix(library): reconcile stale PendingGameAssignment with game index by folder path
+
+Merged titles (e.g. Horizon Zero Dawn Complete Edition) could show the correct
+name from one platform row while another disk folder stayed stuck with the
+scanner’s “Needs assignment · …” placeholder. ApplySavedGameIndexRows skipped
+those folders entirely, so PendingGameAssignment never cleared from cache even
+when a saved GameIndexEditorRow matched FolderPath + platform — blocking 100%
+complete, Favorite, Showcase, and profile notes.
+
+- FindSavedGameIndexRow: after GameId / title+platform identity, fall back to
+  matching saved rows by normalized FolderPath + normalized platform label.
+  Ambiguous matches prefer the row that already has a GameId.
+- ApplySavedGameIndexRows: merge saved rows when resolved this way and clear
+  PendingGameAssignment instead of continuing early.
+- UpsertSavedGameIndexRow: when folder.GameId is empty but FindSavedGameIndexRow
+  resolves a saved row, reuse that row’s GameId before creating a new id (avoids
+  orphan rows when placeholder folders sync).
+- SetLibraryBrowserCompletionState / SetLibraryBrowserBooleanGameFlag: resolve
+  rows via FindSavedGameIndexRow; if we clear a stale pending flag, persist and
+  RefreshFolderCacheAfterGameIndexChange so on-disk folder cache matches.
+  Completion toggle shows a toast when no saved row exists for a truly pending
+  folder.

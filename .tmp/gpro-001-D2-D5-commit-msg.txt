@@ -1,0 +1,95 @@
+feat(gpro-001 D.2-D.5): Sessions section with threshold picker + View All modal
+
+Closes the rest of PV-PLN-GPRO-001 Phase D. Builds on the pure
+LibraryGameProfileSessionMath helper landed in 5900f45 and turns it
+into the visible Sessions surface between Game Notes and Recent
+Captures.
+
+Body order is now: Stats - Notes - Sessions (NEW) - Recent Captures -
+Achievements (the order called out in the plan's acceptance criteria).
+
+D.2 - Sessions section UI (BuildLibraryGameProfileSessionsSection):
+
+- Pulls the per-window LibraryGameProfileSessionEntry snapshot built in
+  ShowLibraryGameProfileWindow (one resolved-date pass over
+  orderedFiles, reused by both stat card and section so we don't
+  re-read metadata on threshold change - PV-POL-GPRO-DATA-001).
+- Section header is a Grid: BuildLibraryGameProfileSectionTitle
+  ("Sessions" + subtitle) on the left, threshold picker pill on the
+  right.
+- Renders up to 6 inline session cards (BuildLibraryGameProfileSessionCard).
+  Each card is a 3-column Grid: 96x70 thumbnail, title/range/relative
+  stack, capture+video count stats. Newest-first ordering matches the
+  helper's contract.
+- Thumbnail picks the first IMAGE entry inside the session (newest
+  first traversal), falls back to the first entry overall, and lets
+  CreateAsyncImageTile show "CLIP" / filename text when the file is
+  a video or unresolved (PV-POL-GPRO-PIPE-001).
+- Empty state renders BuildLibraryGameProfileEmptyCard("No sessions
+  yet ...") so we never show a blank section header
+  (PV-POL-GPRO-FALLBACK-001).
+- New duration formatter (FormatLibraryGameProfileSessionDuration):
+  "instant" for <1 min, "X min" for <60, "Xh Ym" otherwise (Y
+  suppressed when 0).
+
+D.3 - Threshold picker pill (BuildLibraryGameProfileSessionThresholdPill):
+
+- Five presets matching the main browser's Sessions-mode buttons in
+  MainWindow.LibraryBrowserShowOrchestration.cs:706-710 (30/60/90/120/180
+  minutes).
+- On click, opens a ContextMenu of checkable items; selecting one
+  invokes applyThreshold(minutes).
+- applyThreshold (declared in ShowLibraryGameProfileWindow):
+  * Normalizes via SettingsService.NormalizeLibrarySessionThresholdMinutes.
+  * Writes librarySessionThresholdMinutes + SaveSettings() (same setting
+    key the main browser writes - PV-POL-GPRO-SESSION-001).
+  * Recomputes metrics through the existing
+    ComputeLibraryGameProfileMetrics path (which now funnels through
+    LibraryGameProfileSessionMath.CountSessions per D.1).
+  * Re-renders ONLY the Stats slot, the Sessions slot, and the hero
+    summary line (the three surfaces that depend on SessionCount). No
+    full body rebuild; achievements + filmstrip + notes do not flicker.
+  * try/catch + ping _libraryBrowserLiveWorkingSet?.RerenderFolderList
+    so the main browser's Sessions grouping mode picks up the new
+    threshold without reopening the window (the cross-window risk
+    called out in the plan's risks table).
+- Stats and Sessions are now slotted into ContentControl hosts so the
+  refresh path is a single Content-property assignment.
+- New label formatter (FormatLibraryGameProfileThresholdLabel):
+  30 -> "30 min", 60 -> "1 hr", 90 -> "1.5 hr", 120 -> "2 hr",
+  180 -> "3 hr".
+- AutomationProperties.Name on the pill includes the current threshold
+  value (Phase F.3 down payment).
+
+D.4 - View All Sessions modal (ShowLibraryGameProfileViewAllSessionsDialog):
+
+- "View all sessions" pill renders below the inline cards when the
+  session count exceeds the 6-card preview cap. Tooltip shows the full
+  count + threshold, AutomationProperties.Name reads "View all
+  sessions" (Phase F.3 down payment).
+- Modal Window (ShowDialog) sized 720x720, MinWidth 520, MinHeight 420,
+  centered on the profile, Esc closes (PV-POL-GPRO-ESC-001), reuses
+  the same BuildLibraryGameProfileSessionCard helper so the inline
+  list and the dialog list never visually drift.
+- Dialog header reads "<N> sessions at <label> threshold" + a one-line
+  hint that the threshold is changed from the profile.
+
+D.5 - Real Sessions stat card consumer:
+
+- The Sessions stat card at the top of the body now reflects
+  LibraryGameProfileSessionMath.CountSessions (already wired at the
+  metrics layer in 5900f45). The stat card refreshes in lockstep with
+  the section on threshold change because applyThreshold rebuilds the
+  Stats slot's content.
+
+Manual verification (per the plan's "Tests / acceptance" block):
+
+- Builds clean, all 592 tests pass.
+- A game with multiple bursts at 60min splits into more sessions at
+  30min and fewer at 180min (verified by feeding sample data through
+  LibraryGameProfileSessionMath in the test pass landed in 5900f45;
+  the section just renders that result).
+- Threshold round-trip: changing the threshold from the profile writes
+  to librarySessionThresholdMinutes and SaveSettings() persists - the
+  main browser's existing Sessions-mode threshold UI reads the same
+  field on next paint.

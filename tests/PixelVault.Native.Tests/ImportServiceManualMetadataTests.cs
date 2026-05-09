@@ -264,6 +264,103 @@ public sealed class ImportServiceManualMetadataTests
     }
 
     [Fact]
+    public void BuildSourceInventory_RemovesStaleExifToolTempFiles()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "pv-exiftool-temp-import-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(root);
+            var capture = Path.Combine(root, "capture.jpg");
+            var temp = Path.Combine(root, "capture.jpg_exiftool_tmp");
+            File.WriteAllBytes(capture, new byte[] { 1 });
+            File.WriteAllBytes(temp, new byte[] { 2 });
+            File.SetLastWriteTimeUtc(temp, DateTime.UtcNow - TimeSpan.FromMinutes(10));
+            var svc = CreateMinimalImportService(new[] { capture, temp });
+
+            var inventory = svc.BuildSourceInventory(false);
+
+            Assert.Contains(capture, inventory.TopLevelMediaFiles);
+            Assert.False(File.Exists(temp));
+        }
+        finally
+        {
+            try
+            {
+                if (Directory.Exists(root)) Directory.Delete(root, true);
+            }
+            catch
+            {
+            }
+        }
+    }
+
+    [Fact]
+    public void BuildSourceInventory_LeavesFreshExifToolTempFilesAlone()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "pv-exiftool-fresh-import-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(root);
+            var capture = Path.Combine(root, "capture.jpg");
+            var temp = Path.Combine(root, "capture.jpg_exiftool_tmp");
+            File.WriteAllBytes(capture, new byte[] { 1 });
+            File.WriteAllBytes(temp, new byte[] { 2 });
+            File.SetLastWriteTimeUtc(temp, DateTime.UtcNow);
+            var svc = CreateMinimalImportService(new[] { capture, temp });
+
+            var inventory = svc.BuildSourceInventory(false);
+
+            Assert.Contains(capture, inventory.TopLevelMediaFiles);
+            Assert.True(File.Exists(temp));
+            Assert.DoesNotContain(temp, inventory.TopLevelMediaFiles);
+        }
+        finally
+        {
+            try
+            {
+                if (Directory.Exists(root)) Directory.Delete(root, true);
+            }
+            catch
+            {
+            }
+        }
+    }
+
+    [Fact]
+    public void TryDeleteExifToolTempForRequest_RemovesTargetCompanion()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "pv-exiftool-request-cleanup-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(root);
+            var target = Path.Combine(root, "capture.jpg");
+            var temp = target + MetadataService.ExifToolTempSuffix;
+            File.WriteAllBytes(target, new byte[] { 1 });
+            File.WriteAllBytes(temp, new byte[] { 2 });
+            var request = new ExifWriteRequest
+            {
+                FilePath = target,
+                Arguments = new[] { "-overwrite_original", target }
+            };
+
+            var deleted = MetadataService.TryDeleteExifToolTempForRequest(request);
+
+            Assert.True(deleted);
+            Assert.False(File.Exists(temp));
+        }
+        finally
+        {
+            try
+            {
+                if (Directory.Exists(root)) Directory.Delete(root, true);
+            }
+            catch
+            {
+            }
+        }
+    }
+
+    [Fact]
     public async Task RunSteamRenameAsync_TitlelessSwitchCapture_UsesUploadFolderTitle()
     {
         var root = Path.Combine(Path.GetTempPath(), "pv-switch-folder-rename-" + Guid.NewGuid().ToString("N"));

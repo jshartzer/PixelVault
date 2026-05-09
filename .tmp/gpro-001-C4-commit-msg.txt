@@ -1,0 +1,26 @@
+feat(gpro-001 C.4): Change Art dropdown pill in hero action cluster
+
+PV-PLN-GPRO-001 Phase C step C.4. Added a "Change Art" dropdown pill next to
+Open Folder(s) so users can swap covers/banners without leaving the profile
+window. Each menu item routes through an existing helper - no new asset
+pipeline code, no new persistence path.
+
+Menu items:
+- Choose Cover from SteamGridDB... -> ChooseLibraryAssetFromSteamGridDbAsync
+  with LibraryAssetPickerKind.Cover. Disabled (with tooltip) when
+  HasSteamGridDbApiToken() is false.
+- Choose Banner from SteamGridDB... -> same picker with
+  LibraryAssetPickerKind.Banner. Same gate.
+- Set Custom Cover... -> Directory.CreateDirectory(savedCoversRoot) +
+  PickFile + SaveCustomCoverAsync(GetLibraryBrowserActionFolders(view),
+  picked). Mirrors the existing folder-tile setCoverItem.Click body.
+- Open My Covers Folder -> OpenSavedCoversFolder().
+
+The picker callbacks (showFolder + refreshPhotoWorkspaceHeroBanner) both
+just call refreshHero - the same Action declared in
+ShowLibraryGameProfileWindow that the Edit Game pill uses - so picking new
+art rebuilds the hero in place and the new cover/banner shows up
+immediately without reopening the window.
+
+Errors from the picker or local cover save log via LogException and surface
+through TryLibraryToast.

@@ -1,0 +1,39 @@
+feat(gpro-001 C.2/C.3): Hero action cluster - Favorite/Showcase/100% toggles + Edit Game/Open Folders pills
+
+PV-PLN-GPRO-001 Phase C steps C.2 + C.3.
+
+Layout:
+- BuildLibraryGameProfileHero gains a third Auto column for the action cluster
+  (right-aligned, vertical-aligned bottom of the hero). The copy column stays
+  Star and the cover column stays Auto.
+- Cluster has two stacked rows: a top row of three round 36px icon toggles
+  (Favorite -> heart, Showcase -> star, 100% Complete -> trophy), and a
+  bottom row of two pill buttons (Edit Game, Open Folders / Open Folder).
+
+Toggles (C.2):
+- BuildLibraryGameProfileHeroToggleButton renders a Border-based round 36px
+  control with a Segoe MDL2 Assets glyph; ApplyLibraryGameProfileHeroToggleState
+  toggles the chrome (filled tinted bg + colored border + colored glyph when
+  on, muted otherwise). Each click writes through SetLibraryBrowserFavoriteState,
+  SetLibraryBrowserShowcaseState, or SetLibraryBrowserCompletionState (the C.1
+  helpers) and refreshes only its own button - no full hero rebuild required.
+- Toasts on each successful toggle ("Added to favorites." etc.).
+
+Pills (C.3):
+- Edit Game calls OpenLibraryFolderIdEditor(folder, refreshHero) - the
+  existing IDs editor mutates the folder reference in place, then
+  refreshHero (defined in ShowLibraryGameProfileWindow) rebuilds the hero
+  and swaps it into row 0 of the root grid so renamed/re-IDed games update
+  without reopening the window. Disabled when view.IsMergedAcrossPlatforms
+  (matching the existing folder-tile context-menu rule).
+- Open Folder(s) calls foreach OpenFolder(p) for
+  GetLibraryBrowserSourceFolderPaths(view); label and tooltip switch to
+  reflect single vs. multi-folder counts; disabled when no paths.
+
+Hero refresh plumbing:
+- BuildLibraryGameProfileHero now takes Action refreshHero and threads it
+  into the action cluster.
+- ShowLibraryGameProfileWindow declares refreshHero as a self-referential
+  closure that finds the existing hero via Grid.GetRow == 0, rebuilds with
+  the latest folder/view/metrics snapshot, and swaps it back in. Window
+  title also refreshes from folder.Name post-edit.

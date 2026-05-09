@@ -1,0 +1,24 @@
+feat(gpro-001 C.1): SetLibraryBrowserFavoriteState/ShowcaseState helpers + view-model fields
+
+PV-PLN-GPRO-001 Phase C step C.1 - prep work for the upcoming hero action
+cluster. No UI surface changes yet; this commit just plumbs the boolean game
+flags so any future surface (profile hero toggles, folder-tile context menu,
+right-click menus) writes through one path.
+
+- LibraryBrowserFolderView gains IsFavorite/IsShowcase fields (mirroring the
+  existing IsCompleted100Percent slot).
+- LibraryBrowserViewModel.Clone copies the new fields, BuildLibraryBrowserDisplayFolder
+  propagates them to LibraryFolderInfo (so persistence + rendering see them),
+  and the view builder aggregates them across SourceFolders with the same
+  Any() semantics used for IsCompleted100Percent.
+- New SetLibraryBrowserBooleanGameFlag helper extracts the load-rows / find-or-
+  create-row / mutate / persist / propagate-to-view skeleton from the existing
+  SetLibraryBrowserCompletionState. Future flags only need to supply small
+  read/write delegates and a noun for the "pending assignment" toast.
+- SetLibraryBrowserFavoriteState(view, isFavorite) and
+  SetLibraryBrowserShowcaseState(view, isShowcase) are thin one-line wrappers
+  on top of the generic helper. Returns true on first toggle, false on no-op
+  repeats (matches SetLibraryBrowserCompletionState's contract).
+
+Bumped Game Profile window default Height 980 -> 1040 to give the upcoming
+Phase C action cluster room without scrolling on a typical 1080p display.

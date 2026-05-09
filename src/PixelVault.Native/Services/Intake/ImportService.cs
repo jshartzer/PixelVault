@@ -221,6 +221,7 @@ namespace PixelVaultNative
         internal const string HdrDuplicatesFolderName = "HDR Duplicates";
         internal const string LegacyHdrFallbackFolderName = "PixelVault HDR Fallbacks";
         internal const string ImportDuplicatesFolderName = "Import Duplicates";
+        internal static readonly TimeSpan ExifToolTempCleanupMinimumAge = TimeSpan.FromMinutes(5);
 
         readonly ImportServiceDependencies d;
         readonly IFileSystemService fs;
@@ -788,6 +789,7 @@ namespace PixelVaultNative
             var isMedia = d.IsMedia;
             if (enumerate == null || isMedia == null) return new SourceInventory();
             var searchOption = includeSubfolders ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
+            CleanupStaleExifToolTempFiles(searchOption);
             var candidateMediaFiles = enumerate(searchOption, isMedia)
                 .Where(file => !IsImportParkingPath(file))
                 .Where(file => !IsHiddenFileOrInsideHiddenDirectory(file))
@@ -804,6 +806,62 @@ namespace PixelVaultNative
                 RenameScopeFiles = candidateMediaFiles.ToList(),
                 HdrPairs = hdrPairs
             };
+        }
+
+        void CleanupStaleExifToolTempFiles(SearchOption searchOption)
+        {
+            var enumerate = d.EnumerateSourceMediaFiles;
+            if (enumerate == null) return;
+
+            List<string> tempFiles;
+            try
+            {
+                tempFiles = enumerate(searchOption, MetadataService.IsExifToolTempPath)
+                    .Where(file => !string.IsNullOrWhiteSpace(file))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+            }
+            catch (Exception ex)
+            {
+                d.LogService.AppendMainLine("ExifTool temp cleanup skipped: " + ex.Message);
+                return;
+            }
+
+            if (tempFiles.Count == 0) return;
+
+            var deleted = 0;
+            foreach (var file in tempFiles)
+            {
+                if (!IsStaleExifToolTempFile(file, DateTime.UtcNow, ExifToolTempCleanupMinimumAge)) continue;
+                try
+                {
+                    if (!fs.FileExists(file)) continue;
+                    fs.DeleteFile(file);
+                    deleted++;
+                }
+                catch (Exception ex)
+                {
+                    d.LogService.AppendMainLine("Could not remove stale ExifTool temp file: " + file + ". " + ex.Message);
+                }
+            }
+
+            if (deleted > 0)
+                d.LogService.AppendMainLine("Removed " + deleted + " stale ExifTool temp file(s) from the import source.");
+        }
+
+        internal static bool IsStaleExifToolTempFile(string file, DateTime utcNow, TimeSpan minimumAge)
+        {
+            if (!MetadataService.IsExifToolTempPath(file)) return false;
+            try
+            {
+                var lastWriteUtc = File.GetLastWriteTimeUtc(file);
+                if (lastWriteUtc == DateTime.MinValue) return false;
+                return utcNow - lastWriteUtc >= minimumAge;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         internal static List<HdrCapturePair> BuildHdrCapturePairs(IEnumerable<string> files)

@@ -58,9 +58,9 @@ namespace PixelVaultNative
                 Width = 1180,
                 // Sized for the Phase B/C dashboard layout (hero + action cluster +
                 // summary line + 5–7 stat cards + filmstrip + notes card + achievements).
-                // 1040 still fits comfortably on 1080p displays after the OS chrome /
-                // taskbar (typical usable height ~1032-1040px on a 1920x1080 monitor).
-                Height = 1040,
+                // 1200 shows more body content before scroll; on 1080p it may approach the
+                // usable viewport (OS chrome / taskbar) — the body remains scrollable.
+                Height = 1200,
                 MinWidth = 900,
                 MinHeight = 640,
                 Owner = owner,
@@ -185,7 +185,7 @@ namespace PixelVaultNative
             body.Children.Add(BuildLibraryGameProfileCaptureFilmstrip(win, view, orderedFilePaths));
             var achievementHost = new StackPanel { Margin = new Thickness(0, 24, 0, 0) };
             body.Children.Add(achievementHost);
-            BeginLoadLibraryGameProfileAchievements(win, achievementHost, view, steamStats, refreshStatsSection, lifetimeCts.Token);
+            BeginLoadLibraryGameProfileAchievements(win, achievementHost, view, steamStats, refreshStatsSection, refreshHero, lifetimeCts.Token);
             // Sessions live at the bottom of the body so achievements (the highest-
             // signal "did I beat this thing" surface) sits directly under the
             // recent-captures filmstrip. The Sessions ContentControl is still
@@ -348,7 +348,9 @@ namespace PixelVaultNative
                 Background = new LinearGradientBrush(Color.FromArgb(0, 11, 17, 22), Color.FromArgb(255, 11, 17, 22), new Point(0, 0), new Point(0, 1))
             });
 
-            var content = new Grid { Margin = new Thickness(26, contentMarginV, 26, contentMarginV), ClipToBounds = true };
+            // Avoid clipping anti-aliased pixels at rounded corners: ClipToBounds uses a
+            // rectangular clip that can bite into the curved edge of the cover + shadow fringe.
+            var content = new Grid { Margin = new Thickness(26, contentMarginV, 26, contentMarginV), ClipToBounds = false };
             content.RowDefinitions.Add(new RowDefinition { Height = new GridLength(profileCoverHeight) });
             content.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             content.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -370,12 +372,8 @@ namespace PixelVaultNative
                 profileCoverCorner,
                 Brush("#3E5665"),
                 new Thickness(1));
-            // WPF's Border doesn't auto-clip its child to the CornerRadius - the
-            // inner Image (Stretch=UniformToFill) was painting past the rounded
-            // corners and looked like a square photo punched into a rounded frame.
-            // Apply an explicit RectangleGeometry clip matching the cover's outer
-            // rounded rect so the image, foil, and frame all respect the rounded
-            // edge. Frozen for cheap reuse across hero rebuilds.
+            // Outer clip matches the Border chrome; inner bitmap painting is clipped inside
+            // CreateAsyncImageTile to the inset rounded rect so UniformToFill cannot square off corners.
             var coverClipGeometry = new RectangleGeometry(
                 new Rect(0, 0, profileCoverWidth, profileCoverHeight),
                 profileCoverCorner.TopLeft,
@@ -397,7 +395,9 @@ namespace PixelVaultNative
                 {
                     Width = profileCoverWidth,
                     Height = profileCoverHeight,
-                    Clip = coverClipGeometry
+                    Clip = coverClipGeometry,
+                    SnapsToDevicePixels = true,
+                    UseLayoutRounding = true
                 };
                 foilWrap.Children.Add(coverArt);
                 var foilVisual = BuildLibraryTileCompletionFoilOverlay(profileCoverWidth, profileCoverHeight, profileCoverCorner.TopLeft);
@@ -583,8 +583,9 @@ namespace PixelVaultNative
             cluster.Children.Add(showcaseBtn);
 
             Border completeBtn = BuildLibraryGameProfileHeroToggleButton(
-                "\uED15", "#5DD68B", "#0D2E1A",
-                view.IsCompleted100Percent, "Cleared 100% complete", "Mark 100% complete");
+                "100%", "#5DD68B", "#0D2E1A",
+                view.IsCompleted100Percent, "Cleared 100% complete", "Mark 100% complete",
+                useSegoeUiLabel: true);
             completeBtn.Margin = new Thickness(0);
             completeBtn.MouseLeftButtonUp += delegate(object _, MouseButtonEventArgs e)
             {
@@ -845,11 +846,10 @@ namespace PixelVaultNative
             return menu;
         }
 
-        Border BuildLibraryGameProfileHeroToggleButton(string glyph, string activeColorHex, string activeBgHex, bool isOn, string tooltipOn, string tooltipOff)
+        Border BuildLibraryGameProfileHeroToggleButton(string glyph, string activeColorHex, string activeBgHex, bool isOn, string tooltipOn, string tooltipOff, bool useSegoeUiLabel = false)
         {
             var btn = new Border
             {
-                Width = 40,
                 Height = 40,
                 CornerRadius = new CornerRadius(20),
                 BorderThickness = new Thickness(1.4),
@@ -857,10 +857,18 @@ namespace PixelVaultNative
                 Margin = new Thickness(0, 0, 10, 0),
                 SnapsToDevicePixels = true
             };
+            if (useSegoeUiLabel)
+            {
+                btn.MinWidth = 44;
+                btn.Padding = new Thickness(10, 0, 12, 0);
+            }
+            else btn.Width = 40;
+
             btn.Child = new TextBlock
             {
-                FontFamily = new FontFamily("Segoe MDL2 Assets"),
-                FontSize = 18,
+                FontFamily = useSegoeUiLabel ? SystemFonts.MessageFontFamily : new FontFamily("Segoe MDL2 Assets"),
+                FontSize = useSegoeUiLabel ? 12 : 18,
+                FontWeight = useSegoeUiLabel ? FontWeights.SemiBold : FontWeights.Normal,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center
             };
@@ -1205,6 +1213,35 @@ namespace PixelVaultNative
             return string.Empty;
         }
 
+        /// <summary>True when every returned row has known progress and is unlocked (full achievement sweep).</summary>
+        static bool LibraryGameProfileAchievementsAreFullyUnlocked(IReadOnlyList<GameAchievementsFetchService.AchievementRow> rows)
+        {
+            if (rows == null || rows.Count == 0) return false;
+            for (var i = 0; i < rows.Count; i++)
+            {
+                var row = rows[i];
+                if (row == null || !row.ProgressKnown || !row.Unlocked) return false;
+            }
+
+            return true;
+        }
+
+        void TryLibraryGameProfileAutoMarkCompleteFromAchievements(
+            LibraryBrowserFolderView view,
+            IReadOnlyList<GameAchievementsFetchService.AchievementRow> rows,
+            bool hideSteamDefinitionsForEmptyNonSteamEntry,
+            Action refreshHero)
+        {
+            if (view == null || hideSteamDefinitionsForEmptyNonSteamEntry) return;
+            if (!LibraryGameProfileAchievementsAreFullyUnlocked(rows)) return;
+            if (view.IsCompleted100Percent) return;
+            if (!SetLibraryBrowserCompletionState(view, true)) return;
+            TryLibraryToast("Marked 100% complete — all tracked achievements unlocked.", MessageBoxImage.Information);
+            refreshHero?.Invoke();
+            try { _libraryBrowserLiveWorkingSet?.RerenderFolderList?.Invoke(); }
+            catch (Exception ex) { LogException("LibraryGameProfile.TryLibraryGameProfileAutoMarkCompleteFromAchievements rerenderFolderList", ex); }
+        }
+
         // Fire-and-forget: kicks off the achievements fetch on a worker thread and marshals
         // the result back to the UI. Tied to <paramref name="cancellation"/> so closing the
         // profile window before the network call returns short-circuits the dispatcher work.
@@ -1214,6 +1251,7 @@ namespace PixelVaultNative
             LibraryBrowserFolderView view,
             LibraryGameProfileSteamStats steamStats,
             Action refreshStatsSection,
+            Action refreshHero,
             CancellationToken cancellation)
         {
             host.Children.Add(BuildLibraryGameProfileSectionTitle("Achievements", "Collected achievements are grouped first; hover any badge for details."));
@@ -1288,6 +1326,7 @@ namespace PixelVaultNative
                         && string.Equals(result.SourceLabel ?? string.Empty, "Steam", StringComparison.OrdinalIgnoreCase)
                         && progressKnown
                         && earned.Count == 0;
+                    TryLibraryGameProfileAutoMarkCompleteFromAchievements(view, rows, hideSteamDefinitionsForEmptyNonSteamEntry, refreshHero);
                     var displayRows = rows
                         .Where(row => row != null)
                         .OrderBy(row => progressKnown && row.Unlocked ? 0 : 1)

@@ -1,0 +1,24 @@
+feat(gpro-001 B.3): External-ID pills with safe URL launch
+
+PV-PLN-GPRO-001 Phase B step B.3.
+
+- Replace BuildLibraryGameProfileIdLine (a string of pipe-separated tokens) with
+  BuildLibraryGameProfileIdPills, which renders each ID as a pill in a
+  WrapPanel inside the hero. Steam, SteamGridDB, and RetroAchievements pills
+  are clickable and open the matching external page; Non-Steam stays
+  informational because there is no canonical destination.
+- URL builders (BuildLibraryGameProfileSteamUrl /
+  BuildLibraryGameProfileSteamGridDbUrl /
+  BuildLibraryGameProfileRetroAchievementsUrl) accept only digit-only IDs and
+  return an empty string otherwise, so a malformed ID renders as a non-clickable
+  info pill instead of feeding free-form text into the shell.
+- Steam pill -> steam://nav/games/details/<id> (handled by the Steam protocol
+  registration), SteamGridDB -> https://www.steamgriddb.com/game/<id>,
+  RetroAchievements -> https://retroachievements.org/game/<id>.
+- TryOpenLibraryGameProfileExternalUrl wraps Process.Start with UseShellExecute
+  in a try/catch, logs the URL via LogException, and surfaces a "Couldn't open
+  external link." toast on failure (matches the rest of the library's error
+  surface conventions).
+- Pills get hover styling, hand cursor, AutomationProperties.SetName ("<label>
+  (link)" for clickable, plain label otherwise), and a tooltip describing the
+  destination so the surface stays accessible.

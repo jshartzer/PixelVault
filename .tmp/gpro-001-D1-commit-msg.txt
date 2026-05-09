@@ -1,0 +1,66 @@
+feat(gpro-001 D.1): pure session-grouping helper + unit tests
+
+Phase D.1 of PV-PLN-GPRO-001 lands the pure math the Sessions section
+will render in D.2-D.5. No UI yet - the helper just replaces the Phase
+A placeholder int-only count with a structured result the renderer can
+iterate without re-sorting.
+
+New (src/PixelVault.Native/UI/Library/LibraryGameProfileSessions.cs):
+
+- LibraryGameProfileSessionEntry { FilePath, CapturedUtc, IsVideo } -
+  the input row the helper groups. Caller pre-resolves dates via the
+  existing ResolveLibraryProfileCaptureDate path so the helper stays
+  free of MainWindow couplings (testable as pure code).
+- LibraryGameProfileSession { StartUtc, EndUtc, Entries (newest-first),
+  VideoCount, Count, Duration } - the output card the Phase D Sessions
+  list will render.
+- LibraryGameProfileSessionMath.BuildSessions(entries, threshold) -
+  drops entries with CapturedUtc <= MinValue, sorts ascending, walks
+  with strict-greater-than gap semantics so the existing Phase A
+  placeholder count keeps the same boundaries (no silent rebucketing
+  for users who already see "5 sessions"), then reverses the session
+  list so the newest session is index 0. Each session's entries are
+  also returned newest-first for direct rendering.
+- BuildSessions normalizes the threshold via
+  SettingsService.NormalizeLibrarySessionThresholdMinutes so callers
+  can pass the raw librarySessionThresholdMinutes value
+  (PV-POL-GPRO-SESSION-001 - one threshold for the whole app).
+- Convenience: CountSessions(entries, threshold) and
+  BuildEntriesFromDates(dates) for legacy date-only call sites.
+
+Wiring (src/PixelVault.Native/UI/Library/MainWindow.LibraryGameProfile.cs):
+
+- Removed the static CountLibraryGameProfileSessions placeholder.
+- ComputeLibraryGameProfileMetrics now builds a single
+  IReadOnlyList<LibraryGameProfileSessionEntry> in one pass over
+  orderedFiles (resolving captured-utc + IsVideo at the same time)
+  and routes the Sessions stat card through
+  LibraryGameProfileSessionMath.CountSessions. Same metrics as before
+  for the same inputs, just funneled through the shared helper.
+
+Tests (tests/PixelVault.Native.Tests/LibraryGameProfileSessionsTests.cs):
+
+- 13 cases covering the contract Phase D.2 will lean on:
+  * No entries / all unresolved dates -> empty result.
+  * All entries within threshold -> one session, newest-first ordering
+    inside the session.
+  * Boundary semantics: gap == threshold stays in same session; gap >
+    threshold splits.
+  * Multiple bursts across thresholds -> correct count, newest-first
+    session order, correct StartUtc/EndUtc per session.
+  * Unsorted input -> sorted ascending before grouping.
+  * Large threshold collapses everything into one session.
+  * Threshold below the SettingsService minimum (15) clamps up;
+    threshold above the maximum (720) clamps down - both verified by
+    feeding 1 and 999999.
+  * VideoCount matches the IsVideo flag in the entries.
+  * CountSessions agrees with BuildSessions().Count for the same input.
+  * BuildEntriesFromDates round-trips through CountSessions.
+  * Entries with DateTime.MinValue captures are dropped without
+    affecting the surviving entries' grouping.
+
+Build clean, all 592 tests pass.
+
+Per the plan's commit cadence, D.2-D.5 (Sessions UI, threshold picker,
+View All Sessions modal, real Sessions stat card consumer) ship in a
+follow-up commit.
