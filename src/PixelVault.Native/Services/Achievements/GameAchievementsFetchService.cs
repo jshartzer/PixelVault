@@ -21,6 +21,8 @@ namespace PixelVaultNative
             public bool ProgressKnown;
             public bool Unlocked;
             public long UnlockUtcTicks;
+            /// <summary>Steam achievement API name (schema <c>name</c>); empty for RetroAchievements rows.</summary>
+            public string SteamApiName;
             /// <summary>Preferred color icon URL (badge / Steam unlocked art).</summary>
             public string IconUrlColor;
             /// <summary>Steam locked icon hash URL when available; otherwise empty (UI may grayscale <see cref="IconUrlColor"/>).</summary>
@@ -34,8 +36,34 @@ namespace PixelVaultNative
             public string DetailLine;
             public List<AchievementRow> Rows;
             public string ErrorMessage;
+            /// <summary>Steam <c>playtime_forever</c> from <see cref="TryLoadSteamOwnedGamePlaytimeMinutesAsync"/> (minutes).</summary>
+            public int? SteamPlaytimeMinutes;
+            /// <summary>Achievements unlocked by the player whose Steam global completion rate is at or below <see cref="SteamRareAchievementMaxPercent"/>.</summary>
+            public int? SteamRareUnlockedCount;
+            /// <summary>True when global rarity percentages were retrieved (even if empty).</summary>
+            public bool SteamGlobalRarityAvailable;
 
             public bool IsError => !string.IsNullOrEmpty(ErrorMessage);
+        }
+
+        /// <summary>Achievements with global Steam unlock rate at or below this threshold count as &quot;rare&quot; on the game profile.</summary>
+        internal const double SteamRareAchievementMaxPercent = 10d;
+
+        /// <summary>Whether the game profile should show Steam playtime / rarity stat cards (matches achievement backend selection).</summary>
+        internal static bool ShouldShowSteamExtrasForProfile(string normalizedPlatform, LibraryFolderInfo folder)
+        {
+            return TryPickAchievementsBackend(normalizedPlatform, folder, out var useSteam) && useSteam;
+        }
+
+        /// <summary>Formats <paramref name="totalMinutes"/> for dashboard stat cards (e.g. <c>142h</c>, <c>45m</c>).</summary>
+        internal static string FormatSteamPlaytimeForDisplay(int totalMinutes)
+        {
+            if (totalMinutes <= 0) return "0 min";
+            var h = totalMinutes / 60;
+            var m = totalMinutes % 60;
+            if (h <= 0) return m.ToString(CultureInfo.CurrentCulture) + " min";
+            if (m == 0) return h.ToString(CultureInfo.CurrentCulture) + "h";
+            return h.ToString(CultureInfo.CurrentCulture) + "h " + m.ToString(CultureInfo.CurrentCulture) + "m";
         }
 
         public static async Task<FetchResult> FetchAsync(
@@ -244,6 +272,135 @@ namespace PixelVaultNative
             }
         }
 
+        static async Task<string> DownloadSteamJsonStringAsync(string url, string userAgent, CancellationToken cancellationToken)
+        {
+            using (var wc = new TimeoutWebClient
+            {
+                Encoding = Encoding.UTF8,
+                TimeoutMilliseconds = 25000,
+                MaxStringResponseBytes = TimeoutWebClient.DefaultMaxStringResponseBytes
+            })
+            {
+                TrySetUa(wc, userAgent);
+                return await wc.DownloadStringAsync(url, cancellationToken).ConfigureAwait(false);
+            }
+        }
+
+        static bool TryReadJsonPercent(JsonElement el, out double pct)
+        {
+            pct = 0;
+            if (el.ValueKind == JsonValueKind.Number && el.TryGetDouble(out pct)) return true;
+            if (el.ValueKind == JsonValueKind.String
+                && double.TryParse(el.GetString(), NumberStyles.Float, CultureInfo.InvariantCulture, out pct))
+                return true;
+            return false;
+        }
+
+        static async Task<int?> TryLoadSteamOwnedGamePlaytimeMinutesAsync(
+            int appId,
+            string steamWebApiKeyTrimmed,
+            ulong steamId64,
+            string userAgent,
+            CancellationToken cancellationToken)
+        {
+            var url = "https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key="
+                + Uri.EscapeDataString(steamWebApiKeyTrimmed)
+                + "&steamid=" + steamId64.ToString(CultureInfo.InvariantCulture)
+                + "&include_appinfo=0&format=json";
+            string json;
+            try
+            {
+                json = await DownloadSteamJsonStringAsync(url, userAgent, cancellationToken).ConfigureAwait(false);
+            }
+            catch
+            {
+                return null;
+            }
+
+            try
+            {
+                using (var doc = JsonDocument.Parse(json))
+                {
+                    var root = doc.RootElement;
+                    if (!root.TryGetProperty("response", out var response)) return null;
+                    if (!response.TryGetProperty("games", out var games) || games.ValueKind != JsonValueKind.Array)
+                        return null;
+                    foreach (var g in games.EnumerateArray())
+                    {
+                        if (!g.TryGetProperty("appid", out var aid) || aid.ValueKind != JsonValueKind.Number || !aid.TryGetInt32(out var id) || id != appId)
+                            continue;
+                        if (g.TryGetProperty("playtime_forever", out var pt) && pt.ValueKind == JsonValueKind.Number && pt.TryGetInt32(out var minutes))
+                            return minutes;
+                        return 0;
+                    }
+
+                    return null;
+                }
+            }
+            catch (JsonException)
+            {
+                return null;
+            }
+        }
+
+        static async Task<Dictionary<string, double>> TryLoadSteamGlobalAchievementPercentsAsync(
+            int appId,
+            string steamWebApiKeyTrimmed,
+            string userAgent,
+            CancellationToken cancellationToken)
+        {
+            var url = "https://api.steampowered.com/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v0002/?key="
+                + Uri.EscapeDataString(steamWebApiKeyTrimmed)
+                + "&gameid=" + appId.ToString(CultureInfo.InvariantCulture)
+                + "&format=json";
+            string json;
+            try
+            {
+                json = await DownloadSteamJsonStringAsync(url, userAgent, cancellationToken).ConfigureAwait(false);
+            }
+            catch
+            {
+                return null;
+            }
+
+            try
+            {
+                using (var doc = JsonDocument.Parse(json))
+                {
+                    var root = doc.RootElement;
+                    JsonElement achievementsEl;
+                    if (root.TryGetProperty("achievementpercentages", out var achPct)
+                        && achPct.TryGetProperty("achievements", out achievementsEl))
+                    {
+                    }
+                    else if (root.TryGetProperty("response", out var resp) && resp.TryGetProperty("achievements", out achievementsEl))
+                    {
+                    }
+                    else
+                        return null;
+
+                    if (achievementsEl.ValueKind != JsonValueKind.Array)
+                        return new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+
+                    var map = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+                    foreach (var row in achievementsEl.EnumerateArray())
+                    {
+                        var apiName = ReadString(row, "name");
+                        if (string.IsNullOrWhiteSpace(apiName)) continue;
+                        if (!row.TryGetProperty("percent", out var pEl)) continue;
+                        if (!TryReadJsonPercent(pEl, out var pct)) continue;
+                        map[apiName.Trim()] = pct;
+                    }
+
+                    return map;
+                }
+            }
+            catch (JsonException)
+            {
+                return null;
+            }
+        }
+
         static async Task<FetchResult> FetchSteamAsync(
             LibraryFolderInfo folder,
             string fallbackTitle,
@@ -257,35 +414,42 @@ namespace PixelVaultNative
             if (folder == null || !TryParsePositiveInt(folder.SteamAppId, out var appId))
                 return Err("This Steam game needs a Steam App ID. Use Edit Metadata to set it.");
 
-            var url = "https://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?key=" + Uri.EscapeDataString(steamWebApiKey.Trim())
+            var keyTrim = steamWebApiKey.Trim();
+            var schemaUrl = "https://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?key=" + Uri.EscapeDataString(keyTrim)
                 + "&appid=" + appId.ToString(CultureInfo.InvariantCulture);
 
-            string json;
-            using (var wc = new TimeoutWebClient
+            var progressAttempted = TryParseULong(steamUserId64Raw, out var sid64);
+            Task<string> schemaTask = DownloadSteamJsonStringAsync(schemaUrl, userAgent, cancellationToken);
+            Task<Dictionary<string, (int achieved, int unlocktime)>> progressTask = progressAttempted
+                ? TryLoadSteamPlayerAchievementsAsync(appId, steamWebApiKey, sid64, userAgent, cancellationToken)
+                : Task.FromResult<Dictionary<string, (int achieved, int unlocktime)>>(null);
+            Task<int?> playtimeTask = progressAttempted
+                ? TryLoadSteamOwnedGamePlaytimeMinutesAsync(appId, keyTrim, sid64, userAgent, cancellationToken)
+                : Task.FromResult<int?>(null);
+            Task<Dictionary<string, double>> globalPctTask = TryLoadSteamGlobalAchievementPercentsAsync(appId, keyTrim, userAgent, cancellationToken);
+
+            try
             {
-                Encoding = Encoding.UTF8,
-                TimeoutMilliseconds = 25000,
-                MaxStringResponseBytes = TimeoutWebClient.DefaultMaxStringResponseBytes
-            })
+                await Task.WhenAll(schemaTask, progressTask, playtimeTask, globalPctTask).ConfigureAwait(false);
+            }
+            catch (Exception ex)
             {
-                TrySetUa(wc, userAgent);
-                try
-                {
-                    json = await wc.DownloadStringAsync(url, cancellationToken).ConfigureAwait(false);
-                }
-                catch (Exception ex)
-                {
-                    return Err("Steam request failed: " + ex.Message);
-                }
+                return Err("Steam request failed: " + ex.Message);
             }
 
-            Dictionary<string, (int achieved, int unlocktime)> progress = null;
-            var progressAttempted = false;
-            if (TryParseULong(steamUserId64Raw, out var sid64))
+            string json;
+            try
             {
-                progressAttempted = true;
-                progress = await TryLoadSteamPlayerAchievementsAsync(appId, steamWebApiKey, sid64, userAgent, cancellationToken).ConfigureAwait(false);
+                json = await schemaTask.ConfigureAwait(false);
             }
+            catch (Exception ex)
+            {
+                return Err("Steam request failed: " + ex.Message);
+            }
+
+            var progress = await progressTask.ConfigureAwait(false);
+            var playtimeMinutes = await playtimeTask.ConfigureAwait(false);
+            var globalPercents = await globalPctTask.ConfigureAwait(false);
 
             try
             {
@@ -354,6 +518,7 @@ namespace PixelVaultNative
                                 ProgressKnown = progressKnown,
                                 Unlocked = unlocked,
                                 UnlockUtcTicks = unlockTicks,
+                                SteamApiName = apiName.Trim(),
                                 IconUrlColor = colorUrl ?? string.Empty,
                                 IconUrlGray = grayUrl ?? string.Empty
                             });
@@ -371,12 +536,36 @@ namespace PixelVaultNative
                     else
                         detail += " · add SteamID64 in Path Settings for unlock status";
 
+                    if (playtimeMinutes.HasValue)
+                        detail += " · " + FormatSteamPlaytimeForDisplay(playtimeMinutes.Value) + " on Steam";
+
+                    int? rareUnlocked = null;
+                    var rarityAvailable = globalPercents != null;
+                    if (rarityAvailable)
+                    {
+                        var rare = 0;
+                        foreach (var row in ordered)
+                        {
+                            if (row == null || !row.ProgressKnown || !row.Unlocked) continue;
+                            var key = row.SteamApiName ?? string.Empty;
+                            if (string.IsNullOrWhiteSpace(key)) continue;
+                            if (globalPercents.TryGetValue(key.Trim(), out var pct)
+                                && pct <= SteamRareAchievementMaxPercent)
+                                rare++;
+                        }
+
+                        rareUnlocked = rare;
+                    }
+
                     return new FetchResult
                     {
                         SourceLabel = "Steam",
                         GameTitle = gameTitle,
                         DetailLine = detail,
-                        Rows = ordered
+                        Rows = ordered,
+                        SteamPlaytimeMinutes = playtimeMinutes,
+                        SteamRareUnlockedCount = rareUnlocked,
+                        SteamGlobalRarityAvailable = rarityAvailable
                     };
                 }
             }

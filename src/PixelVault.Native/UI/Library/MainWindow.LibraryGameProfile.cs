@@ -57,7 +57,7 @@ namespace PixelVaultNative
                 Title = "PixelVault Game Profile - " + title,
                 Width = 1180,
                 // Sized for the Phase B/C dashboard layout (hero + action cluster +
-                // summary line + 5 stat cards + filmstrip + notes card + achievements).
+                // summary line + 5–7 stat cards + filmstrip + notes card + achievements).
                 // 1040 still fits comfortably on 1080p displays after the OS chrome /
                 // taskbar (typical usable height ~1032-1040px on a 1920x1080 monitor).
                 Height = 1040,
@@ -113,6 +113,16 @@ namespace PixelVaultNative
                 .ToList();
             var metrics = ComputeLibraryGameProfileMetrics(orderedFilePaths, metadataIndex, librarySessionThresholdMinutes);
 
+            var achievementLookupFolder = ResolveLibraryBrowserAchievementLookupFolder(view);
+            var achievementPlatformNorm = NormalizeConsoleLabel(
+                achievementLookupFolder == null ? string.Empty : achievementLookupFolder.PlatformLabel);
+            var steamStats = new LibraryGameProfileSteamStats
+            {
+                ShowSteamCards = GameAchievementsFetchService.ShouldShowSteamExtrasForProfile(
+                    achievementPlatformNorm,
+                    achievementLookupFolder ?? folder)
+            };
+
             var root = new Grid();
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
@@ -165,13 +175,17 @@ namespace PixelVaultNative
             Grid.SetRow(scroll, 1);
             var body = new StackPanel();
             scroll.Content = body;
-            var statsHost = new ContentControl { Content = BuildLibraryGameProfileStats(metrics) };
+            var statsHost = new ContentControl { Content = BuildLibraryGameProfileStats(metrics, steamStats) };
             body.Children.Add(statsHost);
+            refreshStatsSection = delegate
+            {
+                statsHost.Content = BuildLibraryGameProfileStats(metrics, steamStats);
+            };
             body.Children.Add(BuildLibraryGameProfileNotesCard(win, view, folder, out refreshNotesCard));
             body.Children.Add(BuildLibraryGameProfileCaptureFilmstrip(win, view, orderedFilePaths));
             var achievementHost = new StackPanel { Margin = new Thickness(0, 24, 0, 0) };
             body.Children.Add(achievementHost);
-            BeginLoadLibraryGameProfileAchievements(win, achievementHost, view, lifetimeCts.Token);
+            BeginLoadLibraryGameProfileAchievements(win, achievementHost, view, steamStats, refreshStatsSection, lifetimeCts.Token);
             // Sessions live at the bottom of the body so achievements (the highest-
             // signal "did I beat this thing" surface) sits directly under the
             // recent-captures filmstrip. The Sessions ContentControl is still
@@ -183,10 +197,6 @@ namespace PixelVaultNative
             body.Children.Add(sessionsHost);
             root.Children.Add(scroll);
 
-            refreshStatsSection = delegate
-            {
-                statsHost.Content = BuildLibraryGameProfileStats(metrics);
-            };
             refreshSessionsSection = delegate
             {
                 sessionsHost.Content = BuildLibraryGameProfileSessionsSection(win, view, folder, sessionEntries, librarySessionThresholdMinutes, mins => applyThreshold(mins));
@@ -226,6 +236,16 @@ namespace PixelVaultNative
             public int SessionCount;
             public DateTime FirstCaptureDate;
             public DateTime LatestCaptureDate;
+        }
+
+        /// <summary>Steam dashboard extras (playtime, rare unlock count); mutated when achievements fetch completes.</summary>
+        sealed class LibraryGameProfileSteamStats
+        {
+            public bool ShowSteamCards;
+            public bool Hydrated;
+            public int? SteamPlaytimeMinutes;
+            public int? SteamRareUnlockedCount;
+            public bool SteamGlobalRarityAvailable;
         }
 
         LibraryGameProfileMetrics ComputeLibraryGameProfileMetrics(
@@ -1024,9 +1044,11 @@ namespace PixelVaultNative
             border.BorderThickness = new Thickness(1);
         }
 
-        FrameworkElement BuildLibraryGameProfileStats(LibraryGameProfileMetrics metrics)
+        FrameworkElement BuildLibraryGameProfileStats(LibraryGameProfileMetrics metrics, LibraryGameProfileSteamStats steamStats = null)
         {
-            var root = new UniformGrid { Columns = 5 };
+            var ss = steamStats;
+            var showSteam = ss != null && ss.ShowSteamCards;
+            var root = new UniformGrid { Columns = showSteam ? 7 : 5 };
             var safe = metrics ?? new LibraryGameProfileMetrics();
             var firstCaptureText = safe.FirstCaptureDate > DateTime.MinValue
                 ? FormatLibraryGameProfileDate(safe.FirstCaptureDate)
@@ -1035,7 +1057,7 @@ namespace PixelVaultNative
                 ? FormatLibraryGameProfileDate(safe.LatestCaptureDate)
                 : "\u2014";
             var latestCaptureRelative = FormatLibraryGameProfileRelative(safe.LatestCaptureDate);
-            var cards = new[]
+            var cards = new List<FrameworkElement>
             {
                 BuildLibraryGameProfileStatCard("Captures", safe.CaptureCount.ToString(CultureInfo.CurrentCulture)),
                 BuildLibraryGameProfileStatCard("Videos", safe.VideoCount.ToString(CultureInfo.CurrentCulture)),
@@ -1043,12 +1065,65 @@ namespace PixelVaultNative
                 BuildLibraryGameProfileStatCard("First Capture", firstCaptureText),
                 BuildLibraryGameProfileStatCard("Latest Capture", latestCaptureText, latestCaptureRelative)
             };
-            for (var i = 0; i < cards.Length; i++)
+            if (showSteam)
             {
-                if (cards[i] is FrameworkElement fe)
-                    fe.Margin = new Thickness(0, 0, i == cards.Length - 1 ? 0 : 12, 0);
+                if (!ss.Hydrated)
+                {
+                    cards.Add(BuildLibraryGameProfileStatCard("Steam time", "\u2014", "Loading\u2026"));
+                    cards.Add(BuildLibraryGameProfileStatCard("Rare unlocked", "\u2014", "Loading\u2026"));
+                }
+                else
+                {
+                    FrameworkElement timeCard;
+                    if (ss.SteamPlaytimeMinutes.HasValue)
+                    {
+                        var formatted = GameAchievementsFetchService.FormatSteamPlaytimeForDisplay(ss.SteamPlaytimeMinutes.Value);
+                        timeCard = BuildLibraryGameProfileStatCard("Steam time", formatted, "Lifetime (Steam)");
+                        ToolTipService.SetToolTip(timeCard,
+                            "Total play time reported by Steam for this app on your account.");
+                    }
+                    else
+                    {
+                        var steamIdSet = !string.IsNullOrWhiteSpace(CurrentSteamUserId64());
+                        var sub = steamIdSet
+                            ? "Hidden, not owned, or API unavailable"
+                            : "Add SteamID64 in Path Settings";
+                        timeCard = BuildLibraryGameProfileStatCard("Steam time", "\u2014", sub);
+                        ToolTipService.SetToolTip(timeCard,
+                            "Requires Steam Web API key and SteamID64. Play time comes from GetOwnedGames.");
+                    }
+
+                    cards.Add(timeCard);
+
+                    FrameworkElement rareCard;
+                    if (!ss.SteamGlobalRarityAvailable)
+                    {
+                        rareCard = BuildLibraryGameProfileStatCard("Rare unlocked", "\u2014", "Rarity unavailable");
+                        ToolTipService.SetToolTip(rareCard,
+                            "Steam did not return global achievement percentages for this title.");
+                    }
+                    else
+                    {
+                        var n = ss.SteamRareUnlockedCount ?? 0;
+                        rareCard = BuildLibraryGameProfileStatCard(
+                            "Rare unlocked",
+                            n.ToString(CultureInfo.CurrentCulture),
+                            "\u2264" + GameAchievementsFetchService.SteamRareAchievementMaxPercent.ToString(CultureInfo.InvariantCulture) + "% rarity");
+                        ToolTipService.SetToolTip(rareCard,
+                            "Achievements you have unlocked whose global Steam completion rate is at or below "
+                            + GameAchievementsFetchService.SteamRareAchievementMaxPercent.ToString(CultureInfo.InvariantCulture) + "%.");
+                    }
+
+                    cards.Add(rareCard);
+                }
+            }
+
+            for (var i = 0; i < cards.Count; i++)
+            {
+                cards[i].Margin = new Thickness(0, 0, i == cards.Count - 1 ? 0 : 12, 0);
                 root.Children.Add(cards[i]);
             }
+
             return root;
         }
 
@@ -1133,7 +1208,13 @@ namespace PixelVaultNative
         // Fire-and-forget: kicks off the achievements fetch on a worker thread and marshals
         // the result back to the UI. Tied to <paramref name="cancellation"/> so closing the
         // profile window before the network call returns short-circuits the dispatcher work.
-        void BeginLoadLibraryGameProfileAchievements(Window owner, StackPanel host, LibraryBrowserFolderView view, CancellationToken cancellation)
+        void BeginLoadLibraryGameProfileAchievements(
+            Window owner,
+            StackPanel host,
+            LibraryBrowserFolderView view,
+            LibraryGameProfileSteamStats steamStats,
+            Action refreshStatsSection,
+            CancellationToken cancellation)
         {
             host.Children.Add(BuildLibraryGameProfileSectionTitle("Achievements", "Collected achievements are grouped first; hover any badge for details."));
             var loading = new TextBlock
@@ -1178,6 +1259,21 @@ namespace PixelVaultNative
                 {
                     if (cancellation.IsCancellationRequested || !owner.IsLoaded) return;
                     host.Children.Remove(loading);
+                    if (steamStats != null && steamStats.ShowSteamCards)
+                    {
+                        steamStats.Hydrated = true;
+                        if (result != null && !result.IsError
+                            && string.Equals(result.SourceLabel ?? string.Empty, "Steam", StringComparison.OrdinalIgnoreCase))
+                        {
+                            steamStats.SteamPlaytimeMinutes = result.SteamPlaytimeMinutes;
+                            steamStats.SteamRareUnlockedCount = result.SteamRareUnlockedCount;
+                            steamStats.SteamGlobalRarityAvailable = result.SteamGlobalRarityAvailable;
+                        }
+
+                        try { refreshStatsSection?.Invoke(); }
+                        catch (Exception ex) { LogException("LibraryGameProfile.refreshStatsSection", ex); }
+                    }
+
                     if (result == null || result.IsError)
                     {
                         host.Children.Add(BuildLibraryGameProfileEmptyCard(result == null ? "Achievements are not available for this game yet." : result.ErrorMessage));
