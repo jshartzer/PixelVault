@@ -26,10 +26,23 @@ namespace PixelVaultNative
             if (targetFolders.Count == 0) return false;
 
             var changed = false;
+            var repairedStalePendingAssignment = false;
             foreach (var folder in targetFolders.Where(folder => folder != null))
             {
-                if (folder.PendingGameAssignment) return false;
-                var row = FindSavedGameIndexRowById(rows, folder.GameId) ?? FindSavedGameIndexRowByIdentity(rows, folder.Name, folder.PlatformLabel);
+                var row = FindSavedGameIndexRow(rows, folder);
+                if (folder.PendingGameAssignment)
+                {
+                    if (row == null)
+                    {
+                        TryLibraryToast(
+                            "Assign a game title before toggling 100% complete.",
+                            MessageBoxImage.Information);
+                        return false;
+                    }
+                    folder.PendingGameAssignment = false;
+                    repairedStalePendingAssignment = true;
+                }
+
                 if (row == null)
                 {
                     row = new GameIndexEditorRow
@@ -76,9 +89,11 @@ namespace PixelVaultNative
                 folder.CompletedUtcTicks = targetCompletedTicks;
             }
 
-            if (!changed) return false;
+            if (!changed && !repairedStalePendingAssignment) return false;
 
             librarySession.PersistGameIndexRows(rows);
+            if (repairedStalePendingAssignment)
+                librarySession.RefreshFolderCacheAfterGameIndexChange();
             var resolvedCompletedTicks = targetFolders.Select(folder => folder == null ? 0L : folder.CompletedUtcTicks).Where(ticks => ticks > 0).DefaultIfEmpty(0L).Max();
             view.IsCompleted100Percent = targetFolders.Any(folder => folder != null && folder.IsCompleted100Percent);
             view.CompletedUtcTicks = resolvedCompletedTicks;
@@ -122,17 +137,23 @@ namespace PixelVaultNative
             if (targetFolders.Count == 0) return false;
 
             var changed = false;
+            var repairedStalePendingAssignment = false;
             foreach (var folder in targetFolders.Where(folder => folder != null))
             {
+                var row = FindSavedGameIndexRow(rows, folder);
                 if (folder.PendingGameAssignment)
                 {
-                    TryLibraryToast(
-                        "Assign a game title before changing " + (string.IsNullOrWhiteSpace(flagNoun) ? "this flag" : flagNoun) + ".",
-                        MessageBoxImage.Information);
-                    return false;
+                    if (row == null)
+                    {
+                        TryLibraryToast(
+                            "Assign a game title before changing " + (string.IsNullOrWhiteSpace(flagNoun) ? "this flag" : flagNoun) + ".",
+                            MessageBoxImage.Information);
+                        return false;
+                    }
+                    folder.PendingGameAssignment = false;
+                    repairedStalePendingAssignment = true;
                 }
-                var row = FindSavedGameIndexRowById(rows, folder.GameId)
-                    ?? FindSavedGameIndexRowByIdentity(rows, folder.Name, folder.PlatformLabel);
+
                 if (row == null)
                 {
                     row = new GameIndexEditorRow
@@ -171,9 +192,11 @@ namespace PixelVaultNative
                 writeFolder(folder, desired);
             }
 
-            if (!changed) return false;
+            if (!changed && !repairedStalePendingAssignment) return false;
 
             librarySession.PersistGameIndexRows(rows);
+            if (repairedStalePendingAssignment)
+                librarySession.RefreshFolderCacheAfterGameIndexChange();
             var aggregate = targetFolders.Any(folder => folder != null && readFolder(folder));
             applyAggregateToView(view, aggregate);
             if (view.PrimaryFolder != null) writeFolder(view.PrimaryFolder, aggregate);

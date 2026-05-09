@@ -204,13 +204,39 @@ namespace PixelVaultNative
                 .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.OrdinalIgnoreCase);
         }
 
+        GameIndexEditorRow FindSavedGameIndexRowByFolderPathAndPlatform(IEnumerable<GameIndexEditorRow> rows, string folderPath, string platformLabel)
+        {
+            if (string.IsNullOrWhiteSpace(folderPath)) return null;
+            string NormalizeFolderPath(string path)
+            {
+                if (string.IsNullOrWhiteSpace(path)) return string.Empty;
+                try { return Path.GetFullPath(path.Trim()); }
+                catch { return path.Trim().TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar); }
+            }
+
+            var normFolder = NormalizeFolderPath(folderPath);
+            if (string.IsNullOrWhiteSpace(normFolder)) return null;
+            var plat = NormalizeConsoleLabel(platformLabel ?? string.Empty);
+            var candidates = (rows ?? Enumerable.Empty<GameIndexEditorRow>())
+                .Where(row => row != null && !string.IsNullOrWhiteSpace(row.FolderPath))
+                .Where(row => string.Equals(NormalizeFolderPath(row.FolderPath), normFolder, StringComparison.OrdinalIgnoreCase))
+                .Where(row => string.Equals(NormalizeConsoleLabel(row.PlatformLabel ?? string.Empty), plat, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            if (candidates.Count == 0) return null;
+            if (candidates.Count == 1) return candidates[0];
+            var withId = candidates.FirstOrDefault(row => !string.IsNullOrWhiteSpace(NormalizeGameId(row.GameId)));
+            return withId ?? candidates[0];
+        }
+
         GameIndexEditorRow FindSavedGameIndexRow(IEnumerable<GameIndexEditorRow> rows, LibraryFolderInfo folder)
         {
             if (folder == null) return null;
             var savedRows = (rows ?? Enumerable.Empty<GameIndexEditorRow>()).Where(row => row != null).ToList();
             var byGameId = FindSavedGameIndexRowById(savedRows, folder.GameId);
             if (byGameId != null) return byGameId;
-            return FindSavedGameIndexRowByIdentity(savedRows, folder.Name, folder.PlatformLabel);
+            var byIdentity = FindSavedGameIndexRowByIdentity(savedRows, folder.Name, folder.PlatformLabel);
+            if (byIdentity != null) return byIdentity;
+            return FindSavedGameIndexRowByFolderPathAndPlatform(savedRows, folder.FolderPath, folder.PlatformLabel);
         }
 
         bool ApplySavedGameIndexRows(string root, List<LibraryFolderInfo> folders)
@@ -220,9 +246,19 @@ namespace PixelVaultNative
             bool changed = false;
             foreach (var folder in folders)
             {
-                if (folder.PendingGameAssignment) continue;
                 var saved = FindSavedGameIndexRow(savedRows, folder);
                 if (saved == null) continue;
+
+                // Disk folders marked “Needs assignment · …” skipped this merge entirely
+                // before folder-path matching existed, so real saved rows (same FolderPath +
+                // platform as the index row) never hydrated the cache — merged tiles could
+                // still show the resolved title from siblings while one folder stayed
+                // PendingGameAssignment forever and blocked toggles / edits (HZD-style).
+                if (folder.PendingGameAssignment)
+                {
+                    folder.PendingGameAssignment = false;
+                    changed = true;
+                }
                 if (!string.IsNullOrWhiteSpace(saved.GameId) && !string.Equals(folder.GameId ?? string.Empty, saved.GameId ?? string.Empty, StringComparison.Ordinal))
                 {
                     folder.GameId = saved.GameId;
@@ -327,10 +363,12 @@ namespace PixelVaultNative
             var rows = GetSavedGameIndexRowsForRoot(root);
             var saved = FindSavedGameIndexRow(rows, folder);
             var gameId = NormalizeGameId(folder.GameId);
+            if (string.IsNullOrWhiteSpace(gameId) && saved != null && !string.IsNullOrWhiteSpace(NormalizeGameId(saved.GameId)))
+                gameId = NormalizeGameId(saved.GameId);
             if (string.IsNullOrWhiteSpace(gameId))
             {
                 var byIdentity = FindSavedGameIndexRowByIdentity(rows, folder.Name, folder.PlatformLabel);
-                gameId = byIdentity == null ? CreateGameId(rows.Select(row => row.GameId)) : byIdentity.GameId;
+                gameId = byIdentity == null ? CreateGameId(rows.Select(row => row.GameId)) : NormalizeGameId(byIdentity.GameId);
             }
             if (saved == null)
             {
