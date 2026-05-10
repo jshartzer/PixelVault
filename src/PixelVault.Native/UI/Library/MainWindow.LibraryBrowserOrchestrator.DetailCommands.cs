@@ -50,6 +50,7 @@ namespace PixelVaultNative
                     DeleteMetadataSidecarIfPresent(file);
                     if (File.Exists(file))
                     {
+                        FileSystemService.TryClearReadOnlyForFile(file);
                         File.Delete(file);
                         removedFiles.Add(file);
                         Log("Library delete: " + file);

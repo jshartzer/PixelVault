@@ -45,6 +45,7 @@ namespace PixelVaultNative
         {
             if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
             {
+                TryLibraryToast("Could not update star: file was not found.", MessageBoxImage.Warning);
                 uiAfter?.Invoke(false);
                 return;
             }
@@ -52,6 +53,7 @@ namespace PixelVaultNative
             var root = libraryWorkspace.LibraryRoot;
             if (string.IsNullOrWhiteSpace(root))
             {
+                TryLibraryToast("Set a library folder before starring photos.", MessageBoxImage.Warning);
                 uiAfter?.Invoke(false);
                 return;
             }
@@ -63,18 +65,57 @@ namespace PixelVaultNative
                 var applied = false;
                 try
                 {
-                    var index = LoadLibraryMetadataIndexViaSessionWhenActive(root, true);
-                    LibraryMetadataIndexEntry row;
-                    if (!index.TryGetValue(filePath, out row) || row == null)
+                    static string CanonicalizeExistingPath(string p)
                     {
-                        dispatcher.BeginInvoke(new Action(delegate { uiAfter?.Invoke(false); }));
+                        if (string.IsNullOrWhiteSpace(p) || !File.Exists(p)) return p;
+                        try
+                        {
+                            return Path.GetFullPath(p);
+                        }
+                        catch
+                        {
+                            return p;
+                        }
+                    }
+
+                    var canonicalPath = CanonicalizeExistingPath(filePath);
+                    if (string.IsNullOrWhiteSpace(canonicalPath) || !File.Exists(canonicalPath))
+                    {
+                        dispatcher.BeginInvoke(new Action(delegate
+                        {
+                            TryLibraryToast("Could not update star: file was not found.", MessageBoxImage.Warning);
+                            uiAfter?.Invoke(false);
+                        }));
                         return;
                     }
 
+                    var index = LoadLibraryMetadataIndexViaSessionWhenActive(root, true);
+                    LibraryMetadataIndexEntry row;
+                    if (!index.TryGetValue(canonicalPath, out row) || row == null)
+                    {
+                        // Gallery paths can appear before this file has a photo_index row (fresh cache from Exif scan,
+                        // or index rebuild). Starring should still work — upsert a minimal row then persist.
+                        row = new LibraryMetadataIndexEntry
+                        {
+                            FilePath = canonicalPath,
+                            Stamp = BuildLibraryMetadataStamp(canonicalPath),
+                            GameId = string.Empty,
+                            RetroAchievementsGameId = string.Empty,
+                            ConsoleLabel = string.Empty,
+                            TagText = string.Empty,
+                            CaptureUtcTicks = 0,
+                            Starred = false,
+                            IndexAddedUtcTicks = DateTime.UtcNow.Ticks
+                        };
+                        index[canonicalPath] = row;
+                    }
+
                     var nextStarred = !row.Starred;
-                    ApplyEmbeddedXmpStarRating(filePath, nextStarred);
+                    EnsureExifTool();
+                    ApplyEmbeddedXmpStarRating(canonicalPath, nextStarred);
+                    row.FilePath = canonicalPath;
                     row.Starred = nextStarred;
-                    row.Stamp = BuildLibraryMetadataStamp(filePath);
+                    row.Stamp = BuildLibraryMetadataStamp(canonicalPath);
                     SaveLibraryMetadataIndexViaSessionWhenActive(root, index);
                     applied = true;
                 }
@@ -154,7 +195,15 @@ namespace PixelVaultNative
                 try
                 {
                     EnsureExifTool();
-                    var item = BuildLibraryMetadataItemForPath(filePath, null);
+                    static string CanonicalizePath(string p)
+                    {
+                        if (string.IsNullOrWhiteSpace(p) || !File.Exists(p)) return p;
+                        try { return Path.GetFullPath(p); }
+                        catch { return p; }
+                    }
+
+                    var indexPath = CanonicalizePath(filePath);
+                    var item = BuildLibraryMetadataItemForPath(indexPath, null);
                     if (item != null)
                     {
                         var cleanedComment = CleanComment(comment);
@@ -166,9 +215,9 @@ namespace PixelVaultNative
                             {
                                 var index = LoadLibraryMetadataIndexViaSessionWhenActive(root, true);
                                 LibraryMetadataIndexEntry row;
-                                if (index.TryGetValue(filePath, out row) && row != null)
+                                if (index.TryGetValue(indexPath, out row) && row != null)
                                 {
-                                    row.Stamp = BuildLibraryMetadataStamp(filePath);
+                                    row.Stamp = BuildLibraryMetadataStamp(indexPath);
                                     SaveLibraryMetadataIndexViaSessionWhenActive(root, index);
                                 }
                             }

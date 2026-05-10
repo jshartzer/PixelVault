@@ -154,7 +154,7 @@ namespace PixelVaultNative
                 }
                 if (existingHero != null)
                 {
-                    var freshHero = BuildLibraryGameProfileHero(win, view, folder, metrics, refreshHero);
+                    var freshHero = BuildLibraryGameProfileHero(win, view, folder, refreshHero);
                     var idx = root.Children.IndexOf(existingHero);
                     root.Children.Remove(existingHero);
                     if (idx >= 0) root.Children.Insert(idx, freshHero); else root.Children.Add(freshHero);
@@ -162,7 +162,7 @@ namespace PixelVaultNative
                 if (refreshNotesCard != null) refreshNotesCard();
                 win.Title = "PixelVault Game Profile - " + (string.IsNullOrWhiteSpace(folder.Name) ? "Game Profile" : folder.Name);
             };
-            var heroElement = BuildLibraryGameProfileHero(win, view, folder, metrics, refreshHero);
+            var heroElement = BuildLibraryGameProfileHero(win, view, folder, refreshHero);
             heroElement.VerticalAlignment = VerticalAlignment.Top;
             root.Children.Add(heroElement);
 
@@ -292,7 +292,7 @@ namespace PixelVaultNative
             };
         }
 
-        FrameworkElement BuildLibraryGameProfileHero(Window window, LibraryBrowserFolderView view, LibraryFolderInfo folder, LibraryGameProfileMetrics metrics, Action refreshHero)
+        FrameworkElement BuildLibraryGameProfileHero(Window window, LibraryBrowserFolderView view, LibraryFolderInfo folder, Action refreshHero)
         {
             const double profileCoverHeight = 276d;
             const double contentMarginV = 12d;
@@ -434,13 +434,6 @@ namespace PixelVaultNative
                 TextTrimming = TextTrimming.CharacterEllipsis,
                 ToolTip = folder.Name ?? "Game Profile"
             });
-            var summaryLine = BuildLibraryGameProfileHeroSummaryLine(metrics);
-            if (summaryLine is TextBlock sumTb)
-            {
-                sumTb.TextWrapping = TextWrapping.NoWrap;
-                sumTb.TextTrimming = TextTrimming.CharacterEllipsis;
-            }
-            if (summaryLine != null) copy.Children.Add(summaryLine);
             var badges = new WrapPanel { Margin = new Thickness(0, 10, 0, 0) };
             foreach (var label in ResolveLibraryGameProfilePlatformLabels(view, folder))
             {
@@ -1018,30 +1011,6 @@ namespace PixelVaultNative
             }
         }
 
-        FrameworkElement BuildLibraryGameProfileHeroSummaryLine(LibraryGameProfileMetrics metrics)
-        {
-            if (metrics == null) return null;
-            var parts = new List<string>();
-            if (metrics.CaptureCount > 0) parts.Add(metrics.CaptureCount.ToString(CultureInfo.CurrentCulture) + (metrics.CaptureCount == 1 ? " capture" : " captures"));
-            if (metrics.VideoCount > 0) parts.Add(metrics.VideoCount.ToString(CultureInfo.CurrentCulture) + (metrics.VideoCount == 1 ? " video" : " videos"));
-            if (metrics.SessionCount > 0) parts.Add(metrics.SessionCount.ToString(CultureInfo.CurrentCulture) + (metrics.SessionCount == 1 ? " session" : " sessions"));
-            if (metrics.FirstCaptureDate > DateTime.MinValue && metrics.LatestCaptureDate > DateTime.MinValue)
-            {
-                parts.Add(metrics.FirstCaptureDate.Date == metrics.LatestCaptureDate.Date
-                    ? FormatLibraryGameProfileDate(metrics.FirstCaptureDate)
-                    : FormatLibraryGameProfileDate(metrics.FirstCaptureDate) + " \u2192 " + FormatLibraryGameProfileDate(metrics.LatestCaptureDate));
-            }
-            if (parts.Count == 0) return null;
-            return new TextBlock
-            {
-                Text = string.Join(" \u00B7 ", parts),
-                Foreground = Brush("#A9BAC4"),
-                FontSize = 13,
-                TextWrapping = TextWrapping.Wrap,
-                Margin = new Thickness(0, 8, 0, 0)
-            };
-        }
-
         // The folder-tile platform badge is intentionally bright (#F4F8FB at 1.15px) for tile
         // contrast; in the profile hero the same chrome reads as a hard outline against the
         // 38pt title. Tone the border down only for the hero so other surfaces are unchanged.
@@ -1254,7 +1223,7 @@ namespace PixelVaultNative
             Action refreshHero,
             CancellationToken cancellation)
         {
-            host.Children.Add(BuildLibraryGameProfileSectionTitle("Achievements", "Collected achievements are grouped first; hover any badge for details."));
+            host.Children.Add(BuildLibraryGameProfileSectionTitle("Achievements", null));
             var loading = new TextBlock
             {
                 Text = "Loading achievements...",

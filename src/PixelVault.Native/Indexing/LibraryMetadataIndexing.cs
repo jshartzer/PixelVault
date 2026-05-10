@@ -443,7 +443,11 @@ namespace PixelVaultNative
 
         string MetadataSidecarPath(string file)
         {
-            return IsVideo(file) ? file + ".xmp" : null;
+            if (IsVideo(file)) return file + ".xmp";
+            // Switch HDR stills are JPEG XR; ExifTool cannot reliably write embedded XMP in-place — use Adobe-style companion sidecar (same as video).
+            if (!string.IsNullOrWhiteSpace(file) && string.Equals(Path.GetExtension(file), ".jxr", StringComparison.OrdinalIgnoreCase))
+                return file + ".xmp";
+            return null;
         }
 
         long MetadataCacheStamp(string file)
@@ -464,6 +468,7 @@ namespace PixelVaultNative
         {
             var sidecar = MetadataSidecarPath(file);
             if (string.IsNullOrWhiteSpace(sidecar) || !File.Exists(sidecar)) return;
+            FileSystemService.TryClearReadOnlyForFile(sidecar);
             File.Delete(sidecar);
             Log("Deleted sidecar: " + sidecar);
         }

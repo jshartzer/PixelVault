@@ -178,6 +178,17 @@ namespace PixelVaultNative
             return deleted;
         }
 
+        /// <summary>ExifTool <c>-overwrite_original</c> writes via a sibling <c>_exiftool_tmp</c> file; if a prior run crashed, that temp blocks the next write (&quot;temporary file already exists&quot;).</summary>
+        static void DeleteStaleExifToolTempsBeforeWrite(IEnumerable<ExifWriteRequest> requests, Action<string> log)
+        {
+            if (requests == null) return;
+            foreach (var request in requests)
+            {
+                if (request?.Arguments == null || request.Arguments.Length == 0) continue;
+                TryDeleteExifToolTempForRequest(request, log);
+            }
+        }
+
         public string[] BuildExifArgs(string file, DateTime dt, string[] platformTags, bool preserveFileTimes, string comment, bool addPhotographyTag)
         {
             return BuildExifArgs(file, dt, platformTags, null, preserveFileTimes, comment, addPhotographyTag, true, true, true);
@@ -190,14 +201,16 @@ namespace PixelVaultNative
 
         public string[] BuildExifArgs(string file, DateTime dt, string[] platformTags, IEnumerable<string> extraTags, bool preserveFileTimes, string comment, bool addPhotographyTag, bool writeDateMetadata, bool writeCommentMetadata, bool writeTagMetadata)
         {
-            var targetPath = IsVideo(file) ? MetadataSidecarPath(file) : file;
-            var contentIsPng = !IsVideo(file) && FileContentHasPngSignature(file);
+            var sidecar = MetadataSidecarPath(file);
+            var writesMetadataToSidecar = !string.IsNullOrWhiteSpace(sidecar);
+            var targetPath = writesMetadataToSidecar ? sidecar : file;
+            var contentIsPng = !writesMetadataToSidecar && FileContentHasPngSignature(file);
             var args = new List<string>();
             var png = dt.ToString("yyyy:MM:dd HH:mm:ss");
             var std = dt.ToString("yyyyMMdd HH:mm:ss");
             if (writeDateMetadata)
             {
-                if (IsVideo(file))
+                if (writesMetadataToSidecar)
                 {
                     args.Add("-XMP:DateTimeOriginal=" + std);
                     args.Add("-XMP:CreateDate=" + std);
@@ -223,7 +236,7 @@ namespace PixelVaultNative
                     args.Add("-XMP:ModifyDate=" + std);
                     args.Add("-XMP:MetadataDate=" + std);
                 }
-                if (!preserveFileTimes && !IsVideo(file))
+                if (!preserveFileTimes && !writesMetadataToSidecar)
                 {
                     args.Add("-File:FileCreateDate=" + std);
                     args.Add("-File:FileModifyDate=" + std);
@@ -237,7 +250,7 @@ namespace PixelVaultNative
                     args.Add("-XMP-dc:Description-x-default=" + cleanedComment);
                     args.Add("-XMP-dc:Description=" + cleanedComment);
                     args.Add("-XMP-exif:UserComment=" + cleanedComment);
-                    if (!IsVideo(file))
+                    if (!writesMetadataToSidecar)
                     {
                         args.Add("-EXIF:ImageDescription=" + cleanedComment);
                         args.Add("-EXIF:UserComment=" + cleanedComment);
@@ -250,7 +263,7 @@ namespace PixelVaultNative
                     args.Add("-XMP-dc:Description-x-default=");
                     args.Add("-XMP-dc:Description=");
                     args.Add("-XMP-exif:UserComment=");
-                    if (!IsVideo(file))
+                    if (!writesMetadataToSidecar)
                     {
                         args.Add("-EXIF:ImageDescription=");
                         args.Add("-EXIF:UserComment=");
@@ -272,7 +285,7 @@ namespace PixelVaultNative
                 args.Add("-XMP:TagsList=" + serializedTags);
                 args.Add("-XMP-digiKam:TagsList=" + serializedTags);
                 args.Add("-XMP-lr:HierarchicalSubject=" + serializedTags);
-                if (!IsVideo(file))
+                if (!writesMetadataToSidecar)
                 {
                     args.Add("-IPTC:Keywords=" + serializedTags);
                     args.Add("-Keywords=" + serializedTags);
@@ -431,10 +444,14 @@ namespace PixelVaultNative
             if (string.IsNullOrWhiteSpace(file) || !File.Exists(file)) return Array.Empty<string>();
             if (string.IsNullOrWhiteSpace(ExifToolPath) || !File.Exists(ExifToolPath)) return Array.Empty<string>();
             var rating = starred ? "5" : "0";
-            var targetPath = IsVideo(file) ? MetadataSidecarPath(file) : file;
+            var sidecar = MetadataSidecarPath(file);
+            var writesToSidecar = !string.IsNullOrWhiteSpace(sidecar);
+            var targetPath = writesToSidecar ? sidecar : file;
             if (string.IsNullOrWhiteSpace(targetPath)) return Array.Empty<string>();
-            if (!IsVideo(file) && !File.Exists(targetPath)) return Array.Empty<string>();
-            return new[] { "-XMP:Rating=" + rating, "-overwrite_original", targetPath };
+            // Sidecar may not exist yet (video / JPEG XR HDR); ExifTool creates it on first write.
+            if (!writesToSidecar && !File.Exists(targetPath)) return Array.Empty<string>();
+            // No *_exiftool_tmp sibling file — avoids Windows/AV races that surface as "Temporary file already exists".
+            return new[] { "-XMP:Rating=" + rating, "-overwrite_original_in_place", targetPath };
         }
 
         public Dictionary<string, string[]> ReadEmbeddedKeywordTagsBatch(IEnumerable<string> files, CancellationToken cancellationToken = default(CancellationToken))
@@ -692,29 +709,32 @@ namespace PixelVaultNative
             RunExe(ExifToolPath, new[] { "-ver" }, Path.GetDirectoryName(ExifToolPath), false);
         }
 
+        /// <summary>
+        /// Runs each write as its own ExifTool process. Avoids <c>-stay_open</c> + <c>-overwrite_original</c>,
+        /// which often triggers spurious &quot;Temporary file already exists&quot; on Windows when scanners touch <c>_exiftool_tmp</c>.
+        /// </summary>
         public void RunExifToolBatch(IReadOnlyList<ExifWriteRequest> requests)
         {
             if (requests == null || requests.Count == 0) return;
 
-            var argFile = Path.Combine(dependencies.CacheRoot, "exiftool-batch-write-" + Guid.NewGuid().ToString("N") + ".args");
-            try
+            var cwd = Path.GetDirectoryName(ExifToolPath);
+            DeleteStaleExifToolTempsBeforeWrite(requests, Log);
+            foreach (var request in requests.Where(entry => entry != null && entry.Arguments != null && entry.Arguments.Length > 0))
             {
-                var argLines = new List<string> { "-stay_open", "True" };
-                foreach (var request in requests.Where(entry => entry != null && entry.Arguments != null && entry.Arguments.Length > 0))
+                try
                 {
-                    argLines.AddRange(request.Arguments);
-                    argLines.Add("-execute");
+                    FileSystemService.TryClearReadOnlyForFile(request.FilePath);
+                    var exifWriteTarget = ResolveExifWriteTargetPathForCleanup(request);
+                    if (!string.IsNullOrWhiteSpace(exifWriteTarget)
+                        && !string.Equals(exifWriteTarget, request.FilePath, StringComparison.OrdinalIgnoreCase))
+                        FileSystemService.TryClearReadOnlyForFile(exifWriteTarget);
+                    DeleteStaleExifToolTempsBeforeWrite(new[] { request }, Log);
+                    RunExe(ExifToolPath, request.Arguments, cwd, false);
                 }
-                argLines.Add("-stay_open");
-                argLines.Add("False");
-                File.WriteAllLines(argFile, argLines.ToArray(), Encoding.UTF8);
-                RunExe(ExifToolPath, new[] { "-@", argFile }, Path.GetDirectoryName(ExifToolPath), false);
-            }
-            finally
-            {
-                foreach (var request in requests)
+                finally
+                {
                     TryDeleteExifToolTempForRequest(request, Log);
-                if (File.Exists(argFile)) File.Delete(argFile);
+                }
             }
         }
 
@@ -751,6 +771,12 @@ namespace PixelVaultNative
                 cancellationToken.ThrowIfCancellationRequested();
                 try
                 {
+                    FileSystemService.TryClearReadOnlyForFile(request.FilePath);
+                    var exifWriteTarget = ResolveExifWriteTargetPathForCleanup(request);
+                    if (!string.IsNullOrWhiteSpace(exifWriteTarget)
+                        && !string.Equals(exifWriteTarget, request.FilePath, StringComparison.OrdinalIgnoreCase))
+                        FileSystemService.TryClearReadOnlyForFile(exifWriteTarget);
+                    DeleteStaleExifToolTempsBeforeWrite(new[] { request }, Log);
                     RunExe(ExifToolPath, request.Arguments, Path.GetDirectoryName(ExifToolPath), false);
                 }
                 finally

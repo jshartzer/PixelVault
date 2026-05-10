@@ -123,6 +123,57 @@ public sealed class FileSystemServiceTests
     }
 
     [Fact]
+    public void DeleteFile_Clears_ReadOnly_Before_Delete()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "pv-ro-del-" + Guid.NewGuid().ToString("N") + ".txt");
+        File.WriteAllText(path, "x");
+        File.SetAttributes(path, FileAttributes.ReadOnly);
+        try
+        {
+            var fs = new FileSystemService();
+            fs.DeleteFile(path);
+            Assert.False(File.Exists(path));
+        }
+        finally
+        {
+            if (File.Exists(path))
+            {
+                File.SetAttributes(path, FileAttributes.Normal);
+                File.Delete(path);
+            }
+        }
+    }
+
+    [Fact]
+    public void MoveFile_Clears_ReadOnly_On_Destination_When_Source_Was_ReadOnly()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "pv-ro-move-" + Guid.NewGuid().ToString("N"));
+        var src = Path.Combine(dir, "src.txt");
+        var dst = Path.Combine(dir, "dst.txt");
+        Directory.CreateDirectory(dir);
+        File.WriteAllText(src, "x");
+        File.SetAttributes(src, FileAttributes.ReadOnly);
+        try
+        {
+            var fs = new FileSystemService();
+            fs.MoveFile(src, dst);
+            Assert.False(File.Exists(src));
+            Assert.True(File.Exists(dst));
+            var attrs = File.GetAttributes(dst);
+            Assert.False(attrs.HasFlag(FileAttributes.ReadOnly));
+        }
+        finally
+        {
+            if (File.Exists(dst))
+            {
+                File.SetAttributes(dst, FileAttributes.Normal);
+                File.Delete(dst);
+            }
+            try { Directory.Delete(dir); } catch { /* ignore */ }
+        }
+    }
+
+    [Fact]
     public void GetCreationTime_And_GetLastWriteTime_On_Same_File()
     {
         var path = Path.Combine(Path.GetTempPath(), "pv-fs-times-" + Guid.NewGuid().ToString("N") + ".tmp");
