@@ -1198,10 +1198,9 @@ namespace PixelVaultNative
         void TryLibraryGameProfileAutoMarkCompleteFromAchievements(
             LibraryBrowserFolderView view,
             IReadOnlyList<GameAchievementsFetchService.AchievementRow> rows,
-            bool hideSteamDefinitionsForEmptyNonSteamEntry,
             Action refreshHero)
         {
-            if (view == null || hideSteamDefinitionsForEmptyNonSteamEntry) return;
+            if (view == null) return;
             if (!LibraryGameProfileAchievementsAreFullyUnlocked(rows)) return;
             if (view.IsCompleted100Percent) return;
             if (!SetLibraryBrowserCompletionState(view, true)) return;
@@ -1234,7 +1233,6 @@ namespace PixelVaultNative
             host.Children.Add(loading);
             var folder = ResolveLibraryBrowserAchievementLookupFolder(view);
             var platform = NormalizeConsoleLabel(folder == null ? string.Empty : folder.PlatformLabel);
-            var steamLookupFromNonSteamEntry = IsLibraryBrowserSteamAchievementLookupFromNonSteamEntry(view, folder);
             var userAgent = "PixelVault/" + AppVersion;
             _ = Task.Run(async () =>
             {
@@ -1290,12 +1288,7 @@ namespace PixelVaultNative
                     var rows = result.Rows ?? new List<GameAchievementsFetchService.AchievementRow>();
                     var progressKnown = rows.Any(row => row != null && row.ProgressKnown);
                     var earned = rows.Where(row => row != null && row.ProgressKnown && row.Unlocked).ToList();
-                    var hideSteamDefinitionsForEmptyNonSteamEntry =
-                        steamLookupFromNonSteamEntry
-                        && string.Equals(result.SourceLabel ?? string.Empty, "Steam", StringComparison.OrdinalIgnoreCase)
-                        && progressKnown
-                        && earned.Count == 0;
-                    TryLibraryGameProfileAutoMarkCompleteFromAchievements(view, rows, hideSteamDefinitionsForEmptyNonSteamEntry, refreshHero);
+                    TryLibraryGameProfileAutoMarkCompleteFromAchievements(view, rows, refreshHero);
                     var displayRows = rows
                         .Where(row => row != null)
                         .OrderBy(row => progressKnown && row.Unlocked ? 0 : 1)
@@ -1306,16 +1299,14 @@ namespace PixelVaultNative
                     var earnedCount = earned.Count;
                     var percentText = string.Empty;
                     double? percent = null;
-                    if (progressKnown && totalRows > 0 && !hideSteamDefinitionsForEmptyNonSteamEntry)
+                    if (progressKnown && totalRows > 0)
                     {
                         percent = (double)earnedCount / totalRows;
                         percentText = " \u00B7 " + ((int)Math.Round(percent.Value * 100)).ToString(CultureInfo.CurrentCulture) + "%";
                     }
-                    var summary = hideSteamDefinitionsForEmptyNonSteamEntry
-                        ? "No Steam achievements have been obtained for this non-Steam entry"
-                        : (progressKnown
-                            ? earnedCount + " of " + totalRows + " earned" + percentText
-                            : "Progress unknown - showing achievement definitions");
+                    var summary = progressKnown
+                        ? earnedCount + " of " + totalRows + " earned" + percentText
+                        : "Progress unknown - showing achievement definitions";
                     host.Children.Add(new TextBlock
                     {
                         Text = (result.SourceLabel ?? "Achievements") + ": " + summary,
@@ -1326,8 +1317,6 @@ namespace PixelVaultNative
                     });
                     if (percent.HasValue)
                         host.Children.Add(BuildLibraryGameProfileAchievementProgressBar(percent.Value));
-                    if (hideSteamDefinitionsForEmptyNonSteamEntry)
-                        return;
 
                     if (displayRows.Count == 0)
                     {
@@ -1344,7 +1333,7 @@ namespace PixelVaultNative
                     var grid = new WrapPanel { Orientation = Orientation.Horizontal };
                     var palette = LibraryGameProfileAchievementPalette.Default;
                     foreach (var row in displayRows)
-                        grid.Children.Add(BuildLibraryGameProfileAchievementCard(row, userAgent, progressKnown, palette));
+                        grid.Children.Add(BuildLibraryGameProfileAchievementCard(row, userAgent, palette));
                     container.Child = grid;
                     host.Children.Add(container);
                 }, DispatcherPriority.Background);
@@ -1412,10 +1401,12 @@ namespace PixelVaultNative
             }
         }
 
-        FrameworkElement BuildLibraryGameProfileAchievementCard(GameAchievementsFetchService.AchievementRow row, string userAgent, bool progressKnown, LibraryGameProfileAchievementPalette palette)
+        FrameworkElement BuildLibraryGameProfileAchievementCard(GameAchievementsFetchService.AchievementRow row, string userAgent, LibraryGameProfileAchievementPalette palette)
         {
             var unlocked = row != null && row.ProgressKnown && row.Unlocked;
-            var muted = progressKnown && !unlocked;
+            // Dim every tile that is not a confirmed unlock (locked, or progress unknown) so "unknown"
+            // Steam rows do not render at full opacity like completed badges.
+            var muted = !unlocked;
             var card = new Border
             {
                 Width = 48,
@@ -1441,14 +1432,16 @@ namespace PixelVaultNative
             iconHost.Child = img;
             AchievementsInfoWindow.StartAchievementBadgeDownload(img, row, userAgent);
             card.Child = iconHost;
-            card.ToolTip = BuildLibraryGameProfileAchievementToolTip(row, progressKnown);
+            card.ToolTip = BuildLibraryGameProfileAchievementToolTip(row, row != null && row.ProgressKnown);
             ToolTipService.SetShowDuration(card, 90000);
             return card;
         }
 
         FrameworkElement BuildLibraryGameProfileAchievementToolTip(GameAchievementsFetchService.AchievementRow row, bool progressKnown)
         {
-            var stack = new StackPanel { MaxWidth = 320 };
+            // Match LibraryBrowserAchievements hover card: explicit dark chrome so we do not rely on the OS
+            // tooltip panel (often light), which made muted foreground colors nearly illegible.
+            var stack = new StackPanel { MaxWidth = 308 };
             stack.Children.Add(new TextBlock
             {
                 Text = row == null ? "Achievement" : row.Title ?? "Achievement",
@@ -1461,7 +1454,7 @@ namespace PixelVaultNative
                 stack.Children.Add(new TextBlock
                 {
                     Text = row.Description,
-                    Foreground = Brush("#B8C9D4"),
+                    Foreground = Brush("#D5E4EE"),
                     FontSize = 12,
                     TextWrapping = TextWrapping.Wrap,
                     Margin = new Thickness(0, 6, 0, 0)
@@ -1476,12 +1469,21 @@ namespace PixelVaultNative
                 Text = string.IsNullOrWhiteSpace(row == null ? string.Empty : row.Meta)
                     ? status
                     : row.Meta + " | " + status,
-                Foreground = row != null && row.Unlocked ? Brush("#E7C66B") : Brush("#8FA4B0"),
+                Foreground = row != null && row.Unlocked ? Brush("#F0D78C") : Brush("#C8D6DE"),
                 FontSize = 11,
                 TextWrapping = TextWrapping.Wrap,
                 Margin = new Thickness(0, 8, 0, 0)
             });
-            return stack;
+            return new Border
+            {
+                Background = Brush("#10171D"),
+                BorderBrush = Brush("#273540"),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(10),
+                Padding = new Thickness(12),
+                MaxWidth = 340,
+                Child = stack
+            };
         }
 
         // PV-PLN-GPRO-001 Phase D.2-D.4: Sessions section. Walks the per-window

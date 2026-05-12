@@ -27,6 +27,7 @@ public sealed class MetadataServiceJxrSidecarTests
             var args = svc.BuildStarRatingExifArgs(jxr, starred: true);
             Assert.NotNull(args);
             Assert.NotEmpty(args);
+            Assert.Contains("-overwrite_original", args);
             Assert.Equal(jxr + ".xmp", args[^1]);
         }
         finally
@@ -60,6 +61,7 @@ public sealed class MetadataServiceJxrSidecarTests
             var args = svc.BuildStarRatingExifArgs(png, starred: false);
             Assert.NotNull(args);
             Assert.NotEmpty(args);
+            Assert.Contains("-overwrite_original", args);
             Assert.Equal(png, args[^1]);
         }
         finally

@@ -450,8 +450,9 @@ namespace PixelVaultNative
             if (string.IsNullOrWhiteSpace(targetPath)) return Array.Empty<string>();
             // Sidecar may not exist yet (video / JPEG XR HDR); ExifTool creates it on first write.
             if (!writesToSidecar && !File.Exists(targetPath)) return Array.Empty<string>();
-            // No *_exiftool_tmp sibling file — avoids Windows/AV races that surface as "Temporary file already exists".
-            return new[] { "-XMP:Rating=" + rating, "-overwrite_original_in_place", targetPath };
+            // Rename-based overwrite matches <see cref="BuildExifArgs"/> (manual metadata). In-place JPEG updates fail sporadically on Windows
+            // when scanners/indexers or brief handles contend — Switch exports like "*_c.jpg" behave as normal JPEGs but hit this often.
+            return new[] { "-XMP:Rating=" + rating, "-overwrite_original", targetPath };
         }
 
         public Dictionary<string, string[]> ReadEmbeddedKeywordTagsBatch(IEnumerable<string> files, CancellationToken cancellationToken = default(CancellationToken))
@@ -713,13 +714,10 @@ namespace PixelVaultNative
         /// Runs each write as its own ExifTool process. Avoids <c>-stay_open</c> + <c>-overwrite_original</c>,
         /// which often triggers spurious &quot;Temporary file already exists&quot; on Windows when scanners touch <c>_exiftool_tmp</c>.
         /// </summary>
-        public void RunExifToolBatch(IReadOnlyList<ExifWriteRequest> requests)
+        void RunExifToolSingleRequestWithRetries(string cwd, ExifWriteRequest request)
         {
-            if (requests == null || requests.Count == 0) return;
-
-            var cwd = Path.GetDirectoryName(ExifToolPath);
-            DeleteStaleExifToolTempsBeforeWrite(requests, Log);
-            foreach (var request in requests.Where(entry => entry != null && entry.Arguments != null && entry.Arguments.Length > 0))
+            InvalidOperationException last = null;
+            for (var attempt = 1; attempt <= 4; attempt++)
             {
                 try
                 {
@@ -730,6 +728,31 @@ namespace PixelVaultNative
                         FileSystemService.TryClearReadOnlyForFile(exifWriteTarget);
                     DeleteStaleExifToolTempsBeforeWrite(new[] { request }, Log);
                     RunExe(ExifToolPath, request.Arguments, cwd, false);
+                    return;
+                }
+                catch (InvalidOperationException ex)
+                {
+                    last = ex;
+                    TryDeleteExifToolTempForRequest(request, Log);
+                    if (attempt >= 4) throw;
+                    Log("ExifTool write attempt " + attempt + "/4 failed; retrying. " + ex.Message);
+                    Thread.Sleep(80 * attempt);
+                }
+            }
+            throw last;
+        }
+
+        public void RunExifToolBatch(IReadOnlyList<ExifWriteRequest> requests)
+        {
+            if (requests == null || requests.Count == 0) return;
+
+            var cwd = Path.GetDirectoryName(ExifToolPath);
+            DeleteStaleExifToolTempsBeforeWrite(requests, Log);
+            foreach (var request in requests.Where(entry => entry != null && entry.Arguments != null && entry.Arguments.Length > 0))
+            {
+                try
+                {
+                    RunExifToolSingleRequestWithRetries(cwd, request);
                 }
                 finally
                 {
@@ -771,13 +794,7 @@ namespace PixelVaultNative
                 cancellationToken.ThrowIfCancellationRequested();
                 try
                 {
-                    FileSystemService.TryClearReadOnlyForFile(request.FilePath);
-                    var exifWriteTarget = ResolveExifWriteTargetPathForCleanup(request);
-                    if (!string.IsNullOrWhiteSpace(exifWriteTarget)
-                        && !string.Equals(exifWriteTarget, request.FilePath, StringComparison.OrdinalIgnoreCase))
-                        FileSystemService.TryClearReadOnlyForFile(exifWriteTarget);
-                    DeleteStaleExifToolTempsBeforeWrite(new[] { request }, Log);
-                    RunExe(ExifToolPath, request.Arguments, Path.GetDirectoryName(ExifToolPath), false);
+                    RunExifToolSingleRequestWithRetries(Path.GetDirectoryName(ExifToolPath), request);
                 }
                 finally
                 {

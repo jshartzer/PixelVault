@@ -490,7 +490,11 @@ namespace PixelVaultNative
                             var colorUrl = ResolveSteamAchievementIconUrl(appId, icon);
                             var grayUrl = ResolveSteamAchievementIconUrl(appId, iconGray);
 
-                            var progressKnown = progress != null;
+                            // Treat unlock progress as "known" whenever SteamID64 is configured so multi-console /
+                            // merged folders still show x/y with locked badges instead of "progress unknown".
+                            // If GetPlayerAchievements fails or profile privacy blocks it (progress == null), we still
+                            // treat achievements as locked rather than stripping unlock semantics from every row.
+                            var progressKnown = progressAttempted;
                             var unlocked = false;
                             var unlockTicks = 0L;
                             if (progress != null && !string.IsNullOrWhiteSpace(apiName)

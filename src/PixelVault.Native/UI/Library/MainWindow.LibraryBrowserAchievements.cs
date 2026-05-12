@@ -96,32 +96,6 @@ namespace PixelVaultNative
             return raw.Any(char.IsDigit);
         }
 
-        bool IsLibraryBrowserSteamAchievementLookupFromNonSteamEntry(LibraryBrowserFolderView view, LibraryFolderInfo lookupFolder)
-        {
-            if (view == null || lookupFolder == null) return false;
-            if (!string.Equals(NormalizeConsoleLabel(lookupFolder.PlatformLabel), "Steam", StringComparison.OrdinalIgnoreCase)) return false;
-
-            var lookupSteamAppId = CleanTag(lookupFolder.SteamAppId ?? string.Empty);
-            if (string.IsNullOrWhiteSpace(lookupSteamAppId)) return false;
-
-            var candidates = new List<LibraryFolderInfo>();
-            foreach (var folder in view.SourceFolders ?? Enumerable.Empty<LibraryFolderInfo>())
-            {
-                if (folder != null) candidates.Add(folder);
-            }
-            if (view.PrimaryFolder != null) candidates.Add(view.PrimaryFolder);
-
-            foreach (var candidate in candidates)
-            {
-                if (candidate == null) continue;
-                if (!string.Equals(CleanTag(candidate.SteamAppId ?? string.Empty), lookupSteamAppId, StringComparison.OrdinalIgnoreCase)) continue;
-                if (string.Equals(NormalizeConsoleLabel(candidate.PlatformLabel), "Steam", StringComparison.OrdinalIgnoreCase))
-                    return false;
-            }
-
-            return true;
-        }
-
         internal void LibraryBrowserClearAchievementsSummary(LibraryBrowserPaneRefs panes)
         {
             var ws = _libraryBrowserLiveWorkingSet;

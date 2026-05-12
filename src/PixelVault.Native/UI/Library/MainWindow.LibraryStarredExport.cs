@@ -144,6 +144,15 @@ namespace PixelVaultNative
             var dispatcher = Dispatcher;
             var destNorm = Path.GetFullPath(dest);
             var rootNorm = Path.GetFullPath(root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+            if (string.Equals(destNorm, rootNorm, StringComparison.OrdinalIgnoreCase))
+            {
+                TryLibraryToast(
+                    "Export Starred: choose a folder different from your library folder. "
+                    + "With the same path, each file would copy onto itself and nothing is exported.",
+                    MessageBoxImage.Information);
+                return;
+            }
+
             var pathsOrdered = paths.OrderBy(p => p, StringComparer.OrdinalIgnoreCase).ToList();
             var entryByPath = new Dictionary<string, LibraryMetadataIndexEntry>(StringComparer.OrdinalIgnoreCase);
             foreach (var p in pathsOrdered)
@@ -155,7 +164,8 @@ namespace PixelVaultNative
             {
                 var tracking = librarySession.LoadStarredExportFingerprints(destNorm);
                 var copied = 0;
-                var skipped = 0;
+                var skippedAlreadyAtDestination = 0;
+                var skippedUnchanged = 0;
                 var failed = 0;
                 string lastError = null;
                 foreach (var src in pathsOrdered)
@@ -167,7 +177,7 @@ namespace PixelVaultNative
                         var dst = Path.Combine(destNorm, rel);
                         if (string.Equals(Path.GetFullPath(src), Path.GetFullPath(dst), StringComparison.OrdinalIgnoreCase))
                         {
-                            skipped++;
+                            skippedAlreadyAtDestination++;
                             continue;
                         }
                         var srcNorm = NormalizePathForStarredExportTracking(src);
@@ -178,7 +188,7 @@ namespace PixelVaultNative
                             && string.Equals(prevPrint, fingerprint, StringComparison.Ordinal)
                             && File.Exists(dst))
                         {
-                            skipped++;
+                            skippedUnchanged++;
                             continue;
                         }
                         var dstDir = Path.GetDirectoryName(dst);
@@ -200,10 +210,18 @@ namespace PixelVaultNative
                 librarySession.PruneStarredExportFingerprints(destNorm, activeNorm);
                 dispatcher.BeginInvoke(new Action(delegate
                 {
-                    var summary = "Export Starred: " + copied + " copied, " + skipped + " up to date" + (failed > 0 ? ", " + failed + " failed" : string.Empty) + " → " + destNorm;
+                    var skipParts = new List<string>();
+                    if (skippedUnchanged > 0) skipParts.Add(skippedUnchanged + " unchanged on disk");
+                    if (skippedAlreadyAtDestination > 0)
+                        skipParts.Add(skippedAlreadyAtDestination + " already at export path (same as library layout — pick a different export folder)");
+                    var skippedSummary = skipParts.Count > 0 ? string.Join(", ", skipParts) : "0 skipped";
+                    var summary = "Export Starred: " + copied + " copied, " + skippedSummary + (failed > 0 ? ", " + failed + " failed" : string.Empty) + " → " + destNorm;
+                    if (copied > 0)
+                        summary += ". Files keep subfolders relative to the library root.";
                     Log(summary);
+                    var skippedTotal = skippedUnchanged + skippedAlreadyAtDestination;
                     if (status != null) status.Text = failed == 0
-                        ? "Export Starred: " + copied + " updated, " + skipped + " skipped"
+                        ? "Export Starred: " + copied + " updated, " + skippedTotal + " skipped"
                         : "Export Starred: " + failed + " failed";
                     if (failed == 0)
                         TryLibraryToast(summary);
