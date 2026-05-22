@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 
 namespace PixelVaultNative
 {
@@ -26,6 +27,28 @@ namespace PixelVaultNative
             return !string.IsNullOrWhiteSpace(env) ? env : (retroAchievementsApiKey ?? string.Empty).Trim();
         }
         bool HasRetroAchievementsApiKey() => !string.IsNullOrWhiteSpace(CurrentRetroAchievementsApiKey());
+        string CurrentIgdbTwitchClientId()
+        {
+            var env = SettingsService.FindIgdbTwitchClientIdInEnvironment();
+            return !string.IsNullOrWhiteSpace(env) ? env : (igdbTwitchClientId ?? string.Empty).Trim();
+        }
+        string CurrentIgdbTwitchClientSecret()
+        {
+            var env = SettingsService.FindIgdbTwitchClientSecretInEnvironment();
+            return !string.IsNullOrWhiteSpace(env) ? env : (igdbTwitchClientSecret ?? string.Empty).Trim();
+        }
+        bool HasIgdbCredentials()
+        {
+            return !string.IsNullOrWhiteSpace(CurrentIgdbTwitchClientId())
+                && !string.IsNullOrWhiteSpace(CurrentIgdbTwitchClientSecret());
+        }
+        async Task<string> ProbeIgdbFieldsAsync(string twitchClientIdOverride, string twitchClientSecretOverride, string searchText)
+        {
+            var clientId = string.IsNullOrWhiteSpace(twitchClientIdOverride) ? CurrentIgdbTwitchClientId() : twitchClientIdOverride.Trim();
+            var clientSecret = string.IsNullOrWhiteSpace(twitchClientSecretOverride) ? CurrentIgdbTwitchClientSecret() : twitchClientSecretOverride.Trim();
+            var probe = new IgdbProbeService(AppVersion);
+            return await probe.ProbeGameFieldsAsync(clientId, clientSecret, searchText).ConfigureAwait(false);
+        }
         string CurrentSteamUserId64()
         {
             var env = SettingsService.FindSteamUserId64InEnvironment();

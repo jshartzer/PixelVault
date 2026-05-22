@@ -20,6 +20,11 @@ namespace PixelVaultNative
     public sealed partial class MainWindow
     {
         readonly Dictionary<string, Window> _libraryGameProfileWindows = new Dictionary<string, Window>(StringComparer.OrdinalIgnoreCase);
+        readonly object _libraryGameProfileIgdbSeriesCacheLock = new object();
+        readonly Dictionary<string, List<IgdbGameMetadata>> _libraryGameProfileIgdbSeriesCache = new Dictionary<string, List<IgdbGameMetadata>>(StringComparer.OrdinalIgnoreCase);
+        readonly Dictionary<string, Task<List<IgdbGameMetadata>>> _libraryGameProfileIgdbSeriesInflight = new Dictionary<string, Task<List<IgdbGameMetadata>>>(StringComparer.OrdinalIgnoreCase);
+        readonly Dictionary<string, List<IgdbGameMetadata>> _libraryGameProfileIgdbDeveloperCache = new Dictionary<string, List<IgdbGameMetadata>>(StringComparer.OrdinalIgnoreCase);
+        readonly Dictionary<string, Task<List<IgdbGameMetadata>>> _libraryGameProfileIgdbDeveloperInflight = new Dictionary<string, Task<List<IgdbGameMetadata>>>(StringComparer.OrdinalIgnoreCase);
 
         internal void LibraryBrowserOpenGameProfile(Window owner, LibraryBrowserFolderView view)
         {
@@ -40,6 +45,8 @@ namespace PixelVaultNative
 
         void ShowLibraryGameProfileWindow(Window owner, LibraryBrowserFolderView view, LibraryFolderInfo folder)
         {
+            ApplyCachedIgdbMetadataToLibraryGameProfileFolder(folder);
+            EnsureLibraryGameProfileIgdbMetadataCachedBeforeOpen(folder);
             var key = LibraryGameProfileWindowKey(folder);
             if (!string.IsNullOrEmpty(key)
                 && _libraryGameProfileWindows.TryGetValue(key, out var existing)
@@ -65,7 +72,8 @@ namespace PixelVaultNative
                 MinHeight = 640,
                 Owner = owner,
                 WindowStartupLocation = owner == null ? WindowStartupLocation.CenterScreen : WindowStartupLocation.CenterOwner,
-                Background = Brush("#0B1116")
+                Background = Brush("#0B1116"),
+                Tag = folder
             };
             AutomationProperties.SetName(win, "Game Profile - " + title);
 
@@ -182,6 +190,12 @@ namespace PixelVaultNative
                 statsHost.Content = BuildLibraryGameProfileStats(metrics, steamStats);
             };
             body.Children.Add(BuildLibraryGameProfileNotesCard(win, view, folder, out refreshNotesCard));
+            var relatedGamesHost = new ContentControl
+            {
+                Content = BuildLibraryGameProfileEmptyCard("Checking IGDB related games...")
+            };
+            body.Children.Add(relatedGamesHost);
+            BeginLoadLibraryGameProfileRelatedGames(win, relatedGamesHost, view, folder, lifetimeCts.Token);
             body.Children.Add(BuildLibraryGameProfileCaptureFilmstrip(win, view, orderedFilePaths));
             var achievementHost = new StackPanel { Margin = new Thickness(0, 24, 0, 0) };
             body.Children.Add(achievementHost);
@@ -224,6 +238,55 @@ namespace PixelVaultNative
             if (!string.IsNullOrEmpty(key)) _libraryGameProfileWindows[key] = win;
             win.Show();
             win.Activate();
+        }
+
+        void ApplyCachedIgdbMetadataToLibraryGameProfileFolder(LibraryFolderInfo folder)
+        {
+            if (folder == null || librarySession == null || !librarySession.HasLibraryRoot) return;
+            try
+            {
+                var rows = GetSavedGameIndexRowsForRoot(librarySession.LibraryRoot);
+                var saved = FindSavedGameIndexRow(rows, folder);
+                if (saved != null) ApplyIgdbSavedFieldsToFolder(folder, saved);
+            }
+            catch (Exception ex)
+            {
+                LogException("Game profile | apply cached IGDB metadata", ex);
+            }
+        }
+
+        void EnsureLibraryGameProfileIgdbMetadataCachedBeforeOpen(LibraryFolderInfo folder)
+        {
+            if (folder == null || !LibraryGameProfileNeedsIgdbHeroInfo(folder)) return;
+            var clientId = CurrentIgdbTwitchClientId();
+            var secret = CurrentIgdbTwitchClientSecret();
+            if (string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(secret)) return;
+            try
+            {
+                var service = new IgdbProbeService(AppVersion);
+                var metadata = Task.Run(() => service.ResolveGameMetadataAsync(
+                    clientId,
+                    secret,
+                    folder.IgdbId,
+                    folder.Name,
+                    CancellationToken.None)).GetAwaiter().GetResult();
+                if (metadata == null) return;
+                ApplyIgdbMetadataToFolder(folder, metadata);
+                SaveLibraryGameProfileIgdbMetadataToLocalCache(folder, metadata);
+                ApplyCachedIgdbMetadataToLibraryGameProfileFolder(folder);
+            }
+            catch (Exception ex)
+            {
+                LogException("Game profile | sync IGDB metadata before open", ex);
+            }
+        }
+
+        static bool LibraryGameProfileNeedsIgdbHeroInfo(LibraryFolderInfo folder)
+        {
+            if (folder == null) return false;
+            return string.IsNullOrWhiteSpace(folder.IgdbSummary)
+                || string.IsNullOrWhiteSpace(folder.IgdbReleaseDate)
+                || string.IsNullOrWhiteSpace(folder.IgdbDeveloper);
         }
 
         // Snapshot of the numbers the dashboard top-strip and hero summary line share.
@@ -355,7 +418,7 @@ namespace PixelVaultNative
             content.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             content.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = 0 });
-            content.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(500), MinWidth = 420 });
             const double profileCoverWidth = 184d;
             var profileCoverCorner = new CornerRadius(18);
             var coverArt = CreateAsyncImageTile(
@@ -423,7 +486,7 @@ namespace PixelVaultNative
 
             // Copy column top-aligned inside fixed-height hero so long titles ellipsize
             // instead of growing the header when the window is resized wider.
-            var copy = new StackPanel { Margin = new Thickness(24, 0, 8, 0), VerticalAlignment = VerticalAlignment.Top };
+            var copy = new StackPanel { Margin = new Thickness(24, 0, 26, 0), VerticalAlignment = VerticalAlignment.Top };
             copy.Children.Add(new TextBlock
             {
                 Text = folder.Name ?? "Game Profile",
@@ -444,15 +507,10 @@ namespace PixelVaultNative
                 badges.Children.Add(badge);
             }
             if (badges.Children.Count > 0) copy.Children.Add(badges);
-            // Row 0 only: identity text + platform badges + external-ID pills. Edit /
+            var heroInfo = BuildLibraryGameProfileHeroInfo(folder);
+            if (heroInfo != null) copy.Children.Add(heroInfo);
+            // Row 0 only: identity text + platform badges. Edit /
             // Open / Change Art live on row 1 (left); Favorite / Showcase / 100% on row 1 (right).
-            var idPills = BuildLibraryGameProfileIdPills(folder);
-            if (idPills is FrameworkElement idFe)
-            {
-                idFe.HorizontalAlignment = HorizontalAlignment.Left;
-                idFe.Margin = new Thickness(0, 6, 0, 0);
-                copy.Children.Add(idFe);
-            }
             Grid.SetRow(copy, 0);
             Grid.SetColumn(copy, 1);
             content.Children.Add(copy);
@@ -502,22 +560,88 @@ namespace PixelVaultNative
         {
             var logoPath = GetLibraryHeroLogoPathForDisplayOnly(folder);
             if (string.IsNullOrWhiteSpace(logoPath) || !File.Exists(logoPath)) return null;
+            var host = new Grid
+            {
+                Width = 500,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(38, 0, 12, 0)
+            };
             var logo = new Image
             {
-                MaxWidth = 320,
-                MaxHeight = 200,
+                MaxWidth = 430,
+                MaxHeight = 210,
                 Stretch = Stretch.Uniform,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(20, 0, 0, 0),
                 Visibility = Visibility.Collapsed
             };
+            host.Children.Add(logo);
             QueueImageLoad(logo, logoPath, 720, loaded =>
             {
                 logo.Source = loaded;
                 logo.Visibility = Visibility.Visible;
             }, true);
-            return logo;
+            return host;
+        }
+
+        FrameworkElement BuildLibraryGameProfileHeroInfo(LibraryFolderInfo folder)
+        {
+            if (folder == null) return null;
+            var year = ResolveLibraryGameProfileReleaseYear(folder.IgdbReleaseDate);
+            var developer = (folder.IgdbDeveloper ?? string.Empty).Trim();
+            var summary = (folder.IgdbSummary ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(year) && string.IsNullOrWhiteSpace(developer) && string.IsNullOrWhiteSpace(summary))
+                return null;
+
+            var stack = new StackPanel { Margin = new Thickness(0, 18, 0, 0), MaxWidth = 690 };
+            var facts = new WrapPanel { Margin = new Thickness(0, 0, 0, string.IsNullOrWhiteSpace(summary) ? 0 : 8) };
+            if (!string.IsNullOrWhiteSpace(year)) facts.Children.Add(BuildLibraryGameProfileHeroFact("Release Year", year));
+            if (!string.IsNullOrWhiteSpace(developer)) facts.Children.Add(BuildLibraryGameProfileHeroFact("Developer", developer));
+            if (facts.Children.Count > 0) stack.Children.Add(facts);
+            if (!string.IsNullOrWhiteSpace(summary))
+            {
+                stack.Children.Add(new TextBlock
+                {
+                    Text = summary,
+                    Foreground = Brush("#D7E2EA"),
+                    FontSize = 14,
+                    LineHeight = 20,
+                    TextWrapping = TextWrapping.Wrap,
+                    MaxHeight = 84,
+                    TextTrimming = TextTrimming.CharacterEllipsis,
+                    Opacity = 0.94
+                });
+            }
+            return stack;
+        }
+
+        FrameworkElement BuildLibraryGameProfileHeroFact(string label, string value)
+        {
+            var row = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Margin = new Thickness(0, 0, 18, 7)
+            };
+            row.Children.Add(new TextBlock
+            {
+                Text = label + " ",
+                Foreground = Brush("#8FA4B0"),
+                FontSize = 12.5,
+                FontWeight = FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center
+            });
+            row.Children.Add(new TextBlock
+            {
+                Text = value ?? string.Empty,
+                Foreground = Brushes.White,
+                FontSize = 13.5,
+                FontWeight = FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center,
+                MaxWidth = 360,
+                TextTrimming = TextTrimming.CharacterEllipsis
+            });
+            return row;
         }
 
         IEnumerable<string> ResolveLibraryGameProfilePlatformLabels(LibraryBrowserFolderView view, LibraryFolderInfo folder)
@@ -1486,6 +1610,525 @@ namespace PixelVaultNative
             };
         }
 
+        sealed class LibraryGameProfileSeriesItem
+        {
+            public IgdbGameMetadata Metadata;
+            public LibraryFolderInfo LocalFolder;
+            public bool IsCurrent;
+        }
+
+        sealed class LibraryGameProfileRelatedGamesResult
+        {
+            public IReadOnlyList<LibraryGameProfileSeriesItem> SeriesItems;
+            public IReadOnlyList<LibraryGameProfileSeriesItem> DeveloperItems;
+            public string DeveloperName = string.Empty;
+        }
+
+        void BeginLoadLibraryGameProfileRelatedGames(Window profileWindow, ContentControl host, LibraryBrowserFolderView view, LibraryFolderInfo folder, CancellationToken cancellationToken)
+        {
+            if (host == null || folder == null) return;
+            _ = Task.Run(async delegate
+            {
+                try
+                {
+                    var result = await LoadLibraryGameProfileRelatedGamesAsync(folder, cancellationToken).ConfigureAwait(false);
+                    if (profileWindow == null || profileWindow.Dispatcher == null) return;
+                    await profileWindow.Dispatcher.InvokeAsync(new Action(delegate
+                    {
+                        if (host != null)
+                            host.Content = result == null || ((result.SeriesItems == null || result.SeriesItems.Count == 0) && (result.DeveloperItems == null || result.DeveloperItems.Count == 0))
+                                ? null
+                                : BuildLibraryGameProfileRelatedGamesSection(profileWindow, view, folder, result);
+                    }), DispatcherPriority.Background);
+                }
+                catch (OperationCanceledException)
+                {
+                }
+                catch (Exception ex)
+                {
+                    LogException("Game profile | IGDB related games", ex);
+                    if (profileWindow == null || profileWindow.Dispatcher == null) return;
+                    await profileWindow.Dispatcher.InvokeAsync(new Action(delegate
+                    {
+                        if (host != null) host.Content = null;
+                    }), DispatcherPriority.Background);
+                }
+            }, cancellationToken);
+        }
+
+        async Task<LibraryGameProfileRelatedGamesResult> LoadLibraryGameProfileRelatedGamesAsync(LibraryFolderInfo folder, CancellationToken cancellationToken)
+        {
+            var result = new LibraryGameProfileRelatedGamesResult();
+            result.SeriesItems = await LoadLibraryGameProfileSeriesItemsAsync(folder, cancellationToken).ConfigureAwait(false);
+            var developer = await LoadLibraryGameProfileDeveloperItemsAsync(folder, cancellationToken).ConfigureAwait(false);
+            if (developer != null)
+            {
+                result.DeveloperItems = developer.Items;
+                result.DeveloperName = developer.DeveloperName ?? string.Empty;
+            }
+            return result;
+        }
+
+        sealed class LibraryGameProfileDeveloperItemsResult
+        {
+            public IReadOnlyList<LibraryGameProfileSeriesItem> Items;
+            public string DeveloperName = string.Empty;
+        }
+
+        async Task<IReadOnlyList<LibraryGameProfileSeriesItem>> LoadLibraryGameProfileSeriesItemsAsync(LibraryFolderInfo folder, CancellationToken cancellationToken)
+        {
+            if (folder == null || string.IsNullOrWhiteSpace(folder.Name)) return null;
+            var clientId = CurrentIgdbTwitchClientId();
+            var secret = CurrentIgdbTwitchClientSecret();
+            if (string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(secret)) return null;
+
+            var service = new IgdbProbeService(AppVersion);
+            var collectionId = folder.IgdbCollectionId ?? string.Empty;
+            var franchiseId = folder.IgdbFranchiseId ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(collectionId) || string.IsNullOrWhiteSpace(folder.IgdbId))
+            {
+                var metadata = await service.ResolveGameMetadataAsync(clientId, secret, folder.IgdbId, folder.Name, cancellationToken).ConfigureAwait(false);
+                if (metadata != null)
+                {
+                    if (string.IsNullOrWhiteSpace(collectionId)) collectionId = metadata.CollectionId ?? string.Empty;
+                    if (string.IsNullOrWhiteSpace(franchiseId)) franchiseId = metadata.FranchiseId ?? string.Empty;
+                    SaveLibraryGameProfileIgdbMetadataToLocalCache(folder, metadata);
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(collectionId) && string.IsNullOrWhiteSpace(franchiseId)) return null;
+            var games = await LoadLibraryGameProfileSeriesGamesCachedAsync(service, clientId, secret, collectionId, franchiseId, cancellationToken).ConfigureAwait(false);
+            if (games == null || games.Count <= 1) return null;
+            return BuildLibraryGameProfileSeriesItems(games, folder);
+        }
+
+        async Task<LibraryGameProfileDeveloperItemsResult> LoadLibraryGameProfileDeveloperItemsAsync(LibraryFolderInfo folder, CancellationToken cancellationToken)
+        {
+            if (folder == null || string.IsNullOrWhiteSpace(folder.Name)) return null;
+            var clientId = CurrentIgdbTwitchClientId();
+            var secret = CurrentIgdbTwitchClientSecret();
+            if (string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(secret)) return null;
+
+            var service = new IgdbProbeService(AppVersion);
+            var metadata = await service.ResolveGameMetadataAsync(clientId, secret, folder.IgdbId, folder.Name, cancellationToken).ConfigureAwait(false);
+            if (metadata != null) SaveLibraryGameProfileIgdbMetadataToLocalCache(folder, metadata);
+            var developerId = metadata == null ? string.Empty : metadata.DeveloperId;
+            var developerName = metadata == null || string.IsNullOrWhiteSpace(metadata.Developer)
+                ? (folder.IgdbDeveloper ?? string.Empty)
+                : metadata.Developer;
+            if (string.IsNullOrWhiteSpace(developerId)) return null;
+
+            var games = await LoadLibraryGameProfileDeveloperGamesCachedAsync(service, clientId, secret, developerId, cancellationToken).ConfigureAwait(false);
+            if (games == null || games.Count <= 1) return null;
+            return new LibraryGameProfileDeveloperItemsResult
+            {
+                Items = BuildLibraryGameProfileSeriesItems(games, folder),
+                DeveloperName = developerName
+            };
+        }
+
+        void SaveLibraryGameProfileIgdbMetadataToLocalCache(LibraryFolderInfo folder, IgdbGameMetadata metadata)
+        {
+            if (folder == null || metadata == null || librarySession == null || !librarySession.HasLibraryRoot) return;
+            try
+            {
+                var cached = CloneLibraryFolderInfo(folder) ?? new LibraryFolderInfo();
+                ApplyIgdbMetadataToFolder(cached, metadata);
+                UpsertSavedGameIndexRow(librarySession.LibraryRoot, cached);
+            }
+            catch (Exception ex)
+            {
+                LogException("Game profile | cache IGDB metadata", ex);
+            }
+        }
+
+        async Task<List<IgdbGameMetadata>> LoadLibraryGameProfileSeriesGamesCachedAsync(
+            IgdbProbeService service,
+            string clientId,
+            string secret,
+            string collectionId,
+            string franchiseId,
+            CancellationToken cancellationToken)
+        {
+            var key = !string.IsNullOrWhiteSpace(collectionId)
+                ? "related-v2:collection:" + collectionId.Trim()
+                : "related-v2:franchise:" + (franchiseId ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(key) || key.EndsWith(":", StringComparison.Ordinal)) return new List<IgdbGameMetadata>();
+
+            Task<List<IgdbGameMetadata>> run;
+            lock (_libraryGameProfileIgdbSeriesCacheLock)
+            {
+                List<IgdbGameMetadata> cached;
+                if (_libraryGameProfileIgdbSeriesCache.TryGetValue(key, out cached))
+                    return cached == null ? new List<IgdbGameMetadata>() : new List<IgdbGameMetadata>(cached);
+
+                Task<List<IgdbGameMetadata>> existing;
+                if (_libraryGameProfileIgdbSeriesInflight.TryGetValue(key, out existing))
+                {
+                    run = existing;
+                }
+                else
+                {
+                    run = service.LoadSeriesGamesAsync(clientId, secret, collectionId, franchiseId, CancellationToken.None);
+                    _libraryGameProfileIgdbSeriesInflight[key] = run;
+                    _ = run.ContinueWith(t =>
+                    {
+                        lock (_libraryGameProfileIgdbSeriesCacheLock)
+                        {
+                            _libraryGameProfileIgdbSeriesInflight.Remove(key);
+                            if (t.Status == TaskStatus.RanToCompletion)
+                                _libraryGameProfileIgdbSeriesCache[key] = t.Result ?? new List<IgdbGameMetadata>();
+                        }
+                    }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+                }
+            }
+            var result = await run.WaitAsync(cancellationToken).ConfigureAwait(false);
+            return result == null ? new List<IgdbGameMetadata>() : new List<IgdbGameMetadata>(result);
+        }
+
+        async Task<List<IgdbGameMetadata>> LoadLibraryGameProfileDeveloperGamesCachedAsync(
+            IgdbProbeService service,
+            string clientId,
+            string secret,
+            string developerCompanyId,
+            CancellationToken cancellationToken)
+        {
+            var key = "related-v2:developer:" + (developerCompanyId ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(developerCompanyId) || key.EndsWith(":", StringComparison.Ordinal)) return new List<IgdbGameMetadata>();
+
+            Task<List<IgdbGameMetadata>> run;
+            lock (_libraryGameProfileIgdbSeriesCacheLock)
+            {
+                List<IgdbGameMetadata> cached;
+                if (_libraryGameProfileIgdbDeveloperCache.TryGetValue(key, out cached))
+                    return cached == null ? new List<IgdbGameMetadata>() : new List<IgdbGameMetadata>(cached);
+
+                Task<List<IgdbGameMetadata>> existing;
+                if (_libraryGameProfileIgdbDeveloperInflight.TryGetValue(key, out existing))
+                {
+                    run = existing;
+                }
+                else
+                {
+                    run = service.LoadDeveloperGamesAsync(clientId, secret, developerCompanyId, CancellationToken.None);
+                    _libraryGameProfileIgdbDeveloperInflight[key] = run;
+                    _ = run.ContinueWith(t =>
+                    {
+                        lock (_libraryGameProfileIgdbSeriesCacheLock)
+                        {
+                            _libraryGameProfileIgdbDeveloperInflight.Remove(key);
+                            if (t.Status == TaskStatus.RanToCompletion)
+                                _libraryGameProfileIgdbDeveloperCache[key] = t.Result ?? new List<IgdbGameMetadata>();
+                        }
+                    }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+                }
+            }
+            var result = await run.WaitAsync(cancellationToken).ConfigureAwait(false);
+            return result == null ? new List<IgdbGameMetadata>() : new List<IgdbGameMetadata>(result);
+        }
+
+        static void ApplyIgdbMetadataToFolder(LibraryFolderInfo folder, IgdbGameMetadata metadata)
+        {
+            if (folder == null || metadata == null) return;
+            folder.IgdbId = metadata.Id ?? string.Empty;
+            folder.IgdbSlug = metadata.Slug ?? string.Empty;
+            folder.IgdbCollectionId = metadata.CollectionId ?? string.Empty;
+            folder.IgdbCollectionName = metadata.CollectionName ?? string.Empty;
+            folder.IgdbFranchiseId = metadata.FranchiseId ?? string.Empty;
+            folder.IgdbFranchiseName = metadata.FranchiseName ?? string.Empty;
+            folder.IgdbSummary = metadata.Summary ?? string.Empty;
+            folder.IgdbReleaseDate = metadata.ReleaseDate ?? string.Empty;
+            folder.IgdbGenres = metadata.Genres ?? string.Empty;
+            folder.IgdbPlatforms = metadata.Platforms ?? string.Empty;
+            folder.IgdbDeveloper = metadata.Developer ?? string.Empty;
+            folder.IgdbPublisher = metadata.Publisher ?? string.Empty;
+            folder.IgdbCoverImageId = metadata.CoverImageId ?? string.Empty;
+            folder.IgdbFetchedUtcTicks = DateTime.UtcNow.Ticks;
+        }
+
+        List<LibraryGameProfileSeriesItem> BuildLibraryGameProfileSeriesItems(IReadOnlyList<IgdbGameMetadata> games, LibraryFolderInfo currentFolder)
+        {
+            var localRows = librarySession == null || !librarySession.HasLibraryRoot
+                ? new List<GameIndexEditorRow>()
+                : MergeGameIndexRows(GetSavedGameIndexRowsForRoot(librarySession.LibraryRoot) ?? new List<GameIndexEditorRow>());
+            var byIgdb = localRows
+                .Where(row => row != null && !string.IsNullOrWhiteSpace(row.IgdbId))
+                .GroupBy(row => row.IgdbId.Trim(), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+            var byTitle = localRows
+                .Where(row => row != null && !string.IsNullOrWhiteSpace(row.Name))
+                .GroupBy(row => FoldGameTitleForIdentityMatch(NormalizeGameIndexName(row.Name, row.FolderPath)), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+            var currentIgdb = (currentFolder.IgdbId ?? string.Empty).Trim();
+            var currentTitle = FoldGameTitleForIdentityMatch(NormalizeGameIndexName(currentFolder.Name, currentFolder.FolderPath));
+            return (games ?? Array.Empty<IgdbGameMetadata>())
+                .Where(game => game != null && IsLibraryGameProfileDisplayableRelatedGame(game))
+                .Select(game =>
+                {
+                    GameIndexEditorRow row = null;
+                    if (!string.IsNullOrWhiteSpace(game.Id)) byIgdb.TryGetValue(game.Id.Trim(), out row);
+                    if (row == null && !string.IsNullOrWhiteSpace(game.Name))
+                        byTitle.TryGetValue(FoldGameTitleForIdentityMatch(NormalizeGameIndexName(game.Name, string.Empty)), out row);
+                    return new LibraryGameProfileSeriesItem
+                    {
+                        Metadata = game,
+                        LocalFolder = row == null ? null : BuildLibraryFolderInfoFromGameIndexRow(row),
+                        IsCurrent = (!string.IsNullOrWhiteSpace(currentIgdb) && string.Equals(currentIgdb, game.Id ?? string.Empty, StringComparison.OrdinalIgnoreCase))
+                            || (string.IsNullOrWhiteSpace(currentIgdb) && string.Equals(currentTitle, FoldGameTitleForIdentityMatch(NormalizeGameIndexName(game.Name, string.Empty)), StringComparison.OrdinalIgnoreCase))
+                    };
+                })
+                .ToList();
+        }
+
+        static bool IsLibraryGameProfileDisplayableRelatedGame(IgdbGameMetadata game)
+        {
+            if (game == null) return false;
+            var typeId = (game.GameTypeId ?? string.Empty).Trim();
+            var typeName = (game.GameTypeName ?? string.Empty).Trim();
+            var isRemaster = typeId == "9" || string.Equals(typeName, "Remaster", StringComparison.OrdinalIgnoreCase);
+            if (isRemaster) return true;
+            var hasParent = !string.IsNullOrWhiteSpace(game.ParentGameId) || !string.IsNullOrWhiteSpace(game.VersionParentId);
+            if (hasParent) return false;
+            if (typeId == "0") return true;
+            return string.Equals(typeName, "Main Game", StringComparison.OrdinalIgnoreCase);
+        }
+
+        static LibraryFolderInfo BuildLibraryFolderInfoFromGameIndexRow(GameIndexEditorRow row)
+        {
+            if (row == null) return null;
+            return new LibraryFolderInfo
+            {
+                GameId = row.GameId,
+                Name = row.Name,
+                FolderPath = row.FolderPath,
+                FileCount = row.FileCount,
+                PreviewImagePath = row.PreviewImagePath,
+                PlatformLabel = row.PlatformLabel,
+                FilePaths = row.FilePaths,
+                SteamAppId = row.SteamAppId,
+                NonSteamId = row.NonSteamId,
+                SteamGridDbId = row.SteamGridDbId,
+                RetroAchievementsGameId = row.RetroAchievementsGameId,
+                IgdbId = row.IgdbId,
+                IgdbSlug = row.IgdbSlug,
+                IgdbCollectionId = row.IgdbCollectionId,
+                IgdbCollectionName = row.IgdbCollectionName,
+                IgdbFranchiseId = row.IgdbFranchiseId,
+                IgdbFranchiseName = row.IgdbFranchiseName,
+                IgdbSummary = row.IgdbSummary,
+                IgdbReleaseDate = row.IgdbReleaseDate,
+                IgdbGenres = row.IgdbGenres,
+                IgdbPlatforms = row.IgdbPlatforms,
+                IgdbDeveloper = row.IgdbDeveloper,
+                IgdbPublisher = row.IgdbPublisher,
+                IgdbCoverImageId = row.IgdbCoverImageId,
+                IgdbHiddenSeriesIds = row.IgdbHiddenSeriesIds,
+                IgdbFetchedUtcTicks = row.IgdbFetchedUtcTicks,
+                IsCompleted100Percent = row.IsCompleted100Percent,
+                CompletedUtcTicks = row.CompletedUtcTicks,
+                IsFavorite = row.IsFavorite,
+                IsShowcase = row.IsShowcase,
+                CollectionNotes = row.CollectionNotes,
+                StorageGroupId = row.StorageGroupId
+            };
+        }
+
+        FrameworkElement BuildLibraryGameProfileRelatedGamesSection(Window profileWindow, LibraryBrowserFolderView view, LibraryFolderInfo folder, LibraryGameProfileRelatedGamesResult result)
+        {
+            var grid = new Grid { Margin = new Thickness(0, 18, 0, 0) };
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(18) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+            var series = BuildLibraryGameProfileSeriesSection(profileWindow, view, folder, result == null ? null : result.SeriesItems, new Thickness(0), "Other Games In This Series", ResolveLibraryGameProfileSeriesName(folder));
+            var developer = BuildLibraryGameProfileSeriesSection(profileWindow, view, folder, result == null ? null : result.DeveloperItems, new Thickness(0), "Other Games By This Developer", result == null ? string.Empty : result.DeveloperName);
+
+            if (series != null)
+            {
+                Grid.SetColumn(series, 0);
+                if (developer == null) Grid.SetColumnSpan(series, 3);
+                grid.Children.Add(series);
+            }
+            if (developer != null)
+            {
+                Grid.SetColumn(developer, series == null ? 0 : 2);
+                if (series == null) Grid.SetColumnSpan(developer, 3);
+                grid.Children.Add(developer);
+            }
+            return grid.Children.Count == 0 ? null : grid;
+        }
+
+        static string ResolveLibraryGameProfileSeriesName(LibraryFolderInfo folder)
+        {
+            var seriesNameRaw = !string.IsNullOrWhiteSpace(folder == null ? string.Empty : folder.IgdbCollectionName)
+                ? folder.IgdbCollectionName
+                : (folder == null ? string.Empty : folder.IgdbFranchiseName);
+            return string.IsNullOrWhiteSpace(seriesNameRaw)
+                ? "this series"
+                : seriesNameRaw.Trim();
+        }
+
+        FrameworkElement BuildLibraryGameProfileSeriesSection(Window profileWindow, LibraryBrowserFolderView view, LibraryFolderInfo folder, IReadOnlyList<LibraryGameProfileSeriesItem> items, Thickness margin, string title, string subtitle)
+        {
+            if (items == null || items.Count == 0) return null;
+            var section = new StackPanel { Margin = margin };
+            section.Children.Add(BuildLibraryGameProfileSectionTitle(title, subtitle));
+            var hiddenIds = ParseLibraryGameProfileHiddenSeriesIds(igdbHiddenSeriesIds);
+            var row = new StackPanel { Orientation = Orientation.Horizontal };
+            foreach (var item in items ?? Array.Empty<LibraryGameProfileSeriesItem>())
+            {
+                if (item == null || item.Metadata == null) continue;
+                if (!string.IsNullOrWhiteSpace(item.Metadata.Id) && hiddenIds.Contains(item.Metadata.Id.Trim())) continue;
+                row.Children.Add(BuildLibraryGameProfileSeriesTile(profileWindow, view, item, row));
+            }
+            if (row.Children.Count == 0) return section;
+            var scroller = new ScrollViewer
+            {
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Hidden,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                Padding = new Thickness(0, 0, 0, 0),
+                Content = row
+            };
+            section.Children.Add(BuildLibraryGameProfileHorizontalRail(scroller, 120d, new Thickness(0, 10, 0, 0)));
+            return section;
+        }
+
+        FrameworkElement BuildLibraryGameProfileSeriesTile(Window profileWindow, LibraryBrowserFolderView view, LibraryGameProfileSeriesItem item, Panel ownerPanel)
+        {
+            const double w = 86d;
+            const double h = 116d;
+            var inLibrary = item.LocalFolder != null;
+            var metadata = item.Metadata;
+            var outer = new Border
+            {
+                Width = w,
+                Height = h,
+                Margin = new Thickness(0, 0, 10, 0),
+                CornerRadius = new CornerRadius(8),
+                Background = Brush("#101820"),
+                BorderBrush = item.IsCurrent ? Brush("#8EC5F4") : Brush(inLibrary ? "#3E5665" : "#25323B"),
+                BorderThickness = item.IsCurrent ? new Thickness(2) : new Thickness(1),
+                Cursor = Cursors.Hand,
+                Opacity = inLibrary ? 1.0 : 0.42,
+                ToolTip = (metadata.Name ?? "IGDB game")
+                    + (inLibrary ? " - In library" : " - Not in library - Open IGDB")
+            };
+            var grid = new Grid();
+            var image = new Image { Stretch = Stretch.UniformToFill };
+            grid.Children.Add(image);
+            var coverUrl = IgdbProbeService.BuildIgdbCoverUrl(metadata.CoverImageId, "t_cover_small");
+            SetRemoteImageSource(image, coverUrl, 190);
+            if (string.IsNullOrWhiteSpace(coverUrl))
+            {
+                grid.Children.Add(new TextBlock
+                {
+                    Text = metadata.Name ?? string.Empty,
+                    Foreground = Brushes.White,
+                    TextWrapping = TextWrapping.Wrap,
+                    TextAlignment = TextAlignment.Center,
+                    FontSize = 10,
+                    Margin = new Thickness(6),
+                    VerticalAlignment = VerticalAlignment.Center
+                });
+            }
+            if (!inLibrary)
+            {
+                grid.Children.Add(new Border { Background = new SolidColorBrush(Color.FromArgb(88, 0, 0, 0)) });
+            }
+            outer.Child = grid;
+            outer.MouseEnter += delegate { outer.Opacity = inLibrary ? 1.0 : 0.62; };
+            outer.MouseLeave += delegate { outer.Opacity = inLibrary ? 1.0 : 0.42; };
+            outer.MouseLeftButtonUp += delegate(object _, MouseButtonEventArgs e)
+            {
+                if (e.ChangedButton != MouseButton.Left) return;
+                e.Handled = true;
+                if (inLibrary)
+                    ShowLibraryGameProfileWindow(profileWindow ?? this, null, item.LocalFolder);
+                else
+                    TryOpenLibraryGameProfileExternalUrl(IgdbProbeService.BuildIgdbGameUrl(metadata.Slug));
+            };
+            var menu = new ContextMenu();
+            var hide = new MenuItem { Header = "Hide this cover" };
+            hide.Click += delegate
+            {
+                HideLibraryGameProfileSeriesCover(profileWindow, item, outer, ownerPanel);
+            };
+            menu.Items.Add(hide);
+            outer.ContextMenu = menu;
+            AutomationProperties.SetName(outer, metadata.Name + (inLibrary ? " in library" : " not in library"));
+            return outer;
+        }
+
+        void HideLibraryGameProfileSeriesCover(Window profileWindow, LibraryGameProfileSeriesItem item, UIElement tile, Panel ownerPanel)
+        {
+            if (item == null || item.Metadata == null || string.IsNullOrWhiteSpace(item.Metadata.Id)) return;
+            var ownerFolder = profileWindow == null ? null : profileWindow.Tag as LibraryFolderInfo;
+            if (ownerFolder == null) return;
+            var ids = ParseLibraryGameProfileHiddenSeriesIds(igdbHiddenSeriesIds);
+            ids.Add(item.Metadata.Id.Trim());
+            igdbHiddenSeriesIds = string.Join("|", ids.OrderBy(v => v, StringComparer.OrdinalIgnoreCase));
+            SaveSettings();
+            TryLibraryToast("Hidden from series strips.", MessageBoxImage.Information);
+            if (ownerPanel != null && tile != null && ownerPanel.Children.Contains(tile))
+            {
+                ownerPanel.Children.Remove(tile);
+            }
+        }
+
+        static HashSet<string> ParseLibraryGameProfileHiddenSeriesIds(string value)
+        {
+            return new HashSet<string>(
+                (value ?? string.Empty).Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries)
+                    .Select(v => v.Trim())
+                    .Where(v => !string.IsNullOrWhiteSpace(v)),
+                StringComparer.OrdinalIgnoreCase);
+        }
+
+        FrameworkElement BuildLibraryGameProfileHorizontalRail(ScrollViewer scroller, double step, Thickness margin)
+        {
+            var host = new Grid { Margin = margin };
+            host.Children.Add(scroller);
+            var left = BuildLibraryGameProfileRailArrow("\u2039", HorizontalAlignment.Left);
+            var right = BuildLibraryGameProfileRailArrow("\u203A", HorizontalAlignment.Right);
+            left.Click += delegate { ScrollLibraryGameProfileRail(scroller, -Math.Abs(step)); };
+            right.Click += delegate { ScrollLibraryGameProfileRail(scroller, Math.Abs(step)); };
+            host.Children.Add(left);
+            host.Children.Add(right);
+            return host;
+        }
+
+        Button BuildLibraryGameProfileRailArrow(string text, HorizontalAlignment alignment)
+        {
+            var button = new Button
+            {
+                Content = text,
+                Width = 44,
+                Height = 72,
+                HorizontalAlignment = alignment,
+                VerticalAlignment = VerticalAlignment.Stretch,
+                Margin = alignment == HorizontalAlignment.Left ? new Thickness(0, 0, 0, 0) : new Thickness(0, 0, 0, 0),
+                Background = Brushes.Transparent,
+                Foreground = Brushes.White,
+                BorderBrush = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                FontSize = 42,
+                FontWeight = FontWeights.SemiBold,
+                Padding = new Thickness(0),
+                Opacity = 0.38,
+                Cursor = Cursors.Hand
+            };
+            button.MouseEnter += delegate { button.Opacity = 0.76; };
+            button.MouseLeave += delegate { button.Opacity = 0.38; };
+            AutomationProperties.SetName(button, alignment == HorizontalAlignment.Left ? "Scroll left" : "Scroll right");
+            return button;
+        }
+
+        static void ScrollLibraryGameProfileRail(ScrollViewer scroller, double delta)
+        {
+            if (scroller == null) return;
+            scroller.ScrollToHorizontalOffset(Math.Max(0, scroller.HorizontalOffset + delta));
+        }
+
         // PV-PLN-GPRO-001 Phase D.2-D.4: Sessions section. Walks the per-window
         // LibraryGameProfileSessionEntry snapshot built in ShowLibraryGameProfileWindow
         // through LibraryGameProfileSessionMath, renders a header (with the threshold
@@ -1944,12 +2587,12 @@ namespace PixelVaultNative
 
             var scroller = new ScrollViewer
             {
-                HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Hidden,
                 VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
-                Padding = new Thickness(0, 0, 0, 6),
+                Padding = new Thickness(0, 0, 0, 0),
                 Content = rail
             };
-            section.Children.Add(scroller);
+            section.Children.Add(BuildLibraryGameProfileHorizontalRail(scroller, 150d, new Thickness(0, 0, 0, 0)));
             return section;
         }
 
@@ -2156,6 +2799,87 @@ namespace PixelVaultNative
                     TextWrapping = TextWrapping.Wrap
                 }
             };
+        }
+
+        FrameworkElement BuildLibraryGameProfileIgdbDetailsCard(LibraryFolderInfo folder)
+        {
+            if (folder == null) return null;
+            var year = ResolveLibraryGameProfileReleaseYear(folder.IgdbReleaseDate);
+            var developer = (folder.IgdbDeveloper ?? string.Empty).Trim();
+            var summary = (folder.IgdbSummary ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(year) && string.IsNullOrWhiteSpace(developer) && string.IsNullOrWhiteSpace(summary))
+                return null;
+
+            var card = new Border
+            {
+                Margin = new Thickness(0, 18, 0, 0),
+                Padding = new Thickness(18, 14, 18, 16),
+                CornerRadius = new CornerRadius(16),
+                Background = Brush("#111A21")
+            };
+            var stack = new StackPanel();
+            var facts = new WrapPanel { Margin = new Thickness(0, 0, 0, string.IsNullOrWhiteSpace(summary) ? 0 : 12) };
+            if (!string.IsNullOrWhiteSpace(year)) facts.Children.Add(BuildLibraryGameProfileFactPill("Release Year", year));
+            if (!string.IsNullOrWhiteSpace(developer)) facts.Children.Add(BuildLibraryGameProfileFactPill("Developer", developer));
+            if (facts.Children.Count > 0) stack.Children.Add(facts);
+            if (!string.IsNullOrWhiteSpace(summary))
+            {
+                stack.Children.Add(new TextBlock
+                {
+                    Text = summary,
+                    Foreground = Brush("#D2DFE7"),
+                    FontSize = 14,
+                    TextWrapping = TextWrapping.Wrap,
+                    LineHeight = 20
+                });
+            }
+            card.Child = stack;
+            return card;
+        }
+
+        FrameworkElement BuildLibraryGameProfileFactPill(string label, string value)
+        {
+            var outer = new Border
+            {
+                Background = Brush("#16232C"),
+                BorderBrush = Brush("#263640"),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(10),
+                Padding = new Thickness(11, 7, 11, 8),
+                Margin = new Thickness(0, 0, 8, 8)
+            };
+            var row = new StackPanel { Orientation = Orientation.Horizontal };
+            row.Children.Add(new TextBlock
+            {
+                Text = label + " ",
+                Foreground = Brush("#86A0AE"),
+                FontSize = 12,
+                FontWeight = FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center
+            });
+            row.Children.Add(new TextBlock
+            {
+                Text = value ?? string.Empty,
+                Foreground = Brushes.White,
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center,
+                TextWrapping = TextWrapping.NoWrap,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                MaxWidth = 420
+            });
+            outer.Child = row;
+            return outer;
+        }
+
+        static string ResolveLibraryGameProfileReleaseYear(string releaseDate)
+        {
+            var trimmed = (releaseDate ?? string.Empty).Trim();
+            if (trimmed.Length >= 4 && trimmed.Take(4).All(char.IsDigit)) return trimmed.Substring(0, 4);
+            DateTime parsed;
+            return DateTime.TryParse(trimmed, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out parsed)
+                ? parsed.Year.ToString(CultureInfo.InvariantCulture)
+                : string.Empty;
         }
 
         // Game Notes card (PV-PLN-GPRO-001 step B.1). Renders folder.CollectionNotes

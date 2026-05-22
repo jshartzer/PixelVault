@@ -53,6 +53,7 @@ namespace PixelVaultNative
             Batteries_V2.Init();
             var app = new Application();
             MergeGlobalScrollBarTheme(app);
+            PixelVaultWindowChromeStyler.Install(app);
             app.Run(new MainWindow());
         }
     }
@@ -103,6 +104,9 @@ namespace PixelVaultNative
         string steamGridDbApiToken;
         string steamWebApiKey;
         string retroAchievementsApiKey;
+        string igdbTwitchClientId;
+        string igdbTwitchClientSecret;
+        string igdbHiddenSeriesIds;
         string steamUserId64;
         string retroAchievementsUsername;
         int libraryFolderTileSize = 300;
@@ -864,9 +868,6 @@ namespace PixelVaultNative
         string FormatViewKeyForTroubleshooting(string viewKey) => troubleshootingLog.FormatViewKey(viewKey);
     }
 }
-
-
-
 
 
 

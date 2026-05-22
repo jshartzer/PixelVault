@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace PixelVaultNative
 {
@@ -202,15 +203,117 @@ namespace PixelVaultNative
             var hint = parse.GameTitleHint ?? string.Empty;
             if (!string.IsNullOrWhiteSpace(hint))
             {
-                var wanted = buildGameIndexIdentity(hint, parse.PlatformLabel ?? "Other");
-                foreach (var r in list)
+                var direct = TryResolveGameIndexRowByTitleIdentity(hint, parse.PlatformLabel ?? "Other", list, buildGameIndexIdentity);
+                if (direct != null) return direct;
+
+                var aliasMatches = new List<GameIndexEditorRow>();
+                foreach (var alias in BuildImportTitleAliasCandidates(hint, plat).Skip(1))
                 {
-                    if (string.Equals(buildGameIndexIdentity(r.Name ?? string.Empty, r.PlatformLabel ?? "Other"), wanted, StringComparison.OrdinalIgnoreCase))
-                        return r;
+                    var match = TryResolveGameIndexRowByTitleIdentity(alias, parse.PlatformLabel ?? "Other", list, buildGameIndexIdentity);
+                    if (match == null || aliasMatches.Any(row => ReferenceEquals(row, match))) continue;
+                    aliasMatches.Add(match);
                 }
+                if (aliasMatches.Count == 1) return aliasMatches[0];
             }
 
             return null;
+        }
+
+        static GameIndexEditorRow TryResolveGameIndexRowByTitleIdentity(
+            string title,
+            string platformLabel,
+            IReadOnlyList<GameIndexEditorRow> rows,
+            Func<string, string, string> buildGameIndexIdentity)
+        {
+            if (string.IsNullOrWhiteSpace(title) || rows == null || buildGameIndexIdentity == null) return null;
+            var wanted = buildGameIndexIdentity(title, platformLabel ?? "Other");
+            foreach (var r in rows)
+            {
+                if (r == null) continue;
+                if (string.Equals(buildGameIndexIdentity(r.Name ?? string.Empty, r.PlatformLabel ?? "Other"), wanted, StringComparison.OrdinalIgnoreCase))
+                    return r;
+            }
+            return null;
+        }
+
+        internal static IReadOnlyList<string> BuildImportTitleAliasCandidates(string title, string normalizedPlatformLabel)
+        {
+            var candidates = new List<string>();
+
+            void Add(string value)
+            {
+                var cleaned = (value ?? string.Empty).Trim();
+                if (string.IsNullOrWhiteSpace(cleaned)) return;
+                if (!candidates.Contains(cleaned, StringComparer.OrdinalIgnoreCase))
+                    candidates.Add(cleaned);
+            }
+
+            Add(title);
+            if (!string.Equals(normalizedPlatformLabel ?? string.Empty, "Emulation", StringComparison.OrdinalIgnoreCase))
+                return candidates;
+
+            var seeds = new List<string>();
+            void AddSeed(string value)
+            {
+                var cleaned = (value ?? string.Empty).Trim();
+                if (string.IsNullOrWhiteSpace(cleaned)) return;
+                if (!seeds.Contains(cleaned, StringComparer.OrdinalIgnoreCase))
+                    seeds.Add(cleaned);
+            }
+
+            AddSeed(title);
+            AddSeed(StripTrailingRomMetadataTags(title));
+
+            foreach (var seed in seeds.ToArray())
+            {
+                Add(seed);
+                Add(FilenameParserService.NormalizeGameTitleHint(seed));
+                var articleFixed = MoveTrailingArticleToFront(seed);
+                Add(articleFixed);
+                Add(FilenameParserService.NormalizeGameTitleHint(articleFixed));
+            }
+
+            return candidates;
+        }
+
+        internal static string StripTrailingRomMetadataTags(string title)
+        {
+            var current = (title ?? string.Empty).Trim();
+            while (!string.IsNullOrWhiteSpace(current))
+            {
+                var match = Regex.Match(current, @"\s*(?<tag>\([^()]*\)|\[[^\[\]]*\])\s*$", RegexOptions.CultureInvariant);
+                if (!match.Success || !IsLikelyRomMetadataTag(match.Groups["tag"].Value)) break;
+                current = current.Substring(0, match.Index).TrimEnd();
+            }
+            return current.Trim();
+        }
+
+        static bool IsLikelyRomMetadataTag(string tag)
+        {
+            var value = Regex.Replace((tag ?? string.Empty).Trim(), @"^[\(\[]|[\)\]]$", string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(value)) return false;
+            if (Regex.IsMatch(value, @"\b(USA|US|Europe|EUR|Japan|JPN|World|Korea|China|Taiwan|Australia|Germany|France|Spain|Italy|Netherlands|Brazil|Russia)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)) return true;
+            if (Regex.IsMatch(value, @"\b(Rev|Revision|Beta|Proto|Prototype|Demo|Sample|Hack|Unl|Unlicensed|Aftermarket|Virtual Console)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)) return true;
+            if (Regex.IsMatch(value, @"\bv?\d+(\.\d+)*\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)) return true;
+            if (Regex.IsMatch(value, @"^[A-Z][a-z]?(,[A-Z][a-z]?)+$", RegexOptions.CultureInvariant)) return true;
+            return false;
+        }
+
+        internal static string MoveTrailingArticleToFront(string title)
+        {
+            var cleaned = (title ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(cleaned)) return string.Empty;
+
+            var delimiter = Regex.Match(cleaned, @"\s+-\s+", RegexOptions.CultureInvariant);
+            var head = delimiter.Success ? cleaned.Substring(0, delimiter.Index).Trim() : cleaned;
+            var tail = delimiter.Success ? cleaned.Substring(delimiter.Index) : string.Empty;
+            var article = Regex.Match(head, @"^(?<name>.+),\s*(?<article>The|A|An)$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+            if (!article.Success) return cleaned;
+
+            var articleText = article.Groups["article"].Value;
+            var name = article.Groups["name"].Value.Trim();
+            if (string.IsNullOrWhiteSpace(name)) return cleaned;
+            return articleText + " " + name + tail;
         }
 
         /// <summary>

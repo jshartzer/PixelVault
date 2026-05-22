@@ -22,6 +22,12 @@ namespace PixelVaultNative
         public string SteamWebApiKey = string.Empty;
         /// <summary>RetroAchievements.org API key (optional; for future integration).</summary>
         public string RetroAchievementsApiKey = string.Empty;
+        /// <summary>Twitch Developer app Client ID used for IGDB API access.</summary>
+        public string IgdbTwitchClientId = string.Empty;
+        /// <summary>Twitch Developer app Client Secret used to fetch IGDB app access tokens.</summary>
+        public string IgdbTwitchClientSecret = string.Empty;
+        /// <summary>Pipe-delimited IGDB game IDs hidden from profile series strips.</summary>
+        public string IgdbHiddenSeriesIds = string.Empty;
         /// <summary>Your SteamID64 for Steam Web API calls that need a profile (e.g. achievement unlocks). Optional.</summary>
         public string SteamUserId64 = string.Empty;
         /// <summary>RetroAchievements site username for per-game unlock progress. Optional.</summary>
@@ -94,6 +100,9 @@ namespace PixelVaultNative
                 SteamGridDbApiToken = s.SteamGridDbApiToken ?? string.Empty,
                 SteamWebApiKey = s.SteamWebApiKey ?? string.Empty,
                 RetroAchievementsApiKey = s.RetroAchievementsApiKey ?? string.Empty,
+                IgdbTwitchClientId = s.IgdbTwitchClientId ?? string.Empty,
+                IgdbTwitchClientSecret = s.IgdbTwitchClientSecret ?? string.Empty,
+                IgdbHiddenSeriesIds = s.IgdbHiddenSeriesIds ?? string.Empty,
                 SteamUserId64 = s.SteamUserId64 ?? string.Empty,
                 RetroAchievementsUsername = s.RetroAchievementsUsername ?? string.Empty,
                 LibraryFolderTileSize = s.LibraryFolderTileSize,

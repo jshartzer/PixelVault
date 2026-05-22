@@ -151,6 +151,9 @@ public sealed class SettingsServiceTests
                 "steamgriddb_token=secret",
                 "steam_web_api_key=steamkey",
                 "retroachievements_api_key=rakey",
+                "igdb_twitch_client_id=igdbid",
+                "igdb_twitch_client_secret=igdbsecret",
+                "igdb_hidden_series_ids=71|72",
                 "library_folder_tile_size=200",
                 "library_photo_tile_size=410",
                 "library_folder_grid_columns=3",
@@ -194,6 +197,9 @@ public sealed class SettingsServiceTests
             Assert.Equal("secret", loaded.SteamGridDbApiToken);
             Assert.Equal("steamkey", loaded.SteamWebApiKey);
             Assert.Equal("rakey", loaded.RetroAchievementsApiKey);
+            Assert.Equal("igdbid", loaded.IgdbTwitchClientId);
+            Assert.Equal("igdbsecret", loaded.IgdbTwitchClientSecret);
+            Assert.Equal("71|72", loaded.IgdbHiddenSeriesIds);
             Assert.Equal(200, loaded.LibraryFolderTileSize);
             Assert.Equal(410, loaded.LibraryPhotoTileSize);
             Assert.Equal(3, loaded.LibraryFolderGridColumnCount);
@@ -261,6 +267,9 @@ public sealed class SettingsServiceTests
                 SteamGridDbApiToken = "tok",
                 SteamWebApiKey = "sw",
                 RetroAchievementsApiKey = "ra",
+                IgdbTwitchClientId = "igdb-client",
+                IgdbTwitchClientSecret = "igdb-secret",
+                IgdbHiddenSeriesIds = "71|72",
                 SteamUserId64 = "76561198000000000",
                 RetroAchievementsUsername = "pvuser",
                 LibraryFolderTileSize = 180,
@@ -300,6 +309,9 @@ public sealed class SettingsServiceTests
             Assert.Equal(original.SteamGridDbApiToken, loaded.SteamGridDbApiToken);
             Assert.Equal(original.SteamWebApiKey, loaded.SteamWebApiKey);
             Assert.Equal(original.RetroAchievementsApiKey, loaded.RetroAchievementsApiKey);
+            Assert.Equal(original.IgdbTwitchClientId, loaded.IgdbTwitchClientId);
+            Assert.Equal(original.IgdbTwitchClientSecret, loaded.IgdbTwitchClientSecret);
+            Assert.Equal(original.IgdbHiddenSeriesIds, loaded.IgdbHiddenSeriesIds);
             Assert.Equal(original.SteamUserId64, loaded.SteamUserId64);
             Assert.Equal(original.RetroAchievementsUsername, loaded.RetroAchievementsUsername);
             Assert.Equal(SettingsService.NormalizeLibraryFolderTileSize(original.LibraryFolderTileSize), loaded.LibraryFolderTileSize);

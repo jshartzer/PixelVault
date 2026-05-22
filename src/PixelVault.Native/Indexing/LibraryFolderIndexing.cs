@@ -144,6 +144,16 @@ namespace PixelVaultNative
                         row.RetroAchievementsGameId = folder.RetroAchievementsGameId ?? string.Empty;
                         changed = true;
                     }
+                    if (!string.IsNullOrWhiteSpace(folder.IgdbId) && !string.Equals(row.IgdbId ?? string.Empty, folder.IgdbId ?? string.Empty, StringComparison.Ordinal))
+                    {
+                        row.IgdbId = folder.IgdbId ?? string.Empty;
+                        changed = true;
+                    }
+                    if (!string.IsNullOrWhiteSpace(folder.IgdbCollectionId) && !string.Equals(row.IgdbCollectionId ?? string.Empty, folder.IgdbCollectionId ?? string.Empty, StringComparison.Ordinal))
+                    {
+                        row.IgdbCollectionId = folder.IgdbCollectionId ?? string.Empty;
+                        changed = true;
+                    }
                     if (row.FileCount != folder.FileCount)
                     {
                         row.FileCount = folder.FileCount;

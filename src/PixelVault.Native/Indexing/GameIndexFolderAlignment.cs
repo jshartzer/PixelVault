@@ -353,6 +353,7 @@ namespace PixelVaultNative
                     folder.CollectionNotes = saved.CollectionNotes ?? string.Empty;
                     changed = true;
                 }
+                if (ApplyIgdbSavedFieldsToFolder(folder, saved)) changed = true;
             }
             return changed;
         }
@@ -382,6 +383,21 @@ namespace PixelVaultNative
                     NonSteamId = folder.NonSteamId ?? string.Empty,
                     SteamGridDbId = folder.SteamGridDbId ?? string.Empty,
                     RetroAchievementsGameId = folder.RetroAchievementsGameId ?? string.Empty,
+                    IgdbId = folder.IgdbId ?? string.Empty,
+                    IgdbSlug = folder.IgdbSlug ?? string.Empty,
+                    IgdbCollectionId = folder.IgdbCollectionId ?? string.Empty,
+                    IgdbCollectionName = folder.IgdbCollectionName ?? string.Empty,
+                    IgdbFranchiseId = folder.IgdbFranchiseId ?? string.Empty,
+                    IgdbFranchiseName = folder.IgdbFranchiseName ?? string.Empty,
+                    IgdbSummary = folder.IgdbSummary ?? string.Empty,
+                    IgdbReleaseDate = folder.IgdbReleaseDate ?? string.Empty,
+                    IgdbGenres = folder.IgdbGenres ?? string.Empty,
+                    IgdbPlatforms = folder.IgdbPlatforms ?? string.Empty,
+                    IgdbDeveloper = folder.IgdbDeveloper ?? string.Empty,
+                    IgdbPublisher = folder.IgdbPublisher ?? string.Empty,
+                    IgdbCoverImageId = folder.IgdbCoverImageId ?? string.Empty,
+                    IgdbHiddenSeriesIds = folder.IgdbHiddenSeriesIds ?? string.Empty,
+                    IgdbFetchedUtcTicks = folder.IgdbFetchedUtcTicks,
                     SuppressSteamAppIdAutoResolve = folder.SuppressSteamAppIdAutoResolve,
                     SuppressSteamGridDbIdAutoResolve = folder.SuppressSteamGridDbIdAutoResolve,
                     FileCount = folder.FileCount,
@@ -412,6 +428,7 @@ namespace PixelVaultNative
                     saved.SuppressSteamGridDbIdAutoResolve = folder.SuppressSteamGridDbIdAutoResolve;
                 }
                 saved.RetroAchievementsGameId = folder.RetroAchievementsGameId ?? string.Empty;
+                CopyIgdbFolderFieldsToSavedRow(saved, folder);
                 saved.FileCount = folder.FileCount;
                 saved.PreviewImagePath = folder.PreviewImagePath ?? string.Empty;
                 saved.FilePaths = folder.FilePaths ?? new string[0];
@@ -424,6 +441,48 @@ namespace PixelVaultNative
                     saved.StorageGroupId = folder.StorageGroupId;
             }
             SaveSavedGameIndexRows(root, rows);
+        }
+
+        static bool ApplyIgdbSavedFieldsToFolder(LibraryFolderInfo folder, GameIndexEditorRow saved)
+        {
+            if (folder == null || saved == null) return false;
+            var changed = false;
+            if (!string.Equals(folder.IgdbId ?? string.Empty, saved.IgdbId ?? string.Empty, StringComparison.Ordinal)) { folder.IgdbId = saved.IgdbId ?? string.Empty; changed = true; }
+            if (!string.Equals(folder.IgdbSlug ?? string.Empty, saved.IgdbSlug ?? string.Empty, StringComparison.Ordinal)) { folder.IgdbSlug = saved.IgdbSlug ?? string.Empty; changed = true; }
+            if (!string.Equals(folder.IgdbCollectionId ?? string.Empty, saved.IgdbCollectionId ?? string.Empty, StringComparison.Ordinal)) { folder.IgdbCollectionId = saved.IgdbCollectionId ?? string.Empty; changed = true; }
+            if (!string.Equals(folder.IgdbCollectionName ?? string.Empty, saved.IgdbCollectionName ?? string.Empty, StringComparison.Ordinal)) { folder.IgdbCollectionName = saved.IgdbCollectionName ?? string.Empty; changed = true; }
+            if (!string.Equals(folder.IgdbFranchiseId ?? string.Empty, saved.IgdbFranchiseId ?? string.Empty, StringComparison.Ordinal)) { folder.IgdbFranchiseId = saved.IgdbFranchiseId ?? string.Empty; changed = true; }
+            if (!string.Equals(folder.IgdbFranchiseName ?? string.Empty, saved.IgdbFranchiseName ?? string.Empty, StringComparison.Ordinal)) { folder.IgdbFranchiseName = saved.IgdbFranchiseName ?? string.Empty; changed = true; }
+            if (!string.Equals(folder.IgdbSummary ?? string.Empty, saved.IgdbSummary ?? string.Empty, StringComparison.Ordinal)) { folder.IgdbSummary = saved.IgdbSummary ?? string.Empty; changed = true; }
+            if (!string.Equals(folder.IgdbReleaseDate ?? string.Empty, saved.IgdbReleaseDate ?? string.Empty, StringComparison.Ordinal)) { folder.IgdbReleaseDate = saved.IgdbReleaseDate ?? string.Empty; changed = true; }
+            if (!string.Equals(folder.IgdbGenres ?? string.Empty, saved.IgdbGenres ?? string.Empty, StringComparison.Ordinal)) { folder.IgdbGenres = saved.IgdbGenres ?? string.Empty; changed = true; }
+            if (!string.Equals(folder.IgdbPlatforms ?? string.Empty, saved.IgdbPlatforms ?? string.Empty, StringComparison.Ordinal)) { folder.IgdbPlatforms = saved.IgdbPlatforms ?? string.Empty; changed = true; }
+            if (!string.Equals(folder.IgdbDeveloper ?? string.Empty, saved.IgdbDeveloper ?? string.Empty, StringComparison.Ordinal)) { folder.IgdbDeveloper = saved.IgdbDeveloper ?? string.Empty; changed = true; }
+            if (!string.Equals(folder.IgdbPublisher ?? string.Empty, saved.IgdbPublisher ?? string.Empty, StringComparison.Ordinal)) { folder.IgdbPublisher = saved.IgdbPublisher ?? string.Empty; changed = true; }
+            if (!string.Equals(folder.IgdbCoverImageId ?? string.Empty, saved.IgdbCoverImageId ?? string.Empty, StringComparison.Ordinal)) { folder.IgdbCoverImageId = saved.IgdbCoverImageId ?? string.Empty; changed = true; }
+            if (!string.Equals(folder.IgdbHiddenSeriesIds ?? string.Empty, saved.IgdbHiddenSeriesIds ?? string.Empty, StringComparison.Ordinal)) { folder.IgdbHiddenSeriesIds = saved.IgdbHiddenSeriesIds ?? string.Empty; changed = true; }
+            if (folder.IgdbFetchedUtcTicks != saved.IgdbFetchedUtcTicks) { folder.IgdbFetchedUtcTicks = saved.IgdbFetchedUtcTicks; changed = true; }
+            return changed;
+        }
+
+        static void CopyIgdbFolderFieldsToSavedRow(GameIndexEditorRow saved, LibraryFolderInfo folder)
+        {
+            if (saved == null || folder == null) return;
+            saved.IgdbId = folder.IgdbId ?? string.Empty;
+            saved.IgdbSlug = folder.IgdbSlug ?? string.Empty;
+            saved.IgdbCollectionId = folder.IgdbCollectionId ?? string.Empty;
+            saved.IgdbCollectionName = folder.IgdbCollectionName ?? string.Empty;
+            saved.IgdbFranchiseId = folder.IgdbFranchiseId ?? string.Empty;
+            saved.IgdbFranchiseName = folder.IgdbFranchiseName ?? string.Empty;
+            saved.IgdbSummary = folder.IgdbSummary ?? string.Empty;
+            saved.IgdbReleaseDate = folder.IgdbReleaseDate ?? string.Empty;
+            saved.IgdbGenres = folder.IgdbGenres ?? string.Empty;
+            saved.IgdbPlatforms = folder.IgdbPlatforms ?? string.Empty;
+            saved.IgdbDeveloper = folder.IgdbDeveloper ?? string.Empty;
+            saved.IgdbPublisher = folder.IgdbPublisher ?? string.Empty;
+            saved.IgdbCoverImageId = folder.IgdbCoverImageId ?? string.Empty;
+            saved.IgdbHiddenSeriesIds = folder.IgdbHiddenSeriesIds ?? string.Empty;
+            saved.IgdbFetchedUtcTicks = folder.IgdbFetchedUtcTicks;
         }
     }
 }

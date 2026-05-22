@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -45,6 +46,11 @@ namespace PixelVaultNative
         public Func<bool> HasSteamWebApiKey { get; set; }
         public Func<string> GetRetroAchievementsApiKey { get; set; }
         public Func<bool> HasRetroAchievementsApiKey { get; set; }
+        public Func<string> GetIgdbTwitchClientId { get; set; }
+        public Func<string> GetIgdbTwitchClientSecret { get; set; }
+        public Func<bool> HasIgdbCredentials { get; set; }
+        public Func<string, string, string, Task<string>> ProbeIgdbFieldsAsync { get; set; }
+        public Func<string, string, Task<string>> RefreshIgdbMetadataAsync { get; set; }
 
         public Func<bool> GetTroubleshootingLoggingEnabled { get; set; }
         public Action<bool> SetTroubleshootingLoggingEnabled { get; set; }
@@ -93,6 +99,8 @@ namespace PixelVaultNative
         public Action<string> SetSteamGridDbApiToken { get; set; }
         public Action<string> SetSteamWebApiKey { get; set; }
         public Action<string> SetRetroAchievementsApiKey { get; set; }
+        public Action<string> SetIgdbTwitchClientId { get; set; }
+        public Action<string> SetIgdbTwitchClientSecret { get; set; }
         public Func<string> GetSteamUserId64 { get; set; }
         public Action<string> SetSteamUserId64 { get; set; }
         public Func<string> GetRetroAchievementsUsername { get; set; }

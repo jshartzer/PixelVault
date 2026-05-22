@@ -99,7 +99,11 @@ namespace PixelVaultNative
             steamUserIdBox.ToolTip = "Steam Web API: used with GetPlayerAchievements so the library can show which Steam achievements you unlocked (steam_user_id_64). Env: PIXELVAULT_STEAM_USER_ID / STEAMID64.";
             var retroUserBox = SettingsTextBox(panel, 9, "RetroAchievements username (optional)", d.GetRetroAchievementsUsername?.Invoke() ?? string.Empty, labelFg, boxBg, boxFg, borderBrush, boxFg);
             retroUserBox.ToolTip = "retro_user on RetroAchievements.org — required for unlock/progress in the achievements viewer (retroachievements_username). Env: PIXELVAULT_RETROACHIEVEMENTS_USERNAME / RA_USERNAME.";
-            var starredExportBox = SettingsTextBox(panel, 10, "Starred export folder (optional)", d.GetStarredExportFolder(), labelFg, boxBg, boxFg, borderBrush, boxFg);
+            var igdbClientIdBox = SettingsTextBox(panel, 10, "IGDB Twitch Client ID (optional)", d.GetIgdbTwitchClientId?.Invoke() ?? string.Empty, labelFg, boxBg, boxFg, borderBrush, boxFg);
+            igdbClientIdBox.ToolTip = "Twitch Developer app Client ID for IGDB. Env: PIXELVAULT_IGDB_TWITCH_CLIENT_ID / IGDB_TWITCH_CLIENT_ID / TWITCH_CLIENT_ID.";
+            var igdbClientSecretBox = SettingsTextBox(panel, 11, "IGDB Twitch Client Secret (optional)", d.GetIgdbTwitchClientSecret?.Invoke() ?? string.Empty, labelFg, boxBg, boxFg, borderBrush, boxFg);
+            igdbClientSecretBox.ToolTip = "Twitch Developer app Client Secret for IGDB app-token auth. Stored locally unless provided by env: PIXELVAULT_IGDB_TWITCH_CLIENT_SECRET / IGDB_TWITCH_CLIENT_SECRET / TWITCH_CLIENT_SECRET.";
+            var starredExportBox = SettingsTextBox(panel, 13, "Starred export folder (optional)", d.GetStarredExportFolder(), labelFg, boxBg, boxFg, borderBrush, boxFg);
             starredExportBox.ToolTip =
                 "Must be a different folder than the library folder (same path would export onto itself). "
                 + "Export Starred copies starred files here using the same subfolders as under the library root, so look inside those subfolders — not only the top level you pick here. "
@@ -111,7 +115,72 @@ namespace PixelVaultNative
             SettingsBrowseButton(panel, 2, delegate { var picked = d.PickFolder(libraryBox.Text); if (!string.IsNullOrWhiteSpace(picked)) libraryBox.Text = picked; });
             SettingsBrowseButton(panel, 3, delegate { var picked = d.PickFile(exifBox.Text, "Executable (*.exe)|*.exe|All files (*.*)|*.*", null); if (!string.IsNullOrWhiteSpace(picked)) exifBox.Text = picked; });
             SettingsBrowseButton(panel, 4, delegate { var picked = d.PickFile(ffmpegBox.Text, "Executable (*.exe)|*.exe|All files (*.*)|*.*", null); if (!string.IsNullOrWhiteSpace(picked)) ffmpegBox.Text = picked; });
-            SettingsBrowseButton(panel, 10, delegate { var picked = d.PickFolder(starredExportBox.Text); if (!string.IsNullOrWhiteSpace(picked)) starredExportBox.Text = picked; });
+            var igdbActions = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 12, 12, 0) };
+            var igdbProbeButton = d.Btn("Test IGDB fields", null, DesignTokens.ActionSecondaryFill, Brushes.White);
+            igdbProbeButton.ToolTip = "Fetches a Twitch app token and runs a tiny IGDB games query for Portal, then writes the returned field paths to Run history.";
+            igdbProbeButton.Width = 150;
+            var igdbRefreshButton = d.Btn("Refresh IGDB cache", null, DesignTokens.ActionPrimaryFill, Brushes.White);
+            igdbRefreshButton.Margin = new Thickness(10, 0, 0, 0);
+            igdbRefreshButton.Width = 180;
+            igdbRefreshButton.ToolTip = "Refresh locally stored IGDB summary, release year, developer, series, and cover metadata for saved game-index rows. Profiles use this local data when they open.";
+            igdbActions.Children.Add(igdbProbeButton);
+            igdbActions.Children.Add(igdbRefreshButton);
+            Grid.SetRow(igdbActions, 12);
+            Grid.SetColumn(igdbActions, 1);
+            while (panel.RowDefinitions.Count <= 12) panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            panel.Children.Add(igdbActions);
+            igdbProbeButton.Click += async delegate
+            {
+                if (d.ProbeIgdbFieldsAsync == null) return;
+                igdbProbeButton.IsEnabled = false;
+                d.Log("IGDB probe: requesting sample game fields...");
+                try
+                {
+                    var result = await d.ProbeIgdbFieldsAsync(
+                        (igdbClientIdBox.Text ?? string.Empty).Trim(),
+                        (igdbClientSecretBox.Text ?? string.Empty).Trim(),
+                        "Portal");
+                    d.Log(result);
+                    MessageBox.Show(window, result, "PixelVault IGDB probe", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                catch (Exception ex)
+                {
+                    var msg = "IGDB probe failed: " + ex.Message;
+                    d.Log(msg);
+                    MessageBox.Show(window, msg, "PixelVault IGDB probe", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+                finally
+                {
+                    igdbProbeButton.IsEnabled = true;
+                }
+            };
+            igdbRefreshButton.Click += async delegate
+            {
+                if (d.RefreshIgdbMetadataAsync == null) return;
+                igdbRefreshButton.IsEnabled = false;
+                igdbProbeButton.IsEnabled = false;
+                d.Log("IGDB cache refresh: starting...");
+                try
+                {
+                    var result = await d.RefreshIgdbMetadataAsync(
+                        (igdbClientIdBox.Text ?? string.Empty).Trim(),
+                        (igdbClientSecretBox.Text ?? string.Empty).Trim());
+                    d.Log(result);
+                    MessageBox.Show(window, result, "PixelVault IGDB cache", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                catch (Exception ex)
+                {
+                    var msg = "IGDB cache refresh failed: " + ex.Message;
+                    d.Log(msg);
+                    MessageBox.Show(window, msg, "PixelVault IGDB cache", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+                finally
+                {
+                    igdbRefreshButton.IsEnabled = true;
+                    igdbProbeButton.IsEnabled = true;
+                }
+            };
+            SettingsBrowseButton(panel, 13, delegate { var picked = d.PickFolder(starredExportBox.Text); if (!string.IsNullOrWhiteSpace(picked)) starredExportBox.Text = picked; });
 
             var importSubfolderScanBox = new CheckBox
             {
@@ -122,9 +191,9 @@ namespace PixelVaultNative
             };
             importSubfolderScanBox.ToolTip =
                 "Default import only inspects the top level of each source folder. Turn this on if you intentionally keep captures in nested folders and want PixelVault to include them in import prep and Steam/non-Steam rename scanning.";
-            Grid.SetRow(importSubfolderScanBox, 11);
+            Grid.SetRow(importSubfolderScanBox, 14);
             Grid.SetColumnSpan(importSubfolderScanBox, 3);
-            while (panel.RowDefinitions.Count <= 11) panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            while (panel.RowDefinitions.Count <= 14) panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             panel.Children.Add(importSubfolderScanBox);
 
             var intakeHeader = new TextBlock
@@ -134,9 +203,9 @@ namespace PixelVaultNative
                 Foreground = labelFg,
                 Margin = new Thickness(0, 18, 0, 6)
             };
-            Grid.SetRow(intakeHeader, 12);
+            Grid.SetRow(intakeHeader, 15);
             Grid.SetColumnSpan(intakeHeader, 3);
-            while (panel.RowDefinitions.Count <= 12) panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            while (panel.RowDefinitions.Count <= 15) panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             panel.Children.Add(intakeHeader);
 
             var autoIntakeEnableBox = new CheckBox
@@ -149,12 +218,12 @@ namespace PixelVaultNative
             autoIntakeEnableBox.ToolTip =
                 "Runs the same standard import pipeline as the Library for matching top-level files. Custom rules need 'Trusted exact match' in Filename Conventions; built-ins import when automatic metadata is fully possible. "
                 + "Review and undo: Library command palette → Background imports.";
-            Grid.SetRow(autoIntakeEnableBox, 13);
+            Grid.SetRow(autoIntakeEnableBox, 16);
             Grid.SetColumnSpan(autoIntakeEnableBox, 3);
-            while (panel.RowDefinitions.Count <= 13) panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            while (panel.RowDefinitions.Count <= 16) panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             panel.Children.Add(autoIntakeEnableBox);
 
-            var quietSecondsBox = SettingsTextBox(panel, 14, "Stability quiet period (seconds)", (d.GetBackgroundAutoIntakeQuietSeconds?.Invoke() ?? 3).ToString(CultureInfo.InvariantCulture), labelFg, boxBg, boxFg, borderBrush, boxFg);
+            var quietSecondsBox = SettingsTextBox(panel, 17, "Stability quiet period (seconds)", (d.GetBackgroundAutoIntakeQuietSeconds?.Invoke() ?? 3).ToString(CultureInfo.InvariantCulture), labelFg, boxBg, boxFg, borderBrush, boxFg);
             quietSecondsBox.ToolTip = "The file must stay unchanged (size and write time) for this long after activity stops. Allowed range: 1–120 seconds.";
 
             var toastBox = new CheckBox
@@ -164,9 +233,9 @@ namespace PixelVaultNative
                 Margin = new Thickness(0, 0, 0, 4),
                 Foreground = boxFg
             };
-            Grid.SetRow(toastBox, 15);
+            Grid.SetRow(toastBox, 18);
             Grid.SetColumnSpan(toastBox, 3);
-            while (panel.RowDefinitions.Count <= 15) panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            while (panel.RowDefinitions.Count <= 18) panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             panel.Children.Add(toastBox);
 
             var summaryBox = new CheckBox
@@ -177,9 +246,9 @@ namespace PixelVaultNative
                 Foreground = boxFg
             };
             summaryBox.ToolTip = "Does not open the Background imports window. Use Library command palette → Background imports anytime. Success toasts include a Review button when the library window is active.";
-            Grid.SetRow(summaryBox, 16);
+            Grid.SetRow(summaryBox, 19);
             Grid.SetColumnSpan(summaryBox, 3);
-            while (panel.RowDefinitions.Count <= 16) panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            while (panel.RowDefinitions.Count <= 19) panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             panel.Children.Add(summaryBox);
 
             var verboseIntakeBox = new CheckBox
@@ -190,9 +259,9 @@ namespace PixelVaultNative
                 Foreground = boxFg
             };
             verboseIntakeBox.ToolTip = "Writes detailed lines prefixed with [BGINT] to the normal PixelVault log (watchers, queue, stability, eligibility). Turn off after diagnosing.";
-            Grid.SetRow(verboseIntakeBox, 17);
+            Grid.SetRow(verboseIntakeBox, 20);
             Grid.SetColumnSpan(verboseIntakeBox, 3);
-            while (panel.RowDefinitions.Count <= 17) panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            while (panel.RowDefinitions.Count <= 20) panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             panel.Children.Add(verboseIntakeBox);
 
             var trayHeader = new TextBlock
@@ -202,9 +271,9 @@ namespace PixelVaultNative
                 Foreground = labelFg,
                 Margin = new Thickness(0, 18, 0, 6)
             };
-            Grid.SetRow(trayHeader, 18);
+            Grid.SetRow(trayHeader, 21);
             Grid.SetColumnSpan(trayHeader, 3);
-            while (panel.RowDefinitions.Count <= 18) panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            while (panel.RowDefinitions.Count <= 21) panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             panel.Children.Add(trayHeader);
 
             var minimizeToTrayBox = new CheckBox
@@ -215,9 +284,9 @@ namespace PixelVaultNative
                 Foreground = boxFg
             };
             minimizeToTrayBox.ToolTip = "Useful if you want background auto-intake to keep running without a taskbar window.";
-            Grid.SetRow(minimizeToTrayBox, 19);
+            Grid.SetRow(minimizeToTrayBox, 22);
             Grid.SetColumnSpan(minimizeToTrayBox, 3);
-            while (panel.RowDefinitions.Count <= 19) panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            while (panel.RowDefinitions.Count <= 22) panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             panel.Children.Add(minimizeToTrayBox);
 
             var promptOnCloseBox = new CheckBox
@@ -228,9 +297,9 @@ namespace PixelVaultNative
                 Foreground = boxFg
             };
             promptOnCloseBox.ToolTip = "The tray icon shows recent background-import activity and quick actions like Restore and Background Imports.";
-            Grid.SetRow(promptOnCloseBox, 20);
+            Grid.SetRow(promptOnCloseBox, 23);
             Grid.SetColumnSpan(promptOnCloseBox, 3);
-            while (panel.RowDefinitions.Count <= 20) panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            while (panel.RowDefinitions.Count <= 23) panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             panel.Children.Add(promptOnCloseBox);
 
             var pathScroll = new ScrollViewer
@@ -264,6 +333,8 @@ namespace PixelVaultNative
                 d.SetSteamGridDbApiToken((steamGridDbTokenBox.Text ?? string.Empty).Trim());
                 d.SetSteamWebApiKey((steamWebApiKeyBox.Text ?? string.Empty).Trim());
                 d.SetRetroAchievementsApiKey((retroAchievementsKeyBox.Text ?? string.Empty).Trim());
+                d.SetIgdbTwitchClientId((igdbClientIdBox.Text ?? string.Empty).Trim());
+                d.SetIgdbTwitchClientSecret((igdbClientSecretBox.Text ?? string.Empty).Trim());
                 d.SetSteamUserId64((steamUserIdBox.Text ?? string.Empty).Trim());
                 d.SetRetroAchievementsUsername((retroUserBox.Text ?? string.Empty).Trim());
                 d.SetBackgroundAutoIntakeEnabled(autoIntakeEnableBox.IsChecked == true);
@@ -531,6 +602,7 @@ namespace PixelVaultNative
             stack.Children.Add(new TextBlock { Text = "SteamGridDB: " + (d.HasSteamGridDbApiToken() ? "token configured" : "(token not configured)"), TextWrapping = TextWrapping.Wrap, Foreground = textMuted });
             stack.Children.Add(new TextBlock { Text = "Steam Web API: " + ((d.HasSteamWebApiKey?.Invoke() ?? false) ? "key configured" : "(not configured)"), TextWrapping = TextWrapping.Wrap, Foreground = textMuted, Margin = new Thickness(0, 4, 0, 0) });
             stack.Children.Add(new TextBlock { Text = "RetroAchievements: " + ((d.HasRetroAchievementsApiKey?.Invoke() ?? false) ? "API key configured" : "(not configured)"), TextWrapping = TextWrapping.Wrap, Foreground = textMuted, Margin = new Thickness(0, 4, 0, 0) });
+            stack.Children.Add(new TextBlock { Text = "IGDB: " + ((d.HasIgdbCredentials?.Invoke() ?? false) ? "Twitch app credentials configured" : "(not configured)"), TextWrapping = TextWrapping.Wrap, Foreground = textMuted, Margin = new Thickness(0, 4, 0, 0) });
             stack.Children.Add(new TextBlock { Text = "Steam user (achievements): " + (string.IsNullOrWhiteSpace(d.GetSteamUserId64?.Invoke()) ? "(not set)" : "SteamID64 set"), TextWrapping = TextWrapping.Wrap, Foreground = textMuted, Margin = new Thickness(0, 4, 0, 0) });
             stack.Children.Add(new TextBlock { Text = "RetroAchievements user: " + (string.IsNullOrWhiteSpace(d.GetRetroAchievementsUsername?.Invoke()) ? "(not set)" : "username set"), TextWrapping = TextWrapping.Wrap, Foreground = textMuted, Margin = new Thickness(0, 4, 0, 0) });
             border.Child = stack;

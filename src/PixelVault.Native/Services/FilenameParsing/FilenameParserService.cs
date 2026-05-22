@@ -108,7 +108,11 @@ namespace PixelVaultNative
             SuppressCaptureHostPlaceholderTitle(result);
 
             if (!string.IsNullOrWhiteSpace(result.GameTitleHint))
-                result.GameTitleHint = NormalizeGameTitleHint(result.GameTitleHint);
+            {
+                result.GameTitleHint = KeepsRawTitleSeparators(result.ConventionId)
+                    ? TextAndPathHelpers.StripTitleLegalMarks((result.GameTitleHint ?? string.Empty).Trim())
+                    : NormalizeGameTitleHint(result.GameTitleHint);
+            }
 
             return result;
         }
@@ -429,6 +433,21 @@ namespace PixelVaultNative
                     PlatformTagsText = "Steam",
                     TimestampGroup = "stamp",
                     TimestampFormat = "unix-ms",
+                    ConfidenceLabel = "ExplicitPattern",
+                    IsBuiltIn = true
+                },
+                new FilenameConventionRule
+                {
+                    ConventionId = "retroarch_native_screenshot",
+                    Name = "RetroArch Native Screenshot",
+                    Priority = 860,
+                    Pattern = "[title]-[yy][MM][dd]-[HH][mm][ss].[ext:image]",
+                    PatternText = "[title]-[yy][MM][dd]-[HH][mm][ss].[ext:image]",
+                    PlatformLabel = "Emulation",
+                    PlatformTagsText = "Emulation",
+                    TitleGroup = "title",
+                    TimestampGroup = "stamp",
+                    TimestampFormat = "yyMMdd-HHmmss",
                     ConfidenceLabel = "ExplicitPattern",
                     IsBuiltIn = true
                 },
@@ -870,6 +889,11 @@ namespace PixelVaultNative
                 || string.Equals(conventionId ?? string.Empty, "switch_album_capture_suffix", StringComparison.OrdinalIgnoreCase);
         }
 
+        static bool KeepsRawTitleSeparators(string conventionId)
+        {
+            return string.Equals(conventionId ?? string.Empty, "retroarch_native_screenshot", StringComparison.OrdinalIgnoreCase);
+        }
+
         static bool LooksLikeRenamedSteamScreenshot(string fileName)
         {
             var baseName = Path.GetFileNameWithoutExtension(fileName ?? string.Empty);
@@ -1286,6 +1310,7 @@ namespace PixelVaultNative
                 case "M":
                 case "d":
                 case "h":
+                case "yy":
                 case "yyyy":
                 case "MM":
                 case "dd":
@@ -1342,6 +1367,8 @@ namespace PixelVaultNative
                 case "d":
                 case "h":
                     return @"\d{1,2}";
+                case "yy":
+                    return @"\d{2}";
                 case "yyyy":
                     return @"\d{4}";
                 case "MM":
@@ -1377,6 +1404,7 @@ namespace PixelVaultNative
                 || trimmed == "M"
                 || trimmed == "d"
                 || trimmed == "h"
+                || trimmed == "yy"
                 || trimmed == "yyyy"
                 || trimmed == "MM"
                 || trimmed == "dd"

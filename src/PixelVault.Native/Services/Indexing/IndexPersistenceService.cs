@@ -319,6 +319,21 @@ CREATE TABLE IF NOT EXISTS game_index (
     is_showcase INTEGER NOT NULL DEFAULT 0,
     collection_notes TEXT NOT NULL DEFAULT '',
     retro_achievements_game_id TEXT NOT NULL DEFAULT '',
+    igdb_id TEXT NOT NULL DEFAULT '',
+    igdb_slug TEXT NOT NULL DEFAULT '',
+    igdb_collection_id TEXT NOT NULL DEFAULT '',
+    igdb_collection_name TEXT NOT NULL DEFAULT '',
+    igdb_franchise_id TEXT NOT NULL DEFAULT '',
+    igdb_franchise_name TEXT NOT NULL DEFAULT '',
+    igdb_summary TEXT NOT NULL DEFAULT '',
+    igdb_release_date TEXT NOT NULL DEFAULT '',
+    igdb_genres TEXT NOT NULL DEFAULT '',
+    igdb_platforms TEXT NOT NULL DEFAULT '',
+    igdb_developer TEXT NOT NULL DEFAULT '',
+    igdb_publisher TEXT NOT NULL DEFAULT '',
+    igdb_cover_image_id TEXT NOT NULL DEFAULT '',
+    igdb_hidden_series_ids TEXT NOT NULL DEFAULT '',
+    igdb_fetched_utc_ticks INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (root, game_id)
 );
 CREATE INDEX IF NOT EXISTS idx_game_index_root_identity ON game_index(root, name, platform_label);
@@ -382,6 +397,7 @@ CREATE INDEX IF NOT EXISTS idx_starred_export_root_dest ON starred_export_state(
             EnsurePhotoIndexStarredColumn(connection);
             EnsureGameIndexIndexAddedUtcTicksColumn(connection);
             EnsureGameIndexCollectionMetadataColumns(connection);
+            EnsureGameIndexIgdbColumns(connection);
             EnsureGameIndexRetroAchievementsGameIdColumn(connection);
             EnsureGameIndexNonSteamIdColumn(connection);
             EnsureGameIndexStorageGroupIdColumn(connection);
@@ -407,6 +423,25 @@ CREATE INDEX IF NOT EXISTS idx_starred_export_root_dest ON starred_export_state(
         void EnsureGameIndexRetroAchievementsGameIdColumn(SqliteConnection connection)
         {
             EnsureDatabaseColumn(connection, "game_index", "retro_achievements_game_id", "TEXT NOT NULL DEFAULT ''");
+        }
+
+        void EnsureGameIndexIgdbColumns(SqliteConnection connection)
+        {
+            EnsureDatabaseColumn(connection, "game_index", "igdb_id", "TEXT NOT NULL DEFAULT ''");
+            EnsureDatabaseColumn(connection, "game_index", "igdb_slug", "TEXT NOT NULL DEFAULT ''");
+            EnsureDatabaseColumn(connection, "game_index", "igdb_collection_id", "TEXT NOT NULL DEFAULT ''");
+            EnsureDatabaseColumn(connection, "game_index", "igdb_collection_name", "TEXT NOT NULL DEFAULT ''");
+            EnsureDatabaseColumn(connection, "game_index", "igdb_franchise_id", "TEXT NOT NULL DEFAULT ''");
+            EnsureDatabaseColumn(connection, "game_index", "igdb_franchise_name", "TEXT NOT NULL DEFAULT ''");
+            EnsureDatabaseColumn(connection, "game_index", "igdb_summary", "TEXT NOT NULL DEFAULT ''");
+            EnsureDatabaseColumn(connection, "game_index", "igdb_release_date", "TEXT NOT NULL DEFAULT ''");
+            EnsureDatabaseColumn(connection, "game_index", "igdb_genres", "TEXT NOT NULL DEFAULT ''");
+            EnsureDatabaseColumn(connection, "game_index", "igdb_platforms", "TEXT NOT NULL DEFAULT ''");
+            EnsureDatabaseColumn(connection, "game_index", "igdb_developer", "TEXT NOT NULL DEFAULT ''");
+            EnsureDatabaseColumn(connection, "game_index", "igdb_publisher", "TEXT NOT NULL DEFAULT ''");
+            EnsureDatabaseColumn(connection, "game_index", "igdb_cover_image_id", "TEXT NOT NULL DEFAULT ''");
+            EnsureDatabaseColumn(connection, "game_index", "igdb_hidden_series_ids", "TEXT NOT NULL DEFAULT ''");
+            EnsureDatabaseColumn(connection, "game_index", "igdb_fetched_utc_ticks", "INTEGER NOT NULL DEFAULT 0");
         }
 
         void EnsureGameIndexNonSteamIdColumn(SqliteConnection connection)
@@ -492,7 +527,8 @@ CREATE INDEX IF NOT EXISTS idx_starred_export_root_dest ON starred_export_state(
             {
                 command.CommandText = @"
 SELECT game_id, folder_path, name, platform_label, steam_app_id, non_steam_id, steam_grid_db_id, file_count, preview_image_path, file_paths, index_added_utc_ticks,
-       is_completed_100_percent, completed_utc_ticks, is_favorite, is_showcase, collection_notes, retro_achievements_game_id, storage_group_id
+       is_completed_100_percent, completed_utc_ticks, is_favorite, is_showcase, collection_notes, retro_achievements_game_id, storage_group_id,
+       igdb_id, igdb_slug, igdb_collection_id, igdb_collection_name, igdb_franchise_id, igdb_franchise_name, igdb_summary, igdb_release_date, igdb_genres, igdb_platforms, igdb_developer, igdb_publisher, igdb_cover_image_id, igdb_hidden_series_ids, igdb_fetched_utc_ticks
 FROM game_index
 WHERE root = $root
 ORDER BY name COLLATE NOCASE, platform_label COLLATE NOCASE, game_id COLLATE NOCASE;";
@@ -525,7 +561,22 @@ ORDER BY name COLLATE NOCASE, platform_label COLLATE NOCASE, game_id COLLATE NOC
                             IsShowcase = ReadSqliteBoolLoose(reader, 14),
                             CollectionNotes = reader.IsDBNull(15) ? string.Empty : reader.GetString(15),
                             RetroAchievementsGameId = DisplayExternalIdValue(reader.IsDBNull(16) ? string.Empty : reader.GetString(16)),
-                            StorageGroupId = reader.IsDBNull(17) ? string.Empty : reader.GetString(17)
+                            StorageGroupId = reader.IsDBNull(17) ? string.Empty : reader.GetString(17),
+                            IgdbId = DisplayExternalIdValue(reader.IsDBNull(18) ? string.Empty : reader.GetString(18)),
+                            IgdbSlug = reader.IsDBNull(19) ? string.Empty : reader.GetString(19),
+                            IgdbCollectionId = DisplayExternalIdValue(reader.IsDBNull(20) ? string.Empty : reader.GetString(20)),
+                            IgdbCollectionName = reader.IsDBNull(21) ? string.Empty : reader.GetString(21),
+                            IgdbFranchiseId = DisplayExternalIdValue(reader.IsDBNull(22) ? string.Empty : reader.GetString(22)),
+                            IgdbFranchiseName = reader.IsDBNull(23) ? string.Empty : reader.GetString(23),
+                            IgdbSummary = reader.IsDBNull(24) ? string.Empty : reader.GetString(24),
+                            IgdbReleaseDate = reader.IsDBNull(25) ? string.Empty : reader.GetString(25),
+                            IgdbGenres = reader.IsDBNull(26) ? string.Empty : reader.GetString(26),
+                            IgdbPlatforms = reader.IsDBNull(27) ? string.Empty : reader.GetString(27),
+                            IgdbDeveloper = reader.IsDBNull(28) ? string.Empty : reader.GetString(28),
+                            IgdbPublisher = reader.IsDBNull(29) ? string.Empty : reader.GetString(29),
+                            IgdbCoverImageId = reader.IsDBNull(30) ? string.Empty : reader.GetString(30),
+                            IgdbHiddenSeriesIds = reader.IsDBNull(31) ? string.Empty : reader.GetString(31),
+                            IgdbFetchedUtcTicks = reader.IsDBNull(32) ? 0L : reader.GetInt64(32)
                         });
                     }
                 }
@@ -541,7 +592,8 @@ ORDER BY name COLLATE NOCASE, platform_label COLLATE NOCASE, game_id COLLATE NOC
             {
                 command.CommandText = @"
 SELECT game_id, folder_path, name, platform_label, steam_app_id, non_steam_id, steam_grid_db_id, file_count, preview_image_path, file_paths, index_added_utc_ticks,
-       is_completed_100_percent, completed_utc_ticks, is_favorite, is_showcase, collection_notes, retro_achievements_game_id, storage_group_id
+       is_completed_100_percent, completed_utc_ticks, is_favorite, is_showcase, collection_notes, retro_achievements_game_id, storage_group_id,
+       igdb_id, igdb_slug, igdb_collection_id, igdb_collection_name, igdb_franchise_id, igdb_franchise_name, igdb_summary, igdb_release_date, igdb_genres, igdb_platforms, igdb_developer, igdb_publisher, igdb_cover_image_id, igdb_hidden_series_ids, igdb_fetched_utc_ticks
 FROM game_index
 ORDER BY name COLLATE NOCASE, platform_label COLLATE NOCASE, game_id COLLATE NOCASE;";
                 using (var reader = command.ExecuteReader())
@@ -572,7 +624,22 @@ ORDER BY name COLLATE NOCASE, platform_label COLLATE NOCASE, game_id COLLATE NOC
                             IsShowcase = ReadSqliteBoolLoose(reader, 14),
                             CollectionNotes = reader.IsDBNull(15) ? string.Empty : reader.GetString(15),
                             RetroAchievementsGameId = DisplayExternalIdValue(reader.IsDBNull(16) ? string.Empty : reader.GetString(16)),
-                            StorageGroupId = reader.IsDBNull(17) ? string.Empty : reader.GetString(17)
+                            StorageGroupId = reader.IsDBNull(17) ? string.Empty : reader.GetString(17),
+                            IgdbId = DisplayExternalIdValue(reader.IsDBNull(18) ? string.Empty : reader.GetString(18)),
+                            IgdbSlug = reader.IsDBNull(19) ? string.Empty : reader.GetString(19),
+                            IgdbCollectionId = DisplayExternalIdValue(reader.IsDBNull(20) ? string.Empty : reader.GetString(20)),
+                            IgdbCollectionName = reader.IsDBNull(21) ? string.Empty : reader.GetString(21),
+                            IgdbFranchiseId = DisplayExternalIdValue(reader.IsDBNull(22) ? string.Empty : reader.GetString(22)),
+                            IgdbFranchiseName = reader.IsDBNull(23) ? string.Empty : reader.GetString(23),
+                            IgdbSummary = reader.IsDBNull(24) ? string.Empty : reader.GetString(24),
+                            IgdbReleaseDate = reader.IsDBNull(25) ? string.Empty : reader.GetString(25),
+                            IgdbGenres = reader.IsDBNull(26) ? string.Empty : reader.GetString(26),
+                            IgdbPlatforms = reader.IsDBNull(27) ? string.Empty : reader.GetString(27),
+                            IgdbDeveloper = reader.IsDBNull(28) ? string.Empty : reader.GetString(28),
+                            IgdbPublisher = reader.IsDBNull(29) ? string.Empty : reader.GetString(29),
+                            IgdbCoverImageId = reader.IsDBNull(30) ? string.Empty : reader.GetString(30),
+                            IgdbHiddenSeriesIds = reader.IsDBNull(31) ? string.Empty : reader.GetString(31),
+                            IgdbFetchedUtcTicks = reader.IsDBNull(32) ? 0L : reader.GetInt64(32)
                         });
                     }
                 }
@@ -599,8 +666,8 @@ ORDER BY name COLLATE NOCASE, platform_label COLLATE NOCASE, game_id COLLATE NOC
                     {
                         insert.Transaction = transaction;
                         insert.CommandText = @"
-INSERT INTO game_index (root, game_id, folder_path, name, platform_label, steam_app_id, non_steam_id, steam_grid_db_id, file_count, preview_image_path, file_paths, index_added_utc_ticks, is_completed_100_percent, completed_utc_ticks, is_favorite, is_showcase, collection_notes, retro_achievements_game_id, storage_group_id)
-VALUES ($root, $gameId, $folderPath, $name, $platformLabel, $steamAppId, $nonSteamId, $steamGridDbId, $fileCount, $previewImagePath, $filePaths, $indexAddedUtcTicks, $isCompleted100Percent, $completedUtcTicks, $isFavorite, $isShowcase, $collectionNotes, $retroAchievementsGameId, $storageGroupId);";
+INSERT INTO game_index (root, game_id, folder_path, name, platform_label, steam_app_id, non_steam_id, steam_grid_db_id, file_count, preview_image_path, file_paths, index_added_utc_ticks, is_completed_100_percent, completed_utc_ticks, is_favorite, is_showcase, collection_notes, retro_achievements_game_id, storage_group_id, igdb_id, igdb_slug, igdb_collection_id, igdb_collection_name, igdb_franchise_id, igdb_franchise_name, igdb_summary, igdb_release_date, igdb_genres, igdb_platforms, igdb_developer, igdb_publisher, igdb_cover_image_id, igdb_hidden_series_ids, igdb_fetched_utc_ticks)
+VALUES ($root, $gameId, $folderPath, $name, $platformLabel, $steamAppId, $nonSteamId, $steamGridDbId, $fileCount, $previewImagePath, $filePaths, $indexAddedUtcTicks, $isCompleted100Percent, $completedUtcTicks, $isFavorite, $isShowcase, $collectionNotes, $retroAchievementsGameId, $storageGroupId, $igdbId, $igdbSlug, $igdbCollectionId, $igdbCollectionName, $igdbFranchiseId, $igdbFranchiseName, $igdbSummary, $igdbReleaseDate, $igdbGenres, $igdbPlatforms, $igdbDeveloper, $igdbPublisher, $igdbCoverImageId, $igdbHiddenSeriesIds, $igdbFetchedUtcTicks);";
                         insert.Parameters.AddWithValue("$root", root ?? string.Empty);
                         insert.Parameters.AddWithValue("$gameId", NormalizeGameId(row.GameId));
                         insert.Parameters.AddWithValue("$folderPath", row.FolderPath ?? string.Empty);
@@ -620,6 +687,21 @@ VALUES ($root, $gameId, $folderPath, $name, $platformLabel, $steamAppId, $nonSte
                         insert.Parameters.AddWithValue("$collectionNotes", row.CollectionNotes ?? string.Empty);
                         insert.Parameters.AddWithValue("$retroAchievementsGameId", SerializeExternalIdValue(row.RetroAchievementsGameId, false));
                         insert.Parameters.AddWithValue("$storageGroupId", row.StorageGroupId ?? string.Empty);
+                        insert.Parameters.AddWithValue("$igdbId", SerializeExternalIdValue(row.IgdbId, false));
+                        insert.Parameters.AddWithValue("$igdbSlug", row.IgdbSlug ?? string.Empty);
+                        insert.Parameters.AddWithValue("$igdbCollectionId", SerializeExternalIdValue(row.IgdbCollectionId, false));
+                        insert.Parameters.AddWithValue("$igdbCollectionName", row.IgdbCollectionName ?? string.Empty);
+                        insert.Parameters.AddWithValue("$igdbFranchiseId", SerializeExternalIdValue(row.IgdbFranchiseId, false));
+                        insert.Parameters.AddWithValue("$igdbFranchiseName", row.IgdbFranchiseName ?? string.Empty);
+                        insert.Parameters.AddWithValue("$igdbSummary", row.IgdbSummary ?? string.Empty);
+                        insert.Parameters.AddWithValue("$igdbReleaseDate", row.IgdbReleaseDate ?? string.Empty);
+                        insert.Parameters.AddWithValue("$igdbGenres", row.IgdbGenres ?? string.Empty);
+                        insert.Parameters.AddWithValue("$igdbPlatforms", row.IgdbPlatforms ?? string.Empty);
+                        insert.Parameters.AddWithValue("$igdbDeveloper", row.IgdbDeveloper ?? string.Empty);
+                        insert.Parameters.AddWithValue("$igdbPublisher", row.IgdbPublisher ?? string.Empty);
+                        insert.Parameters.AddWithValue("$igdbCoverImageId", row.IgdbCoverImageId ?? string.Empty);
+                        insert.Parameters.AddWithValue("$igdbHiddenSeriesIds", row.IgdbHiddenSeriesIds ?? string.Empty);
+                        insert.Parameters.AddWithValue("$igdbFetchedUtcTicks", row.IgdbFetchedUtcTicks > 0 ? row.IgdbFetchedUtcTicks : 0L);
                         insert.ExecuteNonQuery();
                     }
                 }

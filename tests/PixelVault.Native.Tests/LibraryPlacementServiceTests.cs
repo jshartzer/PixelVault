@@ -10,6 +10,11 @@ public sealed class LibraryPlacementServiceTests
     static readonly Func<string, string, string> Norm = (n, _) => (n ?? string.Empty).Trim();
     static readonly Func<string, string> Safe = n => string.IsNullOrWhiteSpace(n) ? "Unknown Game" : n.Trim();
     static readonly Func<string, string> Plat = p => (p ?? string.Empty).Trim();
+    static readonly Func<string, string, string> AppLikeIdentity = (name, platform) =>
+        GameIndexIdentityMatch.FoldNormalizedTitle(
+            FilenameParserService.NormalizeGameTitleHint((name ?? string.Empty).Trim()),
+            value => (value ?? string.Empty).Replace(':', '-'))
+        + "|" + Plat(platform);
 
     [Fact]
     public void SharedStorageGroupId_DoesNotAppendPlatformSuffix()
@@ -130,6 +135,55 @@ public sealed class LibraryPlacementServiceTests
         string Id(string n, string pl) => Norm(n, string.Empty) + "|" + Plat(pl);
         var hit = LibraryPlacementService.TryResolveGameIndexRowForImportSort(parse, rows, Plat, s => s.Trim(), Id);
         Assert.Same(rows[0], hit);
+    }
+
+    [Fact]
+    public void BuildImportTitleAliasCandidates_ForRetroArchRom_ReordersArticleAndStripsRegion()
+    {
+        var candidates = LibraryPlacementService.BuildImportTitleAliasCandidates(
+            "Legend of Zelda, The - The Minish Cap (USA)",
+            "Emulation");
+
+        Assert.Contains("Legend of Zelda, The - The Minish Cap", candidates);
+        Assert.Contains("The Legend of Zelda - The Minish Cap", candidates);
+        Assert.Contains("The Legend of Zelda: The Minish Cap", candidates);
+    }
+
+    [Fact]
+    public void TryResolveImportSort_MatchesEmulationAlias_FromRetroArchRomTitle()
+    {
+        var rows = new List<GameIndexEditorRow>
+        {
+            new() { GameId = "zelda", Name = "The Legend of Zelda: The Minish Cap", PlatformLabel = "Emulation", StorageGroupId = string.Empty, FolderPath = string.Empty }
+        };
+        var parse = new FilenameParseResult
+        {
+            GameTitleHint = "Legend of Zelda, The - The Minish Cap (USA)",
+            PlatformLabel = "Emulation"
+        };
+
+        var hit = LibraryPlacementService.TryResolveGameIndexRowForImportSort(parse, rows, Plat, s => s.Trim(), AppLikeIdentity);
+
+        Assert.Same(rows[0], hit);
+    }
+
+    [Fact]
+    public void TryResolveImportSort_DoesNotUseEmulationAlias_WhenAmbiguous()
+    {
+        var rows = new List<GameIndexEditorRow>
+        {
+            new() { GameId = "raw", Name = "Legend of Zelda, The - The Minish Cap", PlatformLabel = "Emulation", StorageGroupId = string.Empty, FolderPath = string.Empty },
+            new() { GameId = "canonical", Name = "The Legend of Zelda: The Minish Cap", PlatformLabel = "Emulation", StorageGroupId = string.Empty, FolderPath = string.Empty }
+        };
+        var parse = new FilenameParseResult
+        {
+            GameTitleHint = "Legend of Zelda, The - The Minish Cap (USA)",
+            PlatformLabel = "Emulation"
+        };
+
+        var hit = LibraryPlacementService.TryResolveGameIndexRowForImportSort(parse, rows, Plat, s => s.Trim(), AppLikeIdentity);
+
+        Assert.Null(hit);
     }
 
     [Fact]

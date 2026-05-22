@@ -153,6 +153,26 @@ namespace PixelVaultNative
             return string.Empty;
         }
 
+        public static string FindIgdbTwitchClientIdInEnvironment()
+        {
+            foreach (var key in new[] { "PIXELVAULT_IGDB_TWITCH_CLIENT_ID", "IGDB_TWITCH_CLIENT_ID", "TWITCH_CLIENT_ID" })
+            {
+                var value = Environment.GetEnvironmentVariable(key);
+                if (!string.IsNullOrWhiteSpace(value)) return value.Trim();
+            }
+            return string.Empty;
+        }
+
+        public static string FindIgdbTwitchClientSecretInEnvironment()
+        {
+            foreach (var key in new[] { "PIXELVAULT_IGDB_TWITCH_CLIENT_SECRET", "IGDB_TWITCH_CLIENT_SECRET", "TWITCH_CLIENT_SECRET" })
+            {
+                var value = Environment.GetEnvironmentVariable(key);
+                if (!string.IsNullOrWhiteSpace(value)) return value.Trim();
+            }
+            return string.Empty;
+        }
+
         public static string FindSteamUserId64InEnvironment()
         {
             foreach (var key in new[] { "PIXELVAULT_STEAM_USER_ID", "STEAM_USER_ID_64", "STEAMID64" })
@@ -209,6 +229,9 @@ namespace PixelVaultNative
                 else if (key == "steamgriddb_token") s.SteamGridDbApiToken = value ?? string.Empty;
                 else if (key == "steam_web_api_key") s.SteamWebApiKey = value ?? string.Empty;
                 else if (key == "retroachievements_api_key") s.RetroAchievementsApiKey = value ?? string.Empty;
+                else if (key == "igdb_twitch_client_id") s.IgdbTwitchClientId = value ?? string.Empty;
+                else if (key == "igdb_twitch_client_secret") s.IgdbTwitchClientSecret = value ?? string.Empty;
+                else if (key == "igdb_hidden_series_ids") s.IgdbHiddenSeriesIds = value ?? string.Empty;
                 else if (key == "steam_user_id_64") s.SteamUserId64 = value ?? string.Empty;
                 else if (key == "retroachievements_username") s.RetroAchievementsUsername = value ?? string.Empty;
                 else if (key == "library_folder_tile_size")
@@ -388,6 +411,10 @@ namespace PixelVaultNative
             if (!string.IsNullOrWhiteSpace(envSteamWeb)) s.SteamWebApiKey = envSteamWeb;
             var envRa = FindRetroAchievementsApiKeyInEnvironment();
             if (!string.IsNullOrWhiteSpace(envRa)) s.RetroAchievementsApiKey = envRa;
+            var envIgdbClientId = FindIgdbTwitchClientIdInEnvironment();
+            if (!string.IsNullOrWhiteSpace(envIgdbClientId)) s.IgdbTwitchClientId = envIgdbClientId.Trim();
+            var envIgdbClientSecret = FindIgdbTwitchClientSecretInEnvironment();
+            if (!string.IsNullOrWhiteSpace(envIgdbClientSecret)) s.IgdbTwitchClientSecret = envIgdbClientSecret.Trim();
             var envSid = FindSteamUserId64InEnvironment();
             if (!string.IsNullOrWhiteSpace(envSid)) s.SteamUserId64 = envSid.Trim();
             var envRaUser = FindRetroAchievementsUsernameInEnvironment();
@@ -438,6 +465,9 @@ namespace PixelVaultNative
                 "steamgriddb_token=" + (state.SteamGridDbApiToken ?? string.Empty),
                 "steam_web_api_key=" + (state.SteamWebApiKey ?? string.Empty),
                 "retroachievements_api_key=" + (state.RetroAchievementsApiKey ?? string.Empty),
+                "igdb_twitch_client_id=" + (state.IgdbTwitchClientId ?? string.Empty),
+                "igdb_twitch_client_secret=" + (state.IgdbTwitchClientSecret ?? string.Empty),
+                "igdb_hidden_series_ids=" + (state.IgdbHiddenSeriesIds ?? string.Empty).Replace("\r", " ").Replace("\n", " "),
                 "steam_user_id_64=" + (state.SteamUserId64 ?? string.Empty),
                 "retroachievements_username=" + (state.RetroAchievementsUsername ?? string.Empty),
                 "library_folder_tile_size=" + NormalizeLibraryFolderTileSize(state.LibraryFolderTileSize),

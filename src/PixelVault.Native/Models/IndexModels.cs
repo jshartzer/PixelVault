@@ -41,6 +41,21 @@ namespace PixelVaultNative
         public string SteamGridDbId;
         /// <summary>RetroAchievements.org game ID (numeric in their API; stored as text).</summary>
         public string RetroAchievementsGameId;
+        public string IgdbId;
+        public string IgdbSlug;
+        public string IgdbCollectionId;
+        public string IgdbCollectionName;
+        public string IgdbFranchiseId;
+        public string IgdbFranchiseName;
+        public string IgdbSummary;
+        public string IgdbReleaseDate;
+        public string IgdbGenres;
+        public string IgdbPlatforms;
+        public string IgdbDeveloper;
+        public string IgdbPublisher;
+        public string IgdbCoverImageId;
+        public string IgdbHiddenSeriesIds;
+        public long IgdbFetchedUtcTicks;
         public bool SuppressSteamAppIdAutoResolve;
         public bool SuppressSteamGridDbIdAutoResolve;
         public bool IsCompleted100Percent;
@@ -64,6 +79,21 @@ namespace PixelVaultNative
         public string SteamGridDbId { get; set; }
         /// <summary>RetroAchievements.org game ID.</summary>
         public string RetroAchievementsGameId { get; set; }
+        public string IgdbId { get; set; }
+        public string IgdbSlug { get; set; }
+        public string IgdbCollectionId { get; set; }
+        public string IgdbCollectionName { get; set; }
+        public string IgdbFranchiseId { get; set; }
+        public string IgdbFranchiseName { get; set; }
+        public string IgdbSummary { get; set; }
+        public string IgdbReleaseDate { get; set; }
+        public string IgdbGenres { get; set; }
+        public string IgdbPlatforms { get; set; }
+        public string IgdbDeveloper { get; set; }
+        public string IgdbPublisher { get; set; }
+        public string IgdbCoverImageId { get; set; }
+        public string IgdbHiddenSeriesIds { get; set; }
+        public long IgdbFetchedUtcTicks { get; set; }
         public bool SuppressSteamAppIdAutoResolve { get; set; }
         public bool SuppressSteamGridDbIdAutoResolve { get; set; }
         public int FileCount { get; set; }

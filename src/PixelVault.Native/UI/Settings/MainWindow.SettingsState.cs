@@ -24,6 +24,9 @@ namespace PixelVaultNative
                 SteamGridDbApiToken = steamGridDbApiToken ?? string.Empty,
                 SteamWebApiKey = steamWebApiKey ?? string.Empty,
                 RetroAchievementsApiKey = retroAchievementsApiKey ?? string.Empty,
+                IgdbTwitchClientId = igdbTwitchClientId ?? string.Empty,
+                IgdbTwitchClientSecret = igdbTwitchClientSecret ?? string.Empty,
+                IgdbHiddenSeriesIds = igdbHiddenSeriesIds ?? string.Empty,
                 SteamUserId64 = steamUserId64 ?? string.Empty,
                 RetroAchievementsUsername = retroAchievementsUsername ?? string.Empty,
                 LibraryFolderTileSize = libraryFolderTileSize,
@@ -74,6 +77,9 @@ namespace PixelVaultNative
             steamGridDbApiToken = s.SteamGridDbApiToken ?? string.Empty;
             steamWebApiKey = s.SteamWebApiKey ?? string.Empty;
             retroAchievementsApiKey = s.RetroAchievementsApiKey ?? string.Empty;
+            igdbTwitchClientId = s.IgdbTwitchClientId ?? string.Empty;
+            igdbTwitchClientSecret = s.IgdbTwitchClientSecret ?? string.Empty;
+            igdbHiddenSeriesIds = s.IgdbHiddenSeriesIds ?? string.Empty;
             steamUserId64 = s.SteamUserId64 ?? string.Empty;
             retroAchievementsUsername = s.RetroAchievementsUsername ?? string.Empty;
             libraryFolderTileSize = s.LibraryFolderTileSize;

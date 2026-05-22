@@ -59,6 +59,24 @@ public sealed class FilenameParserServiceTests
     }
 
     [Fact]
+    public void Parse_RetroArchNativeScreenshot_UsesRomFilenameTimestampAndEmulation()
+    {
+        var parser = CreateParser();
+
+        var parsed = parser.Parse("Legend of Zelda, The - The Minish Cap (USA)-260517-211331.png", string.Empty);
+
+        Assert.Equal("Emulation", parsed.PlatformLabel);
+        Assert.Equal(new[] { "Emulation" }, parsed.PlatformTags);
+        Assert.Equal("Legend of Zelda, The - The Minish Cap (USA)", parsed.GameTitleHint);
+        Assert.Equal(new DateTime(2026, 5, 17, 21, 13, 31), parsed.CaptureTime);
+        Assert.Equal(DateTimeKind.Local, parsed.CaptureTime!.Value.Kind);
+        Assert.False(parsed.PreserveFileTimes);
+        Assert.False(parsed.RoutesToManualWhenMissingSteamAppId);
+        Assert.Equal("retroarch_native_screenshot", parsed.ConventionId);
+        Assert.Equal("ExplicitPattern", parsed.ConfidenceLabel);
+    }
+
+    [Fact]
     public void Parse_XboxCapture_WritesFileTimesLikeSteamAndCapturesTitleHint()
     {
         var parser = CreateParser();
@@ -439,6 +457,23 @@ public sealed class FilenameParserServiceTests
     }
 
     [Fact]
+    public void GetConventionRules_IncludesRetroArchNativeScreenshot_BuiltInAutoEligible()
+    {
+        var parser = CreateParser();
+        var rules = parser.GetConventionRules(string.Empty);
+        var parsed = parser.Parse("Legend of Zelda, The - The Minish Cap (USA)-260517-211331.png", string.Empty);
+        var row = AutoIntakePolicy.TryResolveMatchedRule(rules, parsed);
+
+        Assert.NotNull(row);
+        Assert.True(row.IsBuiltIn);
+        Assert.Equal("retroarch_native_screenshot", row.ConventionId);
+        Assert.Equal("Emulation", row.PlatformLabel);
+        Assert.True(AutoIntakePolicy.IsEligibleForBackgroundAutoImport(
+            new IntakePreviewFileAnalysis { CanUpdateMetadata = true, Parsed = parsed },
+            row));
+    }
+
+    [Fact]
     public void GetConventionRules_IncludesSteamScreenshotNonSteamId_FallbackStub_BuiltIn()
     {
         var parser = CreateParser();
@@ -630,6 +665,16 @@ public sealed class FilenameParserServiceTests
         var rule = parser.GetConventionRules(string.Empty).First(r => r.ConventionId == "xbox_pc_recording_iso24h");
 
         Assert.Equal("[title] [yyyy]-[MM]-[dd] [HH]-[mm]-[ss].[ext:video]", rule.PatternText);
+    }
+
+    [Fact]
+    public void GetConventionRules_RetroArchNativeScreenshotBuiltIn_ExposesReadablePatternText()
+    {
+        var parser = CreateParser();
+
+        var rule = parser.GetConventionRules(string.Empty).First(r => r.ConventionId == "retroarch_native_screenshot");
+
+        Assert.Equal("[title]-[yy][MM][dd]-[HH][mm][ss].[ext:image]", rule.PatternText);
     }
 
     [Fact]

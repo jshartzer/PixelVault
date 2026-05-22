@@ -90,18 +90,52 @@ namespace PixelVaultNative
                 BorderThickness = new Thickness(1),
                 FontSize = 14
             };
+            var igdbGameIdBox = new TextBox
+            {
+                Text = savedRow == null ? DisplayExternalIdValue(folder.IgdbId ?? string.Empty) : DisplayExternalIdValue(savedRow.IgdbId ?? string.Empty),
+                Padding = new Thickness(10, 7, 10, 7),
+                Background = Brushes.White,
+                BorderBrush = Brush("#D7E1E8"),
+                BorderThickness = new Thickness(1),
+                FontSize = 14
+            };
+            var igdbCollectionIdBox = new TextBox
+            {
+                Text = savedRow == null ? DisplayExternalIdValue(folder.IgdbCollectionId ?? string.Empty) : DisplayExternalIdValue(savedRow.IgdbCollectionId ?? string.Empty),
+                Padding = new Thickness(10, 7, 10, 7),
+                Background = Brushes.White,
+                BorderBrush = Brush("#D7E1E8"),
+                BorderThickness = new Thickness(1),
+                FontSize = 14
+            };
+            var igdbFranchiseIdBox = new TextBox
+            {
+                Text = savedRow == null ? DisplayExternalIdValue(folder.IgdbFranchiseId ?? string.Empty) : DisplayExternalIdValue(savedRow.IgdbFranchiseId ?? string.Empty),
+                Padding = new Thickness(10, 7, 10, 7),
+                Background = Brushes.White,
+                BorderBrush = Brush("#D7E1E8"),
+                BorderThickness = new Thickness(1),
+                FontSize = 14
+            };
+            foreach (var box in new[] { nameBox, notesBox, appIdBox, steamGridDbIdBox, nonSteamIdBox, retroAchievementsGameIdBox, igdbGameIdBox, igdbCollectionIdBox, igdbFranchiseIdBox })
+            {
+                box.Background = Brush("#162028");
+                box.Foreground = Brushes.White;
+                box.BorderBrush = Brush("#2C3D4A");
+                box.CaretBrush = Brushes.White;
+            }
 
             var editorWindow = new Window
             {
                 Title = "PixelVault " + AppVersion + " Edit Game",
-                Width = 580,
-                Height = 760,
+                Width = 640,
+                Height = 900,
                 MinWidth = 560,
-                MinHeight = 700,
+                MinHeight = 440,
                 Owner = owner ?? this,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
-                Background = Brush("#F3EEE4"),
-                ResizeMode = ResizeMode.NoResize
+                Background = Brush("#0F1820"),
+                ResizeMode = ResizeMode.CanResize
             };
 
             var root = new Grid { Margin = new Thickness(22) };
@@ -110,68 +144,96 @@ namespace PixelVaultNative
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
             var header = new StackPanel { Margin = new Thickness(0, 0, 0, 16) };
-            header.Children.Add(new TextBlock { Text = "Edit Game", FontSize = 22, FontWeight = FontWeights.SemiBold, Foreground = Brush("#1F2A30"), TextWrapping = TextWrapping.Wrap });
-            header.Children.Add(new TextBlock { Text = NormalizeConsoleLabel(folder.PlatformLabel), Margin = new Thickness(0, 6, 0, 0), Foreground = Brush("#5F6970"), FontSize = 13 });
-            header.Children.Add(new TextBlock { Text = "Update the saved name, notes, and external IDs for this game + platform row. Another console is a separate index row; several rows can share one disk folder when their storage group matches (see Game Index).", Margin = new Thickness(0, 10, 0, 0), Foreground = Brush("#5F6970"), FontSize = 13, TextWrapping = TextWrapping.Wrap });
+            header.Children.Add(new TextBlock { Text = "Edit Game", FontSize = 22, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, TextWrapping = TextWrapping.Wrap });
+            header.Children.Add(new TextBlock { Text = NormalizeConsoleLabel(folder.PlatformLabel), Margin = new Thickness(0, 6, 0, 0), Foreground = Brush("#8FA4B0"), FontSize = 13 });
+            header.Children.Add(new TextBlock { Text = "Update the saved name, notes, and external IDs for this game + platform row. Another console is a separate index row; several rows can share one disk folder when their storage group matches (see Game Index).", Margin = new Thickness(0, 10, 0, 0), Foreground = Brush("#9FB1BC"), FontSize = 13, TextWrapping = TextWrapping.Wrap });
             root.Children.Add(header);
 
-            // Long enough to host the new Game name + Notes fields above the four IDs
-            // without forcing the user to scroll. Every field gets its own form row so
-            // future additions can land without reshuffling indexes.
+            var formScroll = new ScrollViewer
+            {
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                Padding = new Thickness(0),
+                Margin = new Thickness(0)
+            };
+            Grid.SetRow(formScroll, 1);
+            root.Children.Add(formScroll);
+
+            // Every field gets its own form row so future additions can land without reshuffling indexes.
             var form = new Grid { Margin = new Thickness(0, 0, 0, 12) };
-            for (var i = 0; i < 7; i++)
+            for (var i = 0; i < 10; i++)
                 form.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            Grid.SetRow(form, 1);
-            root.Children.Add(form);
+            formScroll.Content = form;
 
             var nameStack = new StackPanel { Margin = new Thickness(0, 0, 0, 14) };
-            nameStack.Children.Add(new TextBlock { Text = "Game name", FontWeight = FontWeights.SemiBold, Foreground = Brush("#1F2A30"), Margin = new Thickness(0, 0, 0, 6) });
-            nameStack.Children.Add(new TextBlock { Text = "Display name shown in the library, the Game Profile hero, and search.", Foreground = Brush("#5F6970"), FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 6) });
+            nameStack.Children.Add(new TextBlock { Text = "Game name", FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, Margin = new Thickness(0, 0, 0, 6) });
+            nameStack.Children.Add(new TextBlock { Text = "Display name shown in the library, the Game Profile hero, and search.", Foreground = Brush("#8FA4B0"), FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 6) });
             nameStack.Children.Add(nameBox);
             form.Children.Add(nameStack);
 
             var notesStack = new StackPanel { Margin = new Thickness(0, 0, 0, 14) };
-            notesStack.Children.Add(new TextBlock { Text = "Notes", FontWeight = FontWeights.SemiBold, Foreground = Brush("#1F2A30"), Margin = new Thickness(0, 0, 0, 6) });
-            notesStack.Children.Add(new TextBlock { Text = "Same field shown on the profile's Game Notes card. Mods, settings, run rules.", Foreground = Brush("#5F6970"), FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 6) });
+            notesStack.Children.Add(new TextBlock { Text = "Notes", FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, Margin = new Thickness(0, 0, 0, 6) });
+            notesStack.Children.Add(new TextBlock { Text = "Same field shown on the profile's Game Notes card. Mods, settings, run rules.", Foreground = Brush("#8FA4B0"), FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 6) });
             notesStack.Children.Add(notesBox);
             Grid.SetRow(notesStack, 1);
             form.Children.Add(notesStack);
 
             var appIdStack = new StackPanel { Margin = new Thickness(0, 0, 0, 14) };
-            appIdStack.Children.Add(new TextBlock { Text = "Steam App ID", FontWeight = FontWeights.SemiBold, Foreground = Brush("#1F2A30"), Margin = new Thickness(0, 0, 0, 6) });
+            appIdStack.Children.Add(new TextBlock { Text = "Steam App ID", FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, Margin = new Thickness(0, 0, 0, 6) });
             appIdStack.Children.Add(appIdBox);
             Grid.SetRow(appIdStack, 2);
             form.Children.Add(appIdStack);
 
             var steamGridDbIdStack = new StackPanel { Margin = new Thickness(0, 0, 0, 14) };
-            steamGridDbIdStack.Children.Add(new TextBlock { Text = "SteamGridDB ID", FontWeight = FontWeights.SemiBold, Foreground = Brush("#1F2A30"), Margin = new Thickness(0, 0, 0, 6) });
+            steamGridDbIdStack.Children.Add(new TextBlock { Text = "SteamGridDB ID", FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, Margin = new Thickness(0, 0, 0, 6) });
             steamGridDbIdStack.Children.Add(steamGridDbIdBox);
             Grid.SetRow(steamGridDbIdStack, 3);
             form.Children.Add(steamGridDbIdStack);
 
             var nonSteamIdStack = new StackPanel { Margin = new Thickness(0, 0, 0, 14) };
-            nonSteamIdStack.Children.Add(new TextBlock { Text = "Non-Steam ID", FontWeight = FontWeights.SemiBold, Foreground = Brush("#1F2A30"), Margin = new Thickness(0, 0, 0, 6) });
-            nonSteamIdStack.Children.Add(new TextBlock { Text = "Steam shortcut ID for imported non-Steam and emulator entries.", Foreground = Brush("#5F6970"), FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 6) });
+            nonSteamIdStack.Children.Add(new TextBlock { Text = "Non-Steam ID", FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, Margin = new Thickness(0, 0, 0, 6) });
+            nonSteamIdStack.Children.Add(new TextBlock { Text = "Steam shortcut ID for imported non-Steam and emulator entries.", Foreground = Brush("#8FA4B0"), FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 6) });
             nonSteamIdStack.Children.Add(nonSteamIdBox);
             Grid.SetRow(nonSteamIdStack, 4);
             form.Children.Add(nonSteamIdStack);
 
             var retroStack = new StackPanel { Margin = new Thickness(0, 0, 0, 14) };
-            retroStack.Children.Add(new TextBlock { Text = "RetroAchievements game ID", FontWeight = FontWeights.SemiBold, Foreground = Brush("#1F2A30"), Margin = new Thickness(0, 0, 0, 6) });
-            retroStack.Children.Add(new TextBlock { Text = "Numeric game id from retroachievements.org (same id their API uses).", Foreground = Brush("#5F6970"), FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 6) });
+            retroStack.Children.Add(new TextBlock { Text = "RetroAchievements game ID", FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, Margin = new Thickness(0, 0, 0, 6) });
+            retroStack.Children.Add(new TextBlock { Text = "Numeric game id from retroachievements.org (same id their API uses).", Foreground = Brush("#8FA4B0"), FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 6) });
             retroStack.Children.Add(retroAchievementsGameIdBox);
             Grid.SetRow(retroStack, 5);
             form.Children.Add(retroStack);
 
+            var igdbGameStack = new StackPanel { Margin = new Thickness(0, 0, 0, 14) };
+            igdbGameStack.Children.Add(new TextBlock { Text = "IGDB Game ID", FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, Margin = new Thickness(0, 0, 0, 6) });
+            igdbGameStack.Children.Add(new TextBlock { Text = "Primary game id used for IGDB summary, release year, developer, and related strips.", Foreground = Brush("#8FA4B0"), FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 6) });
+            igdbGameStack.Children.Add(igdbGameIdBox);
+            Grid.SetRow(igdbGameStack, 6);
+            form.Children.Add(igdbGameStack);
+
+            var igdbCollectionStack = new StackPanel { Margin = new Thickness(0, 0, 0, 14) };
+            igdbCollectionStack.Children.Add(new TextBlock { Text = "IGDB Collection ID", FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, Margin = new Thickness(0, 0, 0, 6) });
+            igdbCollectionStack.Children.Add(new TextBlock { Text = "Used for the Other Games In This Series strip when IGDB has a collection.", Foreground = Brush("#8FA4B0"), FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 6) });
+            igdbCollectionStack.Children.Add(igdbCollectionIdBox);
+            Grid.SetRow(igdbCollectionStack, 7);
+            form.Children.Add(igdbCollectionStack);
+
+            var igdbFranchiseStack = new StackPanel { Margin = new Thickness(0, 0, 0, 14) };
+            igdbFranchiseStack.Children.Add(new TextBlock { Text = "IGDB Franchise ID", FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, Margin = new Thickness(0, 0, 0, 6) });
+            igdbFranchiseStack.Children.Add(new TextBlock { Text = "Fallback grouping id for series-style relationships when collection data is not available.", Foreground = Brush("#8FA4B0"), FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 6) });
+            igdbFranchiseStack.Children.Add(igdbFranchiseIdBox);
+            Grid.SetRow(igdbFranchiseStack, 8);
+            form.Children.Add(igdbFranchiseStack);
+
             var helperText = new TextBlock
             {
                 Text = "Leave an ID field blank if you want to clear the saved value. Look up IDs fills empty Steam, SteamGridDB, and RetroAchievements fields when those services are configured.",
-                Foreground = Brush("#5F6970"),
+                Foreground = Brush("#8FA4B0"),
                 FontSize = 12.5,
                 TextWrapping = TextWrapping.Wrap,
                 Margin = new Thickness(0, 4, 0, 0)
             };
-            Grid.SetRow(helperText, 6);
+            Grid.SetRow(helperText, 9);
             form.Children.Add(helperText);
 
             var actions = new Grid { HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 8, 0, 0) };
@@ -220,6 +282,9 @@ namespace PixelVaultNative
                 steamGridDbIdBox.IsEnabled = false;
                 nonSteamIdBox.IsEnabled = false;
                 retroAchievementsGameIdBox.IsEnabled = false;
+                igdbGameIdBox.IsEnabled = false;
+                igdbCollectionIdBox.IsEnabled = false;
+                igdbFranchiseIdBox.IsEnabled = false;
                 try
                 {
                     var existingApp = CleanTag(appIdBox.Text);
@@ -332,6 +397,9 @@ namespace PixelVaultNative
                     steamGridDbIdBox.IsEnabled = true;
                     nonSteamIdBox.IsEnabled = true;
                     retroAchievementsGameIdBox.IsEnabled = true;
+                    igdbGameIdBox.IsEnabled = true;
+                    igdbCollectionIdBox.IsEnabled = true;
+                    igdbFranchiseIdBox.IsEnabled = true;
                 }
             };
             saveButton.Click += delegate
@@ -344,6 +412,9 @@ namespace PixelVaultNative
                     var nonSteamId = CleanTag(nonSteamIdBox.Text);
                     var steamGridDbId = CleanTag(steamGridDbIdBox.Text);
                     var retroAchievementsGameId = CleanTag(retroAchievementsGameIdBox.Text);
+                    var igdbGameId = CleanTag(igdbGameIdBox.Text);
+                    var igdbCollectionId = CleanTag(igdbCollectionIdBox.Text);
+                    var igdbFranchiseId = CleanTag(igdbFranchiseIdBox.Text);
                     var nameChanged = !string.Equals(nameInput, (initialName ?? string.Empty).Trim(), StringComparison.Ordinal)
                         && !string.IsNullOrWhiteSpace(nameInput);
                     var notesChanged = !string.Equals(
@@ -357,7 +428,10 @@ namespace PixelVaultNative
                         var allBlank = string.IsNullOrWhiteSpace(steamAppId)
                             && string.IsNullOrWhiteSpace(nonSteamId)
                             && string.IsNullOrWhiteSpace(steamGridDbId)
-                            && string.IsNullOrWhiteSpace(retroAchievementsGameId);
+                            && string.IsNullOrWhiteSpace(retroAchievementsGameId)
+                            && string.IsNullOrWhiteSpace(igdbGameId)
+                            && string.IsNullOrWhiteSpace(igdbCollectionId)
+                            && string.IsNullOrWhiteSpace(igdbFranchiseId);
                         if (allBlank && !nameChanged && !notesChanged)
                         {
                             editorWindow.Close();
@@ -390,6 +464,9 @@ namespace PixelVaultNative
                     row.SuppressSteamAppIdAutoResolve = ShouldSuppressExternalIdAutoResolve(steamAppId, previousSteamAppId, previousSuppressSteamAppId);
                     row.SuppressSteamGridDbIdAutoResolve = ShouldSuppressExternalIdAutoResolve(steamGridDbId, previousSteamGridDbId, previousSuppressSteamGridDbId);
                     row.RetroAchievementsGameId = retroAchievementsGameId;
+                    row.IgdbId = igdbGameId;
+                    row.IgdbCollectionId = igdbCollectionId;
+                    row.IgdbFranchiseId = igdbFranchiseId;
                     SaveGameIndexEditorRows(libraryRoot, rows);
                     folder.Name = row.Name;
                     folder.CollectionNotes = row.CollectionNotes;
@@ -399,6 +476,9 @@ namespace PixelVaultNative
                     folder.RetroAchievementsGameId = retroAchievementsGameId;
                     folder.SuppressSteamAppIdAutoResolve = row.SuppressSteamAppIdAutoResolve;
                     folder.SuppressSteamGridDbIdAutoResolve = row.SuppressSteamGridDbIdAutoResolve;
+                    folder.IgdbId = igdbGameId;
+                    folder.IgdbCollectionId = igdbCollectionId;
+                    folder.IgdbFranchiseId = igdbFranchiseId;
                     status.Text = "Game saved";
                     Log("Updated game " + (folder.Name ?? "folder") + " | " + NormalizeConsoleLabel(folder.PlatformLabel)
                         + (nameChanged ? " | renamed" : string.Empty)
@@ -406,7 +486,10 @@ namespace PixelVaultNative
                         + " | AppID=" + (string.IsNullOrWhiteSpace(steamAppId) ? "(blank)" : steamAppId) + (row.SuppressSteamAppIdAutoResolve ? " [manual clear]" : string.Empty)
                         + " | Non-Steam=" + (string.IsNullOrWhiteSpace(nonSteamId) ? "(blank)" : nonSteamId)
                         + " | STID=" + (string.IsNullOrWhiteSpace(steamGridDbId) ? "(blank)" : steamGridDbId) + (row.SuppressSteamGridDbIdAutoResolve ? " [manual clear]" : string.Empty)
-                        + " | RA=" + (string.IsNullOrWhiteSpace(retroAchievementsGameId) ? "(blank)" : retroAchievementsGameId));
+                        + " | RA=" + (string.IsNullOrWhiteSpace(retroAchievementsGameId) ? "(blank)" : retroAchievementsGameId)
+                        + " | IGDB=" + (string.IsNullOrWhiteSpace(igdbGameId) ? "(blank)" : igdbGameId)
+                        + " | IGDB collection=" + (string.IsNullOrWhiteSpace(igdbCollectionId) ? "(blank)" : igdbCollectionId)
+                        + " | IGDB franchise=" + (string.IsNullOrWhiteSpace(igdbFranchiseId) ? "(blank)" : igdbFranchiseId));
                     if (refreshLibrary != null) refreshLibrary();
                     editorWindow.Close();
                 }

@@ -103,12 +103,12 @@ namespace PixelVaultNative
         double PreferredLibraryWindowWidth()
         {
             var available = Math.Max(720, SystemParameters.WorkArea.Width - 24);
-            return Math.Min(available, 2560);
+            return Math.Min(available, 1292);
         }
         double PreferredLibraryWindowHeight()
         {
             var available = Math.Max(520, SystemParameters.WorkArea.Height - 24);
-            return Math.Min(available, 1280);
+            return Math.Min(available, 1398);
         }
         string ResolveWorkspaceAssetPath(string fileName)
         {
