@@ -215,6 +215,55 @@ public sealed class IntakeAnalysisServiceTests
     }
 
     [Fact]
+    public void AnalyzeFiles_GenericXboxCapture_UsesUploadFolderTitleHint()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "pv_intake_test_" + Guid.NewGuid().ToString("N"));
+        var gameFolder = Path.Combine(root, "Luna Abyss");
+        var temp = Path.Combine(gameFolder, "Screenshot 5_22_2026 9_32_48 PM.png");
+        try
+        {
+            Directory.CreateDirectory(gameFolder);
+            File.WriteAllBytes(temp, new byte[] { 0 });
+            var svc = new IntakeAnalysisService(
+                _ => new FilenameParseResult
+                {
+                    MatchedConvention = true,
+                    ConventionId = "xbox_pc_capture_ampm",
+                    ConventionName = "PC Capture (Windows Xbox App)",
+                    ConfidenceLabel = "ExplicitPattern",
+                    PlatformLabel = "Xbox",
+                    PlatformTags = new[] { "Xbox" },
+                    GameTitleHint = "Screenshot",
+                    CaptureTime = new DateTime(2026, 5, 22, 21, 32, 48)
+                },
+                _ => false,
+                _ => DateTime.MinValue,
+                null,
+                file => string.Equals(file, temp, StringComparison.OrdinalIgnoreCase) ? "Luna Abyss" : string.Empty);
+
+            var map = svc.AnalyzeFiles(new[] { temp });
+
+            var a = Assert.Single(map.Values);
+            Assert.True(a.CanUpdateMetadata);
+            Assert.Equal("Xbox", a.Parsed.PlatformLabel);
+            Assert.Contains("Xbox", a.Parsed.PlatformTags);
+            Assert.Equal("Luna Abyss", a.Parsed.GameTitleHint);
+            Assert.Equal(new DateTime(2026, 5, 22, 21, 32, 48), a.CaptureTime);
+        }
+        finally
+        {
+            try
+            {
+                if (Directory.Exists(root)) Directory.Delete(root, true);
+            }
+            catch
+            {
+                // ignore
+            }
+        }
+    }
+
+    [Fact]
     public void AnalyzeFiles_TitlelessSwitchCaptureSuffix_UsesUploadFolderTitleHint()
     {
         var root = Path.Combine(Path.GetTempPath(), "pv_intake_test_" + Guid.NewGuid().ToString("N"));

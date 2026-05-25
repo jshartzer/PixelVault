@@ -1224,14 +1224,33 @@ namespace PixelVaultNative
         internal static bool CanUseImportFolderTitleHint(FilenameParseResult parsed)
         {
             if (parsed == null) return false;
-            if (!string.IsNullOrWhiteSpace(parsed.GameTitleHint)) return false;
+            if (!string.IsNullOrWhiteSpace(parsed.GameTitleHint) && !HasGenericCaptureTitleHint(parsed.GameTitleHint)) return false;
             if (parsed.RoutesToManualWhenMissingSteamAppId) return false;
             var platform = MainWindow.NormalizeConsoleLabel(parsed.PlatformLabel ?? string.Empty);
             if (string.Equals(platform, "Switch", StringComparison.OrdinalIgnoreCase)) return true;
+            if (string.Equals(platform, "Xbox", StringComparison.OrdinalIgnoreCase)) return true;
+            if (string.Equals(platform, "PC", StringComparison.OrdinalIgnoreCase)) return true;
+            if (string.Equals(platform, "PS5", StringComparison.OrdinalIgnoreCase)) return true;
             return (parsed.PlatformTags ?? new string[0]).Any(tag =>
                 string.Equals(MainWindow.NormalizeConsoleLabel(tag), "Switch", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(tag, "Nintendo", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(tag, "Nintendo Switch", StringComparison.OrdinalIgnoreCase));
+                || string.Equals(tag, "Nintendo Switch", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(MainWindow.NormalizeConsoleLabel(tag), "Xbox", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(MainWindow.NormalizeConsoleLabel(tag), "PC", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(MainWindow.NormalizeConsoleLabel(tag), "PS5", StringComparison.OrdinalIgnoreCase));
+        }
+
+        internal static bool HasGenericCaptureTitleHint(string title)
+        {
+            var cleaned = TextAndPathHelpers.Sanitize(FilenameParserService.NormalizeGameTitleHint(title ?? string.Empty));
+            cleaned = Regex.Replace(cleaned, @"\s+", " ").Trim();
+            if (string.IsNullOrWhiteSpace(cleaned)) return false;
+            return string.Equals(cleaned, "screenshot", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(cleaned, "screenshots", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(cleaned, "game clip", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(cleaned, "game clips", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(cleaned, "capture", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(cleaned, "captures", StringComparison.OrdinalIgnoreCase);
         }
 
         bool TryBuildImportFolderTitleRenameBase(string file, FilenameParseResult parsed, out string newBase)

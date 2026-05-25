@@ -45,6 +45,31 @@ public sealed class AutoIntakePolicyTests
     }
 
     [Fact]
+    public void IsEligible_GenericCaptureTitle_NotEligibleWithoutFolderHint()
+    {
+        var rule = new FilenameConventionRule
+        {
+            ConventionId = "xbox_pc_capture_ampm",
+            Enabled = true,
+            IsBuiltIn = true,
+            AutoIntakeMode = FilenameAutoIntakeModes.ManualOnly
+        };
+        var analysis = new IntakePreviewFileAnalysis
+        {
+            CanUpdateMetadata = true,
+            Parsed = new FilenameParseResult
+            {
+                MatchedConvention = true,
+                ConventionId = "xbox_pc_capture_ampm",
+                GameTitleHint = "Screenshot"
+            }
+        };
+
+        Assert.False(AutoIntakePolicy.IsEligibleForBackgroundAutoImport(analysis, rule));
+        Assert.Equal("generic_capture_title_needs_folder_hint", AutoIntakePolicy.TryGetIneligibilityReason(analysis, rule));
+    }
+
+    [Fact]
     public void TryGetIneligibilityReason_ReturnsNullWhenEligible()
     {
         var rule = new FilenameConventionRule

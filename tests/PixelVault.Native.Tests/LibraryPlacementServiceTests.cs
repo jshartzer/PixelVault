@@ -138,6 +138,21 @@ public sealed class LibraryPlacementServiceTests
     }
 
     [Fact]
+    public void TryResolveImportSort_ExplicitTitleDoesNotMatchDifferentExistingGame()
+    {
+        var rows = new List<GameIndexEditorRow>
+        {
+            new() { GameId = "sub", Name = "Subnautica 2", PlatformLabel = "Xbox", StorageGroupId = string.Empty, FolderPath = string.Empty }
+        };
+        var parse = new FilenameParseResult { GameTitleHint = "Luna Abyss", PlatformLabel = "Xbox" };
+        string Id(string n, string pl) => Norm(n, string.Empty) + "|" + Plat(pl);
+
+        var hit = LibraryPlacementService.TryResolveGameIndexRowForImportSort(parse, rows, Plat, s => s.Trim(), Id);
+
+        Assert.Null(hit);
+    }
+
+    [Fact]
     public void BuildImportTitleAliasCandidates_ForRetroArchRom_ReordersArticleAndStripsRegion()
     {
         var candidates = LibraryPlacementService.BuildImportTitleAliasCandidates(

@@ -26,6 +26,7 @@ namespace PixelVaultNative
             if (!matchedRule.Enabled) return false;
             if (!string.Equals(parsed.ConventionId ?? string.Empty, matchedRule.ConventionId ?? string.Empty, StringComparison.OrdinalIgnoreCase))
                 return false;
+            if (ImportService.HasGenericCaptureTitleHint(parsed.GameTitleHint ?? string.Empty)) return false;
 
             if (matchedRule.IsBuiltIn) return true;
 
@@ -47,6 +48,8 @@ namespace PixelVaultNative
             if (!matchedRule.Enabled) return "rule_disabled";
             if (!string.Equals(parsed.ConventionId ?? string.Empty, matchedRule.ConventionId ?? string.Empty, StringComparison.OrdinalIgnoreCase))
                 return "convention_id_mismatch";
+            if (ImportService.HasGenericCaptureTitleHint(parsed.GameTitleHint ?? string.Empty))
+                return "generic_capture_title_needs_folder_hint";
             if (!matchedRule.IsBuiltIn
                 && !string.Equals(
                     FilenameAutoIntakeModes.Normalize(matchedRule.AutoIntakeMode),

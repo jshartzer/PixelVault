@@ -207,9 +207,7 @@ namespace PixelVaultNative
             {
                 preferredGameId = string.Empty;
             }
-            var resolvedGameId = !string.IsNullOrWhiteSpace(preferredGameId)
-                ? preferredGameId
-                : ResolveGameIdForIndexedFile(root, file, platformLabel, tags, index, gameRows, preferredGameId);
+            var resolvedGameId = ResolveGameIdForIndexedFile(root, file, platformLabel, tags, index, gameRows, preferredGameId);
             return new LibraryMetadataIndexEntry
             {
                 FilePath = file,
