@@ -739,13 +739,21 @@ namespace PixelVaultNative
                 refreshGroupingButtons();
                 refreshTimelineRangeUi();
                 refreshSessionsThresholdUi();
+                var startupSnapshotFolders = _shell.LibrarySession.LoadLibraryFolderCacheSnapshot(allowStaleMetadataRevision: true);
+                var currentFolderCacheSnapshotExists = _shell.LibrarySession.HasLibraryFolderCacheSnapshot();
+                if (startupSnapshotFolders != null)
+                {
+                    ws.Folders.Clear();
+                    ws.Folders.AddRange(startupSnapshotFolders);
+                    if (_shell.StatusLine != null) _shell.StatusLine.Text = "Library ready";
+                }
+
                 if (reuseMainWindow) _shell.RegisterLibraryBrowserLiveWorkingSet(ws);
                 if (!reuseMainWindow) libraryWindow.Show();
                 if (renderTiles != null) renderTiles();
                 if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge();
-                var autoRefreshLibraryFoldersOnStartup = !_shell.LibrarySession.HasLibraryFolderCacheSnapshot();
-                if (!autoRefreshLibraryFoldersOnStartup && _shell.StatusLine != null) _shell.StatusLine.Text = "Loading cached library folders...";
-                if (prefillLibraryFoldersFromSnapshotAsync != null) prefillLibraryFoldersFromSnapshotAsync();
+                var autoRefreshLibraryFoldersOnStartup = !currentFolderCacheSnapshotExists;
+                if (prefillLibraryFoldersFromSnapshotAsync != null && startupSnapshotFolders == null) prefillLibraryFoldersFromSnapshotAsync();
                 if (refreshLibraryFoldersAsync != null && autoRefreshLibraryFoldersOnStartup) refreshLibraryFoldersAsync(false);
                 _shell.ScheduleDeferredGameIndexWarmup(libraryWindow);
             }

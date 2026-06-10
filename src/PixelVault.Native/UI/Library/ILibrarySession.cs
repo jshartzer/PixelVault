@@ -65,10 +65,10 @@ namespace PixelVaultNative
         void RequestSaveCaptureComment(string absoluteFilePath, string comment, Action<bool> onCompleted = null);
 
         /// <summary>Load folder-cache snapshot lines for <see cref="LibraryRoot"/> if present; otherwise <c>null</c>.</summary>
-        List<LibraryFolderInfo> LoadLibraryFolderCacheSnapshot();
+        List<LibraryFolderInfo> LoadLibraryFolderCacheSnapshot(bool allowStaleMetadataRevision = false);
 
         /// <summary>True when a folder-cache snapshot exists for <see cref="LibraryRoot"/>.</summary>
-        bool HasLibraryFolderCacheSnapshot();
+        bool HasLibraryFolderCacheSnapshot(bool allowStaleMetadataRevision = false);
 
         /// <summary>Indexed capture date for <paramref name="file"/> under <see cref="LibraryRoot"/> (same rules as library scan host).</summary>
         DateTime ResolveIndexedLibraryDate(string file, Dictionary<string, LibraryMetadataIndexEntry> index);
