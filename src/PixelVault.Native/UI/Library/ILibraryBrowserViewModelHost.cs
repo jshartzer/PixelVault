@@ -40,6 +40,7 @@ namespace PixelVaultNative
         string GuessGameIndexNameForFile(string file);
         string PrimaryPlatformLabel(string file);
 
+        Dictionary<string, LibraryMetadataIndexEntry> LoadLibraryMetadataIndex(string libraryRoot, bool forceDiskReload = false);
         DateTime ResolveIndexedLibraryDate(string libraryRoot, string file, Dictionary<string, LibraryMetadataIndexEntry> index = null);
         LibraryMetadataIndexEntry TryGetLibraryMetadataIndexEntry(string libraryRoot, string file, Dictionary<string, LibraryMetadataIndexEntry> index);
         long ResolveLibraryFileRecentSortUtcTicks(string libraryRoot, string file, Dictionary<string, LibraryMetadataIndexEntry> index = null);

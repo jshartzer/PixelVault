@@ -67,6 +67,9 @@ namespace PixelVaultNative
         /// <summary>Load folder-cache snapshot lines for <see cref="LibraryRoot"/> if present; otherwise <c>null</c>.</summary>
         List<LibraryFolderInfo> LoadLibraryFolderCacheSnapshot(bool allowStaleMetadataRevision = false);
 
+        /// <summary>Load folder-cache snapshot and freshness state for <see cref="LibraryRoot"/> from a single disk read.</summary>
+        LibraryFolderCacheSnapshotRead LoadLibraryFolderCacheSnapshotRead(bool allowStaleMetadataRevision = false);
+
         /// <summary>True when a folder-cache snapshot exists for <see cref="LibraryRoot"/>.</summary>
         bool HasLibraryFolderCacheSnapshot(bool allowStaleMetadataRevision = false);
 

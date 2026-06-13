@@ -47,6 +47,8 @@ namespace PixelVaultNative
             public string GuessGameIndexNameForFile(string file) => _owner.GuessGameIndexNameForFile(file);
             public string PrimaryPlatformLabel(string file) => _owner.PrimaryPlatformLabel(file);
 
+            public Dictionary<string, LibraryMetadataIndexEntry> LoadLibraryMetadataIndex(string libraryRoot, bool forceDiskReload = false)
+                => _owner.LoadLibraryMetadataIndexViaSessionWhenActive(libraryRoot, forceDiskReload);
             public DateTime ResolveIndexedLibraryDate(string libraryRoot, string file, Dictionary<string, LibraryMetadataIndexEntry> index = null)
                 => _owner.ResolveIndexedLibraryDate(libraryRoot, file, index);
             public LibraryMetadataIndexEntry TryGetLibraryMetadataIndexEntry(string libraryRoot, string file, Dictionary<string, LibraryMetadataIndexEntry> index)

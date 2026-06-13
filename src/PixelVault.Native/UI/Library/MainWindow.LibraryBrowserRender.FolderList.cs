@@ -49,6 +49,21 @@ namespace PixelVaultNative
             var projectionStopwatch = Stopwatch.StartNew();
             var browserFolders = GetOrBuildLibraryBrowserFolderViews(folders, timeProjectionMode ? "all" : groupingMode);
             projectionStopwatch.Stop();
+            var startupCacheSegment =
+                "; startupCache=" + (ws.StartupFolderCacheState ?? "unknown")
+                + "; startupCacheFolders=" + ws.StartupFolderCacheFolderCount
+                + "; startupCacheStrictCurrent=" + ws.StartupFolderCacheStrictCurrent
+                + "; startupRefreshQueued=" + ws.StartupFolderCacheBackgroundRefreshQueued;
+            LogPerformanceSample(
+                "LibraryFolderProjection",
+                projectionStopwatch,
+                "foldersLoaded=" + folders.Count
+                + "; views=" + browserFolders.Count
+                + "; grouping=" + groupingMode
+                + "; projectedGrouping=" + (timeProjectionMode ? "all" : groupingMode)
+                + "; workspace=" + ws.WorkspaceMode
+                + startupCacheSegment,
+                20);
             ws.ViewFolders.Clear();
             ws.ViewFolders.AddRange(browserFolders);
             ApplyLibraryBrowserLayoutMode(panes, ws.WorkspaceMode);

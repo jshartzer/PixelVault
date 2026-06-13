@@ -91,6 +91,7 @@ namespace PixelVaultNative
         bool IsLibraryRasterImageFilePath(string path);
         void LibraryBrowserMountToastHost(Grid rootGrid, MainWindow.LibraryBrowserWorkingSet ws);
         void LibraryBrowserShowToast(MainWindow.LibraryBrowserWorkingSet ws, string message);
+        void LogTroubleshooting(string area, string message);
         void ShowLibraryBrowserKeyboardShortcutsHelp(Window owner);
         void ShowLibraryCommandPalette(Window owner, LibraryBrowserPaletteContext context, string initialSearch);
 

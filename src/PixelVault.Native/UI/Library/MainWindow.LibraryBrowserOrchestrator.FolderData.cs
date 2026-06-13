@@ -11,6 +11,7 @@ namespace PixelVaultNative
     {
         void LibraryBrowserRefreshFoldersAsync(Window libraryWindow, LibraryBrowserWorkingSet ws, bool forceRefresh, Action renderTiles)
         {
+            if (!CanApplyLibraryBrowserAsyncResult(libraryWindow, ws, "LibraryFolderRefreshStart", 0)) return;
             var refreshVersion = ++ws.LibraryFolderRefreshVersion;
             var loadingStatusText = forceRefresh || ws.Folders.Count > 0
                 ? "Refreshing library folders..."
@@ -30,6 +31,10 @@ namespace PixelVaultNative
             {
                 libraryWindow.Dispatcher.BeginInvoke(new Action(delegate
                 {
+                    if (!CanApplyLibraryBrowserAsyncResult(libraryWindow, ws, "LibraryFolderRefreshAbandoned", refreshVersion))
+                    {
+                        return;
+                    }
                     if (refreshVersion != ws.LibraryFolderRefreshVersion)
                     {
                         LogTroubleshooting("LibraryFolderRefreshStale",
@@ -96,6 +101,7 @@ namespace PixelVaultNative
 
         void LibraryBrowserPrefillFoldersFromSnapshot(Window libraryWindow, LibraryBrowserWorkingSet ws, Action renderTiles)
         {
+            if (!CanApplyLibraryBrowserAsyncResult(libraryWindow, ws, "LibraryFolderSnapshotStart", 0)) return;
             Task.Factory.StartNew(delegate
             {
                 return librarySession.LoadLibraryFolderCacheSnapshot();
@@ -103,6 +109,10 @@ namespace PixelVaultNative
             {
                 libraryWindow.Dispatcher.BeginInvoke(new Action(delegate
                 {
+                    if (!CanApplyLibraryBrowserAsyncResult(libraryWindow, ws, "LibraryFolderSnapshotAbandoned", 0))
+                    {
+                        return;
+                    }
                     if (snapshotTask.IsFaulted || ws.Folders.Count > 0) return;
                     var snapshotFolders = snapshotTask.Status == TaskStatus.RanToCompletion && snapshotTask.Result != null
                         ? snapshotTask.Result
@@ -117,6 +127,23 @@ namespace PixelVaultNative
                     if (renderTiles != null) renderTiles();
                 }));
             }, TaskScheduler.Default);
+        }
+
+        bool CanApplyLibraryBrowserAsyncResult(Window libraryWindow, LibraryBrowserWorkingSet ws, string abandonedArea, int refreshVersion)
+        {
+            var valid = ws != null
+                && ws.IsActive
+                && libraryWindow != null
+                && libraryWindow.Dispatcher != null
+                && !libraryWindow.Dispatcher.HasShutdownStarted
+                && !libraryWindow.Dispatcher.HasShutdownFinished;
+            if (valid) return true;
+            LogTroubleshooting(abandonedArea ?? "LibraryBrowserAsyncAbandoned",
+                "version=" + refreshVersion
+                + "; hasWindow=" + (libraryWindow != null)
+                + "; hasWorkingSet=" + (ws != null)
+                + "; workingSetActive=" + (ws != null && ws.IsActive));
+            return false;
         }
 
         void LibraryBrowserRunFolderMetadataScan(

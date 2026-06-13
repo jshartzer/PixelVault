@@ -20,6 +20,7 @@ namespace PixelVaultNative
             internal readonly HashSet<string> SelectedDetailFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             internal readonly List<Border> DetailTiles = new List<Border>();
             internal readonly List<string> DetailFilesDisplayOrder = new List<string>();
+            internal bool IsActive = true;
             internal bool PreserveFolderScrollOnNextRender;
             internal double PreservedFolderScrollOffset;
             internal bool PreserveDetailScrollOnNextRender;
@@ -34,6 +35,10 @@ namespace PixelVaultNative
             internal double LastFolderViewportWidth;
             internal bool LibraryFoldersLoading;
             internal int LibraryFolderRefreshVersion;
+            internal string StartupFolderCacheState = "unknown";
+            internal int StartupFolderCacheFolderCount;
+            internal bool StartupFolderCacheStrictCurrent;
+            internal bool StartupFolderCacheBackgroundRefreshQueued;
             internal int DetailRenderSequence;
             internal readonly LibraryDetailRenderCancellationController DetailRenderCancellation = new LibraryDetailRenderCancellationController();
             internal int AchievementsSummaryFetchGeneration;

@@ -23,6 +23,7 @@ namespace PixelVaultNative
         {
             if (_libraryBrowserLiveWorkingSet != null)
             {
+                _libraryBrowserLiveWorkingSet.IsActive = false;
                 FlushLibraryBrowserWorkingSetToSettings(_libraryBrowserLiveWorkingSet);
                 _libraryBrowserLiveWorkingSet = null;
             }
@@ -30,6 +31,9 @@ namespace PixelVaultNative
 
         void RegisterLibraryBrowserLiveWorkingSet(LibraryBrowserWorkingSet ws)
         {
+            if (_libraryBrowserLiveWorkingSet != null && !ReferenceEquals(_libraryBrowserLiveWorkingSet, ws))
+                _libraryBrowserLiveWorkingSet.IsActive = false;
+            if (ws != null) ws.IsActive = true;
             _libraryBrowserLiveWorkingSet = ws;
         }
 

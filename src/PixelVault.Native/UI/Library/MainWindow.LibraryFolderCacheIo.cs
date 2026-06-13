@@ -6,6 +6,14 @@ using System.Linq;
 
 namespace PixelVaultNative
 {
+    internal sealed class LibraryFolderCacheSnapshotRead
+    {
+        public List<LibraryFolderInfo> Folders { get; set; }
+        public bool CacheFileExists { get; set; }
+        public bool RootMatches { get; set; }
+        public bool MetadataRevisionCurrent { get; set; }
+    }
+
     public sealed partial class MainWindow
     {
         internal const string LibraryFolderCacheMetadataRevisionVersion = "scanner-v2";
@@ -244,7 +252,8 @@ namespace PixelVaultNative
 
         bool HasLibraryFolderCacheSnapshot(string root)
         {
-            return LoadLibraryFolderCacheSnapshot(root) != null;
+            var snapshot = LoadLibraryFolderCacheSnapshotRead(root);
+            return snapshot.Folders != null;
         }
 
         bool LibraryFolderCacheLooksIncomplete(string root, List<LibraryFolderInfo> folders)
@@ -285,22 +294,30 @@ namespace PixelVaultNative
 
         List<LibraryFolderInfo> LoadLibraryFolderCacheSnapshot(string root, bool allowStaleMetadataRevision = false)
         {
+            return LoadLibraryFolderCacheSnapshotRead(root, allowStaleMetadataRevision).Folders;
+        }
+
+        LibraryFolderCacheSnapshotRead LoadLibraryFolderCacheSnapshotRead(string root, bool allowStaleMetadataRevision = false)
+        {
             var path = LibraryFolderCachePath(root);
-            if (!File.Exists(path)) return null;
+            var result = new LibraryFolderCacheSnapshotRead();
+            if (!File.Exists(path)) return result;
+            result.CacheFileExists = true;
             var lines = File.ReadAllLines(path);
-            if (lines.Length < 2) return null;
-            if (!string.Equals(lines[0], root, StringComparison.OrdinalIgnoreCase)) return null;
-            if (!allowStaleMetadataRevision
-                && lines.Length >= 3
-                && !string.Equals(lines[2], GetLibraryMetadataIndexRevision(root), StringComparison.Ordinal)) return null;
+            if (lines.Length < 2) return result;
+            if (!string.Equals(lines[0], root, StringComparison.OrdinalIgnoreCase)) return result;
+            result.RootMatches = true;
+            result.MetadataRevisionCurrent = lines.Length < 3 || string.Equals(lines[2], GetLibraryMetadataIndexRevision(root), StringComparison.Ordinal);
+            if (!allowStaleMetadataRevision && !result.MetadataRevisionCurrent) return result;
             var parsed = ParseLibraryFolderCacheLines(root, lines);
             if (LibraryFolderCacheLooksIncomplete(root, parsed))
             {
                 Log("Library folder cache snapshot looked incomplete for " + root + ". Skipping startup prefill.");
-                return null;
+                return result;
             }
             ApplySavedGameIndexRows(root, parsed);
-            return parsed;
+            result.Folders = parsed;
+            return result;
         }
 
         List<LibraryFolderInfo> ParseLibraryFolderCacheLines(string root, string[] lines)

@@ -435,14 +435,17 @@ namespace PixelVaultNative
             var sourceViews = (visibleFolders ?? Enumerable.Empty<LibraryBrowserFolderView>())
                 .Where(view => view != null)
                 .ToList();
-            var orderedImagePaths = sourceViews
+            var imagePaths = sourceViews
                 .SelectMany(view => view.FilePaths ?? new string[0])
                 .Where(path => !string.IsNullOrWhiteSpace(path) && TextAndPathHelpers.IsImage(path))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderByDescending(path => _host.ResolveIndexedLibraryDate(libraryRoot, path))
+                .ToList();
+            var metadataIndex = LoadProjectionMetadataIndex(libraryRoot, imagePaths);
+            var orderedImagePaths = imagePaths
+                .OrderByDescending(path => _host.ResolveIndexedLibraryDate(libraryRoot, path, metadataIndex))
                 .ThenBy(path => path, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
-            var newest = orderedImagePaths.Length == 0 ? DateTime.MinValue : _host.ResolveIndexedLibraryDate(libraryRoot, orderedImagePaths[0]);
+            var newest = orderedImagePaths.Length == 0 ? DateTime.MinValue : _host.ResolveIndexedLibraryDate(libraryRoot, orderedImagePaths[0], metadataIndex);
             var timelineView = new LibraryBrowserFolderView
             {
                 ViewKey = "timeline|capture-feed",
@@ -483,14 +486,17 @@ namespace PixelVaultNative
             var sourceViews = (visibleFolders ?? Enumerable.Empty<LibraryBrowserFolderView>())
                 .Where(view => view != null)
                 .ToList();
-            var orderedImagePaths = sourceViews
+            var imagePaths = sourceViews
                 .SelectMany(view => view.FilePaths ?? new string[0])
                 .Where(path => !string.IsNullOrWhiteSpace(path) && TextAndPathHelpers.IsImage(path))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderByDescending(path => _host.ResolveIndexedLibraryDate(libraryRoot, path))
+                .ToList();
+            var metadataIndex = LoadProjectionMetadataIndex(libraryRoot, imagePaths);
+            var orderedImagePaths = imagePaths
+                .OrderByDescending(path => _host.ResolveIndexedLibraryDate(libraryRoot, path, metadataIndex))
                 .ThenBy(path => path, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
-            var newest = orderedImagePaths.Length == 0 ? DateTime.MinValue : _host.ResolveIndexedLibraryDate(libraryRoot, orderedImagePaths[0]);
+            var newest = orderedImagePaths.Length == 0 ? DateTime.MinValue : _host.ResolveIndexedLibraryDate(libraryRoot, orderedImagePaths[0], metadataIndex);
             var sessionView = new LibraryBrowserFolderView
             {
                 ViewKey = "sessions|capture-feed|" + normalizedThreshold,
@@ -711,6 +717,13 @@ namespace PixelVaultNative
                 }).ToList();
             }
 
+            var projectionFiles = rawFolders
+                .SelectMany(folder => folder.FilePaths ?? new string[0])
+                .Where(path => !string.IsNullOrWhiteSpace(path))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            var metadataIndex = LoadProjectionMetadataIndex(libraryRoot, projectionFiles);
+
             return rawFolders
                 .GroupBy(folder => BuildLibraryBrowserAllMergeKey(folder), StringComparer.OrdinalIgnoreCase)
                 .Select(group =>
@@ -727,7 +740,7 @@ namespace PixelVaultNative
                         .Distinct(StringComparer.OrdinalIgnoreCase)
                         .ToList();
                     var orderedPaths = pathList
-                        .OrderByDescending(path => _host.ResolveIndexedLibraryDate(libraryRoot, path))
+                        .OrderByDescending(path => _host.ResolveIndexedLibraryDate(libraryRoot, path, metadataIndex))
                         .ThenBy(path => path, StringComparer.OrdinalIgnoreCase)
                         .ToArray();
                     var pathBackedCount = orderedPaths.Length;
@@ -747,7 +760,7 @@ namespace PixelVaultNative
                     var tickMax = sourceFolders.Max(folder => folder == null ? 0L : folder.NewestCaptureUtcTicks);
                     if (tickMax == 0 && orderedPaths.Length > 0)
                     {
-                        var fromIndex = _host.ResolveIndexedLibraryDate(libraryRoot, orderedPaths[0]);
+                        var fromIndex = _host.ResolveIndexedLibraryDate(libraryRoot, orderedPaths[0], metadataIndex);
                         if (fromIndex > DateTime.MinValue)
                         {
                             try
@@ -762,7 +775,7 @@ namespace PixelVaultNative
                     var tickMaxRecent = sourceFolders.Max(folder => folder == null ? 0L : folder.NewestRecentSortUtcTicks);
                     if (tickMaxRecent == 0 && orderedPaths.Length > 0)
                     {
-                        tickMaxRecent = orderedPaths.Max(path => _host.ResolveLibraryFileRecentSortUtcTicks(libraryRoot, path, null));
+                        tickMaxRecent = orderedPaths.Max(path => _host.ResolveLibraryFileRecentSortUtcTicks(libraryRoot, path, metadataIndex));
                     }
                     var previewImagePath = primary != null && !string.IsNullOrWhiteSpace(primary.PreviewImagePath)
                         ? primary.PreviewImagePath
@@ -801,6 +814,13 @@ namespace PixelVaultNative
                     return view;
                 })
                 .ToList();
+        }
+
+        Dictionary<string, LibraryMetadataIndexEntry> LoadProjectionMetadataIndex(string libraryRoot, IReadOnlyCollection<string> projectionFiles)
+        {
+            if (string.IsNullOrWhiteSpace(libraryRoot) || projectionFiles == null || projectionFiles.Count == 0)
+                return null;
+            return _host.LoadLibraryMetadataIndex(libraryRoot, false) ?? new Dictionary<string, LibraryMetadataIndexEntry>(StringComparer.OrdinalIgnoreCase);
         }
     }
 }

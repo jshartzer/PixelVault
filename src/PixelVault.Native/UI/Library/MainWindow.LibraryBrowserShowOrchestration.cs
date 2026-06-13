@@ -400,6 +400,7 @@ namespace PixelVaultNative
                 {
                     libraryWindow.Closed += delegate
                     {
+                        ws.IsActive = false;
                         if (_shell.ActiveLibraryFolderRefresh == refreshLibraryFoldersAsync) _shell.ActiveLibraryFolderRefresh = null;
                         _shell.ActiveSelectedLibraryFolder = null;
                     };
@@ -739,20 +740,33 @@ namespace PixelVaultNative
                 refreshGroupingButtons();
                 refreshTimelineRangeUi();
                 refreshSessionsThresholdUi();
-                var startupSnapshotFolders = _shell.LibrarySession.LoadLibraryFolderCacheSnapshot(allowStaleMetadataRevision: true);
-                var currentFolderCacheSnapshotExists = _shell.LibrarySession.HasLibraryFolderCacheSnapshot();
+                var startupSnapshot = _shell.LibrarySession.LoadLibraryFolderCacheSnapshotRead(allowStaleMetadataRevision: true);
+                var startupSnapshotFolders = startupSnapshot.Folders;
+                var currentFolderCacheSnapshotExists = startupSnapshotFolders != null && startupSnapshot.MetadataRevisionCurrent;
+                ws.StartupFolderCacheState = startupSnapshotFolders == null
+                    ? "none"
+                    : (currentFolderCacheSnapshotExists ? "freshSnapshot" : "staleSnapshot");
+                ws.StartupFolderCacheFolderCount = startupSnapshotFolders == null ? 0 : startupSnapshotFolders.Count;
+                ws.StartupFolderCacheStrictCurrent = currentFolderCacheSnapshotExists;
                 if (startupSnapshotFolders != null)
                 {
                     ws.Folders.Clear();
                     ws.Folders.AddRange(startupSnapshotFolders);
                     if (_shell.StatusLine != null) _shell.StatusLine.Text = "Library ready";
                 }
+                var autoRefreshLibraryFoldersOnStartup = !currentFolderCacheSnapshotExists;
+                ws.StartupFolderCacheBackgroundRefreshQueued = autoRefreshLibraryFoldersOnStartup;
 
                 if (reuseMainWindow) _shell.RegisterLibraryBrowserLiveWorkingSet(ws);
                 if (!reuseMainWindow) libraryWindow.Show();
                 if (renderTiles != null) renderTiles();
                 if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge();
-                var autoRefreshLibraryFoldersOnStartup = !currentFolderCacheSnapshotExists;
+                _shell.LogTroubleshooting("LibraryStartupCache",
+                    "state=" + ws.StartupFolderCacheState
+                    + "; folders=" + ws.StartupFolderCacheFolderCount
+                    + "; strictCurrent=" + currentFolderCacheSnapshotExists
+                    + "; backgroundRefreshQueued=" + autoRefreshLibraryFoldersOnStartup
+                    + "; grouping=" + _shell.NormalizeLibraryGroupingMode(_shell.LibraryGroupingMode));
                 if (prefillLibraryFoldersFromSnapshotAsync != null && startupSnapshotFolders == null) prefillLibraryFoldersFromSnapshotAsync();
                 if (refreshLibraryFoldersAsync != null && autoRefreshLibraryFoldersOnStartup) refreshLibraryFoldersAsync(false);
                 _shell.ScheduleDeferredGameIndexWarmup(libraryWindow);

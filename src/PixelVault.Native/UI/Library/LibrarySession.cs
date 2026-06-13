@@ -18,7 +18,7 @@ namespace PixelVaultNative
         readonly Action<string, Dictionary<string, LibraryMetadataIndexEntry>> _saveLibraryMetadataIndex;
         readonly Func<string, IEnumerable<string>, Dictionary<string, LibraryMetadataIndexEntry>> _loadLibraryMetadataIndexForFilePaths;
         readonly Action<string, IEnumerable<LibraryMetadataIndexEntry>> _mergePersistLibraryMetadataIndexEntries;
-        readonly Func<string, bool, List<LibraryFolderInfo>> _loadLibraryFolderCacheSnapshot;
+        readonly Func<string, bool, LibraryFolderCacheSnapshotRead> _loadLibraryFolderCacheSnapshotRead;
         readonly Func<string, string, Dictionary<string, LibraryMetadataIndexEntry>, DateTime> _resolveIndexedLibraryDate;
         readonly Func<string, string, string, EmbeddedMetadataSnapshot, LibraryMetadataIndexEntry, Dictionary<string, LibraryMetadataIndexEntry>, List<GameIndexEditorRow>, LibraryMetadataIndexEntry> _buildResolvedLibraryMetadataIndexEntry;
         readonly LibraryCoverRefreshAsyncInvoker _refreshLibraryCovers;
@@ -38,7 +38,7 @@ namespace PixelVaultNative
             Action<string, Dictionary<string, LibraryMetadataIndexEntry>> saveLibraryMetadataIndex,
             Func<string, IEnumerable<string>, Dictionary<string, LibraryMetadataIndexEntry>> loadLibraryMetadataIndexForFilePaths,
             Action<string, IEnumerable<LibraryMetadataIndexEntry>> mergePersistLibraryMetadataIndexEntries,
-            Func<string, bool, List<LibraryFolderInfo>> loadLibraryFolderCacheSnapshot,
+            Func<string, bool, LibraryFolderCacheSnapshotRead> loadLibraryFolderCacheSnapshotRead,
             Func<string, string, Dictionary<string, LibraryMetadataIndexEntry>, DateTime> resolveIndexedLibraryDate,
             Func<string, string, string, EmbeddedMetadataSnapshot, LibraryMetadataIndexEntry, Dictionary<string, LibraryMetadataIndexEntry>, List<GameIndexEditorRow>, LibraryMetadataIndexEntry> buildResolvedLibraryMetadataIndexEntry,
             LibraryCoverRefreshAsyncInvoker refreshLibraryCovers,
@@ -57,7 +57,7 @@ namespace PixelVaultNative
             _saveLibraryMetadataIndex = saveLibraryMetadataIndex ?? throw new ArgumentNullException(nameof(saveLibraryMetadataIndex));
             _loadLibraryMetadataIndexForFilePaths = loadLibraryMetadataIndexForFilePaths ?? throw new ArgumentNullException(nameof(loadLibraryMetadataIndexForFilePaths));
             _mergePersistLibraryMetadataIndexEntries = mergePersistLibraryMetadataIndexEntries ?? throw new ArgumentNullException(nameof(mergePersistLibraryMetadataIndexEntries));
-            _loadLibraryFolderCacheSnapshot = loadLibraryFolderCacheSnapshot ?? throw new ArgumentNullException(nameof(loadLibraryFolderCacheSnapshot));
+            _loadLibraryFolderCacheSnapshotRead = loadLibraryFolderCacheSnapshotRead ?? throw new ArgumentNullException(nameof(loadLibraryFolderCacheSnapshotRead));
             _resolveIndexedLibraryDate = resolveIndexedLibraryDate ?? throw new ArgumentNullException(nameof(resolveIndexedLibraryDate));
             _buildResolvedLibraryMetadataIndexEntry = buildResolvedLibraryMetadataIndexEntry ?? throw new ArgumentNullException(nameof(buildResolvedLibraryMetadataIndexEntry));
             _refreshLibraryCovers = refreshLibraryCovers ?? throw new ArgumentNullException(nameof(refreshLibraryCovers));
@@ -166,14 +166,18 @@ namespace PixelVaultNative
 
         public List<LibraryFolderInfo> LoadLibraryFolderCacheSnapshot(bool allowStaleMetadataRevision = false)
         {
-            if (string.IsNullOrWhiteSpace(LibraryRoot)) return null;
-            return _loadLibraryFolderCacheSnapshot(LibraryRoot, allowStaleMetadataRevision);
+            return LoadLibraryFolderCacheSnapshotRead(allowStaleMetadataRevision).Folders;
+        }
+
+        public LibraryFolderCacheSnapshotRead LoadLibraryFolderCacheSnapshotRead(bool allowStaleMetadataRevision = false)
+        {
+            if (string.IsNullOrWhiteSpace(LibraryRoot)) return new LibraryFolderCacheSnapshotRead();
+            return _loadLibraryFolderCacheSnapshotRead(LibraryRoot, allowStaleMetadataRevision) ?? new LibraryFolderCacheSnapshotRead();
         }
 
         public bool HasLibraryFolderCacheSnapshot(bool allowStaleMetadataRevision = false)
         {
-            if (string.IsNullOrWhiteSpace(LibraryRoot)) return false;
-            return _loadLibraryFolderCacheSnapshot(LibraryRoot, allowStaleMetadataRevision) != null;
+            return LoadLibraryFolderCacheSnapshotRead(allowStaleMetadataRevision).Folders != null;
         }
 
         public DateTime ResolveIndexedLibraryDate(string file, Dictionary<string, LibraryMetadataIndexEntry> index)

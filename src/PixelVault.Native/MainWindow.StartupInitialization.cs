@@ -201,7 +201,7 @@ namespace PixelVaultNative
                 mw.SaveLibraryMetadataIndex,
                 mw.LoadLibraryMetadataIndexForFilePaths,
                 mw.MergePersistLibraryMetadataIndexEntries,
-                (root, allowStaleMetadataRevision) => mw.LoadLibraryFolderCacheSnapshot(root, allowStaleMetadataRevision),
+                (root, allowStaleMetadataRevision) => mw.LoadLibraryFolderCacheSnapshotRead(root, allowStaleMetadataRevision),
                 mw.ResolveIndexedLibraryDate,
                 mw.BuildResolvedLibraryMetadataIndexEntry,
                 mw.RefreshLibraryCoversAsync,

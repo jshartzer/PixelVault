@@ -5,6 +5,88 @@ using System.Linq;
 
 namespace PixelVaultNative
 {
+    internal sealed class SavedGameIndexRowLookup
+    {
+        readonly Func<string, string> _normalizeGameId;
+        readonly Func<string, string> _normalizeConsoleLabel;
+        readonly Func<string, string, string> _buildGameIndexIdentity;
+        readonly Dictionary<string, GameIndexEditorRow> _byGameId;
+        readonly Dictionary<string, GameIndexEditorRow> _byIdentity;
+        readonly Dictionary<string, GameIndexEditorRow> _byFolderPathAndPlatform;
+
+        public SavedGameIndexRowLookup(
+            IEnumerable<GameIndexEditorRow> rows,
+            Func<string, string> normalizeGameId,
+            Func<string, string> normalizeConsoleLabel,
+            Func<string, string, string> buildGameIndexIdentity)
+        {
+            _normalizeGameId = normalizeGameId ?? (value => value ?? string.Empty);
+            _normalizeConsoleLabel = normalizeConsoleLabel ?? (value => value ?? string.Empty);
+            _buildGameIndexIdentity = buildGameIndexIdentity ?? ((name, platform) => (name ?? string.Empty) + "|" + (platform ?? string.Empty));
+            var savedRows = (rows ?? Enumerable.Empty<GameIndexEditorRow>())
+                .Where(row => row != null)
+                .ToList();
+
+            _byGameId = savedRows
+                .Where(row => !string.IsNullOrWhiteSpace(_normalizeGameId(row.GameId)))
+                .GroupBy(row => _normalizeGameId(row.GameId), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+
+            _byIdentity = savedRows
+                .GroupBy(row => _buildGameIndexIdentity(row.Name, row.PlatformLabel), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+
+            _byFolderPathAndPlatform = savedRows
+                .Where(row => !string.IsNullOrWhiteSpace(row.FolderPath))
+                .GroupBy(row => BuildFolderPathPlatformKey(row.FolderPath, row.PlatformLabel), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(group => group.Key, group => PickFolderPathPlatformCandidate(group), StringComparer.OrdinalIgnoreCase);
+        }
+
+        public GameIndexEditorRow Find(LibraryFolderInfo folder)
+        {
+            if (folder == null) return null;
+
+            var wantedId = _normalizeGameId(folder.GameId);
+            GameIndexEditorRow row;
+            if (!string.IsNullOrWhiteSpace(wantedId) && _byGameId.TryGetValue(wantedId, out row))
+                return row;
+
+            var identity = _buildGameIndexIdentity(folder.Name, folder.PlatformLabel);
+            if (_byIdentity.TryGetValue(identity, out row))
+                return row;
+
+            var folderKey = BuildFolderPathPlatformKey(folder.FolderPath, folder.PlatformLabel);
+            if (!string.IsNullOrWhiteSpace(folderKey) && _byFolderPathAndPlatform.TryGetValue(folderKey, out row))
+                return row;
+
+            return null;
+        }
+
+        GameIndexEditorRow PickFolderPathPlatformCandidate(IEnumerable<GameIndexEditorRow> candidates)
+        {
+            var candidateList = (candidates ?? Enumerable.Empty<GameIndexEditorRow>())
+                .Where(row => row != null)
+                .ToList();
+            if (candidateList.Count == 0) return null;
+            if (candidateList.Count == 1) return candidateList[0];
+            return candidateList.FirstOrDefault(row => !string.IsNullOrWhiteSpace(_normalizeGameId(row.GameId))) ?? candidateList[0];
+        }
+
+        string BuildFolderPathPlatformKey(string folderPath, string platformLabel)
+        {
+            var normalizedFolder = NormalizeFolderPath(folderPath);
+            if (string.IsNullOrWhiteSpace(normalizedFolder)) return string.Empty;
+            return normalizedFolder + "|" + _normalizeConsoleLabel(platformLabel ?? string.Empty);
+        }
+
+        static string NormalizeFolderPath(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path)) return string.Empty;
+            try { return Path.GetFullPath(path.Trim()); }
+            catch { return path.Trim().TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar); }
+        }
+    }
+
     public sealed partial class MainWindow
     {
         string BuildCanonicalGameIndexFolderName(GameIndexEditorRow row, List<GameIndexEditorRow> allRows, Dictionary<string, int> titleCounts)
@@ -230,23 +312,18 @@ namespace PixelVaultNative
 
         GameIndexEditorRow FindSavedGameIndexRow(IEnumerable<GameIndexEditorRow> rows, LibraryFolderInfo folder)
         {
-            if (folder == null) return null;
-            var savedRows = (rows ?? Enumerable.Empty<GameIndexEditorRow>()).Where(row => row != null).ToList();
-            var byGameId = FindSavedGameIndexRowById(savedRows, folder.GameId);
-            if (byGameId != null) return byGameId;
-            var byIdentity = FindSavedGameIndexRowByIdentity(savedRows, folder.Name, folder.PlatformLabel);
-            if (byIdentity != null) return byIdentity;
-            return FindSavedGameIndexRowByFolderPathAndPlatform(savedRows, folder.FolderPath, folder.PlatformLabel);
+            return new SavedGameIndexRowLookup(rows, NormalizeGameId, NormalizeConsoleLabel, BuildGameIndexIdentity).Find(folder);
         }
 
         bool ApplySavedGameIndexRows(string root, List<LibraryFolderInfo> folders)
         {
             var savedRows = GetSavedGameIndexRowsForRoot(root);
             if (savedRows.Count == 0 || folders == null || folders.Count == 0) return false;
+            var savedLookup = new SavedGameIndexRowLookup(savedRows, NormalizeGameId, NormalizeConsoleLabel, BuildGameIndexIdentity);
             bool changed = false;
             foreach (var folder in folders)
             {
-                var saved = FindSavedGameIndexRow(savedRows, folder);
+                var saved = savedLookup.Find(folder);
                 if (saved == null) continue;
 
                 // Disk folders marked “Needs assignment · …” skipped this merge entirely

@@ -15,6 +15,7 @@ Long-lived execution plans that use a **stable plan ID** for cross-linking (repo
 | **PV-PLN-LIBPV-001** | [PV-PLN-LIBPV-001-in-app-library-photo-viewer.md](PV-PLN-LIBPV-001-in-app-library-photo-viewer.md) | **In-app library photo viewer:** non-modal full-frame window (match main size), timeline chrome parity, **Ctrl+click** = selection only (**PV-POL-LIBPV-SEL-001**), translucent **prev/next** overlays (**PV-POL-LIBPV-NAV-001**); staged phases A–E + risks. |
 | **PV-PLN-DIST-001** | [PV-PLN-DIST-001-windows-store-and-distribution-roadmap.md](PV-PLN-DIST-001-windows-store-and-distribution-roadmap.md) | **Distribution roadmap:** Phase 1 **1.0** (signing, **storage-root hardening**, tool **redistribution**, installer/updater), Phase 2 **Store** (manifest + **packaged spike**), Phase 3 **iOS/backend**; Store blockers box, tech vs submission split, Phase 2 gate. |
 | **PV-PLN-PERF-001** | [PV-PLN-PERF-001-app-speed-and-efficiency.md](PV-PLN-PERF-001-app-speed-and-efficiency.md) | **App speed and efficiency:** single-pass import prep, incremental folder-cache updates, background metadata repair, progress/log coalescing, cancelable detail-pane work, scroll/render polish. |
+| **PV-PLN-PERF-002** | [PV-PLN-PERF-002-library-open-responsiveness.md](PV-PLN-PERF-002-library-open-responsiveness.md) | **Library open responsiveness:** cached/stale folder first paint, folder projection metadata-index reuse, linear saved game-index merge, and async refresh close/session guards. |
 | **PV-PLN-GPRO-001** | [PV-PLN-GPRO-001-game-profile-dashboard.md](PV-PLN-GPRO-001-game-profile-dashboard.md) | **Game Profile dashboard:** turn the new "Open Game Profile" window into a per-game dashboard — hero action cluster (Favorite/Showcase/100% + Edit Game / Open Folders / Change Art), summary line, Game Notes, **Sessions** section reusing `librarySessionThresholdMinutes`, achievements completion %, external-ID pills, Recent Captures with chevron scroll. |
 
 ### Plan families (merge by theme, not by file)
@@ -26,7 +27,7 @@ These are **documentation umbrellas**—each plan file stays canonical for its I
 | **MainWindow / services / iOS-aligned seams** | **PV-PLN-UI-001** (active), **PV-PLN-EXT-002** (complete), **`docs/NEXT_TRIM_PLAN.md`**, **`pixelvault_service_split_plan.txt`** |
 | **Pre-1.0 polish + shipping** | **PV-PLN-V1POL-001**, **PV-PLN-DIST-001** |
 | **Intake, filenames, trust, placement** | **PV-PLN-FNRU-001**, **PV-PLN-AINT-001** (complete), **PV-PLN-LIBST-001** (complete) |
-| **Performance / responsiveness** | **PV-PLN-PERF-001**, **`docs/LIBRARY_PERFORMANCE_PLAN.md`**, **`docs/PERFORMANCE_TODO.md`** |
+| **Performance / responsiveness** | **PV-PLN-PERF-001**, **PV-PLN-PERF-002**, **`docs/LIBRARY_PERFORMANCE_PLAN.md`**, **`docs/PERFORMANCE_TODO.md`** |
 | **Library UX surfaces** | **PV-PLN-LIBPV-001** (capture viewer), **PV-PLN-GPRO-001** (game profile dashboard), **PV-PLN-RVW-001** (post-app-review hardening, complete) |
 
 **ID format:** `PV-PLN-<TOPIC>-<NNN>`  

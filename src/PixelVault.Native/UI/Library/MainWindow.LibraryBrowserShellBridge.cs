@@ -202,6 +202,8 @@ namespace PixelVaultNative
 
             public void LibraryBrowserShowToast(LibraryBrowserWorkingSet ws, string message) => _m.ShowLibraryBrowserToast(ws, message);
 
+            public void LogTroubleshooting(string area, string message) => _m.LogTroubleshooting(area, message);
+
             public void ShowLibraryBrowserKeyboardShortcutsHelp(Window owner) => _m.ShowLibraryBrowserKeyboardShortcutsHelp(owner);
 
             public void ShowLibraryCommandPalette(Window owner, LibraryBrowserPaletteContext context, string initialSearch) =>

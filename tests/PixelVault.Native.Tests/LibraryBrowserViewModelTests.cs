@@ -31,6 +31,13 @@ namespace PixelVaultNative.Tests
                 new(StringComparer.OrdinalIgnoreCase);
             public readonly Dictionary<string, long> FileRecentSortTicks =
                 new(StringComparer.OrdinalIgnoreCase);
+            public readonly Dictionary<string, LibraryMetadataIndexEntry> MetadataIndex =
+                new(StringComparer.OrdinalIgnoreCase);
+            public int LoadLibraryMetadataIndexCallCount;
+            public int ResolveDateWithIndexCount;
+            public int ResolveDateWithoutIndexCount;
+            public int ResolveRecentWithIndexCount;
+            public int ResolveRecentWithoutIndexCount;
 
             public LibraryFolderInfo CloneLibraryFolderInfo(LibraryFolderInfo folder)
             {
@@ -82,9 +89,22 @@ namespace PixelVaultNative.Tests
             public string PrimaryPlatformLabel(string file) =>
                 string.Empty;
 
+            public Dictionary<string, LibraryMetadataIndexEntry> LoadLibraryMetadataIndex(string libraryRoot, bool forceDiskReload = false)
+            {
+                LoadLibraryMetadataIndexCallCount++;
+                return new Dictionary<string, LibraryMetadataIndexEntry>(MetadataIndex, StringComparer.OrdinalIgnoreCase);
+            }
+
             public DateTime ResolveIndexedLibraryDate(string libraryRoot, string file, Dictionary<string, LibraryMetadataIndexEntry> index = null!)
             {
                 if (string.IsNullOrEmpty(file)) return DateTime.MinValue;
+                if (index == null) ResolveDateWithoutIndexCount++;
+                else ResolveDateWithIndexCount++;
+                if (index != null
+                    && index.TryGetValue(file, out var entry)
+                    && entry != null
+                    && entry.CaptureUtcTicks > 0)
+                    return new DateTime(entry.CaptureUtcTicks, DateTimeKind.Utc);
                 return FileCaptureDates.TryGetValue(file, out var dt) ? dt : DateTime.MinValue;
             }
 
@@ -97,6 +117,13 @@ namespace PixelVaultNative.Tests
             public long ResolveLibraryFileRecentSortUtcTicks(string libraryRoot, string file, Dictionary<string, LibraryMetadataIndexEntry> index = null!)
             {
                 if (string.IsNullOrEmpty(file)) return 0;
+                if (index == null) ResolveRecentWithoutIndexCount++;
+                else ResolveRecentWithIndexCount++;
+                if (index != null
+                    && index.TryGetValue(file, out var entry)
+                    && entry != null
+                    && entry.IndexAddedUtcTicks > 0)
+                    return entry.IndexAddedUtcTicks;
                 return FileRecentSortTicks.TryGetValue(file, out var t) ? t : 0;
             }
 
@@ -137,6 +164,7 @@ namespace PixelVaultNative.Tests
             Assert.Equal(3, views.Count);
             Assert.All(views, v => Assert.False(v.IsMergedAcrossPlatforms, "console views must not be cross-platform merged"));
             Assert.Equal(new[] { "Steam", "PS5", "PC" }, views.Select(v => v.PrimaryPlatformLabel).ToArray());
+            Assert.Equal(0, host.LoadLibraryMetadataIndexCallCount);
         }
 
         [Fact]
@@ -162,6 +190,41 @@ namespace PixelVaultNative.Tests
             var celeste = views.Single(v => string.Equals(v.Name, "Celeste", StringComparison.OrdinalIgnoreCase));
             Assert.False(celeste.IsMergedAcrossPlatforms);
             Assert.Single(celeste.SourceFolders);
+        }
+
+        [Fact]
+        public void AllGrouping_LoadsMetadataIndexOnceAndPassesItToDateResolution()
+        {
+            var host = new StubHost { LibraryGroupingMode = "all" };
+            var vm = new LibraryBrowserViewModel(host);
+            var older = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+            var newer = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+            host.MetadataIndex["C:/lib/a/old.png"] = new LibraryMetadataIndexEntry
+            {
+                FilePath = "C:/lib/a/old.png",
+                CaptureUtcTicks = older.Ticks,
+                IndexAddedUtcTicks = older.AddDays(1).Ticks
+            };
+            host.MetadataIndex["C:/lib/b/new.png"] = new LibraryMetadataIndexEntry
+            {
+                FilePath = "C:/lib/b/new.png",
+                CaptureUtcTicks = newer.Ticks,
+                IndexAddedUtcTicks = newer.AddDays(1).Ticks
+            };
+            var folders = new List<LibraryFolderInfo>
+            {
+                MakeFolder("Game", "Steam", "C:/lib/a", files: new[] { "C:/lib/a/old.png" }),
+                MakeFolder("Game", "PS5", "C:/lib/b", files: new[] { "C:/lib/b/new.png" })
+            };
+
+            var views = vm.BuildLibraryBrowserFolderViews(folders, "all");
+
+            Assert.Equal(1, host.LoadLibraryMetadataIndexCallCount);
+            Assert.True(host.ResolveDateWithIndexCount > 0);
+            Assert.Equal(0, host.ResolveDateWithoutIndexCount);
+            Assert.True(host.ResolveRecentWithIndexCount > 0);
+            Assert.Equal(0, host.ResolveRecentWithoutIndexCount);
+            Assert.Equal(new[] { "C:/lib/b/new.png", "C:/lib/a/old.png" }, views.Single().FilePaths);
         }
 
         [Fact]
@@ -223,6 +286,8 @@ namespace PixelVaultNative.Tests
             Assert.Equal(2, timeline.FileCount);
             Assert.Equal(new[] { "C:/lib/b/new.png", "C:/lib/a/old.png" }, timeline.FilePaths);
             Assert.Equal("C:/lib/b/new.png", timeline.PreviewImagePath);
+            Assert.Equal(2, host.LoadLibraryMetadataIndexCallCount);
+            Assert.Equal(0, host.ResolveDateWithoutIndexCount);
         }
 
         [Fact]
@@ -246,6 +311,8 @@ namespace PixelVaultNative.Tests
             Assert.Equal(90, sessions.SessionThresholdMinutes);
             Assert.Equal("sessions|capture-feed|90", sessions.ViewKey);
             Assert.Equal(new[] { "C:/lib/b/new.png", "C:/lib/a/old.png" }, sessions.FilePaths);
+            Assert.Equal(2, host.LoadLibraryMetadataIndexCallCount);
+            Assert.Equal(0, host.ResolveDateWithoutIndexCount);
         }
 
         [Fact]
