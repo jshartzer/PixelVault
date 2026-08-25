@@ -25,7 +25,8 @@ namespace PixelVaultNative
                 CurrentRetroAchievementsApiKey(),
                 CurrentSteamUserId64(),
                 CurrentRetroAchievementsUsername(),
-                "PixelVault/" + AppVersion);
+                "PixelVault/" + AppVersion,
+                achievementGuideService);
         }
 
         LibraryFolderInfo ResolveLibraryBrowserAchievementLookupFolder(LibraryBrowserFolderView view)

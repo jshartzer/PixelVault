@@ -39,6 +39,19 @@ If this path fails, stop and fix that first before spending time on deeper spot 
 10. If virtualization or layout changed, scroll a larger folder and look for spacing, rerender, or selection regressions.
 11. If **Photo workspace hero/banner** download or selection handling changed: switch to **Photo** mode, scrub the folder rail quickly on a few titles that auto-fetch banner art, and confirm the header banner still tracks the current selection without obvious duplicate fetch churn (network tray or debugger optional). Cancelling selection should abandon the prior wait quickly (Steam / SteamGridDB ID resolution and hero HTTP use cancellation between steps).
 
+## Achievement guides (`PV-PLN-ACHG-001`)
+
+Run after changing achievement fetching, the Game Profile achievements section, guide persistence, or JSON import.
+
+1. Open a Steam game with achievements in Game Profile. Confirm the provider summary loads, choose **Open Guide**, and verify the achievement list is populated.
+2. Repeat with a RetroAchievements game and confirm its list maps to numeric provider achievement IDs without title-only matching.
+3. Exercise text search and each status filter: **Guided**, **Unguided**, **Missable**, and **Locked**.
+4. Edit one disposable guide, source URL/title, tag list, and missable flag. Save, close, reopen, and confirm it persisted. Verify switching or closing with unsaved edits prompts before discarding them.
+5. Preview a known-good JSON bundle and a wrong-game bundle. Confirm the preview distinguishes matched/changed/unchanged/unmatched rows and that validation errors write nothing.
+6. Confirm `PixelVaultData/guides/pixelvault-guides.sqlite` and a file under `guides/backups/` exist after a save/import. Clear only disposable cache data and confirm the saved guide remains.
+
+Pass if both providers open stable rows, authored data survives reopen/cache maintenance, imports never fall back to title matching, and no provider fetch is duplicated when opening Guide from Game Profile.
+
 ## PV-PLN-PERF-001 — performance spot checks
 
 Run this section for PixelVault speed/efficiency slices, especially import, library cache, detail pane, folder rendering, progress windows, or background metadata work.

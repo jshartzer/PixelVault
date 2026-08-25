@@ -20,10 +20,21 @@ namespace PixelVaultNative
         readonly TextBlock _error;
         readonly ListBox _list;
         readonly TextBlock _empty;
+        readonly Button _guide;
+        readonly IAchievementGuideService _guideService;
+        readonly LibraryFolderInfo _folder;
+        GameAchievementsFetchService.FetchResult _loadedResult;
 
-        AchievementsInfoWindow(Window owner, string initialHeading)
+        AchievementsInfoWindow(
+            Window owner,
+            string initialHeading,
+            IAchievementGuideService guideService,
+            LibraryFolderInfo folder,
+            string userAgent)
         {
             Owner = owner;
+            _guideService = guideService;
+            _folder = folder;
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
             Title = "Achievements";
             Width = 720;
@@ -114,6 +125,45 @@ namespace PixelVaultNative
             root.Children.Add(_list);
 
             var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 4, 0, 0) };
+            _guide = new Button
+            {
+                Content = "Guide",
+                Width = 120,
+                Height = 40,
+                Margin = new Thickness(0, 0, 10, 0),
+                Foreground = Brushes.White,
+                Background = UiBrushHelper.FromHex("#20343A"),
+                BorderBrush = UiBrushHelper.FromHex("#C0CCD6"),
+                BorderThickness = new Thickness(1),
+                FontWeight = FontWeights.SemiBold,
+                IsEnabled = false
+            };
+            _guide.Click += delegate
+            {
+                var rows = _loadedResult?.Rows;
+                if (_guideService == null || rows == null || rows.Count == 0) return;
+                try
+                {
+                    AchievementGuideWindow.ShowModal(
+                        this,
+                        _guideService,
+                        _loadedResult.GameTitle ?? _folder?.Name ?? "Game",
+                        _folder?.GameId ?? string.Empty,
+                        rows);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(
+                        this,
+                        "Could not open the achievement guide.\n\n" + ex.Message,
+                        "Achievement Guide",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Error);
+                }
+            };
+            AccessibilityUi.TryApplyFocusVisualStyle(_guide);
+            AutomationProperties.SetName(_guide, "Open achievement guides");
+            buttons.Children.Add(_guide);
             var close = new Button
             {
                 Content = "Close",
@@ -143,11 +193,12 @@ namespace PixelVaultNative
             string retroKey,
             string steamUserId64,
             string retroAchievementsUsername,
-            string userAgent)
+            string userAgent,
+            IAchievementGuideService guideService)
         {
             var title = folder == null ? string.Empty : (folder.Name ?? string.Empty).Trim();
             if (string.IsNullOrWhiteSpace(title)) title = "Achievements";
-            var dlg = new AchievementsInfoWindow(owner, title);
+            var dlg = new AchievementsInfoWindow(owner, title, guideService, folder, userAgent);
             AutomationProperties.SetName(dlg, "Achievements");
             dlg.Loaded += async (_, __) => { await dlg.LoadAsync(normalizedPlatform, folder, steamKey, retroKey, steamUserId64, retroAchievementsUsername, userAgent); };
             dlg.ShowDialog();
@@ -203,8 +254,10 @@ namespace PixelVaultNative
             }
 
             _error.Visibility = Visibility.Collapsed;
+            _loadedResult = result;
             _list.Items.Clear();
             var rows = result.Rows ?? new List<GameAchievementsFetchService.AchievementRow>();
+            _guide.IsEnabled = _guideService != null && rows.Any(row => row != null && row.HasStableProviderIdentity);
             if (rows.Count == 0)
             {
                 _list.Visibility = Visibility.Collapsed;

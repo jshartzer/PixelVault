@@ -1,5 +1,9 @@
 ## 0.077.000
 - **Release:** Version **0.077.000** — **`PV-PLN-PERF-001`** app speed and efficiency release.
+- **Achievement guides (`PV-PLN-ACHG-001`):** Steam and RetroAchievements rows now synchronize into a durable local catalog with stable provider identities, while unlock progress remains live from each provider.
+- **Guide editor:** The Achievements window and Game Profile now open a per-achievement Guide editor with completion notes, source attribution, tags, missable state, text/status filters, unsaved-change protection, and keyboard/accessibility support.
+- **Guide imports and recovery:** Versioned JSON bundles can be validated, previewed, and imported transactionally from a file or clipboard. Authored data lives outside disposable caches in `PixelVaultData/guides/` with rolling backups.
+- **Achievement guide QA:** Identity, persistence, backup, filtering, import validation/matching, and Game Profile entry points have automated coverage; live Steam and RetroAchievements Game Profile/Guide checks passed.
 - **Import performance:** Standard import, manual intake, import-and-edit, and headless import now share one source inventory / intake-analysis pass where possible, reducing repeated file scans before work starts.
 - **Post-import refresh:** Import and metadata edits now prefer touched-folder cache updates instead of full recursive library refreshes, while explicit manual refresh still keeps the full rebuild path available.
 - **Library responsiveness:** Folder lists can paint from cached/indexed data before deeper embedded-metadata repair finishes; large detail panes prioritize viewport/overscan metadata before deferred background chunks.

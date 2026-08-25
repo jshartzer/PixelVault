@@ -48,4 +48,23 @@ public sealed class LibraryAchievementsPreviewTests
         Assert.Contains(recent, row => row.Title == "No Date A");
         Assert.Contains(recent, row => row.Title == "No Date B");
     }
+
+    [Fact]
+    public void LibraryGameProfileCanOpenAchievementGuide_RequiresStableProviderIdentity()
+    {
+        var rows = new List<GameAchievementsFetchService.AchievementRow>
+        {
+            new() { Title = "Display-only row" },
+            new()
+            {
+                Title = "Guide-compatible row",
+                Provider = GameAchievementsFetchService.RetroAchievementsProvider,
+                ProviderGameId = "123",
+                ProviderAchievementId = "456"
+            }
+        };
+
+        Assert.True(MainWindow.LibraryGameProfileCanOpenAchievementGuide(rows));
+        Assert.False(MainWindow.LibraryGameProfileCanOpenAchievementGuide(rows.Take(1)));
+    }
 }

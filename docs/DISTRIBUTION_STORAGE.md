@@ -17,6 +17,8 @@ Regardless of which root is chosen, **`MainWindow.ComputePersistentStorageLayout
 | **`cache/covers/`**, **`cache/thumbs/`** | Cover/thumbnail caches |
 | **`logs/`** | Logs |
 | **`saved-covers/`** | User‑managed custom covers + README |
+| **`guides/pixelvault-guides.sqlite`** | Durable achievement definitions and user-authored per-achievement guides |
+| **`guides/backups/`** | Rolling SQLite snapshots created after guide edits |
 | **`cache/last-import.tsv`** | Undo manifest path |
 
 **Read‑only beside the EXE:** `CHANGELOG.md` is still loaded from **`appRoot`** (install folder), not from the data root.
@@ -47,7 +49,7 @@ Regardless of which root is chosen, **`MainWindow.ComputePersistentStorageLayout
 
 ## Migration (`MigrateFromLegacyVersions`)
 
-When **`dataRoot`** ≠ **`appRoot`**, first‑run behavior copies **settings / cache / logs** from the app folder (and older **`dist/PixelVault-*`** siblings) into the authoritative data root **only when destination files are missing** (or settings: newer‑wins rules per migrator). Shared **`PixelVaultData`** never gets rolled back by older release folders.
+When **`dataRoot`** ≠ **`appRoot`**, first‑run behavior copies **settings / cache / logs** from the app folder (and older **`dist/PixelVault-*`** siblings) into the authoritative data root **only when destination files are missing** (or settings: newer‑wins rules per migrator). Shared **`PixelVaultData`** never gets rolled back by older release folders. Achievement guide data is authored state under **`guides/`**, outside cache-clearing operations.
 
 ---
 
@@ -65,3 +67,4 @@ When **`dataRoot`** ≠ **`appRoot`**, first‑run behavior copies **settings / 
 |------|--------|
 | **2026‑04‑18** | Initial doc; **`ResolvePersistentDataRoot`** gains LocalAppData branch for Program Files / WindowsApps (**`PV-PLN-DIST-001` §5.8**). |
 | **2026‑04‑18** | **`PIXELVAULT_DATA_ROOT`**, **`PixelVault.data-root.ini`**, Health dashboard row, migration test with sidecar. |
+| **2026‑08‑24** | Added durable achievement-guide database and rolling-backup paths for **`PV-PLN-ACHG-001`**. |

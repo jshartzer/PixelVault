@@ -48,6 +48,8 @@
     <Compile Include="Services\Library\LibraryStorageMergeModels.cs" />
     <Compile Include="Services\Library\LibraryStorageMergePlanner.cs" />
     <Compile Include="Services\Achievements\GameAchievementsFetchService.cs" />
+    <Compile Include="Services\Achievements\AchievementGuideService.cs" />
+    <Compile Include="Services\Achievements\AchievementGuideImportService.cs" />
     <Compile Include="Services\Covers\CoverService.cs" />
     <Compile Include="Services\Covers\CoverWorkflowHelpers.cs" />
     <Compile Include="Services\Covers\ILibraryCoverResolution.cs" />
@@ -82,6 +84,7 @@
     <Compile Include="Services\Metadata\IgdbProbeService.cs" />
     <Compile Include="Storage\IndexDatabaseStorage.cs" />
     <Compile Include="UI\AchievementsInfoWindow.cs" />
+    <Compile Include="UI\AchievementGuideWindow.cs" />
     <Compile Include="UI\ChangelogWindow.cs" />
     <Compile Include="UI\Intake\BackgroundIntakeActivityWindow.cs" />
     <Compile Include="UI\Intake\IntakePreviewWindow.cs" />

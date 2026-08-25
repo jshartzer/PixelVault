@@ -32,6 +32,7 @@ PixelVaultData/cache/library-folders-*.cache
 PixelVaultData/cache/photography-gallery-*.cache
 PixelVaultData/cache/last-import.tsv
 PixelVaultData/saved-covers/
+PixelVaultData/guides/
 
 # Local backups and temp artifacts
 .cursor/

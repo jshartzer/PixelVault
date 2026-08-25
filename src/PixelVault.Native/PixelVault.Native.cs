@@ -168,6 +168,7 @@ namespace PixelVaultNative
         readonly IMetadataService metadataService;
         readonly ISettingsService settingsService;
         readonly IFileSystemService fileSystemService;
+        readonly IAchievementGuideService achievementGuideService;
         readonly ILibraryScanner libraryScanner;
         readonly ILibrarySession librarySession;
         readonly IImportService importService;
@@ -197,10 +198,11 @@ namespace PixelVaultNative
                 DiagnosticsSessionId = _diagnosticsSessionId,
             });
             InitializeLibraryThumbnailPipeline(thumbsRoot);
-            var services = BuildApplicationServiceGraph(this, cacheRoot, coversRoot, troubleshootingLog);
+            var services = BuildApplicationServiceGraph(this, dataRoot, cacheRoot, coversRoot, troubleshootingLog);
             logService = services.LogService;
             settingsService = services.SettingsService;
             fileSystemService = services.FileSystemService;
+            achievementGuideService = services.AchievementGuideService;
             coverService = services.CoverService;
             libraryCoverResolutionService = services.LibraryCoverResolutionService;
             indexPersistenceService = services.IndexPersistenceService;
@@ -868,7 +870,6 @@ namespace PixelVaultNative
         string FormatViewKeyForTroubleshooting(string viewKey) => troubleshootingLog.FormatViewKey(viewKey);
     }
 }
-
 
 
 

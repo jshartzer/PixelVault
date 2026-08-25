@@ -13,6 +13,7 @@ namespace PixelVaultNative
             ILogService LogService,
             ISettingsService SettingsService,
             IFileSystemService FileSystemService,
+            IAchievementGuideService AchievementGuideService,
             ICoverService CoverService,
             ILibraryCoverResolution LibraryCoverResolutionService,
             IIndexPersistenceService IndexPersistenceService,
@@ -32,6 +33,7 @@ namespace PixelVaultNative
         /// <list type="number">
         /// <item><description><see cref="TroubleshootingLogService"/> from <paramref name="troubleshootingLog"/></description></item>
         /// <item><description><see cref="CreateSettingsAndFileServices"/></description></item>
+        /// <item><description><see cref="AchievementGuideService"/> from the durable application data root</description></item>
         /// <item><description><see cref="CreateCoverService"/></description></item>
         /// <item><description><see cref="CreateIndexFilenameRulesServices"/></description></item>
         /// <item><description><see cref="CreateLibraryCoverResolutionService"/></description></item>
@@ -44,10 +46,11 @@ namespace PixelVaultNative
         /// <item><description><see cref="CreateGameIndexServiceForStartup"/></description></item>
         /// </list>
         /// </summary>
-        static MainWindowServiceGraph BuildApplicationServiceGraph(MainWindow host, string cacheRoot, string coversRoot, TroubleshootingLog troubleshootingLog)
+        static MainWindowServiceGraph BuildApplicationServiceGraph(MainWindow host, string dataRoot, string cacheRoot, string coversRoot, TroubleshootingLog troubleshootingLog)
         {
             var logService = new TroubleshootingLogService(troubleshootingLog);
             var (settingsService, fileSystemService) = CreateSettingsAndFileServices();
+            var achievementGuideService = new AchievementGuideService(dataRoot);
             var coverService = CreateCoverService(host, fileSystemService, coversRoot);
             var (indexPersistenceService, filenameParserService, gameIndexEditorAssignmentService, filenameRulesService) =
                 CreateIndexFilenameRulesServices(cacheRoot, host);
@@ -88,6 +91,7 @@ namespace PixelVaultNative
                 logService,
                 settingsService,
                 fileSystemService,
+                achievementGuideService,
                 coverService,
                 libraryCoverResolutionService,
                 indexPersistenceService,

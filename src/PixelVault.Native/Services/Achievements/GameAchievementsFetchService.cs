@@ -14,6 +14,12 @@ namespace PixelVaultNative
     {
         public sealed class AchievementRow
         {
+            /// <summary>Normalized achievement provider slug. Initially <c>steam</c> or <c>retroachievements</c>.</summary>
+            public string Provider;
+            /// <summary>Provider-owned game identity (Steam App ID or RetroAchievements Game ID).</summary>
+            public string ProviderGameId;
+            /// <summary>Provider-owned achievement identity (Steam API name or RetroAchievements numeric achievement ID).</summary>
+            public string ProviderAchievementId;
             public string Title;
             public string Description;
             public string Meta;
@@ -23,11 +29,21 @@ namespace PixelVaultNative
             public long UnlockUtcTicks;
             /// <summary>Steam achievement API name (schema <c>name</c>); empty for RetroAchievements rows.</summary>
             public string SteamApiName;
+            /// <summary>Whether the provider marks the achievement as hidden.</summary>
+            public bool Hidden;
             /// <summary>Preferred color icon URL (badge / Steam unlocked art).</summary>
             public string IconUrlColor;
             /// <summary>Steam locked icon hash URL when available; otherwise empty (UI may grayscale <see cref="IconUrlColor"/>).</summary>
             public string IconUrlGray;
+
+            public bool HasStableProviderIdentity =>
+                !string.IsNullOrWhiteSpace(Provider)
+                && !string.IsNullOrWhiteSpace(ProviderGameId)
+                && !string.IsNullOrWhiteSpace(ProviderAchievementId);
         }
+
+        internal const string SteamProvider = "steam";
+        internal const string RetroAchievementsProvider = "retroachievements";
 
         public sealed class FetchResult
         {
@@ -515,6 +531,9 @@ namespace PixelVaultNative
 
                             rows.Add(new AchievementRow
                             {
+                                Provider = SteamProvider,
+                                ProviderGameId = appId.ToString(CultureInfo.InvariantCulture),
+                                ProviderAchievementId = apiName.Trim(),
                                 Title = title.Trim(),
                                 Description = desc.Trim(),
                                 Meta = string.Join(" · ", metaParts.Where(s => !string.IsNullOrWhiteSpace(s))),
@@ -523,6 +542,7 @@ namespace PixelVaultNative
                                 Unlocked = unlocked,
                                 UnlockUtcTicks = unlockTicks,
                                 SteamApiName = apiName.Trim(),
+                                Hidden = hidden,
                                 IconUrlColor = colorUrl ?? string.Empty,
                                 IconUrlGray = grayUrl ?? string.Empty
                             });
@@ -624,7 +644,16 @@ namespace PixelVaultNative
             return false;
         }
 
-        static void ParseRaAchievementObject(JsonElement o, string fallbackKey, bool userProgressMode, List<AchievementRow> rows)
+        internal static string ResolveRetroAchievementId(JsonElement achievement, string fallbackKey)
+        {
+            var explicitId = ReadIntString(achievement, "ID", "id", "AchievementID", "achievementId");
+            if (!string.IsNullOrWhiteSpace(explicitId)) return explicitId.Trim();
+
+            var key = (fallbackKey ?? string.Empty).Trim();
+            return key.All(char.IsDigit) ? key : string.Empty;
+        }
+
+        static void ParseRaAchievementObject(JsonElement o, string fallbackKey, int gameId, bool userProgressMode, List<AchievementRow> rows)
         {
             var title = ReadString(o, "Title", "title");
             if (string.IsNullOrWhiteSpace(title)) title = string.IsNullOrWhiteSpace(fallbackKey) ? "(achievement)" : fallbackKey;
@@ -634,6 +663,7 @@ namespace PixelVaultNative
             var order = ReadDisplayOrder(o);
             var badge = ReadString(o, "BadgeName", "badgeName") ?? string.Empty;
             var badgeUrl = BuildRetroBadgeUrl(badge);
+            var providerAchievementId = ResolveRetroAchievementId(o, fallbackKey);
 
             var earnedRaw = ReadString(o, "DateEarned", "dateEarned")
                 ?? ReadString(o, "DateEarnedHardcore", "dateEarnedHardcore");
@@ -648,6 +678,9 @@ namespace PixelVaultNative
 
             rows.Add(new AchievementRow
             {
+                Provider = RetroAchievementsProvider,
+                ProviderGameId = gameId.ToString(CultureInfo.InvariantCulture),
+                ProviderAchievementId = providerAchievementId,
                 Title = title.Trim(),
                 Description = desc.Trim(),
                 Meta = string.Join(" · ", metaParts.Where(s => !string.IsNullOrWhiteSpace(s))),
@@ -727,12 +760,12 @@ namespace PixelVaultNative
                     if (ach.ValueKind == JsonValueKind.Object)
                     {
                         foreach (var p in ach.EnumerateObject())
-                            ParseRaAchievementObject(p.Value, p.Name, useUser, rows);
+                            ParseRaAchievementObject(p.Value, p.Name, gameId, useUser, rows);
                     }
                     else if (ach.ValueKind == JsonValueKind.Array)
                     {
                         foreach (var o in ach.EnumerateArray())
-                            ParseRaAchievementObject(o, string.Empty, useUser, rows);
+                            ParseRaAchievementObject(o, string.Empty, gameId, useUser, rows);
                     }
 
                     var ordered = OrderAchievementRows(rows);

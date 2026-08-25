@@ -1439,6 +1439,14 @@ namespace PixelVaultNative
                         FontWeight = FontWeights.SemiBold,
                         Margin = new Thickness(0, 8, 0, 6)
                     });
+                    if (LibraryGameProfileCanOpenAchievementGuide(rows))
+                    {
+                        host.Children.Add(BuildLibraryGameProfileAchievementGuideButton(
+                            owner,
+                            view,
+                            folder,
+                            result));
+                    }
                     if (percent.HasValue)
                         host.Children.Add(BuildLibraryGameProfileAchievementProgressBar(percent.Value));
 
@@ -1462,6 +1470,56 @@ namespace PixelVaultNative
                     host.Children.Add(container);
                 }, DispatcherPriority.Background);
             });
+        }
+
+        internal static bool LibraryGameProfileCanOpenAchievementGuide(
+            IEnumerable<GameAchievementsFetchService.AchievementRow> rows)
+        {
+            return (rows ?? Enumerable.Empty<GameAchievementsFetchService.AchievementRow>())
+                .Any(row => row != null && row.HasStableProviderIdentity);
+        }
+
+        Button BuildLibraryGameProfileAchievementGuideButton(
+            Window owner,
+            LibraryBrowserFolderView view,
+            LibraryFolderInfo folder,
+            GameAchievementsFetchService.FetchResult result)
+        {
+            var button = Btn("Open Guide", null, "#15242D", Brushes.White);
+            button.Height = 30;
+            button.MinWidth = 128;
+            button.FontSize = 12;
+            button.Padding = new Thickness(14, 0, 14, 0);
+            button.HorizontalAlignment = HorizontalAlignment.Left;
+            button.Margin = new Thickness(0, 2, 0, 10);
+            ApplyLibraryPillChrome(button, "#15242D", "#26404E", "#1F3340", "#0F1B22", "#D7E2EA");
+            button.ToolTip = "Open your locally stored per-achievement completion guides.";
+            AutomationProperties.SetName(button, "Open achievement guides");
+            button.Click += delegate
+            {
+                var rows = result?.Rows;
+                if (!LibraryGameProfileCanOpenAchievementGuide(rows)) return;
+                try
+                {
+                    AchievementGuideWindow.ShowModal(
+                        owner,
+                        achievementGuideService,
+                        result?.GameTitle ?? view?.Name ?? folder?.Name ?? "Game",
+                        folder?.GameId ?? view?.GameId ?? string.Empty,
+                        rows);
+                }
+                catch (Exception ex)
+                {
+                    LogException("LibraryGameProfile.OpenAchievementGuide", ex);
+                    MessageBox.Show(
+                        owner,
+                        "Could not open the achievement guide.\n\n" + ex.Message,
+                        "Achievement Guide",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Error);
+                }
+            };
+            return button;
         }
 
         // Thin progress bar shown under the achievement summary line when the source
