@@ -134,7 +134,7 @@ namespace PixelVaultNative
                 Padding = new Thickness(8, 3, 8, 3),
                 Background = UiBrushHelper.FromHex("#151F25"),
                 BorderBrush = UiBrushHelper.FromHex("#34454F"),
-                Foreground = Brushes.White,
+                Foreground = Brushes.Black,
                 HorizontalContentAlignment = HorizontalAlignment.Stretch
             };
             _filter.Items.Add(new GuideFilterOption { Key = "all", Label = "All achievements" });
