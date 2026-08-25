@@ -19,15 +19,19 @@ namespace PixelVaultNative
         {
             public AchievementGuideEntry Entry;
             public GameAchievementsFetchService.AchievementRow LiveRow;
+            public FrameworkElement Visual;
+            public TextBlock GuideStatus;
 
             public override string ToString()
             {
-                var status = LiveRow != null && LiveRow.ProgressKnown
-                    ? (LiveRow.Unlocked ? "✓ " : "○ ")
-                    : string.Empty;
-                var guided = Entry != null && !string.IsNullOrWhiteSpace(Entry.GuideText) ? "  • Guide" : string.Empty;
-                return status + (Entry?.Title ?? "Achievement") + guided;
+                return Entry?.Title ?? "Achievement";
             }
+        }
+
+        sealed class GuideListItemVisual : Grid
+        {
+            public string AccessibleName;
+            public override string ToString() => AccessibleName ?? "Achievement";
         }
 
         sealed class GuideFilterOption
@@ -319,6 +323,7 @@ namespace PixelVaultNative
             {
                 liveByKey.TryGetValue(ProviderKey(entry), out var liveRow);
                 var item = new GuideListItem { Entry = entry, LiveRow = liveRow };
+                item.Visual = BuildGuideListItemVisual(item);
                 _allItems.Add(item);
                 if (entry.AchievementId == preferredAchievementId) preferred = item;
             }
@@ -332,6 +337,9 @@ namespace PixelVaultNative
             _importFile.IsEnabled = canImport;
             _pasteJson.IsEnabled = canImport;
 
+            // Prime the editor before filtering so an existing guide is not mistaken for a dirty
+            // blank form on the initial load.
+            if (_current != null) LoadCurrent();
             ApplyListFilter(preferredAchievementId);
         }
 
@@ -353,9 +361,9 @@ namespace PixelVaultNative
 
             _suppressSelection = true;
             _achievementList.Items.Clear();
-            foreach (var item in visible) _achievementList.Items.Add(item);
+            foreach (var item in visible) _achievementList.Items.Add(item.Visual);
             _current = preferred;
-            _achievementList.SelectedItem = _current;
+            _achievementList.SelectedItem = _current?.Visual;
             _suppressSelection = false;
 
             if (_current != null)
@@ -398,6 +406,87 @@ namespace PixelVaultNative
         static bool ContainsIgnoreCase(string value, string query)
         {
             return (value ?? string.Empty).IndexOf(query ?? string.Empty, StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        static FrameworkElement BuildGuideListItemVisual(GuideListItem item)
+        {
+            var root = new GuideListItemVisual
+            {
+                Tag = item,
+                MinHeight = 40
+            };
+            root.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+            var badgeHost = new Border
+            {
+                Width = 40,
+                Height = 40,
+                Margin = new Thickness(0, 0, 10, 0),
+                CornerRadius = new CornerRadius(5),
+                ClipToBounds = true,
+                Background = UiBrushHelper.FromHex("#141E24"),
+                BorderBrush = UiBrushHelper.FromHex("#2B3A44"),
+                BorderThickness = new Thickness(1),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            var badge = new Image
+            {
+                Stretch = Stretch.UniformToFill,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                VerticalAlignment = VerticalAlignment.Stretch
+            };
+            badgeHost.Child = badge;
+            if (item.LiveRow != null)
+                AchievementsInfoWindow.StartAchievementBadgeDownload(badge, item.LiveRow, "PixelVault");
+            else
+                badge.Visibility = Visibility.Collapsed;
+            root.Children.Add(badgeHost);
+
+            var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+            text.Children.Add(new TextBlock
+            {
+                Text = item.Entry?.Title ?? "Achievement",
+                Foreground = Brushes.White,
+                FontWeight = FontWeights.SemiBold,
+                TextWrapping = TextWrapping.Wrap
+            });
+            item.GuideStatus = new TextBlock
+            {
+                Text = "Guide added",
+                Margin = new Thickness(0, 2, 0, 0),
+                Foreground = UiBrushHelper.FromHex("#88B8A0"),
+                FontSize = 10.5
+            };
+            text.Children.Add(item.GuideStatus);
+            Grid.SetColumn(text, 1);
+            root.Children.Add(text);
+
+            item.Visual = root;
+            UpdateGuideListItemState(item);
+            return root;
+        }
+
+        static void UpdateGuideListItemState(GuideListItem item)
+        {
+            if (item == null) return;
+            var hasGuide = !string.IsNullOrWhiteSpace(item.Entry?.GuideText);
+            if (item.GuideStatus != null)
+                item.GuideStatus.Visibility = hasGuide ? Visibility.Visible : Visibility.Collapsed;
+            if (item.Visual != null)
+            {
+                var status = GuideAchievementProgressLabel(item.LiveRow);
+                var guide = hasGuide ? ", guide added" : string.Empty;
+                var accessibleName = (item.Entry?.Title ?? "Achievement") + ", " + status + guide;
+                if (item.Visual is GuideListItemVisual visual) visual.AccessibleName = accessibleName;
+                AutomationProperties.SetName(item.Visual, accessibleName);
+            }
+        }
+
+        internal static string GuideAchievementProgressLabel(GameAchievementsFetchService.AchievementRow row)
+        {
+            if (row == null || !row.ProgressKnown) return "progress unknown";
+            return row.Unlocked ? "unlocked" : "locked";
         }
 
         internal static void ShowModal(
@@ -458,13 +547,13 @@ namespace PixelVaultNative
         void AchievementSelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (_suppressSelection) return;
-            var selected = _achievementList.SelectedItem as GuideListItem;
+            var selected = (_achievementList.SelectedItem as FrameworkElement)?.Tag as GuideListItem;
             if (selected == null || ReferenceEquals(selected, _current)) return;
 
             if (!ResolveUnsavedChanges())
             {
                 _suppressSelection = true;
-                _achievementList.SelectedItem = _current;
+                _achievementList.SelectedItem = _current?.Visual;
                 _suppressSelection = false;
                 return;
             }
@@ -555,6 +644,7 @@ namespace PixelVaultNative
                     IsMissable = _missable.IsChecked == true
                 });
                 _openSource.IsEnabled = IsHttpUrl(_current.Entry.SourceUrl);
+                UpdateGuideListItemState(_current);
                 ApplyListFilter(_current.Entry.AchievementId);
                 if (showConfirmation)
                     MessageBox.Show(this, "Guide saved.", "Achievement Guide", MessageBoxButton.OK, MessageBoxImage.Information);

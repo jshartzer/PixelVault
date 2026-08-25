@@ -5,6 +5,23 @@ namespace PixelVaultNative.Tests;
 
 public sealed class AchievementGuideFilterTests
 {
+    [Fact]
+    public void GuideAchievementProgressLabel_DescribesIconStateWithoutGlyphs()
+    {
+        Assert.Equal("progress unknown", AchievementGuideWindow.GuideAchievementProgressLabel(null));
+        Assert.Equal("progress unknown", AchievementGuideWindow.GuideAchievementProgressLabel(new GameAchievementsFetchService.AchievementRow()));
+        Assert.Equal("locked", AchievementGuideWindow.GuideAchievementProgressLabel(new GameAchievementsFetchService.AchievementRow
+        {
+            ProgressKnown = true,
+            Unlocked = false
+        }));
+        Assert.Equal("unlocked", AchievementGuideWindow.GuideAchievementProgressLabel(new GameAchievementsFetchService.AchievementRow
+        {
+            ProgressKnown = true,
+            Unlocked = true
+        }));
+    }
+
     readonly AchievementGuideEntry entry = new()
     {
         Title = "Hidden Collector",
