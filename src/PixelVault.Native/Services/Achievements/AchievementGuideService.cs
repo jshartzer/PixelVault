@@ -26,6 +26,8 @@ namespace PixelVaultNative
         public string Tags;
         public bool IsMissable;
         public long GuideUpdatedUtcTicks;
+        public string GroupName;
+        public int GroupSortOrder;
     }
 
     sealed class AchievementGuideEdit
@@ -36,10 +38,16 @@ namespace PixelVaultNative
         public string SourceTitle;
         public string Tags;
         public bool IsMissable;
+        public string GroupName;
+        public int GroupSortOrder;
     }
 
     interface IAchievementGuideService
     {
+        IReadOnlyList<AchievementGuideEntry> LoadPinnedAchievements(string provider, string providerGameId);
+        AchievementPinChange SetAchievementPinned(GameAchievementsFetchService.AchievementRow row, bool pinned);
+        int ReconcileAchievementPins(IEnumerable<GameAchievementsFetchService.AchievementRow> rows);
+
         IReadOnlyList<AchievementGuideEntry> SyncDefinitionsAndLoadGuides(
             string pixelVaultGameId,
             IEnumerable<GameAchievementsFetchService.AchievementRow> rows);
@@ -136,6 +144,32 @@ CREATE TABLE IF NOT EXISTS achievement_guide (
 );";
                 command.ExecuteNonQuery();
             }
+
+            EnsureDefinitionColumn(connection, "group_name", "TEXT NOT NULL DEFAULT ''");
+            EnsureDefinitionColumn(connection, "group_sort_order", "INTEGER NOT NULL DEFAULT 0");
+            InitializePinTable(connection);
+        }
+
+        static void EnsureDefinitionColumn(SqliteConnection connection, string columnName, string definition)
+        {
+            using (var check = connection.CreateCommand())
+            {
+                check.CommandText = "PRAGMA table_info(achievement_definition);";
+                using (var reader = check.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        if (string.Equals(reader.GetString(1), columnName, StringComparison.OrdinalIgnoreCase))
+                            return;
+                    }
+                }
+            }
+
+            using (var alter = connection.CreateCommand())
+            {
+                alter.CommandText = "ALTER TABLE achievement_definition ADD COLUMN " + columnName + " " + definition + ";";
+                alter.ExecuteNonQuery();
+            }
         }
 
         public IReadOnlyList<AchievementGuideEntry> SyncDefinitionsAndLoadGuides(
@@ -223,7 +257,12 @@ ON CONFLICT(provider, provider_game_id, provider_achievement_id) DO UPDATE SET
                         NormalizeProvider(row.Provider),
                         row.ProviderGameId.Trim(),
                         row.ProviderAchievementId.Trim());
-                    if (entry != null) result.Add(entry);
+                    if (entry != null)
+                    {
+                        row.GroupName = entry.GroupName ?? string.Empty;
+                        row.GroupSortOrder = entry.GroupSortOrder;
+                        result.Add(entry);
+                    }
                 }
                 return result;
             }
@@ -274,6 +313,20 @@ ON CONFLICT(achievement_id) DO UPDATE SET
                     save.ExecuteNonQuery();
                 }
 
+                using (var saveGroup = connection.CreateCommand())
+                {
+                    saveGroup.Transaction = transaction;
+                    saveGroup.CommandText = @"
+UPDATE achievement_definition
+SET group_name = $group_name,
+    group_sort_order = $group_sort_order
+WHERE achievement_id = $achievement_id;";
+                    saveGroup.Parameters.AddWithValue("$achievement_id", edit.AchievementId);
+                    saveGroup.Parameters.AddWithValue("$group_name", NormalizeGroupName(edit.GroupName));
+                    saveGroup.Parameters.AddWithValue("$group_sort_order", NormalizeGroupSortOrder(edit.GroupSortOrder));
+                    saveGroup.ExecuteNonQuery();
+                }
+
                 transaction.Commit();
             }
 
@@ -305,6 +358,21 @@ ON CONFLICT(achievement_id) DO UPDATE SET
                 .Select(tag => tag.Trim())
                 .Where(tag => tag.Length > 0)
                 .Distinct(StringComparer.OrdinalIgnoreCase));
+        }
+
+        internal static string NormalizeGroupName(string groupName)
+        {
+            var normalized = (groupName ?? string.Empty).Trim();
+            if (normalized.Length > 120)
+                throw new ArgumentException("Achievement group names cannot exceed 120 characters.", nameof(groupName));
+            return normalized;
+        }
+
+        internal static int NormalizeGroupSortOrder(int order)
+        {
+            if (order < 0 || order > 100000)
+                throw new ArgumentOutOfRangeException(nameof(order), "Achievement group order must be between 0 and 100000.");
+            return order;
         }
 
         void TryCreateRollingBackup()
@@ -388,7 +456,8 @@ SELECT d.achievement_id, d.provider, d.provider_game_id, d.provider_achievement_
        d.pixelvault_game_id, d.title, d.description, d.icon_url, d.display_order,
        d.is_hidden, d.is_active,
        COALESCE(g.guide_text, ''), COALESCE(g.source_url, ''), COALESCE(g.source_title, ''),
-       COALESCE(g.tags, ''), COALESCE(g.is_missable, 0), COALESCE(g.updated_utc_ticks, 0)
+       COALESCE(g.tags, ''), COALESCE(g.is_missable, 0), COALESCE(g.updated_utc_ticks, 0),
+       d.group_name, d.group_sort_order
 FROM achievement_definition d
 LEFT JOIN achievement_guide g ON g.achievement_id = d.achievement_id";
             return command;
@@ -414,7 +483,9 @@ LEFT JOIN achievement_guide g ON g.achievement_id = d.achievement_id";
                 SourceTitle = reader.GetString(13),
                 Tags = reader.GetString(14),
                 IsMissable = reader.GetInt32(15) != 0,
-                GuideUpdatedUtcTicks = reader.GetInt64(16)
+                GuideUpdatedUtcTicks = reader.GetInt64(16),
+                GroupName = reader.GetString(17),
+                GroupSortOrder = reader.GetInt32(18)
             };
         }
     }

@@ -21,15 +21,22 @@ param(
     # Skip deleting the output folder first (not recommended; publish may leave stale files)
     [switch]$NoClean,
     # Shortcut inside the output folder (default: PixelVault.lnk). Set to "" to skip.
-    [string]$ShortcutName = "PixelVault.lnk"
+    [string]$ShortcutName = "PixelVault.lnk",
+    # Optional source repository; a copy outside the repo defaults to C:\Codex.
+    [string]$RepositoryPath
 )
 
 $ErrorActionPreference = "Stop"
 
-. (Join-Path $PSScriptRoot "Merge-BundledToolLicenses.ps1")
-
-$repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
+if ([string]::IsNullOrWhiteSpace($RepositoryPath))
+{
+    $adjacentRepo = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
+    $RepositoryPath = if (Test-Path -LiteralPath (Join-Path $adjacentRepo 'src\PixelVault.Native\PixelVault.Native.csproj')) { $adjacentRepo } else { 'C:\Codex' }
+}
+$repoRoot = [System.IO.Path]::GetFullPath($RepositoryPath)
 $projectPath = Join-Path $repoRoot "src\PixelVault.Native\PixelVault.Native.csproj"
+if (-not (Test-Path -LiteralPath $projectPath)) { throw "PixelVault project not found: $projectPath" }
+. (Join-Path $repoRoot "scripts\Merge-BundledToolLicenses.ps1")
 $sourcePath = Join-Path $repoRoot "src\PixelVault.Native\PixelVault.Native.cs"
 $nativeProjectDir = Join-Path $repoRoot "src\PixelVault.Native"
 $testsProjectDir = Join-Path $repoRoot "tests\PixelVault.Native.Tests"

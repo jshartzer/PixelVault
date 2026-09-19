@@ -6,41 +6,72 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Effects;
 using System.Windows.Media.Imaging;
 
 namespace PixelVaultNative
 {
-    sealed class AchievementsInfoWindow : Window
+    sealed partial class AchievementsInfoWindow : Window
     {
+        internal sealed class AchievementGroupSummary
+        {
+            public string Name;
+            public int SortOrder;
+            public List<GameAchievementsFetchService.AchievementRow> Rows;
+            public int Total => Rows?.Count ?? 0;
+            public int Earned => Rows?.Count(row => row.ProgressKnown && row.Unlocked) ?? 0;
+            public bool ProgressKnown => Rows != null && Rows.Count > 0 && Rows.All(row => row.ProgressKnown);
+            public int? Percent => ProgressKnown && Total > 0
+                ? (int?)Math.Round(Earned * 100d / Total, MidpointRounding.AwayFromZero)
+                : null;
+        }
+
         readonly TextBlock _heading;
         readonly TextBlock _earnedSummary;
         readonly TextBlock _detail;
         readonly TextBlock _error;
         readonly ListBox _list;
+        readonly Border _gridHost;
+        readonly StackPanel _gridContent;
         readonly TextBlock _empty;
         readonly Button _guide;
+        readonly Button _listView;
+        readonly Button _gridView;
+        readonly Button _refresh;
+        readonly CheckBox _remainingOnly;
+        readonly TextBlock _updated;
+        readonly Func<Task<GameAchievementsFetchService.FetchResult>> _fetchAchievements;
         readonly IAchievementGuideService _guideService;
         readonly LibraryFolderInfo _folder;
+        readonly string _userAgent;
+        readonly HashSet<string> _collapsedGroups = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         GameAchievementsFetchService.FetchResult _loadedResult;
+        bool _showGrid = true;
+        bool _isLoading;
+        bool _isClosed;
 
         AchievementsInfoWindow(
             Window owner,
             string initialHeading,
             IAchievementGuideService guideService,
             LibraryFolderInfo folder,
-            string userAgent)
+            string userAgent,
+            Func<Task<GameAchievementsFetchService.FetchResult>> fetchAchievements)
         {
             Owner = owner;
             _guideService = guideService;
             _folder = folder;
+            _userAgent = userAgent;
+            _fetchAchievements = fetchAchievements;
+            Closed += delegate { _isClosed = true; ClearUnlockFeedback(); };
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
             Title = "Achievements";
-            Width = 720;
-            Height = 720;
-            MinWidth = 560;
-            MinHeight = 420;
+            Width = 960;
+            Height = 800;
+            MinWidth = 680;
+            MinHeight = 520;
             Background = UiBrushHelper.FromHex("#11181D");
 
             var root = new Grid { Margin = new Thickness(22, 18, 22, 16) };
@@ -84,6 +115,23 @@ namespace PixelVaultNative
             Grid.SetRow(_detail, 2);
             root.Children.Add(_detail);
 
+            var detailArea = new StackPanel();
+            root.Children.Remove(_detail);
+            detailArea.Children.Add(_detail);
+            _updated = new TextBlock
+            {
+                FontSize = 11,
+                Foreground = UiBrushHelper.FromHex("#9CB1BC"),
+                Margin = new Thickness(0, 4, 0, 0),
+                Visibility = Visibility.Collapsed
+            };
+            detailArea.Children.Add(_updated);
+            detailArea.Children.Add(BuildSortControls());
+            detailArea.Children.Add(_nextUpHost);
+            detailArea.Children.Add(_unlockNotice);
+            Grid.SetRow(detailArea, 2);
+            root.Children.Add(detailArea);
+
             _error = new TextBlock
             {
                 Margin = new Thickness(0, 10, 0, 0),
@@ -124,7 +172,88 @@ namespace PixelVaultNative
             Grid.SetRow(_list, 5);
             root.Children.Add(_list);
 
-            var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 4, 0, 0) };
+            _gridContent = new StackPanel { Margin = new Thickness(10, 4, 10, 12) };
+            var gridScroll = new ScrollViewer
+            {
+                Content = _gridContent,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+            };
+            _gridHost = new Border
+            {
+                Margin = new Thickness(0, 12, 0, 12),
+                Background = UiBrushHelper.FromHex("#0D1216"),
+                BorderBrush = UiBrushHelper.FromHex("#27313A"),
+                BorderThickness = new Thickness(1),
+                Child = gridScroll,
+                Visibility = Visibility.Collapsed
+            };
+            Grid.SetRow(_gridHost, 5);
+            root.Children.Add(_gridHost);
+
+            var footer = new Grid { Margin = new Thickness(0, 4, 0, 0) };
+            footer.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            footer.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            footer.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var viewButtons = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            viewButtons.Children.Add(new TextBlock
+            {
+                Text = "View",
+                Margin = new Thickness(0, 0, 10, 0),
+                Foreground = UiBrushHelper.FromHex("#9CB1BC"),
+                FontSize = 12,
+                FontWeight = FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center
+            });
+            _gridView = BuildViewButton("Grid", true);
+            _listView = BuildViewButton("List", false);
+            viewButtons.Children.Add(_gridView);
+            _listView.Margin = new Thickness(6, 0, 0, 0);
+            viewButtons.Children.Add(_listView);
+            _refresh = new Button
+            {
+                Content = new TextBlock
+                {
+                    Text = "\uE72C",
+                    FontFamily = new FontFamily("Segoe MDL2 Assets"),
+                    FontSize = 15,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center
+                },
+                Width = 36,
+                Height = 36,
+                Margin = new Thickness(8, 0, 0, 0),
+                Foreground = Brushes.White,
+                Background = UiBrushHelper.FromHex("#172127"),
+                BorderBrush = UiBrushHelper.FromHex("#33434D"),
+                BorderThickness = new Thickness(1),
+                ToolTip = "Refresh achievement status (F5)"
+            };
+            _refresh.Click += async (_, __) => { await LoadAsync(); };
+            AccessibilityUi.TryApplyFocusVisualStyle(_refresh);
+            AutomationProperties.SetName(_refresh, "Refresh achievement status");
+            viewButtons.Children.Add(_refresh);
+            _remainingOnly = new CheckBox
+            {
+                Content = "Remaining Only",
+                Margin = new Thickness(12, 0, 0, 0),
+                Padding = new Thickness(0, 8, 0, 8),
+                VerticalContentAlignment = VerticalAlignment.Center,
+                Foreground = Brushes.White,
+                ToolTip = "Show achievements with known locked progress."
+            };
+            _remainingOnly.Click += delegate
+            {
+                if (_loadedResult != null)
+                    RenderAchievementRows(_loadedResult.Rows, _userAgent, _loadedResult.SourceLabel);
+            };
+            AccessibilityUi.TryApplyFocusVisualStyle(_remainingOnly);
+            AutomationProperties.SetName(_remainingOnly, "Show remaining achievements only");
+            viewButtons.Children.Add(_remainingOnly);
+            footer.Children.Add(viewButtons);
+
+            var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
             _guide = new Button
             {
                 Content = "Guide",
@@ -140,26 +269,7 @@ namespace PixelVaultNative
             };
             _guide.Click += delegate
             {
-                var rows = _loadedResult?.Rows;
-                if (_guideService == null || rows == null || rows.Count == 0) return;
-                try
-                {
-                    AchievementGuideWindow.ShowModal(
-                        this,
-                        _guideService,
-                        _loadedResult.GameTitle ?? _folder?.Name ?? "Game",
-                        _folder?.GameId ?? string.Empty,
-                        rows);
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show(
-                        this,
-                        "Could not open the achievement guide.\n\n" + ex.Message,
-                        "Achievement Guide",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Error);
-                }
+                OpenAchievementGuide(null, userAgent);
             };
             AccessibilityUi.TryApplyFocusVisualStyle(_guide);
             AutomationProperties.SetName(_guide, "Open achievement guides");
@@ -179,10 +289,54 @@ namespace PixelVaultNative
             close.Click += delegate { Close(); };
             AccessibilityUi.TryApplyFocusVisualStyle(close);
             buttons.Children.Add(close);
-            Grid.SetRow(buttons, 6);
-            root.Children.Add(buttons);
+            Grid.SetColumn(buttons, 2);
+            footer.Children.Add(buttons);
+            Grid.SetRow(footer, 6);
+            root.Children.Add(footer);
+
+            UpdateViewButtonAppearance();
+
+            InputBindings.Add(new KeyBinding(NavigationCommands.Refresh, Key.F5, ModifierKeys.None));
+            CommandBindings.Add(new CommandBinding(NavigationCommands.Refresh,
+                async (_, __) => { await LoadAsync(); },
+                (_, e) => { e.CanExecute = !_isLoading && !_isClosed; e.Handled = true; }));
 
             Content = root;
+            AchievementCollectionUi.ApplyHighContrast(this);
+        }
+
+        Button BuildViewButton(string label, bool grid)
+        {
+            var button = new Button
+            {
+                Content = label,
+                Width = 76,
+                Height = 36,
+                Margin = new Thickness(0),
+                Foreground = Brushes.White,
+                BorderThickness = new Thickness(1),
+                FontWeight = FontWeights.SemiBold
+            };
+            button.Click += delegate
+            {
+                if (_showGrid == grid) return;
+                _showGrid = grid;
+                UpdateViewButtonAppearance();
+                if (_loadedResult?.Rows != null)
+                    RenderAchievementRows(_loadedResult.Rows, _userAgent, _loadedResult.SourceLabel);
+            };
+            AccessibilityUi.TryApplyFocusVisualStyle(button);
+            AutomationProperties.SetName(button, "Show achievements as a " + label.ToLowerInvariant());
+            return button;
+        }
+
+        void UpdateViewButtonAppearance()
+        {
+            if (_listView == null || _gridView == null) return;
+            _listView.Background = UiBrushHelper.FromHex(_showGrid ? "#172127" : "#31505D");
+            _gridView.Background = UiBrushHelper.FromHex(_showGrid ? "#31505D" : "#172127");
+            _listView.BorderBrush = UiBrushHelper.FromHex(_showGrid ? "#33434D" : "#7FA593");
+            _gridView.BorderBrush = UiBrushHelper.FromHex(_showGrid ? "#7FA593" : "#33434D");
         }
 
         internal static void ShowModal(
@@ -194,52 +348,83 @@ namespace PixelVaultNative
             string steamUserId64,
             string retroAchievementsUsername,
             string userAgent,
-            IAchievementGuideService guideService)
+            IAchievementGuideService guideService,
+            bool remainingOnly = false)
         {
             var title = folder == null ? string.Empty : (folder.Name ?? string.Empty).Trim();
             if (string.IsNullOrWhiteSpace(title)) title = "Achievements";
-            var dlg = new AchievementsInfoWindow(owner, title, guideService, folder, userAgent);
+            var dlg = new AchievementsInfoWindow(owner, title, guideService, folder, userAgent,
+                () => GameAchievementsFetchService.FetchAsync(
+                    normalizedPlatform, folder, steamKey, retroKey, steamUserId64,
+                    retroAchievementsUsername, userAgent, default));
+            dlg._remainingOnly.IsChecked = remainingOnly;
+            dlg._feedbackAccountScope = (normalizedPlatform ?? "") + "|" + (steamUserId64 ?? "") + "|" + (retroAchievementsUsername ?? "");
             AutomationProperties.SetName(dlg, "Achievements");
-            dlg.Loaded += async (_, __) => { await dlg.LoadAsync(normalizedPlatform, folder, steamKey, retroKey, steamUserId64, retroAchievementsUsername, userAgent); };
+            dlg.Loaded += async (_, __) => { await dlg.LoadAsync(); };
             dlg.ShowDialog();
         }
 
-        async Task LoadAsync(
-            string normalizedPlatform,
-            LibraryFolderInfo folder,
-            string steamKey,
-            string retroKey,
-            string steamUserId64,
-            string retroAchievementsUsername,
-            string userAgent)
+        async Task LoadAsync()
         {
-            GameAchievementsFetchService.FetchResult result;
+            if (_isLoading || _isClosed) return;
+            ClearUnlockFeedback();
+            _isLoading = true;
+            _refresh.IsEnabled = false;
+            _refresh.ToolTip = "Refreshing achievement status…";
+            _guide.IsEnabled = false;
+            _error.Visibility = Visibility.Collapsed;
             try
             {
-                result = await GameAchievementsFetchService.FetchAsync(
-                    normalizedPlatform,
-                    folder,
-                    steamKey,
-                    retroKey,
-                    steamUserId64,
-                    retroAchievementsUsername,
-                    userAgent,
-                    default);
+                GameAchievementsFetchService.FetchResult result;
+                try
+                {
+                    result = await _fetchAchievements()
+                        ?? new GameAchievementsFetchService.FetchResult { ErrorMessage = "No achievement data was returned." };
+                }
+                catch (Exception ex)
+                {
+                    result = new GameAchievementsFetchService.FetchResult { ErrorMessage = ex.Message };
+                }
+                if (_isClosed) return;
+                if ((result.IsError || !string.IsNullOrEmpty(result.ProgressErrorMessage)) && _loadedResult != null)
+                {
+                    _error.Text = "Could not refresh achievement status. Showing the last loaded status. " + (result.ErrorMessage ?? result.ProgressErrorMessage);
+                    _error.Visibility = Visibility.Visible;
+                    return;
+                }
+                _newUnlocks = _unlockTracker.Observe(result, _feedbackAccountScope);
+                ApplyLoadedResult(result);
+                ShowUnlockFeedback();
+                if (!result.IsError && string.IsNullOrEmpty(result.ProgressErrorMessage))
+                {
+                    // An absolute label stays truthful without a timer and does not advance on failure.
+                    var updated = DateTimeOffset.Now;
+                    _updated.Text = "Updated " + updated.ToString("g");
+                    _updated.ToolTip = "Last successful retrieval: " + updated.ToString("F") + " " + updated.ToString("zzz");
+                    _updated.Visibility = Visibility.Visible;
+                }
             }
-            catch (Exception ex)
+            finally
             {
-                result = new GameAchievementsFetchService.FetchResult { ErrorMessage = ex.Message };
+                _isLoading = false;
+                _refresh.IsEnabled = true;
+                _refresh.ToolTip = "Refresh achievement status (F5)";
+                _guide.IsEnabled = _guideService != null
+                    && _loadedResult?.Rows?.Any(row => row != null && row.HasStableProviderIdentity) == true;
             }
+        }
 
+        void ApplyLoadedResult(GameAchievementsFetchService.FetchResult result)
+        {
             Title = result.IsError
                 ? "Achievements"
                 : ("Achievements — " + (result.SourceLabel ?? ""));
 
             var displayTitle = result.IsError
-                ? (folder == null ? string.Empty : (folder.Name ?? string.Empty).Trim())
+                ? (_folder == null ? string.Empty : (_folder.Name ?? string.Empty).Trim())
                 : (result.GameTitle ?? string.Empty);
-            if (string.IsNullOrWhiteSpace(displayTitle) && folder != null)
-                displayTitle = folder.Name ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(displayTitle) && _folder != null)
+                displayTitle = _folder.Name ?? string.Empty;
             _heading.Text = string.IsNullOrWhiteSpace(displayTitle) ? "Achievements" : displayTitle;
             _detail.Text = result.IsError ? string.Empty : (result.DetailLine ?? string.Empty);
             _earnedSummary.Visibility = Visibility.Collapsed;
@@ -249,54 +434,415 @@ namespace PixelVaultNative
                 _error.Visibility = Visibility.Visible;
                 _error.Text = result.ErrorMessage ?? "Unknown error.";
                 _list.Visibility = Visibility.Collapsed;
+                _gridHost.Visibility = Visibility.Collapsed;
                 _empty.Visibility = Visibility.Collapsed;
                 return;
             }
 
             _error.Visibility = Visibility.Collapsed;
             _loadedResult = result;
-            _list.Items.Clear();
             var rows = result.Rows ?? new List<GameAchievementsFetchService.AchievementRow>();
             _guide.IsEnabled = _guideService != null && rows.Any(row => row != null && row.HasStableProviderIdentity);
+            UpdateProgressDetails(rows);
+            TryApplyStoredAchievementGroups(rows);
+            ReloadPins(true);
+            RenderAchievementRows(rows, _userAgent, result.SourceLabel);
+        }
+
+        void TryApplyStoredAchievementGroups(List<GameAchievementsFetchService.AchievementRow> rows)
+        {
+            if (_guideService == null || rows == null || rows.Count == 0) return;
+            try
+            {
+                _guideService.SyncDefinitionsAndLoadGuides(_folder?.GameId ?? string.Empty, rows);
+            }
+            catch
+            {
+                // Group metadata is optional; a catalog failure must not hide live provider achievements.
+            }
+        }
+
+        internal static List<GameAchievementsFetchService.AchievementRow> FilterAchievementRows(
+            IEnumerable<GameAchievementsFetchService.AchievementRow> rows,
+            bool remainingOnly)
+        {
+            return (rows ?? Enumerable.Empty<GameAchievementsFetchService.AchievementRow>())
+                .Where(row => row != null && (!remainingOnly || (row.ProgressKnown && !row.Unlocked)))
+                .ToList();
+        }
+
+        internal static string BuildRemainingAchievementMessage(
+            IEnumerable<GameAchievementsFetchService.AchievementRow> rows)
+        {
+            var all = FilterAchievementRows(rows, false);
+            if (all.Count == 0) return "No achievement definitions were returned for this game.";
+            var unknown = all.Count(row => !row.ProgressKnown);
+            var remaining = all.Count(row => row.ProgressKnown && !row.Unlocked);
+            if (unknown > 0)
+                return (remaining > 0 ? "Showing " + remaining + " known remaining. " : "No known remaining achievements. ")
+                    + "Progress unavailable for " + unknown + " achievement" + (unknown == 1 ? "." : "s.");
+            return remaining == 0 ? "All " + all.Count + " achievements have been obtained." : string.Empty;
+        }
+
+        static TextBlock BuildFilteredGroupMessage(IEnumerable<GameAchievementsFetchService.AchievementRow> rows)
+        {
+            return new TextBlock
+            {
+                Text = BuildRemainingAchievementMessage(rows),
+                Foreground = UiBrushHelper.FromHex("#9CB1BC"),
+                Margin = new Thickness(8, 8, 8, 8),
+                FontSize = 12,
+                TextWrapping = TextWrapping.Wrap
+            };
+        }
+
+        void RenderAchievementRows(
+            List<GameAchievementsFetchService.AchievementRow> rows,
+            string userAgent,
+            string sourceLabel)
+        {
+            _feedbackRestores.Clear();
+            _list.Items.Clear();
+            _gridContent.Children.Clear();
+            rows = FilterAchievementRows(rows, false);
             if (rows.Count == 0)
             {
+                _empty.Text = "No achievement definitions were returned for this game.";
+                _earnedSummary.Visibility = Visibility.Collapsed;
                 _list.Visibility = Visibility.Collapsed;
+                _gridHost.Visibility = Visibility.Collapsed;
                 _empty.Visibility = Visibility.Visible;
                 return;
             }
 
-            var total = rows.Count;
-            var earned = rows.Count(r => r.ProgressKnown && r.Unlocked);
-            _earnedSummary.Text = "\U0001F3C6 " + earned + " of " + total + " Achievements earned";
+            _earnedSummary.Text = (_stats ?? AchievementCollectionStats.Build(rows, DateTime.UtcNow.Ticks)).Summary;
             _earnedSummary.Visibility = Visibility.Visible;
 
             _empty.Visibility = Visibility.Collapsed;
-            _list.Visibility = Visibility.Visible;
+            _list.Visibility = _showGrid ? Visibility.Collapsed : Visibility.Visible;
+            _gridHost.Visibility = _showGrid ? Visibility.Visible : Visibility.Collapsed;
+            if (_showGrid) _gridContent.Children.Add(_progressDetails);
+            else _list.Items.Add(_progressDetails);
 
-            var lastSection = string.Empty;
-            foreach (var row in rows)
+            if (_remainingOnly.IsChecked == true)
             {
-                var section = !row.ProgressKnown ? "unknown" : (row.Unlocked ? "unlocked" : "locked");
-                if (!string.Equals(section, lastSection, StringComparison.Ordinal))
+                _empty.Text = BuildRemainingAchievementMessage(rows);
+                _empty.Visibility = string.IsNullOrEmpty(_empty.Text) ? Visibility.Collapsed : Visibility.Visible;
+            }
+
+            if (_showGrid)
+            {
+                RenderAchievementGrid(rows, userAgent, sourceLabel);
+                AchievementCollectionUi.ApplyHighContrast(this);
+                HighlightUnlocks();
+                return;
+            }
+
+            foreach (var group in BuildAchievementGroups(rows))
+            {
+                var collapsed = _collapsedGroups.Contains(group.Name);
+                _list.Items.Add(BuildAchievementGroupHeader(group, collapsed, () =>
                 {
-                    lastSection = section;
-                    var headerText = section == "unlocked"
-                        ? "Unlocked"
-                        : section == "locked"
-                            ? "Locked"
-                            : UnknownProgressSectionTitle(result.SourceLabel);
-                    _list.Items.Add(new TextBlock
+                    if (!_collapsedGroups.Add(group.Name)) _collapsedGroups.Remove(group.Name);
+                    RenderAchievementRows(rows, userAgent, sourceLabel);
+                }));
+                if (collapsed) continue;
+                var visibleRows = VisibleSortedRows(group.Rows);
+                if (visibleRows.Count == 0)
+                    _list.Items.Add(BuildFilteredGroupMessage(group.Rows));
+                var lastSection = string.Empty;
+                foreach (var row in visibleRows)
+                {
+                    var section = !row.ProgressKnown ? "unknown" : (row.Unlocked ? "unlocked" : "locked");
+                    if (SelectedSort == AchievementCollectionSort.Provider && !string.Equals(section, lastSection, StringComparison.Ordinal))
                     {
-                        Text = headerText,
+                        lastSection = section;
+                        var headerText = section == "unlocked"
+                            ? "Unlocked"
+                            : section == "locked"
+                                ? "Locked"
+                                : UnknownProgressSectionTitle(sourceLabel);
+                        _list.Items.Add(new TextBlock
+                        {
+                            Text = headerText,
+                            FontWeight = FontWeights.SemiBold,
+                            FontSize = 12,
+                            Foreground = UiBrushHelper.FromHex("#7D909C"),
+                            Margin = new Thickness(8, section == "unlocked" ? 4 : 14, 0, 4)
+                        });
+                    }
+
+                    var card = BuildAchievementRowCard(row, userAgent);
+                    AddPinAction(card, row);
+                    AttachGuideDoubleClick(card, row, userAgent);
+                    _list.Items.Add(card);
+                }
+            }
+            AchievementCollectionUi.ApplyHighContrast(this);
+            HighlightUnlocks();
+        }
+
+        void RenderAchievementGrid(
+            List<GameAchievementsFetchService.AchievementRow> rows,
+            string userAgent,
+            string sourceLabel)
+        {
+            foreach (var group in BuildAchievementGroups(rows))
+            {
+                var collapsed = _collapsedGroups.Contains(group.Name);
+                _gridContent.Children.Add(BuildAchievementGroupHeader(group, collapsed, () =>
+                {
+                    if (!_collapsedGroups.Add(group.Name)) _collapsedGroups.Remove(group.Name);
+                    RenderAchievementRows(rows, userAgent, sourceLabel);
+                }));
+                if (collapsed) continue;
+
+                var visibleRows = VisibleSortedRows(group.Rows);
+                if (visibleRows.Count == 0)
+                    _gridContent.Children.Add(BuildFilteredGroupMessage(group.Rows));
+                foreach (var section in VisibleSections(visibleRows))
+                {
+                    _gridContent.Children.Add(new TextBlock
+                    {
+                        Text = section.Title + " · " + section.Rows.Count,
                         FontWeight = FontWeights.SemiBold,
                         FontSize = 12,
-                        Foreground = UiBrushHelper.FromHex("#7D909C"),
-                        Margin = new Thickness(8, section == "unlocked" ? 4 : 14, 0, 4)
+                        Foreground = section.Key == "obtained"
+                            ? UiBrushHelper.FromHex("#88B8A0")
+                            : UiBrushHelper.FromHex("#9CB1BC"),
+                        Margin = new Thickness(8, 14, 0, 5)
+                    });
+
+                    if (section.Rows.Count == 0)
+                    {
+                        _gridContent.Children.Add(new TextBlock
+                        {
+                            Text = group.ProgressKnown
+                                ? "All achievements in this group have been obtained."
+                                : "No known locked achievements in this group.",
+                            Foreground = UiBrushHelper.FromHex("#88B8A0"),
+                            FontSize = 12,
+                            Margin = new Thickness(8, 3, 0, 8)
+                        });
+                        continue;
+                    }
+
+                    var panel = new WrapPanel
+                    {
+                        HorizontalAlignment = HorizontalAlignment.Left,
+                        ItemWidth = 164,
+                        ItemHeight = 164
+                    };
+                    foreach (var row in section.Rows)
+                    {
+                        var card = BuildAchievementGridCard(row, userAgent);
+                        AddPinAction(card, row);
+                        AttachGuideDoubleClick(card, row, userAgent);
+                        panel.Children.Add(card);
+                    }
+                    _gridContent.Children.Add(panel);
+                }
+            }
+        }
+
+        void AttachGuideDoubleClick(
+            FrameworkElement visual,
+            GameAchievementsFetchService.AchievementRow row,
+            string userAgent)
+        {
+            if (visual == null || row == null || _guideService == null || !row.HasStableProviderIdentity) return;
+            visual.Cursor = Cursors.Hand;
+            visual.Focusable = true;
+            visual.SetResourceReference(FrameworkElement.FocusVisualStyleProperty, "PixelVaultFocusVisual");
+            visual.KeyDown += (_, e) =>
+            {
+                if (!ReferenceEquals(e.OriginalSource, visual) || (e.Key != Key.Enter && e.Key != Key.Space)) return;
+                e.Handled = true;
+                OpenAchievementGuide(row, userAgent);
+            };
+            const string hint = "Double-click to open this achievement in Guide.";
+            visual.ToolTip = visual.ToolTip is string existing && !string.IsNullOrWhiteSpace(existing)
+                ? existing + Environment.NewLine + Environment.NewLine + hint
+                : hint;
+            visual.MouseLeftButtonDown += (_, e) =>
+            {
+                if (e.ClickCount != 2) return;
+                e.Handled = true;
+                OpenAchievementGuide(row, userAgent);
+            };
+        }
+
+        void OpenAchievementGuide(GameAchievementsFetchService.AchievementRow preferredRow, string userAgent)
+        {
+            if (_isLoading || _isClosed) return;
+            var rows = _loadedResult?.Rows;
+            if (_guideService == null || rows == null || rows.Count == 0) return;
+            try
+            {
+                AchievementGuideWindow.ShowModal(
+                    this,
+                    _guideService,
+                    _loadedResult.GameTitle ?? _folder?.Name ?? "Game",
+                    _folder?.GameId ?? string.Empty,
+                    rows,
+                    preferredRow?.ProviderAchievementId);
+                TryApplyStoredAchievementGroups(rows);
+                ReloadPins(false);
+                RenderAchievementRows(rows, userAgent, _loadedResult.SourceLabel);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    this,
+                    "Could not open the achievement guide.\n\n" + ex.Message,
+                    "Achievement Guide",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+        }
+
+        internal sealed class AchievementGridSection
+        {
+            public string Key;
+            public string Title;
+            public List<GameAchievementsFetchService.AchievementRow> Rows;
+        }
+
+        internal static List<AchievementGridSection> BuildAchievementGridSections(
+            IEnumerable<GameAchievementsFetchService.AchievementRow> rows)
+        {
+            var all = (rows ?? Enumerable.Empty<GameAchievementsFetchService.AchievementRow>())
+                .Where(row => row != null)
+                .ToList();
+            var sections = new List<AchievementGridSection>();
+            var progressKnown = all.Any(row => row.ProgressKnown);
+            if (progressKnown)
+            {
+                sections.Add(new AchievementGridSection
+                {
+                    Key = "not-obtained",
+                    Title = "Not obtained",
+                    Rows = all.Where(row => row.ProgressKnown && !row.Unlocked).ToList()
+                });
+                var obtained = all.Where(row => row.ProgressKnown && row.Unlocked).ToList();
+                if (obtained.Count > 0)
+                {
+                    sections.Add(new AchievementGridSection
+                    {
+                        Key = "obtained",
+                        Title = "Obtained",
+                        Rows = obtained
                     });
                 }
-
-                _list.Items.Add(BuildAchievementRowCard(row, userAgent));
             }
+
+            var unknown = all.Where(row => !row.ProgressKnown).ToList();
+            if (unknown.Count > 0)
+            {
+                sections.Add(new AchievementGridSection
+                {
+                    Key = "unknown",
+                    Title = "Progress unknown",
+                    Rows = unknown
+                });
+            }
+            return sections;
+        }
+
+        internal static List<AchievementGroupSummary> BuildAchievementGroups(
+            IEnumerable<GameAchievementsFetchService.AchievementRow> rows)
+        {
+            return (rows ?? Enumerable.Empty<GameAchievementsFetchService.AchievementRow>())
+                .Where(row => row != null)
+                .GroupBy(row => EffectiveAchievementGroupName(row), StringComparer.OrdinalIgnoreCase)
+                .Select(group => new AchievementGroupSummary
+                {
+                    Name = group.Key,
+                    SortOrder = group.Min(row => row.GroupSortOrder),
+                    Rows = group.ToList()
+                })
+                .OrderBy(group => group.SortOrder)
+                .ThenBy(group => string.Equals(group.Name, "Base Game", StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+                .ThenBy(group => group.Name, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        internal static string EffectiveAchievementGroupName(GameAchievementsFetchService.AchievementRow row)
+        {
+            var name = (row?.GroupName ?? string.Empty).Trim();
+            return name.Length == 0 ? "Base Game" : name;
+        }
+
+        internal static Button BuildAchievementGroupHeader(
+            AchievementGroupSummary group,
+            bool collapsed,
+            Action toggle)
+        {
+            var grid = new Grid();
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            var chevron = new TextBlock
+            {
+                Text = collapsed ? "\u25B8" : "\u25BE",
+                Width = 20,
+                Margin = new Thickness(0, 0, 7, 0),
+                FontSize = 14,
+                Foreground = UiBrushHelper.FromHex("#9FC7B0"),
+                VerticalAlignment = VerticalAlignment.Center,
+                TextAlignment = TextAlignment.Center
+            };
+            Grid.SetRowSpan(chevron, 2);
+            grid.Children.Add(chevron);
+            var title = new TextBlock
+            {
+                Text = group?.Name ?? "Base Game",
+                FontSize = 15,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = Brushes.White,
+                TextWrapping = TextWrapping.Wrap
+            };
+            Grid.SetColumn(title, 1);
+            grid.Children.Add(title);
+            var progress = new TextBlock
+            {
+                Text = group?.Percent.HasValue == true
+                    ? group.Earned + " / " + group.Total + " · " + group.Percent.Value + "%"
+                    : (group?.Total ?? 0) + " achievements · progress unavailable",
+                Margin = new Thickness(0, 3, 0, 0),
+                Foreground = UiBrushHelper.FromHex("#9FC7B0"),
+                FontSize = 12,
+                FontWeight = FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center,
+                TextWrapping = TextWrapping.Wrap
+            };
+            Grid.SetColumn(progress, 1);
+            Grid.SetRow(progress, 1);
+            grid.Children.Add(progress);
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            var progressBar = AchievementCollectionUi.GroupProgress(group);
+            Grid.SetRow(progressBar, 2);
+            Grid.SetColumn(progressBar, 1);
+            grid.Children.Add(progressBar);
+            var button = new Button
+            {
+                Content = grid,
+                Margin = new Thickness(0, 8, 0, 2),
+                Padding = new Thickness(10, 7, 10, 7),
+                Background = UiBrushHelper.FromHex("#17242B"),
+                BorderBrush = UiBrushHelper.FromHex("#31505D"),
+                BorderThickness = new Thickness(0, 0, 0, 1),
+                Foreground = Brushes.White,
+                HorizontalContentAlignment = HorizontalAlignment.Stretch,
+                ToolTip = (collapsed ? "Expand " : "Collapse ") + (group?.Name ?? "Base Game")
+            };
+            button.Click += delegate { toggle?.Invoke(); };
+            AccessibilityUi.TryApplyFocusVisualStyle(button);
+            AutomationProperties.SetName(
+                button,
+                (collapsed ? "Expand " : "Collapse ") + (group?.Name ?? "Base Game") + " achievement group");
+            return button;
         }
 
         static string UnknownProgressSectionTitle(string sourceLabel)
@@ -329,14 +875,117 @@ namespace PixelVaultNative
             return string.IsNullOrWhiteSpace(date) ? string.Empty : "Achieved " + date;
         }
 
-        Border BuildAchievementRowCard(GameAchievementsFetchService.AchievementRow row, string userAgent)
+        Border BuildAchievementGridCard(GameAchievementsFetchService.AchievementRow row, string userAgent)
         {
+            var obtained = row.ProgressKnown && row.Unlocked;
             var card = new Border
             {
-                BorderBrush = UiBrushHelper.FromHex("#24323A"),
-                BorderThickness = new Thickness(0, 0, 0, 1),
+                Width = 154,
+                Height = 154,
+                Margin = new Thickness(5),
+                Padding = new Thickness(8),
+                CornerRadius = new CornerRadius(7),
+                Background = UiBrushHelper.FromHex(obtained ? "#15231E" : "#11191E"),
+                BorderBrush = UiBrushHelper.FromHex(obtained ? "#3E6A54" : "#2B3A44"),
+                BorderThickness = new Thickness(1),
+                Tag = row,
+                ToolTip = BuildAchievementGridToolTip(row)
+            };
+
+            var content = new Grid();
+            content.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            content.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            content.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+            var badgeHost = new Border
+            {
+                Width = 76,
+                Height = 76,
+                Margin = new Thickness(0, 0, 0, 6),
+                CornerRadius = new CornerRadius(6),
+                ClipToBounds = true,
+                Background = UiBrushHelper.FromHex("#0D1418"),
+                BorderBrush = UiBrushHelper.FromHex(obtained ? "#527A64" : "#2B3A44"),
+                BorderThickness = new Thickness(1),
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+            var image = new Image
+            {
+                Stretch = Stretch.UniformToFill,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            badgeHost.Child = image;
+            StartAchievementBadgeDownload(image, row, userAgent);
+            content.Children.Add(badgeHost);
+
+            var title = new TextBlock
+            {
+                Text = row.Title ?? string.Empty,
+                Foreground = Brushes.White,
+                FontSize = 12,
+                FontWeight = FontWeights.SemiBold,
+                TextAlignment = TextAlignment.Center,
+                TextWrapping = TextWrapping.Wrap,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                MaxHeight = 36,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            Grid.SetRow(title, 1);
+            content.Children.Add(title);
+
+            var earnedDate = obtained ? FormatAchievementEarnedDateLabel(row.UnlockUtcTicks) : string.Empty;
+            var state = obtained
+                ? (string.IsNullOrWhiteSpace(earnedDate) ? "Obtained" : earnedDate)
+                : (row.ProgressKnown ? "Not obtained" : "Progress unknown");
+            var meta = new TextBlock
+            {
+                Text = state,
+                Margin = new Thickness(0, 4, 0, 0),
+                Foreground = UiBrushHelper.FromHex(obtained ? "#88B8A0" : "#7D909C"),
+                FontSize = 10,
+                TextAlignment = TextAlignment.Center,
+                TextTrimming = TextTrimming.CharacterEllipsis
+            };
+            Grid.SetRow(meta, 2);
+            content.Children.Add(meta);
+
+            card.Child = content;
+            AutomationProperties.SetName(card, (row.Title ?? "Achievement") + ", " + state);
+            return card;
+        }
+
+        static string BuildAchievementGridToolTip(GameAchievementsFetchService.AchievementRow row)
+        {
+            if (row == null) return string.Empty;
+            var parts = new List<string>();
+            if (!string.IsNullOrWhiteSpace(row.Title)) parts.Add(row.Title.Trim());
+            if (!string.IsNullOrWhiteSpace(row.Description)) parts.Add(row.Description.Trim());
+            var earned = FormatAchievementEarnedMeta(row.UnlockUtcTicks);
+            if (!string.IsNullOrWhiteSpace(earned)) parts.Add(earned);
+            parts.Add(AchievementCollectionStats.ValidPercent(row.GlobalUnlockPercent)
+                ? "Achieved by " + row.GlobalUnlockPercent.Value.ToString("0.##", System.Globalization.CultureInfo.CurrentCulture) + "% of players globally."
+                : "Global unlock percentage unavailable.");
+            if (!string.IsNullOrWhiteSpace(row.Meta))
+            {
+                var meta = string.Join(" · ", row.Meta.Split('·').Select(part => part.Trim())
+                    .Where(part => part.Length > 0 && !part.EndsWith("% global unlocks", StringComparison.OrdinalIgnoreCase)));
+                if (meta.Length > 0) parts.Add(meta);
+            }
+            return string.Join(Environment.NewLine, parts);
+        }
+
+        Border BuildAchievementRowCard(GameAchievementsFetchService.AchievementRow row, string userAgent)
+        {
+            var obtained = row.ProgressKnown && row.Unlocked;
+            var card = new Border
+            {
+                Tag = row,
+                BorderBrush = UiBrushHelper.FromHex(obtained ? "#3E6A54" : "#24323A"),
+                BorderThickness = obtained ? new Thickness(2, 0, 0, 1) : new Thickness(0, 0, 0, 1),
                 Padding = new Thickness(10, 8, 10, 8),
-                Background = Brushes.Transparent
+                Background = obtained ? UiBrushHelper.FromHex("#15231E") : Brushes.Transparent,
+                ToolTip = BuildAchievementGridToolTip(row)
             };
             var grid = new Grid { MinHeight = 52 };
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -418,6 +1067,7 @@ namespace PixelVaultNative
             }
 
             card.Child = grid;
+            AutomationProperties.SetName(card, (row.Title ?? "Achievement") + ", " + (obtained ? "Obtained" : row.ProgressKnown ? "Not obtained" : "Progress unknown"));
             return card;
         }
 

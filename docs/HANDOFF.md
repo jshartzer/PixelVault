@@ -2,6 +2,10 @@
 
 This file is the short current-state handoff.
 
+September 7 Roblox naming correction: new imports use `Roblox_Experience_capture-token.png`, with Roblox (PC) as the game identity in parser and intake preparation. Earlier experience-first filenames remain recognized; existing library files and saved assignments are not migrated. All 77 targeted importer/parser/intake tests pass. Included in App Testing; no release-version bump.
+
+September 7 settings follow-up: Settings now uses HealthApp-style top tabs with inline configuration and deferred utility pages. Opening no longer reads/renders the entire 20 MB main log; Run history loads a 64 KiB tail in the background when selected. All 69 targeted settings tests pass. See `docs/SETTINGS_UI.md`. Included in the App Testing rebuild; release version remains unchanged.
+
 Use it for:
 
 - where to work
@@ -14,6 +18,8 @@ For durable architecture and data-model context, use:
 - `C:\Codex\docs\PROJECT_CONTEXT.md`
 
 ## Active Workspace
+
+September 7 follow-up: Grid/List achievement cards now expose Pin/Unpin to Next Up through their context menu, with no card pin icon. Hover text includes the global unlock percentage or an unavailable label; Guide and Next Up pin controls remain. Roblox captures now resolve experience names through the public API and rename to `Title_Roblox_capture-token.png`, using existing creation times without decoding the token. Unresolved captures stay in manual intake. All 703 tests pass, including 12 Roblox checks; the application service resolved the sample place to Sell Lemons through the live API. See `docs/ROBLOX_CAPTURES.md`. The requested App Testing rebuild includes both changes. The runnable script copy is `C:\Scripts\App Development\Build-PixelVault-AppTesting.ps1`; it uses `C:\Codex` by default when outside the repository and accepts `-RepositoryPath` to override. Published version remains 0.077.000.
 
 Work out of:
 
@@ -87,6 +93,9 @@ The current codebase direction is:
 
 Practical current focus:
 
+App Testing rebuilt for ACHG-002 on 2026-09-07; open it to load A–E. The old session had exited, so the normal clean build removed the temporary previous executable. No forced shutdown or published version change.
+
+- **PV-PLN-ACHG-002 active, resumed at user request (2026-09-07):** Phases A–E implemented: access/read-first guides, durable Next Up pins, statistics/history, and sorting. **Next: Phase F manual verification.** Shadow of War guide/DLC curation completed separately: 72 guides (52 base, 10 Blade of Galadriel, 10 Desolation of Mordor), with live Steam IDs verified and saved pins preserved. The user resumed the plan: compact 24-DIP vector pins, Guide title pin, Next Up tag chips, group progress bars, earned List accents, and static six-second refresh feedback are implemented. Full suite 691 passed; pinned collection/statistics WPF layouts checked. Pin storage is separate from imports; missing targets open stored guides without provider sync. Steam unavailable player data is unknown, and failed player refresh preserves prior results/timestamp. Live provider/account, interactive import, and OS scaling QA remain in Phase F. See `docs/plans/PV-PLN-ACHG-002-achievement-collection-experience.md`; roadmap mirror: [Notion](https://www.notion.so/3d373adc59b681cdb2bddc883381e1f8). Published version remains 0.077.000.
 - continue the MainWindow extraction roadmap in small slices
 - keep service extraction coordinated so parallel work does not collide
 - treat source-only refactors and published-build changes as different things

@@ -31,8 +31,9 @@ namespace PixelVaultNative
             public HdrFallbackMoveResult HdrFallbackResult;
         }
 
-        void RunWorkflow(bool withReview)
+        async void RunWorkflow(bool withReview)
         {
+            if (IsForegroundIntakeBusy) return;
             var importEditModalForegroundBusy = false;
             try
             {
@@ -41,7 +42,10 @@ namespace PixelVaultNative
                 fileSystemService.CreateDirectory(destinationRoot);
                 var prepStopwatch = Stopwatch.StartNew();
                 var inventory = importService.BuildSourceInventory(importSearchSubfoldersForRename);
-                var prep = BuildIntakePreparation(inventory.TopLevelMediaFiles, withReview);
+                BeginForegroundIntakeBusy();
+                importEditModalForegroundBusy = true;
+                status.Text = "Preparing import…";
+                var prep = await Task.Run(() => BuildIntakePreparation(inventory.TopLevelMediaFiles, withReview));
                 var reviewItems = prep.ReviewItems;
                 var manualItems = prep.ManualItems;
                 var manualPaths = prep.ManualPaths;
@@ -53,8 +57,6 @@ namespace PixelVaultNative
                     ApplyHdrPairAlternatesToManualMetadataItems(importEditItems, inventory.HdrPairs);
                     if (importEditItems.Count > 0)
                     {
-                        BeginForegroundIntakeBusy();
-                        importEditModalForegroundBusy = true;
                         status.Text = "Import and edit";
                         Log("Opening import and edit window for " + importEditItems.Count + " upload file(s).");
                         if (!ShowManualMetadataWindow(importEditItems, false, "Import and comment", true))
@@ -247,8 +249,9 @@ namespace PixelVaultNative
                 0);
         }
 
-        void OpenManualIntakeWindow()
+        async void OpenManualIntakeWindow()
         {
+            if (IsForegroundIntakeBusy) return;
             var manualIntakeModalForegroundBusy = false;
             try
             {
@@ -257,7 +260,10 @@ namespace PixelVaultNative
                 fileSystemService.CreateDirectory(destinationRoot);
                 var prepStopwatch = Stopwatch.StartNew();
                 var inventory = importService.BuildSourceInventory(importSearchSubfoldersForRename);
-                var prep = BuildIntakePreparation(inventory.TopLevelMediaFiles, false);
+                BeginForegroundIntakeBusy();
+                manualIntakeModalForegroundBusy = true;
+                status.Text = "Preparing manual intake…";
+                var prep = await Task.Run(() => BuildIntakePreparation(inventory.TopLevelMediaFiles, false));
                 var manualItems = prep.ManualItems;
                 ApplyHdrPairAlternatesToManualMetadataItems(manualItems, inventory.HdrPairs);
                 prepStopwatch.Stop();
@@ -271,8 +277,6 @@ namespace PixelVaultNative
                     return;
                 }
 
-                BeginForegroundIntakeBusy();
-                manualIntakeModalForegroundBusy = true;
                 status.Text = "Manual intake review";
                 Log("Opening manual intake window for " + manualItems.Count + " unmatched image(s).");
                 if (!ShowManualMetadataWindow(manualItems, false, string.Empty))

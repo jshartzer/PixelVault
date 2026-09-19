@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 
@@ -68,6 +69,40 @@ namespace PixelVaultNative
                 }
             }
             return string.Empty;
+        }
+
+        /// <summary>Reads a bounded UTF-8 tail without scanning the growing log from the beginning.</summary>
+        internal static string ReadRecentHistory(string path, int maxBytes = 64 * 1024)
+        {
+            if (maxBytes <= 0) throw new ArgumentOutOfRangeException(nameof(maxBytes));
+            try
+            {
+                using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+                var count = (int)Math.Min(stream.Length, maxBytes);
+                var truncated = stream.Length > count;
+                stream.Seek(-count, SeekOrigin.End);
+                var bytes = new byte[count];
+                var read = 0;
+                while (read < count)
+                {
+                    var n = stream.Read(bytes, read, count - read);
+                    if (n == 0) break;
+                    read += n;
+                }
+                var start = 0;
+                if (truncated)
+                {
+                    // Skip a partial first line, including any split UTF-8 sequence.
+                    var newline = Array.IndexOf(bytes, (byte)'\n', 0, read);
+                    if (newline >= 0 && newline < read - 1) start = newline + 1;
+                    else while (start < read && (bytes[start] & 0xC0) == 0x80) start++;
+                }
+                else if (read >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF) start = 3;
+                return (truncated ? "[Recent history excerpt. Open the logs folder for the complete file.]" + Environment.NewLine : string.Empty)
+                    + Encoding.UTF8.GetString(bytes, start, read - start);
+            }
+            catch (FileNotFoundException) { return string.Empty; }
+            catch (DirectoryNotFoundException) { return string.Empty; }
         }
 
         /// <summary>Appends a timestamped line to the main log and returns the formatted line

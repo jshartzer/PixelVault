@@ -44,9 +44,11 @@ namespace PixelVaultNative
         public string ProviderAchievementId { get; set; }
         public string GuideText { get; set; }
         public List<string> Tags { get; set; }
-        public bool IsMissable { get; set; }
+        public bool? IsMissable { get; set; }
         public string SourceUrl { get; set; }
         public string SourceTitle { get; set; }
+        public string GroupName { get; set; }
+        public int? GroupSortOrder { get; set; }
     }
 
     sealed class AchievementGuideImportCandidate
@@ -58,6 +60,10 @@ namespace PixelVaultNative
         public string SourceTitle;
         public string Tags;
         public bool IsMissable;
+        public string GroupName;
+        public int GroupSortOrder;
+        public bool GuideChanged;
+        public bool GroupChanged;
         public bool Changed;
     }
 
@@ -103,10 +109,12 @@ namespace PixelVaultNative
                 {
                     foreach (var candidate in changed)
                     {
-                        using (var command = connection.CreateCommand())
+                        if (candidate.GuideChanged)
                         {
-                            command.Transaction = transaction;
-                            command.CommandText = @"
+                            using (var command = connection.CreateCommand())
+                            {
+                                command.Transaction = transaction;
+                                command.CommandText = @"
 INSERT INTO achievement_guide
     (achievement_id, guide_text, source_url, source_title, tags, is_missable, created_utc_ticks, updated_utc_ticks)
 VALUES
@@ -118,14 +126,32 @@ ON CONFLICT(achievement_id) DO UPDATE SET
     tags = excluded.tags,
     is_missable = excluded.is_missable,
     updated_utc_ticks = excluded.updated_utc_ticks;";
-                            command.Parameters.AddWithValue("$achievement_id", candidate.AchievementId);
-                            command.Parameters.AddWithValue("$guide_text", candidate.GuideText);
-                            command.Parameters.AddWithValue("$source_url", candidate.SourceUrl);
-                            command.Parameters.AddWithValue("$source_title", candidate.SourceTitle);
-                            command.Parameters.AddWithValue("$tags", candidate.Tags);
-                            command.Parameters.AddWithValue("$is_missable", candidate.IsMissable ? 1 : 0);
-                            command.Parameters.AddWithValue("$now", now);
-                            command.ExecuteNonQuery();
+                                command.Parameters.AddWithValue("$achievement_id", candidate.AchievementId);
+                                command.Parameters.AddWithValue("$guide_text", candidate.GuideText);
+                                command.Parameters.AddWithValue("$source_url", candidate.SourceUrl);
+                                command.Parameters.AddWithValue("$source_title", candidate.SourceTitle);
+                                command.Parameters.AddWithValue("$tags", candidate.Tags);
+                                command.Parameters.AddWithValue("$is_missable", candidate.IsMissable ? 1 : 0);
+                                command.Parameters.AddWithValue("$now", now);
+                                command.ExecuteNonQuery();
+                            }
+                        }
+
+                        if (candidate.GroupChanged)
+                        {
+                            using (var command = connection.CreateCommand())
+                            {
+                                command.Transaction = transaction;
+                                command.CommandText = @"
+UPDATE achievement_definition
+SET group_name = $group_name,
+    group_sort_order = $group_sort_order
+WHERE achievement_id = $achievement_id;";
+                                command.Parameters.AddWithValue("$achievement_id", candidate.AchievementId);
+                                command.Parameters.AddWithValue("$group_name", candidate.GroupName);
+                                command.Parameters.AddWithValue("$group_sort_order", candidate.GroupSortOrder);
+                                command.ExecuteNonQuery();
+                            }
                         }
                     }
                     transaction.Commit();
@@ -217,10 +243,25 @@ ON CONFLICT(achievement_id) DO UPDATE SET
                     result.Preview.ValidationErrors.Add("Every achievement entry requires providerAchievementId.");
                 else if (!seenIds.Add(id))
                     result.Preview.ValidationErrors.Add("Duplicate providerAchievementId: " + id + ".");
-                if (string.IsNullOrWhiteSpace(item?.GuideText))
-                    result.Preview.ValidationErrors.Add("Achievement " + (id.Length == 0 ? "(missing ID)" : id) + " requires guideText.");
+                var hasGuidePayload = item != null && (item.GuideText != null
+                    || item.Tags != null
+                    || item.IsMissable.HasValue
+                    || item.SourceUrl != null
+                    || item.SourceTitle != null);
+                var hasGroupPayload = item != null && (item.GroupName != null || item.GroupSortOrder.HasValue);
+                if (!hasGuidePayload && !hasGroupPayload)
+                    result.Preview.ValidationErrors.Add("Achievement " + (id.Length == 0 ? "(missing ID)" : id) + " requires guide or group metadata.");
+                if (hasGuidePayload && string.IsNullOrWhiteSpace(item?.GuideText))
+                    result.Preview.ValidationErrors.Add("Achievement " + (id.Length == 0 ? "(missing ID)" : id) + " requires guideText when guide metadata is supplied.");
                 if (!IsOptionalHttpUrl(item?.SourceUrl))
                     result.Preview.ValidationErrors.Add("Achievement " + (id.Length == 0 ? "(missing ID)" : id) + " has an invalid sourceUrl.");
+                if (item?.GroupName != null)
+                {
+                    try { NormalizeGroupName(item.GroupName); }
+                    catch (ArgumentException ex) { result.Preview.ValidationErrors.Add("Achievement " + (id.Length == 0 ? "(missing ID)" : id) + ": " + ex.Message); }
+                }
+                if (item?.GroupSortOrder.HasValue == true && (item.GroupSortOrder.Value < 0 || item.GroupSortOrder.Value > 100000))
+                    result.Preview.ValidationErrors.Add("Achievement " + (id.Length == 0 ? "(missing ID)" : id) + " has groupSortOrder outside 0-100000.");
             }
 
             if (result.Preview.ValidationErrors.Count > 0) return result;
@@ -236,15 +277,26 @@ ON CONFLICT(achievement_id) DO UPDATE SET
                     continue;
                 }
 
-                var guideText = item.GuideText.Trim();
-                var sourceUrl = FirstNonBlank(item.SourceUrl, bundle.SourceUrl);
-                var sourceTitle = FirstNonBlank(item.SourceTitle, bundle.SourceTitle);
-                var tags = NormalizeTags(string.Join(", ", item.Tags ?? new List<string>()));
-                var changed = !string.Equals(guideText, existing.GuideText ?? string.Empty, StringComparison.Ordinal)
+                var hasGuidePayload = item.GuideText != null
+                    || item.Tags != null
+                    || item.IsMissable.HasValue
+                    || item.SourceUrl != null
+                    || item.SourceTitle != null;
+                var guideText = hasGuidePayload ? (item.GuideText ?? string.Empty).Trim() : existing.GuideText ?? string.Empty;
+                var sourceUrl = hasGuidePayload ? FirstNonBlank(item.SourceUrl, bundle.SourceUrl) : existing.SourceUrl ?? string.Empty;
+                var sourceTitle = hasGuidePayload ? FirstNonBlank(item.SourceTitle, bundle.SourceTitle) : existing.SourceTitle ?? string.Empty;
+                var tags = hasGuidePayload ? NormalizeTags(string.Join(", ", item.Tags ?? new List<string>())) : existing.Tags ?? string.Empty;
+                var isMissable = hasGuidePayload ? item.IsMissable == true : existing.IsMissable;
+                var groupName = item.GroupName == null ? existing.GroupName ?? string.Empty : NormalizeGroupName(item.GroupName);
+                var groupSortOrder = item.GroupSortOrder ?? existing.GroupSortOrder;
+                var guideChanged = hasGuidePayload && (!string.Equals(guideText, existing.GuideText ?? string.Empty, StringComparison.Ordinal)
                     || !string.Equals(sourceUrl, existing.SourceUrl ?? string.Empty, StringComparison.Ordinal)
                     || !string.Equals(sourceTitle, existing.SourceTitle ?? string.Empty, StringComparison.Ordinal)
                     || !string.Equals(tags, existing.Tags ?? string.Empty, StringComparison.Ordinal)
-                    || item.IsMissable != existing.IsMissable;
+                    || isMissable != existing.IsMissable);
+                var groupChanged = (item.GroupName != null || item.GroupSortOrder.HasValue)
+                    && (!string.Equals(groupName, existing.GroupName ?? string.Empty, StringComparison.Ordinal)
+                        || groupSortOrder != existing.GroupSortOrder);
 
                 result.Candidates.Add(new AchievementGuideImportCandidate
                 {
@@ -254,11 +306,15 @@ ON CONFLICT(achievement_id) DO UPDATE SET
                     SourceUrl = sourceUrl,
                     SourceTitle = sourceTitle,
                     Tags = tags,
-                    IsMissable = item.IsMissable,
-                    Changed = changed
+                    IsMissable = isMissable,
+                    GroupName = groupName,
+                    GroupSortOrder = groupSortOrder,
+                    GuideChanged = guideChanged,
+                    GroupChanged = groupChanged,
+                    Changed = guideChanged || groupChanged
                 });
                 result.Preview.MatchedCount++;
-                if (changed) result.Preview.ChangedCount++;
+                if (guideChanged || groupChanged) result.Preview.ChangedCount++;
                 else result.Preview.UnchangedCount++;
             }
             return result;

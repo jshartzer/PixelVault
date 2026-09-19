@@ -151,6 +151,7 @@ namespace PixelVaultNative
                 EnumerateSourceMediaFiles = mw.EnumerateSourceFiles,
                 GetImportFolderTitleHint = mw.GetImportFolderTitleHint,
                 ParseFilenameForImport = mw.ParseFilename,
+                ResolveRobloxExperienceTitle = RobloxExperienceService.Shared.ResolveTitleAsync,
                 EnsureSteamAppIdInGameIndex = mw.EnsureSteamAppIdInGameIndex,
                 EnsureNonSteamIdInGameIndex = mw.EnsureNonSteamIdInGameIndex,
                 SanitizeManualRenameGameTitle = MainWindow.Sanitize,

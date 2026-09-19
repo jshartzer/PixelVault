@@ -29,6 +29,9 @@ For **splitting `MainWindow` / shrinking `PixelVault.Native.cs`**, use:
 - **Done in source:** MainWindow extraction **Phases A–F** (library host + `ILibraryBrowserShell`, settings `SettingsShellHost`, photography partial, settings persistence partial, etc.). See `C:\Codex\docs\completed-projects\README.md`.
 
 ## Current Focus
+
+**Achievement collection experience — PV-PLN-ACHG-002 (active, resumed 2026-09-07):** Phases A–E implemented and App Testing rebuilt: access, read-first guides, durable Next Up pins, statistics/history, and sorting. Shadow of War guide/DLC curation completed separately: 72 guides (52 base, 10 Blade of Galadriel, 10 Desolation of Mordor), with live Steam IDs verified and saved pins preserved. The user resumed the plan: compact 24-DIP vector pins, Guide title pin, Next Up tag chips, group progress bars, earned List accents, and static six-second refresh feedback are implemented. Next: **Phase F manual verification**. Full suite: 691 passed. See [source plan](../docs/plans/PV-PLN-ACHG-002-achievement-collection-experience.md) and [Notion roadmap](https://www.notion.so/3d373adc59b681cdb2bddc883381e1f8).
+
 1. **Incremental monolith shrink + service routing** (when touching related files).
 - Narrow remaining direct persistence/scanner glue in `MainWindow`; prefer `ILibrarySession` / `IGameIndexService` / dedicated partials per `HANDOFF.md` and `PERFORMANCE_TODO.md` item 7.
 - Large perf slices (virtualization, debounced search, batch cold index, cancellation, keyword mirror / 5a) are **landed** — track only **new** regressions or optional polish there.
@@ -70,4 +73,3 @@ Remaining highlights: Steam rename edge cases (`SteamAppIdLooksLikeFilenamePrefi
 - Media-tool wrappers third.
 - Import orchestration fourth.
 - UI wiring last.
-

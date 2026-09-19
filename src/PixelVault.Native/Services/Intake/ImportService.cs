@@ -143,6 +143,7 @@ namespace PixelVaultNative
 
         /// <summary>Parse filename for intake (Steam AppID, title hint).</summary>
         public Func<string, FilenameParseResult> ParseFilenameForImport;
+        public Func<string, CancellationToken, Task<string>> ResolveRobloxExperienceTitle;
 
         /// <summary>Optional override for Steam store title by AppID; when null, <see cref="IImportService.RunSteamRenameAsync"/> uses <see cref="ICoverService.SteamNameAsync"/>.</summary>
         public Func<string, string> ResolveSteamStoreTitle;
@@ -352,6 +353,13 @@ namespace PixelVaultNative
                 cancellationToken.ThrowIfCancellationRequested();
                 var file = fileList[i];
                 var remaining = total - (i + 1);
+                if (!string.IsNullOrWhiteSpace(d.ParseFilenameForImport?.Invoke(file)?.RobloxPlaceId))
+                {
+                    skipped++;
+                    detailLogLines.Add("Left Roblox capture in source: experience rename did not complete | " + Path.GetFileName(file));
+                    progress?.Invoke(i + 1, total, "Skipped move: Roblox experience rename did not complete | " + Path.GetFileName(file));
+                    continue;
+                }
                 var sourceDirectory = Path.GetDirectoryName(file);
                 var target = Path.Combine(destinationRoot, Path.GetFileName(file));
                 if (TryGetFileLength(file, out var sourceLength)
@@ -1095,6 +1103,41 @@ namespace PixelVaultNative
                 var file = files[i];
                 var remaining = total - (i + 1);
                 var parsed = parse(file);
+                if (!string.IsNullOrWhiteSpace(parsed?.RobloxPlaceId))
+                {
+                    var title = d.ResolveRobloxExperienceTitle == null ? string.Empty
+                        : await d.ResolveRobloxExperienceTitle(parsed.RobloxPlaceId, cancellationToken).ConfigureAwait(false);
+                    if (!RobloxCaptureNaming.TryBuildRenameBase(file, title, out var robloxBase))
+                    {
+                        skipped++;
+                        detailLogLines.Add("Roblox experience unavailable; original filename retained: " + Path.GetFileName(file));
+                        progress?.Invoke(i + 1, total, "Skipped rename: Roblox experience unavailable | " + Path.GetFileName(file));
+                        continue;
+                    }
+                    var combinedRoblox = Path.Combine(Path.GetDirectoryName(file) ?? string.Empty, robloxBase + Path.GetExtension(file));
+                    var robloxTarget = d.UniquePath == null
+                        ? (fs.FileExists(combinedRoblox) ? BuildFallbackUniquePath(combinedRoblox) : combinedRoblox)
+                        : d.UniquePath(combinedRoblox);
+                    try
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        fs.MoveFile(file, robloxTarget);
+                    }
+                    catch (OperationCanceledException) { throw; }
+                    catch (Exception ex)
+                    {
+                        skipped++;
+                        detailLogLines.Add("Roblox rename failed | " + Path.GetFileName(file) + " | " + ex.Message);
+                        progress?.Invoke(i + 1, total, "Skipped rename: " + ex.Message);
+                        continue;
+                    }
+                    pathMap[file] = robloxTarget;
+                    d.MoveMetadataSidecarIfPresent?.Invoke(file, robloxTarget);
+                    renamed++;
+                    detailLogLines.Add("Renamed Roblox capture: " + Path.GetFileName(file) + " -> " + Path.GetFileName(robloxTarget));
+                    progress?.Invoke(i + 1, total, "Renamed " + Path.GetFileName(robloxTarget));
+                    continue;
+                }
                 var appId = parsed == null ? null : parsed.SteamAppId;
                 var nonSteamId = parsed == null ? null : parsed.NonSteamId;
                 string folderTitleRenameBase;

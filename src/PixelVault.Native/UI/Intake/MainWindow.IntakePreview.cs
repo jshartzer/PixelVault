@@ -60,7 +60,8 @@ namespace PixelVaultNative
             {
                 SourceRoots = GetSourceRoots(),
                 RenameScopeCount = rename.Count,
-                RenameCandidateCount = rename.Count(f => !string.IsNullOrWhiteSpace(GuessSteamAppIdFromFileName(f))),
+                RenameCandidateCount = rename.Count(f => !string.IsNullOrWhiteSpace(GuessSteamAppIdFromFileName(f))
+                    || !string.IsNullOrWhiteSpace(ParseFilename(f).RobloxPlaceId)),
                 TopLevelMediaCount = move.Count,
                 MetadataCandidateCount = reviewItems.Count,
                 MoveCandidateCount = moveCandidates.Count,

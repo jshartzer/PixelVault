@@ -24,6 +24,7 @@ namespace PixelVaultNative
         public Func<string, IEnumerable<string>> ParseTagText;
         public Func<string, bool> IsVideo;
         public Func<string, string> NormalizeConsoleLabel;
+        public Func<string, string> GetCachedRobloxTitle;
     }
 
     sealed class FilenameParserService : IFilenameParserService
@@ -70,6 +71,16 @@ namespace PixelVaultNative
                 result.CaptureTime = ParseTimestamp(ReadGroup(match, rule.TimestampGroup), rule.TimestampFormat);
                 result.PreserveFileTimes = rule.PreserveFileTimes;
                 result.RoutesToManualWhenMissingSteamAppId = rule.RoutesToManualWhenMissingSteamAppId;
+                if (RobloxCaptureNaming.IsCapture(result))
+                {
+                    result.RobloxPlaceId = ReadGroup(match, "placeId");
+                    if (result.RobloxPlaceId.Length > 0)
+                        result.GameTitleHint = dependencies.GetCachedRobloxTitle?.Invoke(result.RobloxPlaceId) ?? string.Empty;
+                    result.GameTitleHint = NormalizeGameTitleHint(result.GameTitleHint);
+                    result.RoutesToManualWhenMissingSteamAppId = string.IsNullOrWhiteSpace(result.GameTitleHint);
+                    if (!result.RoutesToManualWhenMissingSteamAppId) result.GameTitleHint = RobloxCaptureNaming.GameTitle;
+                    return result; // Never interpret the numeric capture token as a date or a Steam ID.
+                }
                 break;
             }
 
@@ -220,6 +231,10 @@ namespace PixelVaultNative
             var cleanedBaseName = baseName ?? string.Empty;
             if (string.IsNullOrWhiteSpace(cleanedBaseName)) return string.Empty;
 
+            var roblox = Regex.Match(cleanedBaseName + ".png", RobloxCaptureNaming.NamedPattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+            if (roblox.Success) return RobloxCaptureNaming.GameTitle;
+            if (Regex.IsMatch(cleanedBaseName + ".png", RobloxCaptureNaming.RawPattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)) return string.Empty;
+
             string xboxPcTitle;
             DateTime unusedCaptureTime;
             string unusedConventionId;
@@ -333,6 +348,25 @@ namespace PixelVaultNative
         {
             return new List<FilenameConventionRule>
             {
+                new FilenameConventionRule
+                {
+                    ConventionId = RobloxCaptureNaming.RawConvention,
+                    Name = "Roblox Capture (account + place ID + capture token)",
+                    Priority = 1010,
+                    Pattern = RobloxCaptureNaming.RawPattern, PatternText = RobloxCaptureNaming.RawPattern,
+                    PlatformLabel = "PC", PlatformTagsText = "PC",
+                    PreserveFileTimes = true, RoutesToManualWhenMissingSteamAppId = true,
+                    ConfidenceLabel = "ExplicitPattern", IsBuiltIn = true
+                },
+                new FilenameConventionRule
+                {
+                    ConventionId = RobloxCaptureNaming.NamedConvention,
+                    Name = "Roblox Capture (Roblox + experience title)",
+                    Priority = 1011,
+                    Pattern = RobloxCaptureNaming.NamedPattern, PatternText = RobloxCaptureNaming.NamedPattern,
+                    TitleGroup = "title", PlatformLabel = "PC", PlatformTagsText = "PC",
+                    PreserveFileTimes = true, ConfidenceLabel = "ExplicitPattern", IsBuiltIn = true
+                },
                 new FilenameConventionRule
                 {
                     ConventionId = "emulation_nonsteam_shortcut_capture",

@@ -55,6 +55,7 @@ namespace PixelVaultNative
         public string[] PlatformTags { get; set; } = new string[0];
         public string SteamAppId { get; set; } = string.Empty;
         public string NonSteamId { get; set; } = string.Empty;
+        public string RobloxPlaceId { get; set; } = string.Empty;
         public string GameTitleHint { get; set; } = string.Empty;
         public DateTime? CaptureTime { get; set; }
         public bool PreserveFileTimes { get; set; }

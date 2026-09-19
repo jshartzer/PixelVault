@@ -27,6 +27,8 @@ namespace PixelVaultNative
             public bool ProgressKnown;
             public bool Unlocked;
             public long UnlockUtcTicks;
+            /// <summary>Provider-supplied global unlock percentage, when available. This is rarity, not difficulty.</summary>
+            public double? GlobalUnlockPercent;
             /// <summary>Steam achievement API name (schema <c>name</c>); empty for RetroAchievements rows.</summary>
             public string SteamApiName;
             /// <summary>Whether the provider marks the achievement as hidden.</summary>
@@ -35,6 +37,10 @@ namespace PixelVaultNative
             public string IconUrlColor;
             /// <summary>Steam locked icon hash URL when available; otherwise empty (UI may grayscale <see cref="IconUrlColor"/>).</summary>
             public string IconUrlGray;
+            /// <summary>Optional locally curated achievement set, such as Base Game or a DLC name.</summary>
+            public string GroupName;
+            /// <summary>Locally curated display order for <see cref="GroupName"/>. Lower values appear first.</summary>
+            public int GroupSortOrder;
 
             public bool HasStableProviderIdentity =>
                 !string.IsNullOrWhiteSpace(Provider)
@@ -52,6 +58,7 @@ namespace PixelVaultNative
             public string DetailLine;
             public List<AchievementRow> Rows;
             public string ErrorMessage;
+            public string ProgressErrorMessage;
             /// <summary>Steam <c>playtime_forever</c> from <see cref="TryLoadSteamOwnedGamePlaytimeMinutesAsync"/> (minutes).</summary>
             public int? SteamPlaytimeMinutes;
             /// <summary>Achievements unlocked by the player whose Steam global completion rate is at or below <see cref="SteamRareAchievementMaxPercent"/>.</summary>
@@ -242,6 +249,8 @@ namespace PixelVaultNative
                     var root = doc.RootElement;
                     if (!root.TryGetProperty("playerstats", out var ps))
                         return null;
+                    if (ps.TryGetProperty("success", out var success) && success.ValueKind == JsonValueKind.False)
+                        return null;
                     if (ps.TryGetProperty("error", out var errEl) && errEl.ValueKind == JsonValueKind.String)
                     {
                         var err = errEl.GetString();
@@ -255,11 +264,12 @@ namespace PixelVaultNative
                     {
                         var apiName = ReadString(row, "apiname", "name");
                         if (string.IsNullOrWhiteSpace(apiName)) continue;
-                        var achieved = 0;
+                        var achieved = -1;
                         if (row.TryGetProperty("achieved", out var ach))
                         {
                             if (ach.ValueKind == JsonValueKind.Number && ach.TryGetInt32(out var ai)) achieved = ai;
                             else if (ach.ValueKind == JsonValueKind.True) achieved = 1;
+                            else if (ach.ValueKind == JsonValueKind.False) achieved = 0;
                         }
                         var unlock = 0;
                         if (row.TryGetProperty("unlocktime", out var ut) && ut.ValueKind == JsonValueKind.Number && ut.TryGetInt32(out var uti))
@@ -506,25 +516,15 @@ namespace PixelVaultNative
                             var colorUrl = ResolveSteamAchievementIconUrl(appId, icon);
                             var grayUrl = ResolveSteamAchievementIconUrl(appId, iconGray);
 
-                            // Treat unlock progress as "known" whenever SteamID64 is configured so multi-console /
-                            // merged folders still show x/y with locked badges instead of "progress unknown".
-                            // If GetPlayerAchievements fails or profile privacy blocks it (progress == null), we still
-                            // treat achievements as locked rather than stripping unlock semantics from every row.
-                            var progressKnown = progressAttempted;
-                            var unlocked = false;
-                            var unlockTicks = 0L;
-                            if (progress != null && !string.IsNullOrWhiteSpace(apiName)
-                                && progress.TryGetValue(apiName.Trim(), out var pr))
-                            {
-                                unlocked = pr.achieved != 0;
-                                unlockTicks = UnlockTicksFromUnix(pr.unlocktime);
-                            }
-                            else if (progress != null)
-                            {
-                                unlocked = false;
-                            }
+                            var playerState = ResolveSteamProgress(progress, apiName);
+                            var progressKnown = playerState.Known;
+                            var unlocked = playerState.Unlocked;
+                            var unlockTicks = playerState.UnlockUtcTicks;
 
                             var metaParts = new List<string>();
+                            var globalPercent = ResolveSteamGlobalPercent(globalPercents, apiName);
+                            if (globalPercent.HasValue)
+                                metaParts.Add(globalPercent.Value.ToString("0.##", CultureInfo.CurrentCulture) + "% global unlocks");
                             if (hidden) metaParts.Add("Hidden");
                             if (progressKnown)
                                 metaParts.Add(unlocked ? "Unlocked" : "Locked");
@@ -541,6 +541,7 @@ namespace PixelVaultNative
                                 ProgressKnown = progressKnown,
                                 Unlocked = unlocked,
                                 UnlockUtcTicks = unlockTicks,
+                                GlobalUnlockPercent = globalPercent,
                                 SteamApiName = apiName.Trim(),
                                 Hidden = hidden,
                                 IconUrlColor = colorUrl ?? string.Empty,
@@ -565,7 +566,7 @@ namespace PixelVaultNative
 
                     int? rareUnlocked = null;
                     var rarityAvailable = globalPercents != null;
-                    if (rarityAvailable)
+                    if (rarityAvailable && ordered.Count > 0 && ordered.All(row => row.ProgressKnown))
                     {
                         var rare = 0;
                         foreach (var row in ordered)
@@ -573,8 +574,8 @@ namespace PixelVaultNative
                             if (row == null || !row.ProgressKnown || !row.Unlocked) continue;
                             var key = row.SteamApiName ?? string.Empty;
                             if (string.IsNullOrWhiteSpace(key)) continue;
-                            if (globalPercents.TryGetValue(key.Trim(), out var pct)
-                                && pct <= SteamRareAchievementMaxPercent)
+                            if (AchievementCollectionStats.ValidPercent(row.GlobalUnlockPercent)
+                                && row.GlobalUnlockPercent <= SteamRareAchievementMaxPercent)
                                 rare++;
                         }
 
@@ -589,7 +590,8 @@ namespace PixelVaultNative
                         Rows = ordered,
                         SteamPlaytimeMinutes = playtimeMinutes,
                         SteamRareUnlockedCount = rareUnlocked,
-                        SteamGlobalRarityAvailable = rarityAvailable
+                        SteamGlobalRarityAvailable = rarityAvailable,
+                        ProgressErrorMessage = progressAttempted && progress == null ? "Steam player progress is unavailable. Check SteamID64 or game/profile privacy." : null
                     };
                 }
             }
@@ -597,6 +599,22 @@ namespace PixelVaultNative
             {
                 return Err("Could not read Steam achievement data (invalid JSON).");
             }
+        }
+
+        internal static (bool Known, bool Unlocked, long UnlockUtcTicks) ResolveSteamProgress(
+            Dictionary<string, (int achieved, int unlocktime)> progress, string apiName)
+        {
+            if (progress == null || string.IsNullOrWhiteSpace(apiName)
+                || !progress.TryGetValue(apiName.Trim(), out var state) || (state.achieved != 0 && state.achieved != 1))
+                return (false, false, 0);
+            return (true, state.achieved == 1, state.achieved == 1 ? UnlockTicksFromUnix(state.unlocktime) : 0);
+        }
+
+        internal static double? ResolveSteamGlobalPercent(Dictionary<string, double> percentages, string apiName)
+        {
+            return percentages != null && !string.IsNullOrWhiteSpace(apiName)
+                && percentages.TryGetValue(apiName.Trim(), out var value) && AchievementCollectionStats.ValidPercent(value)
+                ? value : (double?)null;
         }
 
         static List<AchievementRow> OrderAchievementRows(List<AchievementRow> rows)

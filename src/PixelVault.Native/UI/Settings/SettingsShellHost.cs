@@ -1,9 +1,12 @@
 using System;
 using System.Globalization;
+using System.Diagnostics;
+using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
-using System.Windows.Media.Effects;
+using System.Windows.Data;
 using PixelVaultNative.UI.Design;
 
 namespace PixelVaultNative
@@ -20,6 +23,7 @@ namespace PixelVaultNative
 
         public void ShowMainSettingsDialog()
         {
+            var opening = Stopwatch.StartNew();
             var window = new Window
             {
                 Title = "PixelVault " + d.AppVersion + " Settings",
@@ -32,14 +36,13 @@ namespace PixelVaultNative
                 Background = d.Brush("#0F1519")
             };
 
-            var previousStatus = d.GetStatusLine();
-            var previousLogBox = d.GetLogBox();
-            window.Content = BuildUi();
-            d.LoadLogView();
+            window.Content = BuildUi(window);
+            window.ContentRendered += delegate
+            {
+                d.LogTroubleshooting?.Invoke("Settings", "First render: " + opening.ElapsedMilliseconds + " ms.");
+            };
             window.Closed += delegate
             {
-                d.SetStatusLine(previousStatus);
-                d.SetLogBox(previousLogBox);
                 d.SyncIncludeGameCaptureKeywordsMirror();
             };
             window.ShowDialog();
@@ -52,26 +55,31 @@ namespace PixelVaultNative
 
         public void ShowPathSettingsDialog()
         {
+            var window = new Window
+            {
+                Title = "PixelVault " + d.AppVersion + " Configuration",
+                Width = 1000,
+                Height = PreferredSettingsWindowHeight(),
+                MinWidth = 800,
+                MinHeight = 560,
+                Owner = d.OwnerWindow,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Background = d.Brush(DesignTokens.PageBackground)
+            };
+            window.Content = BuildConfigurationUi(window, true);
+            window.ShowDialog();
+        }
+
+        Grid BuildConfigurationUi(Window window, bool closeOnSave)
+        {
             var pageBg = d.Brush(DesignTokens.PageBackground);
-            var panelBg = d.Brush(DesignTokens.PanelElevated);
             var borderBrush = d.Brush(DesignTokens.BorderDefault);
             var labelFg = d.Brush(DesignTokens.TextLabelMuted);
             var boxBg = d.Brush(DesignTokens.InputBackground);
             var boxFg = d.Brush(DesignTokens.TextOnInput);
 
-            var window = new Window
-            {
-                Title = "PixelVault " + d.AppVersion + " Path Settings",
-                Width = 780,
-                Height = 860,
-                MinWidth = 640,
-                MinHeight = 560,
-                Owner = d.OwnerWindow,
-                WindowStartupLocation = WindowStartupLocation.CenterOwner,
-                Background = pageBg
-            };
-
-            var root = new Grid { Margin = new Thickness(24), Background = panelBg };
+            var root = new Grid { Margin = new Thickness(24), Background = pageBg };
+            root.SetValue(System.Windows.Documents.TextElement.FontSizeProperty, 13d);
             root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             var panel = new Grid();
@@ -115,11 +123,11 @@ namespace PixelVaultNative
             SettingsBrowseButton(panel, 2, delegate { var picked = d.PickFolder(libraryBox.Text); if (!string.IsNullOrWhiteSpace(picked)) libraryBox.Text = picked; });
             SettingsBrowseButton(panel, 3, delegate { var picked = d.PickFile(exifBox.Text, "Executable (*.exe)|*.exe|All files (*.*)|*.*", null); if (!string.IsNullOrWhiteSpace(picked)) exifBox.Text = picked; });
             SettingsBrowseButton(panel, 4, delegate { var picked = d.PickFile(ffmpegBox.Text, "Executable (*.exe)|*.exe|All files (*.*)|*.*", null); if (!string.IsNullOrWhiteSpace(picked)) ffmpegBox.Text = picked; });
-            var igdbActions = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 12, 12, 0) };
-            var igdbProbeButton = d.Btn("Test IGDB fields", null, DesignTokens.ActionSecondaryFill, Brushes.White);
+            var igdbActions = new WrapPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 12, 12, 0) };
+            var igdbProbeButton = SettingsButton("Test IGDB fields", null, DesignTokens.ActionSecondaryFill, Brushes.White);
             igdbProbeButton.ToolTip = "Fetches a Twitch app token and runs a tiny IGDB games query for Portal, then writes the returned field paths to Run history.";
             igdbProbeButton.Width = 150;
-            var igdbRefreshButton = d.Btn("Refresh IGDB cache", null, DesignTokens.ActionPrimaryFill, Brushes.White);
+            var igdbRefreshButton = SettingsButton("Refresh IGDB cache", null, DesignTokens.ActionPrimaryFill, Brushes.White);
             igdbRefreshButton.Margin = new Thickness(10, 0, 0, 0);
             igdbRefreshButton.Width = 180;
             igdbRefreshButton.ToolTip = "Refresh locally stored IGDB summary, release year, developer, series, and cover metadata for saved game-index rows. Profiles use this local data when they open.";
@@ -302,23 +310,23 @@ namespace PixelVaultNative
             while (panel.RowDefinitions.Count <= 23) panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             panel.Children.Add(promptOnCloseBox);
 
-            var pathScroll = new ScrollViewer
-            {
-                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
-                Content = panel
-            };
-            Grid.SetRow(pathScroll, 0);
-            root.Children.Add(pathScroll);
-            var buttons = new WrapPanel { Margin = new Thickness(0, 18, 0, 0) };
-            var save = d.Btn("Save Settings", null, DesignTokens.ActionPrimaryFill, Brushes.White);
+            var tabs = CreateSettingsTabs();
+            AddConfigurationPage(tabs, panel, "Folders & tools", "Choose where captures come from, where they go, and the tools used to process them.", new[] { 0, 1, 2, 13, 3, 4 });
+            AddConfigurationPage(tabs, panel, "Accounts", "Connect artwork and achievement services. Credentials are saved locally.", new[] { 5, 6, 8, 7, 9, 10, 11, 12 });
+            AddConfigurationPage(tabs, panel, "Import & tray", "Control folder scanning, automatic imports, and how PixelVault runs in the background.", Enumerable.Range(14, 10).ToArray());
+            root.Children.Add(tabs);
+            var buttons = new WrapPanel { Margin = new Thickness(0, 18, 0, 0), HorizontalAlignment = HorizontalAlignment.Right };
+            var save = SettingsButton("Save Settings", null, DesignTokens.ActionPrimaryFill, Brushes.White);
             save.Margin = new Thickness(0, 0, 12, 0);
-            var cancel = d.Btn("Cancel", null, DesignTokens.ActionSecondaryFill, Brushes.White);
+            tabs.SelectionChanged += (_, e) =>
+            {
+                if (ReferenceEquals(e.Source, tabs)) save.Visibility = tabs.SelectedIndex < 3 ? Visibility.Visible : Visibility.Collapsed;
+            };
+            var cancel = SettingsButton(closeOnSave ? "Cancel" : "Close", null, DesignTokens.ActionSecondaryFill, Brushes.White);
             buttons.Children.Add(save);
             buttons.Children.Add(cancel);
             Grid.SetRow(buttons, 1);
             root.Children.Add(buttons);
-            window.Content = root;
 
             save.Click += delegate
             {
@@ -349,172 +357,202 @@ namespace PixelVaultNative
                 d.SetSystemTrayPromptOnCloseEnabled(promptOnCloseBox.IsChecked == true);
                 d.SaveSettings();
                 d.RefreshMainUi();
-                window.Close();
+                if (closeOnSave) window.Close();
                 d.Log("Settings saved.");
+                save.Content = "Saved";
             };
+            root.AddHandler(TextBox.TextChangedEvent, new TextChangedEventHandler((_, __) => save.Content = "Save Settings"));
+            root.AddHandler(CheckBox.CheckedEvent, new RoutedEventHandler((_, __) => save.Content = "Save Settings"));
+            root.AddHandler(CheckBox.UncheckedEvent, new RoutedEventHandler((_, __) => save.Content = "Save Settings"));
             cancel.Click += delegate { window.Close(); };
-            window.ShowDialog();
-        }
-
-        UIElement BuildUi()
-        {
-            var pageBg = d.Brush("#0F1519");
-            var cardBg = d.Brush("#141B20");
-            var cardBorder = d.Brush("#27313A");
-            var textPrimary = d.Brush("#F4F7FA");
-            var textMuted = d.Brush("#8FA1AD");
-            var textSoft = d.Brush("#A7B5BD");
-            var accentHeader = d.Brush("#161E24");
-
-            var root = new Grid { Margin = new Thickness(20), Background = pageBg };
-            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-
-            var header = new Border
-            {
-                Background = accentHeader,
-                BorderBrush = cardBorder,
-                BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(20),
-                Padding = new Thickness(22),
-                Margin = new Thickness(0, 0, 0, 16)
-            };
-            var headerGrid = new Grid();
-            headerGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            headerGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            headerGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            var hs = new StackPanel();
-            hs.Children.Add(new TextBlock { Text = "PixelVault Settings", FontSize = 28, FontWeight = FontWeights.SemiBold, Foreground = textPrimary });
-            hs.Children.Add(new TextBlock
-            {
-                Text = "Paths, health, and logs here; editors and storage merge live in the panel below. Import and queue review stay on the Library toolbar.",
-                Margin = new Thickness(0, 8, 0, 0),
-                Foreground = textSoft,
-                FontSize = 14,
-                TextWrapping = TextWrapping.Wrap
-            });
-            var statusLocal = new TextBlock { Text = "Ready", Foreground = textPrimary, VerticalAlignment = VerticalAlignment.Center };
-            d.SetStatusLine(statusLocal);
-            var quickActions = new WrapPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 14, 0, 0) };
-            Action<Button> styleHeaderBtn = delegate(Button b) { b.Margin = new Thickness(0, 0, 10, 8); };
-            var pathSettingsTopButton = d.Btn("Path Settings", delegate { d.OpenPathSettingsDialog?.Invoke(); }, DesignTokens.ActionPrimaryFill, Brushes.White);
-            styleHeaderBtn(pathSettingsTopButton);
-            Button exportStarredTopButton = null;
-            exportStarredTopButton = d.Btn("Export Starred", delegate { d.ExportStarredLibraryCaptures?.Invoke(Window.GetWindow(exportStarredTopButton) ?? d.OwnerWindow); }, DesignTokens.ActionSecondaryFill, Brushes.White);
-            exportStarredTopButton.ToolTip = "Copy starred captures to the folder in Path Settings (not the library folder). Files are placed in subfolders mirroring the library layout.";
-            exportStarredTopButton.IsEnabled = d.ExportStarredLibraryCaptures != null;
-            styleHeaderBtn(exportStarredTopButton);
-            var healthTopButton = d.Btn("Setup & health", delegate { ShowHealthDashboardDialog(); }, DesignTokens.ActionSecondaryFill, Brushes.White);
-            styleHeaderBtn(healthTopButton);
-            var viewLogsTopButton = d.Btn("View Logs", delegate { d.OpenFolder(d.LogsRoot); }, DesignTokens.ActionSecondaryFill, Brushes.White);
-            styleHeaderBtn(viewLogsTopButton);
-            quickActions.Children.Add(pathSettingsTopButton);
-            quickActions.Children.Add(exportStarredTopButton);
-            quickActions.Children.Add(healthTopButton);
-            quickActions.Children.Add(viewLogsTopButton);
-            var statusBar = new Border
-            {
-                Child = statusLocal,
-                Background = d.Brush("#1A242C"),
-                BorderBrush = cardBorder,
-                BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(12),
-                Padding = new Thickness(14, 10, 14, 10),
-                Margin = new Thickness(0, 10, 0, 0),
-                HorizontalAlignment = HorizontalAlignment.Stretch
-            };
-            Grid.SetRow(hs, 0);
-            headerGrid.Children.Add(hs);
-            Grid.SetRow(quickActions, 1);
-            headerGrid.Children.Add(quickActions);
-            Grid.SetRow(statusBar, 2);
-            headerGrid.Children.Add(statusBar);
-            header.Child = headerGrid;
-            root.Children.Add(header);
-
-            var main = new Grid();
-            main.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.55, GridUnitType.Star) });
-            main.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            Grid.SetRow(main, 1);
-            root.Children.Add(main);
-
-            var left = SettingsCardSurface(cardBg, cardBorder);
-            left.Margin = new Thickness(0, 0, 14, 0);
-            var leftScroll = new ScrollViewer
-            {
-                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
-                Padding = new Thickness(16, 4, 12, 12)
-            };
-            var leftStack = new StackPanel();
-            leftStack.Children.Add(TitleBlock("Overview", textPrimary));
-            leftStack.Children.Add(new TextBlock
-            {
-                Text = "Path Settings (header) opens the full dialog for folders and credentials. Use Library tools for editors, cover fetch, and merging storage folders.",
-                Foreground = textMuted,
-                Margin = new Thickness(0, 0, 0, 12),
-                TextWrapping = TextWrapping.Wrap
-            });
-            leftStack.Children.Add(BuildLibraryToolsCard(cardBg, cardBorder, textPrimary, textMuted));
-            leftStack.Children.Add(BuildSettingsSummary(cardBg, cardBorder, textPrimary, textMuted));
-            leftStack.Children.Add(BuildLibraryBehaviorSummary(cardBg, cardBorder, textPrimary, textMuted));
-            leftStack.Children.Add(BuildDiagnosticsSummary(cardBg, cardBorder, textPrimary, textMuted, textSoft));
-            leftScroll.Content = leftStack;
-            left.Child = leftScroll;
-            main.Children.Add(left);
-
-            var right = new Border
-            {
-                Background = d.Brush("#111820"),
-                BorderBrush = cardBorder,
-                BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(18),
-                Padding = new Thickness(14)
-            };
-            var rightGrid = new Grid();
-            rightGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            rightGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-            rightGrid.Children.Add(new TextBlock { Text = "Run history", FontSize = 18, FontWeight = FontWeights.SemiBold, Foreground = d.Brush("#E8EEF2"), Margin = new Thickness(0, 0, 0, 8) });
-            var logBoxLocal = new TextBox
-            {
-                IsReadOnly = true,
-                AcceptsReturn = true,
-                TextWrapping = TextWrapping.Wrap,
-                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
-                BorderThickness = new Thickness(1),
-                BorderBrush = d.Brush("#26313A"),
-                Background = d.Brush("#0D1218"),
-                Foreground = d.Brush("#D8E4EA"),
-                CaretBrush = d.Brush("#D8E4EA"),
-                FontFamily = new FontFamily("Cascadia Mono")
-            };
-            d.SetLogBox(logBoxLocal);
-            Grid.SetRow(logBoxLocal, 1);
-            rightGrid.Children.Add(logBoxLocal);
-            right.Child = rightGrid;
-            Grid.SetColumn(right, 1);
-            main.Children.Add(right);
-
             return root;
         }
 
-        static Border SettingsCardSurface(Brush bg, Brush border)
+        UIElement BuildUi(Window window)
         {
-            return new Border
+            var cardBg = d.Brush(DesignTokens.PanelElevated);
+            var cardBorder = d.Brush(DesignTokens.BorderDefault);
+            var textPrimary = d.Brush(DesignTokens.TextOnInput);
+            var textMuted = d.Brush(DesignTokens.TextLabelMuted);
+            var root = BuildConfigurationUi(window, false);
+            var tabs = root.Children.OfType<TabControl>().Single();
+            root.RowDefinitions.Insert(0, new RowDefinition { Height = GridLength.Auto });
+            foreach (UIElement child in root.Children) Grid.SetRow(child, Grid.GetRow(child) + 1);
+            var heading = new StackPanel { Margin = new Thickness(0, 0, 0, 18) };
+            heading.Children.Add(new TextBlock { Text = "Settings", FontSize = 28, FontWeight = FontWeights.SemiBold, Foreground = textPrimary });
+            heading.Children.Add(new TextBlock { Text = "Make PixelVault work your way.", Foreground = textMuted, Margin = new Thickness(0, 6, 0, 0) });
+            root.Children.Add(heading);
+            AddLazyPage(tabs, "Library", () =>
             {
-                Background = bg,
-                BorderBrush = border,
-                BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(18),
-                Effect = new DropShadowEffect { Color = Color.FromArgb(48, 0, 0, 0), BlurRadius = 20, ShadowDepth = 3, Direction = 270, Opacity = 0.35 }
+                var stack = new StackPanel();
+                stack.Children.Add(BuildLibraryToolsCard(cardBg, cardBorder, textPrimary, textMuted));
+                var export = SettingsButton("Export Starred", null, DesignTokens.ActionSecondaryFill, Brushes.White);
+                export.HorizontalAlignment = HorizontalAlignment.Left;
+                export.IsEnabled = d.ExportStarredLibraryCaptures != null;
+                export.Click += delegate { d.ExportStarredLibraryCaptures?.Invoke(window); };
+                export.ToolTip = "Copy starred captures to the saved starred export folder, preserving library subfolders.";
+                stack.Children.Add(export);
+                stack.Children.Add(BuildLibraryBehaviorSummary(cardBg, cardBorder, textPrimary, textMuted));
+                stack.Children.Add(new TextBlock { Text = "Library preferences save immediately.", Foreground = textMuted, Margin = new Thickness(0, 12, 0, 0) });
+                return ScrollPage(stack);
+            });
+            AddLazyPage(tabs, "Diagnostics", () =>
+            {
+                var stack = new StackPanel();
+                var health = SettingsButton("Setup & health", delegate { HealthDashboardWindow.ShowDialog(window, d); }, DesignTokens.ActionSecondaryFill, Brushes.White);
+                health.HorizontalAlignment = HorizontalAlignment.Left;
+                stack.Children.Add(health);
+                stack.Children.Add(BuildDiagnosticsSummary(cardBg, cardBorder, textPrimary, textMuted, textMuted));
+                stack.Children.Add(new TextBlock { Text = "Diagnostics preferences save immediately.", Foreground = textMuted, Margin = new Thickness(0, 12, 0, 0) });
+                return ScrollPage(stack);
+            });
+            AddLazyPage(tabs, "Run history", () => BuildHistoryPage(window));
+            return root;
+        }
+
+        TabControl CreateSettingsTabs()
+        {
+            var tabs = new TabControl { Background = Brushes.Transparent, BorderThickness = new Thickness(0), Padding = new Thickness(0), TabStripPlacement = Dock.Top };
+            var style = new Style(typeof(TabItem));
+            style.Setters.Add(new Setter(Control.ForegroundProperty, d.Brush(DesignTokens.TextLabelMuted)));
+            style.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(16, 11, 16, 11)));
+            var template = new ControlTemplate(typeof(TabItem));
+            var border = new FrameworkElementFactory(typeof(Border));
+            border.Name = "TabSurface";
+            border.SetValue(Border.CornerRadiusProperty, new CornerRadius(8, 8, 0, 0));
+            border.SetValue(Border.MarginProperty, new Thickness(0, 0, 4, 0));
+            border.SetBinding(Border.PaddingProperty, new Binding("Padding") { RelativeSource = RelativeSource.TemplatedParent });
+            var content = new FrameworkElementFactory(typeof(ContentPresenter));
+            content.SetValue(ContentPresenter.ContentSourceProperty, "Header");
+            content.SetValue(ContentPresenter.RecognizesAccessKeyProperty, true);
+            border.AppendChild(content);
+            template.VisualTree = border;
+            var selected = new Trigger { Property = TabItem.IsSelectedProperty, Value = true };
+            selected.Setters.Add(new Setter(Border.BackgroundProperty, d.Brush(DesignTokens.PanelElevated), "TabSurface"));
+            selected.Setters.Add(new Setter(Control.ForegroundProperty, d.Brush(DesignTokens.TextOnInput)));
+            selected.Setters.Add(new Setter(Control.FontWeightProperty, FontWeights.SemiBold));
+            template.Triggers.Add(selected);
+            var hover = new Trigger { Property = UIElement.IsMouseOverProperty, Value = true };
+            hover.Setters.Add(new Setter(Border.BackgroundProperty, d.Brush("#263B49"), "TabSurface"));
+            template.Triggers.Add(hover);
+            var focus = new Trigger { Property = UIElement.IsKeyboardFocusedProperty, Value = true };
+            focus.Setters.Add(new Setter(Border.BorderBrushProperty, d.Brush("#77BDE8"), "TabSurface"));
+            focus.Setters.Add(new Setter(Border.BorderThicknessProperty, new Thickness(0, 0, 0, 2), "TabSurface"));
+            template.Triggers.Add(focus);
+            style.Setters.Add(new Setter(Control.TemplateProperty, template));
+            tabs.ItemContainerStyle = style;
+            return tabs;
+        }
+
+        void AddConfigurationPage(TabControl tabs, Grid source, string title, string description, int[] rows)
+        {
+            var page = new Grid();
+            page.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(235) });
+            page.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            page.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            foreach (var row in rows)
+            {
+                var targetRow = page.RowDefinitions.Count;
+                page.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                foreach (var child in source.Children.Cast<UIElement>().Where(c => Grid.GetRow(c) == row).ToArray())
+                {
+                    source.Children.Remove(child);
+                    Grid.SetRow(child, targetRow);
+                    if (child is TextBlock label) label.TextWrapping = TextWrapping.Wrap;
+                    if (child is CheckBox check && check.Content is string text)
+                        check.Content = new TextBlock { Text = text, TextWrapping = TextWrapping.Wrap };
+                    page.Children.Add(child);
+                }
+            }
+            var stack = new StackPanel();
+            stack.Children.Add(TitleBlock(title, d.Brush(DesignTokens.TextOnInput)));
+            stack.Children.Add(new TextBlock { Text = description, TextWrapping = TextWrapping.Wrap, Foreground = d.Brush(DesignTokens.TextLabelMuted), Margin = new Thickness(0, 0, 0, 16) });
+            stack.Children.Add(page);
+            tabs.Items.Add(new TabItem { Header = title, Content = ScrollPage(stack) });
+        }
+
+        UIElement ScrollPage(UIElement content)
+        {
+            return new ScrollViewer
+            {
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                Content = new Border
+                {
+                    Background = d.Brush(DesignTokens.PanelElevated), BorderBrush = d.Brush(DesignTokens.BorderDefault),
+                    BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(8), Padding = new Thickness(20), Child = content
+                },
+                Margin = new Thickness(0, 12, 0, 0)
             };
+        }
+
+        static void AddLazyPage(TabControl tabs, string title, Func<UIElement> build)
+        {
+            var tab = new TabItem { Header = title };
+            tabs.SelectionChanged += (_, e) =>
+            {
+                if (ReferenceEquals(e.Source, tabs) && ReferenceEquals(tabs.SelectedItem, tab) && tab.Content == null)
+                    tab.Content = build();
+            };
+            tabs.Items.Add(tab);
+        }
+
+        UIElement BuildHistoryPage(Window window)
+        {
+            var grid = new Grid { Margin = new Thickness(0, 12, 0, 0) };
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            var actions = new WrapPanel();
+            var refresh = SettingsButton("Refresh history", null, DesignTokens.ActionSecondaryFill, Brushes.White);
+            var open = SettingsButton("Open logs folder", delegate { d.OpenFolder(d.LogsRoot); }, DesignTokens.ActionSecondaryFill, Brushes.White);
+            open.Margin = new Thickness(10, 0, 0, 0);
+            actions.Children.Add(refresh);
+            actions.Children.Add(open);
+            grid.Children.Add(actions);
+            var state = new TextBlock { Text = "Recent history loads when this tab opens. Use Refresh history for new entries.", TextWrapping = TextWrapping.Wrap, Foreground = d.Brush(DesignTokens.TextLabelMuted), Margin = new Thickness(0, 12, 0, 12) };
+            Grid.SetRow(state, 1);
+            grid.Children.Add(state);
+            var history = new TextBox
+            {
+                IsReadOnly = true, AcceptsReturn = true, TextWrapping = TextWrapping.NoWrap,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+                Background = d.Brush(DesignTokens.InputBackground), Foreground = d.Brush(DesignTokens.TextOnInput),
+                BorderBrush = d.Brush(DesignTokens.BorderDefault), Padding = new Thickness(12), FontFamily = new FontFamily("Consolas"), FontSize = 12
+            };
+            System.Windows.Automation.AutomationProperties.SetName(history, "Recent run history");
+            Grid.SetRow(history, 2);
+            grid.Children.Add(history);
+            var closed = false;
+            window.Closed += delegate { closed = true; };
+            async Task Reload()
+            {
+                if (!refresh.IsEnabled || closed) return;
+                refresh.IsEnabled = false;
+                state.Text = "Loading recent history…";
+                try
+                {
+                    var path = d.LogFilePath();
+                    var text = await Task.Run(() => TroubleshootingLog.ReadRecentHistory(path));
+                    if (closed) return;
+                    history.Text = text;
+                    history.ScrollToEnd();
+                    state.Text = text.Length == 0 ? "No run history yet." : "Recent history · up to 64 KB. Refresh for new entries, or open the logs folder for the complete file.";
+                }
+                catch (Exception ex)
+                {
+                    if (!closed) state.Text = "Could not load history: " + ex.Message;
+                }
+                finally { if (!closed) refresh.IsEnabled = true; }
+            }
+            refresh.Click += async delegate { await Reload(); };
+            grid.Loaded += async delegate { await Reload(); };
+            return grid;
         }
 
         static double PreferredSettingsWindowHeight()
         {
             var available = Math.Max(600, SystemParameters.WorkArea.Height - 32);
-            return Math.Min(available, 1200);
+            return Math.Min(available, 860);
         }
 
         static TextBlock TitleBlock(string title, Brush foreground)
@@ -536,29 +574,29 @@ namespace PixelVaultNative
             });
             var wrap = new WrapPanel { Orientation = Orientation.Horizontal };
             Action<Button> styleToolBtn = delegate(Button b) { b.Margin = new Thickness(0, 0, 10, 8); };
-            var gameIndexBtn = d.Btn("Game Index", delegate { d.OpenGameIndexEditor(); }, DesignTokens.ActionSecondaryFill, Brushes.White);
+            var gameIndexBtn = SettingsButton("Game Index", delegate { d.OpenGameIndexEditor(); }, DesignTokens.ActionSecondaryFill, Brushes.White);
             styleToolBtn(gameIndexBtn);
-            var photoIndexBtn = d.Btn("Photo Index", delegate { d.OpenPhotoIndexEditor(); }, DesignTokens.ActionSecondaryFill, Brushes.White);
+            var photoIndexBtn = SettingsButton("Photo Index", delegate { d.OpenPhotoIndexEditor(); }, DesignTokens.ActionSecondaryFill, Brushes.White);
             styleToolBtn(photoIndexBtn);
-            var mergeBtn = d.Btn("Merge folders", delegate { d.OpenLibraryStorageMergeTool?.Invoke(d.OwnerWindow); }, DesignTokens.ActionShortcutDismissFill, Brushes.White);
+            var mergeBtn = SettingsButton("Merge folders", delegate { d.OpenLibraryStorageMergeTool?.Invoke(d.OwnerWindow); }, DesignTokens.ActionShortcutDismissFill, Brushes.White);
             mergeBtn.ToolTip = "Preview and apply moving captures into shared storage folders (same storage group).";
             styleToolBtn(mergeBtn);
-            var myCoversBtn = d.Btn("My Covers", delegate { d.OpenSavedCoversFolder(); }, DesignTokens.ActionSecondaryFill, Brushes.White);
+            var myCoversBtn = SettingsButton("My Covers", delegate { d.OpenSavedCoversFolder(); }, DesignTokens.ActionSecondaryFill, Brushes.White);
             styleToolBtn(myCoversBtn);
-            var photoGalleryBtn = d.Btn("Photography", delegate { d.ShowPhotographyGallery(d.OwnerWindow); }, DesignTokens.ActionSecondaryFill, Brushes.White);
+            var photoGalleryBtn = SettingsButton("Photography", delegate { d.ShowPhotographyGallery(d.OwnerWindow); }, DesignTokens.ActionSecondaryFill, Brushes.White);
             photoGalleryBtn.ToolTip = "Browse captures tagged for game photography";
             styleToolBtn(photoGalleryBtn);
-            var renameBtn = d.Btn("Renaming rules", delegate { d.OpenFilenameConventionEditor(); }, DesignTokens.ActionSecondaryFill, Brushes.White);
+            var renameBtn = SettingsButton("Renaming rules", delegate { d.OpenFilenameConventionEditor(); }, DesignTokens.ActionSecondaryFill, Brushes.White);
             renameBtn.ToolTip = "How capture filenames are parsed for imports and grouping";
             styleToolBtn(renameBtn);
-            var fetchCoversBtn = d.Btn(
+            var fetchCoversBtn = SettingsButton(
                 "Fetch covers",
                 delegate { d.PromptFetchCoversForLibrary?.Invoke(d.OwnerWindow); },
                 DesignTokens.ActionShortcutDismissFill,
                 Brushes.White);
             fetchCoversBtn.ToolTip = "Resolve IDs and download cover art for the whole library (occasional maintenance)";
             styleToolBtn(fetchCoversBtn);
-            var changelogBtn = d.Btn("Changelog", delegate { ChangelogWindow.ShowDialog(d.OwnerWindow, d.AppVersion, d.ChangelogPath); }, DesignTokens.ActionSecondaryFill, Brushes.White);
+            var changelogBtn = SettingsButton("Changelog", delegate { ChangelogWindow.ShowDialog(d.OwnerWindow, d.AppVersion, d.ChangelogPath); }, DesignTokens.ActionSecondaryFill, Brushes.White);
             styleToolBtn(changelogBtn);
             wrap.Children.Add(gameIndexBtn);
             wrap.Children.Add(photoIndexBtn);
@@ -569,42 +607,6 @@ namespace PixelVaultNative
             wrap.Children.Add(fetchCoversBtn);
             wrap.Children.Add(changelogBtn);
             stack.Children.Add(wrap);
-            border.Child = stack;
-            return border;
-        }
-
-        Border BuildSettingsSummary(Brush cardBg, Brush cardBorder, Brush textPrimary, Brush textMuted)
-        {
-            var border = new Border { Background = cardBg, CornerRadius = new CornerRadius(14), Padding = new Thickness(14), BorderBrush = cardBorder, BorderThickness = new Thickness(1) };
-            var stack = new StackPanel();
-            stack.Children.Add(new TextBlock { Text = "Paths & credentials", FontWeight = FontWeights.SemiBold, Foreground = textPrimary, Margin = new Thickness(0, 0, 0, 8) });
-            stack.Children.Add(new TextBlock { Text = "Sources: " + d.SourceRootsSummary(), TextWrapping = TextWrapping.Wrap, Foreground = textMuted, Margin = new Thickness(0, 0, 0, 4) });
-            stack.Children.Add(new TextBlock { Text = "Destination: " + d.GetDestinationRoot(), TextWrapping = TextWrapping.Wrap, Foreground = textMuted, Margin = new Thickness(0, 0, 0, 4) });
-            stack.Children.Add(new TextBlock { Text = "Library: " + d.GetLibraryWorkspaceRoot(), TextWrapping = TextWrapping.Wrap, Foreground = textMuted, Margin = new Thickness(0, 0, 0, 4) });
-            stack.Children.Add(new TextBlock { Text = "My Covers: " + d.GetSavedCoversRoot(), TextWrapping = TextWrapping.Wrap, Foreground = textMuted, Margin = new Thickness(0, 0, 0, 4) });
-            stack.Children.Add(new TextBlock { Text = "ExifTool: " + d.GetExifToolPath(), TextWrapping = TextWrapping.Wrap, Foreground = textMuted, Margin = new Thickness(0, 0, 0, 4) });
-            stack.Children.Add(new TextBlock
-            {
-                Text = "FFmpeg: " + (string.IsNullOrWhiteSpace(d.GetFfmpegPath())
-                    ? "(optional video add-on not configured — install FFmpeg separately for video thumbnails, clip previews, and richer clip details)"
-                    : d.GetFfmpegPath()),
-                TextWrapping = TextWrapping.Wrap,
-                Foreground = textMuted,
-                Margin = new Thickness(0, 0, 0, 4)
-            });
-            stack.Children.Add(new TextBlock
-            {
-                Text = "Import scan scope: " + ((d.GetImportSearchSubfoldersForRename?.Invoke() ?? false) ? "includes source subfolders" : "top-level only"),
-                TextWrapping = TextWrapping.Wrap,
-                Foreground = textMuted,
-                Margin = new Thickness(0, 0, 0, 4)
-            });
-            stack.Children.Add(new TextBlock { Text = "SteamGridDB: " + (d.HasSteamGridDbApiToken() ? "token configured" : "(token not configured)"), TextWrapping = TextWrapping.Wrap, Foreground = textMuted });
-            stack.Children.Add(new TextBlock { Text = "Steam Web API: " + ((d.HasSteamWebApiKey?.Invoke() ?? false) ? "key configured" : "(not configured)"), TextWrapping = TextWrapping.Wrap, Foreground = textMuted, Margin = new Thickness(0, 4, 0, 0) });
-            stack.Children.Add(new TextBlock { Text = "RetroAchievements: " + ((d.HasRetroAchievementsApiKey?.Invoke() ?? false) ? "API key configured" : "(not configured)"), TextWrapping = TextWrapping.Wrap, Foreground = textMuted, Margin = new Thickness(0, 4, 0, 0) });
-            stack.Children.Add(new TextBlock { Text = "IGDB: " + ((d.HasIgdbCredentials?.Invoke() ?? false) ? "Twitch app credentials configured" : "(not configured)"), TextWrapping = TextWrapping.Wrap, Foreground = textMuted, Margin = new Thickness(0, 4, 0, 0) });
-            stack.Children.Add(new TextBlock { Text = "Steam user (achievements): " + (string.IsNullOrWhiteSpace(d.GetSteamUserId64?.Invoke()) ? "(not set)" : "SteamID64 set"), TextWrapping = TextWrapping.Wrap, Foreground = textMuted, Margin = new Thickness(0, 4, 0, 0) });
-            stack.Children.Add(new TextBlock { Text = "RetroAchievements user: " + (string.IsNullOrWhiteSpace(d.GetRetroAchievementsUsername?.Invoke()) ? "(not set)" : "username set"), TextWrapping = TextWrapping.Wrap, Foreground = textMuted, Margin = new Thickness(0, 4, 0, 0) });
             border.Child = stack;
             return border;
         }
@@ -673,7 +675,7 @@ namespace PixelVaultNative
             var border = new Border { Background = cardBg, CornerRadius = new CornerRadius(14), Padding = new Thickness(14), BorderBrush = cardBorder, BorderThickness = new Thickness(1), Margin = new Thickness(0, 14, 0, 0) };
             var stack = new StackPanel();
             stack.Children.Add(new TextBlock { Text = "Diagnostics", FontWeight = FontWeights.SemiBold, Foreground = textPrimary, Margin = new Thickness(0, 0, 0, 8) });
-            stack.Children.Add(new TextBlock { Text = "Optional extra logging for library and UI timing. Separate from the run history on the right.", Foreground = textMuted, Margin = new Thickness(0, 0, 0, 10), TextWrapping = TextWrapping.Wrap });
+            stack.Children.Add(new TextBlock { Text = "Optional extra logging for library and UI timing. Run history is available in its own tab.", Foreground = textMuted, Margin = new Thickness(0, 0, 0, 10), TextWrapping = TextWrapping.Wrap });
             stack.Children.Add(new TextBlock { Text = "Troubleshooting lines: [UTC] DIAG | S<session> | T<thread> | <Area> | <message>. Session id is fixed for one window instance; use it to grep a single run. Logs are UTC. Large troubleshooting files rotate automatically.", Foreground = textSoft, Margin = new Thickness(0, 0, 0, 10), TextWrapping = TextWrapping.Wrap });
             var enableTroubleshootingBox = new CheckBox { Content = "Enable troubleshooting logging", IsChecked = d.GetTroubleshootingLoggingEnabled(), Margin = new Thickness(0, 0, 0, 8), Foreground = textPrimary };
             enableTroubleshootingBox.Checked += delegate
@@ -731,9 +733,22 @@ namespace PixelVaultNative
             return box;
         }
 
+        Button SettingsButton(string title, RoutedEventHandler click, string background, Brush foreground)
+        {
+            var button = d.Btn(title, click, background ?? DesignTokens.ActionSecondaryFill, background == null ? Brushes.White : foreground);
+            button.Width = double.NaN;
+            button.MinWidth = 88;
+            button.Height = 36;
+            button.Padding = new Thickness(14, 6, 14, 6);
+            button.Margin = new Thickness(0);
+            button.Effect = null;
+            button.VerticalAlignment = VerticalAlignment.Center;
+            return button;
+        }
+
         void SettingsBrowseButton(Grid panel, int row, RoutedEventHandler click, string label = "Browse")
         {
-            var button = d.Btn(label, click, null, Brushes.Black);
+            var button = SettingsButton(label, click, null, Brushes.Black);
             button.Margin = new Thickness(0, row == 0 ? 0 : 12, 0, 0);
             Grid.SetRow(button, row);
             Grid.SetColumn(button, 2);

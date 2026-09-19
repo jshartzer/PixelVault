@@ -69,7 +69,8 @@ namespace PixelVaultNative
                 coverService,
                 gameIndexEditorAssignmentService,
                 logService));
-            var intakeAnalysisService = new IntakeAnalysisService(host.ParseFilename, IsVideo, host.GetLibraryDate, metadataService.ReadEmbeddedMetadataBatch, host.GetImportFolderTitleHint);
+            var intakeAnalysisService = new IntakeAnalysisService(host.ParseFilename, IsVideo, host.GetLibraryDate, metadataService.ReadEmbeddedMetadataBatch, host.GetImportFolderTitleHint,
+                (placeId, ct) => RobloxExperienceService.Shared.ResolveTitleAsync(placeId, ct).GetAwaiter().GetResult());
             var intakePipeline = new IntakePipeline(importService, fileSystemService, intakeAnalysisService);
             var libraryWorkspace = new LibraryWorkspaceContext(host);
             var librarySession = CreateLibrarySessionForStartup(

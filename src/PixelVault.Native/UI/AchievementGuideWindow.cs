@@ -41,6 +41,13 @@ namespace PixelVaultNative
             public override string ToString() => Label ?? Key ?? "All achievements";
         }
 
+        sealed class GuideListGroup
+        {
+            public string Name;
+            public int SortOrder;
+            public List<GuideListItem> Items;
+        }
+
         readonly IAchievementGuideService _service;
         readonly string _pixelVaultGameId;
         readonly List<GameAchievementsFetchService.AchievementRow> _liveRows;
@@ -48,17 +55,36 @@ namespace PixelVaultNative
         readonly TextBox _search;
         readonly ComboBox _filter;
         readonly List<GuideListItem> _allItems = new List<GuideListItem>();
+        readonly HashSet<string> _collapsedGroups = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        readonly Image _officialBadge;
         readonly TextBlock _officialTitle;
         readonly TextBlock _officialDescription;
+        readonly TextBlock _progressPillText;
+        readonly TextBlock _groupPillText;
+        readonly Border _progressPill;
+        readonly Border _groupPill;
         readonly TextBox _guideText;
         readonly TextBox _sourceUrl;
         readonly TextBox _sourceTitle;
         readonly TextBox _tags;
+        readonly TextBox _groupName;
+        readonly TextBox _groupSortOrder;
         readonly CheckBox _missable;
         readonly Button _save;
         readonly Button _openSource;
         readonly Button _importFile;
         readonly Button _pasteJson;
+        readonly StackPanel _reader;
+        readonly StackPanel _editorFields;
+        readonly TextBlock _readGuide;
+        readonly WrapPanel _readTags;
+        readonly Button _readSource;
+        readonly Button _edit;
+        readonly Button _cancelEdit;
+        readonly StackPanel _pinActionHost;
+        AchievementGuideEntry _storedEntry;
+        readonly Func<MessageBoxResult> _confirmUnsavedChanges;
+        bool _isEditing;
         string _provider;
         string _providerGameId;
         GuideListItem _current;
@@ -70,20 +96,28 @@ namespace PixelVaultNative
             IAchievementGuideService service,
             string title,
             string pixelVaultGameId,
-            IReadOnlyList<GameAchievementsFetchService.AchievementRow> rows)
+            IReadOnlyList<GameAchievementsFetchService.AchievementRow> rows,
+            string preferredProviderAchievementId,
+            Func<MessageBoxResult> confirmUnsavedChanges = null)
         {
             Owner = owner;
             _service = service ?? throw new ArgumentNullException(nameof(service));
+            _confirmUnsavedChanges = confirmUnsavedChanges ?? (() => MessageBox.Show(
+                this,
+                "Save changes to this achievement's guide and group details?",
+                "Unsaved achievement changes",
+                MessageBoxButton.YesNoCancel,
+                MessageBoxImage.Question));
             _pixelVaultGameId = (pixelVaultGameId ?? string.Empty).Trim();
             _liveRows = (rows ?? Array.Empty<GameAchievementsFetchService.AchievementRow>())
                 .Where(row => row != null && row.HasStableProviderIdentity)
                 .ToList();
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
             Title = "Achievement Guide — " + (string.IsNullOrWhiteSpace(title) ? "Game" : title.Trim());
-            Width = 1040;
-            Height = 760;
-            MinWidth = 820;
-            MinHeight = 560;
+            Width = 1120;
+            Height = 820;
+            MinWidth = 900;
+            MinHeight = 620;
             Background = UiBrushHelper.FromHex("#11181D");
             AutomationProperties.SetName(this, "Achievement Guide");
 
@@ -101,14 +135,6 @@ namespace PixelVaultNative
                 Foreground = Brushes.White,
                 TextWrapping = TextWrapping.Wrap
             });
-            heading.Children.Add(new TextBlock
-            {
-                Text = "Select an achievement, add your completion notes, and keep the original source attached.",
-                Margin = new Thickness(0, 5, 0, 0),
-                FontSize = 12.5,
-                Foreground = UiBrushHelper.FromHex("#9CB1BC"),
-                TextWrapping = TextWrapping.Wrap
-            });
             root.Children.Add(heading);
 
             var body = new Grid();
@@ -121,14 +147,35 @@ namespace PixelVaultNative
             var listColumn = new Grid();
             listColumn.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             listColumn.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            listColumn.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             listColumn.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-            body.Children.Add(listColumn);
+            var listBorder = new Border
+            {
+                Background = UiBrushHelper.FromHex("#0D1216"),
+                BorderBrush = UiBrushHelper.FromHex("#27313A"),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(9),
+                Padding = new Thickness(12),
+                Child = listColumn
+            };
+            body.Children.Add(listBorder);
+
+            var listHeading = new TextBlock
+            {
+                Text = "ACHIEVEMENTS",
+                Margin = new Thickness(2, 0, 0, 9),
+                Foreground = UiBrushHelper.FromHex("#88B8A0"),
+                FontSize = 10.5,
+                FontWeight = FontWeights.Bold
+            };
+            listColumn.Children.Add(listHeading);
 
             _search = EditorTextBox(34, false);
             _search.Margin = new Thickness(0, 0, 0, 8);
             _search.ToolTip = "Search achievement names, IDs, guide text, descriptions, and tags (Ctrl+F).";
             AutomationProperties.SetName(_search, "Search achievement guides");
             _search.TextChanged += delegate { ApplyListFilter(); };
+            Grid.SetRow(_search, 1);
             listColumn.Children.Add(_search);
 
             _filter = new ComboBox
@@ -149,7 +196,7 @@ namespace PixelVaultNative
             _filter.SelectedIndex = 0;
             AutomationProperties.SetName(_filter, "Achievement guide filter");
             _filter.SelectionChanged += delegate { ApplyListFilter(); };
-            Grid.SetRow(_filter, 1);
+            Grid.SetRow(_filter, 2);
             listColumn.Children.Add(_filter);
 
             _achievementList = new ListBox
@@ -168,71 +215,161 @@ namespace PixelVaultNative
             _achievementList.ItemContainerStyle = itemStyle;
             AutomationProperties.SetName(_achievementList, "Achievements");
             _achievementList.SelectionChanged += AchievementSelectionChanged;
-            Grid.SetRow(_achievementList, 2);
+            Grid.SetRow(_achievementList, 3);
             listColumn.Children.Add(_achievementList);
 
             var editorBorder = new Border
             {
-                Background = UiBrushHelper.FromHex("#0D1216"),
-                BorderBrush = UiBrushHelper.FromHex("#27313A"),
-                BorderThickness = new Thickness(1),
-                Padding = new Thickness(18)
+                Background = Brushes.Transparent,
+                BorderThickness = new Thickness(0)
             };
             Grid.SetColumn(editorBorder, 2);
             body.Children.Add(editorBorder);
 
             var editorScroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
             editorBorder.Child = editorScroll;
-            var editor = new StackPanel();
+            var editor = new StackPanel { Margin = new Thickness(0, 0, 8, 0) };
             editorScroll.Content = editor;
 
+            var selectedHeader = new Border
+            {
+                Margin = new Thickness(0, 0, 0, 12),
+                Padding = new Thickness(16),
+                Background = UiBrushHelper.FromHex("#122027"),
+                BorderBrush = UiBrushHelper.FromHex("#31505D"),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(10)
+            };
+            var selectedHeaderGrid = new Grid();
+            selectedHeaderGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            selectedHeaderGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(16) });
+            selectedHeaderGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            var badgeHost = new Border
+            {
+                Width = 76,
+                Height = 76,
+                CornerRadius = new CornerRadius(8),
+                ClipToBounds = true,
+                Background = UiBrushHelper.FromHex("#0B1216"),
+                BorderBrush = UiBrushHelper.FromHex("#3A5260"),
+                BorderThickness = new Thickness(1),
+                VerticalAlignment = VerticalAlignment.Top
+            };
+            _officialBadge = new Image { Stretch = Stretch.UniformToFill };
+            badgeHost.Child = _officialBadge;
+            selectedHeaderGrid.Children.Add(badgeHost);
+
+            var selectedDetails = new StackPanel();
             _officialTitle = new TextBlock
             {
-                FontSize = 18,
+                FontSize = 20,
                 FontWeight = FontWeights.SemiBold,
                 Foreground = Brushes.White,
                 TextWrapping = TextWrapping.Wrap
             };
-            editor.Children.Add(_officialTitle);
+            var titleRow = new DockPanel();
+            _pinActionHost = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(8, 0, 0, 0), VerticalAlignment = VerticalAlignment.Top };
+            DockPanel.SetDock(_pinActionHost, Dock.Right);
+            titleRow.Children.Add(_pinActionHost);
+            titleRow.Children.Add(_officialTitle);
+            selectedDetails.Children.Add(titleRow);
+
+            var pills = new WrapPanel { Margin = new Thickness(0, 7, 0, 0) };
+            _progressPillText = new TextBlock();
+            _progressPill = InfoPill(_progressPillText, "#20343A", "#3B5965");
+            pills.Children.Add(_progressPill);
+            _groupPillText = new TextBlock();
+            _groupPill = InfoPill(_groupPillText, "#1B2B25", "#355746");
+            _groupPill.Margin = new Thickness(7, 0, 0, 0);
+            pills.Children.Add(_groupPill);
+            selectedDetails.Children.Add(pills);
+
             _officialDescription = new TextBlock
             {
-                Margin = new Thickness(0, 5, 0, 16),
+                Margin = new Thickness(0, 10, 0, 0),
                 Foreground = UiBrushHelper.FromHex("#9CB1BC"),
                 FontSize = 12.5,
                 TextWrapping = TextWrapping.Wrap
             };
-            editor.Children.Add(_officialDescription);
+            selectedDetails.Children.Add(_officialDescription);
+            Grid.SetColumn(selectedDetails, 2);
+            selectedHeaderGrid.Children.Add(selectedDetails);
+            selectedHeader.Child = selectedHeaderGrid;
+            editor.Children.Add(selectedHeader);
 
-            editor.Children.Add(FieldLabel("Guide"));
-            _guideText = EditorTextBox(150, true);
+            _reader = new StackPanel();
+            _readGuide = new TextBlock
+            {
+                FontSize = 15,
+                LineHeight = 24,
+                TextWrapping = TextWrapping.Wrap,
+                Foreground = UiBrushHelper.FromHex("#D5E3E8"),
+                Margin = new Thickness(0, 10, 0, 8)
+            };
+            AutomationProperties.SetName(_readGuide, "Completion guide");
+            _readTags = new WrapPanel { Margin = new Thickness(0, 4, 0, 8) };
+            _readSource = ActionButton("Open Source", double.NaN);
+            _readSource.HorizontalAlignment = HorizontalAlignment.Left;
+            _readSource.Padding = new Thickness(10, 4, 10, 4);
+            _readSource.Height = double.NaN;
+            _readSource.MinHeight = 32;
+            _readSource.Click += delegate { OpenCurrentSource(); };
+            _reader.Children.Add(EditorSection("GUIDE", "Completion guide", _readGuide, _readTags, _readSource));
+            editor.Children.Add(_reader);
+            _editorFields = new StackPanel { Visibility = Visibility.Collapsed };
+            editor.Children.Add(_editorFields);
+
+            _guideText = EditorTextBox(190, true);
             AutomationProperties.SetName(_guideText, "Guide text");
-            editor.Children.Add(_guideText);
+            _editorFields.Children.Add(EditorSection(
+                "GUIDE NOTES",
+                "Completion guide",
+                LabeledEditor("Notes", _guideText)));
 
-            editor.Children.Add(FieldLabel("Source URL"));
             _sourceUrl = EditorTextBox(34, false);
             AutomationProperties.SetName(_sourceUrl, "Guide source URL");
-            editor.Children.Add(_sourceUrl);
-
-            editor.Children.Add(FieldLabel("Source title"));
             _sourceTitle = EditorTextBox(34, false);
             AutomationProperties.SetName(_sourceTitle, "Guide source title");
-            editor.Children.Add(_sourceTitle);
+            _editorFields.Children.Add(EditorSection(
+                "REFERENCE",
+                "Source",
+                LabeledEditor("Source URL", _sourceUrl),
+                LabeledEditor("Source title", _sourceTitle)));
 
-            editor.Children.Add(FieldLabel("Tags"));
             _tags = EditorTextBox(34, false);
             _tags.ToolTip = "Comma-separated, for example: collectible, multiplayer, difficulty";
             AutomationProperties.SetName(_tags, "Guide tags");
-            editor.Children.Add(_tags);
+            _groupName = EditorTextBox(34, false);
+            _groupName.ToolTip = "Examples: Base Game, The Frozen Wilds, New Game+. Leave blank to use Base Game.";
+            AutomationProperties.SetName(_groupName, "Achievement group name");
+            _groupSortOrder = EditorTextBox(34, false);
+            _groupSortOrder.ToolTip = "A number from 0 to 100000. Lower-numbered groups appear first.";
+            AutomationProperties.SetName(_groupSortOrder, "Achievement group display order");
 
             _missable = new CheckBox
             {
                 Content = "Missable",
-                Margin = new Thickness(0, 8, 0, 0),
+                Margin = new Thickness(2, 12, 0, 0),
                 Foreground = Brushes.White,
                 FontWeight = FontWeights.SemiBold
             };
             AutomationProperties.SetName(_missable, "Missable achievement");
-            editor.Children.Add(_missable);
+
+            var groupFields = new Grid();
+            groupFields.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            groupFields.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(14) });
+            groupFields.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(150) });
+            var groupNameField = LabeledEditor("Achievement group", _groupName);
+            groupFields.Children.Add(groupNameField);
+            var groupOrderField = LabeledEditor("Display order", _groupSortOrder);
+            Grid.SetColumn(groupOrderField, 2);
+            groupFields.Children.Add(groupOrderField);
+            _editorFields.Children.Add(EditorSection(
+                "ORGANIZATION",
+                "Catalog details",
+                LabeledEditor("Tags", _tags),
+                groupFields,
+                _missable));
 
             var buttons = new Grid { Margin = new Thickness(0, 14, 0, 0) };
             buttons.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -242,7 +379,7 @@ namespace PixelVaultNative
 
             var leftButtons = new StackPanel { Orientation = Orientation.Horizontal };
             _importFile = ActionButton("Import JSON...", 126);
-            _importFile.ToolTip = "Import a versioned achievement guide bundle (Ctrl+I).";
+            _importFile.ToolTip = "Import versioned achievement guide and grouping metadata (Ctrl+I).";
             _importFile.IsEnabled = false;
             _importFile.Click += delegate { ImportGuideJsonFile(); };
             AutomationProperties.SetName(_importFile, "Import achievement guide JSON file");
@@ -262,12 +399,25 @@ namespace PixelVaultNative
             leftButtons.Children.Add(_openSource);
             buttons.Children.Add(leftButtons);
 
-            _save = ActionButton("Save Guide", 126);
-            _save.ToolTip = "Save this achievement guide (Ctrl+S).";
+            _save = ActionButton("Save Details", 126);
+            _save.ToolTip = "Save this achievement's guide and group details (Ctrl+S).";
+            _save.Background = UiBrushHelper.FromHex("#315946");
+            _save.BorderBrush = UiBrushHelper.FromHex("#78A98E");
             _save.IsEnabled = false;
-            _save.Click += delegate { SaveCurrent(true); };
-            Grid.SetColumn(_save, 2);
-            buttons.Children.Add(_save);
+            _save.Click += delegate { SaveCurrent(false); };
+            var editingActions = new StackPanel { Orientation = Orientation.Horizontal };
+            _edit = ActionButton("Edit Guide", 110);
+            _edit.Click += delegate { SetEditing(true); _guideText.Focus(); };
+            AutomationProperties.SetName(_edit, "Edit achievement guide");
+            _cancelEdit = ActionButton("Cancel", 90);
+            _cancelEdit.Margin = new Thickness(8, 0, 0, 0);
+            _cancelEdit.Click += delegate { LoadCurrent(); _edit.Focus(); };
+            AutomationProperties.SetName(_cancelEdit, "Cancel guide edits");
+            editingActions.Children.Add(_edit);
+            editingActions.Children.Add(_save);
+            editingActions.Children.Add(_cancelEdit);
+            Grid.SetColumn(editingActions, 2);
+            buttons.Children.Add(editingActions);
 
             var close = ActionButton("Close", 112);
             close.Margin = new Thickness(10, 0, 0, 0);
@@ -305,12 +455,15 @@ namespace PixelVaultNative
             };
             Closing += OnClosing;
 
-            ReloadEntries();
+            ReloadEntries(0, preferredProviderAchievementId);
         }
 
-        void ReloadEntries(long preferredAchievementId = 0)
+        void ReloadEntries(long preferredAchievementId = 0, string preferredProviderAchievementId = null)
         {
-            var entries = _service.SyncDefinitionsAndLoadGuides(_pixelVaultGameId, _liveRows);
+            var entries = _storedEntry == null
+                ? _service.SyncDefinitionsAndLoadGuides(_pixelVaultGameId, _liveRows)
+                : new[] { _storedEntry };
+            if (_storedEntry == null) _service.ReconcileAchievementPins(_liveRows);
             var liveByKey = _liveRows
                 .GroupBy(ProviderKey, StringComparer.Ordinal)
                 .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
@@ -325,7 +478,7 @@ namespace PixelVaultNative
                 var item = new GuideListItem { Entry = entry, LiveRow = liveRow };
                 item.Visual = BuildGuideListItemVisual(item);
                 _allItems.Add(item);
-                if (entry.AchievementId == preferredAchievementId) preferred = item;
+                if (IsPreferredGuideEntry(entry, preferredAchievementId, preferredProviderAchievementId)) preferred = item;
             }
 
             _current = preferred ?? _allItems.FirstOrDefault();
@@ -333,7 +486,7 @@ namespace PixelVaultNative
             var firstEntry = entries.FirstOrDefault();
             _provider = firstEntry?.Provider ?? string.Empty;
             _providerGameId = firstEntry?.ProviderGameId ?? string.Empty;
-            var canImport = _provider.Length > 0 && _providerGameId.Length > 0;
+            var canImport = _storedEntry == null && _provider.Length > 0 && _providerGameId.Length > 0;
             _importFile.IsEnabled = canImport;
             _pasteJson.IsEnabled = canImport;
 
@@ -355,13 +508,44 @@ namespace PixelVaultNative
                 .Where(item => ReferenceEquals(item, keepDirty)
                     || MatchesGuideFilter(item?.Entry, item?.LiveRow, filterKey, searchText))
                 .ToList();
-            var preferred = visible.FirstOrDefault(item => item?.Entry?.AchievementId == preferredAchievementId)
-                ?? visible.FirstOrDefault(item => ReferenceEquals(item, _current))
-                ?? visible.FirstOrDefault();
+            var visibleGroups = BuildGuideListGroups(visible);
+            var fullGroups = BuildGuideListGroups(_allItems)
+                .ToDictionary(group => group.Name, StringComparer.OrdinalIgnoreCase);
+            var selectable = visibleGroups
+                .Where(group => !_collapsedGroups.Contains(group.Name))
+                .SelectMany(group => group.Items)
+                .ToList();
+            var preferred = selectable.FirstOrDefault(item => item?.Entry?.AchievementId == preferredAchievementId)
+                ?? selectable.FirstOrDefault(item => ReferenceEquals(item, _current))
+                ?? selectable.FirstOrDefault();
 
             _suppressSelection = true;
             _achievementList.Items.Clear();
-            foreach (var item in visible) _achievementList.Items.Add(item.Visual);
+            foreach (var group in visibleGroups)
+            {
+                var fullGroup = fullGroups.TryGetValue(group.Name, out var found) ? found : group;
+                var summaryRows = fullGroup.Items
+                    .Select(item => item.LiveRow ?? new GameAchievementsFetchService.AchievementRow
+                    {
+                        GroupName = group.Name,
+                        GroupSortOrder = group.SortOrder,
+                        ProgressKnown = false
+                    })
+                    .ToList();
+                var summary = new AchievementsInfoWindow.AchievementGroupSummary
+                {
+                    Name = group.Name,
+                    SortOrder = group.SortOrder,
+                    Rows = summaryRows
+                };
+                var collapsed = _collapsedGroups.Contains(group.Name);
+                _achievementList.Items.Add(AchievementsInfoWindow.BuildAchievementGroupHeader(
+                    summary,
+                    collapsed,
+                    () => ToggleGuideGroup(group.Name)));
+                if (collapsed) continue;
+                foreach (var item in group.Items) _achievementList.Items.Add(item.Visual);
+            }
             _current = preferred;
             _achievementList.SelectedItem = _current?.Visual;
             _suppressSelection = false;
@@ -376,8 +560,49 @@ namespace PixelVaultNative
                 _officialDescription.Text = _allItems.Count == 0
                     ? "PixelVault could not assign stable provider IDs to the returned achievements."
                     : "Adjust the search or filter to show achievements.";
+                _officialBadge.Source = null;
+                _officialBadge.Visibility = Visibility.Collapsed;
+                _progressPill.Visibility = Visibility.Collapsed;
+                _groupPill.Visibility = Visibility.Collapsed;
                 SetEditorEnabled(false);
             }
+        }
+
+        static List<GuideListGroup> BuildGuideListGroups(IEnumerable<GuideListItem> items)
+        {
+            return (items ?? Enumerable.Empty<GuideListItem>())
+                .Where(item => item?.Entry != null)
+                .GroupBy(item => EffectiveGuideGroupName(item.Entry), StringComparer.OrdinalIgnoreCase)
+                .Select(group => new GuideListGroup
+                {
+                    Name = group.Key,
+                    SortOrder = group.Min(item => item.Entry.GroupSortOrder),
+                    Items = group.ToList()
+                })
+                .OrderBy(group => group.SortOrder)
+                .ThenBy(group => string.Equals(group.Name, "Base Game", StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+                .ThenBy(group => group.Name, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        internal static string EffectiveGuideGroupName(AchievementGuideEntry entry)
+        {
+            var name = (entry?.GroupName ?? string.Empty).Trim();
+            return name.Length == 0 ? "Base Game" : name;
+        }
+
+        void ToggleGuideGroup(string groupName)
+        {
+            var name = string.IsNullOrWhiteSpace(groupName) ? "Base Game" : groupName.Trim();
+            var collapsing = !_collapsedGroups.Contains(name);
+            if (collapsing
+                && _current?.Entry != null
+                && string.Equals(EffectiveGuideGroupName(_current.Entry), name, StringComparison.OrdinalIgnoreCase)
+                && !ResolveUnsavedChanges())
+                return;
+
+            if (!_collapsedGroups.Add(name)) _collapsedGroups.Remove(name);
+            ApplyListFilter();
         }
 
         internal static bool MatchesGuideFilter(
@@ -400,7 +625,8 @@ namespace PixelVaultNative
                 || ContainsIgnoreCase(entry.Description, query)
                 || ContainsIgnoreCase(entry.ProviderAchievementId, query)
                 || ContainsIgnoreCase(entry.GuideText, query)
-                || ContainsIgnoreCase(entry.Tags, query);
+                || ContainsIgnoreCase(entry.Tags, query)
+                || ContainsIgnoreCase(entry.GroupName, query);
         }
 
         static bool ContainsIgnoreCase(string value, string query)
@@ -471,13 +697,22 @@ namespace PixelVaultNative
         {
             if (item == null) return;
             var hasGuide = !string.IsNullOrWhiteSpace(item.Entry?.GuideText);
+            var groupName = (item.Entry?.GroupName ?? string.Empty).Trim();
             if (item.GuideStatus != null)
-                item.GuideStatus.Visibility = hasGuide ? Visibility.Visible : Visibility.Collapsed;
+            {
+                item.GuideStatus.Text = string.Join(" · ", new[]
+                {
+                    groupName.Length > 0 ? groupName : null,
+                    hasGuide ? "Guide added" : null
+                }.Where(value => !string.IsNullOrWhiteSpace(value)));
+                item.GuideStatus.Visibility = item.GuideStatus.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+            }
             if (item.Visual != null)
             {
                 var status = GuideAchievementProgressLabel(item.LiveRow);
+                var group = groupName.Length > 0 ? ", group " + groupName : string.Empty;
                 var guide = hasGuide ? ", guide added" : string.Empty;
-                var accessibleName = (item.Entry?.Title ?? "Achievement") + ", " + status + guide;
+                var accessibleName = (item.Entry?.Title ?? "Achievement") + ", " + status + group + guide;
                 if (item.Visual is GuideListItemVisual visual) visual.AccessibleName = accessibleName;
                 AutomationProperties.SetName(item.Visual, accessibleName);
             }
@@ -494,9 +729,93 @@ namespace PixelVaultNative
             IAchievementGuideService service,
             string title,
             string pixelVaultGameId,
-            IReadOnlyList<GameAchievementsFetchService.AchievementRow> rows)
+            IReadOnlyList<GameAchievementsFetchService.AchievementRow> rows,
+            string preferredProviderAchievementId = null)
         {
-            new AchievementGuideWindow(owner, service, title, pixelVaultGameId, rows).ShowDialog();
+            new AchievementGuideWindow(owner, service, title, pixelVaultGameId, rows, preferredProviderAchievementId).ShowDialog();
+        }
+
+        internal static void ShowStoredModal(Window owner, IAchievementGuideService service, string title, AchievementGuideEntry entry)
+        {
+            // Reading a retired target must not submit a fabricated definition to provider sync.
+            var window = new AchievementGuideWindow(owner, service, title, entry.PixelVaultGameId,
+                Array.Empty<GameAchievementsFetchService.AchievementRow>(), null);
+            window._storedEntry = entry;
+            window.ReloadEntries(entry.AchievementId);
+            window.ShowDialog();
+        }
+
+        internal static bool IsPreferredGuideEntry(
+            AchievementGuideEntry entry,
+            long preferredAchievementId,
+            string preferredProviderAchievementId)
+        {
+            if (entry == null) return false;
+            if (preferredAchievementId > 0 && entry.AchievementId == preferredAchievementId) return true;
+            return preferredAchievementId <= 0
+                && !string.IsNullOrWhiteSpace(preferredProviderAchievementId)
+                && string.Equals(
+                    entry.ProviderAchievementId,
+                    preferredProviderAchievementId.Trim(),
+                    StringComparison.Ordinal);
+        }
+
+        static Border InfoPill(TextBlock text, string background, string border)
+        {
+            text.Foreground = UiBrushHelper.FromHex("#D5E3E8");
+            text.FontSize = 9.5;
+            text.FontWeight = FontWeights.Bold;
+            return new Border
+            {
+                Padding = new Thickness(8, 4, 8, 4),
+                Background = UiBrushHelper.FromHex(background),
+                BorderBrush = UiBrushHelper.FromHex(border),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(10),
+                Child = text
+            };
+        }
+
+        static Border EditorSection(string eyebrow, string title, params UIElement[] fields)
+        {
+            var content = new StackPanel();
+            content.Children.Add(new TextBlock
+            {
+                Text = eyebrow ?? string.Empty,
+                Foreground = UiBrushHelper.FromHex("#88B8A0"),
+                FontSize = 9.5,
+                FontWeight = FontWeights.Bold
+            });
+            content.Children.Add(new TextBlock
+            {
+                Text = title ?? string.Empty,
+                Margin = new Thickness(0, 3, 0, 0),
+                Foreground = Brushes.White,
+                FontSize = 16,
+                FontWeight = FontWeights.SemiBold
+            });
+            foreach (var field in fields ?? Array.Empty<UIElement>())
+            {
+                if (field != null) content.Children.Add(field);
+            }
+            return new Border
+            {
+                Margin = new Thickness(0, 0, 0, 12),
+                Padding = new Thickness(16, 14, 16, 16),
+                Background = UiBrushHelper.FromHex("#0D151A"),
+                BorderBrush = UiBrushHelper.FromHex("#273942"),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(9),
+                Child = content
+            };
+        }
+
+        static StackPanel LabeledEditor(string label, FrameworkElement editor)
+        {
+            var content = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
+            content.Children.Add(FieldLabel(label));
+            content.Children.Add(editor);
+            return content;
         }
 
         static TextBlock FieldLabel(string text)
@@ -504,7 +823,7 @@ namespace PixelVaultNative
             return new TextBlock
             {
                 Text = text,
-                Margin = new Thickness(0, 10, 0, 5),
+                Margin = new Thickness(0, 0, 0, 5),
                 Foreground = UiBrushHelper.FromHex("#C8D8E2"),
                 FontWeight = FontWeights.SemiBold,
                 FontSize = 12
@@ -575,13 +894,122 @@ namespace PixelVaultNative
             _officialDescription.Text = string.IsNullOrWhiteSpace(entry.Description)
                 ? "No official description was returned."
                 : entry.Description;
+            UpdateSelectedAchievementHeader(entry, _current.LiveRow);
             _guideText.Text = entry.GuideText ?? string.Empty;
             _sourceUrl.Text = entry.SourceUrl ?? string.Empty;
             _sourceTitle.Text = entry.SourceTitle ?? string.Empty;
             _tags.Text = entry.Tags ?? string.Empty;
+            _groupName.Text = entry.GroupName ?? string.Empty;
+            _groupSortOrder.Text = entry.GroupSortOrder.ToString(System.Globalization.CultureInfo.InvariantCulture);
             _missable.IsChecked = entry.IsMissable;
             SetEditorEnabled(true);
             _openSource.IsEnabled = IsHttpUrl(entry.SourceUrl);
+            RenderReadView(entry);
+            UpdatePinAction();
+            SetEditing(false);
+        }
+
+        void UpdatePinAction()
+        {
+            _pinActionHost.Children.Clear();
+            var entry = _current?.Entry;
+            if (entry == null) return;
+            try
+            {
+                var row = _current.LiveRow ?? AchievementPinUi.StoredRow(entry);
+                var pinned = _service.LoadPinnedAchievements(entry.Provider, entry.ProviderGameId)
+                    .Any(pin => AchievementPinUi.Matches(pin, row));
+                if (!pinned && (!row.ProgressKnown || row.Unlocked)) return;
+                var button = AchievementPinUi.Button(row, pinned, () =>
+                {
+                    if (AchievementPinUi.Change(this, _service, row, !pinned))
+                    {
+                        UpdatePinAction();
+                        if (_pinActionHost.Children.Count > 0) (_pinActionHost.Children[0] as Control)?.Focus();
+                    }
+                });
+                _pinActionHost.Children.Add(button);
+            }
+            catch (Exception ex)
+            {
+                _pinActionHost.Children.Add(new TextBlock
+                {
+                    Text = "Next Up unavailable", Foreground = UiBrushHelper.FromHex("#E8A598"), ToolTip = ex.Message
+                });
+            }
+        }
+
+        void RenderReadView(AchievementGuideEntry entry)
+        {
+            var hasGuide = !string.IsNullOrWhiteSpace(entry.GuideText);
+            _readGuide.Text = hasGuide ? entry.GuideText : "No guide added yet.";
+            _edit.Content = hasGuide ? "Edit Guide" : "Add Guide";
+            AutomationProperties.SetName(_edit, hasGuide ? "Edit achievement guide" : "Add achievement guide");
+            _readTags.Children.Clear();
+            foreach (var tag in GuideReadTags(entry.Tags, entry.IsMissable))
+            {
+                _readTags.Children.Add(AchievementCollectionUi.TagChip(tag));
+            }
+            _readTags.Visibility = _readTags.Children.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
+            var hasSource = !string.IsNullOrWhiteSpace(entry.SourceTitle) || !string.IsNullOrWhiteSpace(entry.SourceUrl);
+            _readSource.Content = new TextBlock
+            {
+                Text = string.IsNullOrWhiteSpace(entry.SourceTitle) ? entry.SourceUrl : entry.SourceTitle,
+                TextWrapping = TextWrapping.Wrap
+            };
+            _readSource.ToolTip = entry.SourceUrl;
+            _readSource.IsEnabled = IsHttpUrl(entry.SourceUrl);
+            _readSource.Visibility = hasSource ? Visibility.Visible : Visibility.Collapsed;
+            AutomationProperties.SetName(_readSource, "Open guide source: " + (entry.SourceTitle ?? entry.SourceUrl));
+            AchievementCollectionUi.ApplyHighContrast(this);
+        }
+
+        internal static List<string> GuideReadTags(string tags, bool missable)
+        {
+            var values = (tags ?? string.Empty).Split(',').Select(tag => tag.Trim())
+                .Where(tag => tag.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            if (missable && !values.Contains("missable", StringComparer.OrdinalIgnoreCase)) values.Add("Missable");
+            return values;
+        }
+
+        void SetEditing(bool editing)
+        {
+            _isEditing = editing && _current != null;
+            _reader.Visibility = !_isEditing && _current != null ? Visibility.Visible : Visibility.Collapsed;
+            _editorFields.Visibility = _isEditing ? Visibility.Visible : Visibility.Collapsed;
+            _edit.Visibility = _isEditing ? Visibility.Collapsed : Visibility.Visible;
+            _save.Visibility = _isEditing ? Visibility.Visible : Visibility.Collapsed;
+            _save.IsEnabled = _isEditing;
+            _cancelEdit.Visibility = _isEditing ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        void UpdateSelectedAchievementHeader(
+            AchievementGuideEntry entry,
+            GameAchievementsFetchService.AchievementRow liveRow)
+        {
+            _officialBadge.Source = null;
+            if (liveRow != null)
+            {
+                _officialBadge.Visibility = Visibility.Visible;
+                AchievementsInfoWindow.StartAchievementBadgeDownload(_officialBadge, liveRow, "PixelVault");
+            }
+            else
+            {
+                _officialBadge.Visibility = Visibility.Collapsed;
+            }
+
+            var progress = GuideAchievementProgressLabel(liveRow);
+            _progressPillText.Text = progress == "unlocked"
+                ? "OBTAINED"
+                : progress == "locked"
+                    ? "NOT OBTAINED"
+                    : "PROGRESS UNKNOWN";
+            _progressPill.Background = UiBrushHelper.FromHex(progress == "unlocked" ? "#1B3529" : "#20343A");
+            _progressPill.BorderBrush = UiBrushHelper.FromHex(progress == "unlocked" ? "#47765C" : "#3B5965");
+            _progressPill.Visibility = Visibility.Visible;
+
+            _groupPillText.Text = EffectiveGuideGroupName(entry).ToUpperInvariant();
+            _groupPill.Visibility = Visibility.Visible;
         }
 
         void SetEditorEnabled(bool enabled)
@@ -590,31 +1018,34 @@ namespace PixelVaultNative
             _sourceUrl.IsEnabled = enabled;
             _sourceTitle.IsEnabled = enabled;
             _tags.IsEnabled = enabled;
+            _groupName.IsEnabled = enabled;
+            _groupSortOrder.IsEnabled = enabled;
             _missable.IsEnabled = enabled;
             _save.IsEnabled = enabled;
+            _edit.IsEnabled = enabled;
             if (!enabled) _openSource.IsEnabled = false;
+            if (!enabled) _pinActionHost.Children.Clear();
+            if (!enabled) SetEditing(false);
         }
 
         bool IsDirty()
         {
             var entry = _current?.Entry;
-            if (entry == null) return false;
+            if (entry == null || !_isEditing) return false;
             return !string.Equals((_guideText.Text ?? string.Empty).Trim(), entry.GuideText ?? string.Empty, StringComparison.Ordinal)
                 || !string.Equals((_sourceUrl.Text ?? string.Empty).Trim(), entry.SourceUrl ?? string.Empty, StringComparison.Ordinal)
                 || !string.Equals((_sourceTitle.Text ?? string.Empty).Trim(), entry.SourceTitle ?? string.Empty, StringComparison.Ordinal)
                 || !string.Equals(AchievementGuideService.NormalizeTags(_tags.Text), entry.Tags ?? string.Empty, StringComparison.Ordinal)
+                || !string.Equals((_groupName.Text ?? string.Empty).Trim(), entry.GroupName ?? string.Empty, StringComparison.Ordinal)
+                || !int.TryParse((_groupSortOrder.Text ?? string.Empty).Trim(), out var groupOrder)
+                || groupOrder != entry.GroupSortOrder
                 || (_missable.IsChecked == true) != entry.IsMissable;
         }
 
         bool ResolveUnsavedChanges()
         {
             if (!IsDirty()) return true;
-            var choice = MessageBox.Show(
-                this,
-                "Save changes to this achievement guide?",
-                "Unsaved guide changes",
-                MessageBoxButton.YesNoCancel,
-                MessageBoxImage.Question);
+            var choice = _confirmUnsavedChanges();
             if (choice == MessageBoxResult.Cancel) return false;
             if (choice == MessageBoxResult.Yes) return SaveCurrent(false);
             return true;
@@ -631,6 +1062,15 @@ namespace PixelVaultNative
                 _sourceUrl.Focus();
                 return false;
             }
+            if (!int.TryParse((_groupSortOrder.Text ?? string.Empty).Trim(), out var groupSortOrder)
+                || groupSortOrder < 0
+                || groupSortOrder > 100000)
+            {
+                MessageBox.Show(this, "Group display order must be a number from 0 to 100000.", "Achievement group", MessageBoxButton.OK, MessageBoxImage.Warning);
+                _groupSortOrder.Focus();
+                _groupSortOrder.SelectAll();
+                return false;
+            }
 
             try
             {
@@ -641,13 +1081,17 @@ namespace PixelVaultNative
                     SourceUrl = url,
                     SourceTitle = _sourceTitle.Text,
                     Tags = _tags.Text,
-                    IsMissable = _missable.IsChecked == true
+                    IsMissable = _missable.IsChecked == true,
+                    GroupName = _groupName.Text,
+                    GroupSortOrder = groupSortOrder
                 });
                 _openSource.IsEnabled = IsHttpUrl(_current.Entry.SourceUrl);
+                if (_storedEntry != null) _storedEntry = _current.Entry;
                 UpdateGuideListItemState(_current);
+                LoadCurrent();
                 ApplyListFilter(_current.Entry.AchievementId);
                 if (showConfirmation)
-                    MessageBox.Show(this, "Guide saved.", "Achievement Guide", MessageBoxButton.OK, MessageBoxImage.Information);
+                    MessageBox.Show(this, "Achievement details saved.", "Achievement Guide", MessageBoxButton.OK, MessageBoxImage.Information);
                 return true;
             }
             catch (Exception ex)
@@ -762,7 +1206,7 @@ namespace PixelVaultNative
                 ReloadEntries(selectedId);
                 MessageBox.Show(
                     this,
-                    "Imported " + imported.ImportedCount + (imported.ImportedCount == 1 ? " guide." : " guides.")
+                    "Imported " + imported.ImportedCount + (imported.ImportedCount == 1 ? " entry." : " entries.")
                         + (imported.UnmatchedAchievementIds.Count > 0 ? "\n" + imported.UnmatchedAchievementIds.Count + " entries were unmatched." : string.Empty),
                     "Import Guide JSON",
                     MessageBoxButton.OK,

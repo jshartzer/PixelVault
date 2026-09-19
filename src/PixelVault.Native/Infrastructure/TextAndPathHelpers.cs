@@ -161,6 +161,7 @@ namespace PixelVaultNative
         /// </summary>
         public static DateTime GetLibraryDate(string file, FilenameParseResult parsed)
         {
+            if (RobloxCaptureNaming.IsCapture(parsed)) return File.GetCreationTime(file);
             var tags = parsed.PlatformTags ?? new string[0];
             if (!tags.Contains("Xbox"))
             {

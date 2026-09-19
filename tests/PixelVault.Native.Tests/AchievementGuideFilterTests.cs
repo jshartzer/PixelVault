@@ -24,11 +24,13 @@ public sealed class AchievementGuideFilterTests
 
     readonly AchievementGuideEntry entry = new()
     {
+        AchievementId = 42,
         Title = "Hidden Collector",
         Description = "Find every hidden item.",
         ProviderAchievementId = "ACH_COLLECT_ALL",
         GuideText = "Check the final room before leaving.",
         Tags = "collectible, missable",
+        GroupName = "Story DLC",
         IsMissable = true
     };
 
@@ -60,6 +62,7 @@ public sealed class AchievementGuideFilterTests
     [InlineData("ACH_COLLECT")]
     [InlineData("final room")]
     [InlineData("MISSABLE")]
+    [InlineData("story dlc")]
     public void MatchesGuideFilter_SearchesOfficialAndAuthoredFieldsCaseInsensitively(string search)
     {
         Assert.True(AchievementGuideWindow.MatchesGuideFilter(entry, null, "all", search));
@@ -69,5 +72,30 @@ public sealed class AchievementGuideFilterTests
     public void MatchesGuideFilter_SearchRejectsUnrelatedText()
     {
         Assert.False(AchievementGuideWindow.MatchesGuideFilter(entry, null, "all", "multiplayer wins"));
+    }
+
+    [Fact]
+    public void EffectiveGuideGroupName_UsesBaseGameFallback()
+    {
+        Assert.Equal("Base Game", AchievementGuideWindow.EffectiveGuideGroupName(null));
+        Assert.Equal("Base Game", AchievementGuideWindow.EffectiveGuideGroupName(new AchievementGuideEntry()));
+        Assert.Equal("The Bright Lord", AchievementGuideWindow.EffectiveGuideGroupName(new AchievementGuideEntry
+        {
+            GroupName = "  The Bright Lord  "
+        }));
+    }
+
+    [Fact]
+    public void IsPreferredGuideEntry_MatchesProviderAchievementFromAchievementWindow()
+    {
+        Assert.True(AchievementGuideWindow.IsPreferredGuideEntry(entry, 0, "ACH_COLLECT_ALL"));
+        Assert.False(AchievementGuideWindow.IsPreferredGuideEntry(entry, 0, "ACH_OTHER"));
+    }
+
+    [Fact]
+    public void IsPreferredGuideEntry_PrioritizesDatabaseIdDuringGuideReload()
+    {
+        Assert.True(AchievementGuideWindow.IsPreferredGuideEntry(entry, 42, "ACH_OTHER"));
+        Assert.False(AchievementGuideWindow.IsPreferredGuideEntry(entry, 99, "ACH_COLLECT_ALL"));
     }
 }

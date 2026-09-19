@@ -1409,8 +1409,9 @@ namespace PixelVaultNative
                         return;
                     }
 
-                    var rows = result.Rows ?? new List<GameAchievementsFetchService.AchievementRow>();
+                    var rows = AchievementsInfoWindow.FilterAchievementRows(result.Rows, false);
                     var progressKnown = rows.Any(row => row != null && row.ProgressKnown);
+                    var allProgressKnown = rows.Count > 0 && rows.All(row => row.ProgressKnown);
                     var earned = rows.Where(row => row != null && row.ProgressKnown && row.Unlocked).ToList();
                     TryLibraryGameProfileAutoMarkCompleteFromAchievements(view, rows, refreshHero);
                     var displayRows = rows
@@ -1423,7 +1424,7 @@ namespace PixelVaultNative
                     var earnedCount = earned.Count;
                     var percentText = string.Empty;
                     double? percent = null;
-                    if (progressKnown && totalRows > 0)
+                    if (allProgressKnown && totalRows > 0)
                     {
                         percent = (double)earnedCount / totalRows;
                         percentText = " \u00B7 " + ((int)Math.Round(percent.Value * 100)).ToString(CultureInfo.CurrentCulture) + "%";
@@ -1431,6 +1432,8 @@ namespace PixelVaultNative
                     var summary = progressKnown
                         ? earnedCount + " of " + totalRows + " earned" + percentText
                         : "Progress unknown - showing achievement definitions";
+                    if (progressKnown && !allProgressKnown)
+                        summary += " · " + rows.Count(row => !row.ProgressKnown) + " progress unavailable";
                     host.Children.Add(new TextBlock
                     {
                         Text = (result.SourceLabel ?? "Achievements") + ": " + summary,
@@ -1439,14 +1442,21 @@ namespace PixelVaultNative
                         FontWeight = FontWeights.SemiBold,
                         Margin = new Thickness(0, 8, 0, 6)
                     });
+                    var achievementActions = new WrapPanel();
+                    if (progressKnown)
+                    {
+                        achievementActions.Children.Add(BuildLibraryGameProfileRemainingButton(
+                            owner, platform, folder, userAgent, rows));
+                    }
                     if (LibraryGameProfileCanOpenAchievementGuide(rows))
                     {
-                        host.Children.Add(BuildLibraryGameProfileAchievementGuideButton(
+                        achievementActions.Children.Add(BuildLibraryGameProfileAchievementGuideButton(
                             owner,
                             view,
                             folder,
                             result));
                     }
+                    host.Children.Add(achievementActions);
                     if (percent.HasValue)
                         host.Children.Add(BuildLibraryGameProfileAchievementProgressBar(percent.Value));
 
@@ -1470,6 +1480,35 @@ namespace PixelVaultNative
                     host.Children.Add(container);
                 }, DispatcherPriority.Background);
             });
+        }
+
+        Button BuildLibraryGameProfileRemainingButton(
+            Window owner,
+            string platform,
+            LibraryFolderInfo folder,
+            string userAgent,
+            IEnumerable<GameAchievementsFetchService.AchievementRow> rows)
+        {
+            var count = AchievementsInfoWindow.FilterAchievementRows(rows, true).Count;
+            var unknown = rows.Any(row => !row.ProgressKnown);
+            var label = count + (unknown ? " known remaining" : " remaining");
+            var button = Btn(label, null, "#15242D", Brushes.White);
+            button.Height = 30;
+            button.FontSize = 12;
+            button.Padding = new Thickness(14, 0, 14, 0);
+            button.Margin = new Thickness(0, 2, 8, 10);
+            ApplyLibraryPillChrome(button, "#15242D", "#26404E", "#1F3340", "#0F1B22", "#D7E2EA");
+            button.ToolTip = "Open remaining achievements";
+            AutomationProperties.SetName(button, "Open achievements: " + label);
+            AccessibilityUi.TryApplyFocusVisualStyle(button);
+            button.Click += delegate
+            {
+                AchievementsInfoWindow.ShowModal(owner, platform, folder,
+                    CurrentSteamWebApiKey(), CurrentRetroAchievementsApiKey(),
+                    CurrentSteamUserId64(), CurrentRetroAchievementsUsername(),
+                    userAgent, achievementGuideService, remainingOnly: true);
+            };
+            return button;
         }
 
         internal static bool LibraryGameProfileCanOpenAchievementGuide(

@@ -1090,6 +1090,11 @@
 - Added detailed scan progress reporting with processed counts, remaining counts, and per-file activity messages so it is clear what PixelVault is doing.
 # PixelVault Changelog
 
+## Unreleased (App Testing)
+- Roblox imports: game-first filenames (`Roblox_Experience_capture-token.png`) and Roblox game grouping, while preserving experience names and recognizing the previous naming format.
+- Settings: HealthApp-style top tabs with folders, accounts, import/tray preferences, library tools, diagnostics, and run history. Edit configuration directly and retain drafts while switching tabs.
+- Settings performance: removed full-log reading and wrapping from window opening. Run history now loads a bounded recent excerpt in the background; full logs remain available from the logs folder.
+
 ## 0.567
 - Switched virtual library grouping to embedded platform tags only, removing the old filename fallback from the library route.
 - Normalized legacy custom platform tags like Platform:PC and Platform:Steam so they no longer create false Multiple Tags groupings.

@@ -75,6 +75,8 @@ Data-only cleanup work does not require a new build version unless app code chan
 
 ## Application Structure
 
+Roblox capture intake resolves current numeric place IDs through the public Roblox API before automatic naming. Renamed filenames start with `Roblox_`, followed by the experience name and capture token; import identity is Roblox (PC). Existing creation times remain authoritative and capture tokens are not decoded as dates. Unresolved captures stay in manual intake. See `docs/ROBLOX_CAPTURES.md` for the conventions and failure behavior.
+
 PixelVault is a native Windows desktop app built in C# and WPF.
 
 The current live implementation is now a modular monolith rooted in:
@@ -304,6 +306,10 @@ It stores canonical game-level data such as:
 - folder path reference
 
 Grouping should be driven by `GameId`, not fragile title text.
+
+### Achievement guides and Next Up
+
+Achievement guides and Next Up pins are durable local data under `PixelVaultData/guides`, outside the folder cache. Pin writes use the guide service and its separate `achievement_pin` table, keyed through stable provider/game/achievement definitions. Imports cannot overwrite pins; unknown or missing progress cannot remove them. Confirmed earned progress may remove the active pin and release its slot without changing authored notes. See `docs/plans/PV-PLN-ACHG-002-achievement-collection-experience.md` for the collection policies.
 
 ### Folder cache
 

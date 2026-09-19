@@ -14,19 +14,22 @@ namespace PixelVaultNative
         readonly Func<string, DateTime> _getLibraryDate;
         readonly Func<IEnumerable<string>, CancellationToken, Dictionary<string, EmbeddedMetadataSnapshot>> _readEmbeddedMetadataBatch;
         readonly Func<string, string> _getImportFolderTitleHint;
+        readonly Func<string, CancellationToken, string> _resolveRobloxTitle;
 
         public IntakeAnalysisService(
             Func<string, FilenameParseResult> parseFilename,
             Func<string, bool> isVideo,
             Func<string, DateTime> getLibraryDate,
             Func<IEnumerable<string>, CancellationToken, Dictionary<string, EmbeddedMetadataSnapshot>> readEmbeddedMetadataBatch = null,
-            Func<string, string> getImportFolderTitleHint = null)
+            Func<string, string> getImportFolderTitleHint = null,
+            Func<string, CancellationToken, string> resolveRobloxTitle = null)
         {
             _parseFilename = parseFilename ?? throw new ArgumentNullException(nameof(parseFilename));
             _isVideo = isVideo ?? throw new ArgumentNullException(nameof(isVideo));
             _getLibraryDate = getLibraryDate ?? throw new ArgumentNullException(nameof(getLibraryDate));
             _readEmbeddedMetadataBatch = readEmbeddedMetadataBatch;
             _getImportFolderTitleHint = getImportFolderTitleHint;
+            _resolveRobloxTitle = resolveRobloxTitle;
         }
 
         public Dictionary<string, IntakePreviewFileAnalysis> AnalyzeFiles(
@@ -70,6 +73,12 @@ namespace PixelVaultNative
                 cancellationToken.ThrowIfCancellationRequested();
                 var fileName = Path.GetFileName(file);
                 var parsed = parsedByFile[file];
+                if (!string.IsNullOrWhiteSpace(parsed.RobloxPlaceId) && _resolveRobloxTitle != null)
+                {
+                    var experienceTitle = FilenameParserService.NormalizeGameTitleHint(_resolveRobloxTitle(parsed.RobloxPlaceId, cancellationToken));
+                    parsed.RoutesToManualWhenMissingSteamAppId = string.IsNullOrWhiteSpace(experienceTitle);
+                    parsed.GameTitleHint = parsed.RoutesToManualWhenMissingSteamAppId ? string.Empty : RobloxCaptureNaming.GameTitle;
+                }
                 EmbeddedMetadataSnapshot metadata;
                 if (metadataByFile.TryGetValue(file, out metadata))
                     parsed = ApplyEmbeddedMetadataConsoleHint(parsed, metadata);
@@ -78,7 +87,7 @@ namespace PixelVaultNative
                 var isVideo = _isVideo(file);
                 var preserveFileTimes = parsed.PreserveFileTimes || isVideo;
                 var canUpdateMetadata = !(parsed.RoutesToManualWhenMissingSteamAppId && string.IsNullOrWhiteSpace(parsed.SteamAppId))
-                    && (isVideo || platformTags.Contains("Xbox") || parsed.CaptureTime.HasValue);
+                    && (isVideo || platformTags.Contains("Xbox") || parsed.CaptureTime.HasValue || RobloxCaptureNaming.IsCapture(parsed));
                 analysis[file] = new IntakePreviewFileAnalysis
                 {
                     FilePath = file,
@@ -86,7 +95,7 @@ namespace PixelVaultNative
                     Parsed = parsed,
                     CanUpdateMetadata = canUpdateMetadata,
                     PreserveFileTimes = preserveFileTimes,
-                    CaptureTime = parsed.CaptureTime ?? _getLibraryDate(file)
+                    CaptureTime = RobloxCaptureNaming.IsCapture(parsed) ? File.GetCreationTime(file) : parsed.CaptureTime ?? _getLibraryDate(file)
                 };
             }
             return analysis;
@@ -121,6 +130,7 @@ namespace PixelVaultNative
                     .ToArray(),
                 SteamAppId = parsed.SteamAppId ?? string.Empty,
                 NonSteamId = parsed.NonSteamId ?? string.Empty,
+                RobloxPlaceId = parsed.RobloxPlaceId ?? string.Empty,
                 GameTitleHint = parsed.GameTitleHint ?? string.Empty,
                 CaptureTime = parsed.CaptureTime,
                 PreserveFileTimes = parsed.PreserveFileTimes,
@@ -148,6 +158,7 @@ namespace PixelVaultNative
                 PlatformTags = parsed.PlatformTags ?? new string[0],
                 SteamAppId = parsed.SteamAppId ?? string.Empty,
                 NonSteamId = parsed.NonSteamId ?? string.Empty,
+                RobloxPlaceId = parsed.RobloxPlaceId ?? string.Empty,
                 GameTitleHint = folderTitle,
                 CaptureTime = parsed.CaptureTime,
                 PreserveFileTimes = parsed.PreserveFileTimes,

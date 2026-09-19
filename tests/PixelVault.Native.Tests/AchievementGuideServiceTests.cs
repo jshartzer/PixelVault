@@ -119,6 +119,74 @@ public sealed class AchievementGuideServiceTests
     }
 
     [Fact]
+    public void SaveGuide_PersistsGroupAndAppliesItToRefreshedProviderRows()
+    {
+        using var scope = new TempDataRoot();
+        var service = new AchievementGuideService(scope.Path);
+        var entry = service.SyncDefinitionsAndLoadGuides("pv-game", new[]
+        {
+            SteamRow("620", "ACH.ONE", "One", "")
+        }).Single();
+
+        service.SaveGuide(new AchievementGuideEdit
+        {
+            AchievementId = entry.AchievementId,
+            GroupName = "  Challenge Rooms  ",
+            GroupSortOrder = 20
+        });
+
+        var refreshedRow = SteamRow("620", "ACH.ONE", "One", "");
+        var refreshed = service.SyncDefinitionsAndLoadGuides("pv-game", new[] { refreshedRow }).Single();
+
+        Assert.Equal("Challenge Rooms", refreshed.GroupName);
+        Assert.Equal(20, refreshed.GroupSortOrder);
+        Assert.Equal("Challenge Rooms", refreshedRow.GroupName);
+        Assert.Equal(20, refreshedRow.GroupSortOrder);
+    }
+
+    [Fact]
+    public void GroupOnlyBundle_ImportsGroupingWithoutReplacingExistingGuide()
+    {
+        using var scope = new TempDataRoot();
+        var service = new AchievementGuideService(scope.Path);
+        var entry = service.SyncDefinitionsAndLoadGuides("pv-game", new[]
+        {
+            SteamRow("620", "ACH.ONE", "One", "")
+        }).Single();
+        service.SaveGuide(new AchievementGuideEdit
+        {
+            AchievementId = entry.AchievementId,
+            GuideText = "Keep this guide.",
+            Tags = "story"
+        });
+        var json = """
+        {
+          "schemaVersion": 1,
+          "provider": "steam",
+          "providerGameId": "620",
+          "achievements": [
+            { "providerAchievementId": "ACH.ONE", "groupName": "Bonus Chambers", "groupSortOrder": 30 }
+          ]
+        }
+        """;
+
+        var preview = service.PreviewGuideImport(json, "steam", "620");
+        var imported = service.ImportGuideBundle(json, "steam", "620");
+        var refreshed = service.SyncDefinitionsAndLoadGuides("pv-game", new[]
+        {
+            SteamRow("620", "ACH.ONE", "One", "")
+        }).Single();
+
+        Assert.True(preview.CanImport);
+        Assert.Equal(1, preview.ChangedCount);
+        Assert.Equal(1, imported.ImportedCount);
+        Assert.Equal("Keep this guide.", refreshed.GuideText);
+        Assert.Equal("story", refreshed.Tags);
+        Assert.Equal("Bonus Chambers", refreshed.GroupName);
+        Assert.Equal(30, refreshed.GroupSortOrder);
+    }
+
+    [Fact]
     public void GuideBundle_PreviewsAndImportsMatchedChangesTransactionally()
     {
         using var scope = new TempDataRoot();

@@ -37,7 +37,8 @@ namespace PixelVaultNative
                 NormalizeGameIndexName = delegate(string value) { return mw.NormalizeGameIndexName(value); },
                 ParseTagText = delegate(string value) { return MainWindow.ParseTagText(value); },
                 IsVideo = delegate(string file) { return MainWindow.IsVideo(file); },
-                NormalizeConsoleLabel = delegate(string value) { return MainWindow.NormalizeConsoleLabel(value); }
+                NormalizeConsoleLabel = delegate(string value) { return MainWindow.NormalizeConsoleLabel(value); },
+                GetCachedRobloxTitle = RobloxExperienceService.Shared.GetCachedTitle
             });
             var gameIndexEditorAssignmentService = new GameIndexEditorAssignmentService(
                 indexPersistenceService,

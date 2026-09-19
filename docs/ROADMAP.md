@@ -28,6 +28,8 @@ Source input for this roadmap:
 
 ## Current Direction
 
+**Active focused initiative (resumed 2026-09-07 at user request):** [PV-PLN-ACHG-002 — Achievement Collection Experience](plans/PV-PLN-ACHG-002-achievement-collection-experience.md). Phases A–E are implemented, including compact pins and collection styling/unlock feedback. Phase F manual verification remains. [Notion roadmap status](https://www.notion.so/3d373adc59b681cdb2bddc883381e1f8). This does not reorder the strategic phases below.
+
 PixelVault already has a strong core shape:
 
 - a clear ingest → metadata → index → browse workflow
