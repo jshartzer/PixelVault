@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Windows;
@@ -7,7 +6,6 @@ using System.Windows.Controls;
 using System.Windows.Media.Effects;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
 using System.Windows.Media.Animation;
 
 namespace PixelVaultNative
@@ -130,214 +128,6 @@ namespace PixelVaultNative
                 }
             }
             return string.Empty;
-        }
-        static bool IsNearWhiteBitmapPixel(byte[] pixels, int offset)
-        {
-            if (pixels == null || offset < 0 || offset + 3 >= pixels.Length) return false;
-            var alpha = pixels[offset + 3];
-            if (alpha == 0) return false;
-            return pixels[offset] >= 240 && pixels[offset + 1] >= 240 && pixels[offset + 2] >= 240;
-        }
-        static void RemoveEdgeConnectedNearWhitePixels(byte[] pixels, int width, int height, int stride)
-        {
-            if (pixels == null || width <= 0 || height <= 0 || stride <= 0) return;
-            var visited = new bool[width * height];
-            var queue = new Queue<int>();
-            void TryEnqueue(int x, int y)
-            {
-                if (x < 0 || y < 0 || x >= width || y >= height) return;
-                var index = (y * width) + x;
-                if (visited[index]) return;
-                var pixelOffset = (y * stride) + (x * 4);
-                if (!IsNearWhiteBitmapPixel(pixels, pixelOffset)) return;
-                visited[index] = true;
-                queue.Enqueue(index);
-            }
-
-            for (var x = 0; x < width; x++)
-            {
-                TryEnqueue(x, 0);
-                TryEnqueue(x, height - 1);
-            }
-            for (var y = 1; y < height - 1; y++)
-            {
-                TryEnqueue(0, y);
-                TryEnqueue(width - 1, y);
-            }
-
-            while (queue.Count > 0)
-            {
-                var index = queue.Dequeue();
-                var x = index % width;
-                var y = index / width;
-                var pixelOffset = (y * stride) + (x * 4);
-                pixels[pixelOffset + 3] = 0;
-                TryEnqueue(x - 1, y);
-                TryEnqueue(x + 1, y);
-                TryEnqueue(x, y - 1);
-                TryEnqueue(x, y + 1);
-            }
-        }
-        static void KeepLargestOpaqueComponent(byte[] pixels, int width, int height, int stride)
-        {
-            if (pixels == null || width <= 0 || height <= 0 || stride <= 0) return;
-            var visited = new bool[width * height];
-            List<int> largestComponent = null;
-            var queue = new Queue<int>();
-
-            for (var y = 0; y < height; y++)
-            {
-                for (var x = 0; x < width; x++)
-                {
-                    var startIndex = (y * width) + x;
-                    if (visited[startIndex]) continue;
-                    visited[startIndex] = true;
-                    var startOffset = (y * stride) + (x * 4);
-                    if (pixels[startOffset + 3] == 0) continue;
-
-                    var component = new List<int>();
-                    queue.Enqueue(startIndex);
-                    while (queue.Count > 0)
-                    {
-                        var index = queue.Dequeue();
-                        component.Add(index);
-                        var cx = index % width;
-                        var cy = index / width;
-
-                        void TryVisit(int nx, int ny)
-                        {
-                            if (nx < 0 || ny < 0 || nx >= width || ny >= height) return;
-                            var neighborIndex = (ny * width) + nx;
-                            if (visited[neighborIndex]) return;
-                            visited[neighborIndex] = true;
-                            var neighborOffset = (ny * stride) + (nx * 4);
-                            if (pixels[neighborOffset + 3] == 0) return;
-                            queue.Enqueue(neighborIndex);
-                        }
-
-                        TryVisit(cx - 1, cy);
-                        TryVisit(cx + 1, cy);
-                        TryVisit(cx, cy - 1);
-                        TryVisit(cx, cy + 1);
-                    }
-
-                    if (largestComponent == null || component.Count > largestComponent.Count)
-                    {
-                        largestComponent = component;
-                    }
-                }
-            }
-
-            if (largestComponent == null || largestComponent.Count == 0) return;
-
-            var keep = new bool[width * height];
-            foreach (var index in largestComponent) keep[index] = true;
-
-            for (var y = 0; y < height; y++)
-            {
-                for (var x = 0; x < width; x++)
-                {
-                    var index = (y * width) + x;
-                    if (keep[index]) continue;
-                    var pixelOffset = (y * stride) + (x * 4);
-                    pixels[pixelOffset + 3] = 0;
-                }
-            }
-        }
-
-        /// <summary>~12% less saturation + slight warm shift so medal reads quieter against dark UI chrome.</summary>
-        static BitmapSource TuneCompletionBadgeBitmap(BitmapSource source)
-        {
-            if (source == null) return null;
-            var fmt = PixelFormats.Pbgra32;
-            BitmapSource src;
-            if (source.Format == fmt)
-            {
-                src = source;
-            }
-            else
-            {
-                var converted = new FormatConvertedBitmap(source, fmt, null, 0);
-                converted.Freeze();
-                src = converted;
-            }
-
-            var w = src.PixelWidth;
-            var h = src.PixelHeight;
-            if (w <= 0 || h <= 0) return source;
-
-            var stride = w * 4;
-            var pixels = new byte[stride * h];
-            src.CopyPixels(pixels, stride, 0);
-            const double satRetain = 0.88;
-            var invW = w <= 1 ? 0.0 : 1.0 / (w - 1);
-            var invH = h <= 1 ? 0.0 : 1.0 / (h - 1);
-            for (var y = 0; y < h; y++)
-            {
-                var fy = y * invH;
-                for (var x = 0; x < w; x++)
-                {
-                    var i = (y * stride) + (x * 4);
-                    if (pixels[i + 3] == 0) continue;
-                    var fx = x * invW;
-                    var B = pixels[i];
-                    var G = pixels[i + 1];
-                    var R = pixels[i + 2];
-                    var lum = 0.299 * R + 0.587 * G + 0.114 * B;
-                    var r = lum + (R - lum) * satRetain;
-                    var g = lum + (G - lum) * satRetain;
-                    var b = lum + (B - lum) * satRetain;
-                    r = Math.Min(255, r + 4);
-                    g = Math.Min(255, g + 1);
-                    b = Math.Max(0, b - 6);
-                    // Subtle TL highlight / BR shade (baked; avoids a rectangular gloss layer in WPF).
-                    var lightMul = 1.0 + (1.0 - fx) * (1.0 - fy) * 0.068 - fx * fy * 0.058;
-                    if (lightMul < 0.94) lightMul = 0.94;
-                    if (lightMul > 1.07) lightMul = 1.07;
-                    r *= lightMul;
-                    g *= lightMul;
-                    b *= lightMul;
-                    pixels[i] = (byte)Math.Max(0, Math.Min(255, Math.Round(b)));
-                    pixels[i + 1] = (byte)Math.Max(0, Math.Min(255, Math.Round(g)));
-                    pixels[i + 2] = (byte)Math.Max(0, Math.Min(255, Math.Round(r)));
-                }
-            }
-
-            var wb = new WriteableBitmap(w, h, 96, 96, fmt, null);
-            wb.WritePixels(new Int32Rect(0, 0, w, h), pixels, stride, 0);
-            wb.Freeze();
-            return wb;
-        }
-
-        BitmapSource LoadCompletionBadgeBitmap()
-        {
-            if (libraryCompletionBadgeBitmap != null) return libraryCompletionBadgeBitmap;
-            var path = ResolveWorkspaceAssetPath("100 Percent Medal.png")
-                ?? ResolveWorkspaceAssetPath("100 Percent Icon.png");
-            if (string.IsNullOrWhiteSpace(path)) return null;
-            try
-            {
-                var bmp = new BitmapImage();
-                bmp.BeginInit();
-                bmp.UriSource = new Uri(path, UriKind.Absolute);
-                bmp.DecodePixelHeight = 256;
-                bmp.CacheOption = BitmapCacheOption.OnLoad;
-                bmp.EndInit();
-                bmp.Freeze();
-                try
-                {
-                    libraryCompletionBadgeBitmap = TuneCompletionBadgeBitmap(bmp) ?? bmp;
-                }
-                catch
-                {
-                    libraryCompletionBadgeBitmap = bmp;
-                }
-                return libraryCompletionBadgeBitmap;
-            }
-            catch
-            {
-                return null;
-            }
         }
         string ResolveLibrarySectionIconPath(string platformLabel)
         {
@@ -478,66 +268,6 @@ namespace PixelVaultNative
                 }
             };
         }
-        FrameworkElement BuildLibraryTileCompletionBadge(double targetHeight = 66, Thickness? margin = null)
-        {
-            var badgeBitmap = LoadCompletionBadgeBitmap();
-            var resolvedMargin = margin ?? new Thickness(0, 13, 12, 0);
-            var shadow = new DropShadowEffect
-            {
-                Color = Colors.Black,
-                BlurRadius = 20,
-                ShadowDepth = 5,
-                Direction = 315,
-                Opacity = 0.52
-            };
-
-            if (badgeBitmap != null)
-            {
-                var targetWidth = targetHeight;
-                if (badgeBitmap.PixelWidth > 0 && badgeBitmap.PixelHeight > 0)
-                {
-                    targetWidth = Math.Max(44, Math.Min(92, targetHeight * badgeBitmap.PixelWidth / (double)badgeBitmap.PixelHeight));
-                }
-                return new Image
-                {
-                    Source = badgeBitmap,
-                    Width = targetWidth,
-                    Height = targetHeight,
-                    Stretch = Stretch.Uniform,
-                    SnapsToDevicePixels = true,
-                    Effect = shadow,
-                    HorizontalAlignment = HorizontalAlignment.Right,
-                    VerticalAlignment = VerticalAlignment.Top,
-                    Margin = resolvedMargin,
-                    IsHitTestVisible = false
-                };
-            }
-
-            var text = new TextBlock
-            {
-                Text = "100%",
-                FontSize = 20,
-                FontWeight = FontWeights.Bold,
-                Foreground = Brushes.White,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center,
-                Effect = shadow
-            };
-            text.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-            var tw = Math.Max(44, Math.Ceiling(text.DesiredSize.Width) + 18);
-            var th = Math.Max(28, Math.Ceiling(text.DesiredSize.Height) + 8);
-            var textHost = new Grid
-            {
-                Width = tw,
-                Height = th,
-                HorizontalAlignment = HorizontalAlignment.Right,
-                VerticalAlignment = VerticalAlignment.Top,
-                Margin = resolvedMargin,
-                IsHitTestVisible = false
-            };
-            textHost.Children.Add(text);
-            return textHost;
-        }
         Brush BuildLibraryTileCompletionBorderBrush()
         {
             var brush = new LinearGradientBrush
@@ -554,94 +284,38 @@ namespace PixelVaultNative
         }
         sealed class LibraryTileCompletionFoilVisual
         {
-            readonly Grid root;
-            readonly Border glossLayer;
-            readonly Border prismLayer;
-            readonly Border crossLayer;
-            readonly Border stripeLayer;
-            readonly Border glintLayer;
-            readonly TranslateTransform glossShift;
-            readonly TranslateTransform prismShift;
-            readonly TranslateTransform crossShift;
-            readonly TranslateTransform stripeShift;
-            readonly TranslateTransform glintShift;
+            readonly TradingCardFoilEffect effect;
 
-            internal LibraryTileCompletionFoilVisual(
-                Grid root,
-                Border glossLayer,
-                Border prismLayer,
-                Border crossLayer,
-                Border stripeLayer,
-                Border glintLayer,
-                TranslateTransform glossShift,
-                TranslateTransform prismShift,
-                TranslateTransform crossShift,
-                TranslateTransform stripeShift,
-                TranslateTransform glintShift)
+            internal LibraryTileCompletionFoilVisual(double width, double height)
             {
-                this.root = root;
-                this.glossLayer = glossLayer;
-                this.prismLayer = prismLayer;
-                this.crossLayer = crossLayer;
-                this.stripeLayer = stripeLayer;
-                this.glintLayer = glintLayer;
-                this.glossShift = glossShift;
-                this.prismShift = prismShift;
-                this.crossShift = crossShift;
-                this.stripeShift = stripeShift;
-                this.glintShift = glintShift;
+                effect = new TradingCardFoilEffect { Size = new Point(width, height) };
             }
 
-            internal FrameworkElement Root => root;
+            internal void AttachArtwork(UIElement artwork)
+            {
+                if (artwork == null || SystemParameters.HighContrast) return;
+                artwork.Effect = effect;
+            }
 
             internal void Update(double normalizedX, double normalizedY, bool animate)
             {
-                normalizedX = Math.Max(0, Math.Min(1, normalizedX));
-                normalizedY = Math.Max(0, Math.Min(1, normalizedY));
-
-                var xBias = normalizedX - 0.5;
-                var yBias = normalizedY - 0.5;
-                var shimmer = Math.Max(Math.Abs(xBias), Math.Abs(yBias));
-
-                SetDouble(root, UIElement.OpacityProperty, 0.98d + shimmer * 0.08d, animate, 150);
-                SetDouble(glossShift, TranslateTransform.XProperty, xBias * 10d, animate, 150);
-                SetDouble(glossShift, TranslateTransform.YProperty, yBias * 8d, animate, 150);
-                SetDouble(prismShift, TranslateTransform.XProperty, xBias * 36d - yBias * 9d, animate, 150);
-                SetDouble(prismShift, TranslateTransform.YProperty, yBias * 22d - xBias * 8d, animate, 150);
-                SetDouble(crossShift, TranslateTransform.XProperty, -xBias * 30d + yBias * 12d, animate, 150);
-                SetDouble(crossShift, TranslateTransform.YProperty, -yBias * 16d + xBias * 10d, animate, 150);
-                SetDouble(stripeShift, TranslateTransform.XProperty, xBias * 14d, animate, 180);
-                SetDouble(stripeShift, TranslateTransform.YProperty, yBias * 11d, animate, 180);
-                SetDouble(glintShift, TranslateTransform.XProperty, xBias * 20d + yBias * 12d, animate, 120);
-                SetDouble(glintShift, TranslateTransform.YProperty, yBias * 12d - xBias * 8d, animate, 120);
-
-                SetDouble(glossLayer, UIElement.OpacityProperty, 0.36d + shimmer * 0.36d, animate, 150);
-                SetDouble(prismLayer, UIElement.OpacityProperty, 0.30d + shimmer * 0.42d, animate, 150);
-                SetDouble(crossLayer, UIElement.OpacityProperty, 0.22d + shimmer * 0.22d, animate, 150);
-                SetDouble(stripeLayer, UIElement.OpacityProperty, 0.15d + shimmer * 0.18d, animate, 180);
-                SetDouble(glintLayer, UIElement.OpacityProperty, 0.28d + shimmer * 0.30d, animate, 120);
-            }
-
-            static void SetDouble(DependencyObject target, DependencyProperty property, double value, bool animate, int durationMs)
-            {
-                if (target is Animatable animatable)
+                var light = new Point(Math.Clamp(normalizedX, 0, 1), Math.Clamp(normalizedY, 0, 1));
+                if (animate && SystemParameters.ClientAreaAnimation)
                 {
-                    if (animate && durationMs > 0)
+                    var from = effect.Light;
+                    effect.BeginAnimation(TradingCardFoilEffect.LightProperty, new PointAnimation
                     {
-                        animatable.BeginAnimation(property, new DoubleAnimation
-                        {
-                            To = value,
-                            Duration = TimeSpan.FromMilliseconds(durationMs),
-                            EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut },
-                            FillBehavior = FillBehavior.HoldEnd
-                        }, HandoffBehavior.SnapshotAndReplace);
-                        return;
-                    }
-
-                    animatable.BeginAnimation(property, null);
+                        From = from,
+                        To = light,
+                        Duration = TimeSpan.FromMilliseconds(110),
+                        EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut },
+                        FillBehavior = FillBehavior.HoldEnd
+                    }, HandoffBehavior.SnapshotAndReplace);
+                    return;
                 }
 
-                target.SetValue(property, value);
+                effect.Light = light;
+                effect.BeginAnimation(TradingCardFoilEffect.LightProperty, null);
             }
         }
         FrameworkElement BuildLibraryTileCompletionFrameOverlay(double width, double height, CornerRadius cornerRadius)
@@ -679,136 +353,9 @@ namespace PixelVaultNative
 
             return frame;
         }
-        LibraryTileCompletionFoilVisual BuildLibraryTileCompletionFoilOverlay(double tileWidth, double tileHeight, double cornerRadius)
+        LibraryTileCompletionFoilVisual CreateLibraryTileCompletionFoil(double width, double height)
         {
-            var foil = new Grid
-            {
-                Width = tileWidth,
-                Height = tileHeight,
-                IsHitTestVisible = false,
-                Opacity = 0.96,
-                ClipToBounds = false
-            };
-            var foilClip = new RectangleGeometry(new Rect(0, 0, tileWidth, tileHeight), cornerRadius, cornerRadius);
-            if (foilClip.CanFreeze) foilClip.Freeze();
-            foil.Clip = foilClip;
-            var glossShift = new TranslateTransform();
-            var prismShift = new TranslateTransform();
-            var crossShift = new TranslateTransform();
-            var stripeShift = new TranslateTransform();
-            var glintShift = new TranslateTransform();
-
-            var glossBrush = new LinearGradientBrush
-            {
-                StartPoint = new Point(0.08, 0),
-                EndPoint = new Point(0.92, 1)
-            };
-            glossBrush.GradientStops.Add(new GradientStop(Brush("#00FFFFFF").Color, 0));
-            glossBrush.GradientStops.Add(new GradientStop(Brush("#44FFFFFF").Color, 0.22));
-            glossBrush.GradientStops.Add(new GradientStop(Brush("#28F9FCFF").Color, 0.40));
-            glossBrush.GradientStops.Add(new GradientStop(Brush("#50FFFFFF").Color, 0.60));
-            glossBrush.GradientStops.Add(new GradientStop(Brush("#10FFFFFF").Color, 0.82));
-            glossBrush.GradientStops.Add(new GradientStop(Brush("#00FFFFFF").Color, 1));
-            if (glossBrush.CanFreeze) glossBrush.Freeze();
-            var glossLayer = new Border
-            {
-                Background = glossBrush,
-                Margin = new Thickness(-12),
-                RenderTransform = glossShift
-            };
-            foil.Children.Add(glossLayer);
-
-            var prismSweepBrush = new LinearGradientBrush
-            {
-                StartPoint = new Point(0, 0.94),
-                EndPoint = new Point(1, 0.08)
-            };
-            prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#00FFFFFF").Color, 0.26));
-            prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#A0A8F6FF").Color, 0.38));
-            prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#A8E39BFF").Color, 0.46));
-            prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#BBFFF4A8").Color, 0.54));
-            prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#A0FFB6E8").Color, 0.61));
-            prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#72FFE7C8").Color, 0.68));
-            prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#00FFFFFF").Color, 0.80));
-            prismSweepBrush.GradientStops.Add(new GradientStop(Brush("#00FFFFFF").Color, 1));
-            if (prismSweepBrush.CanFreeze) prismSweepBrush.Freeze();
-            var prismLayer = new Border
-            {
-                Background = prismSweepBrush,
-                Opacity = 0.30,
-                Margin = new Thickness(-32),
-                RenderTransform = prismShift
-            };
-            foil.Children.Add(prismLayer);
-
-            var crossSweepBrush = new LinearGradientBrush
-            {
-                StartPoint = new Point(0.06, 0.18),
-                EndPoint = new Point(0.94, 0.82)
-            };
-            crossSweepBrush.GradientStops.Add(new GradientStop(Brush("#00FFFFFF").Color, 0.38));
-            crossSweepBrush.GradientStops.Add(new GradientStop(Brush("#00FFFFFF").Color, 0.48));
-            crossSweepBrush.GradientStops.Add(new GradientStop(Brush("#66C6A8FF").Color, 0.55));
-            crossSweepBrush.GradientStops.Add(new GradientStop(Brush("#44FFF6D7").Color, 0.61));
-            crossSweepBrush.GradientStops.Add(new GradientStop(Brush("#00FFFFFF").Color, 0.72));
-            crossSweepBrush.GradientStops.Add(new GradientStop(Brush("#00FFFFFF").Color, 1));
-            if (crossSweepBrush.CanFreeze) crossSweepBrush.Freeze();
-            var crossLayer = new Border
-            {
-                Background = crossSweepBrush,
-                Opacity = 0.22,
-                Margin = new Thickness(-26),
-                RenderTransform = crossShift
-            };
-            foil.Children.Add(crossLayer);
-
-            var stripeDrawing = new DrawingGroup();
-            stripeDrawing.Children.Add(new GeometryDrawing(
-                Brushes.Transparent,
-                new Pen(Brush("#58FFFFFF"), 1.4),
-                Geometry.Parse("M 0 10 L 10 0")));
-            if (stripeDrawing.CanFreeze) stripeDrawing.Freeze();
-            var stripeBrush = new DrawingBrush(stripeDrawing)
-            {
-                TileMode = TileMode.Tile,
-                Stretch = Stretch.None,
-                Viewbox = new Rect(0, 0, 10, 10),
-                ViewboxUnits = BrushMappingMode.Absolute,
-                Viewport = new Rect(0, 0, 10, 10),
-                ViewportUnits = BrushMappingMode.Absolute
-            };
-            if (stripeBrush.CanFreeze) stripeBrush.Freeze();
-            var stripeLayer = new Border
-            {
-                Background = stripeBrush,
-                Opacity = 0.12,
-                Margin = new Thickness(-10),
-                RenderTransform = stripeShift
-            };
-            foil.Children.Add(stripeLayer);
-
-            var topGlintBrush = new RadialGradientBrush
-            {
-                Center = new Point(0.22, 0.18),
-                GradientOrigin = new Point(0.22, 0.18),
-                RadiusX = 0.32,
-                RadiusY = 0.26
-            };
-            topGlintBrush.GradientStops.Add(new GradientStop(Brush("#88FFFFFF").Color, 0));
-            topGlintBrush.GradientStops.Add(new GradientStop(Brush("#50FFF9F0").Color, 0.28));
-            topGlintBrush.GradientStops.Add(new GradientStop(Brush("#18FFFFFF").Color, 0.60));
-            topGlintBrush.GradientStops.Add(new GradientStop(Brush("#00FFFFFF").Color, 1));
-            if (topGlintBrush.CanFreeze) topGlintBrush.Freeze();
-            var glintLayer = new Border
-            {
-                Background = topGlintBrush,
-                Opacity = 0.28,
-                Margin = new Thickness(-16),
-                RenderTransform = glintShift
-            };
-            foil.Children.Add(glintLayer);
-
-            return new LibraryTileCompletionFoilVisual(foil, glossLayer, prismLayer, crossLayer, stripeLayer, glintLayer, glossShift, prismShift, crossShift, stripeShift, glintShift);
+            return new LibraryTileCompletionFoilVisual(width, height);
         }
         FrameworkElement BuildLibrarySectionHeader(string platformLabel, int folderCount, bool sectionCollapsed, Action toggleSectionCollapse)
         {

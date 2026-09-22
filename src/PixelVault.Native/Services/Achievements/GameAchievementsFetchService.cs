@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Globalization;
 using System.Linq;
 using System.Net;
@@ -12,6 +13,21 @@ namespace PixelVaultNative
 {
     static class GameAchievementsFetchService
     {
+        internal static event Action<FetchResult, string> ProgressObserved;
+        static readonly ConcurrentDictionary<int, (DateTime Expires, string Json)> NotificationSchemaCache = new();
+
+        static async Task<string> LoadNotificationSchemaAsync(int appId, string url, string userAgent, CancellationToken token)
+        {
+            if (NotificationSchemaCache.TryGetValue(appId, out var cached) && cached.Expires > DateTime.UtcNow) return cached.Json;
+            var json = await DownloadSteamJsonStringAsync(url, userAgent, token).ConfigureAwait(false);
+            using var parsed = JsonDocument.Parse(json);
+            if (parsed.RootElement.TryGetProperty("game", out var game) && game.TryGetProperty("availableGameStats", out _))
+            {
+                if (NotificationSchemaCache.Count >= 512) NotificationSchemaCache.Clear();
+                NotificationSchemaCache[appId] = (DateTime.UtcNow.AddHours(6), json);
+            }
+            return json;
+        }
         public sealed class AchievementRow
         {
             /// <summary>Normalized achievement provider slug. Initially <c>steam</c> or <c>retroachievements</c>.</summary>
@@ -97,7 +113,8 @@ namespace PixelVaultNative
             string steamUserId64,
             string retroAchievementsUsername,
             string userAgent,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            bool notificationsOnly = false)
         {
             var folderName = folder == null ? string.Empty : (folder.Name ?? string.Empty).Trim();
             var norm = (normalizedPlatform ?? string.Empty).Trim();
@@ -109,9 +126,12 @@ namespace PixelVaultNative
                 };
             }
 
-            if (useSteam)
-                return await FetchSteamAsync(folder, folderName, steamWebApiKey, steamUserId64, userAgent, cancellationToken).ConfigureAwait(false);
-            return await FetchRetroAsync(folder, folderName, retroAchievementsApiKey, retroAchievementsUsername, userAgent, cancellationToken).ConfigureAwait(false);
+            var result = useSteam
+                ? await FetchSteamAsync(folder, folderName, steamWebApiKey, steamUserId64, userAgent, cancellationToken, notificationsOnly).ConfigureAwait(false)
+                : await FetchRetroAsync(folder, folderName, retroAchievementsApiKey, retroAchievementsUsername, userAgent, cancellationToken).ConfigureAwait(false);
+            if (!cancellationToken.IsCancellationRequested)
+                ProgressObserved?.Invoke(result, useSteam ? steamUserId64 : retroAchievementsUsername);
+            return result;
         }
 
         /// <summary>
@@ -119,7 +139,7 @@ namespace PixelVaultNative
         /// folders only use Steam IDs, Emulation-labeled folders only use RetroAchievements IDs; merged/other
         /// rows may infer from the one achievement-capable ID that is present.
         /// </summary>
-        static bool TryPickAchievementsBackend(string normalizedPlatform, LibraryFolderInfo folder, out bool useSteam)
+        internal static bool TryPickAchievementsBackend(string normalizedPlatform, LibraryFolderInfo folder, out bool useSteam)
         {
             useSteam = true;
             var norm = (normalizedPlatform ?? string.Empty).Trim();
@@ -433,7 +453,8 @@ namespace PixelVaultNative
             string steamWebApiKey,
             string steamUserId64Raw,
             string userAgent,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            bool notificationsOnly = false)
         {
             if (string.IsNullOrWhiteSpace(steamWebApiKey))
                 return Err("Add a Steam Web API key in Settings (Paths), or set PIXELVAULT_STEAM_WEB_API_KEY / STEAM_WEB_API_KEY.");
@@ -445,14 +466,16 @@ namespace PixelVaultNative
                 + "&appid=" + appId.ToString(CultureInfo.InvariantCulture);
 
             var progressAttempted = TryParseULong(steamUserId64Raw, out var sid64);
-            Task<string> schemaTask = DownloadSteamJsonStringAsync(schemaUrl, userAgent, cancellationToken);
+            Task<string> schemaTask = notificationsOnly ? LoadNotificationSchemaAsync(appId, schemaUrl, userAgent, cancellationToken)
+                : DownloadSteamJsonStringAsync(schemaUrl, userAgent, cancellationToken);
             Task<Dictionary<string, (int achieved, int unlocktime)>> progressTask = progressAttempted
                 ? TryLoadSteamPlayerAchievementsAsync(appId, steamWebApiKey, sid64, userAgent, cancellationToken)
                 : Task.FromResult<Dictionary<string, (int achieved, int unlocktime)>>(null);
-            Task<int?> playtimeTask = progressAttempted
+            Task<int?> playtimeTask = progressAttempted && !notificationsOnly
                 ? TryLoadSteamOwnedGamePlaytimeMinutesAsync(appId, keyTrim, sid64, userAgent, cancellationToken)
                 : Task.FromResult<int?>(null);
-            Task<Dictionary<string, double>> globalPctTask = TryLoadSteamGlobalAchievementPercentsAsync(appId, keyTrim, userAgent, cancellationToken);
+            Task<Dictionary<string, double>> globalPctTask = notificationsOnly ? Task.FromResult<Dictionary<string, double>>(null)
+                : TryLoadSteamGlobalAchievementPercentsAsync(appId, keyTrim, userAgent, cancellationToken);
 
             try
             {

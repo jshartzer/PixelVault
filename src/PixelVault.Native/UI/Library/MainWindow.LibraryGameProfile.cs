@@ -171,6 +171,15 @@ namespace PixelVaultNative
                 win.Title = "PixelVault Game Profile - " + (string.IsNullOrWhiteSpace(folder.Name) ? "Game Profile" : folder.Name);
             };
             var heroElement = BuildLibraryGameProfileHero(win, view, folder, refreshHero);
+            void OnAchievementCompletionUpdated(LibraryFolderInfo completed)
+            {
+                if (completed == null || completed.GameId != folder.GameId) return;
+                folder.IsCompleted100Percent = view.IsCompleted100Percent = true;
+                folder.CompletedUtcTicks = view.CompletedUtcTicks = completed.CompletedUtcTicks;
+                refreshHero();
+            }
+            AchievementCompletionUpdated += OnAchievementCompletionUpdated;
+            win.Closed += (_, __) => AchievementCompletionUpdated -= OnAchievementCompletionUpdated;
             heroElement.VerticalAlignment = VerticalAlignment.Top;
             root.Children.Add(heroElement);
 
@@ -444,13 +453,12 @@ namespace PixelVaultNative
             if (coverClipGeometry.CanFreeze) coverClipGeometry.Freeze();
             coverArt.Clip = coverClipGeometry;
             // PV-PLN-GPRO-001 step C.2 follow-up: when the 100% complete toggle is on,
-            // mirror the library tile's holofoil + gold-frame overlays on top of the
-            // profile cover so the toggle has visible feedback right next to the
-            // button. We reuse the BuildLibraryTileCompletionFoilOverlay /
-            // BuildLibraryTileCompletionFrameOverlay helpers from the folder tile
-            // path (PV-POL-GPRO-REUSE-001) instead of building a parallel surface.
-            // Animation is hover-driven here (the profile hero doesn't scroll like the
-            // tile rail does), with a centered idle state on first layout.
+            // apply the same artwork-only foil shader and gold-frame overlay as library
+            // tiles so the toggle has visible feedback next to the button
+            // (PV-POL-GPRO-REUSE-001). Animation is hover-driven here (the profile
+            // hero doesn't scroll like the tile rail does), with a centered idle
+            // state on first layout. Drop shadow stays on the wrapper so it does
+            // not replace the shader Effect on the cover.
             FrameworkElement coverHost = coverArt;
             if (view != null && view.IsCompleted100Percent)
             {
@@ -463,8 +471,8 @@ namespace PixelVaultNative
                     UseLayoutRounding = true
                 };
                 foilWrap.Children.Add(coverArt);
-                var foilVisual = BuildLibraryTileCompletionFoilOverlay(profileCoverWidth, profileCoverHeight, profileCoverCorner.TopLeft);
-                foilWrap.Children.Add(foilVisual.Root);
+                var foilVisual = CreateLibraryTileCompletionFoil(profileCoverWidth, profileCoverHeight);
+                foilVisual.AttachArtwork(coverArt);
                 foilWrap.Children.Add(BuildLibraryTileCompletionFrameOverlay(profileCoverWidth, profileCoverHeight, profileCoverCorner));
                 foilWrap.Loaded += delegate { foilVisual.Update(0.5, 0.5, false); };
                 foilWrap.MouseMove += delegate(object _, MouseEventArgs e)
@@ -1306,17 +1314,21 @@ namespace PixelVaultNative
             return string.Empty;
         }
 
-        /// <summary>True when every returned row has known progress and is unlocked (full achievement sweep).</summary>
-        static bool LibraryGameProfileAchievementsAreFullyUnlocked(IReadOnlyList<GameAchievementsFetchService.AchievementRow> rows)
+        /// <summary>True when at least one base-game achievement exists and all base-game progress is known and unlocked.</summary>
+        internal static bool LibraryGameProfileAchievementsAreFullyUnlocked(IReadOnlyList<GameAchievementsFetchService.AchievementRow> rows)
         {
             if (rows == null || rows.Count == 0) return false;
+            var hasBaseGameAchievements = false;
             for (var i = 0; i < rows.Count; i++)
             {
                 var row = rows[i];
-                if (row == null || !row.ProgressKnown || !row.Unlocked) return false;
+                if (row == null) return false;
+                if (!string.Equals(AchievementsInfoWindow.EffectiveAchievementGroupName(row), "Base Game", StringComparison.OrdinalIgnoreCase)) continue;
+                hasBaseGameAchievements = true;
+                if (!row.ProgressKnown || !row.Unlocked) return false;
             }
 
-            return true;
+            return hasBaseGameAchievements;
         }
 
         void TryLibraryGameProfileAutoMarkCompleteFromAchievements(
@@ -1328,7 +1340,7 @@ namespace PixelVaultNative
             if (!LibraryGameProfileAchievementsAreFullyUnlocked(rows)) return;
             if (view.IsCompleted100Percent) return;
             if (!SetLibraryBrowserCompletionState(view, true)) return;
-            TryLibraryToast("Marked 100% complete — all tracked achievements unlocked.", MessageBoxImage.Information);
+            TryLibraryToast("Marked 100% complete — all base-game achievements unlocked.", MessageBoxImage.Information);
             refreshHero?.Invoke();
             try { _libraryBrowserLiveWorkingSet?.RerenderFolderList?.Invoke(); }
             catch (Exception ex) { LogException("LibraryGameProfile.TryLibraryGameProfileAutoMarkCompleteFromAchievements rerenderFolderList", ex); }
@@ -1372,6 +1384,17 @@ namespace PixelVaultNative
                         CurrentRetroAchievementsUsername(),
                         userAgent,
                         cancellation).ConfigureAwait(false);
+                    if (result != null && !result.IsError && result.Rows != null)
+                    {
+                        try
+                        {
+                            achievementGuideService?.SyncDefinitionsAndLoadGuides(folder?.GameId ?? string.Empty, result.Rows);
+                        }
+                        catch (Exception ex)
+                        {
+                            LogException("LibraryGameProfile.LoadAchievementGroups", ex);
+                        }
+                    }
                 }
                 catch (OperationCanceledException)
                 {

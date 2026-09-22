@@ -198,6 +198,7 @@ namespace PixelVaultNative
                 VerticalAlignment = VerticalAlignment.Center
             };
             headerActions.Children.Add(chrome.SettingsButton);
+            headerActions.Children.Add(CreateAchievementNotificationsButton());
             headerActions.Children.Add(chrome.GameIndexButton);
             headerActions.Children.Add(chrome.PhotoIndexButton);
             headerActions.Children.Add(chrome.PhotographyGalleryButton);

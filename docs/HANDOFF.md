@@ -2,6 +2,16 @@
 
 This file is the short current-state handoff.
 
+September 21 foil follow-up: the shader now attaches to the cover image only (not the whole tile chrome), the empty leftover overlay grid is gone, unused 100% medal-badge helpers were removed, and hover light eases with HoldEnd instead of snapping to the destination first.
+
+September 20 foil refinement: replaced the five translucent overlay layers with `UI/Effects/TradingCardFoilEffect.cs` and a bundled ps_2_0 shader applied to the actual cover artwork in both library and profile. Hover/scroll update one light position; fine grain is a shared frozen texture and there is no idle loop. Recompile shader changes using `scripts/Compile-TradingCardFoil.ps1` (Windows D3D compiler), then build normally. Actual WPF render comparisons checked Shadow of War and Thank Goodness You're Here! at three light positions. All 738 tests pass, including software shader rendering and premultiplied-alpha preservation.
+
+September 19 completion follow-up: Shadow of War's saved progress confirmed 52/52 base achievements, but the background notification path never invoked profile-only auto-completion. All observed successful refreshes now load saved groups without rewriting the guide catalog, persist base-game completion for the matching provider/game, and refresh live library/profile flags. All 736 tests pass, including a 52-base/20-DLC regression.
+
+Live startup verification passed in the rebuilt App Testing executable: Shadow of War's persisted `is_completed_100_percent` changed from 0 to 1 automatically and the completion timestamp was derived from its base-game unlocks. Startup polling prioritizes the selected game and then recent captures instead of leaving the selected game deep in the library queue. Older running executable instances must be restarted to pick up the fix.
+
+September 19 achievement notifications: persistent account-scoped milestones and optional individual unlocks, stacked seven-second popups, fullscreen suppression, saved history, and configurable background checks. Notifications is available in the library toolbar and tray menu, including Preview popups. All 733 native tests pass. Test build updated at `C:\Codex\App Testing\PixelVault.exe`; published version remains 0.077.000. First successful check establishes a silent baseline. State/settings are stored in `PixelVaultData/achievement-notifications.json`. Startup and toolbar accessibility were checked; interactive popup QA remains for the user because the fullscreen game intercepted UI automation targeting.
+
 September 7 Roblox naming correction: new imports use `Roblox_Experience_capture-token.png`, with Roblox (PC) as the game identity in parser and intake preparation. Earlier experience-first filenames remain recognized; existing library files and saved assignments are not migrated. All 77 targeted importer/parser/intake tests pass. Included in App Testing; no release-version bump.
 
 September 7 settings follow-up: Settings now uses HealthApp-style top tabs with inline configuration and deferred utility pages. Opening no longer reads/renders the entire 20 MB main log; Run history loads a 64 KiB tail in the background when selected. All 69 targeted settings tests pass. See `docs/SETTINGS_UI.md`. Included in the App Testing rebuild; release version remains unchanged.

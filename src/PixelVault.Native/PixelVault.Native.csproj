@@ -17,6 +17,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="UI\Effects\TradingCardFoilEffect.cs" />
+    <EmbeddedResource Include="UI\Effects\TradingCardFoil.ps" LogicalName="PixelVault.TradingCardFoil.ps" />
+    <Compile Include="Services\Achievements\AchievementNotifications.cs" />
+    <Compile Include="UI\AchievementFullscreenGuard.cs" />
+    <Compile Include="MainWindow.AchievementNotifications.cs" />
     <Compile Include="Infrastructure\PersistentDataMigrator.cs" />
     <Compile Include="Infrastructure\TextAndPathHelpers.cs" />
     <Compile Include="Infrastructure\TimeoutWebClient.cs" />

@@ -44,6 +44,7 @@ namespace PixelVaultNative
 
     interface IAchievementGuideService
     {
+        void LoadSavedAchievementGroups(IEnumerable<GameAchievementsFetchService.AchievementRow> rows);
         IReadOnlyList<AchievementGuideEntry> LoadPinnedAchievements(string provider, string providerGameId);
         AchievementPinChange SetAchievementPinned(GameAchievementsFetchService.AchievementRow row, bool pinned);
         int ReconcileAchievementPins(IEnumerable<GameAchievementsFetchService.AchievementRow> rows);
@@ -169,6 +170,27 @@ CREATE TABLE IF NOT EXISTS achievement_guide (
             {
                 alter.CommandText = "ALTER TABLE achievement_definition ADD COLUMN " + columnName + " " + definition + ";";
                 alter.ExecuteNonQuery();
+            }
+        }
+
+        public void LoadSavedAchievementGroups(IEnumerable<GameAchievementsFetchService.AchievementRow> rows)
+        {
+            // Background progress checks only need grouping; do not rewrite the catalog or create backups.
+            using var connection = OpenDatabase();
+            foreach (var game in (rows ?? Enumerable.Empty<GameAchievementsFetchService.AchievementRow>())
+                .Where(r => r?.HasStableProviderIdentity == true)
+                .GroupBy(r => (Provider: NormalizeProvider(r.Provider), Game: r.ProviderGameId.Trim())))
+            {
+                using var command = connection.CreateCommand();
+                command.CommandText = "SELECT provider_achievement_id, group_name, group_sort_order FROM achievement_definition WHERE provider = $provider AND provider_game_id = $game;";
+                command.Parameters.AddWithValue("$provider", game.Key.Provider);
+                command.Parameters.AddWithValue("$game", game.Key.Game);
+                var groups = new Dictionary<string, (string Name, int Order)>(StringComparer.Ordinal);
+                using var reader = command.ExecuteReader();
+                while (reader.Read()) groups[reader.GetString(0)] = (reader.GetString(1), reader.GetInt32(2));
+                foreach (var row in game)
+                    if (groups.TryGetValue(row.ProviderAchievementId.Trim(), out var group))
+                    { row.GroupName = group.Name; row.GroupSortOrder = group.Order; }
             }
         }
 

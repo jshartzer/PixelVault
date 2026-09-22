@@ -6,6 +6,48 @@ namespace PixelVaultNative.Tests;
 
 public sealed class LibraryAchievementsPreviewTests
 {
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("  ")]
+    [InlineData("Base Game")]
+    [InlineData(" base game ")]
+    public void BaseGameCompletion_IgnoresLockedAndUnknownDlc(string? group)
+    {
+        GameAchievementsFetchService.AchievementRow[] rows =
+        {
+            new() { GroupName = group, ProgressKnown = true, Unlocked = true },
+            new() { GroupName = "Expansion", ProgressKnown = true, Unlocked = false },
+            new() { GroupName = "Bonus Pack", ProgressKnown = false }
+        };
+        Assert.True(MainWindow.LibraryGameProfileAchievementsAreFullyUnlocked(rows));
+    }
+
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(false, false)]
+    public void BaseGameCompletion_RequiresEveryBaseAchievement(bool known, bool unlocked)
+    {
+        GameAchievementsFetchService.AchievementRow[] rows =
+        {
+            new() { ProgressKnown = true, Unlocked = true },
+            new() { GroupName = "Base Game", ProgressKnown = known, Unlocked = unlocked }
+        };
+        Assert.False(MainWindow.LibraryGameProfileAchievementsAreFullyUnlocked(rows));
+    }
+
+    [Fact]
+    public void BaseGameCompletion_RequiresNonemptyBaseGame()
+    {
+        Assert.False(MainWindow.LibraryGameProfileAchievementsAreFullyUnlocked(null!));
+        Assert.False(MainWindow.LibraryGameProfileAchievementsAreFullyUnlocked(Array.Empty<GameAchievementsFetchService.AchievementRow>()));
+        Assert.False(MainWindow.LibraryGameProfileAchievementsAreFullyUnlocked(new GameAchievementsFetchService.AchievementRow[]
+        {
+            new() { GroupName = "Expansion", ProgressKnown = true, Unlocked = true }
+        }));
+    }
+
     [Fact]
     public void BuildRecentAchievementsPreviewRows_ReturnsFiveMostRecentUnlockedRows()
     {

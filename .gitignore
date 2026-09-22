@@ -79,6 +79,8 @@ dist/PixelVault-0.712/
 dist/PixelVault-0.713/
 
 # OS/editor noise
+/App Testing Notifications/
+/PixelVaultData/achievement-notifications.json*
 .vs/
 Thumbs.db
 .DS_Store

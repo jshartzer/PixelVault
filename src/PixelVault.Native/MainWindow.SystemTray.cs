@@ -122,6 +122,9 @@ namespace PixelVaultNative
                 ContextMenuStrip = new Forms.ContextMenuStrip()
             };
             _systemTrayIcon.ContextMenuStrip.Items.Add(recentStatusItem);
+            var notificationsItem = new Forms.ToolStripMenuItem("Achievement Notifications");
+            notificationsItem.Click += delegate { RestoreMainWindowFromSystemTray(); ShowAchievementNotifications(); };
+            _systemTrayIcon.ContextMenuStrip.Items.Add(notificationsItem);
             _systemTrayIcon.ContextMenuStrip.Items.Add(restoreItem);
             _systemTrayIcon.ContextMenuStrip.Items.Add(backgroundImportsItem);
             _systemTrayIcon.ContextMenuStrip.Items.Add(new Forms.ToolStripSeparator());

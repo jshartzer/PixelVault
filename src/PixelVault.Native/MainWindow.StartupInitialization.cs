@@ -323,6 +323,7 @@ namespace PixelVaultNative
             Content = new Grid();
             ShowLibraryBrowser(true);
             InitializeSystemTraySupport();
+            InitializeAchievementNotifications();
             Log("PixelVault " + AppVersion + " ready.");
         }
     }

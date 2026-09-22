@@ -1,3 +1,11 @@
+## Unreleased — Achievement notifications (App Testing)
+- **Trading-card foil:** Completed game cards and profile covers now use an artwork-aware foil shader with moving silver reflections, localized diffraction color, metallic shadow and fine grain. Replaces the washed-out rainbow/diagonal-stripe overlays. The shader is applied to the cover artwork only so title, scrim, and platform badge stay unfoiled. Hover and scroll drive the light without an idle loop or snap at the start of each move. Shader supports WPF software rendering and preserves rounded transparency.
+- **Base-game completion fix:** Background and manual achievement refreshes now load saved DLC groups and persist the 100% completion flag once all base-game achievements are unlocked, even with DLC unfinished or without opening the game profile. Open profiles and library tiles update together.
+- **Achievement notifications:** Persistent account-specific milestones (25%, 50%, 75%, 100% by default), optional individual unlocks, and saved history with unread counts. Initial checks establish a silent baseline; repeated refreshes and restarts do not repeat milestones.
+- **Popups:** Up to three non-activating cards stack in the desktop corner and expire after seven seconds. Fullscreen / presentation / quiet-state checks suppress popups, with foreground and fullscreen geometry changes dismissing visible cards. Suppressed achievements remain in history.
+- **Refresh:** Delayed startup checks and configurable 5/15/30/60-minute or startup/manual-only checks while the app runs, including in the tray. Games are checked sequentially with a pause; unavailable games back off for 30 minutes. Background Steam checks cache definitions and skip playtime/rarity requests.
+- **Controls:** Open Notifications from the library toolbar or tray menu for thresholds, individual unlocks, refresh interval, manual checks, mark-all-read, and a four-card popup preview. Click a saved notification to open that game's achievements.
+
 ## 0.077.000
 - **Release:** Version **0.077.000** — **`PV-PLN-PERF-001`** app speed and efficiency release.
 - **Achievement guides (`PV-PLN-ACHG-001`):** Steam and RetroAchievements rows now synchronize into a durable local catalog with stable provider identities, while unlock progress remains live from each provider.

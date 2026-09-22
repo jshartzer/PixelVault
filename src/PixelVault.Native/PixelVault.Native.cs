@@ -75,7 +75,6 @@ namespace PixelVaultNative
         readonly string settingsPath;
         readonly string changelogPath;
         readonly string undoManifestPath;
-        BitmapSource libraryCompletionBadgeBitmap;
         readonly SemaphoreSlim videoClipInfoWarmLimiter = new SemaphoreSlim(2);
         readonly SemaphoreSlim videoPreviewWarmLimiter = new SemaphoreSlim(1);
         readonly HashSet<string> failedFfmpegPosterKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

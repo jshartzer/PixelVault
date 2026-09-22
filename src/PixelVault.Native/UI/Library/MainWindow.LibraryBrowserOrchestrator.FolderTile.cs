@@ -401,8 +401,8 @@ namespace PixelVaultNative
             var showCompletedCardTreatment = folder != null
                 && folder.IsCompleted100Percent
                 && ws?.WorkspaceMode != LibraryWorkspaceMode.Photo;
-            var foilVisual = showCompletedCardTreatment ? BuildLibraryTileCompletionFoilOverlay(tileWidth, tileHeight, coverCorner.TopLeft) : null;
-            coverRoot.Children.Add(CreateAsyncImageTile(
+            var foilVisual = showCompletedCardTreatment ? CreateLibraryTileCompletionFoil(tileWidth, tileHeight) : null;
+            var coverArt = CreateAsyncImageTile(
                 GetLibraryArtPathForDisplayOnly(displayFolder),
                 CalculateLibraryFolderArtDecodeWidth(tileWidth, ResolveLibraryDpiScale()),
                 tileWidth,
@@ -415,7 +415,9 @@ namespace PixelVaultNative
                 Brushes.Transparent,
                 new CornerRadius(0),
                 Brushes.Transparent,
-                new Thickness(0)));
+                new Thickness(0));
+            coverRoot.Children.Add(coverArt);
+            foilVisual?.AttachArtwork(coverArt);
             var overlayPadRight = showPlatformBadgeOnTile ? 84d : 10d;
             var titleBlock = new TextBlock
             {
@@ -488,7 +490,6 @@ namespace PixelVaultNative
             if (roundedCoverClip.CanFreeze) roundedCoverClip.Freeze();
             imageBorder.Clip = roundedCoverClip;
             cardHost.Children.Add(imageBorder);
-            if (foilVisual != null) cardHost.Children.Add(foilVisual.Root);
             if (showCompletedCardTreatment) cardHost.Children.Add(BuildLibraryTileCompletionFrameOverlay(tileWidth, tileHeight, coverCorner));
             tile.Content = cardHost;
             if (foilVisual != null)
