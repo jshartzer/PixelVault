@@ -1174,6 +1174,19 @@ namespace PixelVaultNative
             if (string.IsNullOrWhiteSpace(url)) return null;
             url = url.Trim();
             if (AchievementIconCache.TryGetValue(url, out var cached)) return cached;
+            foreach (var candidate in GameAchievementsFetchService.SteamAchievementIconCandidates(url))
+            {
+                var bytes = await DownloadAchievementIconCandidateAsync(candidate, userAgent).ConfigureAwait(false);
+                if (bytes == null || bytes.Length == 0) continue;
+                AchievementIconCache[url] = bytes;
+                return bytes;
+            }
+            return null;
+        }
+
+        static async Task<byte[]> DownloadAchievementIconCandidateAsync(string url, string userAgent)
+        {
+            if (AchievementIconCache.TryGetValue(url, out var cached)) return cached;
             await AchievementIconDownloads.WaitAsync().ConfigureAwait(false);
             try
             {

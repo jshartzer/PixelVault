@@ -30,7 +30,7 @@ For **splitting `MainWindow` / shrinking `PixelVault.Native.cs`**, use:
 
 ## Current Focus
 
-**ACHG-003 Step 4 delivered (October 4):** Background check results merge into the hub store; library-wide collection with grid/list, search, filters, sorts, filter-independent totals, and paging. 167 achievement tests pass; live 7,011-entry check is responsive. All four steps done; awaiting user review. Optional: Steam rarity backfill for merge-only snapshots.
+**ACHG-003 Step 4 delivered (October 4):** Background check results merge into the hub store; library-wide collection with grid/list, search, filters, sorts, filter-independent totals, and paging. 167 achievement tests pass; live 7,011-entry check is responsive. All four steps done; awaiting user review. Steam rarity backfill added afterward (30 games per background check). Pinned games section (hub-only pins, large covers) and 10-game Recently played row with hover-scroll arrows added. Achievement detail window (guide, progress, rarity context, Next Up) and Steam badge host fix added; 179 achievement tests pass.
 
 **ACHG-003 Step 3 delivered (October 4):** Recent-unlocks banner from saved snapshots across library games, provider dates only, coverage and failure retention. 158 achievement tests pass. Review before Step 4 (library-wide collection, including library-wide progress refresh).
 

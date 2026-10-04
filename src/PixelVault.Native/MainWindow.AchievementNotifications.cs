@@ -209,7 +209,9 @@ namespace PixelVaultNative
                     _achievementLastCheck[key] = DateTime.UtcNow.AddMinutes(failed ? 30 : Math.Max(5, _achievementNotifications.Data.IntervalMinutes));
                     await Task.Delay(TimeSpan.FromSeconds(2), token);
                 }
-                _achievementMonitorStatus = "Last check " + DateTime.Now.ToString("t") + ": " + checkedCount + " game(s), " + failures + " unavailable.";
+                var rarity = libraryRoot == root && _achievementNotifications.Data.Enabled ? await BackfillHubRarityAsync(token) : 0;
+                _achievementMonitorStatus = "Last check " + DateTime.Now.ToString("t") + ": " + checkedCount + " game(s), " + failures + " unavailable."
+                    + (rarity > 0 ? " Rarity checked for " + rarity + " game(s)." : "");
             }
             catch (OperationCanceledException) { }
             catch (Exception ex) { _achievementMonitorStatus = "Achievement check failed; will retry later."; Log("Achievement monitor: " + ex.Message); }

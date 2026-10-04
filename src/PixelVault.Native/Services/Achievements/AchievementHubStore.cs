@@ -19,6 +19,8 @@ namespace PixelVaultNative
             public long UpdatedUtc { get; set; }
             /// <summary>When rarity/counter details were last fetched in full; 0 when only background checks have been saved.</summary>
             public long DetailsUpdatedUtc { get; set; }
+            /// <summary>When Steam rarity was last backfilled for a snapshot that lacked it; 0 when never.</summary>
+            public long RarityCheckedUtc { get; set; }
             public List<GameAchievementsFetchService.AchievementRow> Rows { get; set; } = new();
         }
         internal sealed class AccountData
@@ -173,7 +175,35 @@ namespace PixelVaultNative
                 if (string.IsNullOrWhiteSpace(row.IconUrlGray)) row.IconUrlGray = old.IconUrlGray;
                 if (string.IsNullOrWhiteSpace(row.GroupName)) { row.GroupName = old.GroupName; row.GroupSortOrder = old.GroupSortOrder; }
             }
-            return new Snapshot { UpdatedUtc = now, DetailsUpdatedUtc = prior?.DetailsUpdatedUtc ?? 0, Rows = light };
+            return new Snapshot { UpdatedUtc = now, DetailsUpdatedUtc = prior?.DetailsUpdatedUtc ?? 0,
+                RarityCheckedUtc = prior?.RarityCheckedUtc ?? 0, Rows = light };
+        }
+
+        static readonly long RarityRecheckTicks = TimeSpan.FromDays(30).Ticks;
+        /// <summary>
+        /// Saved Steam games with achievements missing rarity whose details were never fetched, or not within 30 days.
+        /// Games whose rarity Steam doesn't publish are therefore retried at most monthly. Most recently updated first.
+        /// </summary>
+        internal static List<string> GamesNeedingRarity(AccountData data, long now) =>
+            (data?.Games ?? new Dictionary<string, Snapshot>())
+                .Where(g => g.Value?.Rows != null && g.Value.Rows.Any(r => r != null && r.GlobalUnlockPercent == null)
+                    && now - Math.Max(g.Value.DetailsUpdatedUtc, g.Value.RarityCheckedUtc) > RarityRecheckTicks)
+                .OrderByDescending(g => g.Value.UpdatedUtc).ThenBy(g => g.Key, StringComparer.Ordinal).Select(g => g.Key).ToList();
+        /// <summary>Fills missing rarity only; earned status and any existing percentages are left alone.</summary>
+        internal Task ApplyRarityAsync(string provider, string account, string game, IReadOnlyDictionary<string, double> percents, CancellationToken token)
+        {
+            if (percents == null) return Task.CompletedTask;
+            var now = DateTime.UtcNow.Ticks;
+            return UpdateAsync(provider, account, d =>
+            {
+                if (!d.Games.TryGetValue(game, out var snapshot) || snapshot?.Rows == null) return false;
+                foreach (var row in snapshot.Rows)
+                    if (row != null && row.GlobalUnlockPercent == null && row.ProviderAchievementId != null
+                        && percents.TryGetValue(row.ProviderAchievementId, out var pct) && pct >= 0 && pct <= 100)
+                        row.GlobalUnlockPercent = pct;
+                snapshot.RarityCheckedUtc = now;
+                return true;
+            }, token);
         }
     }
 }

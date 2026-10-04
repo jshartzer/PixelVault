@@ -97,6 +97,9 @@
     <Compile Include="UI\AchievementHubWindow.cs" />
     <Compile Include="UI\AchievementHubWindow.Collection.cs" />
     <Compile Include="Services\Achievements\AchievementHubCollection.cs" />
+    <Compile Include="UI\AchievementHubWindow.Shelves.cs" />
+    <Compile Include="Services\Achievements\AchievementHubPins.cs" />
+    <Compile Include="UI\AchievementDetailWindow.cs" />
     <Compile Include="UI\Library\MainWindow.AchievementHub.cs" />
     <Compile Include="Services\Achievements\AchievementHubStore.cs" />
     <Compile Include="Services\Achievements\AchievementHubService.cs" />

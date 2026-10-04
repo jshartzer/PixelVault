@@ -109,6 +109,12 @@ public sealed class AchievementHubCollectionTests
                 Assert.Equal(100, window.CollectionShown);
                 boxes.Single(b => AutomationName(b) == "Grid or list view").SelectedIndex = 1;
                 Assert.Contains(Descendants(window.Content).OfType<TextBlock>(), t => t.Text == "Rarity unavailable" || t.Text.EndsWith("% of players"));
+                window.ShowAchievementDetail = w =>
+                {
+                    var openGame = Descendants(w.Content).OfType<Button>().Single(b => b.Content as string == "Open game achievements");
+                    openGame.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                    return true;
+                };
                 var entry = Descendants(window.Content).OfType<Button>().First(b => (b.ToolTip as string)?.StartsWith("Big Game") == true);
                 entry.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                 Assert.Same(game, opened);

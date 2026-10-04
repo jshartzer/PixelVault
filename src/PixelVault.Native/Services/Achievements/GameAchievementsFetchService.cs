@@ -215,10 +215,12 @@ namespace PixelVaultNative
         {
             if (string.IsNullOrWhiteSpace(raw)) return null;
             var t = raw.Trim();
+            if (t.StartsWith("//", StringComparison.Ordinal)) t = "https:" + t;
             if (t.StartsWith("https://", StringComparison.OrdinalIgnoreCase) || t.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
-                return t;
-            if (t.StartsWith("//", StringComparison.Ordinal))
-                return "https:" + t;
+            {
+                var candidates = SteamAchievementIconCandidates(t);
+                return candidates.Count == 0 ? null : candidates[0];
+            }
 
             var hash = t.Replace('\\', '/');
             var slash = hash.LastIndexOf('/');
@@ -232,8 +234,31 @@ namespace PixelVaultNative
                 hash = hash.Substring(0, hash.Length - 4);
 
             if (string.IsNullOrWhiteSpace(hash)) return null;
-            return "https://cdn.akamai.steamstatic.com/steamcommunity/public/images/apps/"
-                + appId.ToString(CultureInfo.InvariantCulture) + "/" + hash + ".jpg";
+            return SteamCommunityAssetsRoot + appId.ToString(CultureInfo.InvariantCulture) + "/" + hash + ".jpg";
+        }
+
+        const string SteamCommunityAssetsRoot = "https://shared.fastly.steamstatic.com/community_assets/images/apps/";
+        static readonly System.Text.RegularExpressions.Regex SteamIconPath = new(
+            @"/(?:steamcommunity/public|community_assets)/images/apps/(\d+)/([^/?#]+)$",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+        /// <summary>
+        /// Download order for a Steam achievement icon. The legacy steamcdn-a / steamcommunity hosts 404 for newer games,
+        /// so the community_assets host is tried first; the original stays as a fallback. A URL with no file name is unusable.
+        /// Non-Steam URLs are returned unchanged.
+        /// </summary>
+        internal static List<string> SteamAchievementIconCandidates(string url)
+        {
+            var result = new List<string>();
+            if (string.IsNullOrWhiteSpace(url)) return result;
+            url = url.Trim();
+            if (url.EndsWith("/", StringComparison.Ordinal)) return result;
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || !uri.Host.Contains("steam", StringComparison.OrdinalIgnoreCase))
+            { result.Add(url); return result; }
+            var match = SteamIconPath.Match(uri.AbsolutePath);
+            if (match.Success) result.Add(SteamCommunityAssetsRoot + match.Groups[1].Value + "/" + match.Groups[2].Value);
+            if (!result.Contains(url, StringComparer.OrdinalIgnoreCase)) result.Add(url);
+            return result;
         }
 
         static async Task<Dictionary<string, (int achieved, int unlocktime)>> TryLoadSteamPlayerAchievementsAsync(
@@ -394,7 +419,8 @@ namespace PixelVaultNative
             }
         }
 
-        static async Task<Dictionary<string, double>> TryLoadSteamGlobalAchievementPercentsAsync(
+        /// <summary>Public global unlock percentages keyed by API name; null when the request or response fails.</summary>
+        internal static async Task<Dictionary<string, double>> TryLoadSteamGlobalAchievementPercentsAsync(
             int appId,
             string steamWebApiKeyTrimmed,
             string userAgent,

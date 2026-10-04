@@ -55,6 +55,9 @@ namespace PixelVaultNative
 
         AchievementGuideEntry SaveGuide(AchievementGuideEdit edit);
 
+        /// <summary>Read-only catalog lookup; null when the achievement was never synced. Never writes or backs up.</summary>
+        AchievementGuideEntry LoadGuideEntry(string provider, string providerGameId, string providerAchievementId);
+
         AchievementGuideImportPreview PreviewGuideImport(
             string json,
             string expectedProvider,
@@ -437,6 +440,14 @@ WHERE achievement_id = $achievement_id;";
             {
                 // Backups are best-effort; a failed snapshot must not discard an otherwise valid guide edit.
             }
+        }
+
+        public AchievementGuideEntry LoadGuideEntry(string provider, string providerGameId, string providerAchievementId)
+        {
+            if (string.IsNullOrWhiteSpace(provider) || string.IsNullOrWhiteSpace(providerGameId) || string.IsNullOrWhiteSpace(providerAchievementId))
+                return null;
+            using var connection = OpenDatabase();
+            return LoadEntry(connection, NormalizeProvider(provider), providerGameId.Trim(), providerAchievementId.Trim());
         }
 
         static AchievementGuideEntry LoadEntry(

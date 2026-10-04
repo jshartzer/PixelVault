@@ -34,6 +34,8 @@ namespace PixelVaultNative
         public List<AchievementHubGame> Games = new();
         public int LibraryGames, GamesWithProgress, GamesWithoutAchievements, Earned, Unearned;
         public string Signature = "";
+        /// <summary>When each covered game's saved progress was last updated, by game key.</summary>
+        public Dictionary<string, long> SnapshotUpdated = new(StringComparer.Ordinal);
         public int GamesWithoutProgress => LibraryGames - GamesWithProgress;
 
         internal static AchievementHubCollection Build(IEnumerable<AchievementHubGame> games,
@@ -47,7 +49,8 @@ namespace PixelVaultNative
                 collection.LibraryGames++;
                 if (!account.Games.TryGetValue(game.Id, out var snapshot) || snapshot?.Rows == null) continue;
                 collection.GamesWithProgress++;
-                unchecked { stamp += snapshot.UpdatedUtc; }
+                collection.SnapshotUpdated[game.Key] = snapshot.UpdatedUtc;
+                unchecked { stamp += snapshot.UpdatedUtc + snapshot.RarityCheckedUtc; }
                 var rows = snapshot.Rows.Where(r => r != null && r.Provider == game.Provider && r.ProviderGameId == game.Id)
                     .GroupBy(r => r.ProviderAchievementId, StringComparer.Ordinal).Select(r => r.First()).ToList();
                 if (rows.Count == 0) { collection.GamesWithoutAchievements++; continue; }

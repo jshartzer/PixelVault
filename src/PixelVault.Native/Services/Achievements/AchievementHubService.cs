@@ -19,6 +19,8 @@ namespace PixelVaultNative
     sealed class AchievementHubSession
     {
         public List<AchievementHubGame> Games = new();
+        /// <summary>Pinned game keys in pin order; not part of <see cref="Scope"/> because pins don't change whose data is shown.</summary>
+        public List<string> Pinned = new();
         public string SteamAccount, SteamKey, RetroAccount, RetroKey, LibraryRoot;
         public string Account(string provider) => provider == "steam" ? (SteamAccount ?? "").Trim() : AchievementHubStore.AccountKey(RetroAccount);
         public string ApiKey(string provider) => provider == "steam" ? SteamKey : RetroKey;
@@ -45,6 +47,7 @@ namespace PixelVaultNative
     sealed class AchievementHubState
     {
         public List<AchievementHubCard> Cards = new();
+        public List<AchievementHubCard> Pinned = new();
         public AchievementHubTimeline Timeline;
         public AchievementHubCollection Collection;
         public string Status;
@@ -73,17 +76,29 @@ namespace PixelVaultNative
             return await client.DownloadStringAsync(url, token).ConfigureAwait(false);
         }
         static bool Fresh(long ticks) => ticks > 0 && ticks <= DateTime.UtcNow.Ticks && DateTime.UtcNow.Ticks - ticks < TimeSpan.FromMinutes(10).Ticks;
+        internal const int RecentLimit = 10;
+        static AchievementHubCard Card(AchievementHubGame game, IReadOnlyDictionary<string, AchievementHubStore.AccountData> data)
+        {
+            data.TryGetValue(game.Provider, out var account);
+            var time = account != null && account.Recent.TryGetValue(game.Id, out var last) ? last : 0;
+            var snapshot = account != null && account.Games.TryGetValue(game.Id, out var saved) ? saved : null;
+            return new AchievementHubCard { Game = game, LastPlayedUtc = time, Snapshot = snapshot };
+        }
+        static bool ValidPlayed(long ticks) => ticks >= DateTime.UnixEpoch.Ticks && ticks <= DateTime.UtcNow.Ticks;
         internal static List<AchievementHubCard> SelectRecent(IEnumerable<AchievementHubGame> games,
+            IReadOnlyDictionary<string, AchievementHubStore.AccountData> data, int limit = RecentLimit)
+        {
+            return games.GroupBy(g => g.Key).Select(g => Card(g.First(), data)).Where(c => ValidPlayed(c.LastPlayedUtc))
+                .OrderByDescending(c => c.LastPlayedUtc).ThenBy(c => c.Game.Key, StringComparer.Ordinal).Take(limit).ToList();
+        }
+        /// <summary>Pinned library games in pin order, for connected providers. Pins for games no longer in the library are skipped.</summary>
+        internal static List<AchievementHubCard> SelectPinned(IEnumerable<AchievementHubGame> games, IEnumerable<string> pins,
             IReadOnlyDictionary<string, AchievementHubStore.AccountData> data)
         {
-            return games.GroupBy(g => g.Key).Select(g => g.First()).Select(game =>
-            {
-                data.TryGetValue(game.Provider, out var account);
-                var time = account != null && account.Recent.TryGetValue(game.Id, out var last) ? last : 0;
-                var snapshot = account != null && account.Games.TryGetValue(game.Id, out var saved) ? saved : null;
-                return new AchievementHubCard { Game = game, LastPlayedUtc = time, Snapshot = snapshot };
-            }).Where(c => c.LastPlayedUtc >= DateTime.UnixEpoch.Ticks && c.LastPlayedUtc <= DateTime.UtcNow.Ticks)
-                .OrderByDescending(c => c.LastPlayedUtc).ThenBy(c => c.Game.Key, StringComparer.Ordinal).Take(3).ToList();
+            var library = games.GroupBy(g => g.Key).ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
+            return (pins ?? Enumerable.Empty<string>()).Distinct(StringComparer.Ordinal)
+                .Where(k => k != null && library.TryGetValue(k, out var game) && data.ContainsKey(game.Provider))
+                .Select(k => Card(library[k], data)).Select(c => { if (!ValidPlayed(c.LastPlayedUtc)) c.LastPlayedUtc = 0; return c; }).ToList();
         }
         /// <summary>Earned achievements with provider unlock dates from saved snapshots of connected accounts, newest first.</summary>
         internal static AchievementHubTimeline SelectUnlocks(IEnumerable<AchievementHubGame> games,
@@ -121,6 +136,7 @@ namespace PixelVaultNative
                 data[provider] = await store.LoadAsync(provider, session.Account(provider), token);
             }
             void Report(string status) => report(new AchievementHubState { Cards = SelectRecent(session.Games, data),
+                Pinned = SelectPinned(session.Games, session.Pinned, data),
                 Timeline = SelectUnlocks(session.Games, data, DateTime.UtcNow.Ticks),
                 Collection = AchievementHubCollection.Build(session.Games, data), Status = status });
             Report("Showing saved progress while checking recent play…");
@@ -147,7 +163,8 @@ namespace PixelVaultNative
                 }
             }
             Report("Updating achievement progress… " + string.Join(" ", notes));
-            foreach (var card in SelectRecent(session.Games, data))
+            foreach (var card in SelectPinned(session.Games, session.Pinned, data).Concat(SelectRecent(session.Games, data))
+                .GroupBy(c => c.Game.Key).Select(g => g.First()).ToList())
             {
                 token.ThrowIfCancellationRequested();
                 if (!force && card.Snapshot != null && Fresh(card.Snapshot.UpdatedUtc)) continue;
@@ -160,7 +177,8 @@ namespace PixelVaultNative
                     if (AchievementHubStore.CanSave(card.Game.Provider, card.Game.Id, result))
                     {
                         RetryAfter.TryRemove(retryKey, out _);
-                        data[card.Game.Provider].Games[card.Game.Id] = new AchievementHubStore.Snapshot { UpdatedUtc = DateTime.UtcNow.Ticks, Rows = result.Rows };
+                        var now = DateTime.UtcNow.Ticks;
+                        data[card.Game.Provider].Games[card.Game.Id] = new AchievementHubStore.Snapshot { UpdatedUtc = now, DetailsUpdatedUtc = now, Rows = result.Rows };
                         try { await store.SaveGameAsync(card.Game.Provider, session.Account(card.Game.Provider), card.Game.Id, result, token); }
                         catch (Exception ex) when (ex is System.IO.IOException || ex is UnauthorizedAccessException) { notes.Add("Progress could not be saved."); }
                     }
@@ -204,7 +222,7 @@ namespace PixelVaultNative
                         && DateTime.TryParse(date.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var time)
                         && time >= DateTime.UnixEpoch && time <= DateTime.UtcNow) result[id.ToString()] = time.Ticks;
                 }
-                if (doc.RootElement.GetArrayLength() < 50 || result.Keys.Count(library.Contains) >= 3) break;
+                if (doc.RootElement.GetArrayLength() < 50 || result.Keys.Count(library.Contains) >= RecentLimit) break;
             }
             return result;
         }

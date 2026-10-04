@@ -23,7 +23,7 @@ namespace PixelVaultNative
         bool SortingByCounterProgress => SelectedSort == AchievementCollectionSort.ProgressHighestFirst
             || SelectedSort == AchievementCollectionSort.ProgressLowestFirst;
 
-        static string CounterLabel(GameAchievementsFetchService.AchievementRow row) =>
+        internal static string CounterLabel(GameAchievementsFetchService.AchievementRow row) =>
             !AchievementCollectionStats.CounterPercent(row).HasValue ? string.Empty
             : row.CounterCurrent.Value.ToString("#,0.##", CultureInfo.CurrentCulture)
                 + " / " + row.CounterTarget.Value.ToString("#,0.##", CultureInfo.CurrentCulture);

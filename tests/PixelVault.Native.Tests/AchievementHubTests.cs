@@ -47,8 +47,9 @@ public sealed class AchievementHubTests : IDisposable
             ["steam"] = new() { Recent = new() { ["1"] = now - 10, ["2"] = now - 30, ["3"] = now - 40, ["outside"] = now } },
             ["retroachievements"] = new() { Recent = new() { ["1"] = now - 20 } }
         };
-        var cards = AchievementHubService.SelectRecent(new[] { Game("1"), Game("1"), Game("2"), Game("3"), Game("1", "retroachievements") }, accounts);
-        Assert.Equal(new[] { "steam:1", "retroachievements:1", "steam:2" }, cards.Select(c => c.Game.Key));
+        var games = new[] { Game("1"), Game("1"), Game("2"), Game("3"), Game("1", "retroachievements") };
+        Assert.Equal(new[] { "steam:1", "retroachievements:1", "steam:2", "steam:3" }, AchievementHubService.SelectRecent(games, accounts).Select(c => c.Game.Key));
+        Assert.Equal(new[] { "steam:1", "retroachievements:1", "steam:2" }, AchievementHubService.SelectRecent(games, accounts, 3).Select(c => c.Game.Key));
     }
 
     [Fact]
@@ -133,6 +134,34 @@ public sealed class AchievementHubTests : IDisposable
     }
 
     [Fact]
+    public async Task RarityBackfill_FillsOnlyMissingPercentsAndWaitsBeforeRechecking()
+    {
+        var store = Store(); var earned = DateTime.UtcNow.AddDays(-1).Ticks;
+        await store.SaveGameAsync("steam", "A", "full", Result("full"), token);
+        await store.SaveGameAsync("steam", "A", "old", Light("old", Unlock("old", "X", earned)), token);
+        await store.SaveGameAsync("steam", "A", "light", Light("light", Unlock("light", "X", earned), Unlock("light", "Y", 0, false)), token);
+        var now = DateTime.UtcNow.Ticks;
+        Assert.Equal(new[] { "light", "old" }, AchievementHubStore.GamesNeedingRarity(await store.LoadAsync("steam", "A", token), now));
+
+        await store.ApplyRarityAsync("steam", "A", "light", new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase) { ["x"] = 12.5, ["Y"] = 140 }, token);
+        await store.ApplyRarityAsync("steam", "A", "old", null, token);
+        var data = await store.LoadAsync("steam", "A", token);
+        var light = data.Games["light"];
+        Assert.Equal(12.5, light.Rows[0].GlobalUnlockPercent);
+        Assert.Null(light.Rows[1].GlobalUnlockPercent);
+        Assert.True(light.Rows[0].Unlocked); Assert.Equal(earned, light.Rows[0].UnlockUtcTicks);
+        Assert.True(light.RarityCheckedUtc > 0);
+        Assert.Equal(0, data.Games["old"].RarityCheckedUtc);
+        Assert.Equal(new[] { "old" }, AchievementHubStore.GamesNeedingRarity(data, now));
+        Assert.Equal(new[] { "light", "old" }, AchievementHubStore.GamesNeedingRarity(data, now + TimeSpan.FromDays(31).Ticks));
+
+        await store.SaveGameAsync("steam", "A", "light", Light("light", Unlock("light", "X", earned), Unlock("light", "Y", earned)), token);
+        light = (await store.LoadAsync("steam", "A", token)).Games["light"];
+        Assert.Equal(12.5, light.Rows[0].GlobalUnlockPercent);
+        Assert.True(light.RarityCheckedUtc > 0);
+    }
+
+    [Fact]
     public async Task VersionOneFilesAreTreatedAsFullDetails()
     {
         var store = Store();
@@ -159,17 +188,18 @@ public sealed class AchievementHubTests : IDisposable
     }
 
     [Fact]
-    public async Task RefreshShowsCachedFirstThenOnlyFetchesThreeLibraryGames()
+    public async Task RefreshShowsCachedFirstThenOnlyFetchesTenLibraryGames()
     {
-        var store = Store(); var session = Session("1", "2", "3", "4");
-        await store.SaveRecentAsync("steam", session.SteamAccount, new() { ["4"] = DateTime.UtcNow.AddDays(-1).Ticks }, token);
-        await store.SaveGameAsync("steam", session.SteamAccount, "4", Result("4"), token);
+        var ids = Enumerable.Range(1, 12).ToArray();
+        var store = Store(); var session = Session(ids.Select(i => i.ToString()).ToArray());
+        await store.SaveRecentAsync("steam", session.SteamAccount, new() { ["12"] = DateTime.UtcNow.AddDays(-1).Ticks }, token);
+        await store.SaveGameAsync("steam", session.SteamAccount, "12", Result("12"), token);
         var fetched = new List<string>(); var reports = new List<AchievementHubState>();
-        var service = new AchievementHubService(store, (_, _) => Task.FromResult(Recent(99, 1, 2, 3, 4)),
+        var service = new AchievementHubService(store, (_, _) => Task.FromResult(Recent(ids.Prepend(99).ToArray())),
             (game, _, _) => { fetched.Add(game.Id); return Task.FromResult(Result(game.Id)); });
         await service.LoadAsync(session, true, reports.Add, token);
-        Assert.Equal("4", Assert.Single(reports[0].Cards).Game.Id);
-        Assert.Equal(new[] { "1", "2", "3" }, fetched);
+        Assert.Equal("12", Assert.Single(reports[0].Cards).Game.Id);
+        Assert.Equal(ids.Take(10).Select(i => i.ToString()), fetched);
         Assert.All(reports.Last().Cards, c => Assert.NotNull(c.Snapshot));
     }
 
@@ -241,7 +271,7 @@ public sealed class AchievementHubTests : IDisposable
                 state.Cards[0].Snapshot = null;
                 window.RenderRecent(state);
                 Assert.Empty(Descendants(window.Content).OfType<ProgressBar>());
-                Assert.Contains(Descendants(window.Content).OfType<TextBlock>(), t => t.Text == "Achievement progress unavailable");
+                Assert.Contains(Descendants(window.Content).OfType<TextBlock>(), t => t.Text == "Progress unavailable");
             }
             finally { window.Close(); }
         });
@@ -340,12 +370,14 @@ public sealed class AchievementHubTests : IDisposable
     }
 
     [Fact]
-    public void TimelineBanner_OpensGameAndRetainsUnlocksWhenALoadFails()
+    public void TimelineBanner_OpensAchievementDetailsAndRetainsUnlocksWhenALoadFails()
     {
         AchievementCollectionAccessTests.OnSta(() =>
         {
             AchievementHubGame? opened = null;
+            AchievementDetailWindow? detail = null;
             var window = new AchievementHubWindow(null!, open: (_, game) => opened = game);
+            window.ShowAchievementDetail = w => { detail = w; w.Close(); return true; };
             try
             {
                 var game = Game("7");
@@ -353,10 +385,11 @@ public sealed class AchievementHubTests : IDisposable
                     OldestSnapshotUtc = DateTime.UtcNow.Ticks,
                     Unlocks = new() { new() { Game = game, Row = Unlock("7", "Champion", DateTime.UtcNow.AddHours(-2).Ticks) } } };
                 window.RenderRecent(new AchievementHubState { Status = "Fixture", Timeline = timeline });
-                Button Tile() => Descendants(window.Content).OfType<Button>().Single(b => (b.ToolTip as string) == "Open 7 achievements");
+                Button Tile() => Descendants(window.Content).OfType<Button>().Single(b => (b.ToolTip as string) == "7 · view achievement details");
                 Assert.Contains(Descendants(window.Content).OfType<TextBlock>(), t => t.Text.Contains("1 of 2 library games") && t.Text.Contains("Partial"));
                 Tile().RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-                Assert.Same(game, opened);
+                Assert.StartsWith("Champion", detail!.Title);
+                Assert.Null(opened);
                 window.RenderRecent(new AchievementHubState { Status = "Recent games could not be loaded. Try Refresh." });
                 Assert.NotNull(Tile());
                 Assert.Contains(Descendants(window.Content).OfType<TextBlock>(), t => t.Text.StartsWith("Refresh failed"));

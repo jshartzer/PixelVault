@@ -16,8 +16,11 @@ namespace PixelVaultNative
     {
         readonly AchievementHubService service;
         readonly Func<AchievementHubSession> getSession;
-        readonly Func<AchievementHubGame, FrameworkElement> cover;
+        readonly Func<AchievementHubGame, double, double, FrameworkElement> cover;
         readonly Action<Window, AchievementHubGame> open;
+        readonly AchievementHubPins pins;
+        readonly IAchievementGuideService guides;
+        readonly StackPanel pinned = new StackPanel();
         readonly StackPanel recent = new StackPanel();
         readonly StackPanel unlocks = new StackPanel();
         AchievementHubTimeline lastTimeline;
@@ -27,7 +30,8 @@ namespace PixelVaultNative
         bool closed, loading;
 
         internal static void ShowFor(Window owner, AchievementHubService service, Func<AchievementHubSession> getSession,
-            Func<AchievementHubGame, FrameworkElement> cover, Action<Window, AchievementHubGame> open)
+            Func<AchievementHubGame, double, double, FrameworkElement> cover, Action<Window, AchievementHubGame> open, AchievementHubPins pins,
+            IAchievementGuideService guides)
         {
             if (owner == null) return;
             var existing = owner.OwnedWindows.OfType<AchievementHubWindow>().FirstOrDefault();
@@ -37,13 +41,14 @@ namespace PixelVaultNative
                 existing.Activate();
                 return;
             }
-            new AchievementHubWindow(owner, service, getSession, cover, open).Show();
+            new AchievementHubWindow(owner, service, getSession, cover, open, pins, guides).Show();
         }
 
         internal AchievementHubWindow(Window owner, AchievementHubService service = null, Func<AchievementHubSession> getSession = null,
-            Func<AchievementHubGame, FrameworkElement> cover = null, Action<Window, AchievementHubGame> open = null)
+            Func<AchievementHubGame, double, double, FrameworkElement> cover = null, Action<Window, AchievementHubGame> open = null,
+            AchievementHubPins pins = null, IAchievementGuideService guides = null)
         {
-            this.service = service; this.getSession = getSession; this.cover = cover; this.open = open;
+            this.service = service; this.getSession = getSession; this.cover = cover; this.open = open; this.pins = pins; this.guides = guides;
             Owner = owner;
             Title = "Achievement Hub";
             Width = 1040;
@@ -97,6 +102,7 @@ namespace PixelVaultNative
                 Margin = new Thickness(0, 0, 0, 16),
                 Child = unlocks
             });
+            sections.Children.Add(pinned);
             sections.Children.Add(recent);
             sections.Children.Add(BuildCollectionSection());
             RenderRecent(new AchievementHubState { Status = "Loading recent play…" });
@@ -127,11 +133,12 @@ namespace PixelVaultNative
             Closed += delegate { closed = true; refreshCancellation?.Cancel(); };
         }
 
-        internal async Task RefreshAsync(bool force)
+        internal async Task RefreshAsync(bool force, bool restart = false)
         {
             if (closed || getSession == null || service == null) return;
             var session = getSession();
-            if (loading && scope == session.Scope) return;
+            if (pins != null) session.Pinned = pins.Keys.ToList();
+            if (loading && scope == session.Scope && !restart) return;
             refreshCancellation?.Cancel();
             var cts = new CancellationTokenSource();
             refreshCancellation = cts;
@@ -164,48 +171,27 @@ namespace PixelVaultNative
             if (state.Timeline != null) lastTimeline = state.Timeline;
             RenderUnlocks(state.Timeline ?? lastTimeline, state.Timeline == null && lastTimeline != null);
             RenderCollection(state.Collection);
-            recent.Children.Clear();
-            recent.Children.Add(Text("Recently played", 18, true));
-            var status = Text(state.Status, 12); status.Margin = new Thickness(0, 6, 0, 10);
-            recent.Children.Add(status);
-            var cards = new WrapPanel { Margin = new Thickness(0, 12, 0, 18) };
-            recent.Children.Add(cards);
-            if (state.Cards.Count == 0)
-                cards.Children.Add(Text("No recent library games with available play dates to show yet.", 14));
-            foreach (var card in state.Cards)
-            {
-                var content = new StackPanel { Margin = new Thickness(12), Width = 250 };
-                if (cover != null) content.Children.Add(cover(card.Game));
-                var name = Text(card.Game.Title, 16, true); name.Margin = new Thickness(0, 10, 0, 6);
-                name.MinHeight = 44; name.MaxHeight = 44; name.TextTrimming = TextTrimming.CharacterEllipsis;
-                content.Children.Add(name);
-                content.Children.Add(Text((card.Game.Provider == "steam" ? "Steam" : "RetroAchievements") + " · "
-                    + new DateTime(card.LastPlayedUtc, DateTimeKind.Utc).ToLocalTime().ToString("g"), 11));
-                var rows = card.Snapshot?.Rows;
-                var stats = rows == null ? null : AchievementCollectionStats.Build(rows, DateTime.UtcNow.Ticks);
-                var progress = stats == null ? "Achievement progress unavailable"
-                    : stats.Total == 0 ? "No achievements for this game"
-                    : stats.Unknown > 0 ? "Achievement progress unavailable"
-                    : stats.Earned + " / " + stats.Total + " earned · " + stats.Percent + "%";
-                var summary = Text(progress, 13, true); summary.Margin = new Thickness(0, 10, 0, 5);
-                content.Children.Add(summary);
-                if (stats?.Percent != null)
-                    content.Children.Add(new ProgressBar { Minimum = 0, Maximum = 100, Value = stats.Percent.Value, Height = 6,
-                        Foreground = Color("#79BBA1", SystemColors.HighlightBrush), Background = Color("#2B3C47", SystemColors.ControlBrush) });
-                if (card.Snapshot != null && card.Snapshot.UpdatedUtc > 0 && card.Snapshot.UpdatedUtc <= DateTime.MaxValue.Ticks)
-                    content.Children.Add(Text("Saved " + new DateTime(card.Snapshot.UpdatedUtc, DateTimeKind.Utc).ToLocalTime().ToString("g"), 11));
-                var button = new Button { Content = content, Margin = new Thickness(0, 0, 12, 12), Padding = new Thickness(0),
-                    Background = Color("#18232B", SystemColors.WindowBrush), Foreground = Color("#EFF4F7", SystemColors.WindowTextBrush),
-                    BorderBrush = Color("#2B3C47", SystemColors.ActiveBorderBrush), Cursor = Cursors.Hand,
-                    ToolTip = "Open " + card.Game.Title + " achievements", VerticalContentAlignment = VerticalAlignment.Top,
-                    VerticalAlignment = VerticalAlignment.Top };
-                if (!SystemParameters.HighContrast)
-                    button.Style = LibraryButtonChrome.LibraryToolbarButtonStyle("#18232B", "#2B3C47", "#243640", "#11181D");
-                AutomationProperties.SetName(button, card.Game.Title + ", " + progress + ". Open achievements.");
-                AccessibilityUi.TryApplyFocusVisualStyle(button);
-                button.Click += async (_, __) => await OpenGameAsync(card.Game);
-                cards.Children.Add(button);
-            }
+            pinned.Visibility = pins == null ? Visibility.Collapsed : Visibility.Visible;
+            if (pins != null)
+                RenderShelf(pinned, "Pinned games", null, state.Pinned, true,
+                    "Pin games with the pin button on a game card, or right-click an achievement and choose Pin game.");
+            RenderShelf(recent, "Recently played", state.Status, state.Cards, false,
+                "No recent library games with available play dates to show yet.");
+        }
+
+        /// <summary>Shows the detail window modally; replaceable so tests can inspect it without blocking.</summary>
+        internal Func<AchievementDetailWindow, bool?> ShowAchievementDetail = window => window.ShowDialog();
+
+        async Task OpenAchievementAsync(AchievementHubGame game, GameAchievementsFetchService.AchievementRow row)
+        {
+            if (getSession != null && getSession().Scope != scope) { await RefreshAsync(false); return; }
+            var rows = collection?.Entries.Where(e => e.Game.Key == game.Key).Select(e => e.Row).ToList();
+            long saved = 0;
+            collection?.SnapshotUpdated.TryGetValue(game.Key, out saved);
+            var detail = new AchievementDetailWindow(this, game, row, rows, saved, guides,
+                pins == null ? null : () => pins.IsPinned(game.Key), pins == null ? null : () => TogglePin(game));
+            ShowAchievementDetail(detail);
+            if (detail.OpenGameRequested) await OpenGameAsync(game);
         }
 
         async Task OpenGameAsync(AchievementHubGame game)
@@ -287,15 +273,15 @@ namespace PixelVaultNative
                 var rarity = AchievementRarityUi.Label(row);
                 var button = new Button { Content = tile, Margin = new Thickness(0, 0, 10, 8), Padding = new Thickness(0),
                     Background = Brushes.Transparent, BorderThickness = new Thickness(0), Cursor = Cursors.Hand,
-                    ToolTip = (row.Description ?? "").Trim() is var d && d.Length > 0 ? d + "\nOpen " + unlock.Game.Title + " achievements"
-                        : "Open " + unlock.Game.Title + " achievements" };
+                    ToolTip = ((row.Description ?? "").Trim() is var d && d.Length > 0 ? d + "\n" : "") + unlock.Game.Title + " · view achievement details" };
                 if (!SystemParameters.HighContrast)
                     button.Style = LibraryButtonChrome.LibraryToolbarButtonStyle("#00000000", "#00000000", "#304956", "#18242B");
                 AutomationProperties.SetName(button, title.Text + ", " + unlock.Game.Title + ", earned " + date
-                    + (rarity.Length > 0 ? ", " + rarity : "") + ". Open achievements.");
+                    + (rarity.Length > 0 ? ", " + rarity : "") + ". Open achievement details.");
                 AccessibilityUi.TryApplyFocusVisualStyle(button);
                 var target = unlock.Game;
-                button.Click += async (_, __) => await OpenGameAsync(target);
+                button.Click += async (_, __) => await OpenAchievementAsync(target, row);
+                AttachPinMenu(button, target);
                 strip.Children.Add(button);
             }
         }

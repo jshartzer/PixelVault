@@ -245,10 +245,11 @@ namespace PixelVaultNative
             };
             button.Template = EntryTemplate;
             AutomationProperties.SetName(button, (string.IsNullOrWhiteSpace(row.Title) ? "Achievement" : row.Title) + ", " + entry.Game.Title
-                + ", " + EntryState(row) + (rarity.Length > 0 ? ", " + rarity : "") + ". Open game achievements.");
+                + ", " + EntryState(row) + (rarity.Length > 0 ? ", " + rarity : "") + ". Open achievement details.");
             AccessibilityUi.TryApplyFocusVisualStyle(button);
             var game = entry.Game;
-            button.Click += async (_, __) => await OpenGameAsync(game);
+            button.Click += async (_, __) => await OpenAchievementAsync(game, row);
+            AttachPinMenu(button, game);
             return button;
         }
 
