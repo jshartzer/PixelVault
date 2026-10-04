@@ -72,13 +72,78 @@ public sealed class AchievementHubTests : IDisposable
         await store.SaveGameAsync("steam", "Alice", "1", Result("1", true), token);
         var bad = Result("1"); bad.ProgressErrorMessage = "private";
         await store.SaveGameAsync("steam", "Alice", "1", bad, token);
-        bad.ProgressErrorMessage = null; bad.NotificationOnly = true;
+        bad.ProgressErrorMessage = null; bad.Rows[0].ProgressKnown = false;
+        bad.NotificationOnly = true;
         await store.SaveGameAsync("steam", "Alice", "1", bad, token);
-        bad.NotificationOnly = false; bad.Rows[0].ProgressKnown = false;
+        bad.NotificationOnly = false;
         await store.SaveGameAsync("steam", "Alice", "1", bad, token);
         bad.Rows[0].ProgressKnown = true; bad.Rows.Add(bad.Rows[0]);
         await store.SaveGameAsync("steam", "Alice", "1", bad, token);
         Assert.True((await store.LoadAsync("steam", "Alice", token)).Games["1"].Rows[0].Unlocked);
+    }
+
+    static GameAchievementsFetchService.FetchResult Light(string game, params GameAchievementsFetchService.AchievementRow[] rows) =>
+        new() { NotificationOnly = true, Rows = rows.ToList() };
+
+    [Fact]
+    public async Task BackgroundResults_SeedNewGamesWithoutDetails()
+    {
+        var store = Store(); var earned = DateTime.UtcNow.AddDays(-1).Ticks;
+        await store.SaveGameAsync("steam", "A", "5", Light("5", Unlock("5", "X", earned)), token);
+        var saved = (await store.LoadAsync("steam", "A", token)).Games["5"];
+        Assert.Equal(0, saved.DetailsUpdatedUtc);
+        Assert.Equal(earned, saved.Rows[0].UnlockUtcTicks);
+        Assert.Null(saved.Rows[0].GlobalUnlockPercent);
+    }
+
+    [Fact]
+    public async Task BackgroundResults_MergeStatusButKeepSavedRarityCountersAndFollowCatalog()
+    {
+        var store = Store();
+        var full = Result("1");
+        full.Rows.Add(new() { Provider = "steam", ProviderGameId = "1", ProviderAchievementId = "Gone", ProgressKnown = true, Title = "Gone" });
+        await store.SaveGameAsync("steam", "A", "1", full, token);
+        var detailsTime = (await store.LoadAsync("steam", "A", token)).Games["1"].DetailsUpdatedUtc;
+        var earned = DateTime.UtcNow.AddHours(-1).Ticks;
+        await store.SaveGameAsync("steam", "A", "1", Light("1", Unlock("1", "A", earned), Unlock("1", "New", 0, false)), token);
+        var saved = (await store.LoadAsync("steam", "A", token)).Games["1"];
+        Assert.Equal(new[] { "A", "New" }, saved.Rows.Select(r => r.ProviderAchievementId));
+        var a = saved.Rows[0];
+        Assert.True(a.Unlocked); Assert.Equal(earned, a.UnlockUtcTicks);
+        Assert.Equal(3, a.GlobalUnlockPercent); Assert.Equal(37, a.CounterCurrent); Assert.Equal(100, a.CounterTarget);
+        Assert.Null(saved.Rows[1].GlobalUnlockPercent);
+        Assert.Equal(detailsTime, saved.DetailsUpdatedUtc);
+        Assert.True(detailsTime > 0);
+    }
+
+    [Fact]
+    public async Task BackgroundResults_UnchangedProgressDoesNotRewriteTheFile()
+    {
+        var store = Store(); var earned = DateTime.UtcNow.AddDays(-1).Ticks;
+        await store.SaveGameAsync("steam", "A", "1", Light("1", Unlock("1", "X", earned)), token);
+        var file = Assert.Single(Directory.GetFiles(dir));
+        var written = File.GetLastWriteTimeUtc(file);
+        File.SetLastWriteTimeUtc(file, written.AddMinutes(-5));
+        var stamp = File.GetLastWriteTimeUtc(file);
+        await store.SaveGameAsync("steam", "A", "1", Light("1", Unlock("1", "X", earned)), token);
+        Assert.Equal(stamp, File.GetLastWriteTimeUtc(file));
+        await store.SaveGameAsync("steam", "A", "1", Light("1", Unlock("1", "X", earned), Unlock("1", "Y", earned)), token);
+        Assert.NotEqual(stamp, File.GetLastWriteTimeUtc(file));
+        Assert.Equal(2, (await store.LoadAsync("steam", "A", token)).Games["1"].Rows.Count);
+    }
+
+    [Fact]
+    public async Task VersionOneFilesAreTreatedAsFullDetails()
+    {
+        var store = Store();
+        await store.SaveGameAsync("steam", "A", "1", Result("1"), token);
+        var file = Assert.Single(Directory.GetFiles(dir));
+        var node = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(file))!;
+        node["Version"] = 1;
+        node["Games"]!["1"]!["DetailsUpdatedUtc"] = 0;
+        File.WriteAllText(file, node.ToJsonString());
+        var saved = (await new AchievementHubStore(dir).LoadAsync("steam", "A", token)).Games["1"];
+        Assert.Equal(saved.UpdatedUtc, saved.DetailsUpdatedUtc);
     }
 
     [Fact]

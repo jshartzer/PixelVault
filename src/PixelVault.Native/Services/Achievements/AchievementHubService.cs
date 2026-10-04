@@ -46,6 +46,7 @@ namespace PixelVaultNative
     {
         public List<AchievementHubCard> Cards = new();
         public AchievementHubTimeline Timeline;
+        public AchievementHubCollection Collection;
         public string Status;
     }
     sealed class AchievementHubService
@@ -120,7 +121,8 @@ namespace PixelVaultNative
                 data[provider] = await store.LoadAsync(provider, session.Account(provider), token);
             }
             void Report(string status) => report(new AchievementHubState { Cards = SelectRecent(session.Games, data),
-                Timeline = SelectUnlocks(session.Games, data, DateTime.UtcNow.Ticks), Status = status });
+                Timeline = SelectUnlocks(session.Games, data, DateTime.UtcNow.Ticks),
+                Collection = AchievementHubCollection.Build(session.Games, data), Status = status });
             Report("Showing saved progress while checking recent play…");
             foreach (var provider in data.Keys.ToArray())
             {

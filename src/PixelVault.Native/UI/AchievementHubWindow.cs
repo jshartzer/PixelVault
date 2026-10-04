@@ -11,8 +11,8 @@ using System.Windows.Media;
 
 namespace PixelVaultNative
 {
-    /// <summary>PV-PLN-ACHG-003: recent unlocks, recent library games, and cached progress; the full collection follows later.</summary>
-    sealed class AchievementHubWindow : Window
+    /// <summary>PV-PLN-ACHG-003: recent unlocks, recent library games, and the library-wide achievement collection.</summary>
+    sealed partial class AchievementHubWindow : Window
     {
         readonly AchievementHubService service;
         readonly Func<AchievementHubSession> getSession;
@@ -21,7 +21,7 @@ namespace PixelVaultNative
         readonly StackPanel recent = new StackPanel();
         readonly StackPanel unlocks = new StackPanel();
         AchievementHubTimeline lastTimeline;
-        readonly Button refresh = new Button { Content = "Refresh", Width = 96, Height = 32, Padding = new Thickness(12, 6, 12, 6), HorizontalAlignment = HorizontalAlignment.Left };
+        readonly Button refresh = new Button { Content = "Refresh", Padding = new Thickness(16, 10, 16, 10), VerticalAlignment = VerticalAlignment.Center };
         CancellationTokenSource refreshCancellation;
         string scope;
         bool closed, loading;
@@ -77,8 +77,12 @@ namespace PixelVaultNative
             };
             AutomationProperties.SetName(back, "Back to Library");
             back.Click += delegate { Close(); };
-            Grid.SetColumn(back, 1);
-            header.Children.Add(back);
+            var actions = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            refresh.Margin = new Thickness(0, 0, 10, 0);
+            actions.Children.Add(refresh);
+            actions.Children.Add(back);
+            Grid.SetColumn(actions, 1);
+            header.Children.Add(actions);
             DockPanel.SetDock(header, Dock.Top);
             root.Children.Add(header);
 
@@ -94,10 +98,8 @@ namespace PixelVaultNative
                 Child = unlocks
             });
             sections.Children.Add(recent);
+            sections.Children.Add(BuildCollectionSection());
             RenderRecent(new AchievementHubState { Status = "Loading recent play…" });
-            sections.Children.Add(BuildSection("All achievements", "One collection across your library",
-                "Your full collection is coming soon.",
-                "Browse achievements by game, earned status, and rarity, with the same metallic styling you know.", "\uE8F1"));
             root.Children.Add(new ScrollViewer
             {
                 Content = sections,
@@ -111,10 +113,11 @@ namespace PixelVaultNative
                 e.Handled = true;
                 Close();
             };
-            if (!SystemParameters.HighContrast)
-                refresh.Style = LibraryButtonChrome.LibraryToolbarButtonStyle("#243640", "#415561", "#304956", "#18242B");
+            refresh.Background = back.Background;
+            refresh.Foreground = back.Foreground;
+            refresh.BorderBrush = back.BorderBrush;
             refresh.ToolTip = "Refresh recent play and achievement progress";
-            AutomationProperties.SetName(refresh, "Refresh recent games");
+            AutomationProperties.SetName(refresh, "Refresh achievements");
             refresh.Click += async (_, __) => await RefreshAsync(true);
             Loaded += async delegate { back.Focus(); await RefreshAsync(false); };
             Activated += async delegate
@@ -132,7 +135,11 @@ namespace PixelVaultNative
             refreshCancellation?.Cancel();
             var cts = new CancellationTokenSource();
             refreshCancellation = cts;
-            if (scope != session.Scope) { lastTimeline = null; RenderRecent(new AchievementHubState { Status = "Loading recent play…" }); }
+            if (scope != session.Scope)
+            {
+                lastTimeline = null; ResetCollection();
+                RenderRecent(new AchievementHubState { Status = "Loading recent play…" });
+            }
             scope = session.Scope; loading = true; refresh.IsEnabled = false;
             try
             {
@@ -156,11 +163,11 @@ namespace PixelVaultNative
         {
             if (state.Timeline != null) lastTimeline = state.Timeline;
             RenderUnlocks(state.Timeline ?? lastTimeline, state.Timeline == null && lastTimeline != null);
+            RenderCollection(state.Collection);
             recent.Children.Clear();
             recent.Children.Add(Text("Recently played", 18, true));
             var status = Text(state.Status, 12); status.Margin = new Thickness(0, 6, 0, 10);
             recent.Children.Add(status);
-            recent.Children.Add(refresh);
             var cards = new WrapPanel { Margin = new Thickness(0, 12, 0, 18) };
             recent.Children.Add(cards);
             if (state.Cards.Count == 0)
@@ -222,7 +229,7 @@ namespace PixelVaultNative
                 if (timeline.OldestSnapshotUtc > 0)
                     coverage += " · oldest saved " + new DateTime(timeline.OldestSnapshotUtc, DateTimeKind.Utc).ToLocalTime().ToString("g", CultureInfo.CurrentCulture);
                 coverage += ".";
-                if (timeline.CoveredGames < timeline.LibraryGames) coverage += " Partial: open a game's achievements to include it.";
+                if (timeline.CoveredGames < timeline.LibraryGames) coverage += " Partial: other games are added as background achievement checks run.";
                 if (timeline.UndatedEarned > 0) coverage += " " + timeline.UndatedEarned + " earned without a provider date are not placed on the timeline.";
             }
             if (refreshFailed) coverage = "Refresh failed; showing previously loaded unlocks. " + coverage;
@@ -232,7 +239,7 @@ namespace PixelVaultNative
             if (timeline.Unlocks.Count == 0)
             {
                 unlocks.Children.Add(Text(timeline.CoveredGames == 0
-                    ? "No saved achievement progress yet. Open a game's achievements or use Refresh below."
+                    ? "No saved achievement progress yet. Background achievement checks add games over time, or use Refresh."
                     : "No dated unlocks in saved progress yet.", 14));
                 return;
             }
@@ -291,45 +298,6 @@ namespace PixelVaultNative
                 button.Click += async (_, __) => await OpenGameAsync(target);
                 strip.Children.Add(button);
             }
-        }
-
-        static Border BuildSection(string title, string subtitle, string emptyTitle, string detail, string glyph)
-        {
-            var content = new StackPanel();
-            content.Children.Add(Text(title, 18, true));
-            var caption = Text(subtitle, 12);
-            caption.Margin = new Thickness(0, 4, 0, 18);
-            content.Children.Add(caption);
-            var empty = new Grid();
-            empty.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            empty.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            empty.Children.Add(new TextBlock
-            {
-                Text = glyph,
-                FontFamily = new FontFamily("Segoe MDL2 Assets"),
-                FontSize = 26,
-                Foreground = Color("#7897A7", SystemColors.WindowTextBrush),
-                Margin = new Thickness(0, 3, 18, 0),
-                VerticalAlignment = VerticalAlignment.Top
-            });
-            var message = new StackPanel();
-            message.Children.Add(Text(emptyTitle, 14, true));
-            var description = Text(detail, 13);
-            description.Margin = new Thickness(0, 6, 0, 0);
-            message.Children.Add(description);
-            Grid.SetColumn(message, 1);
-            empty.Children.Add(message);
-            content.Children.Add(empty);
-            return new Border
-            {
-                Background = Color("#18232B", SystemColors.WindowBrush),
-                BorderBrush = Color("#2B3C47", SystemColors.ActiveBorderBrush),
-                BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(12),
-                Padding = new Thickness(22, 18, 22, 22),
-                Margin = new Thickness(0, 0, 0, 16),
-                Child = content
-            };
         }
 
         static TextBlock Text(string value, double size, bool prominent = false) => new TextBlock

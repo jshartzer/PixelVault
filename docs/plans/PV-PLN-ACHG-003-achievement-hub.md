@@ -3,7 +3,7 @@
 | Field | Value |
 |-------|-------|
 | **Plan ID** | `PV-PLN-ACHG-003` |
-| **Status** | Active — Steps 1–3 implemented and verified; review before Step 4 |
+| **Status** | Active — Steps 1–4 implemented and verified; awaiting user review |
 | **Created** | 2026-10-04 |
 | **Owner** | PixelVault / Codex |
 | **Topic mnemonic** | `ACHG` — Achievement Guides and Collection |
@@ -12,7 +12,7 @@
 
 ## Scope and delivery
 
-Notion tracking: [Roadmap initiative](https://www.notion.so/3ef73adc59b6813a88eef3d2d0e23b32), [Backlog execution](https://www.notion.so/3ef73adc59b68196a615e8d47d64c1ca). Steps 1–3 delivered; review before Step 4.
+Notion tracking: [Roadmap initiative](https://www.notion.so/3ef73adc59b6813a88eef3d2d0e23b32), [Backlog execution](https://www.notion.so/3ef73adc59b68196a615e8d47d64c1ca). Steps 1–4 delivered; awaiting user review.
 
 Add an **Achievements** button to the top toolbar of the main library. It opens an Achievement Hub with three sections: a recent-unlocks banner, three recently played game cards, and a searchable, sortable collection across the library. Reuse existing covers, artwork, per-game achievement navigation, and rarity styling.
 
@@ -86,14 +86,18 @@ The banner paints from saved data before any network work and updates with each 
 
 **Coverage limit:** the timeline only knows games whose progress has been saved: the three recent cards, plus any game whose achievements were opened in the app. A full-library background fetch is deferred to Step 4, which needs bounded, library-wide refresh anyway.
 
+**Step 4 data foundation (2026-10-04, user-selected lowest-cost approach):** the existing background notification check (every library game, configurable interval) now feeds the hub store at no extra network cost. Those lighter results are authoritative for the achievement set, earned status, and unlock dates but skip Steam rarity/counters. They create a snapshot when none exists (`DetailsUpdatedUtc` = 0) or merge into a full one, keeping saved rarity, counters, descriptions, icons, and groups (`AchievementHubStore.Merge`). Unchanged progress is not rewritten (timestamp-only refresh at most every 6 hours), and the parsed account file is cached in memory, invalidated by file time/length. Version 1 files are read as full-detail snapshots. Refresh moved to the hub header beside Back to Library. Live check against a copy of the real store: 189 library achievement games, 107 stored in 40 s, Steam file about 4.4 MB, 20 unchanged repeat saves skipped writes; Death Stranding kept its saved rarity through the merge. The other 82 report Steam player progress unavailable (mostly games without stats or not owned), so coverage will show "Partial" until Step 4 distinguishes "no achievements" from "unavailable". 292 earned achievements from early Valve games have Steam unlock time 0 and are correctly left off the timeline. Remaining Step 4 work: collection UI, filters/sorting, optional Steam rarity backfill.
+
 ### Step 4 — Library-wide achievement collection
 
-- [ ] Add game-labeled grid/list entries using existing achievement visuals and rarity tiers.
-- [ ] Add the search, status/game/rarity filters, and sorting described above; put missing sort values last with deterministic ties.
-- [ ] Keep full-library totals independent of filters and distinguish unknown progress from unearned progress.
-- [ ] Deduplicate repeated folder representations by stable provider/game/achievement identity while retaining separate provider editions.
-- [ ] Keep large libraries responsive using bounded image loading and virtualized/paged presentation as appropriate.
-- [ ] Verify existing per-game navigation and guide behavior when adding collection actions.
+- [x] Add game-labeled grid/list entries using existing achievement visuals and rarity tiers.
+- [x] Add the search, status/game/rarity filters, and sorting described above; put missing sort values last with deterministic ties.
+- [x] Keep full-library totals independent of filters and distinguish unknown progress from unearned progress.
+- [x] Deduplicate repeated folder representations by stable provider/game/achievement identity while retaining separate provider editions.
+- [x] Keep large libraries responsive using bounded image loading and virtualized/paged presentation as appropriate.
+- [x] Verify existing per-game navigation and guide behavior when adding collection actions.
+
+**Implemented (2026-10-04):** `AchievementHubCollection` (plain, WPF-free) builds entries from saved snapshots and runs queries; `AchievementHubWindow.Collection.cs` renders them. Search matches title, description, and game (case- and accent-insensitive, 250 ms debounce). Filters: status (all/earned/unearned), game, rarity tier (including "rarity unavailable"). Sorts: rarest, most common, newest/oldest earned, game, name; missing values last, ties by game title, game key, then original order. Totals ignore filters and report games with progress, games without achievements, and games whose progress is unknown. There is no per-achievement "progress unavailable" status filter: the store only keeps known progress, so unknown progress is shown at game level in the totals. Large collections are paged (100 per page, "Show more") rather than virtualized, because the hub content sits in one outer scroll view; badge downloads are cached (up to 1,500) and limited to 8 at a time. Entries open the existing per-game achievement window. Steam games that return a player-stats error with an empty schema are now stored as having no achievements rather than counted as unavailable. Steam rarity backfill for merge-only snapshots stays optional and was not added.
 
 **Exit:** a mixed-library fixture can be searched, filtered, and sorted accurately; large collections scroll smoothly and maintain clear game identity.
 
@@ -122,6 +126,7 @@ Run checks appropriate to each step. Step 1 needs a build and a focused WPF layo
 
 | Date | Entry |
 |------|-------|
+| 2026-10-04 | User resumed Step 4. Background notification results now merge into the hub store, Refresh moved beside Back to Library, and the library-wide collection (grid/list, search, filters, sorts, filter-independent totals, paging) was added. **167 achievement tests pass**, including 4 collection tests (dedupe and provider editions, filters, sorts with missing values, window paging/filter/view/click-through) and the merge tests. Live check against a copy of the real store: 123 of 189 achievement games stored (16 with no achievements, 66 with progress unavailable), 7,011 entries; build 8 ms, search and sort 14 ms, re-query and page render about 30 ms. Grid and list renders checked at 1040×780 (list rows were centered by the toolbar button template; entries now use their own stretching template). Review build rebuilt at `C:\Codex\App Testing Rarity\PixelVault.exe`; published version remains `0.077.000`. OS scaling/high contrast remain manual checks. All four plan steps are implemented; next: user review. |
 | 2026-10-04 | User resumed Step 3. Added the recent-unlocks banner from saved snapshots across all library games, with provider dates only, coverage/partial/stale captions, and retained timeline on failed loads. **158 achievement tests pass**, including 4 new timeline tests: mixed-game ordering with ties, duplicates, undated/future rows, outside-library and disconnected providers; empty history; failed refresh retention including non-recent games; banner click navigation and failure retention. Real saved Steam snapshots (3 of 13 sampled games) produced 23 correctly ordered unlocks; WPF renders at 1040×780 and 680×520 checked. The full suite has 2 failing `TradingCardFoilTests` pixel assertions (shader software rendering), unrelated to these files. The App Testing build couldn't clear the folder while the running instance held files, so the review build is at `C:\Codex\App Testing Rarity\PixelVault.exe`; App Testing's removed `assets`/`tools`/`CHANGELOG.md` were restored from that build. Live RetroAchievements follow-up with the configured account: the real hub load (isolated snapshot folder) matched 3 of 9 library RA games from recent play in 1.6 s and placed 14 dated unlocks newest first, with badge icons loading in the rendered banner; an offline cached reopen painted the same data in 23 ms. This closes the Step 2/3 live RA check. OS scaling/high contrast remain manual checks. Next: review before Step 4. |
 | 2026-10-04 | User resumed Step 2. Implemented recent cards, shared account snapshots, cached-first refresh, account-change cancellation, and exact game navigation. **154 achievement tests pass**, including 11 hub tests covering account/provider isolation, corrupted cache recovery, concurrent saves, duplicate identities, private/missing dates, failed refresh retention, no-account states, cancellation, RA dates, card navigation, and account changes during a load. Live Steam returned 298 dated games; isolated end-to-end hub refresh saved three real snapshots in 1.8 seconds, with a cached reopen in 2 ms. WPF layouts rendered with real library covers at wide/narrow widths; unknown progress has no bar. Actual OS scaling/high contrast and live RA account QA remain manual checks. Next: review before Step 3. |
 | 2026-10-04 | Registered ACHG-003 and completed Step 1 at the user's request. Added toolbar wiring and a reusable owner-scoped hub window with three coming-soon sections, Back to Library, Escape, and scrollable content. Build passed without warnings/errors; all 130 existing achievement tests passed (test project has an unrelated existing CS8600 warning). WPF smoke passed open/reuse/minimized restore/Back/Escape/reopen/owner-close; default 1040×780 and minimum 680×520 content renders checked, including 2× pixel-density rendering. Actual OS high-contrast and display-scale switching remain manual checks. Steps 2–4 remain pending. |

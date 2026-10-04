@@ -648,7 +648,9 @@ namespace PixelVaultNative
                         SteamPlaytimeMinutes = playtimeMinutes,
                         SteamRareUnlockedCount = rareUnlocked,
                         SteamGlobalRarityAvailable = rarityAvailable,
-                        ProgressErrorMessage = progressAttempted && progress == null ? "Steam player progress is unavailable. Check SteamID64 or game/profile privacy." : null
+                        // Steam reports a player-stats error for games without achievements; that is not missing progress.
+                        ProgressErrorMessage = progressAttempted && progress == null && ordered.Count > 0
+                            ? "Steam player progress is unavailable. Check SteamID64 or game/profile privacy." : null
                     };
                 }
             }

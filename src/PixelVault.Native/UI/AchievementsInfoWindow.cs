@@ -965,7 +965,7 @@ namespace PixelVaultNative
             return card;
         }
 
-        static string BuildAchievementGridToolTip(GameAchievementsFetchService.AchievementRow row)
+        internal static string BuildAchievementGridToolTip(GameAchievementsFetchService.AchievementRow row)
         {
             if (row == null) return string.Empty;
             var parts = new List<string>();
@@ -1165,22 +1165,37 @@ namespace PixelVaultNative
             });
         }
 
+        // Hub filters re-render many cards; reuse recent icon bytes and bound parallel downloads.
+        static readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte[]> AchievementIconCache = new(StringComparer.Ordinal);
+        static readonly System.Threading.SemaphoreSlim AchievementIconDownloads = new System.Threading.SemaphoreSlim(8, 8);
+
         static async Task<byte[]> DownloadAchievementIconBytesAsync(string url, string userAgent)
         {
             if (string.IsNullOrWhiteSpace(url)) return null;
+            url = url.Trim();
+            if (AchievementIconCache.TryGetValue(url, out var cached)) return cached;
+            await AchievementIconDownloads.WaitAsync().ConfigureAwait(false);
             try
             {
+                if (AchievementIconCache.TryGetValue(url, out cached)) return cached;
                 using (var wc = new TimeoutWebClient())
                 {
                     GameAchievementsFetchService.TrySetUa(wc, userAgent);
                     wc.TimeoutMilliseconds = 20000;
-                    return await wc.DownloadBytesAsync(url.Trim(), AchievementIconDownloadMaxBytes, default).ConfigureAwait(false);
+                    var bytes = await wc.DownloadBytesAsync(url, AchievementIconDownloadMaxBytes, default).ConfigureAwait(false);
+                    if (bytes != null && bytes.Length > 0)
+                    {
+                        if (AchievementIconCache.Count >= 1500) AchievementIconCache.Clear();
+                        AchievementIconCache[url] = bytes;
+                    }
+                    return bytes;
                 }
             }
             catch
             {
                 return null;
             }
+            finally { AchievementIconDownloads.Release(); }
         }
 
         static void ApplyGrayscaleSource(Image img, BitmapSource colorSource)

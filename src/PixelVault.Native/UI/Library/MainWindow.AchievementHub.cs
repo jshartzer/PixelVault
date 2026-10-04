@@ -14,7 +14,7 @@ namespace PixelVaultNative
         async Task SaveHubObservationAsync(GameAchievementsFetchService.FetchResult result, string account)
         {
             var first = result?.Rows?.FirstOrDefault();
-            if (_achievementHubStore == null || first == null || !AchievementHubStore.CanSave(first.Provider, first.ProviderGameId, result)) return;
+            if (_achievementHubStore == null || first == null || !AchievementHubStore.CanStore(first.Provider, first.ProviderGameId, result)) return;
             try { await _achievementHubStore.SaveGameAsync(first.Provider, account, first.ProviderGameId, result, CancellationToken.None); }
             catch (Exception ex) { Log("Achievement hub snapshot could not be saved: " + ex.GetType().Name); }
         }

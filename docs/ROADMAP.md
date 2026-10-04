@@ -28,6 +28,8 @@ Source input for this roadmap:
 
 ## Current Direction
 
+**October 4 update — ACHG-003 Step 4:** the library-wide achievement collection is implemented and verified (167 achievement tests; live 7,011-entry check). All four steps are done; next is user review.
+
 **October 4 update — ACHG-003 Step 3:** the recent-unlocks banner is implemented and verified (158 achievement tests). Next is review before Step 4 (library-wide collection).
 
 **October 4 update — ACHG-003:** Step 2 (recent games/shared snapshots) is now implemented and verified. **154 achievement tests pass**; live Steam and cached reopen checks passed. Next is review before Step 3 (earned timeline). Later paragraphs describing Step 1 reflect the initial kickoff.

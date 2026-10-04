@@ -95,6 +95,8 @@
     <Compile Include="Storage\IndexDatabaseStorage.cs" />
     <Compile Include="UI\AchievementsInfoWindow.cs" />
     <Compile Include="UI\AchievementHubWindow.cs" />
+    <Compile Include="UI\AchievementHubWindow.Collection.cs" />
+    <Compile Include="Services\Achievements\AchievementHubCollection.cs" />
     <Compile Include="UI\Library\MainWindow.AchievementHub.cs" />
     <Compile Include="Services\Achievements\AchievementHubStore.cs" />
     <Compile Include="Services\Achievements\AchievementHubService.cs" />
