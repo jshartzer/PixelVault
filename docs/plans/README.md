@@ -19,6 +19,7 @@ Long-lived execution plans that use a **stable plan ID** for cross-linking (repo
 | **PV-PLN-GPRO-001** | [PV-PLN-GPRO-001-game-profile-dashboard.md](PV-PLN-GPRO-001-game-profile-dashboard.md) | **Game Profile dashboard:** turn the new "Open Game Profile" window into a per-game dashboard — hero action cluster (Favorite/Showcase/100% + Edit Game / Open Folders / Change Art), summary line, Game Notes, **Sessions** section reusing `librarySessionThresholdMinutes`, achievements completion %, external-ID pills, Recent Captures with chevron scroll. |
 | **PV-PLN-ACHG-001** | *Complete —* [PV-PLN-ACHG-001-achievement-guide-library.md](PV-PLN-ACHG-001-achievement-guide-library.md) (**Done**) | **Achievement Guide Library:** durable provider achievement identities, locally authored per-achievement guides with source attribution, a compact Guide editor, and validated JSON bundle imports for sourced summaries. |
 | **PV-PLN-ACHG-002** | *Active — A–E implemented; F verification* [PV-PLN-ACHG-002-achievement-collection-experience.md](PV-PLN-ACHG-002-achievement-collection-experience.md) | **Achievement Collection Experience:** Access, read-first guides, Next Up pins, statistics/history, and sorting implemented; compact pins and collection styling/unlock feedback implemented; broader manual QA remains. |
+| **PV-PLN-ACHG-003** | *Active — Steps 1–3 implemented; review before Step 4* [PV-PLN-ACHG-003-achievement-hub.md](PV-PLN-ACHG-003-achievement-hub.md) | **Achievement Hub:** main-toolbar entry and hub shell; then recent games/progress, earned timeline, and a library-wide searchable/sortable achievement collection, one step at a time. |
 
 ### Plan families (merge by theme, not by file)
 
@@ -30,7 +31,7 @@ These are **documentation umbrellas**—each plan file stays canonical for its I
 | **Pre-1.0 polish + shipping** | **PV-PLN-V1POL-001**, **PV-PLN-DIST-001** |
 | **Intake, filenames, trust, placement** | **PV-PLN-FNRU-001**, **PV-PLN-AINT-001** (complete), **PV-PLN-LIBST-001** (complete) |
 | **Performance / responsiveness** | **PV-PLN-PERF-001**, **PV-PLN-PERF-002**, **`docs/LIBRARY_PERFORMANCE_PLAN.md`**, **`docs/PERFORMANCE_TODO.md`** |
-| **Library UX surfaces** | **PV-PLN-LIBPV-001** (capture viewer), **PV-PLN-GPRO-001** (game profile dashboard), **PV-PLN-ACHG-001** (achievement guide library, complete), **PV-PLN-ACHG-002** (achievement collection experience, active), **PV-PLN-RVW-001** (post-app-review hardening, complete) |
+| **Library UX surfaces** | **PV-PLN-LIBPV-001** (capture viewer), **PV-PLN-GPRO-001** (game profile dashboard), **PV-PLN-ACHG-001** (achievement guide library, complete), **PV-PLN-ACHG-002** (achievement collection experience, active), **PV-PLN-ACHG-003** (achievement hub, active), **PV-PLN-RVW-001** (post-app-review hardening, complete) |
 
 **ID format:** `PV-PLN-<TOPIC>-<NNN>`  
 - **PV** — PixelVault  

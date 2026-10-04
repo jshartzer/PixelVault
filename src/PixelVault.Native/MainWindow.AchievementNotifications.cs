@@ -25,11 +25,13 @@ namespace PixelVaultNative
         Window _achievementHistoryWindow;
         Action _reloadAchievementHistory;
         Button _achievementNotificationsButton;
+        Border _achievementNotificationsUnreadDot;
         string _achievementMonitorStatus = "Waiting for startup check…";
         event Action<LibraryFolderInfo> AchievementCompletionUpdated;
 
         void InitializeAchievementNotifications()
         {
+            _achievementHubStore = new AchievementHubStore(Path.Combine(dataRoot, "achievement-hub"));
             try { _achievementNotifications = new AchievementNotifications(Path.Combine(dataRoot, "achievement-notifications.json")); }
             catch (Exception ex) { Log("Could not load achievement notifications: " + ex.Message); return; }
             GameAchievementsFetchService.ProgressObserved += AchievementProgressObserved;
@@ -65,6 +67,7 @@ namespace PixelVaultNative
 
         void AchievementProgressObserved(GameAchievementsFetchService.FetchResult result, string account)
         {
+            _ = SaveHubObservationAsync(result, account);
             // All mutation and persistence is serialized on the UI dispatcher.
             if (_achievementMonitorCancellation.IsCancellationRequested) return;
             Dispatcher.BeginInvoke(new Action(() =>
@@ -176,6 +179,18 @@ namespace PixelVaultNative
                     .OrderByDescending(g => (!string.IsNullOrWhiteSpace(g.SteamAppId) && g.SteamAppId == selected?.SteamAppId)
                         || (!string.IsNullOrWhiteSpace(g.RetroAchievementsGameId) && g.RetroAchievementsGameId == selected?.RetroAchievementsGameId))
                     .ThenByDescending(g => g.GameId != null && recent.TryGetValue(g.GameId, out var ticks) ? ticks : 0).ToList();
+                var titles = new Dictionary<(string, string), string>();
+                foreach (var game in games.Where(g => !string.IsNullOrWhiteSpace(g.Name)))
+                {
+                    if (!GameAchievementsFetchService.TryPickAchievementsBackend(NormalizeConsoleLabel(game.PlatformLabel), game, out var steamGame)) continue;
+                    titles.TryAdd((steamGame ? GameAchievementsFetchService.SteamProvider : GameAchievementsFetchService.RetroAchievementsProvider,
+                        (steamGame ? game.SteamAppId : game.RetroAchievementsGameId).Trim()), game.Name.Trim());
+                }
+                if (_achievementNotifications.ApplyLibraryTitles(titles))
+                {
+                    SaveAchievementNotifications();
+                    _reloadAchievementHistory?.Invoke();
+                }
                 int checkedCount = 0, failures = 0;
                 foreach (var game in games)
                 {
@@ -210,7 +225,28 @@ namespace PixelVaultNative
         Button CreateAchievementNotificationsButton()
         {
             _achievementNotificationsButton = Btn("Notifications", (_, __) => ShowAchievementNotifications(), "#20343A", Brushes.White);
-            _achievementNotificationsButton.ToolTip = "Achievement notifications, history and refresh settings";
+            _achievementNotificationsButton.Width = 36;
+            _achievementNotificationsButton.Height = 36;
+            _achievementNotificationsButton.Padding = new Thickness(0);
+            _achievementNotificationsButton.Margin = new Thickness(0, 0, 12, 0);
+            _achievementNotificationsButton.VerticalAlignment = VerticalAlignment.Center;
+            _achievementNotificationsButton.Effect = null;
+            _achievementNotificationsButton.Cursor = System.Windows.Input.Cursors.Hand;
+            _achievementNotificationsButton.Style = LibraryButtonChrome.LibraryCircleToolbarButtonStyle(
+                "#18242B", "#24353F", "#22323C", "#131D23");
+            var content = new Grid { Width = 32, Height = 32, IsHitTestVisible = false };
+            content.Children.Add((FrameworkElement)BuildToolbarIconButtonContent("\uEA8F", fontSize: 18));
+            _achievementNotificationsUnreadDot = new Border
+            {
+                Width = 8, Height = 8, CornerRadius = new CornerRadius(4),
+                Background = Brush("#63C9EA"), BorderBrush = Brush("#18242B"),
+                BorderThickness = new Thickness(1),
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Top,
+                Margin = new Thickness(0, 2, 2, 0)
+            };
+            content.Children.Add(_achievementNotificationsUnreadDot);
+            _achievementNotificationsButton.Content = content;
             UpdateAchievementNotificationBadge();
             return _achievementNotificationsButton;
         }
@@ -218,7 +254,11 @@ namespace PixelVaultNative
         {
             if (_achievementNotificationsButton == null) return;
             var unread = _achievementNotifications?.Data.History.Count(n => !n.Read) ?? 0;
-            _achievementNotificationsButton.Content = unread > 0 ? "Notifications (" + unread + ")" : "Notifications";
+            if (_achievementNotificationsUnreadDot != null)
+                _achievementNotificationsUnreadDot.Visibility = unread > 0 ? Visibility.Visible : Visibility.Collapsed;
+            var label = unread > 0 ? "Notifications (" + unread + " unread)" : "Notifications";
+            _achievementNotificationsButton.ToolTip = label + " — achievement history and refresh settings";
+            System.Windows.Automation.AutomationProperties.SetName(_achievementNotificationsButton, label);
         }
         void CloseAchievementToasts()
         {

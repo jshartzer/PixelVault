@@ -4,7 +4,7 @@ using System.Linq;
 
 namespace PixelVaultNative
 {
-    enum AchievementCollectionSort { Provider, RarestFirst, MostCommonFirst, NewestFirst, OldestFirst }
+    enum AchievementCollectionSort { Provider, RarestFirst, MostCommonFirst, NewestFirst, OldestFirst, ProgressHighestFirst, ProgressLowestFirst }
 
     sealed class AchievementCollectionStats
     {
@@ -15,6 +15,17 @@ namespace PixelVaultNative
         public List<HistoryPoint> History = new List<HistoryPoint>();
 
         internal static bool ValidPercent(double? value) => value.HasValue && !double.IsNaN(value.Value) && value >= 0 && value <= 100;
+        internal static double? CounterPercent(GameAchievementsFetchService.AchievementRow row)
+        {
+            if (row?.ProgressKnown != true || !row.CounterCurrent.HasValue || !row.CounterMinimum.HasValue || !row.CounterTarget.HasValue)
+                return null;
+            var current = row.CounterCurrent.Value;
+            var minimum = row.CounterMinimum.Value;
+            var target = row.CounterTarget.Value;
+            if (!double.IsFinite(current) || !double.IsFinite(minimum) || !double.IsFinite(target)
+                || current < 0 || minimum < 0 || target <= minimum) return null;
+            return Math.Clamp((current - minimum) / (target - minimum), 0, 1) * 100;
+        }
         internal static bool ValidUnlock(GameAchievementsFetchService.AchievementRow row, long nowUtcTicks) =>
             row?.ProgressKnown == true && row.Unlocked && row.UnlockUtcTicks >= DateTime.UnixEpoch.Ticks
                 && row.UnlockUtcTicks <= Math.Min(nowUtcTicks, DateTime.MaxValue.Ticks);
@@ -51,6 +62,13 @@ namespace PixelVaultNative
             IEnumerable<GameAchievementsFetchService.AchievementRow> rows, AchievementCollectionSort order, long nowUtcTicks)
         {
             var all = (rows ?? Enumerable.Empty<GameAchievementsFetchService.AchievementRow>()).Where(row => row != null);
+            if (order == AchievementCollectionSort.ProgressHighestFirst || order == AchievementCollectionSort.ProgressLowestFirst)
+            {
+                var ordered = all.OrderBy(row => !CounterPercent(row).HasValue);
+                return (order == AchievementCollectionSort.ProgressHighestFirst
+                    ? ordered.ThenByDescending(row => CounterPercent(row) ?? 0)
+                    : ordered.ThenBy(row => CounterPercent(row) ?? 0)).ToList();
+            }
             // LINQ's stable ordering keeps the incoming provider/default order for ties. Missing data is always last.
             if (order == AchievementCollectionSort.RarestFirst || order == AchievementCollectionSort.MostCommonFirst)
             {

@@ -20,6 +20,7 @@ namespace PixelVaultNative
             internal Button PhotoIndexButton;
             internal Button PhotographyGalleryButton;
             internal Button MyCoversButton;
+            internal Button AchievementHubButton;
             internal Button RefreshButton;
             internal Button IntakeReviewButton;
             internal Border IntakeReviewBadge;
@@ -137,6 +138,14 @@ namespace PixelVaultNative
             chrome.MyCoversButton.ToolTip = "Open the saved custom covers folder on disk";
             AutomationProperties.SetName(chrome.MyCoversButton, "My Covers");
             chrome.RefreshButton = Btn("Refresh", null, "#20343A", Brushes.White);
+            chrome.AchievementHubButton = Btn("Achievements", null, "#20343A", Brushes.White);
+            chrome.AchievementHubButton.Width = 134;
+            chrome.AchievementHubButton.Height = 42;
+            chrome.AchievementHubButton.FontSize = 13;
+            chrome.AchievementHubButton.Margin = new Thickness(0, 0, 12, 0);
+            chrome.AchievementHubButton.ToolTip = "Open the Achievement Hub";
+            AutomationProperties.SetName(chrome.AchievementHubButton, "Achievements");
+            ApplyLibraryToolbarChrome(chrome.AchievementHubButton, "#18242B", "#24353F", "#22323C", "#131D23");
             chrome.RefreshButton.Width = 44;
             chrome.RefreshButton.Height = 42;
             chrome.RefreshButton.Margin = new Thickness(8, 0, 0, 0);
@@ -203,6 +212,7 @@ namespace PixelVaultNative
             headerActions.Children.Add(chrome.PhotoIndexButton);
             headerActions.Children.Add(chrome.PhotographyGalleryButton);
             headerActions.Children.Add(chrome.MyCoversButton);
+            headerActions.Children.Add(chrome.AchievementHubButton);
             headerActions.Children.Add(chrome.RefreshButton);
             headerActions.Children.Add(chrome.IntakeReviewButton);
             var headerScroll = new ScrollViewer

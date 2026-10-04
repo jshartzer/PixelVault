@@ -28,6 +28,12 @@ Source input for this roadmap:
 
 ## Current Direction
 
+**October 4 update — ACHG-003 Step 3:** the recent-unlocks banner is implemented and verified (158 achievement tests). Next is review before Step 4 (library-wide collection).
+
+**October 4 update — ACHG-003:** Step 2 (recent games/shared snapshots) is now implemented and verified. **154 achievement tests pass**; live Steam and cached reopen checks passed. Next is review before Step 3 (earned timeline). Later paragraphs describing Step 1 reflect the initial kickoff.
+
+**Current requested feature (2026-10-04):** [PV-PLN-ACHG-003 — Achievement Hub](plans/PV-PLN-ACHG-003-achievement-hub.md). Step 1 (toolbar entry and hub shell) implemented and verified. Review before Step 2 (recent games/shared snapshots), Step 3 (earned timeline), and Step 4 (library-wide collection). The user requested one step at a time; this does not reorder the strategic phases below or close ACHG-002's remaining QA.
+
 **Active focused initiative (resumed 2026-09-07 at user request):** [PV-PLN-ACHG-002 — Achievement Collection Experience](plans/PV-PLN-ACHG-002-achievement-collection-experience.md). Phases A–E are implemented, including compact pins and collection styling/unlock feedback. Phase F manual verification remains. [Notion roadmap status](https://www.notion.so/3d373adc59b681cdb2bddc883381e1f8). This does not reorder the strategic phases below.
 
 PixelVault already has a strong core shape:

@@ -40,6 +40,17 @@ public sealed class AchievementNotificationTests : IDisposable
         Assert.Empty(store.Observe(unknown, "a"));
         Assert.Contains("50%", Assert.Single(store.Observe(Progress(2), "a")).Message);
     }
+    [Fact] public void SavedHistoryCodenamesAreReplacedWithLibraryTitlesPerProvider()
+    {
+        var store = Create();
+        store.Data.History.Add(new() { Title = "Project Lake", Provider = "steam", Game = "1850570", Message = "Achievement unlocked: A" });
+        store.Data.History.Add(new() { Title = "Kraken", Provider = "steam", Game = "356190", Message = "50%" });
+        store.Data.History.Add(new() { Title = "Retro", Provider = "retroachievements", Game = "1850570", Message = "25%" });
+        var titles = new Dictionary<(string Provider, string Game), string> { [("steam", "1850570")] = "Death Stranding Director's Cut" };
+        Assert.True(store.ApplyLibraryTitles(titles));
+        Assert.Equal(new[] { "Death Stranding Director's Cut", "Kraken", "Retro" }, store.Data.History.Select(n => n.Title));
+        Assert.False(store.ApplyLibraryTitles(titles));
+    }
     [Fact] public void AccountsAndProvidersHaveSeparateBaselines()
     {
         var store = Create(); store.Observe(Progress(0), "a");

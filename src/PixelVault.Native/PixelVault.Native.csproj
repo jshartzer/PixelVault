@@ -17,6 +17,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="UI\AchievementRarityUi.cs" />
     <Compile Include="UI\Effects\TradingCardFoilEffect.cs" />
     <EmbeddedResource Include="UI\Effects\TradingCardFoil.ps" LogicalName="PixelVault.TradingCardFoil.ps" />
     <Compile Include="Services\Achievements\AchievementNotifications.cs" />
@@ -93,6 +94,11 @@
     <Compile Include="Services\Metadata\IgdbProbeService.cs" />
     <Compile Include="Storage\IndexDatabaseStorage.cs" />
     <Compile Include="UI\AchievementsInfoWindow.cs" />
+    <Compile Include="UI\AchievementHubWindow.cs" />
+    <Compile Include="UI\Library\MainWindow.AchievementHub.cs" />
+    <Compile Include="Services\Achievements\AchievementHubStore.cs" />
+    <Compile Include="Services\Achievements\AchievementHubService.cs" />
+    <Compile Include="Services\Achievements\SteamAchievementCounters.cs" />
     <Compile Include="UI\AchievementsInfoWindow.Pins.cs" />
     <Compile Include="UI\AchievementsInfoWindow.Stats.cs" />
     <Compile Include="UI\AchievementPinUi.cs" />

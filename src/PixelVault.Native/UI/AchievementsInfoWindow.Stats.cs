@@ -20,10 +20,42 @@ namespace PixelVaultNative
         };
         AchievementCollectionStats _stats;
         AchievementCollectionSort SelectedSort => (AchievementCollectionSort)Math.Max(0, _sort.SelectedIndex);
+        bool SortingByCounterProgress => SelectedSort == AchievementCollectionSort.ProgressHighestFirst
+            || SelectedSort == AchievementCollectionSort.ProgressLowestFirst;
+
+        static string CounterLabel(GameAchievementsFetchService.AchievementRow row) =>
+            !AchievementCollectionStats.CounterPercent(row).HasValue ? string.Empty
+            : row.CounterCurrent.Value.ToString("#,0.##", CultureInfo.CurrentCulture)
+                + " / " + row.CounterTarget.Value.ToString("#,0.##", CultureInfo.CurrentCulture);
+
+        static FrameworkElement BuildCounterProgress(GameAchievementsFetchService.AchievementRow row)
+        {
+            var percent = AchievementCollectionStats.CounterPercent(row);
+            if (!percent.HasValue) return null;
+            var label = "Counter progress: " + CounterLabel(row);
+            var panel = new StackPanel { Margin = new Thickness(0, 7, 0, 0), HorizontalAlignment = HorizontalAlignment.Stretch };
+            var text = StatsText(CounterLabel(row));
+            text.FontSize = 11;
+            text.Foreground = SystemParameters.HighContrast ? SystemColors.WindowTextBrush : UiBrushHelper.FromHex("#A8C6D3");
+            panel.Children.Add(text);
+            var bar = new ProgressBar
+            {
+                Minimum = 0, Maximum = 100, Value = percent.Value, Height = 5,
+                Foreground = SystemParameters.HighContrast ? SystemColors.HighlightBrush : UiBrushHelper.FromHex("#6EAFBF"),
+                Background = SystemParameters.HighContrast ? SystemColors.ControlBrush : UiBrushHelper.FromHex("#263C48"),
+                BorderThickness = new Thickness(0), IsHitTestVisible = false,
+                ToolTip = label + " · " + percent.Value.ToString("0.#", CultureInfo.CurrentCulture) + "%"
+            };
+            AutomationProperties.SetName(bar, label);
+            panel.ToolTip = "Latest counter reported to Steam. Unlock status is reported separately."
+                + (row.CounterMinimum > 0 ? " Progress range: " + row.CounterMinimum.Value.ToString("0.##", CultureInfo.CurrentCulture) + "–" + row.CounterTarget.Value.ToString("0.##", CultureInfo.CurrentCulture) + "." : "");
+            panel.Children.Add(bar);
+            return panel;
+        }
 
         FrameworkElement BuildSortControls()
         {
-            foreach (var label in new[] { "Provider / default", "Global unlock %: rarest first", "Global unlock %: most common first", "Unlock date: newest first", "Unlock date: oldest first" })
+            foreach (var label in new[] { "Provider / default", "Global unlock %: rarest first", "Global unlock %: most common first", "Unlock date: newest first", "Unlock date: oldest first", "Counter progress: highest first", "Counter progress: lowest first" })
                 _sort.Items.Add(label);
             _sort.SelectedIndex = 0;
             _sort.ToolTip = "Sort within each group. Unavailable values appear last; ties retain default order.";

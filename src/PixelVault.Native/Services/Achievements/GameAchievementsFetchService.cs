@@ -45,6 +45,9 @@ namespace PixelVaultNative
             public long UnlockUtcTicks;
             /// <summary>Provider-supplied global unlock percentage, when available. This is rarity, not difficulty.</summary>
             public double? GlobalUnlockPercent;
+            public double? CounterCurrent;
+            public double? CounterMinimum;
+            public double? CounterTarget;
             /// <summary>Steam achievement API name (schema <c>name</c>); empty for RetroAchievements rows.</summary>
             public string SteamApiName;
             /// <summary>Whether the provider marks the achievement as hidden.</summary>
@@ -69,6 +72,7 @@ namespace PixelVaultNative
 
         public sealed class FetchResult
         {
+            public bool NotificationOnly;
             public string SourceLabel;
             public string GameTitle;
             public string DetailLine;
@@ -129,6 +133,7 @@ namespace PixelVaultNative
             var result = useSteam
                 ? await FetchSteamAsync(folder, folderName, steamWebApiKey, steamUserId64, userAgent, cancellationToken, notificationsOnly).ConfigureAwait(false)
                 : await FetchRetroAsync(folder, folderName, retroAchievementsApiKey, retroAchievementsUsername, userAgent, cancellationToken).ConfigureAwait(false);
+            result.NotificationOnly = notificationsOnly;
             if (!cancellationToken.IsCancellationRequested)
                 ProgressObserved?.Invoke(result, useSteam ? steamUserId64 : retroAchievementsUsername);
             return result;
@@ -447,6 +452,30 @@ namespace PixelVaultNative
             }
         }
 
+        static async Task<(Dictionary<string, SteamAchievementCounters.Mapping> Mappings, Dictionary<string, double> Stats)> LoadSteamCountersAsync(
+            int appId, string key, ulong account, string userAgent, CancellationToken token, bool enabled)
+        {
+            var mappings = new Dictionary<string, SteamAchievementCounters.Mapping>(StringComparer.Ordinal);
+            var stats = new Dictionary<string, double>(StringComparer.Ordinal);
+            if (!enabled) return (mappings, stats);
+            mappings = await Task.Run(() => SteamAchievementCounters.LoadMappings(appId), token).ConfigureAwait(false);
+            if (mappings.Count == 0) return (mappings, stats);
+            try
+            {
+                var url = "https://api.steampowered.com/ISteamUserStats/GetUserStatsForGame/v2/?key=" + Uri.EscapeDataString(key)
+                    + "&appid=" + appId.ToString(CultureInfo.InvariantCulture) + "&steamid=" + account.ToString(CultureInfo.InvariantCulture);
+                var json = await DownloadSteamJsonStringAsync(url, userAgent, token).ConfigureAwait(false);
+                stats = SteamAchievementCounters.ParseUserStats(json, account);
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
+            catch (Exception ex) when (ex is WebException || ex is System.Net.Http.HttpRequestException || ex is OperationCanceledException
+                || ex is JsonException || ex is InvalidOperationException || ex is System.IO.IOException)
+            {
+                // Optional counters must not hide otherwise valid achievement status or rarity.
+            }
+            return (mappings, stats);
+        }
+
         static async Task<FetchResult> FetchSteamAsync(
             LibraryFolderInfo folder,
             string fallbackTitle,
@@ -466,6 +495,7 @@ namespace PixelVaultNative
                 + "&appid=" + appId.ToString(CultureInfo.InvariantCulture);
 
             var progressAttempted = TryParseULong(steamUserId64Raw, out var sid64);
+            var counterTask = LoadSteamCountersAsync(appId, keyTrim, sid64, userAgent, cancellationToken, progressAttempted && !notificationsOnly);
             Task<string> schemaTask = notificationsOnly ? LoadNotificationSchemaAsync(appId, schemaUrl, userAgent, cancellationToken)
                 : DownloadSteamJsonStringAsync(schemaUrl, userAgent, cancellationToken);
             Task<Dictionary<string, (int achieved, int unlocktime)>> progressTask = progressAttempted
@@ -479,7 +509,7 @@ namespace PixelVaultNative
 
             try
             {
-                await Task.WhenAll(schemaTask, progressTask, playtimeTask, globalPctTask).ConfigureAwait(false);
+                await Task.WhenAll(schemaTask, progressTask, playtimeTask, globalPctTask, counterTask).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -499,6 +529,7 @@ namespace PixelVaultNative
             var progress = await progressTask.ConfigureAwait(false);
             var playtimeMinutes = await playtimeTask.ConfigureAwait(false);
             var globalPercents = await globalPctTask.ConfigureAwait(false);
+            var counters = await counterTask.ConfigureAwait(false);
 
             try
             {
@@ -508,8 +539,10 @@ namespace PixelVaultNative
                     if (!root.TryGetProperty("game", out var game))
                         return Err("Unexpected Steam response (missing game).");
 
+                    // Steam's schema gameName is often an internal codename (Death Stranding DC is "Project Lake"),
+                    // so it is only used when the library has no title.
                     var gameTitle = fallbackTitle;
-                    if (game.TryGetProperty("gameName", out var gn) && gn.ValueKind == JsonValueKind.String)
+                    if (string.IsNullOrWhiteSpace(gameTitle) && game.TryGetProperty("gameName", out var gn) && gn.ValueKind == JsonValueKind.String)
                     {
                         var n = gn.GetString();
                         if (!string.IsNullOrWhiteSpace(n)) gameTitle = n.Trim();
@@ -573,6 +606,7 @@ namespace PixelVaultNative
                         }
                     }
 
+                    SteamAchievementCounters.Apply(rows, counters.Mappings, counters.Stats);
                     var ordered = OrderAchievementRows(rows);
                     var unlockedCount = ordered.Count(r => r.ProgressKnown && r.Unlocked);
                     var detail = "App " + appId.ToString(CultureInfo.InvariantCulture)

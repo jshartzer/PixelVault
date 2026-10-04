@@ -659,6 +659,8 @@ namespace PixelVaultNative
             var contextMenu = new ContextMenu();
             var openProfileItem = new MenuItem { Header = "Open Game Profile", IsEnabled = canOpenProfile };
             openProfileItem.Click += delegate { LibraryBrowserOpenGameProfile(Window.GetWindow(tile) ?? this, folder); };
+            var achievementsItem = new MenuItem { Header = "Achievements", IsEnabled = canOpenProfile };
+            achievementsItem.Click += delegate { LibraryBrowserShowAchievementsInfo(Window.GetWindow(tile) ?? this, folder); };
             var openMyCoversItem = new MenuItem { Header = "Open My Covers Folder" };
             openMyCoversItem.Click += delegate { OpenSavedCoversFolder(); };
             var setCoverItem = new MenuItem { Header = "Set Custom Cover...", IsEnabled = actionFolders.Count > 0 };
@@ -774,6 +776,7 @@ namespace PixelVaultNative
                     libraryToast).ConfigureAwait(true);
             };
             contextMenu.Items.Add(openProfileItem);
+            contextMenu.Items.Add(achievementsItem);
             contextMenu.Items.Add(new Separator());
             contextMenu.Items.Add(openFolderItem);
             contextMenu.Items.Add(copyFolderPathItem);

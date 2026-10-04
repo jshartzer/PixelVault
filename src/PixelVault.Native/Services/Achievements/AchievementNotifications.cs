@@ -54,6 +54,20 @@ namespace PixelVaultNative
             File.WriteAllText(_path + ".tmp", JsonSerializer.Serialize(Data));
             File.Move(_path + ".tmp", _path, true);
         }
+        /// <summary>Replaces saved notice titles with library names keyed by provider and provider game ID. Returns whether anything changed.</summary>
+        public bool ApplyLibraryTitles(IReadOnlyDictionary<(string Provider, string Game), string> titles)
+        {
+            var changed = false;
+            foreach (var notice in Data.History)
+            {
+                if (notice?.Provider == null || notice.Game == null
+                    || !titles.TryGetValue((notice.Provider, notice.Game), out var title) || string.IsNullOrWhiteSpace(title)
+                    || notice.Title == title) continue;
+                notice.Title = title;
+                changed = true;
+            }
+            return changed;
+        }
         public List<Notice> Observe(GameAchievementsFetchService.FetchResult result, string account)
         {
             var notices = new List<Notice>();

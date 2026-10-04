@@ -950,8 +950,18 @@ namespace PixelVaultNative
             Grid.SetRow(meta, 2);
             content.Children.Add(meta);
 
+            if (SortingByCounterProgress && BuildCounterProgress(row) is FrameworkElement counter)
+            {
+                content.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                Grid.SetRow(counter, 3);
+                content.Children.Add(counter);
+                card.Height = 190;
+            }
+
             card.Child = content;
-            AutomationProperties.SetName(card, (row.Title ?? "Achievement") + ", " + state);
+            AchievementRarityUi.Apply(card, badgeHost, title, row);
+            AutomationProperties.SetName(card, (row.Title ?? "Achievement") + ", " + state +
+                (AchievementRarityUi.Label(row).Length > 0 ? ", " + AchievementRarityUi.Label(row) : ""));
             return card;
         }
 
@@ -960,11 +970,13 @@ namespace PixelVaultNative
             if (row == null) return string.Empty;
             var parts = new List<string>();
             if (!string.IsNullOrWhiteSpace(row.Title)) parts.Add(row.Title.Trim());
+            if (AchievementRarityUi.Label(row).Length > 0) parts.Add(AchievementRarityUi.Label(row));
             if (!string.IsNullOrWhiteSpace(row.Description)) parts.Add(row.Description.Trim());
+            if (AchievementCollectionStats.CounterPercent(row).HasValue) parts.Add("Counter progress: " + CounterLabel(row));
             var earned = FormatAchievementEarnedMeta(row.UnlockUtcTicks);
             if (!string.IsNullOrWhiteSpace(earned)) parts.Add(earned);
             parts.Add(AchievementCollectionStats.ValidPercent(row.GlobalUnlockPercent)
-                ? "Achieved by " + row.GlobalUnlockPercent.Value.ToString("0.##", System.Globalization.CultureInfo.CurrentCulture) + "% of players globally."
+                ? "Achieved by " + row.GlobalUnlockPercent.Value.ToString(row.GlobalUnlockPercent < .01 ? "0.########" : "0.##", System.Globalization.CultureInfo.CurrentCulture) + "% of players globally."
                 : "Global unlock percentage unavailable.");
             if (!string.IsNullOrWhiteSpace(row.Meta))
             {
@@ -1011,13 +1023,14 @@ namespace PixelVaultNative
             grid.Children.Add(badgeHost);
 
             var stack = new StackPanel { MinWidth = 0 };
-            stack.Children.Add(new TextBlock
+            var title = new TextBlock
             {
                 Text = row.Title ?? string.Empty,
                 FontWeight = FontWeights.SemiBold,
                 Foreground = Brushes.White,
                 TextWrapping = TextWrapping.Wrap
-            });
+            };
+            stack.Children.Add(title);
             if (!string.IsNullOrWhiteSpace(row.Description))
             {
                 stack.Children.Add(new TextBlock
@@ -1029,6 +1042,7 @@ namespace PixelVaultNative
                     TextWrapping = TextWrapping.Wrap
                 });
             }
+            if (BuildCounterProgress(row) is FrameworkElement counter) stack.Children.Add(counter);
             Grid.SetColumn(stack, 1);
             grid.Children.Add(stack);
 
@@ -1067,7 +1081,9 @@ namespace PixelVaultNative
             }
 
             card.Child = grid;
-            AutomationProperties.SetName(card, (row.Title ?? "Achievement") + ", " + (obtained ? "Obtained" : row.ProgressKnown ? "Not obtained" : "Progress unknown"));
+            AchievementRarityUi.Apply(card, badgeHost, title, row, list: true);
+            AutomationProperties.SetName(card, (row.Title ?? "Achievement") + ", " + (obtained ? "Obtained" : row.ProgressKnown ? "Not obtained" : "Progress unknown") +
+                (AchievementRarityUi.Label(row).Length > 0 ? ", " + AchievementRarityUi.Label(row) : ""));
             return card;
         }
 
