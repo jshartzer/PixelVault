@@ -228,7 +228,7 @@ namespace PixelVaultNative
             _achievementNotificationsButton.Width = 36;
             _achievementNotificationsButton.Height = 36;
             _achievementNotificationsButton.Padding = new Thickness(0);
-            _achievementNotificationsButton.Margin = new Thickness(0, 0, 12, 0);
+            _achievementNotificationsButton.Margin = new Thickness(0, 0, 8, 0);
             _achievementNotificationsButton.VerticalAlignment = VerticalAlignment.Center;
             _achievementNotificationsButton.Effect = null;
             _achievementNotificationsButton.Cursor = System.Windows.Input.Cursors.Hand;
