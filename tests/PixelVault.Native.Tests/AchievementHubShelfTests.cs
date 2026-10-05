@@ -129,6 +129,18 @@ public sealed class AchievementHubShelfTests : IDisposable
                 window.UpdateLayout();
                 Assert.Equal(offset, Descendants(window).OfType<ScrollViewer>().Single(s => Name(s) == "Recently played").HorizontalOffset, 1);
 
+                Button Card(string title) => Descendants(window).OfType<Button>().Single(b => (b.ToolTip as string) == "Open " + title + " achievements"
+                    && Descendants(window).OfType<ScrollViewer>().Single(s => Name(s) == "Recently played").IsAncestorOf(b));
+                var second = Card("Game 2");
+                var fourth = Card("Game 4");
+                cards[3] = new AchievementHubCard { Game = cards[3].Game, LastPlayedUtc = cards[3].LastPlayedUtc,
+                    Snapshot = new() { Rows = new() { new() { ProgressKnown = true, Unlocked = true } } } };
+                window.RenderRecent(new AchievementHubState { Status = "Again", Cards = cards, Pinned = new() { cards[0] } });
+                window.UpdateLayout();
+                Assert.Same(second, Card("Game 2"));
+                Assert.NotSame(fourth, Card("Game 4"));
+                Assert.Contains("1 / 1", Name(Card("Game 4")));
+
                 var pinThird = Descendants(window).OfType<Button>().Single(b => Name(b) == "Pin Game 3");
                 pinThird.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                 Assert.Equal(new[] { "steam:1", "steam:3" }, pins.Keys);

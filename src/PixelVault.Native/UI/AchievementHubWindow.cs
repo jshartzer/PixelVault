@@ -8,6 +8,7 @@ using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 
 namespace PixelVaultNative
 {
@@ -130,7 +131,7 @@ namespace PixelVaultNative
             {
                 if (IsLoaded && getSession != null && scope != getSession().Scope) await RefreshAsync(false);
             };
-            Closed += delegate { closed = true; refreshCancellation?.Cancel(); };
+            Closed += delegate { closed = true; refreshCancellation?.Cancel(); renderThrottle?.Stop(); };
         }
 
         internal async Task RefreshAsync(bool force, bool restart = false)
@@ -140,6 +141,7 @@ namespace PixelVaultNative
             if (pins != null) session.Pinned = pins.Keys.ToList();
             if (loading && scope == session.Scope && !restart) return;
             refreshCancellation?.Cancel();
+            pendingRender = null;
             var cts = new CancellationTokenSource();
             refreshCancellation = cts;
             if (scope != session.Scope)
@@ -152,9 +154,9 @@ namespace PixelVaultNative
             {
                 await service.LoadAsync(session, force, state =>
                 {
-                    if (!closed && !cts.IsCancellationRequested && scope == session.Scope && getSession().Scope == session.Scope)
-                        RenderRecent(state);
+                    if (!closed && !cts.IsCancellationRequested && scope == session.Scope) QueueRender(state);
                 }, cts.Token);
+                if (!closed && !cts.IsCancellationRequested) FlushRender();
             }
             catch (OperationCanceledException) { }
             catch { if (!closed && !cts.IsCancellationRequested) RenderRecent(new AchievementHubState { Status = "Recent games could not be loaded. Try Refresh." }); }
@@ -164,6 +166,29 @@ namespace PixelVaultNative
                 cts.Dispose();
                 if (ReferenceEquals(refreshCancellation, cts)) refreshCancellation = null;
             }
+        }
+
+        // Loading reports after every fetched game; a full render costs hundreds of milliseconds, so coalesce them.
+        static readonly TimeSpan RenderInterval = TimeSpan.FromMilliseconds(350);
+        AchievementHubState pendingRender;
+        DispatcherTimer renderThrottle;
+
+        void QueueRender(AchievementHubState state)
+        {
+            if (renderThrottle?.IsEnabled == true) { pendingRender = state; return; }
+            RenderRecent(state);
+            renderThrottle ??= new DispatcherTimer(RenderInterval, DispatcherPriority.Background, (_, __) => FlushRender(), Dispatcher);
+            renderThrottle.Start();
+        }
+
+        void FlushRender()
+        {
+            renderThrottle?.Stop();
+            var state = pendingRender;
+            pendingRender = null;
+            if (state == null || closed) return;
+            RenderRecent(state);
+            renderThrottle.Start();
         }
 
         internal void RenderRecent(AchievementHubState state)
@@ -201,8 +226,15 @@ namespace PixelVaultNative
             await RefreshAsync(false);
         }
 
+        string unlocksSignature;
         void RenderUnlocks(AchievementHubTimeline timeline, bool refreshFailed)
         {
+            var signature = timeline == null ? "none" : string.Join("\u001e", refreshFailed, timeline.LibraryGames, timeline.CoveredGames,
+                timeline.UndatedEarned, timeline.OldestSnapshotUtc, string.Join("\u001f", timeline.Unlocks.Select(u => u.Game?.Key + "|" + u.Game?.Title
+                    + "|" + u.Row?.ProviderAchievementId + "|" + u.Row?.Title + "|" + u.Row?.Description + "|" + u.Row?.UnlockUtcTicks
+                    + "|" + u.Row?.GlobalUnlockPercent + "|" + u.Row?.IconUrlColor)));
+            if (signature == unlocksSignature && unlocks.Children.Count > 0) return;
+            unlocksSignature = signature;
             unlocks.Children.Clear();
             unlocks.Children.Add(Text("Recent unlocks", 18, true));
             string coverage;

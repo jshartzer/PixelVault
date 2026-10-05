@@ -16,12 +16,27 @@ namespace PixelVaultNative
         /// <summary>Pinned games use large covers; recently played uses compact ones so the two rows read differently.</summary>
         const double PinnedCoverWidth = 220, PinnedCoverHeight = 320, RecentCoverWidth = 116, RecentCoverHeight = 169;
 
+        sealed class ShelfState
+        {
+            public string Signature;
+            public ScrollViewer Scroller;
+            public StackPanel Strip;
+            public Dictionary<string, FrameworkElement> Cards = new();
+        }
+
         void RenderShelf(StackPanel panel, string heading, string status, List<AchievementHubCard> cards, bool large, string empty)
         {
-            // Loads report several times; keep the row where the user scrolled it.
-            var offset = (panel.Tag as ScrollViewer)?.HorizontalOffset ?? 0;
+            var previous = panel.Tag as ShelfState;
+            var keys = new List<string>();
+            foreach (var card in cards ?? new List<AchievementHubCard>()) keys.Add(CardFingerprint(card, large));
+            var signature = string.Join("\n", heading, status, empty, string.Join("\u001e", keys));
+            if (previous != null && previous.Signature == signature) return;
+            // Loads report several times; keep the row where the user scrolled it, and reuse unchanged cards so covers don't reload.
+            var offset = previous?.Scroller?.HorizontalOffset ?? 0;
+            previous?.Strip?.Children.Clear();
             panel.Children.Clear();
-            panel.Tag = null;
+            var state = new ShelfState { Signature = signature };
+            panel.Tag = state;
             panel.Children.Add(Text(heading, 18, true));
             if (!string.IsNullOrWhiteSpace(status))
             {
@@ -35,12 +50,29 @@ namespace PixelVaultNative
                 return;
             }
             var strip = new StackPanel { Orientation = Orientation.Horizontal };
-            foreach (var card in cards) strip.Children.Add(GameCard(card, large));
+            for (var i = 0; i < cards.Count; i++)
+            {
+                if (state.Cards.ContainsKey(keys[i])) continue;
+                var element = previous != null && previous.Cards.TryGetValue(keys[i], out var reused) ? reused : GameCard(cards[i], large);
+                state.Cards[keys[i]] = element;
+                strip.Children.Add(element);
+            }
             var row = HoverScrollRow(strip, heading, out var scroller);
             row.Margin = new Thickness(0, 12, 0, 22);
             panel.Children.Add(row);
-            panel.Tag = scroller;
+            state.Scroller = scroller;
+            state.Strip = strip;
             if (offset > 0) scroller.ScrollToHorizontalOffset(offset);
+        }
+
+        /// <summary>Everything a game card displays, so identical cards can be kept across load reports.</summary>
+        string CardFingerprint(AchievementHubCard card, bool large)
+        {
+            var rows = card.Snapshot?.Rows;
+            var stats = rows == null ? null : AchievementCollectionStats.Build(rows, DateTime.UtcNow.Ticks);
+            return string.Join("\u001f", card.Game?.Key, card.Game?.Title, card.Game?.ArtPath, card.LastPlayedUtc, large,
+                stats == null ? "none" : stats.Unknown + "/" + stats.Earned + "/" + stats.Total + "/" + stats.Percent,
+                large ? card.Snapshot?.UpdatedUtc ?? 0 : 0, pins?.IsPinned(card.Game?.Key ?? "") ?? false);
         }
 
         FrameworkElement GameCard(AchievementHubCard card, bool large)

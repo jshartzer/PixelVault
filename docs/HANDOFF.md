@@ -4,7 +4,9 @@ This file is the short current-state handoff.
 
 October 4 Hub Step 4 data foundation: background notification checks now merge into the hub store for all library games (no extra requests; saved rarity/counters preserved; unchanged writes skipped; in-memory file cache). Live: 107 of 189 games stored in 40 s; the other 82 report Steam progress unavailable. Refresh moved to the header. 163 achievement tests pass. Collection UI is next.
 
-October 4 Achievement Hub details (uncommitted): clicking a hub achievement opens a new `AchievementDetailWindow` (status, counter progress, rarity context, game completion, guide with Add/Edit, web search, Next Up, pin game, open game). Steam badge downloads now prefer `shared.fastly.steamstatic.com/community_assets` because the legacy hosts 404 for newer games. 179 achievement tests pass.
+October 4 Achievement Hub performance (uncommitted): load reports are coalesced (at most one render per 350 ms); the collection, shelves, and unlocks skip or reuse unchanged content; the hub session's library game list is cached instead of resolving covers on every activation and report. With real data, a per-report render dropped from 0.56–0.89 s to about 20 ms. 179 achievement tests pass.
+
+October 4 Achievement Hub details (committed `ca12c60`): clicking a hub achievement opens a new `AchievementDetailWindow` (status, counter progress, rarity context, game completion, guide with Add/Edit, web search, Next Up, pin game, open game). Steam badge downloads now prefer `shared.fastly.steamstatic.com/community_assets` because the legacy hosts 404 for newer games. 179 achievement tests pass.
 
 October 4 Achievement Hub layout follow-up (uncommitted, with the rarity backfill): new Pinned games section with large covers above a compact 10-game Recently played row; both rows scroll with hover arrows. Pins are hub-only (`PixelVaultData/achievement-hub-pins.json`), toggled from a cover pin button or by right-clicking any hub achievement. 173 achievement tests pass.
 

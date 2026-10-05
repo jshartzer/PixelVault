@@ -141,8 +141,16 @@ namespace PixelVaultNative
         void RenderCollection(AchievementHubCollection next)
         {
             if (next == null || next.Signature == collection?.Signature) return;
+            var sameGames = collection != null && GameList(collection) == GameList(next);
             collection = next;
-            collectionTotals.Text = Totals(next);
+            var totals = Totals(next);
+            if (collectionTotals.Text != totals) collectionTotals.Text = totals;
+            if (sameGames)
+            {
+                // Background fetches re-stamp snapshots constantly; rebuilding identical entries is the hub's main UI-thread cost.
+                if (!KeepShownEntries()) ApplyCollectionQuery();
+                return;
+            }
             var selected = Selected<string>(collectionGame);
             collectionUpdatingGames = true;
             try
@@ -160,6 +168,29 @@ namespace PixelVaultNative
             }
             finally { collectionUpdatingGames = false; }
             ApplyCollectionQuery();
+        }
+
+        static string GameList(AchievementHubCollection c) => string.Join("\n", c.Games.Select(g => g.Key + "\t" + g.Title));
+
+        /// <summary>Re-queries the new collection and keeps the rendered entries when everything they display is unchanged.</summary>
+        bool KeepShownEntries()
+        {
+            if (collectionPanel == null || collectionShown == 0) return false;
+            var matches = collection.Query(CollectionQuery, DateTime.UtcNow.Ticks);
+            if (matches.Count < collectionShown || collectionMatches.Count < collectionShown) return false;
+            for (var i = 0; i < collectionShown; i++)
+                if (EntryFingerprint(matches[i]) != EntryFingerprint(collectionMatches[i])) return false;
+            collectionMatches = matches;
+            UpdateCollectionShowing();
+            return true;
+        }
+
+        static string EntryFingerprint(AchievementHubEntry entry)
+        {
+            var r = entry.Row;
+            return string.Join("\u001f", entry.Game.Key, entry.Game.Title, r.ProviderAchievementId, r.Title, r.Description, r.Meta,
+                r.ProgressKnown, r.Unlocked, r.UnlockUtcTicks, r.GlobalUnlockPercent, r.CounterCurrent, r.CounterMinimum, r.CounterTarget,
+                r.Hidden, r.IconUrlColor);
         }
 
         static string Totals(AchievementHubCollection c)
@@ -195,6 +226,11 @@ namespace PixelVaultNative
             foreach (var entry in collectionMatches.Skip(collectionShown).Take(CollectionPageSize))
                 collectionPanel.Children.Add(list ? ListEntry(entry) : GridEntry(entry));
             collectionShown = Math.Min(collectionMatches.Count, collectionShown + CollectionPageSize);
+            UpdateCollectionShowing();
+        }
+
+        void UpdateCollectionShowing()
+        {
             collectionShowing.Text = collectionMatches.Count == 0 ? ""
                 : "Showing " + collectionShown.ToString("N0", CultureInfo.CurrentCulture) + " of "
                     + collectionMatches.Count.ToString("N0", CultureInfo.CurrentCulture) + " matching";

@@ -102,6 +102,19 @@ public sealed class AchievementHubCollectionTests
                 window.RenderRecent(new AchievementHubState { Status = "Same data", Collection = AchievementHubCollection.Build(new[] { game },
                     new Dictionary<string, AchievementHubStore.AccountData> { ["steam"] = new() { Games = new() { ["1"] = Snap(rows) } } }) });
                 Assert.Equal(200, window.CollectionShown);
+                var firstEntry = Descendants(window.Content).OfType<Button>().First(b => (b.ToolTip as string)?.StartsWith("Big Game") == true);
+                var restamped = Snap(rows); restamped.UpdatedUtc = Now;
+                window.RenderRecent(new AchievementHubState { Status = "Re-saved", Collection = AchievementHubCollection.Build(new[] { game },
+                    new Dictionary<string, AchievementHubStore.AccountData> { ["steam"] = new() { Games = new() { ["1"] = restamped } } }) });
+                Assert.Equal(200, window.CollectionShown);
+                Assert.Same(firstEntry, Descendants(window.Content).OfType<Button>().First(b => (b.ToolTip as string)?.StartsWith("Big Game") == true));
+                var changed = rows.Select(r => r).ToArray();
+                changed[0] = Row("1", "A000", false, 0, 0);
+                window.RenderRecent(new AchievementHubState { Status = "Changed", Collection = AchievementHubCollection.Build(new[] { game },
+                    new Dictionary<string, AchievementHubStore.AccountData> { ["steam"] = new() { Games = new() { ["1"] = Snap(changed) } } }) });
+                Assert.NotSame(firstEntry, Descendants(window.Content).OfType<Button>().First(b => (b.ToolTip as string)?.StartsWith("Big Game") == true));
+                window.RenderRecent(new AchievementHubState { Status = "Back", Collection = AchievementHubCollection.Build(new[] { game },
+                    new Dictionary<string, AchievementHubStore.AccountData> { ["steam"] = new() { Games = new() { ["1"] = Snap(rows) } } }) });
 
                 var boxes = Descendants(window.Content).OfType<ComboBox>().ToList();
                 boxes.Single(b => AutomationName(b) == "Filter by earned status").SelectedIndex = 1;

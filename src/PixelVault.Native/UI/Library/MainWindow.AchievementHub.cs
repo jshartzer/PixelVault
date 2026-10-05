@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -46,13 +47,18 @@ namespace PixelVaultNative
         void ShowAchievementHub(Window owner, LibraryBrowserWorkingSet ws)
         {
             _achievementHubStore ??= new AchievementHubStore(Path.Combine(dataRoot, "achievement-hub"));
-            AchievementHubSession Session()
+            List<AchievementHubGame> games = null;
+            string gamesStamp = null;
+            var gamesAge = System.Diagnostics.Stopwatch.StartNew();
+            // The hub asks for its session on every activation and refresh, and resolving cover art touches disk for each game.
+            // Library reloads replace the folder objects in place; the expiry picks up edits such as a changed Steam App ID or cover.
+            List<AchievementHubGame> Games()
             {
-                var session = new AchievementHubSession
-                {
-                    LibraryRoot = libraryRoot, SteamAccount = CurrentSteamUserId64(), SteamKey = CurrentSteamWebApiKey(),
-                    RetroAccount = CurrentRetroAchievementsUsername(), RetroKey = CurrentRetroAchievementsApiKey()
-                };
+                var folders = ws.Folders;
+                var stamp = libraryRoot + "\n" + folders.Count + "\n" + (folders.Count == 0 ? 0
+                    : System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(folders[0]) ^ System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(folders[folders.Count - 1]) * 31);
+                if (games != null && stamp == gamesStamp && gamesAge.Elapsed < TimeSpan.FromSeconds(60)) return games;
+                var built = new List<AchievementHubGame>();
                 // Raw library folders, independent of search, filters, and timeline/session projections.
                 foreach (var view in BuildLibraryBrowserFolderViews(ws.Folders, "console"))
                 {
@@ -60,15 +66,23 @@ namespace PixelVaultNative
                     if (!GameAchievementsFetchService.TryPickAchievementsBackend(NormalizeConsoleLabel(folder?.PlatformLabel), folder, out var steam)) continue;
                     var id = steam ? folder.SteamAppId : folder.RetroAchievementsGameId;
                     if (!int.TryParse(id, out var numeric) || numeric <= 0) continue;
-                    session.Games.Add(new AchievementHubGame
+                    built.Add(new AchievementHubGame
                     {
                         Provider = steam ? "steam" : "retroachievements", Id = numeric.ToString(System.Globalization.CultureInfo.InvariantCulture),
                         Title = view.Name, Folder = folder, ArtPath = GetLibraryArtPathForDisplayOnly(BuildLibraryBrowserDisplayFolder(view))
                     });
                 }
-                session.Games = session.Games.GroupBy(g => g.Key).Select(g => g.First()).ToList();
-                return session;
+                games = built.GroupBy(g => g.Key).Select(g => g.First()).ToList();
+                gamesStamp = stamp;
+                gamesAge.Restart();
+                return games;
             }
+            AchievementHubSession Session() => new AchievementHubSession
+            {
+                LibraryRoot = libraryRoot, SteamAccount = CurrentSteamUserId64(), SteamKey = CurrentSteamWebApiKey(),
+                RetroAccount = CurrentRetroAchievementsUsername(), RetroKey = CurrentRetroAchievementsApiKey(),
+                Games = new List<AchievementHubGame>(Games())
+            };
             FrameworkElement Cover(AchievementHubGame game, double width, double height) => CreateAsyncImageTile(game.ArtPath,
                 (int)Math.Ceiling(width * 2.5), width, height,
                 Stretch.UniformToFill, game.Title, Brushes.White, new Thickness(0), new Thickness(0),
