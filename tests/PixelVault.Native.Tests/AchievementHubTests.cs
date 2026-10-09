@@ -386,7 +386,7 @@ public sealed class AchievementHubTests : IDisposable
                     Unlocks = new() { new() { Game = game, Row = Unlock("7", "Champion", DateTime.UtcNow.AddHours(-2).Ticks) } } };
                 window.RenderRecent(new AchievementHubState { Status = "Fixture", Timeline = timeline });
                 Button Tile() => Descendants(window.Content).OfType<Button>().Single(b => (b.ToolTip as string) == "7 · view achievement details");
-                Assert.Contains(Descendants(window.Content).OfType<TextBlock>(), t => t.Text.Contains("1 of 2 library games") && t.Text.Contains("Partial"));
+                Assert.DoesNotContain(Descendants(window.Content).OfType<TextBlock>(), t => t.Text.Contains("Provider unlock dates") || t.Text.Contains("Partial") || t.Text.Contains("provider date"));
                 Tile().RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                 Assert.StartsWith("Champion", detail!.Title);
                 Assert.Null(opened);

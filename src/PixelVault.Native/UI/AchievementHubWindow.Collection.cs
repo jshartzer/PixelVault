@@ -286,6 +286,30 @@ namespace PixelVaultNative
             var game = entry.Game;
             button.Click += async (_, __) => await OpenAchievementAsync(game, row);
             AttachPinMenu(button, game);
+            if (guides != null && row.HasStableProviderIdentity)
+            {
+                button.ContextMenu ??= new ContextMenu();
+                AchievementsInfoWindow.AddCategoryMenu(button.ContextMenu, row,
+                    collection.Entries.Where(e => e.Game.Key == game.Key).Select(e => e.Row), name =>
+                    {
+                        try
+                        {
+                            var rows = collection.Entries.Where(e => e.Game.Key == game.Key).Select(e => e.Row).ToList();
+                            guides.SyncDefinitionsAndLoadGuides(game.Folder?.GameId ?? "", rows);
+                            var order = rows.FirstOrDefault(r => string.Equals(AchievementsInfoWindow.EffectiveAchievementGroupName(r),
+                                name, StringComparison.OrdinalIgnoreCase))?.GroupSortOrder ?? 0;
+                            var saved = AchievementsInfoWindow.SaveCategory(guides, row, name, order);
+                            row.GroupName = saved.GroupName;
+                            row.GroupSortOrder = saved.GroupSortOrder;
+                            ApplyCollectionQuery();
+                        }
+                        catch (Exception ex)
+                        {
+                            MessageBox.Show(this, "Could not save the achievement category. " + ex.Message,
+                                "Achievement category", MessageBoxButton.OK, MessageBoxImage.Error);
+                        }
+                    }, () => true, this);
+            }
             return button;
         }
 

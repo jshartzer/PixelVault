@@ -71,13 +71,26 @@ public sealed class AchievementHubCollectionTests
         Assert.Equal("Gem", c.Query(new() { Sort = AchievementHubSort.MostCommonFirst }, Now).Last().Row.Title);
         var newest = c.Query(new() { Sort = AchievementHubSort.NewestEarned }, Now);
         Assert.Equal(new[] { "retroachievements:1", "steam:2", "steam:1" }, newest.Take(3).Select(e => e.Game.Key));
-        Assert.Equal(new[] { "Coin", "Old", "Gem" }, newest.Skip(3).Select(e => e.Row.Title));
+        Assert.Equal(new[] { "Coin", "Gem", "Old" }, newest.Skip(3).Select(e => e.Row.Title));
         Assert.Equal(new[] { "Dragon", "Crown", "Dragon" }, c.Query(new() { Sort = AchievementHubSort.OldestEarned }, Now).Take(3).Select(e => e.Row.Title));
         Assert.Equal(new[] { "retroachievements:1", "steam:1", "steam:1", "steam:1", "steam:2", "steam:2" },
             c.Query(new() { Sort = AchievementHubSort.Game }, Now).Select(e => e.Game.Key));
-        Assert.Equal(new[] { "Coin", "Old" }, c.Query(new() { Sort = AchievementHubSort.Game, GameKey = "steam:1" }, Now).Skip(1).Select(e => e.Row.Title));
+        Assert.Equal(new[] { "Dragon", "Old" }, c.Query(new() { Sort = AchievementHubSort.Game, GameKey = "steam:1" }, Now).Skip(1).Select(e => e.Row.Title));
         Assert.Equal(new[] { "steam:1Coin", "steam:2Crown", "retroachievements:1Dragon", "steam:1Dragon", "steam:2Gem", "steam:1Old" },
             c.Query(new() { Sort = AchievementHubSort.Name }, Now).Select(e => e.Game.Key + e.Row.Title));
+
+        var mixed = AchievementHubCollection.Build(
+            new[] { Game("1", "Zebra"), Game("2", "Alpha") },
+            new Dictionary<string, AchievementHubStore.AccountData>
+            {
+                ["steam"] = new() { Games = new()
+                {
+                    ["1"] = Snap(Row("1", "Apple", false, 0, 10), Row("1", "Mango", false, 0, 10)),
+                    ["2"] = Snap(Row("2", "Banana", false, 0, 10))
+                } }
+            });
+        Assert.Equal(new[] { "Apple", "Banana", "Mango" },
+            mixed.Query(new() { Sort = AchievementHubSort.RarestFirst }, Now).Select(e => e.Row.Title));
     }
 
     [Fact]

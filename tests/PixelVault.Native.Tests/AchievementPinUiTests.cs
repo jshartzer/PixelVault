@@ -11,6 +11,76 @@ namespace PixelVaultNative.Tests;
 public sealed class AchievementPinUiTests
 {
     [Fact]
+    public void CategoryMenu_HandlesEarnedAndRemainingRowsAndPersistsWithoutLosingGuide()
+    {
+        OnSta(() =>
+        {
+            using var scope = new AchievementPinTests.PinScope();
+            var a = AchievementPinTests.Row("A");
+            var b = AchievementPinTests.Row("B"); b.Unlocked = true;
+            var entries = scope.Service.SyncDefinitionsAndLoadGuides("fixture", new[] { a, b });
+            scope.Service.SaveGuide(new AchievementGuideEdit { AchievementId = entries[0].AchievementId,
+                GuideText = "Keep this note", Tags = "missable", IsMissable = true,
+                SourceUrl = "https://example.com/guide", SourceTitle = "Guide" });
+            scope.Service.SetAchievementPinned(a, true);
+            var window = CreateWindow(() => Task.FromResult(Result(a, b)), scope.Service);
+            try
+            {
+                new System.Windows.Interop.WindowInteropHelper(window).EnsureHandle();
+                Click(Field<Button>(window, "_refresh"));
+                var grid = Field<StackPanel>(window, "_gridContent");
+                window.Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    var dialog = window.OwnedWindows.Cast<Window>().Single();
+                    try
+                    {
+                        Assert.Equal("Name DLC", dialog.Title);
+                        var input = Descendants(dialog).OfType<TextBox>().Single();
+                        var save = Buttons(dialog).Single(b => Equals(b.Content, "Assign"));
+                        Assert.False(save.IsEnabled);
+                        input.Text = "   ";
+                        Assert.False(save.IsEnabled);
+                        input.Text = "  Frozen Wilds  ";
+                        Assert.True(save.IsEnabled);
+                        Click(save);
+                    }
+                    finally { dialog.Close(); }
+                }));
+                Assign(Card(grid, "A"), "DLC");
+                Assert.Equal("DLC: Frozen Wilds", a.GroupName);
+                var categories = Card(grid, "A").ContextMenu.Items.OfType<MenuItem>()
+                    .Single(i => Equals(i.Header, "Assign category")).Items.OfType<MenuItem>().ToList();
+                Assert.True(categories.Single(i => Equals(i.Header, "DLC")).IsChecked);
+                Assert.DoesNotContain(categories, i => Equals(i.Header, "DLC: Frozen Wilds"));
+                Click(Field<Button>(window, "_listView"));
+                Assign(Card(Field<ListBox>(window, "_list"), "B"), "Difficulty");
+                Assert.Equal("Difficulty", b.GroupName);
+                var restarted = new AchievementGuideService(scope.Path);
+                var fresh = new[] { AchievementPinTests.Row("A"), AchievementPinTests.Row("B") };
+                restarted.SyncDefinitionsAndLoadGuides("fixture", fresh);
+                Assert.Equal(new[] { "DLC: Frozen Wilds", "Difficulty" }, fresh.Select(r => r.GroupName));
+                var saved = restarted.LoadGuideEntry("steam", "123", "A");
+                Assert.Equal("Keep this note", saved.GuideText);
+                Assert.Equal("missable", saved.Tags);
+                Assert.True(saved.IsMissable);
+                Assert.Equal("https://example.com/guide", saved.SourceUrl);
+                Assert.Equal("Guide", saved.SourceTitle);
+                Assert.Single(restarted.LoadPinnedAchievements("steam", "123"));
+                Assign(Card(Field<ListBox>(window, "_list"), "A"), "Base Game");
+                Assert.Equal("Base Game", scope.Service.LoadGuideEntry("steam", "123", "A").GroupName);
+            }
+            finally { window.Close(); }
+        });
+
+        static void Assign(Border card, string name)
+        {
+            var menu = card.ContextMenu.Items.OfType<MenuItem>().Single(i => Equals(i.Header, "Assign category"));
+            menu.Items.OfType<MenuItem>().Single(i => Equals(i.Header, name))
+                .RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+        }
+    }
+
+    [Fact]
     public void TileAndListPinActions_UpdateStripIndependentlyOfFiltersAndFailedRefresh()
     {
         OnSta(() =>
@@ -118,7 +188,7 @@ public sealed class AchievementPinUiTests
     static void Click(Button button) => button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
     static void PinMenu(Border card, string header)
     {
-        var action = Assert.Single(card.ContextMenu.Items.OfType<MenuItem>());
+        var action = Assert.Single(card.ContextMenu.Items.OfType<MenuItem>(), item => Equals(item.Header, header));
         Assert.Equal(header, action.Header);
         action.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
     }

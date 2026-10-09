@@ -105,6 +105,7 @@
     <Compile Include="Services\Achievements\AchievementHubService.cs" />
     <Compile Include="Services\Achievements\SteamAchievementCounters.cs" />
     <Compile Include="UI\AchievementsInfoWindow.Pins.cs" />
+    <Compile Include="UI\AchievementsInfoWindow.Categories.cs" />
     <Compile Include="UI\AchievementsInfoWindow.Stats.cs" />
     <Compile Include="UI\AchievementPinUi.cs" />
     <Compile Include="UI\AchievementCollectionUi.cs" />

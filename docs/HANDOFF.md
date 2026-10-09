@@ -2,9 +2,17 @@
 
 This file is the short current-state handoff.
 
+October 8 named DLC (unreleased): Assign category → DLC prompts for a required name (prefilled when already assigned), stored as the game's `DLC: <name>` achievement group. Names are excluded from category-menu choices; the DLC preset remains checked. Both the Hub collection and per-game views use the shared prompt.
+
+October 8 manual achievement categories (unreleased): Right-click achievement cards in per-game Grid/List or the Hub collection → Assign category. Uses existing saved achievement groups, with presets, existing names, and a custom-name dialog; Base Game resets the grouping. Guide content and pins are preserved. All 180 achievement tests pass.
+
 October 4 Hub Step 4 data foundation: background notification checks now merge into the hub store for all library games (no extra requests; saved rarity/counters preserved; unchanged writes skipped; in-memory file cache). Live: 107 of 189 games stored in 40 s; the other 82 report Steam progress unavailable. Refresh moved to the header. 163 achievement tests pass. Collection UI is next.
 
-October 4 Achievement Hub performance (uncommitted): load reports are coalesced (at most one render per 350 ms); the collection, shelves, and unlocks skip or reuse unchanged content; the hub session's library game list is cached instead of resolving covers on every activation and report. With real data, a per-report render dropped from 0.56–0.89 s to about 20 ms. 179 achievement tests pass.
+October 4 Achievement Hub collection: All achievements sorts by the achievement (name after rarity/date), not by game. Sort → Game still groups by title.
+
+October 4 Achievement Hub: Recent unlocks no longer shows the coverage paragraph under the heading (counts, oldest saved, Partial, undated unlocks). Tiles and short status notices remain.
+
+October 4 Achievement Hub performance (committed `14fab8e`): load reports are coalesced (at most one render per 350 ms); the collection, shelves, and unlocks skip or reuse unchanged content; the hub session's library game list is cached instead of resolving covers on every activation and report. With real data, a per-report render dropped from 0.56–0.89 s to about 20 ms. 179 achievement tests pass.
 
 October 4 Achievement Hub details (committed `ca12c60`): clicking a hub achievement opens a new `AchievementDetailWindow` (status, counter progress, rarity context, game completion, guide with Add/Edit, web search, Next Up, pin game, open game). Steam badge downloads now prefer `shared.fastly.steamstatic.com/community_assets` because the legacy hosts 404 for newer games. 179 achievement tests pass.
 

@@ -105,9 +105,14 @@ namespace PixelVaultNative
                 AchievementHubSort.OldestEarned => matches.OrderBy(e => !Dated(e)).ThenBy(e => Dated(e) ? e.Row.UnlockUtcTicks : 0),
                 AchievementHubSort.Name => matches.OrderBy(e => string.IsNullOrWhiteSpace(e.Row.Title))
                     .ThenBy(e => e.Row.Title ?? "", StringComparer.CurrentCultureIgnoreCase),
+                AchievementHubSort.Game => matches.OrderBy(e => e.Game.Title ?? "", StringComparer.CurrentCultureIgnoreCase)
+                    .ThenBy(e => e.Game.Key, StringComparer.Ordinal),
                 _ => matches.OrderBy(e => 0)
             };
-            return ordered.ThenBy(e => e.Game.Title ?? "", StringComparer.CurrentCultureIgnoreCase)
+            // Every sort except Game ties on the achievement, not the game, so the page does not clump by title.
+            return ordered.ThenBy(e => string.IsNullOrWhiteSpace(e.Row.Title))
+                .ThenBy(e => e.Row.Title ?? "", StringComparer.CurrentCultureIgnoreCase)
+                .ThenBy(e => e.Row.ProviderAchievementId ?? "", StringComparer.Ordinal)
                 .ThenBy(e => e.Game.Key, StringComparer.Ordinal).ThenBy(e => e.Order).ToList();
         }
     }

@@ -63,12 +63,15 @@ namespace PixelVaultNative
         void AddPinAction(Border card, GameAchievementsFetchService.AchievementRow row)
         {
             if (_guideService == null || row?.HasStableProviderIdentity != true) return;
+            var menu = new ContextMenu();
+            card.ContextMenu = menu;
+            AddCategoryAction(menu, row);
             var pinned = IsPinned(row);
             if (!pinned && (!row.ProgressKnown || row.Unlocked)) return;
             var action = new MenuItem { Header = pinned ? "Unpin from Next Up" : "Pin to Next Up" };
             AutomationProperties.SetName(action, action.Header + ": " + row.Title);
             action.Click += (_, e) => { e.Handled = true; ChangePin(row, !pinned); };
-            var menu = new ContextMenu();
+            menu.Items.Add(new Separator());
             menu.Items.Add(action);
             menu.Opened += (_, __) => action.IsEnabled = !_isLoading && !_isClosed;
             card.ContextMenu = menu;

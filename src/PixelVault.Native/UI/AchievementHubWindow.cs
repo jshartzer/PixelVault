@@ -237,22 +237,15 @@ namespace PixelVaultNative
             unlocksSignature = signature;
             unlocks.Children.Clear();
             unlocks.Children.Add(Text("Recent unlocks", 18, true));
-            string coverage;
-            if (timeline == null) coverage = "Loading saved achievement progress…";
-            else if (timeline.LibraryGames == 0) coverage = "Connect a Steam or RetroAchievements account to see unlocks.";
-            else
+            var notice = timeline == null ? "Loading saved achievement progress…"
+                : timeline.LibraryGames == 0 ? "Connect a Steam or RetroAchievements account to see unlocks."
+                : refreshFailed ? "Refresh failed; showing previously loaded unlocks." : null;
+            if (notice != null)
             {
-                coverage = "Provider unlock dates from saved progress for " + timeline.CoveredGames + " of " + timeline.LibraryGames
-                    + " library games";
-                if (timeline.OldestSnapshotUtc > 0)
-                    coverage += " · oldest saved " + new DateTime(timeline.OldestSnapshotUtc, DateTimeKind.Utc).ToLocalTime().ToString("g", CultureInfo.CurrentCulture);
-                coverage += ".";
-                if (timeline.CoveredGames < timeline.LibraryGames) coverage += " Partial: other games are added as background achievement checks run.";
-                if (timeline.UndatedEarned > 0) coverage += " " + timeline.UndatedEarned + " earned without a provider date are not placed on the timeline.";
+                var caption = Text(notice, 12);
+                caption.Margin = new Thickness(0, 4, 0, 12);
+                unlocks.Children.Add(caption);
             }
-            if (refreshFailed) coverage = "Refresh failed; showing previously loaded unlocks. " + coverage;
-            var caption = Text(coverage, 12); caption.Margin = new Thickness(0, 4, 0, 12);
-            unlocks.Children.Add(caption);
             if (timeline == null) return;
             if (timeline.Unlocks.Count == 0)
             {
@@ -268,7 +261,8 @@ namespace PixelVaultNative
                 HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
                 VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
                 PanningMode = PanningMode.HorizontalOnly,
-                Focusable = false
+                Focusable = false,
+                Margin = new Thickness(0, 8, 0, 0)
             };
             AutomationProperties.SetName(scroller, "Recent unlocks, newest first");
             // The inner horizontal scroller would otherwise swallow wheel input meant for the page.
