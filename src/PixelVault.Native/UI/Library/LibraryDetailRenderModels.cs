@@ -10,6 +10,7 @@ namespace PixelVaultNative
         internal int PixelWidth;
         internal int PixelHeight;
         internal bool IsVideo;
+        internal bool UseSingleSquareCell;
     }
 
     /// <summary>Mutable snapshot for one library detail-pane virtualized render pass (day groups + visible file list).</summary>
@@ -19,6 +20,7 @@ namespace PixelVaultNative
         public List<string> VisibleFiles = new List<string>();
         public Dictionary<string, LibraryTimelineCaptureContext> TimelineContextByFile = new Dictionary<string, LibraryTimelineCaptureContext>(StringComparer.OrdinalIgnoreCase);
         public Dictionary<string, LibraryDetailMediaLayoutInfo> MediaLayoutByFile = new Dictionary<string, LibraryDetailMediaLayoutInfo>(StringComparer.OrdinalIgnoreCase);
+        public List<LibraryTimelineAchievement> Achievements = new List<LibraryTimelineAchievement>();
     }
 
     internal sealed class LibraryDetailRenderGroup

@@ -152,9 +152,23 @@ CREATE TABLE IF NOT EXISTS achievement_guide (
             EnsureDefinitionColumn(connection, "group_name", "TEXT NOT NULL DEFAULT ''");
             EnsureDefinitionColumn(connection, "group_sort_order", "INTEGER NOT NULL DEFAULT 0");
             InitializePinTable(connection);
+            InitializeScoreTables(connection);
         }
 
         static void EnsureDefinitionColumn(SqliteConnection connection, string columnName, string definition)
+        {
+            if (DefinitionHasColumn(connection, columnName)) return;
+            using var alter = connection.CreateCommand();
+            alter.CommandText = "ALTER TABLE achievement_definition ADD COLUMN " + columnName + " " + definition + ";";
+            try { alter.ExecuteNonQuery(); }
+            catch (SqliteException ex) when (ex.SqliteErrorCode == 1)
+            {
+                // Another window/process may have added the column after our schema read.
+                if (!DefinitionHasColumn(connection, columnName)) throw;
+            }
+        }
+
+        static bool DefinitionHasColumn(SqliteConnection connection, string columnName)
         {
             using (var check = connection.CreateCommand())
             {
@@ -164,16 +178,12 @@ CREATE TABLE IF NOT EXISTS achievement_guide (
                     while (reader.Read())
                     {
                         if (string.Equals(reader.GetString(1), columnName, StringComparison.OrdinalIgnoreCase))
-                            return;
+                            return true;
                     }
                 }
             }
 
-            using (var alter = connection.CreateCommand())
-            {
-                alter.CommandText = "ALTER TABLE achievement_definition ADD COLUMN " + columnName + " " + definition + ";";
-                alter.ExecuteNonQuery();
-            }
+            return false;
         }
 
         public void LoadSavedAchievementGroups(IEnumerable<GameAchievementsFetchService.AchievementRow> rows)

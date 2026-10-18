@@ -17,7 +17,13 @@ namespace PixelVaultNative
         {
             var first = result?.Rows?.FirstOrDefault();
             if (_achievementHubStore == null || first == null || !AchievementHubStore.CanStore(first.Provider, first.ProviderGameId, result)) return;
-            try { await _achievementHubStore.SaveGameAsync(first.Provider, account, first.ProviderGameId, result, CancellationToken.None); }
+            try
+            {
+                var before = _achievementHubStore.Revision;
+                await _achievementHubStore.SaveGameAsync(first.Provider, account, first.ProviderGameId, result, CancellationToken.None);
+                if (_achievementHubStore.Revision != before && !Dispatcher.HasShutdownStarted)
+                    _ = Dispatcher.BeginInvoke(new Action(QueueTimelineAchievementRefresh));
+            }
             catch (Exception ex) { Log("Achievement hub snapshot could not be saved: " + ex.GetType().Name); }
         }
         const int HubRarityBackfillPerCheck = 30;
@@ -46,7 +52,7 @@ namespace PixelVaultNative
         }
         void ShowAchievementHub(Window owner, LibraryBrowserWorkingSet ws)
         {
-            _achievementHubStore ??= new AchievementHubStore(Path.Combine(dataRoot, "achievement-hub"));
+            _achievementHubStore ??= new AchievementHubStore(Path.Combine(dataRoot, "achievement-hub"), achievementGuideService as IAchievementScoreStore);
             List<AchievementHubGame> games = null;
             string gamesStamp = null;
             var gamesAge = System.Diagnostics.Stopwatch.StartNew();

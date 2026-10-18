@@ -11,6 +11,9 @@ namespace PixelVaultNative
         internal sealed class HistoryPoint { public DateTime DayUtc; public int Earned; }
         public int Total, Earned, Remaining, Unknown, DatedEarned, EarnedWithRarity;
         public int? Percent;
+        public bool HasPoints;
+        public long EarnedPoints, AvailablePoints;
+        public int ProvisionalAwards;
         public GameAchievementsFetchService.AchievementRow Latest, Rarest;
         public List<HistoryPoint> History = new List<HistoryPoint>();
 
@@ -30,7 +33,8 @@ namespace PixelVaultNative
             row?.ProgressKnown == true && row.Unlocked && row.UnlockUtcTicks >= DateTime.UnixEpoch.Ticks
                 && row.UnlockUtcTicks <= Math.Min(nowUtcTicks, DateTime.MaxValue.Ticks);
 
-        internal static AchievementCollectionStats Build(IEnumerable<GameAchievementsFetchService.AchievementRow> rows, long nowUtcTicks)
+        internal static AchievementCollectionStats Build(IEnumerable<GameAchievementsFetchService.AchievementRow> rows, long nowUtcTicks,
+            AchievementScoreTotals scoreTotals = null)
         {
             var all = (rows ?? Enumerable.Empty<GameAchievementsFetchService.AchievementRow>()).Where(row => row != null).ToList();
             var earned = all.Where(row => row.ProgressKnown && row.Unlocked).ToList();
@@ -38,11 +42,15 @@ namespace PixelVaultNative
             var rarity = earned.Where(row => ValidPercent(row.GlobalUnlockPercent)).ToList();
             var stats = new AchievementCollectionStats
             {
+                HasPoints = scoreTotals != null || all.Any(r => r.Points.HasValue),
+                EarnedPoints = scoreTotals?.Earned ?? all.Sum(r => (long)(r.AwardedPoints ?? 0)),
+                ProvisionalAwards = scoreTotals?.ProvisionalAwards ?? all.Count(r => r.AwardedPoints.HasValue && r.AwardProvisional),
                 Total = all.Count, Earned = earned.Count, Remaining = all.Count(row => row.ProgressKnown && !row.Unlocked),
                 Unknown = all.Count(row => !row.ProgressKnown), DatedEarned = dated.Count, EarnedWithRarity = rarity.Count,
                 Latest = dated.OrderByDescending(row => row.UnlockUtcTicks).FirstOrDefault(),
                 Rarest = rarity.OrderBy(row => row.GlobalUnlockPercent).FirstOrDefault()
             };
+            stats.AvailablePoints = stats.EarnedPoints + all.Where(r => !r.AwardedPoints.HasValue).Sum(r => (long)(r.Points ?? 0));
             if (stats.Total > 0 && stats.Unknown == 0)
                 stats.Percent = (int)Math.Round(stats.Earned * 100d / stats.Total, MidpointRounding.AwayFromZero);
             var cumulative = 0;
@@ -54,9 +62,13 @@ namespace PixelVaultNative
             return stats;
         }
 
-        internal string Summary => Percent.HasValue
+        internal string ScoreSummary => EarnedPoints.ToString("N0") + " / " + AvailablePoints.ToString("N0") + " PV pts"
+            + (ProvisionalAwards > 0 ? " · " + ProvisionalAwards + " provisional awards" : "");
+
+        internal string Summary => (Percent.HasValue
             ? "\U0001F3C6 " + Earned + " of " + Total + " Achievements earned · " + Percent + "% · " + Remaining + " remaining"
-            : "\U0001F3C6 " + Earned + " of " + Total + " Achievements earned · " + Remaining + " known remaining · " + Unknown + " progress unavailable";
+            : "\U0001F3C6 " + Earned + " of " + Total + " Achievements earned · " + Remaining + " known remaining · " + Unknown + " progress unavailable")
+            + (HasPoints ? " · " + ScoreSummary : "");
 
         internal static List<GameAchievementsFetchService.AchievementRow> Sort(
             IEnumerable<GameAchievementsFetchService.AchievementRow> rows, AchievementCollectionSort order, long nowUtcTicks)

@@ -129,6 +129,7 @@ namespace PixelVaultNative
 
         internal void ResetCollection()
         {
+            ResetScore();
             collection = null;
             collectionMatches = new List<AchievementHubEntry>();
             collectionShown = 0;
@@ -190,7 +191,7 @@ namespace PixelVaultNative
             var r = entry.Row;
             return string.Join("\u001f", entry.Game.Key, entry.Game.Title, r.ProviderAchievementId, r.Title, r.Description, r.Meta,
                 r.ProgressKnown, r.Unlocked, r.UnlockUtcTicks, r.GlobalUnlockPercent, r.CounterCurrent, r.CounterMinimum, r.CounterTarget,
-                r.Hidden, r.IconUrlColor);
+                r.Hidden, r.IconUrlColor, r.Points, r.PointsProvisional, r.AwardedPoints, r.AwardProvisional);
         }
 
         static string Totals(AchievementHubCollection c)
@@ -201,6 +202,10 @@ namespace PixelVaultNative
                 : c.Earned.ToString("N0", CultureInfo.CurrentCulture) + " of " + known.ToString("N0", CultureInfo.CurrentCulture) + " earned ("
                     + Math.Round(c.Earned * 100d / known, MidpointRounding.AwayFromZero).ToString(CultureInfo.CurrentCulture) + "%) across "
                     + c.Games.Count.ToString("N0", CultureInfo.CurrentCulture) + " games · " + c.Unearned.ToString("N0", CultureInfo.CurrentCulture) + " unearned";
+            if (c.HasPoints)
+                text += " · " + c.EarnedPoints.ToString("N0", CultureInfo.CurrentCulture) + " / "
+                    + c.AvailablePoints.ToString("N0", CultureInfo.CurrentCulture) + " PV pts in synced library games"
+                    + (c.ProvisionalAwards > 0 ? " · " + c.ProvisionalAwards + " provisional awards" : "");
             if (c.GamesWithoutAchievements > 0) text += " · " + c.GamesWithoutAchievements + " games have no achievements";
             if (c.GamesWithoutProgress > 0)
                 text += " · progress unavailable for " + c.GamesWithoutProgress + " of " + c.LibraryGames
@@ -281,7 +286,8 @@ namespace PixelVaultNative
             };
             button.Template = EntryTemplate;
             AutomationProperties.SetName(button, (string.IsNullOrWhiteSpace(row.Title) ? "Achievement" : row.Title) + ", " + entry.Game.Title
-                + ", " + EntryState(row) + (rarity.Length > 0 ? ", " + rarity : "") + ". Open achievement details.");
+                + ", " + EntryState(row) + (row.Points.HasValue ? ", " + AchievementScoring.Label(row) : "")
+                + (rarity.Length > 0 ? ", " + rarity : "") + ". Open achievement details.");
             AccessibilityUi.TryApplyFocusVisualStyle(button);
             var game = entry.Game;
             button.Click += async (_, __) => await OpenAchievementAsync(game, row);
@@ -338,7 +344,8 @@ namespace PixelVaultNative
             };
             var state = new TextBlock
             {
-                Text = EntryState(row), FontSize = 10, TextAlignment = TextAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis,
+                Text = AchievementScoring.PointText(row), ToolTip = AchievementScoring.Explanation(row),
+                FontSize = 10, TextAlignment = TextAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis,
                 Margin = new Thickness(0, 2, 0, 0), Foreground = Color(earned ? "#88B8A0" : "#7D909C", SystemColors.WindowTextBrush)
             };
             var content = new StackPanel();
@@ -384,7 +391,8 @@ namespace PixelVaultNative
             var meta = new StackPanel { Margin = new Thickness(14, 0, 0, 0), Width = 190 };
             meta.Children.Add(new TextBlock { Text = entry.Game.Title, FontSize = 11, TextTrimming = TextTrimming.CharacterEllipsis,
                 Foreground = Color("#B8C9D4", SystemColors.WindowTextBrush) });
-            meta.Children.Add(new TextBlock { Text = EntryState(row), FontSize = 11, Margin = new Thickness(0, 3, 0, 0),
+            meta.Children.Add(new TextBlock { Text = AchievementScoring.PointText(row), ToolTip = AchievementScoring.Explanation(row),
+                FontSize = 11, Margin = new Thickness(0, 3, 0, 0),
                 Foreground = Color(earned ? "#88B8A0" : "#7D909C", SystemColors.WindowTextBrush) });
             var rarity = AchievementCollectionStats.ValidPercent(row.GlobalUnlockPercent)
                 ? row.GlobalUnlockPercent.Value.ToString(row.GlobalUnlockPercent < .01 ? "0.########" : "0.##", CultureInfo.CurrentCulture) + "% of players"

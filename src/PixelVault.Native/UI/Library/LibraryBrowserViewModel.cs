@@ -437,7 +437,7 @@ namespace PixelVaultNative
                 .ToList();
             var imagePaths = sourceViews
                 .SelectMany(view => view.FilePaths ?? new string[0])
-                .Where(path => !string.IsNullOrWhiteSpace(path) && TextAndPathHelpers.IsImage(path))
+                .Where(path => !string.IsNullOrWhiteSpace(path) && TextAndPathHelpers.IsMedia(path))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
             var metadataIndex = LoadProjectionMetadataIndex(libraryRoot, imagePaths);
@@ -454,7 +454,7 @@ namespace PixelVaultNative
                 PrimaryFolder = null,
                 PrimaryPlatformLabel = string.Empty,
                 PlatformLabels = new string[0],
-                PlatformSummaryText = "Photo timeline",
+                PlatformSummaryText = "Capture timeline",
                 FileCount = orderedImagePaths.Length,
                 PreviewImagePath = orderedImagePaths.FirstOrDefault() ?? string.Empty,
                 FilePaths = orderedImagePaths,
@@ -488,7 +488,7 @@ namespace PixelVaultNative
                 .ToList();
             var imagePaths = sourceViews
                 .SelectMany(view => view.FilePaths ?? new string[0])
-                .Where(path => !string.IsNullOrWhiteSpace(path) && TextAndPathHelpers.IsImage(path))
+                .Where(path => !string.IsNullOrWhiteSpace(path) && TextAndPathHelpers.IsMedia(path))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
             var metadataIndex = LoadProjectionMetadataIndex(libraryRoot, imagePaths);

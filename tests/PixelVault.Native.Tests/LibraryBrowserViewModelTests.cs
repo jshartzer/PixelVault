@@ -290,6 +290,22 @@ namespace PixelVaultNative.Tests
             Assert.Equal(0, host.ResolveDateWithoutIndexCount);
         }
 
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void DateProjections_KeepClipsForTheClipsOnlyFilter(bool sessions)
+        {
+            var host = new StubHost();
+            var files = new[] { "C:/lib/a/shot.png", "C:/lib/a/clip.MP4", "C:/lib/a/older.mkv", "C:/lib/a/notes.txt" };
+            for (var i = 0; i < files.Length; i++) host.FileCaptureDates[files[i]] = new DateTime(2026, 10, 16, 12 - i, 0, 0, DateTimeKind.Utc);
+            var vm = new LibraryBrowserViewModel(host);
+            var views = vm.BuildLibraryBrowserFolderViews(new[] { MakeFolder("Game", "Steam", "C:/lib/a", files: files) }, "all");
+            var projection = sessions ? vm.BuildLibraryBrowserSessionView(views, 90) : vm.BuildLibraryBrowserTimelineView(views);
+            Assert.Equal(files.Take(3), projection.FilePaths);
+            Assert.Equal(new[] { files[1], files[2] }, projection.FilePaths.Where(f => MainWindow.LibraryCaptureMatchesMediaFilter(f, MainWindow.LibraryCaptureMediaFilter.Clips)));
+            Assert.Equal(new[] { files[0] }, projection.FilePaths.Where(f => MainWindow.LibraryCaptureMatchesMediaFilter(f, MainWindow.LibraryCaptureMediaFilter.Screenshots)));
+        }
+
         [Fact]
         public void SessionView_FlattensImagesAndCarriesThreshold()
         {

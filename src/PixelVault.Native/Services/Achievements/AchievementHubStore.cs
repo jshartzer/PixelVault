@@ -22,6 +22,7 @@ namespace PixelVaultNative
             /// <summary>When Steam rarity was last backfilled for a snapshot that lacked it; 0 when never.</summary>
             public long RarityCheckedUtc { get; set; }
             public List<GameAchievementsFetchService.AchievementRow> Rows { get; set; } = new();
+            [System.Text.Json.Serialization.JsonIgnore] public AchievementScoreTotals ScoreTotals { get; set; }
         }
         internal sealed class AccountData
         {
@@ -31,11 +32,17 @@ namespace PixelVaultNative
             public long RecentUpdatedUtc { get; set; }
             public Dictionary<string, long> Recent { get; set; } = new();
             public Dictionary<string, Snapshot> Games { get; set; } = new();
+            [System.Text.Json.Serialization.JsonIgnore]
+            public IReadOnlyDictionary<string, AchievementScoreTotals> Scores { get; set; }
         }
         static readonly JsonSerializerOptions Json = new() { IncludeFields = true };
         static readonly ConcurrentDictionary<string, SemaphoreSlim> Gates = new(StringComparer.OrdinalIgnoreCase);
         readonly string directory;
-        internal AchievementHubStore(string directory) { this.directory = Path.GetFullPath(directory); }
+        readonly IAchievementScoreStore scores;
+        long revision;
+        internal long Revision => Interlocked.Read(ref revision);
+        internal AchievementHubStore(string directory, IAchievementScoreStore scores = null)
+        { this.directory = Path.GetFullPath(directory); this.scores = scores; }
         internal static string AccountKey(string account) => (account ?? "").Trim().ToLowerInvariant();
         string FilePath(string provider, string account) => Path.Combine(directory,
             Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(provider + "\n" + AccountKey(account)))) + ".json");
@@ -85,7 +92,23 @@ namespace PixelVaultNative
             var gate = Gates.GetOrAdd(path, _ => new SemaphoreSlim(1, 1));
             await gate.WaitAsync(token).ConfigureAwait(false);
             // Callers mutate their copy, so never hand out the cached instance.
-            try { return await Task.Run(() => JsonSerializer.Deserialize<AccountData>(JsonSerializer.Serialize(ReadCached(path, provider, account), Json), Json), token).ConfigureAwait(false); }
+            try
+            {
+                return await Task.Run(() =>
+                {
+                    var data = JsonSerializer.Deserialize<AccountData>(JsonSerializer.Serialize(ReadCached(path, provider, account), Json), Json);
+                    // Lazy migration of saved progress: idempotent awards live in SQLite, not the rebuildable JSON snapshots.
+                    scores?.SyncAchievementScores(account, data.Games.Values.SelectMany(s => s.Rows));
+                    if (scores != null)
+                    {
+                        var totals = scores.LoadAchievementScoreTotals(account);
+                        data.Scores = totals;
+                        foreach (var game in data.Games)
+                            game.Value.ScoreTotals = totals.TryGetValue(provider + ":" + game.Key, out var score) ? score : new AchievementScoreTotals();
+                    }
+                    return data;
+                }, token).ConfigureAwait(false);
+            }
             finally { gate.Release(); }
         }
         async Task UpdateAsync(string provider, string account, Func<AccountData, bool> update, CancellationToken token)
@@ -107,11 +130,34 @@ namespace PixelVaultNative
                         File.WriteAllText(temp, JsonSerializer.Serialize(data, Json));
                         token.ThrowIfCancellationRequested();
                         File.Move(temp, path, true);
+                        Interlocked.Increment(ref revision);
                         var info = new FileInfo(path);
                         cache[path] = (info.LastWriteTimeUtc, info.Length, data);
                     }
                     catch { cache.TryRemove(path, out _); throw; }
                     finally { if (File.Exists(temp)) File.Delete(temp); }
+                }, token).ConfigureAwait(false);
+            }
+            finally { gate.Release(); }
+        }
+        internal async Task<Snapshot> LoadGameAsync(string provider, string account, string game, CancellationToken token)
+        {
+            var path = FilePath(provider, account);
+            var gate = Gates.GetOrAdd(path, _ => new SemaphoreSlim(1, 1));
+            await gate.WaitAsync(token).ConfigureAwait(false);
+            try
+            {
+                return await Task.Run(() =>
+                {
+                    if (!ReadCached(path, provider, account).Games.TryGetValue(game, out var saved)) return null;
+                    var snapshot = JsonSerializer.Deserialize<Snapshot>(JsonSerializer.Serialize(saved, Json), Json);
+                    scores?.SyncAchievementScores(account, snapshot.Rows);
+                    if (scores != null)
+                    {
+                        var totals = scores.LoadAchievementScoreTotals(account);
+                        snapshot.ScoreTotals = totals.TryGetValue(provider + ":" + game, out var score) ? score : new AchievementScoreTotals();
+                    }
+                    return snapshot;
                 }, token).ConfigureAwait(false);
             }
             finally { gate.Release(); }
@@ -138,10 +184,12 @@ namespace PixelVaultNative
                 if (prior != null && prior.UpdatedUtc > now) return false;
                 if (!result.NotificationOnly)
                 {
+                    scores?.SyncAchievementScores(account, rows);
                     d.Games[game] = new Snapshot { UpdatedUtc = now, DetailsUpdatedUtc = now, Rows = rows };
                     return true;
                 }
                 var merged = Merge(prior, rows, now);
+                scores?.SyncAchievementScores(account, merged.Rows);
                 if (prior != null && SameProgress(prior.Rows, merged.Rows) && now - prior.UpdatedUtc < TimeSpan.FromHours(6).Ticks) return false;
                 d.Games[game] = merged;
                 return true;
@@ -202,6 +250,7 @@ namespace PixelVaultNative
                         && percents.TryGetValue(row.ProviderAchievementId, out var pct) && pct >= 0 && pct <= 100)
                         row.GlobalUnlockPercent = pct;
                 snapshot.RarityCheckedUtc = now;
+                scores?.SyncAchievementScores(account, snapshot.Rows);
                 return true;
             }, token);
         }

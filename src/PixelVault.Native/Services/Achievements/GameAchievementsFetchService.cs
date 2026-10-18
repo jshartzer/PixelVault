@@ -45,6 +45,11 @@ namespace PixelVaultNative
             public long UnlockUtcTicks;
             /// <summary>Provider-supplied global unlock percentage, when available. This is rarity, not difficulty.</summary>
             public double? GlobalUnlockPercent;
+            // Hydrated from the durable scoring database for the current account, never trusted from provider/JSON data.
+            [System.Text.Json.Serialization.JsonIgnore] public int? Points;
+            [System.Text.Json.Serialization.JsonIgnore] public bool PointsProvisional;
+            [System.Text.Json.Serialization.JsonIgnore] public int? AwardedPoints;
+            [System.Text.Json.Serialization.JsonIgnore] public bool AwardProvisional;
             public double? CounterCurrent;
             public double? CounterMinimum;
             public double? CounterTarget;
@@ -77,6 +82,7 @@ namespace PixelVaultNative
             public string GameTitle;
             public string DetailLine;
             public List<AchievementRow> Rows;
+            internal AchievementScoreTotals ScoreTotals;
             public string ErrorMessage;
             public string ProgressErrorMessage;
             /// <summary>Steam <c>playtime_forever</c> from <see cref="TryLoadSteamOwnedGamePlaytimeMinutesAsync"/> (minutes).</summary>
@@ -762,7 +768,7 @@ namespace PixelVaultNative
             if (string.IsNullOrWhiteSpace(title)) title = string.IsNullOrWhiteSpace(fallbackKey) ? "(achievement)" : fallbackKey;
             var desc = ReadString(o, "Description", "description") ?? string.Empty;
             var points = ReadIntString(o, "Points", "points");
-            var metaPoints = string.IsNullOrWhiteSpace(points) ? string.Empty : points + " pts";
+            var metaPoints = string.IsNullOrWhiteSpace(points) ? string.Empty : points + " RA pts";
             var order = ReadDisplayOrder(o);
             var badge = ReadString(o, "BadgeName", "badgeName") ?? string.Empty;
             var badgeUrl = BuildRetroBadgeUrl(badge);

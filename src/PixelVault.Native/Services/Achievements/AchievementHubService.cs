@@ -177,9 +177,12 @@ namespace PixelVaultNative
                     if (AchievementHubStore.CanSave(card.Game.Provider, card.Game.Id, result))
                     {
                         RetryAfter.TryRemove(retryKey, out _);
-                        var now = DateTime.UtcNow.Ticks;
-                        data[card.Game.Provider].Games[card.Game.Id] = new AchievementHubStore.Snapshot { UpdatedUtc = now, DetailsUpdatedUtc = now, Rows = result.Rows };
-                        try { await store.SaveGameAsync(card.Game.Provider, session.Account(card.Game.Provider), card.Game.Id, result, token); }
+                        try
+                        {
+                            await store.SaveGameAsync(card.Game.Provider, session.Account(card.Game.Provider), card.Game.Id, result, token);
+                            data[card.Game.Provider].Games[card.Game.Id] = await store.LoadGameAsync(
+                                card.Game.Provider, session.Account(card.Game.Provider), card.Game.Id, token);
+                        }
                         catch (Exception ex) when (ex is System.IO.IOException || ex is UnauthorizedAccessException) { notes.Add("Progress could not be saved."); }
                     }
                     else

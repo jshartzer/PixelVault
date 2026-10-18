@@ -57,6 +57,8 @@
     <Compile Include="Services\Achievements\AchievementGuideService.cs" />
     <Compile Include="Services\Achievements\AchievementGuidePins.cs" />
     <Compile Include="Services\Achievements\AchievementCollectionStats.cs" />
+    <Compile Include="Services\Achievements\AchievementScoring.cs" />
+    <Compile Include="Services\Achievements\AchievementGuideScores.cs" />
     <Compile Include="Services\Achievements\AchievementUnlockTracker.cs" />
     <Compile Include="Services\Achievements\AchievementGuideImportService.cs" />
     <Compile Include="Services\Covers\CoverService.cs" />
@@ -95,6 +97,8 @@
     <Compile Include="Storage\IndexDatabaseStorage.cs" />
     <Compile Include="UI\AchievementsInfoWindow.cs" />
     <Compile Include="UI\AchievementHubWindow.cs" />
+    <Compile Include="UI\AchievementHubWindow.Score.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryTimelineAchievements.cs" />
     <Compile Include="UI\AchievementHubWindow.Collection.cs" />
     <Compile Include="Services\Achievements\AchievementHubCollection.cs" />
     <Compile Include="UI\AchievementHubWindow.Shelves.cs" />

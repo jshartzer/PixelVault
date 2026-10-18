@@ -19,6 +19,48 @@ namespace PixelVaultNative
     {
         static SolidColorBrush Brush(string hex) => UiBrushHelper.FromHex(hex);
 
+        public static Button BuildCaptureDeleteButton()
+        {
+            var content = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            content.Children.Add(new TextBlock
+            {
+                Text = "\uE74D",
+                FontFamily = new FontFamily("Segoe MDL2 Assets"),
+                FontSize = 15,
+                Margin = new Thickness(0, 0, 8, 0),
+                VerticalAlignment = VerticalAlignment.Center
+            });
+            content.Children.Add(new TextBlock { Text = "Delete selected", FontSize = 13, FontWeight = FontWeights.SemiBold });
+            var template = BuildLibraryToolbarButtonTemplate("#A83746", "#E68D99", "#BF4454", "#822A36");
+            foreach (var triggerBase in template.Triggers)
+            {
+                if (triggerBase is Trigger trigger && trigger.Property == UIElement.IsEnabledProperty)
+                {
+                    trigger.Setters.Clear();
+                    trigger.Setters.Add(new Setter(Border.BackgroundProperty, Brush("#3E2930"), "Chrome"));
+                    trigger.Setters.Add(new Setter(Border.BorderBrushProperty, Brush("#97616A"), "Chrome"));
+                    trigger.Setters.Add(new Setter(Control.ForegroundProperty, Brush("#E9C3C9")));
+                }
+            }
+            var button = new Button
+            {
+                Content = content,
+                Template = template,
+                Width = 154,
+                Height = 38,
+                Foreground = Brushes.White,
+                Margin = new Thickness(12, 0, 0, 4),
+                VerticalAlignment = VerticalAlignment.Top,
+                Cursor = System.Windows.Input.Cursors.Hand,
+                IsEnabled = false,
+                ToolTip = "Select captures to delete. Deletion cannot be undone from PixelVault."
+            };
+            ToolTipService.SetShowOnDisabled(button, true);
+            AccessibilityUi.TrySetAutomationName(button, "Delete selected captures");
+            AccessibilityUi.TryApplyFocusVisualStyle(button);
+            return button;
+        }
+
         /// <summary>Legacy "big" button factory used by Settings, Intake, Health dashboard, Import summaries, etc.</summary>
         public static Button Btn(string t, RoutedEventHandler? click, string? bg, Brush fg)
         {

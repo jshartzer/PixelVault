@@ -51,6 +51,7 @@ namespace PixelVaultNative
         bool _showGrid = true;
         bool _isLoading;
         bool _isClosed;
+        string _scoreSteamAccount, _scoreRetroAccount;
 
         AchievementsInfoWindow(
             Window owner,
@@ -358,6 +359,8 @@ namespace PixelVaultNative
                     normalizedPlatform, folder, steamKey, retroKey, steamUserId64,
                     retroAchievementsUsername, userAgent, default));
             dlg._remainingOnly.IsChecked = remainingOnly;
+            dlg._scoreSteamAccount = steamUserId64 ?? "";
+            dlg._scoreRetroAccount = retroAchievementsUsername ?? "";
             dlg._feedbackAccountScope = (normalizedPlatform ?? "") + "|" + (steamUserId64 ?? "") + "|" + (retroAchievementsUsername ?? "");
             AutomationProperties.SetName(dlg, "Achievements");
             dlg.Loaded += async (_, __) => { await dlg.LoadAsync(); };
@@ -373,6 +376,7 @@ namespace PixelVaultNative
             _refresh.ToolTip = "Refreshing achievement status…";
             _guide.IsEnabled = false;
             _error.Visibility = Visibility.Collapsed;
+            string scoreError = null;
             try
             {
                 GameAchievementsFetchService.FetchResult result;
@@ -392,8 +396,32 @@ namespace PixelVaultNative
                     _error.Visibility = Visibility.Visible;
                     return;
                 }
+                if (!result.IsError && string.IsNullOrEmpty(result.ProgressErrorMessage)
+                    && (_scoreSteamAccount != null || _scoreRetroAccount != null) && _guideService is IAchievementScoreStore scoreStore)
+                {
+                    try
+                    {
+                        await Task.Run(() =>
+                        {
+                            foreach (var group in (result.Rows ?? new()).Where(r => r != null).GroupBy(r => r.Provider))
+                            {
+                                var account = group.Key == GameAchievementsFetchService.SteamProvider ? _scoreSteamAccount : _scoreRetroAccount;
+                                scoreStore.SyncAchievementScores(account, group);
+                                var first = group.First();
+                                if (scoreStore.LoadAchievementScoreTotals(account).TryGetValue(group.Key + ":" + first.ProviderGameId, out var totals))
+                                    result.ScoreTotals = totals;
+                            }
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        scoreError = "Achievement points could not be saved. " + ex.Message;
+                    }
+                    if (_isClosed) return;
+                }
                 _newUnlocks = _unlockTracker.Observe(result, _feedbackAccountScope);
                 ApplyLoadedResult(result);
+                if (scoreError != null) { _error.Text = scoreError; _error.Visibility = Visibility.Visible; }
                 ShowUnlockFeedback();
                 if (!result.IsError && string.IsNullOrEmpty(result.ProgressErrorMessage))
                 {
@@ -515,7 +543,7 @@ namespace PixelVaultNative
                 return;
             }
 
-            _earnedSummary.Text = (_stats ?? AchievementCollectionStats.Build(rows, DateTime.UtcNow.Ticks)).Summary;
+            _earnedSummary.Text = (_stats ?? AchievementCollectionStats.Build(rows, DateTime.UtcNow.Ticks, _loadedResult?.ScoreTotals)).Summary;
             _earnedSummary.Visibility = Visibility.Visible;
 
             _empty.Visibility = Visibility.Collapsed;
@@ -940,7 +968,8 @@ namespace PixelVaultNative
                 : (row.ProgressKnown ? "Not obtained" : "Progress unknown");
             var meta = new TextBlock
             {
-                Text = state,
+                Text = AchievementScoring.PointText(row),
+                ToolTip = AchievementScoring.Explanation(row),
                 Margin = new Thickness(0, 4, 0, 0),
                 Foreground = UiBrushHelper.FromHex(obtained ? "#88B8A0" : "#7D909C"),
                 FontSize = 10,
@@ -961,6 +990,7 @@ namespace PixelVaultNative
             card.Child = content;
             AchievementRarityUi.Apply(card, badgeHost, title, row);
             AutomationProperties.SetName(card, (row.Title ?? "Achievement") + ", " + state +
+                (row.Points.HasValue ? ", " + AchievementScoring.Label(row) : "") +
                 (AchievementRarityUi.Label(row).Length > 0 ? ", " + AchievementRarityUi.Label(row) : ""));
             return card;
         }
@@ -969,7 +999,9 @@ namespace PixelVaultNative
         {
             if (row == null) return string.Empty;
             var parts = new List<string>();
+            if (row.Points.HasValue) parts.Add(AchievementScoring.Explanation(row));
             if (!string.IsNullOrWhiteSpace(row.Title)) parts.Add(row.Title.Trim());
+            parts.Add(!row.ProgressKnown ? "Progress unknown" : row.Unlocked ? "Obtained" : "Not obtained");
             if (AchievementRarityUi.Label(row).Length > 0) parts.Add(AchievementRarityUi.Label(row));
             if (!string.IsNullOrWhiteSpace(row.Description)) parts.Add(row.Description.Trim());
             if (AchievementCollectionStats.CounterPercent(row).HasValue) parts.Add("Counter progress: " + CounterLabel(row));
@@ -1047,7 +1079,7 @@ namespace PixelVaultNative
             grid.Children.Add(stack);
 
             var earnedMeta = FormatAchievementEarnedMeta(row.UnlockUtcTicks);
-            if (!string.IsNullOrWhiteSpace(row.Meta) || !string.IsNullOrWhiteSpace(earnedMeta))
+            if (!string.IsNullOrWhiteSpace(row.Meta) || !string.IsNullOrWhiteSpace(earnedMeta) || row.Points.HasValue)
             {
                 var metaStack = new StackPanel
                 {
@@ -1055,6 +1087,7 @@ namespace PixelVaultNative
                     VerticalAlignment = VerticalAlignment.Top,
                     MaxWidth = 144
                 };
+                if (row.Points.HasValue) metaStack.Children.Add(AchievementCollectionUi.ScoreChip(row));
                 if (!string.IsNullOrWhiteSpace(row.Meta))
                 {
                     metaStack.Children.Add(new TextBlock
@@ -1083,6 +1116,7 @@ namespace PixelVaultNative
             card.Child = grid;
             AchievementRarityUi.Apply(card, badgeHost, title, row, list: true);
             AutomationProperties.SetName(card, (row.Title ?? "Achievement") + ", " + (obtained ? "Obtained" : row.ProgressKnown ? "Not obtained" : "Progress unknown") +
+                (row.Points.HasValue ? ", " + AchievementScoring.Label(row) : "") +
                 (AchievementRarityUi.Label(row).Length > 0 ? ", " + AchievementRarityUi.Label(row) : ""));
             return card;
         }
@@ -1090,7 +1124,7 @@ namespace PixelVaultNative
         /// <summary>Steam CDN and similar hosts often reject anonymous <see cref="BitmapImage"/> URI downloads; use HttpClient with the same User-Agent as API fetches.</summary>
         const int AchievementIconDownloadMaxBytes = 786432;
 
-        internal static void StartAchievementBadgeDownload(Image img, GameAchievementsFetchService.AchievementRow row, string userAgent)
+        internal static void StartAchievementBadgeDownload(Image img, GameAchievementsFetchService.AchievementRow row, string userAgent, int decodePixelWidth = 108)
         {
             if (img == null || row == null) return;
             var grayOut = row.ProgressKnown && !row.Unlocked;
@@ -1113,7 +1147,7 @@ namespace PixelVaultNative
 
             img.Visibility = Visibility.Visible;
             var ua = string.IsNullOrWhiteSpace(userAgent) ? "PixelVault" : userAgent.Trim();
-            _ = LoadAchievementBadgeIntoImageAsync(img, row, primary, fallback, grayOut, ua);
+            _ = LoadAchievementBadgeIntoImageAsync(img, row, primary, fallback, grayOut, ua, decodePixelWidth);
         }
 
         static async Task LoadAchievementBadgeIntoImageAsync(
@@ -1122,7 +1156,7 @@ namespace PixelVaultNative
             string primaryUrl,
             string fallbackUrl,
             bool grayOut,
-            string userAgent)
+            string userAgent, int decodePixelWidth)
         {
             var bytes = await DownloadAchievementIconBytesAsync(primaryUrl, userAgent).ConfigureAwait(false);
             var usedFallback = false;
@@ -1150,7 +1184,7 @@ namespace PixelVaultNative
                         var bmp = new BitmapImage();
                         bmp.BeginInit();
                         bmp.StreamSource = ms;
-                        bmp.DecodePixelWidth = 108;
+                        bmp.DecodePixelWidth = Math.Clamp(decodePixelWidth, 64, 1024);
                         bmp.CacheOption = BitmapCacheOption.OnLoad;
                         bmp.EndInit();
                         bmp.Freeze();

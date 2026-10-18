@@ -7,6 +7,8 @@ namespace PixelVaultNative
 {
     public sealed partial class MainWindow
     {
+        internal enum LibraryCaptureMediaFilter { All, Screenshots, Clips }
+
         /// <summary>Mutable per-open state for the Library browser window (folder list, detail pane, search, scroll).</summary>
         internal sealed class LibraryBrowserWorkingSet
         {
@@ -20,6 +22,8 @@ namespace PixelVaultNative
             internal readonly HashSet<string> SelectedDetailFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             internal readonly List<Border> DetailTiles = new List<Border>();
             internal readonly List<string> DetailFilesDisplayOrder = new List<string>();
+            internal LibraryCaptureMediaFilter CaptureMediaFilter = LibraryCaptureMediaFilter.All;
+            internal bool ShowTimelineAchievements = true;
             internal bool IsActive = true;
             internal bool PreserveFolderScrollOnNextRender;
             internal double PreservedFolderScrollOffset;

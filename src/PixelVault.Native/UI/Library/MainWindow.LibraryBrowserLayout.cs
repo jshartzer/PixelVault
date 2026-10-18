@@ -47,6 +47,7 @@ namespace PixelVaultNative
             internal Button TimelinePresetThirtyDaysButton;
             internal DatePicker TimelineStartDatePicker;
             internal DatePicker TimelineEndDatePicker;
+            internal CheckBox TimelineAchievementsToggle;
             internal WrapPanel SessionsFilterPanel;
             internal Button SessionThresholdThirtyButton;
             internal Button SessionThresholdSixtyButton;
@@ -54,6 +55,9 @@ namespace PixelVaultNative
             internal Button SessionThresholdOneTwentyButton;
             internal Button SessionThresholdOneEightyButton;
             internal Button DeleteSelectedButton;
+            internal Button CaptureFilterAllButton;
+            internal Button CaptureFilterScreenshotsButton;
+            internal Button CaptureFilterClipsButton;
             internal Button FolderColumnDecreaseButton;
             internal Button FolderCoverLayoutButton;
             internal Button FolderColumnIncreaseButton;
@@ -633,11 +637,6 @@ namespace PixelVaultNative
             Grid.SetRow(banner, 0);
             AutomationProperties.SetName(panes.PhotoWorkspaceHeroBannerStrip, "Game banner");
 
-            var controls = new DockPanel { Margin = new Thickness(0, 4, 0, 14) };
-            panes.LibraryDetailControlsDock = controls;
-            panes.ThumbLabel = new TextBlock { Text = "Screenshots", FontSize = 22, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, VerticalAlignment = VerticalAlignment.Center };
-            controls.Children.Add(panes.ThumbLabel);
-            var sliderPanel = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
             panes.TimelineFilterPanel = new WrapPanel
             {
                 Orientation = Orientation.Horizontal,
@@ -708,7 +707,6 @@ namespace PixelVaultNative
                 BorderThickness = new Thickness(1)
             };
             panes.TimelineFilterPanel.Children.Add(panes.TimelineEndDatePicker);
-            sliderPanel.Children.Add(panes.TimelineFilterPanel);
             panes.SessionsFilterPanel = new WrapPanel
             {
                 Orientation = Orientation.Horizontal,
@@ -754,34 +752,8 @@ namespace PixelVaultNative
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, 0, 0, 0)
             });
-            sliderPanel.Children.Add(panes.SessionsFilterPanel);
-            panes.DeleteSelectedButton = new Button
-            {
-                Width = 28,
-                Height = 28,
-                Margin = new Thickness(12, 0, 0, 0),
-                Padding = new Thickness(0),
-                Background = Brush("#8B2F2F"),
-                BorderBrush = Brush("#E07A6E"),
-                BorderThickness = new Thickness(1.5),
-                Foreground = Brushes.White,
-                Cursor = Cursors.Hand,
-                ToolTip = "Delete selected capture(s) (cannot be undone from PixelVault)",
-                Content = new TextBlock
-                {
-                    Text = "🗑",
-                    FontSize = 13,
-                    FontWeight = FontWeights.SemiBold,
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Center,
-                    TextAlignment = TextAlignment.Center
-                }
-            };
-            AutomationProperties.SetName(panes.DeleteSelectedButton, "Delete selected captures");
-            panes.DeleteSelectedButton.IsEnabled = false;
-            sliderPanel.Children.Add(panes.DeleteSelectedButton);
-            DockPanel.SetDock(sliderPanel, Dock.Right);
-            controls.Children.Add(sliderPanel);
+            var controls = BuildLibraryCaptureControls(panes);
+            panes.LibraryDetailControlsDock = controls;
             Grid.SetRow(controls, 1);
             rightGrid.Children.Add(controls);
 
@@ -800,6 +772,61 @@ namespace PixelVaultNative
             ApplyLibraryBrowserFolderPaneSplit(contentGrid);
 
             return panes;
+        }
+
+        internal static DockPanel BuildLibraryCaptureControls(LibraryBrowserPaneRefs panes)
+        {
+            var controls = new DockPanel { Margin = new Thickness(0, 4, 0, 14), LastChildFill = true };
+            panes.DeleteSelectedButton = LibraryButtonChrome.BuildCaptureDeleteButton();
+            // Reserve the right edge first so filters and selection text cannot push Delete out of view.
+            DockPanel.SetDock(panes.DeleteSelectedButton, Dock.Right);
+            controls.Children.Add(panes.DeleteSelectedButton);
+
+            var filters = new WrapPanel { VerticalAlignment = VerticalAlignment.Center };
+            Button FilterButton(string label, string automationName)
+            {
+                var button = new Button
+                {
+                    Content = new TextBlock { Text = label, Margin = new Thickness(12, 0, 12, 0), VerticalAlignment = VerticalAlignment.Center },
+                    Height = 38,
+                    Padding = new Thickness(12, 0, 12, 0),
+                    Margin = new Thickness(0, 0, 8, 4),
+                    FontSize = 12,
+                    FontWeight = FontWeights.SemiBold
+                };
+                LibraryButtonChrome.ApplyLibraryPillChrome(button, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
+                AutomationProperties.SetName(button, automationName);
+                AccessibilityUi.TryApplyFocusVisualStyle(button);
+                return button;
+            }
+            panes.CaptureFilterAllButton = FilterButton("All captures", "Show all captures");
+            panes.CaptureFilterScreenshotsButton = FilterButton("Screenshots only", "Show screenshots only");
+            panes.CaptureFilterClipsButton = FilterButton("Clips only", "Show clips only");
+            filters.Children.Add(panes.CaptureFilterAllButton);
+            filters.Children.Add(panes.CaptureFilterScreenshotsButton);
+            filters.Children.Add(panes.CaptureFilterClipsButton);
+            panes.TimelineAchievementsToggle = new CheckBox
+            {
+                Content = "Show achievements", IsChecked = true, VerticalAlignment = VerticalAlignment.Center,
+                Foreground = SystemParameters.HighContrast ? SystemColors.WindowTextBrush : UiBrushHelper.FromHex("#D7E2EA"), Margin = new Thickness(8, 0, 12, 4),
+                ToolTip = "Include achievement artwork at its provider-reported unlock time in Timeline. Capture filters apply separately."
+            };
+            AutomationProperties.SetName(panes.TimelineAchievementsToggle, "Show achievements in timeline");
+            AccessibilityUi.TryApplyFocusVisualStyle(panes.TimelineAchievementsToggle);
+            panes.TimelineFilterPanel?.Children.Add(panes.TimelineAchievementsToggle);
+            panes.ThumbLabel = new TextBlock
+            {
+                FontSize = 13,
+                Foreground = UiBrushHelper.FromHex("#D7E2EA"),
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(4, 0, 12, 4),
+                Visibility = Visibility.Collapsed
+            };
+            filters.Children.Add(panes.ThumbLabel);
+            if (panes.TimelineFilterPanel != null) filters.Children.Add(panes.TimelineFilterPanel);
+            if (panes.SessionsFilterPanel != null) filters.Children.Add(panes.SessionsFilterPanel);
+            controls.Children.Add(filters);
+            return controls;
         }
     }
 }

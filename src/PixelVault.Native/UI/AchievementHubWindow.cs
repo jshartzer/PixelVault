@@ -93,6 +93,7 @@ namespace PixelVaultNative
             root.Children.Add(header);
 
             var sections = new StackPanel { Margin = new Thickness(24, 0, 24, 24) };
+            sections.Children.Add(BuildScoreSection());
             sections.Children.Add(new Border
             {
                 Background = Color("#18232B", SystemColors.WindowBrush),
@@ -193,6 +194,7 @@ namespace PixelVaultNative
 
         internal void RenderRecent(AchievementHubState state)
         {
+            if (state.Collection != null) RenderScore(state.Collection);
             if (state.Timeline != null) lastTimeline = state.Timeline;
             RenderUnlocks(state.Timeline ?? lastTimeline, state.Timeline == null && lastTimeline != null);
             RenderCollection(state.Collection);

@@ -58,6 +58,127 @@ public sealed class FilenameParserServiceTests
         Assert.Equal(DateTimeKind.Local, parsed.CaptureTime!.Value.Kind);
     }
 
+    [Theory]
+    [InlineData("clip_1700000000000.mp4")]
+    [InlineData("CLIP_1,700,000,000,000.MKV")]
+    [InlineData("clip_01700000000000.mov")]
+    [InlineData("clip_00001700000000000.webm")]
+    public void Parse_SteamClip_RoutesToManualWithoutInventingGameTitle(string fileName)
+    {
+        var parser = CreateParser(loadSavedGameIndexRows: _ => new List<GameIndexEditorRow>
+        {
+            new() { Name = "Clip", PlatformLabel = "Steam", SteamAppId = "123" }
+        });
+
+        var parsed = parser.Parse(fileName, "library-root");
+
+        Assert.True(parsed.MatchedConvention);
+        Assert.Equal("steam_clip_unix", parsed.ConventionId);
+        Assert.Equal("Steam", parsed.PlatformLabel);
+        Assert.Contains("Steam", parsed.PlatformTags);
+        Assert.Empty(parsed.SteamAppId);
+        Assert.Empty(parsed.GameTitleHint);
+        Assert.True(parsed.RoutesToManualWhenMissingSteamAppId);
+        Assert.Equal(DateTimeOffset.FromUnixTimeMilliseconds(1700000000000).ToLocalTime().DateTime, parsed.CaptureTime);
+    }
+
+    [Theory]
+    [InlineData("clip_1700000000000")]
+    [InlineData("CLIP_1,700,000,000,000")]
+    public void GetGameTitleHint_SteamClip_ReturnsEmpty(string baseName)
+    {
+        Assert.Empty(CreateParser().GetGameTitleHint(baseName, string.Empty));
+    }
+
+    [Theory]
+    [InlineData("Death Stranding Director's Cut_clip_1,791,867,182,055.mp4")]
+    [InlineData("Death Stranding Director's Cut_clip_1791867182055.MP4")]
+    public void Parse_ManuallyNamedSteamClip_ResolvesSteamGameAmongOtherPlatforms(string fileName)
+    {
+        var rows = new List<GameIndexEditorRow>
+        {
+            new() { GameId = "G_PS5", Name = "Death Stranding Director's Cut", PlatformLabel = "PS5" },
+            new() { GameId = "G_STEAM", Name = "Death Stranding Director's Cut", PlatformLabel = "Steam", SteamAppId = "1850570" },
+            new() { GameId = "G_XBOX", Name = "Death Stranding Director's Cut", PlatformLabel = "Xbox" }
+        };
+        var parser = CreateParser(loadSavedGameIndexRows: _ => rows);
+
+        var parsed = parser.Parse(fileName, "library-root");
+
+        Assert.True(parsed.MatchedConvention);
+        Assert.Equal("steam_clip_title_unix", parsed.ConventionId);
+        Assert.Equal("Death Stranding Director's Cut", parsed.GameTitleHint);
+        Assert.Equal("Steam", parsed.PlatformLabel);
+        Assert.Equal("1850570", parsed.SteamAppId);
+        Assert.Equal(DateTimeOffset.FromUnixTimeMilliseconds(1791867182055).ToLocalTime().DateTime, parsed.CaptureTime);
+        var tags = MainWindow.MergePlatformTagsWithFilenamePlatformHint(new[] { "Game Capture" }, parsed);
+        Assert.Contains("Steam", tags);
+        var row = LibraryPlacementService.TryResolveGameIndexRowForImportSort(
+            parsed, rows, MainWindow.NormalizeConsoleLabel, MainWindow.CleanTag,
+            (title, platform) => title + "|" + platform);
+        Assert.Equal("G_STEAM", row!.GameId);
+    }
+
+    [Fact]
+    public void Parse_ManuallyNamedSteamClipWithoutKnownAppId_StillNeedsManualAssignment()
+    {
+        var parsed = CreateParser().Parse("My_Game_clip_1,791,867,182,055.mp4", "library-root");
+
+        Assert.Equal("steam_clip_title_unix", parsed.ConventionId);
+        Assert.Equal("My_Game", parsed.GameTitleHint);
+        Assert.Empty(parsed.SteamAppId);
+        Assert.True(parsed.RoutesToManualWhenMissingSteamAppId);
+    }
+
+    [Fact]
+    public void Parse_ManuallyNamedSteamClipWithAmbiguousSteamIds_DoesNotGuessAppId()
+    {
+        var parser = CreateParser(loadSavedGameIndexRows: _ => new List<GameIndexEditorRow>
+        {
+            new() { Name = "Game", PlatformLabel = "Steam", SteamAppId = "123" },
+            new() { Name = "Game", PlatformLabel = "Steam", SteamAppId = "456" }
+        });
+
+        var parsed = parser.Parse("Game_clip_1,791,867,182,055.mp4", "library-root");
+
+        Assert.Equal("steam_clip_title_unix", parsed.ConventionId);
+        Assert.Empty(parsed.SteamAppId);
+        Assert.True(parsed.RoutesToManualWhenMissingSteamAppId);
+    }
+
+    [Theory]
+    [InlineData("Steam", "G_STEAM")]
+    [InlineData("", "G_STEAM")]
+    [InlineData("PS5", "G_PS5")]
+    public void Index_ManuallyNamedSteamClip_PreservesAssignmentAndExplicitPlatform(string embeddedPlatform, string expectedGameId)
+    {
+        // Exercise the live index resolver without starting a window or reading the user's settings/data.
+        var rows = new List<GameIndexEditorRow>
+        {
+            new() { GameId = "G_PS5", Name = "Death Stranding Director's Cut", PlatformLabel = "PS5" },
+            new() { GameId = "G_STEAM", Name = "Death Stranding Director's Cut", PlatformLabel = "Steam", SteamAppId = "1850570" }
+        };
+        var parser = CreateParser(loadSavedGameIndexRows: _ => rows);
+        var host = (MainWindow)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(MainWindow));
+        var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+        typeof(MainWindow).GetField("filenameParserService", flags)!.SetValue(host, parser);
+        typeof(MainWindow).GetField("libraryRoot", flags)!.SetValue(host, "library-root");
+        var file = "Death Stranding Director's Cut_clip_1,791,867,182,055.mp4";
+        var snapshot = new EmbeddedMetadataSnapshot
+        {
+            Tags = string.IsNullOrEmpty(embeddedPlatform) ? new[] { "Game Capture" } : new[] { "Game Capture", embeddedPlatform },
+            CaptureTime = new DateTime(2026, 10, 12, 23, 53, 3)
+        };
+
+        var entry = (LibraryMetadataIndexEntry)typeof(MainWindow).GetMethod("BuildResolvedLibraryMetadataIndexEntry", flags)!
+            .Invoke(host, new object?[] { "library-root", file, "stamp", snapshot, null, new Dictionary<string, LibraryMetadataIndexEntry>(), rows })!;
+
+        Assert.Equal(expectedGameId, entry.GameId);
+        Assert.Equal(embeddedPlatform == "PS5" ? "PS5" : "Steam", entry.ConsoleLabel);
+        Assert.Contains(entry.ConsoleLabel, entry.TagText);
+        Assert.Equal(2, rows.Count);
+    }
+
     [Fact]
     public void Parse_RetroArchNativeScreenshot_UsesRomFilenameTimestampAndEmulation()
     {

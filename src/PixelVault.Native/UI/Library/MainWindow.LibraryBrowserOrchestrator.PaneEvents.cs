@@ -7,6 +7,58 @@ namespace PixelVaultNative
 {
     public sealed partial class MainWindow
     {
+        internal static void WireLibraryCaptureFilters(
+            LibraryBrowserWorkingSet ws,
+            LibraryBrowserPaneRefs panes,
+            Action renderSelectedFolder)
+        {
+            void RefreshCaptureFilterButtons()
+            {
+                void Apply(Button button, LibraryCaptureMediaFilter filter)
+                {
+                    var active = ws.CaptureMediaFilter == filter;
+                    LibraryButtonChrome.ApplyLibraryPillChrome(button,
+                        active ? "#284D5B" : "#232B35",
+                        active ? "#6EABBD" : "#33424D",
+                        active ? "#345E6D" : "#2A3440",
+                        active ? "#1C3843" : "#182028",
+                        active ? "#F4F7FA" : "#D7E2EA");
+                    System.Windows.Automation.AutomationProperties.SetHelpText(button, active ? "Active capture filter" : "Filter captures by media type");
+                }
+                Apply(panes.CaptureFilterAllButton, LibraryCaptureMediaFilter.All);
+                Apply(panes.CaptureFilterScreenshotsButton, LibraryCaptureMediaFilter.Screenshots);
+                Apply(panes.CaptureFilterClipsButton, LibraryCaptureMediaFilter.Clips);
+            }
+            void SetCaptureMediaFilter(LibraryCaptureMediaFilter filter)
+            {
+                if (ws.CaptureMediaFilter == filter) return;
+                ws.CaptureMediaFilter = filter;
+                ws.SelectedDetailFiles.Clear();
+                ws.DetailSelectionAnchorIndex = -1;
+                ws.DetailFilesDisplayOrder.Clear();
+                ws.ResetDetailRowsToLoadingOnNextRender = true;
+                ws.PreservedDetailScrollOffset = 0;
+                ws.PreserveDetailScrollOnNextRender = true;
+                RefreshCaptureFilterButtons();
+                renderSelectedFolder();
+            }
+            panes.CaptureFilterAllButton.Click += delegate { SetCaptureMediaFilter(LibraryCaptureMediaFilter.All); };
+            panes.CaptureFilterScreenshotsButton.Click += delegate { SetCaptureMediaFilter(LibraryCaptureMediaFilter.Screenshots); };
+            panes.CaptureFilterClipsButton.Click += delegate { SetCaptureMediaFilter(LibraryCaptureMediaFilter.Clips); };
+            if (panes.TimelineAchievementsToggle != null)
+            {
+                panes.TimelineAchievementsToggle.IsChecked = ws.ShowTimelineAchievements;
+                panes.TimelineAchievementsToggle.Click += delegate
+                {
+                    ws.ShowTimelineAchievements = panes.TimelineAchievementsToggle.IsChecked == true;
+                    ws.PreserveDetailScrollOnNextRender = true;
+                    ws.PreservedDetailScrollOffset = panes.ThumbScroll?.VerticalOffset ?? 0;
+                    renderSelectedFolder();
+                };
+            }
+            RefreshCaptureFilterButtons();
+        }
+
         void LibraryBrowserWirePaneEvents(
             Window libraryWindow,
             LibraryBrowserWorkingSet ws,
@@ -15,6 +67,7 @@ namespace PixelVaultNative
             Action renderSelectedFolder,
             Action applySearchFilter)
         {
+            WireLibraryCaptureFilters(ws, panes, renderSelectedFolder);
             panes.SearchDebounceTimer.Tick += delegate
             {
                 applySearchFilter();

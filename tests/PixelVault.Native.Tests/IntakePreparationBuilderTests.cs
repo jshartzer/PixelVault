@@ -128,6 +128,52 @@ public sealed class IntakePreparationBuilderTests : IDisposable
         Assert.DoesNotContain(switchFile, result.ManualPaths);
     }
 
+    [Fact]
+    public void Build_SteamClip_GoesToManualWhileIdentifiedSteamVideoStaysAutomatic()
+    {
+        var clipFile = CreateFile("clip_1700000000000.mp4");
+        var identifiedFile = CreateFile("620_20261012123456_1.mp4");
+        var parser = new FilenameParserService(new FilenameParserServiceDependencies
+        {
+            LoadCustomConventions = _ => new List<FilenameConventionRule>(),
+            LoadSavedGameIndexRows = _ => new List<GameIndexEditorRow>
+            {
+                new() { Name = "Clip", PlatformLabel = "Steam", SteamAppId = "123" }
+            },
+            ParseTagText = value => (value ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries),
+            NormalizeConsoleLabel = MainWindow.NormalizeConsoleLabel
+        });
+        var analyzer = new IntakeAnalysisService(
+            file => parser.Parse(file, "library-root"),
+            _ => true,
+            _ => DateTime.MinValue,
+            getImportFolderTitleHint: _ => "Portal 2");
+
+        var result = IntakePreparationBuilder.Build(
+            new[] { clipFile, identifiedFile },
+            analyzer.AnalyzeFiles,
+            includeImportEditRows: true);
+
+        var manualItem = Assert.Single(result.ManualItems);
+        Assert.Equal(clipFile, manualItem.FilePath);
+        Assert.Empty(manualItem.GameName);
+        Assert.Empty(manualItem.SteamAppId);
+        Assert.Equal("Steam", result.Analysis[clipFile].Parsed.PlatformLabel);
+        Assert.False(manualItem.TagSteam); // Manual platform assignment waits for a Steam AppID.
+        Assert.Equal(DateTimeOffset.FromUnixTimeMilliseconds(1700000000000).ToLocalTime().DateTime, manualItem.CaptureTime);
+        Assert.Contains(clipFile, result.ManualPaths);
+        Assert.DoesNotContain(clipFile, result.RecognizedPaths);
+        Assert.Equal(identifiedFile, Assert.Single(result.ReviewItems).FilePath);
+        Assert.False(result.ImportEditItems.Single(item => item.FilePath == clipFile).IntakeRuleMatched);
+        Assert.True(result.ImportEditItems.Single(item => item.FilePath == identifiedFile).IntakeRuleMatched);
+        var rules = parser.GetConventionRules("library-root");
+        var clipAnalysis = result.Analysis[clipFile];
+        var identifiedAnalysis = result.Analysis[identifiedFile];
+        Assert.True(clipAnalysis.PreserveFileTimes);
+        Assert.False(AutoIntakePolicy.IsEligibleForBackgroundAutoImport(clipAnalysis, AutoIntakePolicy.TryResolveMatchedRule(rules, clipAnalysis.Parsed)));
+        Assert.True(AutoIntakePolicy.IsEligibleForBackgroundAutoImport(identifiedAnalysis, AutoIntakePolicy.TryResolveMatchedRule(rules, identifiedAnalysis.Parsed)));
+    }
+
     string CreateFile(string name)
     {
         var path = Path.Combine(_root, name);

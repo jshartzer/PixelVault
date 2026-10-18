@@ -61,6 +61,7 @@ namespace PixelVaultNative
                 return;
             }
             var renderFolder = ws.Current;
+            var captureMediaFilter = ws.CaptureMediaFilter;
             var calendarTimelineView = IsLibraryBrowserTimelineView(renderFolder);
             var sessionView = IsLibraryBrowserSessionView(renderFolder);
             var timelineView = calendarTimelineView || sessionView;
@@ -101,6 +102,11 @@ namespace PixelVaultNative
             var timelineRangeStart = ws.TimelineStartDate;
             var timelineRangeEnd = ws.TimelineEndDate;
             NormalizeLibraryTimelineDateRange(ref timelineRangeStart, ref timelineRangeEnd);
+            var includeTimelineAchievements = calendarTimelineView && ws.ShowTimelineAchievements;
+            var timelineAchievementGames = includeTimelineAchievements
+                ? BuildTimelineAchievementGames(renderFolder.SourceFolders.ToList()) : new List<AchievementHubGame>();
+            var timelineSteamAccount = includeTimelineAchievements ? CurrentSteamUserId64() : null;
+            var timelineRetroAccount = includeTimelineAchievements ? CurrentRetroAchievementsUsername() : null;
             LogTroubleshooting("LibraryDetailRenderStart",
                 "renderVersion=" + renderVersion
                 + "; resetToLoading=" + resetRowsToLoading
@@ -153,7 +159,7 @@ namespace PixelVaultNative
                 };
                 Func<LibraryDetailRenderSnapshot, List<VirtualizedRowDefinition>> buildVirtualRowsForSnapshot = delegate(LibraryDetailRenderSnapshot snapshot)
                 {
-                    if (snapshot == null || snapshot.Groups == null || snapshot.Groups.Count == 0) return null;
+                    if (snapshot == null || ((snapshot.Groups == null || snapshot.Groups.Count == 0) && snapshot.Achievements.Count == 0)) return null;
                     var timelineCtx = snapshot.TimelineContextByFile ?? new Dictionary<string, LibraryTimelineCaptureContext>(StringComparer.OrdinalIgnoreCase);
                     var mediaMap = snapshot.MediaLayoutByFile ?? new Dictionary<string, LibraryDetailMediaLayoutInfo>(StringComparer.OrdinalIgnoreCase);
                     if (sessionView)
@@ -175,12 +181,13 @@ namespace PixelVaultNative
                             redrawSelectedFolderDetail);
                     }
 
+                    var projection = calendarTimelineView && snapshot.Achievements.Count > 0 ? LibraryTimelineMosaicProjection.Build(snapshot) : null;
                     return BuildLibraryContinuousMosaicRowDefinitions(
                         ws,
                         renderFolder,
-                        snapshot.Groups,
+                        projection?.Groups ?? snapshot.Groups,
                         timelineCtx,
-                        mediaMap,
+                        projection?.Media ?? mediaMap,
                         panes == null ? null : panes.ThumbScroll,
                         detailViewportWidth,
                         effectiveTileSize,
@@ -190,7 +197,8 @@ namespace PixelVaultNative
                         updateDetailSelection,
                         refreshDetailSelectionUi,
                         redrawSelectedFolderDetail,
-                        renderFolderTiles);
+                        renderFolderTiles,
+                        timelineAchievements: projection?.Achievements);
                 };
 
                 Action<LibraryDetailRenderSnapshot, bool, List<VirtualizedRowDefinition>> applyDetailSnapshot = null;
@@ -272,10 +280,10 @@ namespace PixelVaultNative
                         var oldestCapture = captureDates.Count == 0 ? DateTime.MinValue : captureDates.Min();
                         panes.DetailMeta.Text = sessionView
                             ? BuildLibrarySessionSummaryText(visibleFiles.Count, snapshot.Groups == null ? 0 : snapshot.Groups.Count, distinctGames, distinctPlatforms, newestCapture, oldestCapture, sessionThresholdMinutes)
-                            : BuildLibraryTimelineSummaryText(visibleFiles.Count, distinctGames, distinctPlatforms, newestCapture, oldestCapture);
+                            : BuildTimelineActivitySummary(snapshot);
                     }
                     ws.DetailTiles.Clear();
-                    if (snapshot == null || snapshot.Groups == null || snapshot.Groups.Count == 0)
+                    if (snapshot == null || ((snapshot.Groups == null || snapshot.Groups.Count == 0) && snapshot.Achievements.Count == 0))
                     {
                         ws.DetailFilesDisplayOrder.Clear();
                         commitDetailVirtualRows(new[]
@@ -290,7 +298,9 @@ namespace PixelVaultNative
                                         sessionView,
                                         timelineRangeStart,
                                         timelineRangeEnd,
-                                        redrawSelectedFolderDetail);
+                                        redrawSelectedFolderDetail,
+                                        captureMediaFilter,
+                                        delegate { panes.CaptureFilterAllButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); });
                                 }
                             }
                         });
@@ -360,8 +370,14 @@ namespace PixelVaultNative
                         throwIfDetailRenderCancelled();
                         traceStep("LibraryDetailTimelineGameRowsLoaded", "savedGameRows=" + savedGameRows.Count);
                     }
+                    var timelineAchievements = includeTimelineAchievements
+                        ? await LoadTimelineAchievementsAsync(timelineAchievementGames, timelineSteamAccount, timelineRetroAccount,
+                            timelineRangeStart, timelineRangeEnd, detailRenderCancellationToken).ConfigureAwait(false)
+                        : new List<LibraryTimelineAchievement>();
+                    throwIfDetailRenderCancelled();
                     var detailFiles = GetFilesForLibraryFolderEntry(displayFolder, false)
                         .Where(file => !string.IsNullOrWhiteSpace(file) && File.Exists(file))
+                        .Where(file => LibraryCaptureMatchesMediaFilter(file, captureMediaFilter))
                         .Distinct(StringComparer.OrdinalIgnoreCase)
                         .ToList();
                     throwIfDetailRenderCancelled();
@@ -426,7 +442,7 @@ namespace PixelVaultNative
                         var visiblePaths = datedFiles.Select(entry => entry.FilePath).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
                         var layoutPrepMs = segmentSw.ElapsedMilliseconds;
                         segmentSw.Restart();
-                        var snapshot = new LibraryDetailRenderSnapshot { VisibleFiles = visiblePaths };
+                        var snapshot = new LibraryDetailRenderSnapshot { VisibleFiles = visiblePaths, Achievements = timelineAchievements };
                         bool mediaReused;
                         if (reuseMediaFrom != null
                             && reuseMediaFrom.MediaLayoutByFile != null
@@ -600,12 +616,14 @@ namespace PixelVaultNative
                         }
                         var dayGroupingChanged = LibraryTimelineDetailGroupingFingerprint(quickSnapshot.Groups)
                             != LibraryTimelineDetailGroupingFingerprint(commentSnapshot.Groups);
-                        if (commentsChanged || dayGroupingChanged)
+                        var eventOrderChanged = LibraryTimelineMosaicProjection.CaptureTimesChanged(quickSnapshot, commentSnapshot);
+                        if (commentsChanged || dayGroupingChanged || eventOrderChanged)
                         {
                             traceStep("LibraryDetailMetadataDispatchStart",
                                 "stage=" + stage
                                 + "; commentsChanged=" + commentsChanged
-                                + "; dayGroupingChanged=" + dayGroupingChanged);
+                                + "; dayGroupingChanged=" + dayGroupingChanged
+                                + "; eventOrderChanged=" + eventOrderChanged);
                             var commentVirtualRows = buildVirtualRowsForSnapshot(commentSnapshot);
                             throwIfDetailRenderCancelled();
                             await libraryWindow.Dispatcher.InvokeAsync((Action)(delegate { applyDetailSnapshot(commentSnapshot, false, commentVirtualRows); }));
@@ -758,7 +776,8 @@ namespace PixelVaultNative
                         traceStep("LibraryDetailRefinedSnapshotBuilt",
                             "groups=" + refinedSnapshot.Groups.Count
                             + "; visibleFiles=" + refinedSnapshot.VisibleFiles.Count);
-                        var layoutUnchanged = quickSnapshot.Groups.Count == refinedSnapshot.Groups.Count;
+                        var layoutUnchanged = quickSnapshot.Groups.Count == refinedSnapshot.Groups.Count
+                            && !LibraryTimelineMosaicProjection.CaptureTimesChanged(quickSnapshot, refinedSnapshot);
                         if (layoutUnchanged)
                         {
                             for (int gi = 0; gi < quickSnapshot.Groups.Count && layoutUnchanged; gi++)
@@ -923,7 +942,8 @@ namespace PixelVaultNative
             Action refreshDetailSelectionUi,
             Action redrawSelectedFolderDetail,
             Action renderFolderTiles,
-            Action<string> openCaptureViewerOverride = null)
+            Action<string> openCaptureViewerOverride = null,
+            IReadOnlyDictionary<string, LibraryTimelineAchievement> timelineAchievements = null)
         {
             var safeGroups = (groups ?? new List<LibraryDetailRenderGroup>())
                 .Where(group => group != null && (group.Files ?? new List<string>()).Count > 0)
@@ -977,7 +997,7 @@ namespace PixelVaultNative
                         ? new List<string>()
                         : capturedChunk.Placements
                             .Select(placement => placement == null ? null : placement.File)
-                            .Where(file => !string.IsNullOrWhiteSpace(file))
+                            .Where(file => !string.IsNullOrWhiteSpace(file) && (timelineAchievements == null || !timelineAchievements.ContainsKey(file)))
                             .Distinct(StringComparer.OrdinalIgnoreCase)
                             .ToList(),
                     Build = delegate
@@ -992,6 +1012,17 @@ namespace PixelVaultNative
                         foreach (var placement in capturedChunk.Placements)
                         {
                             var decodeWidth = CalculateLibraryDetailTileDecodeWidth(placement.Width, dpiScale);
+                            string captureDateLabel = null;
+                            captureDateLabels.TryGetValue(placement.File, out captureDateLabel);
+                            if (timelineAchievements != null && timelineAchievements.TryGetValue(placement.File, out var achievement))
+                            {
+                                var achievementTile = BuildLibraryTimelineAchievementTile(achievement, placement.Width, decodeWidth,
+                                    captureDateLabel, () => OpenTimelineAchievement(ws, achievement));
+                                Canvas.SetLeft(achievementTile, placement.X);
+                                Canvas.SetTop(achievementTile, placement.Y);
+                                canvas.Children.Add(achievementTile);
+                                continue;
+                            }
                             LibraryTimelineCaptureContext timelineContext;
                             if (timelineContexts == null || !timelineContexts.TryGetValue(placement.File, out timelineContext)) timelineContext = null;
                             Action<string> useFileAsFolderCover = null;
@@ -1007,8 +1038,6 @@ namespace PixelVaultNative
                                     ShowLibraryBrowserToast(ws, "Cover saved");
                                 };
                             }
-                            string captureDateLabel = null;
-                            captureDateLabels.TryGetValue(placement.File, out captureDateLabel);
                             var tile = CreateLibraryDetailTile(
                                 placement.File,
                                 placement.Width,
@@ -2565,7 +2594,7 @@ namespace PixelVaultNative
             return root;
         }
 
-        FrameworkElement BuildLibraryDetailEmptyCapturesPlaceholder(bool timelineView, bool sessionView, DateTime rangeStart, DateTime rangeEnd, Action redrawDetail)
+        FrameworkElement BuildLibraryDetailEmptyCapturesPlaceholder(bool timelineView, bool sessionView, DateTime rangeStart, DateTime rangeEnd, Action redrawDetail, LibraryCaptureMediaFilter mediaFilter = LibraryCaptureMediaFilter.All, Action showAllCaptures = null)
         {
             var root = new StackPanel { Margin = new Thickness(8, 12, 12, 16), MaxWidth = 480 };
             var title = sessionView ? "No captures to group into sessions" : (timelineView ? "No captures in this range" : "No captures in this folder");
@@ -2574,6 +2603,11 @@ namespace PixelVaultNative
                 : (timelineView
                 ? "Nothing falls between " + (rangeStart > DateTime.MinValue ? rangeStart.ToString("yyyy-MM-dd") : "start") + " and " + (rangeEnd > DateTime.MinValue ? rangeEnd.ToString("yyyy-MM-dd") : "end") + ". Widen the range or switch grouping."
                 : "This game folder has no screenshots or clips yet. Import captures or pick another folder.");
+            if (mediaFilter != LibraryCaptureMediaFilter.All)
+            {
+                title = mediaFilter == LibraryCaptureMediaFilter.Clips ? "No clips in this view" : "No screenshots in this view";
+                body = "No captures match this media filter. Choose All captures to see the other media in this view.";
+            }
             root.Children.Add(new TextBlock
             {
                 Text = title,
@@ -2590,11 +2624,12 @@ namespace PixelVaultNative
                 TextWrapping = TextWrapping.Wrap,
                 Margin = new Thickness(0, 8, 0, 12)
             });
-            if (redrawDetail != null)
+            var action = mediaFilter != LibraryCaptureMediaFilter.All && showAllCaptures != null ? showAllCaptures : redrawDetail;
+            if (action != null)
             {
                 var b = new Button
                 {
-                    Content = "Refresh this view",
+                    Content = mediaFilter != LibraryCaptureMediaFilter.All && showAllCaptures != null ? "Show all captures" : "Refresh this view",
                     Padding = new Thickness(14, 8, 14, 8),
                     FontSize = 13,
                     Cursor = Cursors.Hand,
@@ -2604,7 +2639,7 @@ namespace PixelVaultNative
                     BorderThickness = new Thickness(1),
                     HorizontalAlignment = HorizontalAlignment.Left
                 };
-                b.Click += delegate { redrawDetail(); };
+                b.Click += delegate { action(); };
                 root.Children.Add(b);
             }
             return root;

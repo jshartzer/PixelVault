@@ -69,6 +69,7 @@ namespace PixelVaultNative
             text.Children.Add(gameLine);
             var chips = new WrapPanel();
             chips.Children.Add(Chip(Status, row.ProgressKnown && row.Unlocked ? "#2E5A47" : "#243640"));
+            if (row.Points.HasValue) chips.Children.Add(AchievementCollectionUi.ScoreChip(row));
             var rarity = AchievementRarityUi.Label(row);
             if (rarity.Length > 0) chips.Children.Add(Chip(rarity, "#3A3324"));
             if (row.Hidden) chips.Children.Add(Chip("Hidden", "#3A2C3A"));
@@ -122,6 +123,8 @@ namespace PixelVaultNative
                 grid.Children.Add(name); grid.Children.Add(value);
             }
             TextBlock Value(string text) { var t = Text(text, 13, true); t.Margin = new Thickness(0, 0, 0, 10); return t; }
+
+            if (row.Points.HasValue) Add("Achievement points", Value(AchievementScoring.Explanation(row)));
 
             var percent = AchievementCollectionStats.ValidPercent(row.GlobalUnlockPercent) ? row.GlobalUnlockPercent : null;
             var tier = AchievementRarityUi.Label(row);

@@ -81,7 +81,7 @@ namespace PixelVaultNative
 
         void UpdateProgressDetails(List<GameAchievementsFetchService.AchievementRow> rows)
         {
-            _stats = AchievementCollectionStats.Build(rows, DateTime.UtcNow.Ticks);
+            _stats = AchievementCollectionStats.Build(rows, DateTime.UtcNow.Ticks, _loadedResult?.ScoreTotals);
             var panel = new StackPanel { Margin = new Thickness(4, 8, 4, 8) };
             panel.Children.Add(StatsText(_stats.Latest == null ? (_stats.Earned > 0 ? "Latest unlock: date unavailable"
                 : _stats.Unknown > 0 ? "Latest unlock: progress unavailable" : "Latest unlock: none yet")

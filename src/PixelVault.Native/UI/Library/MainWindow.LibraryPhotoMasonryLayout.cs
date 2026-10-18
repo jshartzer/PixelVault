@@ -245,7 +245,9 @@ namespace PixelVaultNative
             if (filtered.Count == 0) return chunks;
 
             var cols = Math.Max(1, (int)Math.Round((avail + gap) / (requestedCell + gap), MidpointRounding.AwayFromZero));
-            cols = Math.Min(cols, Math.Max(1, filtered.Count));
+            // Sparse achievement feeds keep the normal photo cell size rather than stretching one badge across the viewport.
+            if (mediaLayoutByFile == null || !mediaLayoutByFile.Values.Any(info => info?.UseSingleSquareCell == true))
+                cols = Math.Min(cols, Math.Max(1, filtered.Count));
             var minCell = Math.Max(120d, Math.Min(requestedCell, Math.Max(120, minWidth)));
             while (cols > 1)
             {
@@ -342,6 +344,8 @@ namespace PixelVaultNative
             int columns,
             IReadOnlyDictionary<string, LibraryDetailMediaLayoutInfo> mediaLayoutByFile)
         {
+            if (mediaLayoutByFile != null && mediaLayoutByFile.TryGetValue(file, out var cellInfo) && cellInfo?.UseSingleSquareCell == true)
+                return new[] { new LibraryDetailQuiltShape(1, 1) };
             var aspect = ResolveLibraryDetailAspectRatio(file, mediaLayoutByFile);
             var layoutSeed = LibraryDetailFileLayoutHash(file);
             var compactVariation = columns >= 3;

@@ -69,9 +69,9 @@ namespace PixelVaultNative
         string CardFingerprint(AchievementHubCard card, bool large)
         {
             var rows = card.Snapshot?.Rows;
-            var stats = rows == null ? null : AchievementCollectionStats.Build(rows, DateTime.UtcNow.Ticks);
+            var stats = rows == null ? null : AchievementCollectionStats.Build(rows, DateTime.UtcNow.Ticks, card.Snapshot.ScoreTotals);
             return string.Join("\u001f", card.Game?.Key, card.Game?.Title, card.Game?.ArtPath, card.LastPlayedUtc, large,
-                stats == null ? "none" : stats.Unknown + "/" + stats.Earned + "/" + stats.Total + "/" + stats.Percent,
+                stats == null ? "none" : stats.Unknown + "/" + stats.Earned + "/" + stats.Total + "/" + stats.Percent + "/" + stats.HasPoints + "/" + stats.ScoreSummary,
                 large ? card.Snapshot?.UpdatedUtc ?? 0 : 0, pins?.IsPinned(card.Game?.Key ?? "") ?? false);
         }
 
@@ -95,13 +95,19 @@ namespace PixelVaultNative
             meta.TextWrapping = TextWrapping.NoWrap; meta.TextTrimming = TextTrimming.CharacterEllipsis;
             content.Children.Add(meta);
             var rows = card.Snapshot?.Rows;
-            var stats = rows == null ? null : AchievementCollectionStats.Build(rows, DateTime.UtcNow.Ticks);
+            var stats = rows == null ? null : AchievementCollectionStats.Build(rows, DateTime.UtcNow.Ticks, card.Snapshot.ScoreTotals);
             var progress = stats == null || stats.Unknown > 0 ? (large ? "Achievement progress unavailable" : "Progress unavailable")
                 : stats.Total == 0 ? (large ? "No achievements for this game" : "No achievements")
                 : stats.Earned + " / " + stats.Total + (large ? " earned · " : " · ") + stats.Percent + "%";
             var summary = Text(progress, large ? 13 : 11, true);
             summary.Margin = new Thickness(0, large ? 8 : 5, 0, 4);
             content.Children.Add(summary);
+            if (stats?.HasPoints == true)
+            {
+                var score = Text(stats.ScoreSummary, large ? 12 : 10);
+                score.ToolTip = "Earned points are saved in the database. Available points include current locked values. Provisional awards finalize when rarity is known.";
+                content.Children.Add(score);
+            }
             if (stats?.Percent != null && stats.Unknown == 0)
                 content.Children.Add(new ProgressBar { Minimum = 0, Maximum = 100, Value = stats.Percent.Value, Height = large ? 6 : 4,
                     Foreground = Color("#79BBA1", SystemColors.HighlightBrush), Background = Color("#2B3C47", SystemColors.ControlBrush) });

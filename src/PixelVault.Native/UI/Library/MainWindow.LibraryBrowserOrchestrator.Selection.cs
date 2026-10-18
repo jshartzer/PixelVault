@@ -11,6 +11,14 @@ namespace PixelVaultNative
 {
     public sealed partial class MainWindow
     {
+        internal static bool LibraryCaptureMatchesMediaFilter(string file, LibraryCaptureMediaFilter filter)
+        {
+            if (string.IsNullOrWhiteSpace(file)) return false;
+            return filter == LibraryCaptureMediaFilter.Clips ? IsVideo(file)
+                : filter == LibraryCaptureMediaFilter.Screenshots ? IsImage(file)
+                : true;
+        }
+
         void LibraryBrowserApplySortGroupPillState(Button button, bool active)
         {
             if (button == null) return;
@@ -29,11 +37,13 @@ namespace PixelVaultNative
                 {
                     return ws.DetailFilesDisplayOrder
                         .Where(file => !string.IsNullOrWhiteSpace(file) && File.Exists(file))
+                        .Where(file => LibraryCaptureMatchesMediaFilter(file, ws.CaptureMediaFilter))
                         .Distinct(StringComparer.OrdinalIgnoreCase)
                         .ToList();
                 }
                 return GetFilesForLibraryFolderEntry(getDisplayFolder(ws.Current), false)
                     .Where(file => !string.IsNullOrWhiteSpace(file) && File.Exists(file))
+                    .Where(file => LibraryCaptureMatchesMediaFilter(file, ws.CaptureMediaFilter))
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .ToList();
             };

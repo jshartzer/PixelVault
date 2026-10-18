@@ -33,26 +33,52 @@ namespace PixelVaultNative
         /// <summary>Games with at least one achievement, ordered by title, for the game filter.</summary>
         public List<AchievementHubGame> Games = new();
         public int LibraryGames, GamesWithProgress, GamesWithoutAchievements, Earned, Unearned;
+        public bool HasPoints;
+        public long EarnedPoints, AvailablePoints, PointsThisMonth;
+        public AchievementHubEntry RarestEarned;
+        public int ProvisionalAwards;
         public string Signature = "";
         /// <summary>When each covered game's saved progress was last updated, by game key.</summary>
         public Dictionary<string, long> SnapshotUpdated = new(StringComparer.Ordinal);
         public int GamesWithoutProgress => LibraryGames - GamesWithProgress;
 
         internal static AchievementHubCollection Build(IEnumerable<AchievementHubGame> games,
-            IReadOnlyDictionary<string, AchievementHubStore.AccountData> data)
+            IReadOnlyDictionary<string, AchievementHubStore.AccountData> data, DateTime? nowUtc = null, TimeZoneInfo zone = null)
         {
             var collection = new AchievementHubCollection();
+            var now = nowUtc ?? DateTime.UtcNow;
+            var monthStart = AchievementScoring.MonthStartUtc(now, zone ?? TimeZoneInfo.Local).Ticks;
             long stamp = 0;
             foreach (var game in games.GroupBy(g => g.Key).Select(g => g.First()))
             {
                 if (!data.TryGetValue(game.Provider, out var account)) continue;
                 collection.LibraryGames++;
-                if (!account.Games.TryGetValue(game.Id, out var snapshot) || snapshot?.Rows == null) continue;
+                if (!account.Games.TryGetValue(game.Id, out var snapshot) || snapshot?.Rows == null)
+                {
+                    // Clearing the progress cache cannot erase durable awards for games still in the library.
+                    if (account.Scores?.TryGetValue(game.Key, out var savedScore) == true)
+                    {
+                        collection.HasPoints = true;
+                        collection.EarnedPoints += savedScore.Earned;
+                        collection.PointsThisMonth += savedScore.EarnedThisMonth;
+                        collection.AvailablePoints += savedScore.Earned;
+                        collection.ProvisionalAwards += savedScore.ProvisionalAwards;
+                    }
+                    continue;
+                }
                 collection.GamesWithProgress++;
                 collection.SnapshotUpdated[game.Key] = snapshot.UpdatedUtc;
                 unchecked { stamp += snapshot.UpdatedUtc + snapshot.RarityCheckedUtc; }
                 var rows = snapshot.Rows.Where(r => r != null && r.Provider == game.Provider && r.ProviderGameId == game.Id)
                     .GroupBy(r => r.ProviderAchievementId, StringComparer.Ordinal).Select(r => r.First()).ToList();
+                var score = AchievementCollectionStats.Build(rows, now.Ticks, snapshot.ScoreTotals);
+                collection.HasPoints |= score.HasPoints;
+                collection.EarnedPoints += score.EarnedPoints;
+                collection.AvailablePoints += score.AvailablePoints;
+                collection.ProvisionalAwards += score.ProvisionalAwards;
+                collection.PointsThisMonth += snapshot.ScoreTotals?.EarnedThisMonth
+                    ?? rows.Where(r => r.AwardedPoints.HasValue && AchievementCollectionStats.ValidUnlock(r, now.Ticks)
+                        && r.UnlockUtcTicks >= monthStart).Sum(r => (long)r.AwardedPoints.Value);
                 if (rows.Count == 0) { collection.GamesWithoutAchievements++; continue; }
                 collection.Games.Add(game);
                 for (var i = 0; i < rows.Count; i++)
@@ -64,7 +90,14 @@ namespace PixelVaultNative
             }
             collection.Games = collection.Games.OrderBy(g => g.Title, StringComparer.CurrentCultureIgnoreCase)
                 .ThenBy(g => g.Key, StringComparer.Ordinal).ToList();
-            collection.Signature = string.Join(",", collection.LibraryGames, collection.GamesWithProgress, collection.Entries.Count, collection.Earned, stamp);
+            collection.RarestEarned = collection.Entries.Where(e => e.Row.ProgressKnown && e.Row.Unlocked
+                    && AchievementCollectionStats.ValidPercent(e.Row.GlobalUnlockPercent))
+                .OrderBy(e => e.Row.GlobalUnlockPercent.Value)
+                .ThenBy(e => e.Game.Key, StringComparer.Ordinal).ThenBy(e => e.Row.ProviderAchievementId, StringComparer.Ordinal).FirstOrDefault();
+            collection.Signature = string.Join(",", collection.LibraryGames, collection.GamesWithProgress, collection.Entries.Count, collection.Earned,
+                stamp, collection.HasPoints, collection.EarnedPoints, collection.AvailablePoints, collection.ProvisionalAwards,
+                collection.PointsThisMonth, collection.RarestEarned?.Game.Key, collection.RarestEarned?.Row.ProviderAchievementId,
+                collection.RarestEarned?.Row.GlobalUnlockPercent, collection.RarestEarned?.Row.IconUrlColor);
             return collection;
         }
 

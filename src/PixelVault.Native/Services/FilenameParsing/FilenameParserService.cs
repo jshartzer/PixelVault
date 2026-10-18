@@ -103,6 +103,7 @@ namespace PixelVaultNative
             }
 
             ApplyKnownSteamRenameFallback(result, fileName, root);
+            ApplyKnownSteamClipTitleFallback(result, root);
 
             if (string.IsNullOrWhiteSpace(result.PlatformLabel) || string.Equals(result.PlatformLabel, "Other", StringComparison.OrdinalIgnoreCase))
             {
@@ -230,6 +231,9 @@ namespace PixelVaultNative
         {
             var cleanedBaseName = baseName ?? string.Empty;
             if (string.IsNullOrWhiteSpace(cleanedBaseName)) return string.Empty;
+
+            // Steam clip exports contain only a timestamp; "clip" is not a game title.
+            if (Regex.IsMatch(cleanedBaseName, @"^clip_[\d,]{13,17}$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)) return string.Empty;
 
             var roblox = Regex.Match(cleanedBaseName + ".png", RobloxCaptureNaming.NamedPattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
             if (roblox.Success) return RobloxCaptureNaming.GameTitle;
@@ -458,6 +462,22 @@ namespace PixelVaultNative
                 },
                 new FilenameConventionRule
                 {
+                    ConventionId = "steam_clip_title_unix",
+                    Name = "Steam Clip (Manually Named Title + Timestamp)",
+                    Priority = 891,
+                    Pattern = "[title]_clip_[unixms].[ext:video]",
+                    PatternText = "[title]_clip_[unixms].[ext:video]",
+                    PlatformLabel = "Steam",
+                    PlatformTagsText = "Steam",
+                    TitleGroup = "title",
+                    TimestampGroup = "stamp",
+                    TimestampFormat = "unix-ms",
+                    RoutesToManualWhenMissingSteamAppId = true,
+                    ConfidenceLabel = "ExplicitPattern",
+                    IsBuiltIn = true
+                },
+                new FilenameConventionRule
+                {
                     ConventionId = "steam_clip_unix",
                     Name = "Steam Clip",
                     Priority = 890,
@@ -467,6 +487,7 @@ namespace PixelVaultNative
                     PlatformTagsText = "Steam",
                     TimestampGroup = "stamp",
                     TimestampFormat = "unix-ms",
+                    RoutesToManualWhenMissingSteamAppId = true,
                     ConfidenceLabel = "ExplicitPattern",
                     IsBuiltIn = true
                 },
@@ -697,6 +718,20 @@ namespace PixelVaultNative
             return string.IsNullOrWhiteSpace(normalizedExplicit) ? "Other" : normalizedExplicit;
         }
 
+        void ApplyKnownSteamClipTitleFallback(FilenameParseResult result, string root)
+        {
+            if (result == null || string.IsNullOrWhiteSpace(root)
+                || !string.Equals(result.ConventionId, "steam_clip_title_unix", StringComparison.OrdinalIgnoreCase)
+                || !string.IsNullOrWhiteSpace(result.SteamAppId)) return;
+            // The manually added title identifies the game; the clip convention identifies Steam.
+            // Other-platform editions with the same title must not make that Steam match ambiguous.
+            var title = NormalizeGameIndexName(NormalizeGameTitleHint(result.GameTitleHint));
+            if (string.IsNullOrWhiteSpace(title)) return;
+            KnownSteamRenameLookupEntry match;
+            if (GetKnownSteamRenameLookup(root).TryGetValue(title, out match) && !match.HasConflictingSteamAppIds)
+                result.SteamAppId = match.ExplicitSteamAppId ?? string.Empty;
+        }
+
         void ApplyKnownSteamRenameFallback(FilenameParseResult result, string fileName, string root)
         {
             if (result == null) return;
@@ -808,6 +843,16 @@ namespace PixelVaultNative
                 else if (!string.Equals(NormalizeConsoleLabel(row.PlatformLabel), "Other", StringComparison.OrdinalIgnoreCase))
                 {
                     updated.HasConflictingPlatform = true;
+                }
+                if (string.Equals(NormalizeConsoleLabel(row.PlatformLabel), "Steam", StringComparison.OrdinalIgnoreCase)
+                    && !row.SuppressSteamAppIdAutoResolve)
+                {
+                    var appId = CleanNumericId(row.SteamAppId);
+                    if (!string.IsNullOrWhiteSpace(appId))
+                    {
+                        if (string.IsNullOrWhiteSpace(updated.ExplicitSteamAppId)) updated.ExplicitSteamAppId = appId;
+                        else if (!string.Equals(updated.ExplicitSteamAppId, appId, StringComparison.Ordinal)) updated.HasConflictingSteamAppIds = true;
+                    }
                 }
                 lookup[normalizedTitle] = updated;
             }
@@ -1341,6 +1386,7 @@ namespace PixelVaultNative
         {
             switch ((token ?? string.Empty).Trim())
             {
+                case "unixms":
                 case "M":
                 case "d":
                 case "h":
@@ -1484,6 +1530,8 @@ namespace PixelVaultNative
             public bool HasSteamMatch;
             public bool HasConflictingPlatform;
             public string SteamAppId;
+            public string ExplicitSteamAppId;
+            public bool HasConflictingSteamAppIds;
         }
 
         struct KnownNonSteamLookupEntry

@@ -31,7 +31,7 @@ namespace PixelVaultNative
 
         void InitializeAchievementNotifications()
         {
-            _achievementHubStore = new AchievementHubStore(Path.Combine(dataRoot, "achievement-hub"));
+            _achievementHubStore = new AchievementHubStore(Path.Combine(dataRoot, "achievement-hub"), achievementGuideService as IAchievementScoreStore);
             try { _achievementNotifications = new AchievementNotifications(Path.Combine(dataRoot, "achievement-notifications.json")); }
             catch (Exception ex) { Log("Could not load achievement notifications: " + ex.Message); return; }
             GameAchievementsFetchService.ProgressObserved += AchievementProgressObserved;

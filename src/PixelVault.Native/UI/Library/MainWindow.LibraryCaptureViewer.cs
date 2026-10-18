@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -50,7 +51,7 @@ namespace PixelVaultNative
 
         internal sealed class LibraryCaptureViewerWindow : Window
         {
-            const int ViewerDecodeMaxEdge = 4096;
+
             /// <summary>Max logical size of the photo surface (DIP); content uses the image’s pixel aspect inside this cap.</summary>
             const double ViewerMaxContentWidth = 1520;
             const double ViewerMaxContentHeight = 1000;
@@ -64,6 +65,14 @@ namespace PixelVaultNative
             readonly StackPanel _footerSlot;
             readonly Border _navLeft;
             readonly Border _navRight;
+            readonly ScrollViewer _scroll;
+            readonly Button _fitButton;
+            readonly Button _actualButton;
+            readonly TextBlock _status;
+            bool _actualSize;
+            int _loadVersion;
+            Point? _panStart;
+            double _panX, _panY;
 
             internal LibraryCaptureViewerWindow(MainWindow host, Window ownerWindow, List<string> paths, int startIndex)
             {
@@ -75,7 +84,9 @@ namespace PixelVaultNative
                 Background = new SolidColorBrush(Color.FromRgb(16, 24, 29));
                 ResizeMode = ResizeMode.CanResize;
                 WindowStartupLocation = WindowStartupLocation.Manual;
-                SizeToContent = SizeToContent.WidthAndHeight;
+                SizeToContent = SizeToContent.Manual;
+                MinWidth = 360;
+                MinHeight = 280;
                 ShowInTaskbar = true;
                 ShowActivated = true;
                 if (ownerWindow != null)
@@ -97,27 +108,59 @@ namespace PixelVaultNative
                 _navRight = BuildNavChrome("\u203A", "Next capture");
                 _navRight.MouseLeftButtonDown += delegate { Navigate(1); };
 
-                // Photo fills the surface; timeline footer overlays the bottom; prev/next on the sides.
                 _photoSurface = new Grid { ClipToBounds = true };
-                _photoSurface.Children.Add(_image);
-                var footerOverlay = new Border
+                _scroll = new ScrollViewer
                 {
-                    VerticalAlignment = VerticalAlignment.Bottom,
-                    HorizontalAlignment = HorizontalAlignment.Stretch,
-                    Background = Brushes.Transparent,
-                    Child = _footerSlot
+                    Content = _image,
+                    HorizontalContentAlignment = HorizontalAlignment.Center,
+                    VerticalContentAlignment = VerticalAlignment.Center,
+                    CanContentScroll = false
                 };
-                _photoSurface.Children.Add(footerOverlay);
-                _navLeft.HorizontalAlignment = HorizontalAlignment.Left;
-                _navLeft.VerticalAlignment = VerticalAlignment.Stretch;
-                _navLeft.Width = 88;
-                _navRight.HorizontalAlignment = HorizontalAlignment.Right;
-                _navRight.VerticalAlignment = VerticalAlignment.Stretch;
-                _navRight.Width = 88;
-                _photoSurface.Children.Add(_navLeft);
-                _photoSurface.Children.Add(_navRight);
-
-                Content = _photoSurface;
+                _photoSurface.Children.Add(_scroll);
+                var toolbar = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(8) };
+                _fitButton = new Button { Content = "Fit", Padding = new Thickness(12, 4, 12, 4), Margin = new Thickness(4, 0, 4, 0) };
+                _actualButton = new Button { Content = "100%", ToolTip = "Actual size: one image pixel per screen pixel", Padding = new Thickness(12, 4, 12, 4) };
+                _fitButton.Click += delegate { SetViewMode(false); };
+                _actualButton.Click += delegate { SetViewMode(true); };
+                foreach (var nav in new[] { _navLeft, _navRight })
+                {
+                    nav.Width = 40;
+                    ((TextBlock)nav.Child).FontSize = 24;
+                }
+                toolbar.Children.Add(_navLeft);
+                toolbar.Children.Add(_navRight);
+                toolbar.Children.Add(_fitButton);
+                toolbar.Children.Add(_actualButton);
+                _status = new TextBlock { Foreground = Brushes.White, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0) };
+                toolbar.Children.Add(_status);
+                var root = new DockPanel();
+                DockPanel.SetDock(toolbar, Dock.Top);
+                DockPanel.SetDock(_footerSlot, Dock.Bottom);
+                root.Children.Add(toolbar);
+                root.Children.Add(_footerSlot);
+                root.Children.Add(_photoSurface);
+                Content = root;
+                _photoSurface.SizeChanged += delegate { UpdateImageDimensions(); };
+                DpiChanged += delegate { UpdateImageDimensions(); };
+                _image.MouseLeftButtonDown += delegate(object sender, MouseButtonEventArgs e)
+                {
+                    if (!_actualSize) return;
+                    _panStart = e.GetPosition(_scroll);
+                    _panX = _scroll.HorizontalOffset;
+                    _panY = _scroll.VerticalOffset;
+                    _image.CaptureMouse();
+                    e.Handled = true;
+                };
+                _image.MouseMove += delegate(object sender, MouseEventArgs e)
+                {
+                    if (!_panStart.HasValue) return;
+                    var point = e.GetPosition(_scroll);
+                    _scroll.ScrollToHorizontalOffset(_panX + _panStart.Value.X - point.X);
+                    _scroll.ScrollToVerticalOffset(_panY + _panStart.Value.Y - point.Y);
+                };
+                _image.MouseLeftButtonUp += delegate { _image.ReleaseMouseCapture(); _panStart = null; };
+                _image.LostMouseCapture += delegate { _panStart = null; };
+                SetViewMode(false);
 
                 if (_paths.Count > 0)
                     ApplyPhotoSurfaceDimensions(_paths[_index]);
@@ -125,6 +168,7 @@ namespace PixelVaultNative
                 Loaded += delegate
                 {
                     ReloadCurrent();
+                    CenterOnWorkArea();
                 };
 
                 PreviewKeyDown += delegate(object _, KeyEventArgs e)
@@ -150,6 +194,7 @@ namespace PixelVaultNative
 
                 Closing += delegate
                 {
+                    ++_loadVersion;
                     _image.Source = null;
                 };
             }
@@ -179,7 +224,7 @@ namespace PixelVaultNative
                 }
             }
 
-            /// <summary>Logical photo area matches decoded pixel aspect ratio, scaled up to (at most) viewer max bounds.</summary>
+            /// <summary>Choose an initial window size from the image aspect ratio.</summary>
             void ApplyPhotoSurfaceDimensions(string imagePath)
             {
                 var wa = SystemParameters.WorkArea;
@@ -201,8 +246,8 @@ namespace PixelVaultNative
                     gridH = Math.Min(ViewerFallbackContentHeight, maxH);
                 }
 
-                _photoSurface.Width = gridW;
-                _photoSurface.Height = gridH;
+                Width = gridW + 16;
+                Height = Math.Min(wa.Height, gridH + 160);
             }
 
             void CenterOnWorkArea()
@@ -248,20 +293,48 @@ namespace PixelVaultNative
                 _navRight.Visibility = _index >= _paths.Count - 1 ? Visibility.Hidden : Visibility.Visible;
             }
 
-            void ReloadCurrent()
+            void SetViewMode(bool actualSize)
+            {
+                _actualSize = actualSize;
+                _image.ReleaseMouseCapture();
+                _scroll.HorizontalScrollBarVisibility = actualSize ? ScrollBarVisibility.Auto : ScrollBarVisibility.Disabled;
+                _scroll.VerticalScrollBarVisibility = actualSize ? ScrollBarVisibility.Auto : ScrollBarVisibility.Disabled;
+                _fitButton.IsEnabled = actualSize;
+                _actualButton.IsEnabled = !actualSize;
+                _image.Cursor = actualSize ? Cursors.Hand : Cursors.Arrow;
+                UpdateImageDimensions();
+                _scroll.ScrollToHome();
+            }
+
+            void UpdateImageDimensions()
+            {
+                if (_actualSize && _image.Source is BitmapSource bitmap)
+                {
+                    var dpi = VisualTreeHelper.GetDpi(this);
+                    _image.Width = bitmap.PixelWidth / dpi.DpiScaleX;
+                    _image.Height = bitmap.PixelHeight / dpi.DpiScaleY;
+                }
+                else
+                {
+                    _image.Width = Math.Max(1, _photoSurface.ActualWidth);
+                    _image.Height = Math.Max(1, _photoSurface.ActualHeight);
+                }
+            }
+
+            async void ReloadCurrent()
             {
                 if (_paths.Count == 0) return;
                 var path = _paths[_index];
                 Title = Path.GetFileName(path) + " — PixelVault";
 
-                ApplyPhotoSurfaceDimensions(path);
+                var version = ++_loadVersion;
 
                 _image.Source = null;
                 // Hidden (not Collapsed) keeps the grid cell measured so the bitmap has a non-zero arrange slot.
                 _image.Visibility = Visibility.Hidden;
 
                 _footerSlot.Children.Clear();
-                var surfaceW = _photoSurface.Width;
+                var surfaceW = _photoSurface.ActualWidth;
                 var footerWidth = (int)Math.Max(400, Math.Round(surfaceW > 1 ? surfaceW - 48 : 800));
                 var ctx = _host.TryGetLibraryTimelineCaptureContextForViewer(path);
                 if (ctx != null)
@@ -285,25 +358,34 @@ namespace PixelVaultNative
                     });
                 }
 
-                var layoutW = surfaceW > 1 ? surfaceW : 640;
-                var decode = Math.Min(ViewerDecodeMaxEdge, Math.Max(640, (int)Math.Round(layoutW * 2)));
-                // Do not pass shouldLoad: QueueImageLoad evaluates it on a background thread, and reading
-                // WPF DispatcherObject.IsLoaded from Task.Run faults or fails the load for this window.
-                _host.QueueImageLoad(
-                    _image,
-                    path,
-                    decode,
-                    delegate(BitmapImage bmp)
-                    {
-                        _image.Source = bmp;
-                        _image.Visibility = Visibility.Visible;
-                    },
-                    true,
-                    null);
-
+                _status.Text = "Loading...";
                 UpdateNavChrome();
-                UpdateLayout();
-                CenterOnWorkArea();
+                _scroll.ScrollToHome();
+                try
+                {
+                    // Keep the original pixels outside the shared thumbnail cache.
+                    var bitmap = await Task.Run(() =>
+                    {
+                        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                        var bmp = new BitmapImage();
+                        bmp.BeginInit();
+                        bmp.CacheOption = BitmapCacheOption.OnLoad;
+                        bmp.StreamSource = stream;
+                        bmp.EndInit();
+                        bmp.Freeze();
+                        return bmp;
+                    });
+                    if (version != _loadVersion) return;
+                    _image.Source = bitmap;
+                    _image.Visibility = Visibility.Visible;
+                    _status.Text = bitmap.PixelWidth + " \u00d7 " + bitmap.PixelHeight;
+                    UpdateImageDimensions();
+                }
+                catch (Exception)
+                {
+                    if (version != _loadVersion) return;
+                    _status.Text = "Unable to load image";
+                }
             }
         }
     }

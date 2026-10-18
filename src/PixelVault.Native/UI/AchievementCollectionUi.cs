@@ -9,6 +9,15 @@ namespace PixelVaultNative
 {
     static class AchievementCollectionUi
     {
+        internal static Border ScoreChip(GameAchievementsFetchService.AchievementRow row)
+        {
+            var chip = TagChip(AchievementScoring.PointText(row));
+            chip.Margin = new Thickness(0, 3, 0, 0);
+            chip.ToolTip = AchievementScoring.Explanation(row);
+            AutomationProperties.SetName(chip, AchievementScoring.Label(row));
+            return chip;
+        }
+
         internal static Border TagChip(string tag) => new Border
         {
             CornerRadius = new CornerRadius(4), Padding = new Thickness(6, 2, 6, 2), Margin = new Thickness(0, 0, 4, 4),
