@@ -57,13 +57,16 @@ namespace PixelVaultNative
         static readonly ConcurrentDictionary<string, DateTime> RetryAfter = new();
         static bool BackingOff(string key) => RetryAfter.TryGetValue(key, out var time) && time > DateTime.UtcNow;
         readonly AchievementHubStore store;
+        readonly IAchievementGuideService guides;
         readonly Func<string, CancellationToken, Task<string>> download;
         readonly Func<AchievementHubGame, AchievementHubSession, CancellationToken, Task<GameAchievementsFetchService.FetchResult>> fetch;
         internal AchievementHubService(AchievementHubStore store,
             Func<string, CancellationToken, Task<string>> download = null,
-            Func<AchievementHubGame, AchievementHubSession, CancellationToken, Task<GameAchievementsFetchService.FetchResult>> fetch = null)
+            Func<AchievementHubGame, AchievementHubSession, CancellationToken, Task<GameAchievementsFetchService.FetchResult>> fetch = null,
+            IAchievementGuideService guides = null)
         {
             this.store = store;
+            this.guides = guides;
             this.download = download ?? DownloadAsync;
             this.fetch = fetch ?? ((game, session, token) => GameAchievementsFetchService.FetchAsync(
                 game.Provider == "steam" ? "Steam" : "Emulation", game.Folder, session.SteamKey, session.RetroKey,
@@ -134,6 +137,7 @@ namespace PixelVaultNative
                 if (string.IsNullOrEmpty(session.Account(provider)) || string.IsNullOrWhiteSpace(session.ApiKey(provider)))
                 { notes.Add((provider == "steam" ? "Steam" : "RetroAchievements") + ": connect your account in Settings."); continue; }
                 data[provider] = await store.LoadAsync(provider, session.Account(provider), token);
+                await LoadLocalMetadataAsync(data[provider].Games.Values.SelectMany(s => s.Rows), token);
             }
             void Report(string status) => report(new AchievementHubState { Cards = SelectRecent(session.Games, data),
                 Pinned = SelectPinned(session.Games, session.Pinned, data),
@@ -182,6 +186,7 @@ namespace PixelVaultNative
                             await store.SaveGameAsync(card.Game.Provider, session.Account(card.Game.Provider), card.Game.Id, result, token);
                             data[card.Game.Provider].Games[card.Game.Id] = await store.LoadGameAsync(
                                 card.Game.Provider, session.Account(card.Game.Provider), card.Game.Id, token);
+                            await LoadLocalMetadataAsync(data[card.Game.Provider].Games[card.Game.Id]?.Rows, token);
                         }
                         catch (Exception ex) when (ex is System.IO.IOException || ex is UnauthorizedAccessException) { notes.Add("Progress could not be saved."); }
                     }
@@ -204,6 +209,14 @@ namespace PixelVaultNative
                 ? "Add a Steam or RetroAchievements account and game IDs in Settings / Edit Metadata."
                 : "Provider-reported play dates · progress includes all achievement groups · refreshes cached for 10 minutes.");
         }
+        async Task LoadLocalMetadataAsync(IEnumerable<GameAchievementsFetchService.AchievementRow> rows, CancellationToken token)
+        {
+            if (guides == null || rows == null) return;
+            try { await Task.Run(() => guides.LoadSavedAchievementGroups(rows), token); }
+            catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
+            catch { /* Local guide metadata must not prevent saved progress from being displayed. */ }
+        }
+
         async Task<Dictionary<string, long>> LoadRecentAsync(string provider, AchievementHubSession session, CancellationToken token)
         {
             var account = Uri.EscapeDataString(session.Account(provider));

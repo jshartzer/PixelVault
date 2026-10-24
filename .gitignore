@@ -33,6 +33,7 @@ PixelVaultData/cache/photography-gallery-*.cache
 PixelVaultData/cache/last-import.tsv
 PixelVaultData/saved-covers/
 PixelVaultData/guides/
+PixelVaultData/capture-groups.sqlite*
 
 # Local backups and temp artifacts
 .cursor/
@@ -86,3 +87,7 @@ Thumbs.db
 .DS_Store
 *.user
 *.suo
+
+# Personal achievement checklist observations, notes and imported save snapshots
+/PixelVaultData/achievement-tracking/
+/tests/**/TestResults/

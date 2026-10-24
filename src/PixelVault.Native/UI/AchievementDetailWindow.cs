@@ -19,6 +19,10 @@ namespace PixelVaultNative
         readonly GameAchievementsFetchService.AchievementRow row;
         readonly List<GameAchievementsFetchService.AchievementRow> gameRows;
         readonly IAchievementGuideService guides;
+        readonly AchievementTrackingStore trackingStore;
+        readonly string trackingAccount;
+        readonly TrackerNavigation trackerNavigation;
+        internal TrackerNavigation TrackingNavigation=>trackerNavigation;
         readonly Func<bool> isGamePinned;
         readonly Action toggleGamePin;
         readonly StackPanel guidePanel = new StackPanel();
@@ -28,9 +32,11 @@ namespace PixelVaultNative
 
         internal AchievementDetailWindow(Window owner, AchievementHubGame game, GameAchievementsFetchService.AchievementRow row,
             IEnumerable<GameAchievementsFetchService.AchievementRow> gameRows, long savedUtc, IAchievementGuideService guides,
-            Func<bool> isGamePinned = null, Action toggleGamePin = null)
+            Func<bool> isGamePinned = null, Action toggleGamePin = null, AchievementTrackingStore trackingStore = null, string trackingAccount = null)
         {
             this.game = game; this.row = row; this.guides = guides;
+            this.trackingStore = trackingStore; this.trackingAccount = trackingAccount;
+            if(trackingStore!=null)trackerNavigation=new TrackerNavigation(trackingStore,()=>new AchievementHubSession{Games=new(){game},SteamAccount=game.Provider=="steam"?trackingAccount:null,RetroAccount=game.Provider=="retroachievements"?trackingAccount:null});
             this.isGamePinned = isGamePinned; this.toggleGamePin = toggleGamePin;
             this.gameRows = (gameRows ?? Enumerable.Empty<GameAchievementsFetchService.AchievementRow>()).Where(r => r != null).ToList();
             if (!this.gameRows.Contains(row)) this.gameRows.Add(row);
@@ -44,6 +50,7 @@ namespace PixelVaultNative
 
             var body = new StackPanel { Margin = new Thickness(24, 22, 24, 24) };
             body.Children.Add(BuildHeader());
+            if(trackerNavigation!=null)body.Children.Add(BuildTrackingAction());
             var counter = BuildCounter();
             if (counter != null) body.Children.Add(counter);
             body.Children.Add(Section("Details", BuildFacts(savedUtc)));
@@ -172,7 +179,7 @@ namespace PixelVaultNative
             else if (!hasGuide) guidePanel.Children.Add(Text("No guide written for this achievement yet.", 13));
             if (entry != null)
             {
-                var tags = AchievementGuideWindow.GuideReadTags(entry.Tags, entry.IsMissable);
+                var tags = AchievementGuideWindow.GuideReadTags(entry.Tags, entry.IsMissable, row.Unlocked);
                 if (tags.Count > 0)
                 {
                     var chips = new WrapPanel { Margin = new Thickness(0, 0, 0, 8) };
@@ -232,6 +239,19 @@ namespace PixelVaultNative
                 panel.Children.Add(gamePin);
             }
             return panel;
+        }
+
+        FrameworkElement BuildTrackingAction()
+        {
+            var panel=new StackPanel { Margin=new Thickness(0,0,0,12) };
+            var button=AchievementTrackerWindow.Button("Open tracker","Open tracker linked to this achievement");button.HorizontalAlignment=HorizontalAlignment.Left;panel.Children.Add(button);
+            void Update()
+            {
+                try{var count=trackerNavigation.Linked(game,row.ProviderAchievementId).Count;button.Content=count==0?"Create linked tracker…":count==1?"Open tracker":"Open linked trackers ("+count+")";button.IsEnabled=true;}
+                catch(Exception ex){button.Content="Trackers unavailable";button.IsEnabled=false;button.ToolTip=ex.Message;}
+            }
+            button.Click+=(_,__)=>{if(trackerNavigation.Linked(game,row.ProviderAchievementId).Count==0)trackerNavigation.Create(this,game:game,achievement:row.ProviderAchievementId);else trackerNavigation.OpenAchievement(this,game,row.ProviderAchievementId);Update();};
+            Activated+=(_,__)=>Update();Update();return panel;
         }
 
         bool IsNextUp()

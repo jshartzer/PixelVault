@@ -59,6 +59,7 @@ namespace PixelVaultNative
 
         void SaveSettings()
         {
+            trackerAutomation?.SetAccounts(CurrentSteamUserId64(), CurrentRetroAchievementsUsername());
             settingsService.SaveToIni(settingsPath, CaptureAppSettings());
             _backgroundIntakeAgent?.ApplySettingsAndStart();
         }

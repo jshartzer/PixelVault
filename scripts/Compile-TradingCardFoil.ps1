@@ -13,7 +13,8 @@ public static class FoilShaderCompiler {
         string entry, string target, uint flags, uint flags2, out IBlob code, out IBlob errors);
     public static void Compile(string input, string output) {
         var bytes = File.ReadAllBytes(input); IBlob code, errors;
-        int hr = D3DCompile(bytes, (UIntPtr)bytes.Length, input, IntPtr.Zero, IntPtr.Zero, "main", "ps_3_0", 1u << 15, 0, out code, out errors);
+        // WPF's software renderer supports shader model 2; model 3 is silently skipped in bitmap rendering.
+        int hr = D3DCompile(bytes, (UIntPtr)bytes.Length, input, IntPtr.Zero, IntPtr.Zero, "main", "ps_2_0", 1u << 15, 0, out code, out errors);
         try {
             if (hr < 0) throw new Exception(errors == null ? "Shader compilation failed" : Marshal.PtrToStringAnsi(errors.GetBufferPointer()));
             var compiled = new byte[code.GetBufferSize().ToInt32()];

@@ -1529,7 +1529,7 @@ namespace PixelVaultNative
                 AchievementsInfoWindow.ShowModal(owner, platform, folder,
                     CurrentSteamWebApiKey(), CurrentRetroAchievementsApiKey(),
                     CurrentSteamUserId64(), CurrentRetroAchievementsUsername(),
-                    userAgent, achievementGuideService, remainingOnly: true);
+                    userAgent, achievementGuideService, remainingOnly: true, trackingStore: achievementTrackingStore);
             };
             return button;
         }

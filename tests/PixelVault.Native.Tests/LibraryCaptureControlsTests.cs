@@ -51,6 +51,8 @@ public sealed class LibraryCaptureControlsTests
         {
             var panes = new MainWindow.LibraryBrowserPaneRefs();
             var toolbar = MainWindow.BuildLibraryCaptureControls(panes);
+            panes.CaptureGroupsToggle.Visibility = Visibility.Visible;
+            panes.CaptureGroupsToggle.IsChecked = true;
             var ws = new MainWindow.LibraryBrowserWorkingSet { Panes = panes };
             MainWindow.WireLibraryCaptureFilters(ws, panes, () => { });
             var root = new Border { Background = new SolidColorBrush(Color.FromRgb(15, 21, 26)), Padding = new Thickness(16), Child = toolbar };

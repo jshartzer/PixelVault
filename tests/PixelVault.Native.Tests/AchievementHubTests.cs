@@ -12,7 +12,7 @@ public sealed class AchievementHubTests : IDisposable
 {
     readonly string dir = Path.Combine(Path.GetTempPath(), "PixelVault-Hub-" + Guid.NewGuid().ToString("N"));
     readonly CancellationToken token = CancellationToken.None;
-    public void Dispose() { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
+    public void Dispose() { Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools(); if (Directory.Exists(dir)) Directory.Delete(dir, true); }
     AchievementHubStore Store() => new(dir);
     static AchievementHubGame Game(string id, string provider = "steam") => new() { Id = id, Provider = provider, Title = id };
     static GameAchievementsFetchService.FetchResult Result(string id, bool earned = false) => new()
@@ -27,6 +27,29 @@ public sealed class AchievementHubTests : IDisposable
     };
     static string Recent(params int[] ids) => JsonSerializer.Serialize(new { response = new { game_count = ids.Length,
         games = ids.Select((id, index) => new { appid = id, rtime_last_played = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - index - 10 }) } });
+
+    [Fact]
+    public async Task MissableMetadata_LoadsFromGuidesForSavedAndRefreshedProgress()
+    {
+        var guides = new AchievementGuideService(dir);
+        var result = Result("1");
+        var entry = guides.SyncDefinitionsAndLoadGuides("game", result.Rows).Single();
+        guides.SaveGuide(new AchievementGuideEdit { AchievementId = entry.AchievementId, IsMissable = true });
+        var store = Store();
+        var session = Session("1");
+        await store.SaveGameAsync("steam", session.SteamAccount, "1", result, token);
+        await store.SaveRecentAsync("steam", session.SteamAccount, new() { ["1"] = DateTime.UtcNow.AddMinutes(-1).Ticks }, token);
+        var service = new AchievementHubService(store, (_, _) => Task.FromResult(Recent(1)),
+            (_, _, _) => Task.FromResult(Result("1", earned: true)), guides);
+        var reports = new List<AchievementHubState>();
+        await service.LoadAsync(session, true, reports.Add, token);
+        var initial = Assert.Single(reports[0].Collection.Entries).Row;
+        Assert.True(initial.IsMissable); Assert.False(initial.Unlocked);
+        var refreshed = Assert.Single(reports.Last().Collection.Entries).Row;
+        Assert.True(refreshed.IsMissable); Assert.True(refreshed.Unlocked);
+        Assert.False(AchievementCollectionUi.ShowMissable(refreshed));
+        Assert.True(guides.LoadGuideEntry("steam", "1", "A").IsMissable);
+    }
 
     [Fact]
     public void SteamDates_RejectPrivatePayloadAndNeverUsePlaytimeAsADate()

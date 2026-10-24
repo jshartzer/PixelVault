@@ -10,6 +10,19 @@ namespace PixelVaultNative.Tests;
 
 public sealed class TradingCardFoilTests
 {
+    [Fact]
+    public void BundledShaderUsesTheSoftwareCompatibleModel()
+    {
+        using var resource=typeof(TradingCardFoilEffect).Assembly.GetManifestResourceStream("PixelVault.TradingCardFoil.ps");
+        Assert.NotNull(resource);using var reader=new System.IO.BinaryReader(resource!);
+        Assert.Equal(0xffff0200u,reader.ReadUInt32());
+    }
+    static void Save(byte[] pixels,string name)
+    {
+        var output=Environment.GetEnvironmentVariable("PIXELVAULT_TRACKING_REVIEW_OUTPUT");if(string.IsNullOrWhiteSpace(output))return;
+        System.IO.Directory.CreateDirectory(output);var bitmap=BitmapSource.Create(96,144,96,96,PixelFormats.Pbgra32,null,pixels,96*4);
+        var png=new PngBitmapEncoder();png.Frames.Add(BitmapFrame.Create(bitmap));using var file=System.IO.File.Create(System.IO.Path.Combine(output,name));png.Save(file);
+    }
     static byte[] Render(Point light, Color color)
     {
         var card = new Border { Width = 96, Height = 144, Background = new SolidColorBrush(color),
@@ -26,6 +39,7 @@ public sealed class TradingCardFoilTests
     {
         var first = Render(new Point(.2, .2), Color.FromRgb(90, 90, 90));
         var second = Render(new Point(.8, .7), Color.FromRgb(90, 90, 90));
+        Save(first,"foil-light-left.png");Save(second,"foil-light-right.png");
         var changed = Enumerable.Range(0, first.Length / 4).Count(i => Math.Abs(first[i * 4] - second[i * 4]) > 8);
         Assert.True(changed > 1000, "Moving the light should move a reflection across the cover.");
         var opaque = Enumerable.Range(0, first.Length / 4).Where(i => first[i * 4 + 3] == 255).ToList();

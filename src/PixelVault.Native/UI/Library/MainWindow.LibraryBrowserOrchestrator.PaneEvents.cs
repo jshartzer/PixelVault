@@ -68,6 +68,7 @@ namespace PixelVaultNative
             Action applySearchFilter)
         {
             WireLibraryCaptureFilters(ws, panes, renderSelectedFolder);
+            panes.CaptureGroupsToggle.Click += delegate { ToggleCaptureGroupView(ws, renderSelectedFolder); };
             panes.SearchDebounceTimer.Tick += delegate
             {
                 applySearchFilter();

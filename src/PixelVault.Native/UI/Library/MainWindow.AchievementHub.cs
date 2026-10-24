@@ -64,21 +64,7 @@ namespace PixelVaultNative
                 var stamp = libraryRoot + "\n" + folders.Count + "\n" + (folders.Count == 0 ? 0
                     : System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(folders[0]) ^ System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(folders[folders.Count - 1]) * 31);
                 if (games != null && stamp == gamesStamp && gamesAge.Elapsed < TimeSpan.FromSeconds(60)) return games;
-                var built = new List<AchievementHubGame>();
-                // Raw library folders, independent of search, filters, and timeline/session projections.
-                foreach (var view in BuildLibraryBrowserFolderViews(ws.Folders, "console"))
-                {
-                    var folder = ResolveLibraryBrowserAchievementLookupFolder(view);
-                    if (!GameAchievementsFetchService.TryPickAchievementsBackend(NormalizeConsoleLabel(folder?.PlatformLabel), folder, out var steam)) continue;
-                    var id = steam ? folder.SteamAppId : folder.RetroAchievementsGameId;
-                    if (!int.TryParse(id, out var numeric) || numeric <= 0) continue;
-                    built.Add(new AchievementHubGame
-                    {
-                        Provider = steam ? "steam" : "retroachievements", Id = numeric.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                        Title = view.Name, Folder = folder, ArtPath = GetLibraryArtPathForDisplayOnly(BuildLibraryBrowserDisplayFolder(view))
-                    });
-                }
-                games = built.GroupBy(g => g.Key).Select(g => g.First()).ToList();
+                games = BuildTrackerLibraryGames(ws);
                 gamesStamp = stamp;
                 gamesAge.Restart();
                 return games;
@@ -89,16 +75,13 @@ namespace PixelVaultNative
                 RetroAccount = CurrentRetroAchievementsUsername(), RetroKey = CurrentRetroAchievementsApiKey(),
                 Games = new List<AchievementHubGame>(Games())
             };
-            FrameworkElement Cover(AchievementHubGame game, double width, double height) => CreateAsyncImageTile(game.ArtPath,
-                (int)Math.Ceiling(width * 2.5), width, height,
-                Stretch.UniformToFill, game.Title, Brushes.White, new Thickness(0), new Thickness(0),
-                Brushes.Transparent, new CornerRadius(8), Brushes.Transparent, new Thickness(0));
+            FrameworkElement Cover(AchievementHubGame game, double width, double height) => TrackerGameCover(game,width,height);
             void Open(Window hub, AchievementHubGame game) => AchievementsInfoWindow.ShowModal(hub,
                 game.Provider == "steam" ? "Steam" : "Emulation", game.Folder, CurrentSteamWebApiKey(),
                 CurrentRetroAchievementsApiKey(), CurrentSteamUserId64(), CurrentRetroAchievementsUsername(),
-                "PixelVault/" + AppVersion, achievementGuideService);
+                "PixelVault/" + AppVersion, achievementGuideService, trackingStore: achievementTrackingStore);
             _achievementHubPins ??= new AchievementHubPins(Path.Combine(dataRoot, "achievement-hub-pins.json"));
-            AchievementHubWindow.ShowFor(owner, new AchievementHubService(_achievementHubStore), Session, Cover, Open, _achievementHubPins, achievementGuideService);
+            AchievementHubWindow.ShowFor(owner, new AchievementHubService(_achievementHubStore, guides: achievementGuideService), Session, Cover, Open, _achievementHubPins, achievementGuideService, achievementTrackingStore);
         }
     }
 }

@@ -191,6 +191,7 @@ namespace PixelVaultNative
             h.UseCustomTimeBox = new CheckBox { Content = "Use custom date/time", Foreground = Brush("#1F2A30"), Margin = new Thickness(0, 0, 0, 8), IsThreeState = true };
             var dateRow = new WrapPanel { Margin = new Thickness(0, 0, 0, 14) };
             h.CaptureDatePicker = new DatePicker { Width = 170 };
+            DatePickerChrome.Apply(h.CaptureDatePicker, "Capture date");
             h.HourBox = new ComboBox { Width = 68, Margin = new Thickness(12, 0, 0, 0) };
             for (int hour = 1; hour <= 12; hour++) h.HourBox.Items.Add(hour.ToString());
             h.MinuteBox = new ComboBox { Width = 72, Margin = new Thickness(8, 0, 0, 0) };

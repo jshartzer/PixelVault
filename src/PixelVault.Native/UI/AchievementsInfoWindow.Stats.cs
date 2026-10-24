@@ -13,6 +13,7 @@ namespace PixelVaultNative
     sealed partial class AchievementsInfoWindow
     {
         readonly ComboBox _sort = new ComboBox { Width = 290, MinHeight = 30, VerticalContentAlignment = VerticalAlignment.Center };
+        readonly ComboBox _missableFilter = new ComboBox { Width = 170, MinHeight = 30, VerticalContentAlignment = VerticalAlignment.Center };
         readonly Expander _progressDetails = new Expander
         {
             Header = "Progress details", Foreground = Brushes.White, Margin = new Thickness(8, 8, 8, 4),
@@ -68,11 +69,22 @@ namespace PixelVaultNative
             var tools = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 8, 0, 0) };
             tools.Children.Add(new TextBlock { Text = "Sort", Foreground = UiBrushHelper.FromHex("#9CB1BC"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) });
             tools.Children.Add(_sort);
+            foreach (var label in new[] { "All achievements", "Missable only", "Not marked missable" }) _missableFilter.Items.Add(label);
+            _missableFilter.SelectedIndex = 0;
+            AutomationProperties.SetName(_missableFilter, "Filter by missable status");
+            AccessibilityUi.TryApplyFocusVisualStyle(_missableFilter);
+            _missableFilter.SelectionChanged += delegate
+            {
+                if (_loadedResult != null) RenderAchievementRows(_loadedResult.Rows, _userAgent, _loadedResult.SourceLabel);
+            };
+            tools.Children.Add(new TextBlock { Text = "Missable", Foreground = UiBrushHelper.FromHex("#9CB1BC"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(14, 0, 8, 0) });
+            tools.Children.Add(_missableFilter);
             return tools;
         }
 
         List<GameAchievementsFetchService.AchievementRow> VisibleSortedRows(IEnumerable<GameAchievementsFetchService.AchievementRow> rows) =>
-            AchievementCollectionStats.Sort(FilterAchievementRows(rows, _remainingOnly.IsChecked == true), SelectedSort, DateTime.UtcNow.Ticks);
+            AchievementCollectionStats.Sort(FilterAchievementRows(rows, _remainingOnly.IsChecked == true)
+                .Where(row => AchievementHubCollection.MatchesMissable(row, (AchievementMissableFilter)System.Math.Max(0, _missableFilter.SelectedIndex))), SelectedSort, DateTime.UtcNow.Ticks);
 
         List<AchievementGridSection> VisibleSections(List<GameAchievementsFetchService.AchievementRow> rows) =>
             SelectedSort == AchievementCollectionSort.Provider ? BuildAchievementGridSections(rows)

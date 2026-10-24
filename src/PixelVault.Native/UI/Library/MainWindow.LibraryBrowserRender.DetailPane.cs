@@ -29,6 +29,16 @@ namespace PixelVaultNative
             var renderStopwatch = Stopwatch.StartNew();
             var renderVersion = ++ws.DetailRenderSequence;
             var detailRenderCancellationToken = ws.DetailRenderCancellation.BeginRender(renderVersion);
+            var captureGroupGame = CaptureGroupGameId(ws.Current);
+            CaptureGroupStore.CaptureGroupSnapshot captureGroupSnapshot = null;
+            var robloxGroups = IsRobloxCaptureGroupGame(ws.Current);
+            if (!string.IsNullOrWhiteSpace(captureGroupGame) && !string.IsNullOrWhiteSpace(libraryRoot))
+            {
+                try { captureGroupSnapshot = CaptureGroups.Load(libraryRoot, captureGroupGame); }
+                catch (Exception ex) { LogException("LoadCaptureGroups", ex); }
+            }
+            var showCaptureGroups = captureGroupSnapshot != null && (captureGroupSnapshot.Grouped ?? robloxGroups);
+            RefreshCaptureGroupToggle(ws, showCaptureGroups, captureGroupSnapshot != null);
             if (ws.Current != null && panes?.ThumbScroll != null && !ws.PreserveDetailScrollOnNextRender)
             {
                 var liveDetailScroll = panes.ThumbScroll.VerticalOffset;
@@ -198,7 +208,8 @@ namespace PixelVaultNative
                         refreshDetailSelectionUi,
                         redrawSelectedFolderDetail,
                         renderFolderTiles,
-                        timelineAchievements: projection?.Achievements);
+                        timelineAchievements: projection?.Achievements,
+                        namedCaptureGroups: showCaptureGroups);
                 };
 
                 Action<LibraryDetailRenderSnapshot, bool, List<VirtualizedRowDefinition>> applyDetailSnapshot = null;
@@ -536,6 +547,12 @@ namespace PixelVaultNative
                                     Files = dayFilesOrdered
                                 });
                             }
+                        }
+
+                        if (showCaptureGroups)
+                        {
+                            snapshot.Groups = captureGroupSnapshot.Project(snapshot.VisibleFiles, robloxGroups);
+                            snapshot.VisibleFiles = snapshot.Groups.SelectMany(group => group.Files).ToList();
                         }
 
                         var tailMs = segmentSw.ElapsedMilliseconds;
@@ -943,18 +960,57 @@ namespace PixelVaultNative
             Action redrawSelectedFolderDetail,
             Action renderFolderTiles,
             Action<string> openCaptureViewerOverride = null,
-            IReadOnlyDictionary<string, LibraryTimelineAchievement> timelineAchievements = null)
+            IReadOnlyDictionary<string, LibraryTimelineAchievement> timelineAchievements = null,
+            bool namedCaptureGroups = false,
+            double initialDocumentTop = 0d,
+            bool showCaptureDateLabels = true)
         {
             var safeGroups = (groups ?? new List<LibraryDetailRenderGroup>())
                 .Where(group => group != null && (group.Files ?? new List<string>()).Count > 0)
                 .ToList();
             if (safeGroups.Count == 0) return new List<VirtualizedRowDefinition>();
 
+            if (namedCaptureGroups)
+            {
+                var namedRows = new List<VirtualizedRowDefinition>();
+                var documentTop = initialDocumentTop;
+                foreach (var group in safeGroups)
+                {
+                    var title = group.HeaderText;
+                    var count = group.Files.Count;
+                    namedRows.Add(new VirtualizedRowDefinition
+                    {
+                        Height = 52,
+                        Build = () => new Border
+                        {
+                            Height = 52, Padding = new Thickness(4, 16, 4, 10),
+                            Child = new TextBlock
+                            {
+                                Text = title + "  ·  " + count,
+                                ToolTip = title,
+                                TextTrimming = TextTrimming.CharacterEllipsis,
+                                FontSize = 16, FontWeight = FontWeights.SemiBold,
+                                Foreground = SystemParameters.HighContrast ? SystemColors.WindowTextBrush : Brush("#D7E2EA")
+                            }
+                        }
+                    });
+                    documentTop += 52;
+                    var photoRows = BuildLibraryContinuousMosaicRowDefinitions(ws, renderFolder, new[] { group },
+                        timelineContexts, mediaLayoutByFile, detailScroll, viewportWidth, detailTileSize, dpiScale,
+                        timelineView, openSingleFileMetadataEditor, updateDetailSelection, refreshDetailSelectionUi,
+                        redrawSelectedFolderDetail, renderFolderTiles, openCaptureViewerOverride,
+                        initialDocumentTop: documentTop, showCaptureDateLabels: false);
+                    namedRows.AddRange(photoRows);
+                    documentTop += photoRows.Sum(row => row.Height);
+                }
+                return namedRows;
+            }
+
             const int masonryTileGap = 4;
             const int rowGap = 8;
             var availableWidth = viewportWidth <= 0d ? 1100d : Math.Max(320d, viewportWidth - 6d);
             var rowDefinitions = new List<VirtualizedRowDefinition>();
-            var nextRowDocumentTop = 0d;
+            var nextRowDocumentTop = initialDocumentTop;
             var orderedFiles = new List<string>();
             foreach (var group in safeGroups)
             {
@@ -978,8 +1034,11 @@ namespace PixelVaultNative
                 minTileWidth,
                 maxTileWidth,
                 timelineView,
-                mediaLayoutByFile);
-            var captureDateLabels = BuildLibraryCaptureDateLabelMapForPlacements(safeGroups, chunks, DateTime.Today);
+                mediaLayoutByFile,
+                preserveCellDensity: !showCaptureDateLabels);
+            var captureDateLabels = showCaptureDateLabels
+                ? BuildLibraryCaptureDateLabelMapForPlacements(safeGroups, chunks, DateTime.Today)
+                : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
             for (var chunkIndex = 0; chunkIndex < chunks.Count; chunkIndex++)
             {
@@ -1055,6 +1114,7 @@ namespace PixelVaultNative
                                 captureDateLabel,
                                 openCaptureViewerOverride ?? (path => OpenLibraryCaptureViewer(this, ws, path)),
                                 timelineView);
+                            if (!timelineView) AttachCaptureGroupMenu(tile, ws, renderFolder, placement.File, redrawSelectedFolderDetail);
                             Canvas.SetLeft(tile, placement.X);
                             Canvas.SetTop(tile, placement.Y);
                             canvas.Children.Add(tile);

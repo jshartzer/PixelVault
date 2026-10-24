@@ -102,7 +102,7 @@ namespace PixelVaultNative
                 label.Children.Add(new TextBlock { Text = entry.Title, TextTrimming = TextTrimming.CharacterEllipsis, FontWeight = FontWeights.SemiBold });
                 if (live == null || !live.ProgressKnown)
                     label.Children.Add(new TextBlock { Text = "Progress unavailable", FontSize = 10, Foreground = UiBrushHelper.FromHex("#9CB1BC") });
-                var tags = AchievementGuideWindow.GuideReadTags(entry.Tags, entry.IsMissable);
+                var tags = AchievementGuideWindow.GuideReadTags(entry.Tags, entry.IsMissable, row.Unlocked);
                 if (tags.Count > 0)
                 {
                     var chip = AchievementCollectionUi.TagChip(tags[0]);

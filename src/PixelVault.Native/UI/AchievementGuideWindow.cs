@@ -946,7 +946,7 @@ namespace PixelVaultNative
             _edit.Content = hasGuide ? "Edit Guide" : "Add Guide";
             AutomationProperties.SetName(_edit, hasGuide ? "Edit achievement guide" : "Add achievement guide");
             _readTags.Children.Clear();
-            foreach (var tag in GuideReadTags(entry.Tags, entry.IsMissable))
+            foreach (var tag in GuideReadTags(entry.Tags, entry.IsMissable, _current?.LiveRow?.Unlocked == true))
             {
                 _readTags.Children.Add(AchievementCollectionUi.TagChip(tag));
             }
@@ -964,11 +964,12 @@ namespace PixelVaultNative
             AchievementCollectionUi.ApplyHighContrast(this);
         }
 
-        internal static List<string> GuideReadTags(string tags, bool missable)
+        internal static List<string> GuideReadTags(string tags, bool missable, bool unlocked = false)
         {
             var values = (tags ?? string.Empty).Split(',').Select(tag => tag.Trim())
-                .Where(tag => tag.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-            if (missable && !values.Contains("missable", StringComparer.OrdinalIgnoreCase)) values.Add("Missable");
+                .Where(tag => tag.Length > 0 && (!unlocked || !string.Equals(tag, "missable", StringComparison.OrdinalIgnoreCase)))
+                .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            if (missable && !unlocked && !values.Contains("missable", StringComparer.OrdinalIgnoreCase)) values.Add("Missable");
             return values;
         }
 

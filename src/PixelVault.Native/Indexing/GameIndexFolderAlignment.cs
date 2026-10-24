@@ -157,6 +157,7 @@ namespace PixelVaultNative
                         if (File.Exists(targetPath)) targetPath = Unique(targetPath);
                         File.Move(sourcePath, targetPath);
                         MoveMetadataSidecarIfPresent(sourcePath, targetPath);
+                        MoveCaptureGroupFile(root, sourcePath, targetPath);
                         affectedFiles.Add(sourcePath);
                         affectedFiles.Add(targetPath);
                         Log("Game index folder align: " + sourcePath + " -> " + targetPath);

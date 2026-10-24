@@ -26,6 +26,7 @@ namespace PixelVaultNative
             internal Button GroupSessionsButton;
             internal Button OpenCapturesButton;
             internal Button SortFilterMenuButton;
+            internal Button TrackersButton;
             internal VirtualizedRowHost TileRows;
             internal ScrollViewer TileScroll;
             internal TextBlock ThumbLabel;
@@ -58,6 +59,7 @@ namespace PixelVaultNative
             internal Button CaptureFilterAllButton;
             internal Button CaptureFilterScreenshotsButton;
             internal Button CaptureFilterClipsButton;
+            internal CheckBox CaptureGroupsToggle;
             internal Button FolderColumnDecreaseButton;
             internal Button FolderCoverLayoutButton;
             internal Button FolderColumnIncreaseButton;
@@ -171,6 +173,7 @@ namespace PixelVaultNative
             panes.SortFilterMenuButton.ToolTip = "Sort order and visibility filter";
             ApplyLibraryPillChrome(panes.SortFilterMenuButton, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
             browserToolbar.Children.Add(panes.SortFilterMenuButton);
+            AddLibraryTrackerButton(browserToolbar,panes);
             panes.GroupAllButton = Btn("All", null, "#20343A", Brushes.White);
             panes.GroupAllButton.Width = 58;
             panes.GroupAllButton.Height = 32;
@@ -642,18 +645,9 @@ namespace PixelVaultNative
                 Orientation = Orientation.Horizontal,
                 VerticalAlignment = VerticalAlignment.Center,
                 HorizontalAlignment = HorizontalAlignment.Right,
-                Margin = new Thickness(0, 0, 12, 0),
+                Margin = new Thickness(12, 0, 0, 4),
                 Visibility = Visibility.Collapsed
             };
-            panes.TimelineFilterPanel.Children.Add(new TextBlock
-            {
-                Text = "Range",
-                Foreground = Brush("#8FA4B0"),
-                FontSize = 11.5,
-                FontWeight = FontWeights.SemiBold,
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 10, 0)
-            });
             panes.TimelinePresetTodayButton = Btn("Today", null, "#20343A", Brushes.White);
             panes.TimelinePresetTodayButton.Width = 62;
             panes.TimelinePresetTodayButton.Height = 30;
@@ -680,12 +674,9 @@ namespace PixelVaultNative
                 Width = 126,
                 Height = 30,
                 Margin = new Thickness(0, 0, 6, 0),
-                SelectedDateFormat = DatePickerFormat.Short,
-                Background = Brush("#182129"),
-                Foreground = Brush("#F1E9DA"),
-                BorderBrush = Brush("#2D3A43"),
-                BorderThickness = new Thickness(1)
+                SelectedDateFormat = DatePickerFormat.Short
             };
+            DatePickerChrome.Apply(panes.TimelineStartDatePicker, "Timeline start date");
             panes.TimelineFilterPanel.Children.Add(panes.TimelineStartDatePicker);
             panes.TimelineFilterPanel.Children.Add(new TextBlock
             {
@@ -700,12 +691,9 @@ namespace PixelVaultNative
                 Width = 126,
                 Height = 30,
                 Margin = new Thickness(0),
-                SelectedDateFormat = DatePickerFormat.Short,
-                Background = Brush("#182129"),
-                Foreground = Brush("#F1E9DA"),
-                BorderBrush = Brush("#2D3A43"),
-                BorderThickness = new Thickness(1)
+                SelectedDateFormat = DatePickerFormat.Short
             };
+            DatePickerChrome.Apply(panes.TimelineEndDatePicker, "Timeline end date");
             panes.TimelineFilterPanel.Children.Add(panes.TimelineEndDatePicker);
             panes.SessionsFilterPanel = new WrapPanel
             {
@@ -805,6 +793,16 @@ namespace PixelVaultNative
             filters.Children.Add(panes.CaptureFilterAllButton);
             filters.Children.Add(panes.CaptureFilterScreenshotsButton);
             filters.Children.Add(panes.CaptureFilterClipsButton);
+            panes.CaptureGroupsToggle = new CheckBox
+            {
+                Content = "Group photos", VerticalAlignment = VerticalAlignment.Center,
+                Foreground = SystemParameters.HighContrast ? SystemColors.WindowTextBrush : UiBrushHelper.FromHex("#D7E2EA"),
+                Margin = new Thickness(8, 0, 16, 4), Visibility = Visibility.Collapsed,
+                ToolTip = "Show named groups. Turn off to see all photos together."
+            };
+            AutomationProperties.SetName(panes.CaptureGroupsToggle, "Group photos");
+            AccessibilityUi.TryApplyFocusVisualStyle(panes.CaptureGroupsToggle);
+            filters.Children.Add(panes.CaptureGroupsToggle);
             panes.TimelineAchievementsToggle = new CheckBox
             {
                 Content = "Show achievements", IsChecked = true, VerticalAlignment = VerticalAlignment.Center,
@@ -823,7 +821,17 @@ namespace PixelVaultNative
                 Visibility = Visibility.Collapsed
             };
             filters.Children.Add(panes.ThumbLabel);
-            if (panes.TimelineFilterPanel != null) filters.Children.Add(panes.TimelineFilterPanel);
+            if (panes.TimelineFilterPanel != null)
+            {
+                DockPanel.SetDock(panes.TimelineFilterPanel, Dock.Right);
+                controls.Children.Add(panes.TimelineFilterPanel);
+                // Let the range wrap beside Delete while keeping room for the capture filters.
+                controls.SizeChanged += delegate
+                {
+                    var remainingWidth = Math.Max(0, controls.ActualWidth - panes.DeleteSelectedButton.ActualWidth - panes.DeleteSelectedButton.Margin.Left);
+                    panes.TimelineFilterPanel.MaxWidth = Math.Max(126, remainingWidth * 0.65);
+                };
+            }
             if (panes.SessionsFilterPanel != null) filters.Children.Add(panes.SessionsFilterPanel);
             controls.Children.Add(filters);
             return controls;

@@ -1,0 +1,11 @@
+# Death Stranding facility connection research
+
+October 23, 2026: the user reports reaching connection level 4 with the Chiral Artist. Stable private copies were captured while the game remained running; no game-save writes were made.
+
+The installed `ds/location/area02/206/206_delivery_point.core` resolves to **Chiral Artist's Studio**, with household UUID `050bcb50-57c0-f642-8aef-04b9e2c3cd13` and household NameHash `1281133012`. Its `DSHouseholdInfoResource` supplies initial friendship/level, five level thresholds and a level-cap fact. The extraction enumerates 75 delivery-point resources, including camps, aliases and non-achievement locations; it is **not** a validated achievement facility catalogue.
+
+In the compact household candidate region, the unique encoded household hash is followed by a variable-width value and a level-like byte. Manualsave22 records candidate values 368/2; manualsave0 and the later autosave0 record 740/4. The latter matches the user's reported level 4. These are raw candidate fields with a positive control, not a fully validated score/level decoder. In particular, resource thresholds must not be used alone to manufacture displayed levels; the earlier 368/2 values need their cap/pending-level semantics resolved.
+
+Private evidence is organized under `C:\GameDataExtractor\Backup Data\Death Stranding Director's Cut\Analysis\Validation\ll-facility-20261024T0114260539961Z\ll-facility-calibration.json`. Installed reference exports are under `Reference\FacilityResearch-2026-10-23`; the read-only extractor is `C:\GameDataExtractor\Tools\CatalogueExtractor\FacilityResearch.java`. Accounts, saves and raw exports stay outside source history/releases.
+
+Next: validate complete household table boundaries, field types, caps/pending-level transitions, duplicate delivery-point aliases and the player-facing facility catalogue. A future connection tracker can use the existing generic count/target mechanism and stable household identity; it does not need a separate game-specific form. No facility definition/progress was added and no automatic facility reader was enabled in this research pass. Memory-chip restoration still needs an independent control; the old hash-occurrence probe fails on an ambiguous or absent chip hash in this capture and supplies no chip observations.

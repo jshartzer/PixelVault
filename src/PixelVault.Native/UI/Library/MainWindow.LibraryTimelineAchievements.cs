@@ -229,12 +229,13 @@ namespace PixelVaultNative
             if (ws?.IsActive != true || !ws.ShowTimelineAchievements || !IsLibraryBrowserTimelineView(ws.Current)) return;
             var account = entry.Game.Provider == "steam" ? CurrentSteamUserId64() : CurrentRetroAchievementsUsername();
             if (AchievementHubStore.AccountKey(account) != AchievementHubStore.AccountKey(entry.Account)) return;
-            var detail = new AchievementDetailWindow(this, entry.Game, entry.Row, entry.GameRows, entry.SavedUtc, achievementGuideService, null, null);
+            var detail = new AchievementDetailWindow(this, entry.Game, entry.Row, entry.GameRows, entry.SavedUtc, achievementGuideService, null, null,
+                achievementTrackingStore, entry.Game.Provider == "steam" ? CurrentSteamUserId64() : CurrentRetroAchievementsUsername());
             detail.ShowDialog();
             if (detail.OpenGameRequested)
                 AchievementsInfoWindow.ShowModal(this, entry.Game.Provider == "steam" ? "Steam" : "Emulation", entry.Game.Folder,
                     CurrentSteamWebApiKey(), CurrentRetroAchievementsApiKey(), CurrentSteamUserId64(), CurrentRetroAchievementsUsername(),
-                    "PixelVault/" + AppVersion, achievementGuideService);
+                    "PixelVault/" + AppVersion, achievementGuideService, trackingStore: achievementTrackingStore);
         }
     }
 }

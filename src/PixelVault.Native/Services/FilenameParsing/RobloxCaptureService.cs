@@ -23,6 +23,13 @@ namespace PixelVaultNative
         internal static bool IsCapture(FilenameParseResult parsed) => parsed != null
             && (parsed.ConventionId == RawConvention || parsed.ConventionId == NamedConvention);
 
+        internal static string GetExperienceName(string file)
+        {
+            var match = Regex.Match(Path.GetFileName(file ?? string.Empty), NamedPattern,
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100));
+            return match.Success ? match.Groups["title"].Value.Trim() : string.Empty;
+        }
+
         internal static bool TryBuildRenameBase(string file, string title, out string renamed)
         {
             renamed = null;

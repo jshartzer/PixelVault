@@ -50,11 +50,61 @@
     <Compile Include="Services\Library\ILibraryScanHost.cs" />
     <Compile Include="Services\Library\ILibraryScanner.cs" />
     <Compile Include="Services\Library\LibraryScanner.cs" />
+    <Compile Include="Services\Library\CaptureGroupStore.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryCaptureGroups.cs" />
     <Compile Include="Services\Library\LibraryPlacementService.cs" />
     <Compile Include="Services\Library\LibraryStorageMergeModels.cs" />
     <Compile Include="Services\Library\LibraryStorageMergePlanner.cs" />
     <Compile Include="Services\Achievements\GameAchievementsFetchService.cs" />
     <Compile Include="Services\Achievements\AchievementGuideService.cs" />
+    <Compile Include="Services\Achievements\AchievementTracking.cs" />
+    <Compile Include="Services\Achievements\TrackerSpreadsheetProgress.cs" />
+    <Compile Include="Services\Achievements\TrackerMilestones.cs" />
+    <Compile Include="Services\Achievements\TrackerDashboard.cs" />
+    <Compile Include="UI\TrackerDashboardWindow.cs" />
+    <Compile Include="UI\TrackerGameWindow.cs" />
+    <Compile Include="UI\TrackerNavigation.cs" />
+    <Compile Include="UI\Library\MainWindow.TrackerDashboard.cs" />
+    <Compile Include="UI\TrackerMilestoneEditor.cs" />
+    <Compile Include="UI\TrackerFormStyle.cs" />
+    <Compile Include="Services\Achievements\TrackerDefinitionTransfer.cs" />
+    <Compile Include="Services\Achievements\TrackerCatalogueReconcile.cs" />
+    <Compile Include="Services\Achievements\AchievementTrackingCatalogue.cs" />
+    <Compile Include="UI\TrackerCatalogueWindow.cs" />
+    <Compile Include="UI\AchievementTrackerWindow.Catalogue.cs" />
+    <Compile Include="UI\TrackerDefinitionImportWindow.cs" />
+    <Compile Include="UI\AchievementTrackerWindow.DefinitionImport.cs" />
+    <Compile Include="Services\Achievements\AchievementTrackingSpreadsheet.cs" />
+    <Compile Include="Services\Achievements\DeathStrandingWorldReader.cs" />
+    <Compile Include="Services\Achievements\DeathStrandingOrderReader.cs" />
+    <Compile Include="Services\Achievements\DeathStrandingChipReader.cs" />
+    <EmbeddedResource Include="Services\Achievements\TrackingData\DeathStrandingCollectors.json" LogicalName="PixelVault.Tracking.DeathStrandingCollectors.json" />
+    <Compile Include="Services\Achievements\AchievementTrackingStore.cs" />
+    <Compile Include="Services\Achievements\AchievementTrackingHistory.cs" />
+    <Compile Include="Services\Achievements\TrackerRefresh.cs" />
+    <Compile Include="Services\Achievements\TrackerAutomation.cs" />
+    <Compile Include="UI\TrackerAutomationWindow.cs" />
+    <Compile Include="UI\AchievementTrackerWindow.Automation.cs" />
+    <Compile Include="MainWindow.TrackerAutomation.cs" />
+    <Compile Include="Services\Achievements\DeathStrandingTrackerSource.cs" />
+    <Compile Include="Services\Achievements\DeathStrandingSaveReader.cs" />
+    <Compile Include="Services\Achievements\DeathStrandingSaveWorker.cs" />
+    <Compile Include="Services\Achievements\TrackerSpreadsheetImport.cs" />
+    <Compile Include="UI\TrackerAchievementPicker.cs" />
+    <Compile Include="UI\TrackerSpreadsheetForm.cs" />
+    <EmbeddedResource Include="Services\Achievements\TrackingData\DeathStrandingBuildables.json" LogicalName="PixelVault.Tracking.DeathStranding.json" />
+    <EmbeddedResource Include="Services\Achievements\TrackingData\DeathStrandingCatalogueKeys.json" LogicalName="PixelVault.Tracking.DeathStrandingKeys.json" />
+    <EmbeddedResource Include="Services\Achievements\TrackingData\DeathStrandingWorldTrackers.json" LogicalName="PixelVault.Tracking.DeathStrandingWorld.json" />
+    <EmbeddedResource Include="Services\Achievements\TrackingData\DeathStrandingOrders.json" LogicalName="PixelVault.Tracking.DeathStrandingOrders.json" />
+    <EmbeddedResource Include="Services\Achievements\TrackingData\DeathStrandingFacts.json" LogicalName="PixelVault.Tracking.DeathStrandingFacts.json" />
+    <Compile Include="UI\AchievementTrackerWindow.cs" />
+    <Compile Include="UI\AchievementTrackerWindow.Refresh.cs" />
+    <Compile Include="UI\TrackerReconcileWindow.cs" />
+    <Compile Include="UI\TrackerSourceWindow.cs" />
+    <Compile Include="UI\TrackerHistoryWindow.cs" />
+    <Compile Include="UI\AchievementTrackerEditWindow.cs" />
+    <Compile Include="UI\AchievementsInfoWindow.Tracking.cs" />
+    <Compile Include="UI\AchievementHubWindow.Tracking.cs" />
     <Compile Include="Services\Achievements\AchievementGuidePins.cs" />
     <Compile Include="Services\Achievements\AchievementCollectionStats.cs" />
     <Compile Include="Services\Achievements\AchievementScoring.cs" />
@@ -128,6 +178,7 @@
     <Compile Include="UI\Intake\MainWindow.ManualMetadata.Finish.cs" />
     <Compile Include="UI\AccessibilityUi.cs" />
     <Compile Include="UI\UiBrushHelper.cs" />
+    <Compile Include="UI\DatePickerChrome.cs" />
     <Compile Include="UI\Design\DesignTokens.cs" />
     <Compile Include="UI\Diagnostics\HealthDashboardWindow.cs" />
     <Compile Include="UI\Progress\WorkflowProgressCoalescer.cs" />

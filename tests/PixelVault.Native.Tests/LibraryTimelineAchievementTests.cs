@@ -139,7 +139,7 @@ public sealed class LibraryTimelineAchievementTests
         var method = typeof(MainWindow).GetMethod("BuildLibraryContinuousMosaicRowDefinitions", BindingFlags.Instance | BindingFlags.NonPublic)!;
         var rows = (List<MainWindow.VirtualizedRowDefinition>)method.Invoke(host, new object?[]
         { null, null, mosaic.Groups, snapshot.TimelineContextByFile, mosaic.Media, null, 1000d, 220, 1d, true,
-            null, null, null, null, null, null, mosaic.Achievements })!;
+            null, null, null, null, null, null, mosaic.Achievements, false, 0d, true })!;
         Assert.Equal(new[] { "photo.png" }, rows.SelectMany(r => r.Files));
     }
 

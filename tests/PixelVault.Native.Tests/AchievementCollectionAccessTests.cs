@@ -60,6 +60,42 @@ public sealed class AchievementCollectionAccessTests
     }
 
     [Fact]
+    public void MissableFilter_WorksInGameGridAndListAlongsideRemainingOnly()
+    {
+        OnSta(() =>
+        {
+            var locked = Row("locked", true, false); locked.IsMissable = true;
+            var earned = Row("earned", true, true); earned.IsMissable = true;
+            var unmarked = Row("unmarked", true, false);
+            var window = CreateWindow(() => Task.FromResult(Result(locked, earned, unmarked)));
+            try
+            {
+                Refresh(window);
+                var filter = Field<ComboBox>(window, "_missableFilter");
+                filter.SelectedIndex = 1;
+                var grid = Field<StackPanel>(window, "_gridContent");
+                var cards = grid.Children.OfType<WrapPanel>().SelectMany(p => p.Children.OfType<Border>()).ToList();
+                Assert.Equal(2, cards.Count);
+                var marked = cards.Single(b => b.Tag == locked);
+                ((FrameworkElement)window.Content).Measure(new Size(636, 760));
+                ((FrameworkElement)window.Content).Arrange(new Rect(0, 0, 636, 760));
+                var label = ((Grid)marked.Child).Children.OfType<StackPanel>().Single().Children.OfType<TextBlock>().Single(t => t.Text == "Missable");
+                var position = label.TranslatePoint(new Point(), marked);
+                Assert.True(label.ActualHeight > 0);
+                Assert.True(position.Y + label.ActualHeight <= marked.ActualHeight);
+                var remaining = Field<CheckBox>(window, "_remainingOnly");
+                remaining.IsChecked = true;
+                remaining.RaiseEvent(new RoutedEventArgs(CheckBox.ClickEvent));
+                Assert.Single(grid.Children.OfType<WrapPanel>().SelectMany(p => p.Children.OfType<Border>()));
+                Field<Button>(window, "_listView").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                Assert.Same(locked, Assert.Single(Field<ListBox>(window, "_list").Items.OfType<Border>(), b => b.Tag is GameAchievementsFetchService.AchievementRow).Tag);
+                Assert.Contains("1 of 3", Field<TextBlock>(window, "_earnedSummary").Text);
+            }
+            finally { window.Close(); }
+        });
+    }
+
+    [Fact]
     public void RefreshCommand_PreservesFilterViewGroupsAndFailedUpdateTimestamp()
     {
         OnSta(() =>

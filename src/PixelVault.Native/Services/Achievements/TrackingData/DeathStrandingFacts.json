@@ -1,0 +1,158 @@
+[
+  {
+    "Id": "0c634809-78a6-b44d-a2c3-b5fb778ccff3",
+    "Name": "ldfp_lvmax_zip_line",
+    "Persistent": true,
+    "Default": false
+  },
+  {
+    "Id": "2d8d9e1e-f2ee-5346-a471-9757d758f0d7",
+    "Name": "ldfp_builded_post",
+    "Persistent": true,
+    "Default": false
+  },
+  {
+    "Id": "61cd7030-1578-5243-99e4-5e201028a70b",
+    "Name": "ldfp_lvmax_crl_bridge",
+    "Persistent": true,
+    "Default": false
+  },
+  {
+    "Id": "56770342-1076-7e44-8646-8fce98fa3c26",
+    "Name": "ldfp_builded_road",
+    "Persistent": true,
+    "Default": false
+  },
+  {
+    "Id": "d7514447-afc6-d745-b11d-eaa25f1fa2c0",
+    "Name": "ldfp_builded_zip_line",
+    "Persistent": true,
+    "Default": false
+  },
+  {
+    "Id": "142fb84f-1b75-7e4a-ac45-d22002072a14",
+    "Name": "ldfp_lvmax_safety_house",
+    "Persistent": true,
+    "Default": false
+  },
+  {
+    "Id": "151db658-6b75-fb4b-b0d0-f23123c27027",
+    "Name": "ldfp_lvmax_charger",
+    "Persistent": true,
+    "Default": false
+  },
+  {
+    "Id": "56c6a959-9752-bc4c-a0dc-92d657f78598",
+    "Name": "ldfp_lvmax_bridge",
+    "Persistent": true,
+    "Default": false
+  },
+  {
+    "Id": "4f8fdb5b-ae7e-e843-81c4-57ef5aa7ed4f",
+    "Name": "ldfp_builded_safety_house",
+    "Persistent": true,
+    "Default": false
+  },
+  {
+    "Id": "963be55e-b7e9-9c47-bd26-eba6fb9ec66f",
+    "Name": "ldfp_builded_rain_shelter",
+    "Persistent": true,
+    "Default": false
+  },
+  {
+    "Id": "162a1261-0e8d-9645-ac82-ee54b97090f5",
+    "Name": "ldfp_builded_jump",
+    "Persistent": true,
+    "Default": false
+  },
+  {
+    "Id": "0df47c61-abab-e64c-bc01-07d9f55f34b1",
+    "Name": "ldfp_lvmax_watch_tower",
+    "Persistent": true,
+    "Default": false
+  },
+  {
+    "Id": "e97cb274-da42-c94b-a1b4-5f60b896b4e7",
+    "Name": "ldfp_builded_sample",
+    "Persistent": true,
+    "Default": false
+  },
+  {
+    "Id": "61d72677-805e-5a43-9530-ebf89fc7eca7",
+    "Name": "ldfp_builded_catapult",
+    "Persistent": true,
+    "Default": false
+  },
+  {
+    "Id": "42e17b7a-b1e6-3342-8fec-39d735320bda",
+    "Name": "ldfp_lvmax_catapult",
+    "Persistent": true,
+    "Default": false
+  },
+  {
+    "Id": "4490887a-097c-b641-84da-57a0dd7a021f",
+    "Name": "ldfp_builded_bridge",
+    "Persistent": true,
+    "Default": false
+  },
+  {
+    "Id": "bf638a7d-5fe0-8942-b154-44d83254690e",
+    "Name": "ldfp_builded_field_rope",
+    "Persistent": true,
+    "Default": false
+  },
+  {
+    "Id": "ee6f159c-56d1-ca4c-8f70-0b1ae66a7f3f",
+    "Name": "ldfp_builded_watch_tower",
+    "Persistent": true,
+    "Default": false
+  },
+  {
+    "Id": "f6c053ab-e3fa-734b-8d88-465fd23442a4",
+    "Name": "ldfp_builded_signboard",
+    "Persistent": true,
+    "Default": false
+  },
+  {
+    "Id": "138099b2-ea49-fc4f-b590-e6abd1a26775",
+    "Name": "ldfp_builded_crl_bridge",
+    "Persistent": true,
+    "Default": false
+  },
+  {
+    "Id": "3f8e3cba-6889-724f-a328-8fdd679de5df",
+    "Name": "ldfp_lvmax_rain_shelter",
+    "Persistent": true,
+    "Default": false
+  },
+  {
+    "Id": "eb9a18c8-856e-5a46-ac54-3d9aeb918b43",
+    "Name": "ldfp_lvmax_jump",
+    "Persistent": true,
+    "Default": false
+  },
+  {
+    "Id": "073007d5-4f4c-ab4f-a282-2806b61a7279",
+    "Name": "ldfp_builded_charger",
+    "Persistent": true,
+    "Default": false
+  },
+  {
+    "Id": "839222e7-bee3-494e-9483-e7de235acf16",
+    "Name": "ldfp_builded_ladder",
+    "Persistent": true,
+    "Default": false
+  },
+  {
+    "Id": "a3f2c2f0-63c9-2544-958a-f719e59b78f3",
+    "Name": "ldfp_lvmax_post",
+    "Persistent": true,
+    "Default": false
+  },
+  {
+    "Id": "52e2ceff-af4c-4643-bd41-41a49ad677be",
+    "Name": "ldfp_lvmax_sample",
+    "Persistent": true,
+    "Default": false
+  }
+]

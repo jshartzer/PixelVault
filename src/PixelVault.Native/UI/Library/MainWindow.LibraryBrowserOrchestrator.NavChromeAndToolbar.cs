@@ -53,6 +53,7 @@ namespace PixelVaultNative
             navChrome.PhotographyGalleryButton.Click += delegate { ShowPhotographyGallery(libraryWindow); };
             navChrome.MyCoversButton.Click += delegate { OpenSavedCoversFolder(); };
             navChrome.AchievementHubButton.Click += delegate { ShowAchievementHub(libraryWindow, ws); };
+            panes.TrackersButton.Click += delegate { ShowTrackerDashboard(libraryWindow,ws); };
             navChrome.ImportButton.Click += delegate { RunWorkflow(false); if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge(); };
             navChrome.ImportCommentsButton.Click += delegate { RunWorkflow(true); if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge(); };
             navChrome.ManualImportButton.Click += delegate { OpenManualIntakeWindow(); if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge(); };

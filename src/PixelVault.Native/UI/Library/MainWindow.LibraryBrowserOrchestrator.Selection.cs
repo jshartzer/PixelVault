@@ -152,12 +152,7 @@ namespace PixelVaultNative
                     tile.BorderThickness = isSelected ? new Thickness(2) : new Thickness(1);
                 }
                 panes.DeleteSelectedButton.IsEnabled = selectedFiles.Count > 0;
-                if (timelineMode)
-                {
-                    panes.ThumbLabel.Visibility = Visibility.Visible;
-                    panes.ThumbLabel.Text = selectedFiles.Count > 0 ? selectedFiles.Count + " selected" : "Timeline";
-                }
-                else if (selectedFiles.Count > 0)
+                if (selectedFiles.Count > 0)
                 {
                     panes.ThumbLabel.Visibility = Visibility.Visible;
                     panes.ThumbLabel.Text = selectedFiles.Count + " selected";

@@ -130,6 +130,7 @@ namespace PixelVaultNative
             detailArea.Children.Add(BuildSortControls());
             detailArea.Children.Add(_nextUpHost);
             detailArea.Children.Add(_unlockNotice);
+            detailArea.Children.Add(BuildTrackingEntryButton());
             Grid.SetRow(detailArea, 2);
             root.Children.Add(detailArea);
 
@@ -350,7 +351,8 @@ namespace PixelVaultNative
             string retroAchievementsUsername,
             string userAgent,
             IAchievementGuideService guideService,
-            bool remainingOnly = false)
+            bool remainingOnly = false,
+            AchievementTrackingStore trackingStore = null)
         {
             var title = folder == null ? string.Empty : (folder.Name ?? string.Empty).Trim();
             if (string.IsNullOrWhiteSpace(title)) title = "Achievements";
@@ -359,6 +361,7 @@ namespace PixelVaultNative
                     normalizedPlatform, folder, steamKey, retroKey, steamUserId64,
                     retroAchievementsUsername, userAgent, default));
             dlg._remainingOnly.IsChecked = remainingOnly;
+            dlg._trackingStore = trackingStore;
             dlg._scoreSteamAccount = steamUserId64 ?? "";
             dlg._scoreRetroAccount = retroAchievementsUsername ?? "";
             dlg._feedbackAccountScope = (normalizedPlatform ?? "") + "|" + (steamUserId64 ?? "") + "|" + (retroAchievementsUsername ?? "");
@@ -512,11 +515,11 @@ namespace PixelVaultNative
             return remaining == 0 ? "All " + all.Count + " achievements have been obtained." : string.Empty;
         }
 
-        static TextBlock BuildFilteredGroupMessage(IEnumerable<GameAchievementsFetchService.AchievementRow> rows)
+        TextBlock BuildFilteredGroupMessage(IEnumerable<GameAchievementsFetchService.AchievementRow> rows)
         {
             return new TextBlock
             {
-                Text = BuildRemainingAchievementMessage(rows),
+                Text = _missableFilter.SelectedIndex > 0 ? "No achievements match these filters in this group." : BuildRemainingAchievementMessage(rows),
                 Foreground = UiBrushHelper.FromHex("#9CB1BC"),
                 Margin = new Thickness(8, 8, 8, 8),
                 FontSize = 12,
@@ -659,7 +662,7 @@ namespace PixelVaultNative
                     {
                         HorizontalAlignment = HorizontalAlignment.Left,
                         ItemWidth = 164,
-                        ItemHeight = 164
+                        ItemHeight = SortingByCounterProgress ? 220 : 184
                     };
                     foreach (var row in section.Rows)
                     {
@@ -678,6 +681,7 @@ namespace PixelVaultNative
             GameAchievementsFetchService.AchievementRow row,
             string userAgent)
         {
+            AttachTrackingMenu(visual, row);
             if (visual == null || row == null || _guideService == null || !row.HasStableProviderIdentity) return;
             visual.Cursor = Cursors.Hand;
             visual.Focusable = true;
@@ -909,7 +913,7 @@ namespace PixelVaultNative
             var card = new Border
             {
                 Width = 154,
-                Height = 154,
+                Height = 174,
                 Margin = new Thickness(5),
                 Padding = new Thickness(8),
                 CornerRadius = new CornerRadius(7),
@@ -945,7 +949,7 @@ namespace PixelVaultNative
             };
             badgeHost.Child = image;
             StartAchievementBadgeDownload(image, row, userAgent);
-            content.Children.Add(badgeHost);
+            content.Children.Add(AchievementCollectionUi.WithMissableOverlay(badgeHost, row));
 
             var title = new TextBlock
             {
@@ -976,20 +980,28 @@ namespace PixelVaultNative
                 TextAlignment = TextAlignment.Center,
                 TextTrimming = TextTrimming.CharacterEllipsis
             };
-            Grid.SetRow(meta, 2);
-            content.Children.Add(meta);
+            var metaPanel = new StackPanel();
+            metaPanel.Children.Add(meta);
+            if (AchievementCollectionUi.MissableLabel(row) is TextBlock missable)
+            {
+                missable.TextAlignment = TextAlignment.Center;
+                metaPanel.Children.Add(missable);
+            }
+            Grid.SetRow(metaPanel, 2);
+            content.Children.Add(metaPanel);
 
             if (SortingByCounterProgress && BuildCounterProgress(row) is FrameworkElement counter)
             {
                 content.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
                 Grid.SetRow(counter, 3);
                 content.Children.Add(counter);
-                card.Height = 190;
+                card.Height = 210;
             }
 
             card.Child = content;
             AchievementRarityUi.Apply(card, badgeHost, title, row);
             AutomationProperties.SetName(card, (row.Title ?? "Achievement") + ", " + state +
+                (AchievementCollectionUi.ShowMissable(row) ? ", Missable" : "") +
                 (row.Points.HasValue ? ", " + AchievementScoring.Label(row) : "") +
                 (AchievementRarityUi.Label(row).Length > 0 ? ", " + AchievementRarityUi.Label(row) : ""));
             return card;
@@ -1002,6 +1014,7 @@ namespace PixelVaultNative
             if (row.Points.HasValue) parts.Add(AchievementScoring.Explanation(row));
             if (!string.IsNullOrWhiteSpace(row.Title)) parts.Add(row.Title.Trim());
             parts.Add(!row.ProgressKnown ? "Progress unknown" : row.Unlocked ? "Obtained" : "Not obtained");
+            if (AchievementCollectionUi.ShowMissable(row)) parts.Add("Missable — can be missed during a playthrough.");
             if (AchievementRarityUi.Label(row).Length > 0) parts.Add(AchievementRarityUi.Label(row));
             if (!string.IsNullOrWhiteSpace(row.Description)) parts.Add(row.Description.Trim());
             if (AchievementCollectionStats.CounterPercent(row).HasValue) parts.Add("Counter progress: " + CounterLabel(row));
@@ -1051,8 +1064,7 @@ namespace PixelVaultNative
             var img = new Image { Stretch = Stretch.UniformToFill, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
             badgeHost.Child = img;
             StartAchievementBadgeDownload(img, row, userAgent);
-            Grid.SetColumn(badgeHost, 0);
-            grid.Children.Add(badgeHost);
+            grid.Children.Add(AchievementCollectionUi.WithMissableOverlay(badgeHost, row));
 
             var stack = new StackPanel { MinWidth = 0 };
             var title = new TextBlock
@@ -1063,6 +1075,7 @@ namespace PixelVaultNative
                 TextWrapping = TextWrapping.Wrap
             };
             stack.Children.Add(title);
+            if (AchievementCollectionUi.MissableLabel(row) is TextBlock missable) stack.Children.Add(missable);
             if (!string.IsNullOrWhiteSpace(row.Description))
             {
                 stack.Children.Add(new TextBlock
@@ -1116,6 +1129,7 @@ namespace PixelVaultNative
             card.Child = grid;
             AchievementRarityUi.Apply(card, badgeHost, title, row, list: true);
             AutomationProperties.SetName(card, (row.Title ?? "Achievement") + ", " + (obtained ? "Obtained" : row.ProgressKnown ? "Not obtained" : "Progress unknown") +
+                (AchievementCollectionUi.ShowMissable(row) ? ", Missable" : "") +
                 (row.Points.HasValue ? ", " + AchievementScoring.Label(row) : "") +
                 (AchievementRarityUi.Label(row).Length > 0 ? ", " + AchievementRarityUi.Label(row) : ""));
             return card;

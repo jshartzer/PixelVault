@@ -24,6 +24,7 @@ namespace PixelVaultNative
         readonly ComboBox collectionStatus = new ComboBox { Width = 140 };
         readonly ComboBox collectionGame = new ComboBox { Width = 220 };
         readonly ComboBox collectionRarity = new ComboBox { Width = 140 };
+        readonly ComboBox collectionMissable = new ComboBox { Width = 170 };
         readonly ComboBox collectionSort = new ComboBox { Width = 170 };
         readonly ComboBox collectionView = new ComboBox { Width = 90 };
         readonly Button collectionShowMore = new Button { Content = "Show more", Padding = new Thickness(16, 8, 16, 8), HorizontalAlignment = HorizontalAlignment.Left };
@@ -53,6 +54,8 @@ namespace PixelVaultNative
                 ("Newest earned", AchievementHubSort.NewestEarned), ("Oldest earned", AchievementHubSort.OldestEarned),
                 ("Game", AchievementHubSort.Game), ("Achievement name", AchievementHubSort.Name));
             Fill(collectionView, ("Grid", "grid"), ("List", "list"));
+            Fill(collectionMissable, ("All achievements", AchievementMissableFilter.All),
+                ("Missable only", AchievementMissableFilter.Missable), ("Not marked missable", AchievementMissableFilter.NotMarkedMissable));
             collectionGame.Items.Add(new ComboBoxItem { Content = "All games", Tag = null });
             collectionGame.SelectedIndex = 0;
 
@@ -61,6 +64,7 @@ namespace PixelVaultNative
             controls.Children.Add(Labeled("Status", collectionStatus, "Filter by earned status"));
             controls.Children.Add(Labeled("Game", collectionGame, "Filter to one game"));
             controls.Children.Add(Labeled("Rarity", collectionRarity, "Filter by rarity tier"));
+            controls.Children.Add(Labeled("Missable", collectionMissable, "Filter by missable status"));
             controls.Children.Add(Labeled("Sort", collectionSort, "Sort achievements"));
             controls.Children.Add(Labeled("View", collectionView, "Grid or list view"));
             content.Children.Add(controls);
@@ -79,7 +83,7 @@ namespace PixelVaultNative
 
             collectionSearchDelay.Tick += delegate { collectionSearchDelay.Stop(); ApplyCollectionQuery(); };
             collectionSearch.TextChanged += delegate { collectionSearchDelay.Stop(); collectionSearchDelay.Start(); };
-            foreach (var box in new[] { collectionStatus, collectionRarity, collectionSort, collectionView })
+            foreach (var box in new[] { collectionStatus, collectionRarity, collectionMissable, collectionSort, collectionView })
                 box.SelectionChanged += delegate { ApplyCollectionQuery(); };
             collectionGame.SelectionChanged += delegate { if (!collectionUpdatingGames) ApplyCollectionQuery(); };
             Closed += delegate { collectionSearchDelay.Stop(); };
@@ -124,6 +128,7 @@ namespace PixelVaultNative
             Status = Selected<AchievementHubStatusFilter>(collectionStatus),
             GameKey = Selected<string>(collectionGame),
             Rarity = Selected<AchievementHubRarityFilter>(collectionRarity),
+            Missable = Selected<AchievementMissableFilter>(collectionMissable),
             Sort = Selected<AchievementHubSort>(collectionSort)
         };
 
@@ -191,7 +196,7 @@ namespace PixelVaultNative
             var r = entry.Row;
             return string.Join("\u001f", entry.Game.Key, entry.Game.Title, r.ProviderAchievementId, r.Title, r.Description, r.Meta,
                 r.ProgressKnown, r.Unlocked, r.UnlockUtcTicks, r.GlobalUnlockPercent, r.CounterCurrent, r.CounterMinimum, r.CounterTarget,
-                r.Hidden, r.IconUrlColor, r.Points, r.PointsProvisional, r.AwardedPoints, r.AwardProvisional);
+                r.Hidden, r.IconUrlColor, r.Points, r.PointsProvisional, r.AwardedPoints, r.AwardProvisional, r.IsMissable);
         }
 
         static string Totals(AchievementHubCollection c)
@@ -287,11 +292,13 @@ namespace PixelVaultNative
             button.Template = EntryTemplate;
             AutomationProperties.SetName(button, (string.IsNullOrWhiteSpace(row.Title) ? "Achievement" : row.Title) + ", " + entry.Game.Title
                 + ", " + EntryState(row) + (row.Points.HasValue ? ", " + AchievementScoring.Label(row) : "")
+                + (AchievementCollectionUi.ShowMissable(row) ? ", Missable" : "")
                 + (rarity.Length > 0 ? ", " + rarity : "") + ". Open achievement details.");
             AccessibilityUi.TryApplyFocusVisualStyle(button);
             var game = entry.Game;
             button.Click += async (_, __) => await OpenAchievementAsync(game, row);
             AttachPinMenu(button, game);
+            AttachTrackingMenu(button, game, row);
             if (guides != null && row.HasStableProviderIdentity)
             {
                 button.ContextMenu ??= new ContextMenu();
@@ -349,10 +356,15 @@ namespace PixelVaultNative
                 Margin = new Thickness(0, 2, 0, 0), Foreground = Color(earned ? "#88B8A0" : "#7D909C", SystemColors.WindowTextBrush)
             };
             var content = new StackPanel();
-            content.Children.Add(icon); content.Children.Add(title); content.Children.Add(game); content.Children.Add(state);
+            content.Children.Add(AchievementCollectionUi.WithMissableOverlay(icon, row)); content.Children.Add(title); content.Children.Add(game); content.Children.Add(state);
+            if (AchievementCollectionUi.MissableLabel(row) is TextBlock missable)
+            {
+                missable.TextAlignment = TextAlignment.Center;
+                content.Children.Add(missable);
+            }
             var card = new Border
             {
-                Width = 154, Height = 170, Padding = new Thickness(8), CornerRadius = new CornerRadius(7), Child = content,
+                Width = 154, Height = 190, Padding = new Thickness(8), CornerRadius = new CornerRadius(7), Child = content,
                 Background = Color(earned ? "#15231E" : "#11191E", SystemColors.WindowBrush),
                 BorderBrush = Color(earned ? "#3E6A54" : "#2B3A44", SystemColors.ActiveBorderBrush), BorderThickness = new Thickness(1)
             };
@@ -378,7 +390,7 @@ namespace PixelVaultNative
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = 0 });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            grid.Children.Add(icon);
+            grid.Children.Add(AchievementCollectionUi.WithMissableOverlay(icon, row));
             var text = new StackPanel();
             var title = new TextBlock { Text = row.Title ?? "", FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap,
                 Foreground = Color(earned ? "#FFFFFF" : "#CCD0D2", SystemColors.WindowTextBrush) };
@@ -399,6 +411,7 @@ namespace PixelVaultNative
                 : "Rarity unavailable";
             meta.Children.Add(new TextBlock { Text = rarity, FontSize = 11, Margin = new Thickness(0, 3, 0, 0),
                 Foreground = Color("#7D909C", SystemColors.WindowTextBrush) });
+            if (AchievementCollectionUi.MissableLabel(row) is TextBlock missable) meta.Children.Add(missable);
             Grid.SetColumn(meta, 2);
             grid.Children.Add(meta);
             var card = new Border

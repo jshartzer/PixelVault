@@ -33,6 +33,68 @@ public sealed class AchievementHubCollectionTests
         });
 
     [Fact]
+    public void MissableFilter_ComposesWithStatusGameAndRarityWithoutChangingTotals()
+    {
+        var c = Fixture();
+        c.Entries.Single(e => e.Game.Key == "steam:1" && e.Row.Title == "Coin").Row.IsMissable = true;
+        c.Entries.Single(e => e.Game.Key == "steam:2" && e.Row.Title == "Crown").Row.IsMissable = true;
+        Assert.Equal(2, c.Query(new() { Missable = AchievementMissableFilter.Missable }, Now).Count);
+        Assert.Equal("Coin", Assert.Single(c.Query(new() { Missable = AchievementMissableFilter.Missable,
+            Status = AchievementHubStatusFilter.Unearned, GameKey = "steam:1", Rarity = AchievementHubRarityFilter.Common }, Now)).Row.Title);
+        Assert.Equal("Crown", Assert.Single(c.Query(new() { Missable = AchievementMissableFilter.Missable,
+            Status = AchievementHubStatusFilter.Earned }, Now)).Row.Title);
+        Assert.Equal(4, c.Query(new() { Missable = AchievementMissableFilter.NotMarkedMissable }, Now).Count);
+        Assert.Equal(4, c.Earned);
+        Assert.Equal(2, c.Unearned);
+    }
+
+    [Fact]
+    public void MissableMarkers_OnlyAppearOnUnfinishedAchievementsInBothHubViews()
+    {
+        AchievementCollectionAccessTests.OnSta(() =>
+        {
+            var locked = Row("1", "Locked"); locked.IsMissable = true;
+            var earned = Row("1", "Earned", true); earned.IsMissable = true;
+            var unmarked = Row("1", "Unmarked");
+            var window = new AchievementHubWindow(null!);
+            try
+            {
+                AchievementHubCollection Collection(params GameAchievementsFetchService.AchievementRow[] rows) =>
+                    AchievementHubCollection.Build(new[] { Game("1", "Test Game") },
+                        new Dictionary<string, AchievementHubStore.AccountData> { ["steam"] = new() { Games = new() { ["1"] = Snap(rows) } } });
+                window.RenderRecent(new AchievementHubState { Collection = Collection(locked, earned, unmarked) });
+                void CheckMarkers()
+                {
+                    var entries = Descendants(window.Content).OfType<Button>().Where(b => (b.ToolTip as string)?.StartsWith("Test Game") == true).ToList();
+                    var marked = entries.Single(b => (b.ToolTip as string)!.Contains("Locked"));
+                    Assert.Single(Descendants(marked.Content).OfType<Border>(), b => b.Tag as string == "AchievementMissable");
+                    Assert.Single(Descendants(marked.Content).OfType<TextBlock>(), t => t.Text == "Missable");
+                    foreach (var other in entries.Where(b => b != marked))
+                    {
+                        Assert.DoesNotContain(Descendants(other.Content).OfType<FrameworkElement>(), e => e.Tag as string == "AchievementMissable");
+                        Assert.DoesNotContain("Missable", AutomationName(other));
+                    }
+                }
+                CheckMarkers();
+                var boxes = Descendants(window.Content).OfType<ComboBox>().ToList();
+                boxes.Single(b => AutomationName(b) == "Grid or list view").SelectedIndex = 1;
+                CheckMarkers();
+                boxes.Single(b => AutomationName(b) == "Filter by missable status").SelectedIndex = 1;
+                Assert.Equal(2, window.CollectionMatches.Count);
+                boxes.Single(b => AutomationName(b) == "Filter by earned status").SelectedIndex = 2;
+                Assert.Single(window.CollectionMatches);
+                var newlyEarned = Row("1", "Locked", true); newlyEarned.IsMissable = true;
+                window.RenderRecent(new AchievementHubState { Collection = Collection(newlyEarned, earned, unmarked) });
+                Assert.Empty(window.CollectionMatches);
+                boxes.Single(b => AutomationName(b) == "Filter by earned status").SelectedIndex = 0;
+                Assert.Equal(2, window.CollectionMatches.Count);
+                Assert.DoesNotContain(Descendants(window.Content).OfType<FrameworkElement>(), e => e.Tag as string == "AchievementMissable");
+            }
+            finally { window.Close(); }
+        });
+    }
+
+    [Fact]
     public void Build_DeduplicatesFoldersAndRowsKeepsProviderEditionsAndCountsCoverage()
     {
         var c = Fixture();

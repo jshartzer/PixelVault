@@ -310,7 +310,7 @@ namespace PixelVaultNative
             var folder = new LibraryFolderInfo { Name = notice.Title, SteamAppId = steam ? notice.Game : null,
                 RetroAchievementsGameId = steam ? null : notice.Game, PlatformLabel = steam ? "Steam" : "Emulation" };
             AchievementsInfoWindow.ShowModal(this, folder.PlatformLabel, folder, CurrentSteamWebApiKey(), CurrentRetroAchievementsApiKey(),
-                CurrentSteamUserId64(), CurrentRetroAchievementsUsername(), "PixelVault/" + AppVersion, achievementGuideService);
+                CurrentSteamUserId64(), CurrentRetroAchievementsUsername(), "PixelVault/" + AppVersion, achievementGuideService, trackingStore: achievementTrackingStore);
         }
 
         void ShowAchievementNotifications()

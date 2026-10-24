@@ -21,6 +21,7 @@ namespace PixelVaultNative
         readonly Action<Window, AchievementHubGame> open;
         readonly AchievementHubPins pins;
         readonly IAchievementGuideService guides;
+        readonly AchievementTrackingStore trackingStore;
         readonly StackPanel pinned = new StackPanel();
         readonly StackPanel recent = new StackPanel();
         readonly StackPanel unlocks = new StackPanel();
@@ -32,7 +33,7 @@ namespace PixelVaultNative
 
         internal static void ShowFor(Window owner, AchievementHubService service, Func<AchievementHubSession> getSession,
             Func<AchievementHubGame, double, double, FrameworkElement> cover, Action<Window, AchievementHubGame> open, AchievementHubPins pins,
-            IAchievementGuideService guides)
+            IAchievementGuideService guides, AchievementTrackingStore trackingStore = null)
         {
             if (owner == null) return;
             var existing = owner.OwnedWindows.OfType<AchievementHubWindow>().FirstOrDefault();
@@ -42,14 +43,15 @@ namespace PixelVaultNative
                 existing.Activate();
                 return;
             }
-            new AchievementHubWindow(owner, service, getSession, cover, open, pins, guides).Show();
+            new AchievementHubWindow(owner, service, getSession, cover, open, pins, guides, trackingStore).Show();
         }
 
         internal AchievementHubWindow(Window owner, AchievementHubService service = null, Func<AchievementHubSession> getSession = null,
             Func<AchievementHubGame, double, double, FrameworkElement> cover = null, Action<Window, AchievementHubGame> open = null,
-            AchievementHubPins pins = null, IAchievementGuideService guides = null)
+            AchievementHubPins pins = null, IAchievementGuideService guides = null, AchievementTrackingStore trackingStore = null)
         {
             this.service = service; this.getSession = getSession; this.cover = cover; this.open = open; this.pins = pins; this.guides = guides;
+            this.trackingStore = trackingStore;
             Owner = owner;
             Title = "Achievement Hub";
             Width = 1040;
@@ -86,6 +88,13 @@ namespace PixelVaultNative
             var actions = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
             refresh.Margin = new Thickness(0, 0, 10, 0);
             actions.Children.Add(refresh);
+            if (trackingStore != null)
+            {
+                var trackers = AchievementTrackerWindow.Button("Trackers", "Open achievement trackers across your library");
+                trackers.Margin = new Thickness(0, 0, 10, 0);
+                trackers.Click += (_, __) => OpenTracking();
+                actions.Children.Add(trackers);
+            }
             actions.Children.Add(back);
             Grid.SetColumn(actions, 1);
             header.Children.Add(actions);
@@ -216,8 +225,18 @@ namespace PixelVaultNative
             long saved = 0;
             collection?.SnapshotUpdated.TryGetValue(game.Key, out saved);
             var detail = new AchievementDetailWindow(this, game, row, rows, saved, guides,
-                pins == null ? null : () => pins.IsPinned(game.Key), pins == null ? null : () => TogglePin(game));
+                pins == null ? null : () => pins.IsPinned(game.Key), pins == null ? null : () => TogglePin(game),
+                trackingStore, getSession?.Invoke().Account(game.Provider));
             ShowAchievementDetail(detail);
+            if (guides != null && collection != null)
+            {
+                try
+                {
+                    await Task.Run(() => guides.LoadSavedAchievementGroups(collection.Entries.Select(e => e.Row)));
+                    ApplyCollectionQuery();
+                }
+                catch { /* Guide edits must not prevent returning to the collection. */ }
+            }
             if (detail.OpenGameRequested) await OpenGameAsync(game);
         }
 

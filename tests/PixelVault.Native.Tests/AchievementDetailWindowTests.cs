@@ -66,7 +66,7 @@ public sealed class AchievementDetailWindowTests : IDisposable
                 Assert.Contains(texts, t => t.StartsWith("2.5") && t.Contains("% of players") && t.Contains("Silver rarity"));
                 Assert.Contains("#1 rarest of 2 in this game", texts);
                 Assert.Contains("2 of 4 earned · 50%", texts);
-                Assert.Contains("Missable", texts);
+                Assert.DoesNotContain("Missable", texts);
                 Assert.Contains("boss", texts);
                 Assert.Contains(Descendants(rare.Content).OfType<TextBox>(), b => b.Text == "Beat the boss without healing.");
                 Assert.Contains(Descendants(rare.Content).OfType<TextBlock>(), t => t.Inlines.OfType<Hyperlink>().Any(h => h.NavigateUri == new Uri("https://example.com/guide")));

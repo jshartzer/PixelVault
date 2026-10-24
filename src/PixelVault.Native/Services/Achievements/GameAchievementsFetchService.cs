@@ -65,6 +65,8 @@ namespace PixelVaultNative
             public string GroupName;
             /// <summary>Locally curated display order for <see cref="GroupName"/>. Lower values appear first.</summary>
             public int GroupSortOrder;
+            /// <summary>Authored guide metadata, hydrated from the durable catalog rather than progress snapshots.</summary>
+            [System.Text.Json.Serialization.JsonIgnore] public bool IsMissable;
 
             public bool HasStableProviderIdentity =>
                 !string.IsNullOrWhiteSpace(Provider)

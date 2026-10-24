@@ -6,6 +6,7 @@ using System.Linq;
 namespace PixelVaultNative
 {
     enum AchievementHubStatusFilter { All, Earned, Unearned }
+    enum AchievementMissableFilter { All, Missable, NotMarkedMissable }
     enum AchievementHubRarityFilter { All, Common, Bronze, Silver, Gold, UberRare, Unavailable }
     enum AchievementHubSort { RarestFirst, MostCommonFirst, NewestEarned, OldestEarned, Game, Name }
 
@@ -23,6 +24,7 @@ namespace PixelVaultNative
         public AchievementHubStatusFilter Status;
         public string GameKey;
         public AchievementHubRarityFilter Rarity;
+        public AchievementMissableFilter Missable;
         public AchievementHubSort Sort;
     }
 
@@ -97,7 +99,9 @@ namespace PixelVaultNative
             collection.Signature = string.Join(",", collection.LibraryGames, collection.GamesWithProgress, collection.Entries.Count, collection.Earned,
                 stamp, collection.HasPoints, collection.EarnedPoints, collection.AvailablePoints, collection.ProvisionalAwards,
                 collection.PointsThisMonth, collection.RarestEarned?.Game.Key, collection.RarestEarned?.Row.ProviderAchievementId,
-                collection.RarestEarned?.Row.GlobalUnlockPercent, collection.RarestEarned?.Row.IconUrlColor);
+                collection.RarestEarned?.Row.GlobalUnlockPercent, collection.RarestEarned?.Row.IconUrlColor,
+                string.Join("|", collection.Entries.Where(e => e.Row.IsMissable)
+                    .Select(e => e.Game.Key + ":" + e.Row.ProviderAchievementId)));
             return collection;
         }
 
@@ -114,6 +118,9 @@ namespace PixelVaultNative
             };
         }
 
+        internal static bool MatchesMissable(GameAchievementsFetchService.AchievementRow row, AchievementMissableFilter filter) =>
+            filter == AchievementMissableFilter.All || (filter == AchievementMissableFilter.Missable) == row.IsMissable;
+
         internal List<AchievementHubEntry> Query(AchievementHubQuery query, long nowUtcTicks)
         {
             query ??= new AchievementHubQuery();
@@ -126,6 +133,7 @@ namespace PixelVaultNative
                     || (query.Status == AchievementHubStatusFilter.Earned) == (e.Row.ProgressKnown && e.Row.Unlocked)
                         && e.Row.ProgressKnown)
                 && (string.IsNullOrEmpty(query.GameKey) || e.Game.Key == query.GameKey)
+                && MatchesMissable(e.Row, query.Missable)
                 && (query.Rarity == AchievementHubRarityFilter.All || RarityOf(e.Row) == query.Rarity));
 
             bool Dated(AchievementHubEntry e) => AchievementCollectionStats.ValidUnlock(e.Row, nowUtcTicks);

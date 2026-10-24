@@ -229,7 +229,8 @@ namespace PixelVaultNative
             int minWidth,
             int maxWidth,
             bool includeTimelineFooter,
-            IReadOnlyDictionary<string, LibraryDetailMediaLayoutInfo> mediaLayoutByFile = null)
+            IReadOnlyDictionary<string, LibraryDetailMediaLayoutInfo> mediaLayoutByFile = null,
+            bool preserveCellDensity = false)
         {
             var chunks = new List<LibraryDetailMasonryChunk>();
             if (files == null || files.Count == 0) return chunks;
@@ -245,8 +246,8 @@ namespace PixelVaultNative
             if (filtered.Count == 0) return chunks;
 
             var cols = Math.Max(1, (int)Math.Round((avail + gap) / (requestedCell + gap), MidpointRounding.AwayFromZero));
-            // Sparse achievement feeds keep the normal photo cell size rather than stretching one badge across the viewport.
-            if (mediaLayoutByFile == null || !mediaLayoutByFile.Values.Any(info => info?.UseSingleSquareCell == true))
+            // Named groups and sparse achievement feeds retain the requested cell density.
+            if (!preserveCellDensity && (mediaLayoutByFile == null || !mediaLayoutByFile.Values.Any(info => info?.UseSingleSquareCell == true)))
                 cols = Math.Min(cols, Math.Max(1, filtered.Count));
             var minCell = Math.Max(120d, Math.Min(requestedCell, Math.Max(120, minWidth)));
             while (cols > 1)

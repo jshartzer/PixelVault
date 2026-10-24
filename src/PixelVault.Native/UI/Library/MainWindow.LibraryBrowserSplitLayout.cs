@@ -61,6 +61,7 @@ namespace PixelVaultNative
             if (panes.SessionsFilterPanel != null)
                 panes.SessionsFilterPanel.Visibility = isSessions ? Visibility.Visible : Visibility.Collapsed;
             if (panes.GroupAllButton != null) panes.GroupAllButton.Visibility = isPhoto ? Visibility.Collapsed : Visibility.Visible;
+            if (panes.TrackersButton != null) panes.TrackersButton.Visibility = isPhoto ? Visibility.Collapsed : Visibility.Visible;
             if (panes.GroupConsoleButton != null) panes.GroupConsoleButton.Visibility = isPhoto ? Visibility.Collapsed : Visibility.Visible;
             if (panes.GroupTimelineButton != null)
                 panes.GroupTimelineButton.Visibility = isPhoto ? Visibility.Collapsed : Visibility.Visible;
@@ -134,7 +135,7 @@ namespace PixelVaultNative
                     Grid.SetColumnSpan(panes.SortFilterMenuButton, 1);
                     Grid.SetColumn(panes.SortFilterMenuButton, 0);
                     panes.SortFilterMenuButton.ClearValue(FrameworkElement.HorizontalAlignmentProperty);
-                    panes.SortFilterMenuButton.Margin = new Thickness(0, 0, 8, 0);
+                    panes.SortFilterMenuButton.Margin = new Thickness(0);
                 }
                 ApplyLibraryPhotoDetailChromeLayout(panes, false);
                 if (panes.GroupAllButton != null) panes.GroupAllButton.Visibility = Visibility.Visible;

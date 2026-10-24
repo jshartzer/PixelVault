@@ -9,6 +9,41 @@ namespace PixelVaultNative
 {
     static class AchievementCollectionUi
     {
+        internal static bool ShowMissable(GameAchievementsFetchService.AchievementRow row) => row?.IsMissable == true && !row.Unlocked;
+
+        internal static FrameworkElement WithMissableOverlay(Border icon, GameAchievementsFetchService.AchievementRow row)
+        {
+            if (!ShowMissable(row)) return icon;
+            var host = new Grid { Width = icon.Width, Height = icon.Height, Margin = icon.Margin,
+                HorizontalAlignment = icon.HorizontalAlignment, VerticalAlignment = icon.VerticalAlignment };
+            icon.Margin = new Thickness(0);
+            host.Children.Add(icon);
+            var symbol = new Path
+            {
+                Data = Geometry.Parse("M 2,1 L 12,1 L 12,4 L 8,8 L 12,12 L 12,15 L 2,15 L 2,12 L 6,8 L 2,4 Z M 2,3 L 12,3 M 2,13 L 12,13"),
+                Width = 14, Height = 16, StrokeThickness = 1.2,
+                Stroke = SystemParameters.HighContrast ? SystemColors.WindowTextBrush : UiBrushHelper.FromHex("#EFBD63"),
+                HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center
+            };
+            var marker = new Border { Width = 25, Height = 25, CornerRadius = new CornerRadius(13),
+                HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom,
+                Margin = new Thickness(0, 0, -4, -4), Child = symbol, Tag = "AchievementMissable",
+                Background = SystemParameters.HighContrast ? SystemColors.WindowBrush : UiBrushHelper.FromHex("#3C3020"),
+                BorderBrush = SystemParameters.HighContrast ? SystemColors.WindowTextBrush : UiBrushHelper.FromHex("#11191E"),
+                BorderThickness = new Thickness(2), ToolTip = "Missable — can be missed during a playthrough." };
+            AutomationProperties.SetName(marker, "Missable achievement");
+            host.Children.Add(marker);
+            return host;
+        }
+
+        internal static TextBlock MissableLabel(GameAchievementsFetchService.AchievementRow row)
+        {
+            if (!ShowMissable(row)) return null;
+            return new TextBlock { Text = "Missable", FontSize = 11, Margin = new Thickness(0, 4, 0, 0),
+                Tag = "AchievementMissable", Foreground = SystemParameters.HighContrast ? SystemColors.WindowTextBrush : UiBrushHelper.FromHex("#EFBD63"),
+                ToolTip = "Can be missed during a playthrough." };
+        }
+
         internal static Border ScoreChip(GameAchievementsFetchService.AchievementRow row)
         {
             var chip = TagChip(AchievementScoring.PointText(row));

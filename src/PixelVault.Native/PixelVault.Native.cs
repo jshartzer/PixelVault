@@ -43,6 +43,11 @@ namespace PixelVaultNative
         [STAThread]
         private static void Main(string[] args)
         {
+            if (args.Length == 2 && args[0] == "--death-stranding-read")
+            {
+                Environment.ExitCode = DeathStrandingSaveWorker.Run(args[1]);
+                return;
+            }
             // PV-PLN-DIST-001 §5.3: Velopack bootstrap (no-op when not installed via vpk). Same vpk major as NuGet Velopack.
             VelopackApp.Build().SetArgs(args).Run();
 
@@ -168,6 +173,7 @@ namespace PixelVaultNative
         readonly ISettingsService settingsService;
         readonly IFileSystemService fileSystemService;
         readonly IAchievementGuideService achievementGuideService;
+        readonly AchievementTrackingStore achievementTrackingStore;
         readonly ILibraryScanner libraryScanner;
         readonly ILibrarySession librarySession;
         readonly IImportService importService;
@@ -202,6 +208,7 @@ namespace PixelVaultNative
             settingsService = services.SettingsService;
             fileSystemService = services.FileSystemService;
             achievementGuideService = services.AchievementGuideService;
+            achievementTrackingStore = services.AchievementTrackingStore;
             coverService = services.CoverService;
             libraryCoverResolutionService = services.LibraryCoverResolutionService;
             indexPersistenceService = services.IndexPersistenceService;
@@ -216,6 +223,7 @@ namespace PixelVaultNative
             librarySession = services.LibrarySession;
             gameIndexService = services.GameIndexService;
             RunPostServiceStartup();
+            InitializeTrackerAutomation();
             ApplyMainWindowChromeAndShell();
         }
 

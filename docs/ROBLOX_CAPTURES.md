@@ -1,5 +1,7 @@
 # Roblox captures
 
+October 18 photo grouping: The individual-game photo view defaults to named subgame sections for Roblox. Both named conventions below are supported, including underscores/emoji in the title and collision suffixes. Existing captures and future imports use the same projection; no rename, metadata rewrite, or API call is needed for grouping. Unrecognized or unresolved names stay in Ungrouped. The Group photos checkbox switches to the combined chronological grid and saves the preference for that game/library. Right-click selected captures to add/create a group or remove membership; manual choices take priority over automatic title grouping. Group state is stored in the durable `PixelVaultData/capture-groups.sqlite` database rather than in screenshot metadata or the rebuildable photo index.
+
 Current Roblox desktop screenshots are recognized as `<account-id>_<place-id>_<13-digit-capture-token>.png`. The obsolete `RobloxScreenShot20260525_200505425.png` convention is excluded.
 
 During intake analysis, PixelVault resolves the place through Roblox's public place-to-universe endpoint, then fetches the experience name for that universe. Only the place/universe IDs are sent; no account lookup, credentials, or image upload is needed. The filename parser itself performs no network requests. Successful lookups are cached in memory for one day; failures are cached for 30 seconds. Requests are cancellable and have a ten-second overall timeout per lookup.

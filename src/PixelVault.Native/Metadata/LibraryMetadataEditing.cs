@@ -245,6 +245,7 @@ namespace PixelVaultNative
                 var originalPath = item.FilePath;
                 File.Move(item.FilePath, target);
                 MoveMetadataSidecarIfPresent(originalPath, target);
+                MoveCaptureGroupFile(libraryRoot, originalPath, target);
                 item.FilePath = target;
                 item.FileName = Path.GetFileName(target);
                 affectedFiles.Add(originalPath);

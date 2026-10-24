@@ -188,22 +188,27 @@ CREATE TABLE IF NOT EXISTS achievement_guide (
 
         public void LoadSavedAchievementGroups(IEnumerable<GameAchievementsFetchService.AchievementRow> rows)
         {
-            // Background progress checks only need grouping; do not rewrite the catalog or create backups.
+            // Read local display metadata without rewriting the catalog or creating backups.
             using var connection = OpenDatabase();
             foreach (var game in (rows ?? Enumerable.Empty<GameAchievementsFetchService.AchievementRow>())
                 .Where(r => r?.HasStableProviderIdentity == true)
                 .GroupBy(r => (Provider: NormalizeProvider(r.Provider), Game: r.ProviderGameId.Trim())))
             {
                 using var command = connection.CreateCommand();
-                command.CommandText = "SELECT provider_achievement_id, group_name, group_sort_order FROM achievement_definition WHERE provider = $provider AND provider_game_id = $game;";
+                command.CommandText = @"SELECT d.provider_achievement_id, d.group_name, d.group_sort_order, COALESCE(g.is_missable, 0)
+FROM achievement_definition d LEFT JOIN achievement_guide g ON g.achievement_id = d.achievement_id
+WHERE d.provider = $provider AND d.provider_game_id = $game;";
                 command.Parameters.AddWithValue("$provider", game.Key.Provider);
                 command.Parameters.AddWithValue("$game", game.Key.Game);
-                var groups = new Dictionary<string, (string Name, int Order)>(StringComparer.Ordinal);
+                var groups = new Dictionary<string, (string Name, int Order, bool Missable)>(StringComparer.Ordinal);
                 using var reader = command.ExecuteReader();
-                while (reader.Read()) groups[reader.GetString(0)] = (reader.GetString(1), reader.GetInt32(2));
+                while (reader.Read()) groups[reader.GetString(0)] = (reader.GetString(1), reader.GetInt32(2), reader.GetInt32(3) != 0);
                 foreach (var row in game)
+                {
+                    row.IsMissable = false;
                     if (groups.TryGetValue(row.ProviderAchievementId.Trim(), out var group))
-                    { row.GroupName = group.Name; row.GroupSortOrder = group.Order; }
+                    { row.GroupName = group.Name; row.GroupSortOrder = group.Order; row.IsMissable = group.Missable; }
+                }
             }
         }
 
@@ -296,6 +301,7 @@ ON CONFLICT(provider, provider_game_id, provider_achievement_id) DO UPDATE SET
                     {
                         row.GroupName = entry.GroupName ?? string.Empty;
                         row.GroupSortOrder = entry.GroupSortOrder;
+                        row.IsMissable = entry.IsMissable;
                         result.Add(entry);
                     }
                 }

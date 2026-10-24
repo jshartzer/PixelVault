@@ -1,0 +1,1256 @@
+[
+  {
+    "Id": "death-stranding-dc.master-builder",
+    "Provider": "steam",
+    "GameId": "1850570",
+    "GameTitle": "DEATH STRANDING DIRECTOR'S CUT",
+    "AchievementId": "023",
+    "Title": "Structure construction — Master Builder",
+    "Description": "Manual checklist or save refresh. Complete one of each type yourself; fabrication alone does not count. Refresh reads historical construction credit.",
+    "CompletionLabel": "Built",
+    "Items": [
+      {
+        "Id": "2d8d9e1e-f2ee-5346-a471-9757d758f0d7",
+        "Name": "Postbox",
+        "Category": "PCC structures",
+        "Detail": "Mark when you have completed this type of structure yourself.",
+        "Target": 1,
+        "Order": 0,
+        "Identifiers": {
+          "FactName": "ldfp_builded_post",
+          "FactUUID": "2d8d9e1e-f2ee-5346-a471-9757d758f0d7",
+          "Milestone": "CompletedConstruction",
+          "ReferenceResource": "ds/mission/system/ldf_trophy.core"
+        }
+      },
+      {
+        "Id": "ee6f159c-56d1-ca4c-8f70-0b1ae66a7f3f",
+        "Name": "Watchtower",
+        "Category": "PCC structures",
+        "Detail": "Mark when you have completed this type of structure yourself.",
+        "Target": 1,
+        "Order": 1,
+        "Identifiers": {
+          "FactName": "ldfp_builded_watch_tower",
+          "FactUUID": "ee6f159c-56d1-ca4c-8f70-0b1ae66a7f3f",
+          "Milestone": "CompletedConstruction",
+          "ReferenceResource": "ds/mission/system/ldf_trophy.core"
+        }
+      },
+      {
+        "Id": "073007d5-4f4c-ab4f-a282-2806b61a7279",
+        "Name": "Generator",
+        "Category": "PCC structures",
+        "Detail": "Mark when you have completed this type of structure yourself.",
+        "Target": 1,
+        "Order": 2,
+        "Identifiers": {
+          "FactName": "ldfp_builded_charger",
+          "FactUUID": "073007d5-4f4c-ab4f-a282-2806b61a7279",
+          "Milestone": "CompletedConstruction",
+          "ReferenceResource": "ds/mission/system/ldf_trophy.core"
+        }
+      },
+      {
+        "Id": "4490887a-097c-b641-84da-57a0dd7a021f",
+        "Name": "Bridge",
+        "Category": "PCC structures",
+        "Detail": "Mark when you have completed this type of structure yourself. Place your own foundation and supply the materials to finish construction; an unfinished foundation is not complete.",
+        "Target": 1,
+        "Order": 3,
+        "Identifiers": {
+          "FactName": "ldfp_builded_bridge",
+          "FactUUID": "4490887a-097c-b641-84da-57a0dd7a021f",
+          "Milestone": "CompletedConstruction",
+          "ReferenceResource": "ds/mission/system/ldf_trophy.core"
+        }
+      },
+      {
+        "Id": "963be55e-b7e9-9c47-bd26-eba6fb9ec66f",
+        "Name": "Timefall Shelter",
+        "Category": "PCC structures",
+        "Detail": "Mark when you have completed this type of structure yourself.",
+        "Target": 1,
+        "Order": 4,
+        "Identifiers": {
+          "FactName": "ldfp_builded_rain_shelter",
+          "FactUUID": "963be55e-b7e9-9c47-bd26-eba6fb9ec66f",
+          "Milestone": "CompletedConstruction",
+          "ReferenceResource": "ds/mission/system/ldf_trophy.core"
+        }
+      },
+      {
+        "Id": "4f8fdb5b-ae7e-e843-81c4-57ef5aa7ed4f",
+        "Name": "Safe House",
+        "Category": "PCC structures",
+        "Detail": "Mark when you have completed this type of structure yourself. Place your own foundation and supply the materials to finish construction; an unfinished foundation is not complete.",
+        "Target": 1,
+        "Order": 5,
+        "Identifiers": {
+          "FactName": "ldfp_builded_safety_house",
+          "FactUUID": "4f8fdb5b-ae7e-e843-81c4-57ef5aa7ed4f",
+          "Milestone": "CompletedConstruction",
+          "ReferenceResource": "ds/mission/system/ldf_trophy.core"
+        }
+      },
+      {
+        "Id": "d7514447-afc6-d745-b11d-eaa25f1fa2c0",
+        "Name": "Zip-line",
+        "Category": "PCC structures",
+        "Detail": "Mark when you have completed this type of structure yourself.",
+        "Target": 1,
+        "Order": 6,
+        "Identifiers": {
+          "FactName": "ldfp_builded_zip_line",
+          "FactUUID": "d7514447-afc6-d745-b11d-eaa25f1fa2c0",
+          "Milestone": "CompletedConstruction",
+          "ReferenceResource": "ds/mission/system/ldf_trophy.core"
+        }
+      },
+      {
+        "Id": "162a1261-0e8d-9645-ac82-ee54b97090f5",
+        "Name": "Jump Ramp",
+        "Category": "Director's Cut additions",
+        "Detail": "Mark when you have completed this type of structure yourself.",
+        "Target": 1,
+        "Order": 7,
+        "Identifiers": {
+          "FactName": "ldfp_builded_jump",
+          "FactUUID": "162a1261-0e8d-9645-ac82-ee54b97090f5",
+          "Milestone": "CompletedConstruction",
+          "ReferenceResource": "ds/mission/system/ldf_trophy.core"
+        }
+      },
+      {
+        "Id": "61d72677-805e-5a43-9530-ebf89fc7eca7",
+        "Name": "Cargo Catapult",
+        "Category": "Director's Cut additions",
+        "Detail": "Mark when you have completed this type of structure yourself.",
+        "Target": 1,
+        "Order": 8,
+        "Identifiers": {
+          "FactName": "ldfp_builded_catapult",
+          "FactUUID": "61d72677-805e-5a43-9530-ebf89fc7eca7",
+          "Milestone": "CompletedConstruction",
+          "ReferenceResource": "ds/mission/system/ldf_trophy.core"
+        }
+      },
+      {
+        "Id": "138099b2-ea49-fc4f-b590-e6abd1a26775",
+        "Name": "Chiral Bridge",
+        "Category": "Director's Cut additions",
+        "Detail": "Mark when you have completed this type of structure yourself.",
+        "Target": 1,
+        "Order": 9,
+        "Identifiers": {
+          "FactName": "ldfp_builded_crl_bridge",
+          "FactUUID": "138099b2-ea49-fc4f-b590-e6abd1a26775",
+          "Milestone": "CompletedConstruction",
+          "ReferenceResource": "ds/mission/system/ldf_trophy.core"
+        }
+      },
+      {
+        "Id": "f6c053ab-e3fa-734b-8d88-465fd23442a4",
+        "Name": "Sign",
+        "Category": "Placed tools and signs",
+        "Detail": "Place any one sign in the world. Different sign designs are not separate targets.",
+        "Target": 1,
+        "Order": 10,
+        "Identifiers": {
+          "FactName": "ldfp_builded_signboard",
+          "FactUUID": "f6c053ab-e3fa-734b-8d88-465fd23442a4",
+          "Milestone": "CompletedConstruction",
+          "ReferenceResource": "ds/mission/system/ldf_trophy.core"
+        }
+      },
+      {
+        "Id": "839222e7-bee3-494e-9483-e7de235acf16",
+        "Name": "Ladder",
+        "Category": "Placed tools and signs",
+        "Detail": "Place at least one in the world. Fabricating or carrying it alone does not count.",
+        "Target": 1,
+        "Order": 11,
+        "Identifiers": {
+          "FactName": "ldfp_builded_ladder",
+          "FactUUID": "839222e7-bee3-494e-9483-e7de235acf16",
+          "Milestone": "CompletedConstruction",
+          "ReferenceResource": "ds/mission/system/ldf_trophy.core"
+        }
+      },
+      {
+        "Id": "bf638a7d-5fe0-8942-b154-44d83254690e",
+        "Name": "Climbing Anchor",
+        "Category": "Placed tools and signs",
+        "Detail": "Place at least one in the world. Fabricating or carrying it alone does not count.",
+        "Target": 1,
+        "Order": 12,
+        "Identifiers": {
+          "FactName": "ldfp_builded_field_rope",
+          "FactUUID": "bf638a7d-5fe0-8942-b154-44d83254690e",
+          "Milestone": "CompletedConstruction",
+          "ReferenceResource": "ds/mission/system/ldf_trophy.core"
+        }
+      }
+    ]
+  },
+  {
+    "Id": "death-stranding-dc.trail-blazer",
+    "Provider": "steam",
+    "GameId": "1850570",
+    "GameTitle": "DEATH STRANDING DIRECTOR'S CUT",
+    "AchievementId": "057",
+    "Title": "Structure upgrades — Trail-Blazer",
+    "Description": "Manual checklist or save refresh. Record one completed maximum-level upgrade per type. Refresh reads historical credit, not the current condition of each structure.",
+    "CompletionLabel": "Upgraded",
+    "Items": [
+      {
+        "Id": "a3f2c2f0-63c9-2544-958a-f719e59b78f3",
+        "Name": "Postbox",
+        "Category": "PCC structures",
+        "Detail": "Mark after you complete the final upgrade to level 3 for this structure type. This records historical upgrade credit, not the present condition of a world object. Level 2 materials: 200 Metals. Level 3 materials: 600 Metals.",
+        "Target": 1,
+        "Order": 0,
+        "Identifiers": {
+          "FactName": "ldfp_lvmax_post",
+          "FactUUID": "a3f2c2f0-63c9-2544-958a-f719e59b78f3",
+          "Milestone": "MaximumUpgrade",
+          "ReferenceResource": "ds/mission/system/ldf_trophy.core"
+        }
+      },
+      {
+        "Id": "0df47c61-abab-e64c-bc01-07d9f55f34b1",
+        "Name": "Watchtower",
+        "Category": "PCC structures",
+        "Detail": "Mark after you complete the final upgrade to level 3 for this structure type. This records historical upgrade credit, not the present condition of a world object. Level 2 materials: 32 Chiral crystals, 400 Metals. Level 3 materials: 150 Chiral crystals, 800 Metals.",
+        "Target": 1,
+        "Order": 1,
+        "Identifiers": {
+          "FactName": "ldfp_lvmax_watch_tower",
+          "FactUUID": "0df47c61-abab-e64c-bc01-07d9f55f34b1",
+          "Milestone": "MaximumUpgrade",
+          "ReferenceResource": "ds/mission/system/ldf_trophy.core"
+        }
+      },
+      {
+        "Id": "151db658-6b75-fb4b-b0d0-f23123c27027",
+        "Name": "Generator",
+        "Category": "PCC structures",
+        "Detail": "Mark after you complete the final upgrade to level 3 for this structure type. This records historical upgrade credit, not the present condition of a world object. Level 2 materials: 400 Metals. Level 3 materials: 100 Chiral crystals, 400 Metals.",
+        "Target": 1,
+        "Order": 2,
+        "Identifiers": {
+          "FactName": "ldfp_lvmax_charger",
+          "FactUUID": "151db658-6b75-fb4b-b0d0-f23123c27027",
+          "Milestone": "MaximumUpgrade",
+          "ReferenceResource": "ds/mission/system/ldf_trophy.core"
+        }
+      },
+      {
+        "Id": "56c6a959-9752-bc4c-a0dc-92d657f78598",
+        "Name": "Bridge",
+        "Category": "PCC structures",
+        "Detail": "Mark after you complete the final upgrade to level 3 for this structure type. This records historical upgrade credit, not the present condition of a world object. Level 2 materials: 800 Metals. Level 3 materials: 96 Chiral crystals, 1600 Metals.",
+        "Target": 1,
+        "Order": 3,
+        "Identifiers": {
+          "FactName": "ldfp_lvmax_bridge",
+          "FactUUID": "56c6a959-9752-bc4c-a0dc-92d657f78598",
+          "Milestone": "MaximumUpgrade",
+          "ReferenceResource": "ds/mission/system/ldf_trophy.core"
+        }
+      },
+      {
+        "Id": "3f8e3cba-6889-724f-a328-8fdd679de5df",
+        "Name": "Timefall Shelter",
+        "Category": "PCC structures",
+        "Detail": "Mark after you complete the final upgrade to level 3 for this structure type. This records historical upgrade credit, not the present condition of a world object. Level 2 materials: 32 Chiral crystals, 400 Metals. Level 3 materials: 300 Chiral crystals, 1200 Metals.",
+        "Target": 1,
+        "Order": 4,
+        "Identifiers": {
+          "FactName": "ldfp_lvmax_rain_shelter",
+          "FactUUID": "3f8e3cba-6889-724f-a328-8fdd679de5df",
+          "Milestone": "MaximumUpgrade",
+          "ReferenceResource": "ds/mission/system/ldf_trophy.core"
+        }
+      },
+      {
+        "Id": "142fb84f-1b75-7e4a-ac45-d22002072a14",
+        "Name": "Safe House",
+        "Category": "PCC structures",
+        "Detail": "Mark after you complete the final upgrade to level 3 for this structure type. This records historical upgrade credit, not the present condition of a world object. Level 2 materials: 300 Chiral crystals, 2400 Special alloys. Level 3 materials: 500 Chiral crystals, 4560 Special alloys.",
+        "Target": 1,
+        "Order": 5,
+        "Identifiers": {
+          "FactName": "ldfp_lvmax_safety_house",
+          "FactUUID": "142fb84f-1b75-7e4a-ac45-d22002072a14",
+          "Milestone": "MaximumUpgrade",
+          "ReferenceResource": "ds/mission/system/ldf_trophy.core"
+        }
+      },
+      {
+        "Id": "0c634809-78a6-b44d-a2c3-b5fb778ccff3",
+        "Name": "Zip-line",
+        "Category": "PCC structures",
+        "Detail": "Mark after you complete the final upgrade to level 3 for this structure type. This records historical upgrade credit, not the present condition of a world object. Level 2 materials: 480 Special alloys, 240 ChemicalSubstance. Level 3 materials: 300 Chiral crystals, 1440 Special alloys, 1440 ChemicalSubstance.",
+        "Target": 1,
+        "Order": 6,
+        "Identifiers": {
+          "FactName": "ldfp_lvmax_zip_line",
+          "FactUUID": "0c634809-78a6-b44d-a2c3-b5fb778ccff3",
+          "Milestone": "MaximumUpgrade",
+          "ReferenceResource": "ds/mission/system/ldf_trophy.core"
+        }
+      },
+      {
+        "Id": "eb9a18c8-856e-5a46-ac54-3d9aeb918b43",
+        "Name": "Jump Ramp",
+        "Category": "Director's Cut additions",
+        "Detail": "Mark after you complete the final upgrade to level 3 for this structure type. This records historical upgrade credit, not the present condition of a world object. Level 2 materials: 480 Chiral crystals, 240 Special alloys. Level 3 materials: 960 Chiral crystals, 480 Special alloys, 480 Resins.",
+        "Target": 1,
+        "Order": 7,
+        "Identifiers": {
+          "FactName": "ldfp_lvmax_jump",
+          "FactUUID": "eb9a18c8-856e-5a46-ac54-3d9aeb918b43",
+          "Milestone": "MaximumUpgrade",
+          "ReferenceResource": "ds/mission/system/ldf_trophy.core"
+        }
+      },
+      {
+        "Id": "42e17b7a-b1e6-3342-8fec-39d735320bda",
+        "Name": "Cargo Catapult",
+        "Category": "Director's Cut additions",
+        "Detail": "Mark after you complete the final upgrade to level 3 for this structure type. This records historical upgrade credit, not the present condition of a world object. Level 2 materials: 320 Resins, 240 ChemicalSubstance. Level 3 materials: 960 Resins, 720 ChemicalSubstance.",
+        "Target": 1,
+        "Order": 8,
+        "Identifiers": {
+          "FactName": "ldfp_lvmax_catapult",
+          "FactUUID": "42e17b7a-b1e6-3342-8fec-39d735320bda",
+          "Milestone": "MaximumUpgrade",
+          "ReferenceResource": "ds/mission/system/ldf_trophy.core"
+        }
+      },
+      {
+        "Id": "61cd7030-1578-5243-99e4-5e201028a70b",
+        "Name": "Chiral Bridge",
+        "Category": "Director's Cut additions",
+        "Detail": "Mark after you complete the final upgrade to level 3 for this structure type. This records historical upgrade credit, not the present condition of a world object. Level 2 materials: 720 Chiral crystals, 120 Special alloys. Level 3 materials: 1440 Chiral crystals, 240 Special alloys, 240 Resins.",
+        "Target": 1,
+        "Order": 9,
+        "Identifiers": {
+          "FactName": "ldfp_lvmax_crl_bridge",
+          "FactUUID": "61cd7030-1578-5243-99e4-5e201028a70b",
+          "Milestone": "MaximumUpgrade",
+          "ReferenceResource": "ds/mission/system/ldf_trophy.core"
+        }
+      }
+    ]
+  },
+  {
+    "Id": "death-stranding-dc.fount-of-knowledge",
+    "Provider": "steam",
+    "GameId": "1850570",
+    "GameTitle": "DEATH STRANDING DIRECTOR'S CUT",
+    "AchievementId": "035",
+    "Title": "Memory chips — Fount of Knowledge",
+    "Description": "Manual checklist or save refresh. Pick up each chip, then restore it at a facility terminal. Refresh counts restored data; pickup alone does not count.",
+    "CompletionLabel": "Restored",
+    "Items": [
+      {
+        "Id": "b81bb254-453d-6749-a29e-ffea2602870f",
+        "Name": "#01 — Frame Arms: Byakko",
+        "Category": "Chips 01–10",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 0,
+        "Identifiers": {
+          "MemoryChipNumber": "1",
+          "HashId": "-925312509",
+          "NameHash": "104775953",
+          "ResourceUUID": "b81bb254-453d-6749-a29e-ffea2602870f",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "c670b652-776f-354d-bd61-1f6eef239646",
+        "Name": "#02 — Frame Arms Girls: Byakko",
+        "Category": "Chips 01–10",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 1,
+        "Identifiers": {
+          "MemoryChipNumber": "2",
+          "HashId": "-2119286759",
+          "NameHash": "359543525",
+          "ResourceUUID": "c670b652-776f-354d-bd61-1f6eef239646",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "935648a7-65bd-0746-a080-114801eae5dc",
+        "Name": "#03 — Frame Arms: Kagetora",
+        "Category": "Chips 01–10",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 2,
+        "Identifiers": {
+          "MemoryChipNumber": "3",
+          "HashId": "818435125",
+          "NameHash": "1728426470",
+          "ResourceUUID": "935648a7-65bd-0746-a080-114801eae5dc",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "4599b026-321b-c348-afd5-ddcfa0066944",
+        "Name": "#04 — Frame Arms: Genbu",
+        "Category": "Chips 01–10",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 3,
+        "Identifiers": {
+          "MemoryChipNumber": "4",
+          "HashId": "13313712",
+          "NameHash": "869258509",
+          "ResourceUUID": "4599b026-321b-c348-afd5-ddcfa0066944",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "821d7ad9-3a07-3644-9641-eaa13cab0bcc",
+        "Name": "#05 — Frame Arms: Mingwu",
+        "Category": "Chips 01–10",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 4,
+        "Identifiers": {
+          "MemoryChipNumber": "5",
+          "HashId": "-614985795",
+          "NameHash": "1101288974",
+          "ResourceUUID": "821d7ad9-3a07-3644-9641-eaa13cab0bcc",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "78a7727c-84cb-c843-b820-259fd1865fe3",
+        "Name": "#06 — Kotobukiya Ludens Girl Model",
+        "Category": "Chips 01–10",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 5,
+        "Identifiers": {
+          "MemoryChipNumber": "6",
+          "HashId": "2013977247",
+          "NameHash": "1391764986",
+          "ResourceUUID": "78a7727c-84cb-c843-b820-259fd1865fe3",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "4e42c2ac-e555-7043-9e22-9648ebe75952",
+        "Name": "#07 — Prime 1 Studio 1/2 Scale Ludens Statue",
+        "Category": "Chips 01–10",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 6,
+        "Identifiers": {
+          "MemoryChipNumber": "7",
+          "HashId": "1380715463",
+          "NameHash": "547301113",
+          "ResourceUUID": "4e42c2ac-e555-7043-9e22-9648ebe75952",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "6b3238cc-6004-bb4f-ba6c-28601c223648",
+        "Name": "#08 — Sentinel 1/6 Ludens Action Figurine",
+        "Category": "Chips 01–10",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 7,
+        "Identifiers": {
+          "MemoryChipNumber": "8",
+          "HashId": "181681264",
+          "NameHash": "2123111133",
+          "ResourceUUID": "6b3238cc-6004-bb4f-ba6c-28601c223648",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "33b12840-0d75-2245-9eac-fff85b039012",
+        "Name": "#09 — Max Factory Ludens figma",
+        "Category": "Chips 01–10",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 8,
+        "Identifiers": {
+          "MemoryChipNumber": "9",
+          "HashId": "426508720",
+          "NameHash": "216504798",
+          "ResourceUUID": "33b12840-0d75-2245-9eac-fff85b039012",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "1f3f4799-561f-034e-985a-1e43b5188c95",
+        "Name": "#10 — Good Smile Company Nendoroid Jumbo Ludens",
+        "Category": "Chips 01–10",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 9,
+        "Identifiers": {
+          "MemoryChipNumber": "10",
+          "HashId": "804652797",
+          "NameHash": "1744296549",
+          "ResourceUUID": "1f3f4799-561f-034e-985a-1e43b5188c95",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "708c4975-e214-2c41-ae39-72fe5a741f33",
+        "Name": "#11 — Christine",
+        "Category": "Chips 11–20",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 10,
+        "Identifiers": {
+          "MemoryChipNumber": "11",
+          "HashId": "606309066",
+          "NameHash": "190354180",
+          "ResourceUUID": "708c4975-e214-2c41-ae39-72fe5a741f33",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "5ca48443-6c9e-4241-8a5c-8569cda0fc38",
+        "Name": "#12 — Godzilla",
+        "Category": "Chips 11–20",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 11,
+        "Identifiers": {
+          "MemoryChipNumber": "12",
+          "HashId": "1210652394",
+          "NameHash": "403202288",
+          "ResourceUUID": "5ca48443-6c9e-4241-8a5c-8569cda0fc38",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "90a81977-f00b-8541-a758-d7ae71a7fc25",
+        "Name": "#13 — The Walk",
+        "Category": "Chips 11–20",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 12,
+        "Identifiers": {
+          "MemoryChipNumber": "13",
+          "HashId": "370630151",
+          "NameHash": "1784931315",
+          "ResourceUUID": "90a81977-f00b-8541-a758-d7ae71a7fc25",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "29f17497-9d73-d649-93c6-0c75d26f7f2e",
+        "Name": "#14 — Stand By Me",
+        "Category": "Chips 11–20",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 13,
+        "Identifiers": {
+          "MemoryChipNumber": "14",
+          "HashId": "1892761800",
+          "NameHash": "1051297560",
+          "ResourceUUID": "29f17497-9d73-d649-93c6-0c75d26f7f2e",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "9f2429fc-5f67-764a-bdd1-3399f4bd2346",
+        "Name": "#15 — Big Fish",
+        "Category": "Chips 11–20",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 14,
+        "Identifiers": {
+          "MemoryChipNumber": "15",
+          "HashId": "-822510194",
+          "NameHash": "1287783451",
+          "ResourceUUID": "9f2429fc-5f67-764a-bdd1-3399f4bd2346",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "2e972cf3-a5d0-b247-a7b3-e7cb530dffdd",
+        "Name": "#16 — Fright Night",
+        "Category": "Chips 11–20",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 15,
+        "Identifiers": {
+          "MemoryChipNumber": "16",
+          "HashId": "1526882188",
+          "NameHash": "1603467247",
+          "ResourceUUID": "2e972cf3-a5d0-b247-a7b3-e7cb530dffdd",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "ce14e59c-ccb6-2f48-83ab-607683150208",
+        "Name": "#17 — Matango",
+        "Category": "Chips 11–20",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 16,
+        "Identifiers": {
+          "MemoryChipNumber": "17",
+          "HashId": "685660899",
+          "NameHash": "771323116",
+          "ResourceUUID": "ce14e59c-ccb6-2f48-83ab-607683150208",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "7959eee1-aa47-dd44-a7b7-ee2fe14c85f9",
+        "Name": "#18 — The Seven Samurai",
+        "Category": "Chips 11–20",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 17,
+        "Identifiers": {
+          "MemoryChipNumber": "18",
+          "HashId": "91859908",
+          "NameHash": "1944733896",
+          "ResourceUUID": "7959eee1-aa47-dd44-a7b7-ee2fe14c85f9",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "6093efcf-b2b2-0844-aa27-8c936d1b163e",
+        "Name": "#19 — The Bridge on the River Kwai",
+        "Category": "Chips 11–20",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 18,
+        "Identifiers": {
+          "MemoryChipNumber": "19",
+          "HashId": "419412482",
+          "NameHash": "25283531",
+          "ResourceUUID": "6093efcf-b2b2-0844-aa27-8c936d1b163e",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "95266a52-e7f0-9742-a4e0-73da6dd8fd19",
+        "Name": "#20 — Dr. Strangelove",
+        "Category": "Chips 11–20",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 19,
+        "Identifiers": {
+          "MemoryChipNumber": "20",
+          "HashId": "906516219",
+          "NameHash": "1787922544",
+          "ResourceUUID": "95266a52-e7f0-9742-a4e0-73da6dd8fd19",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "23962a12-f1ac-f94b-ba43-d1daa866d43b",
+        "Name": "#21 — Eggshell Carving",
+        "Category": "Chips 21–30",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 20,
+        "Identifiers": {
+          "MemoryChipNumber": "21",
+          "HashId": "-626992661",
+          "NameHash": "830407950",
+          "ResourceUUID": "23962a12-f1ac-f94b-ba43-d1daa866d43b",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "2877485b-b968-5548-b597-83c42484b177",
+        "Name": "#22 — Glasscraft",
+        "Category": "Chips 21–30",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 21,
+        "Identifiers": {
+          "MemoryChipNumber": "22",
+          "HashId": "1968549229",
+          "NameHash": "573568762",
+          "ResourceUUID": "2877485b-b968-5548-b597-83c42484b177",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "9eab17bb-e0e8-4a45-9def-dfbd5e6b54d3",
+        "Name": "#23 — Coffee Cup",
+        "Category": "Chips 21–30",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 22,
+        "Identifiers": {
+          "MemoryChipNumber": "23",
+          "HashId": "414458386",
+          "NameHash": "1346663929",
+          "ResourceUUID": "9eab17bb-e0e8-4a45-9def-dfbd5e6b54d3",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "d8cf2f56-6d19-3d41-a30e-3340fd083bd0",
+        "Name": "#24 — Soap Bubble",
+        "Category": "Chips 21–30",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 23,
+        "Identifiers": {
+          "MemoryChipNumber": "24",
+          "HashId": "316835966",
+          "NameHash": "76419346",
+          "ResourceUUID": "d8cf2f56-6d19-3d41-a30e-3340fd083bd0",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "689262f1-f58a-554d-87e4-f35cddaa42dc",
+        "Name": "#25 — Frozen Soap Bubble",
+        "Category": "Chips 21–30",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 24,
+        "Identifiers": {
+          "MemoryChipNumber": "25",
+          "HashId": "-296315123",
+          "NameHash": "1994756625",
+          "ResourceUUID": "689262f1-f58a-554d-87e4-f35cddaa42dc",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "d5cb3487-2af3-694c-996e-f8a8d647e226",
+        "Name": "#26 — Dandelion Seeds",
+        "Category": "Chips 21–30",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 25,
+        "Identifiers": {
+          "MemoryChipNumber": "26",
+          "HashId": "-1920026426",
+          "NameHash": "1706385893",
+          "ResourceUUID": "d5cb3487-2af3-694c-996e-f8a8d647e226",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "4807e499-da27-484a-9f23-b14d621817c6",
+        "Name": "#27 — Wine Glass",
+        "Category": "Chips 21–30",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 26,
+        "Identifiers": {
+          "MemoryChipNumber": "27",
+          "HashId": "1141105959",
+          "NameHash": "400483046",
+          "ResourceUUID": "4807e499-da27-484a-9f23-b14d621817c6",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "2dd582bb-87bd-384d-8082-131357e4d499",
+        "Name": "#28 — Pottery",
+        "Category": "Chips 21–30",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 27,
+        "Identifiers": {
+          "MemoryChipNumber": "28",
+          "HashId": "-225351855",
+          "NameHash": "1238228674",
+          "ResourceUUID": "2dd582bb-87bd-384d-8082-131357e4d499",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "6e1eceed-efd4-354b-89a9-acef85aa6721",
+        "Name": "#29 — Snow Crystal",
+        "Category": "Chips 21–30",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 28,
+        "Identifiers": {
+          "MemoryChipNumber": "29",
+          "HashId": "1994563734",
+          "NameHash": "1000758721",
+          "ResourceUUID": "6e1eceed-efd4-354b-89a9-acef85aa6721",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "77900f54-dcdd-2b4c-9067-f73154b2e730",
+        "Name": "#30 — Fused Silica",
+        "Category": "Chips 21–30",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 29,
+        "Identifiers": {
+          "MemoryChipNumber": "30",
+          "HashId": "-21805522",
+          "NameHash": "1354112634",
+          "ResourceUUID": "77900f54-dcdd-2b4c-9067-f73154b2e730",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "47991c4b-91bc-1e46-b712-55360f0bc4e1",
+        "Name": "#31 — Reverse Trike: \"Ride\" Type",
+        "Category": "Chips 31–40",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 30,
+        "Identifiers": {
+          "MemoryChipNumber": "31",
+          "HashId": "-1411171096",
+          "NameHash": "1563377255",
+          "ResourceUUID": "47991c4b-91bc-1e46-b712-55360f0bc4e1",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "30c2a0ec-93a4-6e4c-8ddc-1ad818b773fe",
+        "Name": "#32 — Honda NSR250R",
+        "Category": "Chips 31–40",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 31,
+        "Identifiers": {
+          "MemoryChipNumber": "32",
+          "HashId": "-400994286",
+          "NameHash": "1316998547",
+          "ResourceUUID": "30c2a0ec-93a4-6e4c-8ddc-1ad818b773fe",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "92710b65-25f7-ae4c-9638-d5bfdf3c15af",
+        "Name": "#33 — Honda Rebel 500",
+        "Category": "Chips 31–40",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 32,
+        "Identifiers": {
+          "MemoryChipNumber": "33",
+          "HashId": "409752310",
+          "NameHash": "1007963792",
+          "ResourceUUID": "92710b65-25f7-ae4c-9638-d5bfdf3c15af",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "32211799-2ee5-b849-9f92-22d36ee2a757",
+        "Name": "#34 — Triumph Bonneville Bobber",
+        "Category": "Chips 31–40",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 33,
+        "Identifiers": {
+          "MemoryChipNumber": "34",
+          "HashId": "-1980924998",
+          "NameHash": "1759390331",
+          "ResourceUUID": "32211799-2ee5-b849-9f92-22d36ee2a757",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "263f037b-1e96-1c44-8fe5-9956d36908fb",
+        "Name": "#35 — Triumph Street Triple RS",
+        "Category": "Chips 31–40",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 34,
+        "Identifiers": {
+          "MemoryChipNumber": "35",
+          "HashId": "1079201022",
+          "NameHash": "448113016",
+          "ResourceUUID": "263f037b-1e96-1c44-8fe5-9956d36908fb",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "043107d2-8d67-9c4c-9958-f724d9765131",
+        "Name": "#36 — Yamaha MT-09",
+        "Category": "Chips 31–40",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 35,
+        "Identifiers": {
+          "MemoryChipNumber": "36",
+          "HashId": "2139811728",
+          "NameHash": "166025868",
+          "ResourceUUID": "043107d2-8d67-9c4c-9958-f724d9765131",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "fae179e5-96e6-6044-88a3-bc2fdeeea178",
+        "Name": "#37 — Yamaha RD500LC",
+        "Category": "Chips 31–40",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 36,
+        "Identifiers": {
+          "MemoryChipNumber": "37",
+          "HashId": "1639214758",
+          "NameHash": "2072959375",
+          "ResourceUUID": "fae179e5-96e6-6044-88a3-bc2fdeeea178",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "38bc0721-6568-cd44-a3ad-aefbf884479f",
+        "Name": "#38 — Kawasaki Z1 (900 Super Four)",
+        "Category": "Chips 31–40",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 37,
+        "Identifiers": {
+          "MemoryChipNumber": "38",
+          "HashId": "-945586921",
+          "NameHash": "631104939",
+          "ResourceUUID": "38bc0721-6568-cd44-a3ad-aefbf884479f",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "76569d99-42d2-4649-8790-0f2f6fef5dab",
+        "Name": "#39 — Kawasaki Ninja H2R",
+        "Category": "Chips 31–40",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 38,
+        "Identifiers": {
+          "MemoryChipNumber": "39",
+          "HashId": "-1220933654",
+          "NameHash": "1475765928",
+          "ResourceUUID": "76569d99-42d2-4649-8790-0f2f6fef5dab",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "01a80203-ec30-d946-bf8a-aa9d33045b94",
+        "Name": "#40 — Harley-Davidson Pan America 1250",
+        "Category": "Chips 31–40",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 39,
+        "Identifiers": {
+          "MemoryChipNumber": "40",
+          "HashId": "174564160",
+          "NameHash": "1021715731",
+          "ResourceUUID": "01a80203-ec30-d946-bf8a-aa9d33045b94",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "3d4daa50-cfbf-614b-9a12-bc90e3096ccf",
+        "Name": "#41 — Death Stranding/Low Roar",
+        "Category": "Chips 41–50",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 40,
+        "Identifiers": {
+          "MemoryChipNumber": "41",
+          "HashId": "1603010001",
+          "NameHash": "1249428749",
+          "ResourceUUID": "3d4daa50-cfbf-614b-9a12-bc90e3096ccf",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "fb297b60-c33f-3e42-952b-d1c58d07a5ce",
+        "Name": "#42 — Lucio Fulci's Horror & Thriller Compilation",
+        "Category": "Chips 41–50",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 41,
+        "Identifiers": {
+          "MemoryChipNumber": "42",
+          "HashId": "-2098173196",
+          "NameHash": "1495807737",
+          "ResourceUUID": "fb297b60-c33f-3e42-952b-d1c58d07a5ce",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "9acc638e-460e-2542-816b-0d96e8d3f88b",
+        "Name": "#43 — Profondo Rosso Original Motion Picture Soundtrack",
+        "Category": "Chips 41–50",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 42,
+        "Identifiers": {
+          "MemoryChipNumber": "43",
+          "HashId": "1009568980",
+          "NameHash": "725857786",
+          "ResourceUUID": "9acc638e-460e-2542-816b-0d96e8d3f88b",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "63c4fcb5-1c61-6647-9a41-a0132eeffdc8",
+        "Name": "#44 — Thelma Original Motion Picture Soundtrack",
+        "Category": "Chips 41–50",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 43,
+        "Identifiers": {
+          "MemoryChipNumber": "44",
+          "HashId": "-1270209645",
+          "NameHash": "2139738385",
+          "ResourceUUID": "63c4fcb5-1c61-6647-9a41-a0132eeffdc8",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "4cb19ee0-ca6d-244f-a576-9ca57127497c",
+        "Name": "#45 — dawn/SILENT POETS",
+        "Category": "Chips 41–50",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 44,
+        "Identifiers": {
+          "MemoryChipNumber": "45",
+          "HashId": "1581340944",
+          "NameHash": "232935954",
+          "ResourceUUID": "4cb19ee0-ca6d-244f-a576-9ca57127497c",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "6971b24b-09d1-0147-b7ee-e2627dd6441f",
+        "Name": "#46 — Low Roar/Low Roar",
+        "Category": "Chips 41–50",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 45,
+        "Identifiers": {
+          "MemoryChipNumber": "46",
+          "HashId": "-641390954",
+          "NameHash": "515023334",
+          "ResourceUUID": "6971b24b-09d1-0147-b7ee-e2627dd6441f",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "dc1ec632-5dfc-ea4f-bc61-7a6dee45c11e",
+        "Name": "#47 — 0/Low Roar",
+        "Category": "Chips 41–50",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 46,
+        "Identifiers": {
+          "MemoryChipNumber": "47",
+          "HashId": "1550874460",
+          "NameHash": "1826169573",
+          "ResourceUUID": "dc1ec632-5dfc-ea4f-bc61-7a6dee45c11e",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "938add69-7a63-ef4b-89db-8fe177db9a54",
+        "Name": "#48 — Once In A Long, Long While…/Low Roar",
+        "Category": "Chips 41–50",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 47,
+        "Identifiers": {
+          "MemoryChipNumber": "48",
+          "HashId": "-840188836",
+          "NameHash": "852106945",
+          "ResourceUUID": "938add69-7a63-ef4b-89db-8fe177db9a54",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "52daa341-7137-d84a-8cf8-89e035972a61",
+        "Name": "#49 — God of War Original Video Game Soundtrack",
+        "Category": "Chips 41–50",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 48,
+        "Identifiers": {
+          "MemoryChipNumber": "49",
+          "HashId": "1130758180",
+          "NameHash": "1084333506",
+          "ResourceUUID": "52daa341-7137-d84a-8cf8-89e035972a61",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "f289ddde-3bcd-ec45-880e-d0b1aafbd085",
+        "Name": "#50 — Bronson Soundtrack",
+        "Category": "Chips 41–50",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 49,
+        "Identifiers": {
+          "MemoryChipNumber": "50",
+          "HashId": "1319857170",
+          "NameHash": "733077113",
+          "ResourceUUID": "f289ddde-3bcd-ec45-880e-d0b1aafbd085",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "a91994c4-9221-c24a-9ee1-e097faea4c86",
+        "Name": "#51 — Valhalla Rising: Original Soundtrack, by Peter Peter & Peter Kyed",
+        "Category": "Chips 51–56",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 50,
+        "Identifiers": {
+          "MemoryChipNumber": "51",
+          "HashId": "-2090736900",
+          "NameHash": "1507483002",
+          "ResourceUUID": "a91994c4-9221-c24a-9ee1-e097faea4c86",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "af6d917f-2d09-064b-a4a4-2809694ea0d6",
+        "Name": "#52 — Nicolas Winding Refn The Wicked Die Young",
+        "Category": "Chips 51–56",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 51,
+        "Identifiers": {
+          "MemoryChipNumber": "52",
+          "HashId": "1202779670",
+          "NameHash": "1250602638",
+          "ResourceUUID": "af6d917f-2d09-064b-a4a4-2809694ea0d6",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "991cdb5e-8470-f24a-a51f-1a2298c62a1e",
+        "Name": "#53 — My Life Directed By Nicolas Winding Refn",
+        "Category": "Chips 51–56",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 52,
+        "Identifiers": {
+          "MemoryChipNumber": "53",
+          "HashId": "-1825583224",
+          "NameHash": "954281357",
+          "ResourceUUID": "991cdb5e-8470-f24a-a51f-1a2298c62a1e",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "91ac3ae5-6bf2-ae43-b6c7-3a643d95c30b",
+        "Name": "#54 — An Unknown Man's Journal: Part 1",
+        "Category": "Chips 51–56",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 53,
+        "Identifiers": {
+          "MemoryChipNumber": "54",
+          "HashId": "2102281487",
+          "NameHash": "1484539985",
+          "ResourceUUID": "91ac3ae5-6bf2-ae43-b6c7-3a643d95c30b",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "fd513963-6d41-f14b-92ce-82aa116139bb",
+        "Name": "#55 — An Unknown Man's Journal: Part 2",
+        "Category": "Chips 51–56",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 54,
+        "Identifiers": {
+          "MemoryChipNumber": "55",
+          "HashId": "-1182726146",
+          "NameHash": "1261222821",
+          "ResourceUUID": "fd513963-6d41-f14b-92ce-82aa116139bb",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      },
+      {
+        "Id": "eba279fa-1181-484e-84fc-0c4b18518641",
+        "Name": "#56 — An Unknown Man's Journal: Part 3",
+        "Category": "Chips 51–56",
+        "Detail": "Pick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "Target": 1,
+        "Order": 55,
+        "Identifiers": {
+          "MemoryChipNumber": "56",
+          "HashId": "-2035178357",
+          "NameHash": "960968870",
+          "ResourceUUID": "eba279fa-1181-484e-84fc-0c4b18518641",
+          "Milestone": "Restored",
+          "ReferenceResource": "ds/mission/system/mchips/mchips_resource_area01.core"
+        }
+      }
+    ]
+  }
+]

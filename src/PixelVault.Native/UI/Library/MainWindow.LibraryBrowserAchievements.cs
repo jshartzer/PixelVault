@@ -26,7 +26,7 @@ namespace PixelVaultNative
                 CurrentSteamUserId64(),
                 CurrentRetroAchievementsUsername(),
                 "PixelVault/" + AppVersion,
-                achievementGuideService);
+                achievementGuideService, trackingStore: achievementTrackingStore);
         }
 
         LibraryFolderInfo ResolveLibraryBrowserAchievementLookupFolder(LibraryBrowserFolderView view)

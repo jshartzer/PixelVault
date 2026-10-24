@@ -9,6 +9,26 @@ namespace PixelVaultNative.Tests;
 public sealed class AchievementGuideServiceTests
 {
     [Fact]
+    public void MissableMetadata_ReadsSavedCatalogAndClearsRemovedFlagsWithoutChangingNotes()
+    {
+        using var scope = new TempDataRoot();
+        var service = new AchievementGuideService(scope.Path);
+        var row = SteamRow("620", "ACH.PORTAL", "Title", "Description");
+        var entry = service.SyncDefinitionsAndLoadGuides("pv-game", new[] { row }).Single();
+        service.SaveGuide(new AchievementGuideEdit { AchievementId = entry.AchievementId, GuideText = "Keep these notes", IsMissable = true });
+        service.LoadSavedAchievementGroups(new[] { row });
+        Assert.True(row.IsMissable);
+        var refreshed = SteamRow("620", "ACH.PORTAL", "Title", "Description");
+        service.SyncDefinitionsAndLoadGuides("pv-game", new[] { refreshed });
+        Assert.True(refreshed.IsMissable);
+        service.SaveGuide(new AchievementGuideEdit { AchievementId = entry.AchievementId, GuideText = "Keep these notes", IsMissable = false });
+        service.LoadSavedAchievementGroups(new[] { row });
+        Assert.False(row.IsMissable);
+        Assert.Equal("Keep these notes", service.LoadGuideEntry("steam", "620", "ACH.PORTAL").GuideText);
+        Assert.Equal(new[] { "boss" }, AchievementGuideWindow.GuideReadTags("Missable, boss", true, unlocked: true));
+    }
+
+    [Fact]
     public void SyncAndSave_PreservesGuideWhenProviderMetadataRefreshes()
     {
         using var scope = new TempDataRoot();

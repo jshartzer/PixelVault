@@ -1,0 +1,1524 @@
+{
+  "Id": "death-stranding-dc.homo-faber",
+  "Provider": "steam",
+  "GameId": "1850570",
+  "GameTitle": "DEATH STRANDING DIRECTOR'S CUT",
+  "AchievementId": "062",
+  "Title": "Buildables — Homo Faber",
+  "Description": "Fabricate all 108 trophy-target weapons, equipment, tools and vehicles. Individual levels and color variants count separately.",
+  "CompletionLabel": "Fabricated",
+  "Items": [
+    {
+      "Id": "43357b39-933d-5843-ad10-7662e38899b3",
+      "Name": "Ladder",
+      "Category": "Tools",
+      "Detail": "Metals: 20",
+      "Target": 1,
+      "Order": 10010,
+      "Identifiers": {
+        "ItemID": "216",
+        "ItemType": "DSGameWeaponListItem",
+        "ItemUUID": "c8a269e3-4ecb-9f4b-aebd-d80c8b9e7eaf",
+        "CatalogueNameCode": "2113568121"
+      }
+    },
+    {
+      "Id": "2df947b7-7e50-3249-9e8c-2716ff2e30cf",
+      "Name": "Climbing Anchor (Lv. 1)",
+      "Category": "Tools",
+      "Detail": "Resins: 16",
+      "Target": 1,
+      "Order": 10020,
+      "Identifiers": {
+        "ItemID": "217",
+        "ItemType": "DSGameWeaponListItem",
+        "ItemUUID": "6eb86b06-2f3a-4a4e-b86d-a35ea27377f8",
+        "CatalogueNameCode": "261226106"
+      }
+    },
+    {
+      "Id": "ea2eeebb-20ae-3844-a73f-6adeec6c7d84",
+      "Name": "Climbing Anchor (Lv. 2)",
+      "Category": "Tools",
+      "Detail": "Resins: 20; Metals: 10",
+      "Target": 1,
+      "Order": 10021,
+      "Identifiers": {
+        "ItemID": "218",
+        "ItemType": "DSGameWeaponListItem",
+        "ItemUUID": "958e2738-71a6-314d-a633-1d074840118b",
+        "CatalogueNameCode": "1367523934"
+      }
+    },
+    {
+      "Id": "83aea1f1-18f8-154a-8eb4-50d6438853c7",
+      "Name": "PCC (Lv. 1)",
+      "Category": "Tools",
+      "Detail": "Resins: 32; Metals: 40",
+      "Target": 1,
+      "Order": 10030,
+      "Identifiers": {
+        "ItemID": "500",
+        "ItemType": "DSGameWeaponListItem",
+        "ItemUUID": "63ff1b6d-71af-ff4f-a06c-e1e278de4be7",
+        "CatalogueNameCode": "1007249039"
+      }
+    },
+    {
+      "Id": "e361425d-1ab3-8843-a0ee-ac9144a33ded",
+      "Name": "PCC (Lv. 2)",
+      "Category": "Tools",
+      "Detail": "Chiral crystals: 30; Resins: 64; Metals: 80",
+      "Target": 1,
+      "Order": 10031,
+      "Identifiers": {
+        "ItemID": "501",
+        "ItemType": "DSGameWeaponListItem",
+        "ItemUUID": "3db19279-79b0-be4a-9c5b-0c4c2b638ca5",
+        "CatalogueNameCode": "1315104140"
+      }
+    },
+    {
+      "Id": "5a8b9040-804d-ef40-b7a1-fa7228827b60",
+      "Name": "Container Repair Spray",
+      "Category": "Tools",
+      "Detail": "Chiral crystals: 16; Resins: 8",
+      "Target": 1,
+      "Order": 10040,
+      "Identifiers": {
+        "ItemID": "51",
+        "ItemType": "DSGameWeaponListItem",
+        "ItemUUID": "fedfbb0d-b957-844c-8156-97f88380300a",
+        "CatalogueNameCode": "685058627"
+      }
+    },
+    {
+      "Id": "cd753301-4a1e-2c41-bb80-3da20dba4eb5",
+      "Name": "Blood Bag",
+      "Category": "Tools",
+      "Detail": "Chiral crystals: 6; Resins: 6",
+      "Target": 1,
+      "Order": 10050,
+      "Identifiers": {
+        "ItemID": "130",
+        "ItemType": "DSGameCommodityListItem",
+        "ItemUUID": "a8f63a20-e655-2d45-ba9b-99ddc7d0c982",
+        "CatalogueNameCode": "1057385257"
+      }
+    },
+    {
+      "Id": "108f30c7-9861-5648-bbef-7184d553ec8e",
+      "Name": "Smoke-Emitting Decoy Cargo",
+      "Category": "Tools",
+      "Detail": "Metals: 10",
+      "Target": 1,
+      "Order": 10060,
+      "Identifiers": {
+        "ItemID": "103",
+        "ItemType": "DSGameWeaponListItem",
+        "ItemUUID": "34d4ea30-e8f3-174f-a04f-14103ce81b66",
+        "CatalogueNameCode": "830943585"
+      }
+    },
+    {
+      "Id": "0017b2b7-83a4-8d47-8bf1-59320afc8e19",
+      "Name": "Vog-Emitting Decoy Cargo",
+      "Category": "Tools",
+      "Detail": "Resins: 16; Metals: 10",
+      "Target": 1,
+      "Order": 10061,
+      "Identifiers": {
+        "ItemID": "104",
+        "ItemType": "DSGameWeaponListItem",
+        "ItemUUID": "cf3c1b6d-0116-b842-aa16-ced6eea16e72",
+        "CatalogueNameCode": "1699566986"
+      }
+    },
+    {
+      "Id": "d0f2c74b-8edb-4344-b7d2-5c1874580321",
+      "Name": "Bridges Boots (Lv. 1)",
+      "Category": "Equipment",
+      "Detail": "Resins: 8",
+      "Target": 1,
+      "Order": 20020,
+      "Identifiers": {
+        "ItemID": "124",
+        "ItemType": "DSGameCommodityListItem",
+        "ItemUUID": "8ff79ed7-4d01-944b-ba96-91046a4fd116",
+        "CatalogueNameCode": "1799251009"
+      }
+    },
+    {
+      "Id": "179af8ff-20f8-6640-9a03-09af1c2f7778",
+      "Name": "Bridges Boots (Lv. 2)",
+      "Category": "Equipment",
+      "Detail": "Resins: 16; Metals: 12",
+      "Target": 1,
+      "Order": 20021,
+      "Identifiers": {
+        "ItemID": "125",
+        "ItemType": "DSGameCommodityListItem",
+        "ItemUUID": "72abc5d0-860f-834d-82ff-723d569f7e7e",
+        "CatalogueNameCode": "425060162"
+      }
+    },
+    {
+      "Id": "ab790265-98de-ec4e-8161-b86edd0d0cef",
+      "Name": "Bridges Boots (Lv. 3)",
+      "Category": "Equipment",
+      "Detail": "Resins: 32; Metals: 24",
+      "Target": 1,
+      "Order": 20022,
+      "Identifiers": {
+        "ItemID": "126",
+        "ItemType": "DSGameCommodityListItem",
+        "ItemUUID": "abeed943-7066-d34b-bafa-952133d00a8d",
+        "CatalogueNameCode": "168105142"
+      }
+    },
+    {
+      "Id": "21e6aded-90b7-cc46-b9ae-99106d336ad1",
+      "Name": "Support Skeleton",
+      "Category": "Equipment",
+      "Detail": "Resins: 110; Metals: 100",
+      "Target": 1,
+      "Order": 20050,
+      "Identifiers": {
+        "ItemID": "310",
+        "ItemType": "DSGameEquipmentListItem",
+        "ItemUUID": "ac38f6c3-a296-3f44-ac9a-b903a74319f4",
+        "CatalogueNameCode": "1569454014"
+      }
+    },
+    {
+      "Id": "3a42cbe4-c422-5d4b-a679-3d401415cb67",
+      "Name": "Power Skeleton (Lv. 1)",
+      "Category": "Equipment",
+      "Detail": "Resins: 160; Ceramics: 120",
+      "Target": 1,
+      "Order": 20101,
+      "Identifiers": {
+        "ItemID": "140",
+        "ItemType": "DSGameEquipmentListItem",
+        "ItemUUID": "d7c986f1-e4d6-fb4e-8a9c-7fa6ad630608",
+        "CatalogueNameCode": "1338792984"
+      }
+    },
+    {
+      "Id": "9ad7b6f8-b2a9-e048-8b87-4d2cf35daf17",
+      "Name": "Power Skeleton: Silver (Lv. 1)",
+      "Category": "Equipment",
+      "Detail": "Resins: 160; Ceramics: 120",
+      "Target": 1,
+      "Order": 20102,
+      "Identifiers": {
+        "ItemID": "201",
+        "ItemType": "DSGameEquipmentListItem",
+        "ItemUUID": "308e8c71-d25b-0d45-95fe-de92133418ed",
+        "CatalogueNameCode": "419659444"
+      }
+    },
+    {
+      "Id": "d9879251-a9f3-cd43-b144-62249f81bfcd",
+      "Name": "Power Skeleton: Gold (Lv. 1)",
+      "Category": "Equipment",
+      "Detail": "Resins: 160; Ceramics: 120",
+      "Target": 1,
+      "Order": 20103,
+      "Identifiers": {
+        "ItemID": "200",
+        "ItemType": "DSGameEquipmentListItem",
+        "ItemUUID": "bff4de75-c830-9c44-a9ca-eae576eaa606",
+        "CatalogueNameCode": "1802042807"
+      }
+    },
+    {
+      "Id": "5248bed4-f341-5d4c-80a1-189f6cfeb095",
+      "Name": "Power Skeleton (Lv. 2)",
+      "Category": "Equipment",
+      "Detail": "Resins: 200; Ceramics: 160",
+      "Target": 1,
+      "Order": 20104,
+      "Identifiers": {
+        "ItemID": "143",
+        "ItemType": "DSGameEquipmentListItem",
+        "ItemUUID": "cb000fa3-9d8f-564e-9d63-ec7ecde5a4e4",
+        "CatalogueNameCode": "1553772524"
+      }
+    },
+    {
+      "Id": "b320ecb9-bd04-0d44-b341-6e2e85fd974d",
+      "Name": "Power Skeleton: Silver (Lv. 2)",
+      "Category": "Equipment",
+      "Detail": "Resins: 200; Ceramics: 160",
+      "Target": 1,
+      "Order": 20105,
+      "Identifiers": {
+        "ItemID": "221",
+        "ItemType": "DSGameEquipmentListItem",
+        "ItemUUID": "a8a76206-1b36-0c41-988c-e0aef25d601e",
+        "CatalogueNameCode": "1044794970"
+      }
+    },
+    {
+      "Id": "d2236f6e-b94a-b346-b1fb-9c20410dd0d2",
+      "Name": "Power Skeleton: Gold (Lv. 2)",
+      "Category": "Equipment",
+      "Detail": "Resins: 200; Ceramics: 160",
+      "Target": 1,
+      "Order": 20106,
+      "Identifiers": {
+        "ItemID": "220",
+        "ItemType": "DSGameEquipmentListItem",
+        "ItemUUID": "5501b33f-1901-d54a-988f-dad8479dfa8f",
+        "CatalogueNameCode": "1278070105"
+      }
+    },
+    {
+      "Id": "aac5c56c-e0c6-0145-94b3-7dfa92d5d94c",
+      "Name": "Power Skeleton (Lv. 3)",
+      "Category": "Equipment",
+      "Detail": "Resins: 280; Ceramics: 200",
+      "Target": 1,
+      "Order": 20107,
+      "Identifiers": {
+        "ItemID": "144",
+        "ItemType": "DSGameEquipmentListItem",
+        "ItemUUID": "0eeb7e65-98db-504f-b8c7-75bd134f384b",
+        "CatalogueNameCode": "139905799"
+      }
+    },
+    {
+      "Id": "5c24f5c5-8851-a246-9447-eee1196b0c7c",
+      "Name": "Power Skeleton: Silver (Lv. 3)",
+      "Category": "Equipment",
+      "Detail": "Resins: 280; Ceramics: 200",
+      "Target": 1,
+      "Order": 20108,
+      "Identifiers": {
+        "ItemID": "223",
+        "ItemType": "DSGameEquipmentListItem",
+        "ItemUUID": "21f34bd7-41c8-474d-9b76-15f191888703",
+        "CatalogueNameCode": "1602043565"
+      }
+    },
+    {
+      "Id": "cfd0b3bf-5cc6-4d42-8435-0b383a4844fb",
+      "Name": "Power Skeleton: Gold (Lv. 3)",
+      "Category": "Equipment",
+      "Detail": "Resins: 280; Ceramics: 200",
+      "Target": 1,
+      "Order": 20109,
+      "Identifiers": {
+        "ItemID": "222",
+        "ItemType": "DSGameEquipmentListItem",
+        "ItemUUID": "0d235328-5159-a940-bc02-21cbc16e343c",
+        "CatalogueNameCode": "756465070"
+      }
+    },
+    {
+      "Id": "1e5f2080-adc8-f849-bbd6-98c55e6caf51",
+      "Name": "Speed Skeleton (Lv. 1)",
+      "Category": "Equipment",
+      "Detail": "Resins: 120; Ceramics: 160",
+      "Target": 1,
+      "Order": 20201,
+      "Identifiers": {
+        "ItemID": "141",
+        "ItemType": "DSGameEquipmentListItem",
+        "ItemUUID": "5671d35d-a468-534e-95a1-6b4c45397554",
+        "CatalogueNameCode": "1034411803"
+      }
+    },
+    {
+      "Id": "9dd12d3f-4f75-6642-958c-7fd346138e51",
+      "Name": "Speed Skeleton: Silver (Lv. 1)",
+      "Category": "Equipment",
+      "Detail": "Resins: 120; Ceramics: 160",
+      "Target": 1,
+      "Order": 20202,
+      "Identifiers": {
+        "ItemID": "203",
+        "ItemType": "DSGameEquipmentListItem",
+        "ItemUUID": "318f7b6e-e87a-0e41-9109-b2697459f38e",
+        "CatalogueNameCode": "2016939587"
+      }
+    },
+    {
+      "Id": "6f84dd9b-4d05-8747-9387-7d1bbf985e61",
+      "Name": "Speed Skeleton: Gold (Lv. 1)",
+      "Category": "Equipment",
+      "Detail": "Resins: 120; Ceramics: 160",
+      "Target": 1,
+      "Order": 20203,
+      "Identifiers": {
+        "ItemID": "202",
+        "ItemType": "DSGameEquipmentListItem",
+        "ItemUUID": "e1eff998-a567-094e-99e1-1b2675f69077",
+        "CatalogueNameCode": "173247808"
+      }
+    },
+    {
+      "Id": "5c4866e5-8bcf-8f43-925a-8cf87f0f48f6",
+      "Name": "Speed Skeleton (Lv. 2)",
+      "Category": "Equipment",
+      "Detail": "Resins: 160; Ceramics: 200",
+      "Target": 1,
+      "Order": 20204,
+      "Identifiers": {
+        "ItemID": "145",
+        "ItemType": "DSGameEquipmentListItem",
+        "ItemUUID": "3c08c92b-b2a7-6941-8055-633205ee1a6c",
+        "CatalogueNameCode": "2050836484"
+      }
+    },
+    {
+      "Id": "f02abc48-1322-7948-9c81-d7064bc265eb",
+      "Name": "Speed Skeleton: Silver (Lv. 2)",
+      "Category": "Equipment",
+      "Detail": "Resins: 160; Ceramics: 200",
+      "Target": 1,
+      "Order": 20205,
+      "Identifiers": {
+        "ItemID": "225",
+        "ItemType": "DSGameEquipmentListItem",
+        "ItemUUID": "36afe521-ee1d-1e41-b046-e1d617ba89ee",
+        "CatalogueNameCode": "2044516677"
+      }
+    },
+    {
+      "Id": "247a60b6-b8d8-764e-81ee-b060144bd41d",
+      "Name": "Speed Skeleton: Gold (Lv. 2)",
+      "Category": "Equipment",
+      "Detail": "Resins: 160; Ceramics: 200",
+      "Target": 1,
+      "Order": 20206,
+      "Identifiers": {
+        "ItemID": "224",
+        "ItemType": "DSGameEquipmentListItem",
+        "ItemUUID": "5005b6ac-6955-8548-a48c-6b9296fd6df3",
+        "CatalogueNameCode": "196565574"
+      }
+    },
+    {
+      "Id": "0342b723-70f7-9644-891c-7a0d4b51b17d",
+      "Name": "Speed Skeleton (Lv. 3)",
+      "Category": "Equipment",
+      "Detail": "Resins: 240; Ceramics: 240",
+      "Target": 1,
+      "Order": 20207,
+      "Identifiers": {
+        "ItemID": "146",
+        "ItemType": "DSGameEquipmentListItem",
+        "ItemUUID": "b6d01c0b-4e06-7f47-8247-cbd7bbec0031",
+        "CatalogueNameCode": "1768799216"
+      }
+    },
+    {
+      "Id": "4a370624-93d3-ec4e-b0d0-a44cb1882298",
+      "Name": "Speed Skeleton: Silver (Lv. 3)",
+      "Category": "Equipment",
+      "Detail": "Resins: 240; Ceramics: 240",
+      "Target": 1,
+      "Order": 20208,
+      "Identifiers": {
+        "ItemID": "227",
+        "ItemType": "DSGameEquipmentListItem",
+        "ItemUUID": "13f1e847-51ff-f143-baf9-4ac2668c59cc",
+        "CatalogueNameCode": "417835442"
+      }
+    },
+    {
+      "Id": "507847de-9d94-1048-9669-dd1cdbf23146",
+      "Name": "Speed Skeleton: Gold (Lv. 3)",
+      "Category": "Equipment",
+      "Detail": "Resins: 240; Ceramics: 240",
+      "Target": 1,
+      "Order": 20209,
+      "Identifiers": {
+        "ItemID": "226",
+        "ItemType": "DSGameEquipmentListItem",
+        "ItemUUID": "aa88f203-b5ba-d24f-910f-9043fc8b7013",
+        "CatalogueNameCode": "1787570865"
+      }
+    },
+    {
+      "Id": "06f13c08-d882-4c44-9bf9-3971cc3e6eb9",
+      "Name": "All-terrain Skeleton (Lv. 1)",
+      "Category": "Equipment",
+      "Detail": "Resins: 140; Ceramics: 140",
+      "Target": 1,
+      "Order": 20301,
+      "Identifiers": {
+        "ItemID": "142",
+        "ItemType": "DSGameEquipmentListItem",
+        "ItemUUID": "07e86e03-0f43-d844-8130-f222eddba843",
+        "CatalogueNameCode": "787950831"
+      }
+    },
+    {
+      "Id": "07359732-3165-5d42-bb5c-a3063ad32b56",
+      "Name": "All-terrain Skeleton: Silver (Lv. 1)",
+      "Category": "Equipment",
+      "Detail": "Resins: 140; Ceramics: 140",
+      "Target": 1,
+      "Order": 20302,
+      "Identifiers": {
+        "ItemID": "205",
+        "ItemType": "DSGameEquipmentListItem",
+        "ItemUUID": "62954e96-ec4c-8144-8895-9c0b8f16651a",
+        "CatalogueNameCode": "1587145131"
+      }
+    },
+    {
+      "Id": "7dc9f0d4-4f61-bb4f-9e95-3f4b333423c0",
+      "Name": "All-terrain Skeleton: Gold (Lv. 1)",
+      "Category": "Equipment",
+      "Detail": "Resins: 140; Ceramics: 140",
+      "Target": 1,
+      "Order": 20303,
+      "Identifiers": {
+        "ItemID": "204",
+        "ItemType": "DSGameEquipmentListItem",
+        "ItemUUID": "dff76c99-cbbf-644b-83a7-cf6a2aa98e44",
+        "CatalogueNameCode": "754084520"
+      }
+    },
+    {
+      "Id": "579ffb4f-2ca9-5e4e-a578-54935f227dac",
+      "Name": "All-terrain Skeleton (Lv. 2)",
+      "Category": "Equipment",
+      "Detail": "Resins: 180; Ceramics: 180",
+      "Target": 1,
+      "Order": 20304,
+      "Identifiers": {
+        "ItemID": "147",
+        "ItemType": "DSGameEquipmentListItem",
+        "ItemUUID": "bb44e279-2739-7b4f-85bd-377e18ff1d05",
+        "CatalogueNameCode": "453392627"
+      }
+    },
+    {
+      "Id": "c846e36b-08a1-f943-ad31-e229385e2d23",
+      "Name": "All-Terrain Skeleton: Silver (Lv. 2)",
+      "Category": "Equipment",
+      "Detail": "Resins: 180; Ceramics: 180",
+      "Target": 1,
+      "Order": 20305,
+      "Identifiers": {
+        "ItemID": "229",
+        "ItemType": "DSGameEquipmentListItem",
+        "ItemUUID": "d249bf83-f225-574b-9057-563570d90872",
+        "CatalogueNameCode": "882841237"
+      }
+    },
+    {
+      "Id": "47667043-b527-3149-9bde-4685912152de",
+      "Name": "All-Terrain Skeleton: Gold (Lv. 2)",
+      "Category": "Equipment",
+      "Detail": "Resins: 180; Ceramics: 180",
+      "Target": 1,
+      "Order": 20306,
+      "Identifiers": {
+        "ItemID": "228",
+        "ItemType": "DSGameEquipmentListItem",
+        "ItemUUID": "99daeee9-7aa0-0848-b6ff-ed718c892165",
+        "CatalogueNameCode": "1190434198"
+      }
+    },
+    {
+      "Id": "90d15b4e-977c-334d-a981-efcfee1ed93a",
+      "Name": "All-terrain Skeleton (Lv. 3)",
+      "Category": "Equipment",
+      "Detail": "Resins: 260; Ceramics: 220",
+      "Target": 1,
+      "Order": 20307,
+      "Identifiers": {
+        "ItemID": "148",
+        "ItemType": "DSGameEquipmentListItem",
+        "ItemUUID": "69ee8ba6-e78a-1243-b232-cecea8751b55",
+        "CatalogueNameCode": "1159005399"
+      }
+    },
+    {
+      "Id": "5bbca8bc-8c88-574f-83a2-9ee856a2de34",
+      "Name": "All-Terrain Skeleton: Silver (Lv. 3)",
+      "Category": "Equipment",
+      "Detail": "Resins: 260; Ceramics: 220",
+      "Target": 1,
+      "Order": 20308,
+      "Identifiers": {
+        "ItemID": "231",
+        "ItemType": "DSGameEquipmentListItem",
+        "ItemUUID": "1025eec7-4a1f-3246-891a-3d90ee25b6ff",
+        "CatalogueNameCode": "769971757"
+      }
+    },
+    {
+      "Id": "8a87b47b-5b1a-084a-b7e3-80d931921e15",
+      "Name": "All-Terrain Skeleton: Gold (Lv. 3)",
+      "Category": "Equipment",
+      "Detail": "Resins: 260; Ceramics: 220",
+      "Target": 1,
+      "Order": 20309,
+      "Identifiers": {
+        "ItemID": "230",
+        "ItemType": "DSGameEquipmentListItem",
+        "ItemUUID": "a9197782-7be9-6748-b48a-0e184c0a5d11",
+        "CatalogueNameCode": "1603228974"
+      }
+    },
+    {
+      "Id": "92723e66-71e3-9b4c-a438-dfc642ba2540",
+      "Name": "Armor Plate (Lv. 1)",
+      "Category": "Equipment",
+      "Detail": "Resins: 20; Ceramics: 20",
+      "Target": 1,
+      "Order": 20401,
+      "Identifiers": {
+        "ItemID": "152",
+        "ItemType": "DSGameEquipmentListItem",
+        "ItemUUID": "24509705-e1ce-4e47-bc72-6800e4cbb91f",
+        "CatalogueNameCode": "1029026968"
+      }
+    },
+    {
+      "Id": "d9e2615b-78dc-274f-a226-e151d440384e",
+      "Name": "Armor Plate: Silver (Lv. 1)",
+      "Category": "Equipment",
+      "Detail": "Resins: 20; Ceramics: 20",
+      "Target": 1,
+      "Order": 20402,
+      "Identifiers": {
+        "ItemID": "211",
+        "ItemType": "DSGameEquipmentListItem",
+        "ItemUUID": "de7db7d3-abbd-bc4b-be21-2fe4a8551a20",
+        "CatalogueNameCode": "178382531"
+      }
+    },
+    {
+      "Id": "338b75cd-c28d-0043-8cdc-d0158d3d0e65",
+      "Name": "Armor Plate: Gold (Lv. 1)",
+      "Category": "Equipment",
+      "Detail": "Resins: 20; Ceramics: 20",
+      "Target": 1,
+      "Order": 20403,
+      "Identifiers": {
+        "ItemID": "210",
+        "ItemType": "DSGameEquipmentListItem",
+        "ItemUUID": "af085ef9-0e6e-c34f-aa0c-8260822a675a",
+        "CatalogueNameCode": "2026530240"
+      }
+    },
+    {
+      "Id": "7e875d9a-73f3-d44d-9352-898c8585f94c",
+      "Name": "Armor Plate (Lv. 2)",
+      "Category": "Equipment",
+      "Detail": "Ceramics: 20; Special alloys: 60",
+      "Target": 1,
+      "Order": 20404,
+      "Identifiers": {
+        "ItemID": "153",
+        "ItemType": "DSGameEquipmentListItem",
+        "ItemUUID": "4e988bdc-1da3-e149-81a2-0ba03b8673e4",
+        "CatalogueNameCode": "1329477531"
+      }
+    },
+    {
+      "Id": "81fec9af-b006-4745-ba52-42cb2bc244a2",
+      "Name": "Armor Plate: Silver (Lv. 2)",
+      "Category": "Equipment",
+      "Detail": "Ceramics: 20; Special alloys: 60",
+      "Target": 1,
+      "Order": 20405,
+      "Identifiers": {
+        "ItemID": "213",
+        "ItemType": "DSGameEquipmentListItem",
+        "ItemUUID": "a58fdd1a-ef65-cf41-920d-688e851dbeb7",
+        "CatalogueNameCode": "1805293108"
+      }
+    },
+    {
+      "Id": "e3085eef-f4b2-9a47-9eea-1a66c69be935",
+      "Name": "Armor Plate: Gold (Lv. 2)",
+      "Category": "Equipment",
+      "Detail": "Ceramics: 20; Special alloys: 60",
+      "Target": 1,
+      "Order": 20406,
+      "Identifiers": {
+        "ItemID": "212",
+        "ItemType": "DSGameEquipmentListItem",
+        "ItemUUID": "1077c73d-25b8-8942-b60f-f2efbc7edc93",
+        "CatalogueNameCode": "435230007"
+      }
+    },
+    {
+      "Id": "4f2ada1e-290f-d742-a84d-cb45dc286625",
+      "Name": "Armor Plate (Lv. 3)",
+      "Category": "Equipment",
+      "Detail": "Ceramics: 40; Special alloys: 80",
+      "Target": 1,
+      "Order": 20407,
+      "Identifiers": {
+        "ItemID": "150",
+        "ItemType": "DSGameEquipmentListItem",
+        "ItemUUID": "96055cc6-91f7-a340-82c5-c5c6daa05f3a",
+        "CatalogueNameCode": "1550763119"
+      }
+    },
+    {
+      "Id": "41d6a139-4eff-1942-a90a-bb0d885d37ae",
+      "Name": "Armor Plate: Silver (Lv. 3)",
+      "Category": "Equipment",
+      "Detail": "Ceramics: 40; Special alloys: 80",
+      "Target": 1,
+      "Order": 20408,
+      "Identifiers": {
+        "ItemID": "251",
+        "ItemType": "DSGameEquipmentListItem",
+        "ItemUUID": "7f61d942-258d-7a45-89ec-c28ce168b29d",
+        "CatalogueNameCode": "1143703327"
+      }
+    },
+    {
+      "Id": "2a2aa1b6-cde0-8540-8a0f-232d00f71238",
+      "Name": "Armor Plate: Gold (Lv. 3)",
+      "Category": "Equipment",
+      "Detail": "Ceramics: 40; Special alloys: 80",
+      "Target": 1,
+      "Order": 20409,
+      "Identifiers": {
+        "ItemID": "250",
+        "ItemType": "DSGameEquipmentListItem",
+        "ItemUUID": "7ab5aa80-b498-8442-87a4-0425e2d7e53f",
+        "CatalogueNameCode": "910165020"
+      }
+    },
+    {
+      "Id": "f90ce79f-b4d7-0b46-98b5-311e89625cd3",
+      "Name": "Armor Plate (Lv. 4)",
+      "Category": "Equipment",
+      "Detail": "Ceramics: 80; Special alloys: 120",
+      "Target": 1,
+      "Order": 20410,
+      "Identifiers": {
+        "ItemID": "151",
+        "ItemType": "DSGameEquipmentListItem",
+        "ItemUUID": "bbf6f698-0cd1-0241-aa2a-e507b7ad4c8b",
+        "CatalogueNameCode": "772097900"
+      }
+    },
+    {
+      "Id": "b91aade6-3787-3049-86ee-0520ca87f08d",
+      "Name": "Armor Plate: Silver (Lv. 4)",
+      "Category": "Equipment",
+      "Detail": "Ceramics: 80; Special alloys: 120",
+      "Target": 1,
+      "Order": 20411,
+      "Identifiers": {
+        "ItemID": "253",
+        "ItemType": "DSGameEquipmentListItem",
+        "ItemUUID": "1df72f12-d4d6-8544-a2f5-3bb16b8be5ed",
+        "CatalogueNameCode": "621869032"
+      }
+    },
+    {
+      "Id": "6989a31d-da78-794f-a9e7-14f70c0ca095",
+      "Name": "Armor Plate: Gold (Lv. 4)",
+      "Category": "Equipment",
+      "Detail": "Ceramics: 80; Special alloys: 120",
+      "Target": 1,
+      "Order": 20412,
+      "Identifiers": {
+        "ItemID": "252",
+        "ItemType": "DSGameEquipmentListItem",
+        "ItemUUID": "637b2392-9005-7048-9974-7b5e13e01015",
+        "CatalogueNameCode": "1467708651"
+      }
+    },
+    {
+      "Id": "edc5d4d8-b10a-9e4a-a684-96503c4bb619",
+      "Name": "Oxygen Mask",
+      "Category": "Equipment",
+      "Detail": "Resins: 32; Chemicals: 48",
+      "Target": 1,
+      "Order": 20600,
+      "Identifiers": {
+        "ItemID": "155",
+        "ItemType": "DSGameEquipmentListItem",
+        "ItemUUID": "a48398f8-b5bd-4940-96c2-86ca97e7e1b8",
+        "CatalogueNameCode": "1772081267"
+      }
+    },
+    {
+      "Id": "d0372157-bbb1-a845-bb35-48f90b9cc699",
+      "Name": "Power Gloves",
+      "Category": "Equipment",
+      "Detail": "Resins: 60; Special alloys: 30",
+      "Target": 1,
+      "Order": 20700,
+      "Identifiers": {
+        "ItemID": "162",
+        "ItemType": "DSGameEquipmentListItem",
+        "ItemUUID": "eb0f95c2-7617-af40-bcca-e4e2f513fa70",
+        "CatalogueNameCode": "162667521"
+      }
+    },
+    {
+      "Id": "7ce9ee99-5dee-9e46-892d-85909747f127",
+      "Name": "Gravity Gloves",
+      "Category": "Equipment",
+      "Detail": "Resins: 60; Special alloys: 60",
+      "Target": 1,
+      "Order": 20705,
+      "Identifiers": {
+        "ItemID": "800",
+        "ItemType": "DSGameEquipmentListItem",
+        "ItemUUID": "e85ace52-37e3-a847-8ea9-89c27016fb88",
+        "CatalogueNameCode": "475435391"
+      }
+    },
+    {
+      "Id": "a6d7d5cf-501f-6a42-be5d-225886369fad",
+      "Name": "Silver Hand",
+      "Category": "Equipment",
+      "Detail": "Resins: 20; Special alloys: 160",
+      "Target": 1,
+      "Order": 20710,
+      "Identifiers": {
+        "ItemID": "860",
+        "ItemType": "DSGameEquipmentListItem",
+        "ItemUUID": "9aa975b9-77a5-bc42-aeed-8df024de40c8",
+        "CatalogueNameCode": "1973010509"
+      }
+    },
+    {
+      "Id": "ed3de5ae-6a17-8449-9948-9be6d3aa4bba",
+      "Name": "Thermal Pad",
+      "Category": "Equipment",
+      "Detail": "Ceramics: 20; Chemicals: 16",
+      "Target": 1,
+      "Order": 20800,
+      "Identifiers": {
+        "ItemID": "163",
+        "ItemType": "DSGameEquipmentListItem",
+        "ItemUUID": "f1801123-9898-2e4a-bc93-2e5b889793f7",
+        "CatalogueNameCode": "2077859586"
+      }
+    },
+    {
+      "Id": "62c67963-5c63-8b47-9b88-a869bcd23222",
+      "Name": "Floating Carrier (Lv. 1)",
+      "Category": "Vehicles",
+      "Detail": "Resins: 96; Metals: 120",
+      "Target": 1,
+      "Order": 40100,
+      "Identifiers": {
+        "ItemID": "228",
+        "ItemType": "DSGameCommodityListItem",
+        "ItemUUID": "7b4f489b-0fe3-ea45-9cf7-5a35332be097",
+        "CatalogueNameCode": "1469078960"
+      }
+    },
+    {
+      "Id": "e8173c62-b611-c641-ae3a-ff4472347e08",
+      "Name": "Floating Carrier (Lv. 2)",
+      "Category": "Vehicles",
+      "Detail": "Resins: 128; Metals: 160",
+      "Target": 1,
+      "Order": 40101,
+      "Identifiers": {
+        "ItemID": "239",
+        "ItemType": "DSGameCommodityListItem",
+        "ItemUUID": "206af30b-bff0-6440-ad5b-160c8d4ea171",
+        "CatalogueNameCode": "911820484"
+      }
+    },
+    {
+      "Id": "5f328023-09b4-704c-92d0-1b7d01d71b83",
+      "Name": "Buddy Bot",
+      "Category": "Vehicles",
+      "Detail": "Resins: 280; Chemicals: 240; Special alloys: 120",
+      "Target": 1,
+      "Order": 40150,
+      "Identifiers": {
+        "ItemID": "660",
+        "ItemType": "DSGameCommodityListItem",
+        "ItemUUID": "24394cd5-fe6a-ea45-91ee-ac28e23a305c",
+        "CatalogueNameCode": "220053689"
+      }
+    },
+    {
+      "Id": "520f1f3a-b026-764a-9784-7a0d3aaf7ce5",
+      "Name": "Reverse Trike",
+      "Category": "Vehicles",
+      "Detail": "Metals: 220; Ceramics: 160",
+      "Target": 1,
+      "Order": 40200,
+      "Identifiers": {
+        "ItemID": "229",
+        "ItemType": "DSGameCommodityListItem",
+        "ItemUUID": "9527ad7f-6bb8-5743-b62a-0143e817ebfa",
+        "CatalogueNameCode": "637263539"
+      }
+    },
+    {
+      "Id": "33243398-1dff-6849-bcd6-72277d0da706",
+      "Name": "Reverse Trike: Long Range",
+      "Category": "Vehicles",
+      "Detail": "Metals: 240; Ceramics: 160",
+      "Target": 1,
+      "Order": 40210,
+      "Identifiers": {
+        "ItemID": "301",
+        "ItemType": "DSGameCommodityListItem",
+        "ItemUUID": "b3f7ff36-3373-1b42-96f1-5b006294861e",
+        "CatalogueNameCode": "757474540"
+      }
+    },
+    {
+      "Id": "3c4afbf9-5157-0743-92b6-7d358a970bd6",
+      "Name": "Reverse Trike: Defensive",
+      "Category": "Vehicles",
+      "Detail": "Metals: 200; Ceramics: 160; Special alloys: 48",
+      "Target": 1,
+      "Order": 40220,
+      "Identifiers": {
+        "ItemID": "302",
+        "ItemType": "DSGameCommodityListItem",
+        "ItemUUID": "d9df2a4a-f0f8-724e-b001-96faf24d05f1",
+        "CatalogueNameCode": "1047975704"
+      }
+    },
+    {
+      "Id": "08d8ceb2-50ed-f644-ae31-61707957eed1",
+      "Name": "Reverse Trike: \"Ride\" Type",
+      "Category": "Vehicles",
+      "Detail": "Metals: 220; Ceramics: 160; Special alloys: 96",
+      "Target": 1,
+      "Order": 40230,
+      "Identifiers": {
+        "ItemID": "300",
+        "ItemType": "DSGameCommodityListItem",
+        "ItemUUID": "f4329afd-8e53-5e4f-bca8-f0ba9b083ce6",
+        "CatalogueNameCode": "1598924783"
+      }
+    },
+    {
+      "Id": "e35ea821-4ff9-b345-8d3f-3c66a05ad633",
+      "Name": "Reverse Trike: \"Yaiba Kusanagi\" Type",
+      "Category": "Vehicles",
+      "Detail": "Metals: 220; Ceramics: 200; Special alloys: 100",
+      "Target": 1,
+      "Order": 40240,
+      "Identifiers": {
+        "ItemID": "880",
+        "ItemType": "DSGameCommodityListItem",
+        "ItemUUID": "d1a5c84a-7681-b840-b784-ce2eaa0f833a",
+        "CatalogueNameCode": "270965473"
+      }
+    },
+    {
+      "Id": "8dd86490-d35f-2644-a313-f100fef622d8",
+      "Name": "Reverse Trike: Transporter",
+      "Category": "Vehicles",
+      "Detail": "Metals: 240; Ceramics: 160",
+      "Target": 1,
+      "Order": 40250,
+      "Identifiers": {
+        "ItemID": "640",
+        "ItemType": "DSGameCommodityListItem",
+        "ItemUUID": "fdeadf26-a205-9e46-afef-14d1bc6a7d49",
+        "CatalogueNameCode": "710471767"
+      }
+    },
+    {
+      "Id": "23308d21-7d4e-ed46-8b5c-a2610ab7d1f9",
+      "Name": "Truck",
+      "Category": "Vehicles",
+      "Detail": "Metals: 320; Ceramics: 224",
+      "Target": 1,
+      "Order": 40300,
+      "Identifiers": {
+        "ItemID": "231",
+        "ItemType": "DSGameCommodityListItem",
+        "ItemUUID": "ddb06c5d-1046-7048-95c4-eac6944b8615",
+        "CatalogueNameCode": "1015029259"
+      }
+    },
+    {
+      "Id": "10ef6068-e3df-914e-aee5-846a51ea3dc0",
+      "Name": "Truck: Long Range (Lv. 1)",
+      "Category": "Vehicles",
+      "Detail": "Metals: 280; Ceramics: 256; Special alloys: 48",
+      "Target": 1,
+      "Order": 40310,
+      "Identifiers": {
+        "ItemID": "310",
+        "ItemType": "DSGameCommodityListItem",
+        "ItemUUID": "738c88d4-f2e9-9f4f-8c20-4b858c473e5d",
+        "CatalogueNameCode": "1290747800"
+      }
+    },
+    {
+      "Id": "83a98826-3c23-fd49-854a-4f1bf3930454",
+      "Name": "Truck: Long Range (Lv. 2)",
+      "Category": "Vehicles",
+      "Detail": "Metals: 360; Ceramics: 320; Special alloys: 144",
+      "Target": 1,
+      "Order": 40311,
+      "Identifiers": {
+        "ItemID": "312",
+        "ItemType": "DSGameCommodityListItem",
+        "ItemUUID": "a4ab9619-1b49-7c46-9ec4-777f94a61606",
+        "CatalogueNameCode": "1324064008"
+      }
+    },
+    {
+      "Id": "d03fa583-21c0-6f4e-8ff0-8864d0d572a1",
+      "Name": "Truck: Long Range (Lv. 3)",
+      "Category": "Vehicles",
+      "Detail": "Metals: 440; Ceramics: 384; Special alloys: 240",
+      "Target": 1,
+      "Order": 40312,
+      "Identifiers": {
+        "ItemID": "313",
+        "ItemType": "DSGameCommodityListItem",
+        "ItemUUID": "7012d35d-379f-9842-a9c7-8be098493c10",
+        "CatalogueNameCode": "802221567"
+      }
+    },
+    {
+      "Id": "d8f62d8b-778e-304d-aba4-e407ebf3049b",
+      "Name": "Truck: Defensive",
+      "Category": "Vehicles",
+      "Detail": "Metals: 240; Ceramics: 224; Special alloys: 96",
+      "Target": 1,
+      "Order": 40320,
+      "Identifiers": {
+        "ItemID": "311",
+        "ItemType": "DSGameCommodityListItem",
+        "ItemUUID": "3057c01d-7834-1f43-b008-c18ec25cfbae",
+        "CatalogueNameCode": "1048886427"
+      }
+    },
+    {
+      "Id": "a3052f6d-1a84-4745-8d51-ca4821b3f9ad",
+      "Name": "Truck (λ Type)",
+      "Category": "Vehicles",
+      "Detail": "Metals: 280; Ceramics: 288; Special alloys: 96",
+      "Target": 1,
+      "Order": 40330,
+      "Identifiers": {
+        "ItemID": "840",
+        "ItemType": "DSGameCommodityListItem",
+        "ItemUUID": "083d0205-2e70-7f45-8684-629f2b427e5f",
+        "CatalogueNameCode": "1136146565"
+      }
+    },
+    {
+      "Id": "3ab16703-cc54-5447-b463-f8ef4162e19f",
+      "Name": "Roadster",
+      "Category": "Vehicles",
+      "Detail": "Metals: 80; Ceramics: 240; Special alloys: 240",
+      "Target": 1,
+      "Order": 40340,
+      "Identifiers": {
+        "ItemID": "650",
+        "ItemType": "DSGameCommodityListItem",
+        "ItemUUID": "5efeaf79-e379-774c-aa8c-412e662c1382",
+        "CatalogueNameCode": "972711968"
+      }
+    },
+    {
+      "Id": "05357892-06a0-894b-a6dc-d182166b0f8b",
+      "Name": "Roadster: Long Range",
+      "Category": "Vehicles",
+      "Detail": "Metals: 80; Ceramics: 240; Special alloys: 290",
+      "Target": 1,
+      "Order": 40350,
+      "Identifiers": {
+        "ItemID": "651",
+        "ItemType": "DSGameCommodityListItem",
+        "ItemUUID": "ef77a743-3251-9441-b9d3-8f81cb9034ac",
+        "CatalogueNameCode": "1267854115"
+      }
+    },
+    {
+      "Id": "7b1ddc63-9aa7-6445-bb18-ede4171b82b0",
+      "Name": "Maser Gun",
+      "Category": "Weapons",
+      "Detail": "Resins: 80; Metals: 90",
+      "Target": 1,
+      "Order": 50090,
+      "Identifiers": {
+        "ItemID": "320",
+        "ItemType": "DSGameWeaponListItem",
+        "ItemUUID": "5472f3ab-43fb-8b4b-a351-366b00ebf83d",
+        "CatalogueNameCode": "1258135670"
+      }
+    },
+    {
+      "Id": "54f85518-7723-254f-8ff2-26352014ca53",
+      "Name": "Bola Gun (Lv. 1)",
+      "Category": "Weapons",
+      "Detail": "Resins: 32; Metals: 80",
+      "Target": 1,
+      "Order": 50100,
+      "Identifiers": {
+        "ItemID": "7",
+        "ItemType": "DSGameWeaponListItem",
+        "ItemUUID": "4240be36-cf56-df4f-a2e5-f1330b8ecfcb",
+        "CatalogueNameCode": "1398551552"
+      }
+    },
+    {
+      "Id": "85918f4e-14c3-a84a-b856-49ec10d5b573",
+      "Name": "Bola Gun (Lv. 2)",
+      "Category": "Weapons",
+      "Detail": "Resins: 62; Metals: 120",
+      "Target": 1,
+      "Order": 50110,
+      "Identifiers": {
+        "ItemID": "8",
+        "ItemType": "DSGameWeaponListItem",
+        "ItemUUID": "ffe654cb-73c9-f943-8c0d-4ec69e398d34",
+        "CatalogueNameCode": "223283236"
+      }
+    },
+    {
+      "Id": "7cc2ffaa-fd2b-6140-b2b9-46515d129042",
+      "Name": "Anti-BT Handgun (Lv. 1)",
+      "Category": "Weapons",
+      "Detail": "Resins: 32; Metals: 100",
+      "Target": 1,
+      "Order": 50200,
+      "Identifiers": {
+        "ItemID": "16",
+        "ItemType": "DSGameWeaponListItem",
+        "ItemUUID": "1d4d3677-3782-f645-a6f0-5b9a817879a0",
+        "CatalogueNameCode": "848637812"
+      }
+    },
+    {
+      "Id": "0015884b-bb4d-7e4f-978c-f3a88281da87",
+      "Name": "Anti-BT Handgun (Lv. 2)",
+      "Category": "Weapons",
+      "Detail": "Resins: 64; Metals: 180",
+      "Target": 1,
+      "Order": 50210,
+      "Identifiers": {
+        "ItemID": "17",
+        "ItemType": "DSGameWeaponListItem",
+        "ItemUUID": "5acb5d20-e102-1245-95a8-52e8133f4909",
+        "CatalogueNameCode": "1090432119"
+      }
+    },
+    {
+      "Id": "f4526f6b-6d91-f64a-9cce-7023c97fc5d9",
+      "Name": "Sticky Gun",
+      "Category": "Weapons",
+      "Detail": "Resins: 100; Metals: 160",
+      "Target": 1,
+      "Order": 50300,
+      "Identifiers": {
+        "ItemID": "49",
+        "ItemType": "DSGameWeaponListItem",
+        "ItemUUID": "b374104d-db23-2e44-b5f6-0117d2e8b270",
+        "CatalogueNameCode": "833547003"
+      }
+    },
+    {
+      "Id": "b9f1900d-2467-8444-ad0f-21f2cfc75871",
+      "Name": "Handgun (Lv. 1)",
+      "Category": "Weapons",
+      "Detail": "Metals: 140",
+      "Target": 1,
+      "Order": 50400,
+      "Identifiers": {
+        "ItemID": "10",
+        "ItemType": "DSGameWeaponListItem",
+        "ItemUUID": "878a3e9f-bf5f-b442-8ff3-bff5fce1cec7",
+        "CatalogueNameCode": "339003548"
+      }
+    },
+    {
+      "Id": "8b8d01b5-2051-2b4c-a86a-e855e5a678bc",
+      "Name": "Handgun (Lv. 2)",
+      "Category": "Weapons",
+      "Detail": "Metals: 150; Special alloys: 60",
+      "Target": 1,
+      "Order": 50410,
+      "Identifiers": {
+        "ItemID": "11",
+        "ItemType": "DSGameWeaponListItem",
+        "ItemUUID": "58c15011-3778-9047-aee3-ed92b4e5e850",
+        "CatalogueNameCode": "1717521311"
+      }
+    },
+    {
+      "Id": "8e302ffb-ec3f-1d49-a5fc-0b3cb2396057",
+      "Name": "Handgun (HG Custom)",
+      "Category": "Weapons",
+      "Detail": "Metals: 170; Special alloys: 96",
+      "Target": 1,
+      "Order": 50420,
+      "Identifiers": {
+        "ItemID": "12",
+        "ItemType": "DSGameWeaponListItem",
+        "ItemUUID": "89db3d37-1936-5646-8182-5098cede0bd1",
+        "CatalogueNameCode": "1963964523"
+      }
+    },
+    {
+      "Id": "da9ebab4-5164-c540-9b90-6de61df90676",
+      "Name": "Assault Rifle (Lv. 1)",
+      "Category": "Weapons",
+      "Detail": "Metals: 170",
+      "Target": 1,
+      "Order": 50500,
+      "Identifiers": {
+        "ItemID": "22",
+        "ItemType": "DSGameWeaponListItem",
+        "ItemUUID": "a08e98f1-7205-7c43-a684-fed065a122a7",
+        "CatalogueNameCode": "1105727730"
+      }
+    },
+    {
+      "Id": "40319c31-e359-f244-a907-8f7c0f0a0057",
+      "Name": "Assault Rifle (Lv. 2)",
+      "Category": "Weapons",
+      "Detail": "Metals: 180; Special alloys: 80",
+      "Target": 1,
+      "Order": 50510,
+      "Identifiers": {
+        "ItemID": "23",
+        "ItemType": "DSGameWeaponListItem",
+        "ItemUUID": "af7d405b-8218-7c4e-8328-8a319a2d1293",
+        "CatalogueNameCode": "864261105"
+      }
+    },
+    {
+      "Id": "3b615b81-7bd5-0043-bff9-97cab64d90e3",
+      "Name": "Assault Rifle (Lv. 3)",
+      "Category": "Weapons",
+      "Detail": "Metals: 200; Special alloys: 120",
+      "Target": 1,
+      "Order": 50520,
+      "Identifiers": {
+        "ItemID": "52",
+        "ItemType": "DSGameWeaponListItem",
+        "ItemUUID": "71b0c361-8ecd-6749-b9b1-646b1c09dd90",
+        "CatalogueNameCode": "998627767"
+      }
+    },
+    {
+      "Id": "fe9f6c66-5e3c-5144-91a3-ebdf189243be",
+      "Name": "Assault Rifle (HG Custom)",
+      "Category": "Weapons",
+      "Detail": "Metals: 200; Special alloys: 120",
+      "Target": 1,
+      "Order": 50525,
+      "Identifiers": {
+        "ItemID": "24",
+        "ItemType": "DSGameWeaponListItem",
+        "ItemUUID": "3c684355-98f0-e24f-bb79-4d99326f1324",
+        "CatalogueNameCode": "1732900634"
+      }
+    },
+    {
+      "Id": "2e410832-7b2e-a04c-affb-dea7268f6700",
+      "Name": "Non-Lethal Assault Rifle (Lv. 1)",
+      "Category": "Weapons",
+      "Detail": "Resins: 40; Metals: 160",
+      "Target": 1,
+      "Order": 50600,
+      "Identifiers": {
+        "ItemID": "19",
+        "ItemType": "DSGameWeaponListItem",
+        "ItemUUID": "d2346166-c678-bc49-a926-8e8056e627a9",
+        "CatalogueNameCode": "1820726096"
+      }
+    },
+    {
+      "Id": "b9b0f852-4cd7-3e4a-a498-4d917b33264f",
+      "Name": "Non-Lethal Assault Rifle (Lv. 2)",
+      "Category": "Weapons",
+      "Detail": "Resins: 64; Metals: 170",
+      "Target": 1,
+      "Order": 50610,
+      "Identifiers": {
+        "ItemID": "20",
+        "ItemType": "DSGameWeaponListItem",
+        "ItemUUID": "50280c95-2462-374b-b850-e9e096a56816",
+        "CatalogueNameCode": "550723589"
+      }
+    },
+    {
+      "Id": "3b050710-f23e-9f4f-a6c8-552772d5971b",
+      "Name": "Non-Lethal Assault Rifle (Lv. 3)",
+      "Category": "Weapons",
+      "Detail": "Resins: 128; Metals: 170",
+      "Target": 1,
+      "Order": 50620,
+      "Identifiers": {
+        "ItemID": "53",
+        "ItemType": "DSGameWeaponListItem",
+        "ItemUUID": "51276bd2-0395-5d4f-8579-495cb311f597",
+        "CatalogueNameCode": "1240357556"
+      }
+    },
+    {
+      "Id": "242ad985-bb10-1248-b4d0-aff5cfb2f94b",
+      "Name": "Non-Lethal Assault Rifle (HG Custom)",
+      "Category": "Weapons",
+      "Detail": "Resins: 112; Metals: 190",
+      "Target": 1,
+      "Order": 50625,
+      "Identifiers": {
+        "ItemID": "21",
+        "ItemType": "DSGameWeaponListItem",
+        "ItemUUID": "b362ef38-e85b-a24a-a3b2-889a568b2175",
+        "CatalogueNameCode": "1387848454"
+      }
+    },
+    {
+      "Id": "84072dec-0ef2-724f-926f-158733fc14cd",
+      "Name": "Shotgun (Lv. 1)",
+      "Category": "Weapons",
+      "Detail": "Metals: 160",
+      "Target": 1,
+      "Order": 50700,
+      "Identifiers": {
+        "ItemID": "28",
+        "ItemType": "DSGameWeaponListItem",
+        "ItemUUID": "2b21df95-7117-e645-9f64-7251270775f3",
+        "CatalogueNameCode": "705312970"
+      }
+    },
+    {
+      "Id": "b47f9b52-0759-8c42-85e5-c1af97d01605",
+      "Name": "Shotgun (Lv. 2)",
+      "Category": "Weapons",
+      "Detail": "Metals: 170; Special alloys: 96",
+      "Target": 1,
+      "Order": 50720,
+      "Identifiers": {
+        "ItemID": "29",
+        "ItemType": "DSGameWeaponListItem",
+        "ItemUUID": "75737d34-10d4-cf4d-91bd-28ef3c8c2116",
+        "CatalogueNameCode": "1482800073"
+      }
+    },
+    {
+      "Id": "92ea93f6-f70f-1e4c-b6ff-61ccddc97d44",
+      "Name": "Shotgun (HG Custom)",
+      "Category": "Weapons",
+      "Detail": "Metals: 180; Special alloys: 132",
+      "Target": 1,
+      "Order": 50730,
+      "Identifiers": {
+        "ItemID": "30",
+        "ItemType": "DSGameWeaponListItem",
+        "ItemUUID": "fb2cf827-6fbc-e44f-9a59-594bc718a5d3",
+        "CatalogueNameCode": "863107186"
+      }
+    },
+    {
+      "Id": "b814ce11-f958-1a41-b7d0-01abb0f74a6c",
+      "Name": "Riot Shotgun (Lv. 1)",
+      "Category": "Weapons",
+      "Detail": "Resins: 48; Metals: 150",
+      "Target": 1,
+      "Order": 50800,
+      "Identifiers": {
+        "ItemID": "25",
+        "ItemType": "DSGameWeaponListItem",
+        "ItemUUID": "7e957dc3-1216-d54a-bfc2-9d71294318b1",
+        "CatalogueNameCode": "354579481"
+      }
+    },
+    {
+      "Id": "3e38a17a-5819-aa4c-8378-55f935d2cd33",
+      "Name": "Riot Shotgun (Lv. 2)",
+      "Category": "Weapons",
+      "Detail": "Resins: 64; Metals: 160",
+      "Target": 1,
+      "Order": 50810,
+      "Identifiers": {
+        "ItemID": "26",
+        "ItemType": "DSGameWeaponListItem",
+        "ItemUUID": "08da1ecf-e31c-8941-8c91-feba8d885023",
+        "CatalogueNameCode": "108169197"
+      }
+    },
+    {
+      "Id": "1e207fcf-5fc2-2d4d-bb10-81ccab1f90a3",
+      "Name": "Riot Shotgun (HG Custom)",
+      "Category": "Weapons",
+      "Detail": "Resins: 128; Metals: 170",
+      "Target": 1,
+      "Order": 50820,
+      "Identifiers": {
+        "ItemID": "27",
+        "ItemType": "DSGameWeaponListItem",
+        "ItemUUID": "05dfa629-2484-0146-b3f3-883afb2e5a70",
+        "CatalogueNameCode": "1947796718"
+      }
+    },
+    {
+      "Id": "a9938e19-4bc7-d844-9c4d-6e963d4ee948",
+      "Name": "Grenade Launcher",
+      "Category": "Weapons",
+      "Detail": "Special alloys: 160",
+      "Target": 1,
+      "Order": 50900,
+      "Identifiers": {
+        "ItemID": "31",
+        "ItemType": "DSGameWeaponListItem",
+        "ItemUUID": "be7dd29f-b4a8-5745-a9c0-c94c086b567f",
+        "CatalogueNameCode": "1092254577"
+      }
+    },
+    {
+      "Id": "0c594895-ec93-a44a-9576-75ac9a45d7e3",
+      "Name": "Remote-Detonation Grenade Launcher",
+      "Category": "Weapons",
+      "Detail": "Chemicals: 80; Special alloys: 240",
+      "Target": 1,
+      "Order": 50910,
+      "Identifiers": {
+        "ItemID": "32",
+        "ItemType": "DSGameWeaponListItem",
+        "ItemUUID": "16cca765-a240-8e49-b7e8-4110a4ea9f5f",
+        "CatalogueNameCode": "1380616325"
+      }
+    },
+    {
+      "Id": "b68fb5f5-208f-df4a-8f5b-8d23dbb693fd",
+      "Name": "Quadruple Rocket Launcher",
+      "Category": "Weapons",
+      "Detail": "Chemicals: 60; Special alloys: 240",
+      "Target": 1,
+      "Order": 51000,
+      "Identifiers": {
+        "ItemID": "46",
+        "ItemType": "DSGameWeaponListItem",
+        "ItemUUID": "9cececc0-c2cb-344a-9c3d-db35a0084e39",
+        "CatalogueNameCode": "1874712287"
+      }
+    },
+    {
+      "Id": "02cd1a8d-ae1d-f642-bc22-27c5ac75a185",
+      "Name": "Multi-Rocket Launcher",
+      "Category": "Weapons",
+      "Detail": "Chemicals: 96; Special alloys: 288",
+      "Target": 1,
+      "Order": 51010,
+      "Identifiers": {
+        "ItemID": "47",
+        "ItemType": "DSGameWeaponListItem",
+        "ItemUUID": "746d96ce-325d-3248-ab31-01725c709a1d",
+        "CatalogueNameCode": "500585948"
+      }
+    },
+    {
+      "Id": "f32126e9-5c00-2d42-bb4f-f7eedcc719e2",
+      "Name": "Hematic Grenade (Lv. 1)",
+      "Category": "Weapons",
+      "Detail": "Chiral crystals: 4; Resins: 4",
+      "Target": 1,
+      "Order": 55100,
+      "Identifiers": {
+        "ItemID": "82",
+        "ItemType": "DSGameWeaponListItem",
+        "ItemUUID": "511f651a-f79b-bb4d-80ac-195aede75e83",
+        "CatalogueNameCode": "2075780004"
+      }
+    },
+    {
+      "Id": "b19cf6ab-9add-a745-81db-67e9663d40aa",
+      "Name": "Hematic Grenade (Lv. 2)",
+      "Category": "Weapons",
+      "Detail": "Chiral crystals: 10; Resins: 30",
+      "Target": 1,
+      "Order": 55110,
+      "Identifiers": {
+        "ItemID": "83",
+        "ItemType": "DSGameWeaponListItem",
+        "ItemUUID": "704c8e1a-3f16-7349-9389-eded0dc9119e",
+        "CatalogueNameCode": "164782247"
+      }
+    },
+    {
+      "Id": "f89ff10d-272f-8845-9668-9dee012689c2",
+      "Name": "Smoke Grenade (Lv. 1)",
+      "Category": "Weapons",
+      "Detail": "Metals: 5",
+      "Target": 1,
+      "Order": 55200,
+      "Identifiers": {
+        "ItemID": "94",
+        "ItemType": "DSGameWeaponListItem",
+        "ItemUUID": "c2e216a2-1f9c-cc49-b4f5-5b721997e161",
+        "CatalogueNameCode": "1320852539"
+      }
+    },
+    {
+      "Id": "f364017d-d3d3-d04b-85a0-621b16f104c7",
+      "Name": "Smoke Grenade (Lv. 2)",
+      "Category": "Weapons",
+      "Detail": "Metals: 15",
+      "Target": 1,
+      "Order": 55210,
+      "Identifiers": {
+        "ItemID": "95",
+        "ItemType": "DSGameWeaponListItem",
+        "ItemUUID": "7e379d53-cc6c-be42-9185-3d4e24d1ff36",
+        "CatalogueNameCode": "1020337976"
+      }
+    },
+    {
+      "Id": "606ea65f-73ee-8342-a8c9-07d2fe275467",
+      "Name": "Stun Bomb",
+      "Category": "Weapons",
+      "Detail": "Metals: 140",
+      "Target": 1,
+      "Order": 55300,
+      "Identifiers": {
+        "ItemID": "97",
+        "ItemType": "DSGameWeaponListItem",
+        "ItemUUID": "3d0c1309-c259-724d-a70f-5c4b9b7ad05a",
+        "CatalogueNameCode": "1575645135"
+      }
+    },
+    {
+      "Id": "e6738171-d5af-7140-80de-c4f035513021",
+      "Name": "Remote Stun Bomb",
+      "Category": "Weapons",
+      "Detail": "Metals: 180; Special alloys: 120",
+      "Target": 1,
+      "Order": 55310,
+      "Identifiers": {
+        "ItemID": "98",
+        "ItemType": "DSGameWeaponListItem",
+        "ItemUUID": "4bbdbdfe-cb9e-4f4f-8606-84269e5707e0",
+        "CatalogueNameCode": "66671595"
+      }
+    },
+    {
+      "Id": "c83c4bec-b017-c64f-9ec9-5ed3122e29b0",
+      "Name": "Grenade",
+      "Category": "Weapons",
+      "Detail": "Resins: 30; Metals: 80",
+      "Target": 1,
+      "Order": 55400,
+      "Identifiers": {
+        "ItemID": "106",
+        "ItemType": "DSGameWeaponListItem",
+        "ItemUUID": "ccd66d48-c924-af45-8934-d72593e39443",
+        "CatalogueNameCode": "74851709"
+      }
+    }
+  ]
+}
