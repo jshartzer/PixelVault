@@ -96,6 +96,7 @@ namespace PixelVaultNative
         void ShowLibraryCommandPalette(Window owner, LibraryBrowserPaletteContext context, string initialSearch);
 
         void LibraryBrowserShowAchievementsInfo(Window owner, LibraryBrowserFolderView view);
+        void LibraryBrowserShowGameTrackers(Window owner, LibraryBrowserFolderView view);
         void LibraryBrowserOpenGameProfile(Window owner, LibraryBrowserFolderView view);
 
         void LibraryBrowserPaletteOpenSettings();

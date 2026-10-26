@@ -17,6 +17,14 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="Services\Achievements\GameMaps.cs" />
+    <Compile Include="Services\Achievements\DeathStrandingInterviewReader.cs" />
+    <EmbeddedResource Include="Services\Achievements\TrackingData\DeathStrandingAchievementCounters.json" LogicalName="PixelVault.Tracking.DeathStrandingAchievementCounters.json" />
+    <Compile Include="UI\GameMapsWindow.cs" />
+    <Compile Include="UI\GameMapEditors.cs" />
+    <Compile Include="UI\TrackerRenameWindow.cs" />
+    <Compile Include="UI\TrackerContentWindow.cs" />
+    <EmbeddedResource Include="Services\Achievements\TrackingData\DeathStrandingMemoryMaps.json" LogicalName="PixelVault.Maps.DeathStranding.json" />
     <Compile Include="UI\AchievementRarityUi.cs" />
     <Compile Include="UI\Effects\TradingCardFoilEffect.cs" />
     <EmbeddedResource Include="UI\Effects\TradingCardFoil.ps" LogicalName="PixelVault.TradingCardFoil.ps" />
@@ -57,11 +65,13 @@
     <Compile Include="Services\Library\LibraryStorageMergePlanner.cs" />
     <Compile Include="Services\Achievements\GameAchievementsFetchService.cs" />
     <Compile Include="Services\Achievements\AchievementGuideService.cs" />
-    <Compile Include="Services\Achievements\AchievementTracking.cs" />
+    <Compile Include="Services\Achievements\AchievementGuideDlc.cs" />
+    <EmbeddedResource Include="Services\Achievements\TrackingData\LegacyAchievementDlcGroups.json" LogicalName="PixelVault.LegacyAchievementDlcGroups.json" />
     <Compile Include="Services\Achievements\TrackerSpreadsheetProgress.cs" />
-    <Compile Include="Services\Achievements\TrackerMilestones.cs" />
     <Compile Include="Services\Achievements\TrackerDashboard.cs" />
     <Compile Include="UI\TrackerDashboardWindow.cs" />
+    <Compile Include="UI\CompanionWindow.cs" />
+    <Compile Include="Services\Config\CompanionDesktopSettings.cs" />
     <Compile Include="UI\TrackerGameWindow.cs" />
     <Compile Include="UI\TrackerNavigation.cs" />
     <Compile Include="UI\Library\MainWindow.TrackerDashboard.cs" />
@@ -80,7 +90,7 @@
     <Compile Include="Services\Achievements\DeathStrandingChipReader.cs" />
     <EmbeddedResource Include="Services\Achievements\TrackingData\DeathStrandingCollectors.json" LogicalName="PixelVault.Tracking.DeathStrandingCollectors.json" />
     <Compile Include="Services\Achievements\AchievementTrackingStore.cs" />
-    <Compile Include="Services\Achievements\AchievementTrackingHistory.cs" />
+    <Compile Include="UI\AchievementInlineTrackers.cs" />
     <Compile Include="Services\Achievements\TrackerRefresh.cs" />
     <Compile Include="Services\Achievements\TrackerAutomation.cs" />
     <Compile Include="UI\TrackerAutomationWindow.cs" />
@@ -92,10 +102,7 @@
     <Compile Include="Services\Achievements\TrackerSpreadsheetImport.cs" />
     <Compile Include="UI\TrackerAchievementPicker.cs" />
     <Compile Include="UI\TrackerSpreadsheetForm.cs" />
-    <EmbeddedResource Include="Services\Achievements\TrackingData\DeathStrandingBuildables.json" LogicalName="PixelVault.Tracking.DeathStranding.json" />
     <EmbeddedResource Include="Services\Achievements\TrackingData\DeathStrandingCatalogueKeys.json" LogicalName="PixelVault.Tracking.DeathStrandingKeys.json" />
-    <EmbeddedResource Include="Services\Achievements\TrackingData\DeathStrandingWorldTrackers.json" LogicalName="PixelVault.Tracking.DeathStrandingWorld.json" />
-    <EmbeddedResource Include="Services\Achievements\TrackingData\DeathStrandingOrders.json" LogicalName="PixelVault.Tracking.DeathStrandingOrders.json" />
     <EmbeddedResource Include="Services\Achievements\TrackingData\DeathStrandingFacts.json" LogicalName="PixelVault.Tracking.DeathStrandingFacts.json" />
     <Compile Include="UI\AchievementTrackerWindow.cs" />
     <Compile Include="UI\AchievementTrackerWindow.Refresh.cs" />
@@ -197,6 +204,7 @@
     <Compile Include="UI\Settings\MainWindow.SettingsShell.cs" />
     <Compile Include="UI\Settings\SettingsShellDependencies.cs" />
     <Compile Include="UI\Settings\SettingsShellHost.cs" />
+    <Compile Include="UI\Settings\SettingsShellHost.Achievements.cs" />
     <Compile Include="UI\Settings\MainWindow.SettingsPersistence.cs" />
     <Compile Include="UI\Settings\MainWindow.SettingsState.cs" />
     <Compile Include="UI\Library\LibraryButtonChrome.cs" />
@@ -276,6 +284,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\PixelVault.Tracking\PixelVault.Tracking.csproj" />
+    <ProjectReference Include="..\PixelVault.Companion.Client\PixelVault.Companion.Client.csproj" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.8" />
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.6" />
     <PackageReference Include="Velopack" Version="0.0.942" />

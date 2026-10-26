@@ -18,6 +18,11 @@ namespace PixelVaultNative
         internal sealed class AchievementGroupSummary
         {
             public string Name;
+            public string Key;
+            public string ParentName;
+            public bool IsContentGroup;
+            public bool IsCategory;
+            public List<AchievementGroupSummary> Categories;
             public int SortOrder;
             public List<GameAchievementsFetchService.AchievementRow> Rows;
             public int Total => Rows?.Count ?? 0;
@@ -48,6 +53,7 @@ namespace PixelVaultNative
         readonly string _userAgent;
         readonly HashSet<string> _collapsedGroups = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         GameAchievementsFetchService.FetchResult _loadedResult;
+        IReadOnlyList<string> _categoryOrder;
         bool _showGrid = true;
         bool _isLoading;
         bool _isClosed;
@@ -532,9 +538,18 @@ namespace PixelVaultNative
             string userAgent,
             string sourceLabel)
         {
+            try { _categoryOrder = _guideService?.LoadCategoryNames(); }
+            catch { _categoryOrder = null; }
             _feedbackRestores.Clear();
             _list.Items.Clear();
             _gridContent.Children.Clear();
+            // A realized ListBox can retain its old presenter until the next layout pass.
+            // Release the shared details element before moving it into the other view.
+            if (VisualTreeHelper.GetParent(_progressDetails) is ContentPresenter previousPresenter)
+            {
+                previousPresenter.Content = null;
+                previousPresenter.ApplyTemplate();
+            }
             rows = FilterAchievementRows(rows, false);
             if (rows.Count == 0)
             {
@@ -569,15 +584,16 @@ namespace PixelVaultNative
                 return;
             }
 
-            foreach (var group in BuildAchievementGroups(rows))
+            foreach (var group in ExpandedAchievementSections(rows))
             {
-                var collapsed = _collapsedGroups.Contains(group.Name);
+                var key = group.Key ?? group.Name;
+                var collapsed = _collapsedGroups.Contains(key);
                 _list.Items.Add(BuildAchievementGroupHeader(group, collapsed, () =>
                 {
-                    if (!_collapsedGroups.Add(group.Name)) _collapsedGroups.Remove(group.Name);
+                    if (!_collapsedGroups.Add(key)) _collapsedGroups.Remove(key);
                     RenderAchievementRows(rows, userAgent, sourceLabel);
                 }));
-                if (collapsed) continue;
+                if (collapsed || group.IsContentGroup) continue;
                 var visibleRows = VisibleSortedRows(group.Rows);
                 if (visibleRows.Count == 0)
                     _list.Items.Add(BuildFilteredGroupMessage(group.Rows));
@@ -618,15 +634,16 @@ namespace PixelVaultNative
             string userAgent,
             string sourceLabel)
         {
-            foreach (var group in BuildAchievementGroups(rows))
+            foreach (var group in ExpandedAchievementSections(rows))
             {
-                var collapsed = _collapsedGroups.Contains(group.Name);
+                var key = group.Key ?? group.Name;
+                var collapsed = _collapsedGroups.Contains(key);
                 _gridContent.Children.Add(BuildAchievementGroupHeader(group, collapsed, () =>
                 {
-                    if (!_collapsedGroups.Add(group.Name)) _collapsedGroups.Remove(group.Name);
+                    if (!_collapsedGroups.Add(key)) _collapsedGroups.Remove(key);
                     RenderAchievementRows(rows, userAgent, sourceLabel);
                 }));
-                if (collapsed) continue;
+                if (collapsed || group.IsContentGroup) continue;
 
                 var visibleRows = VisibleSortedRows(group.Rows);
                 if (visibleRows.Count == 0)
@@ -717,7 +734,7 @@ namespace PixelVaultNative
                     _loadedResult.GameTitle ?? _folder?.Name ?? "Game",
                     _folder?.GameId ?? string.Empty,
                     rows,
-                    preferredRow?.ProviderAchievementId);
+                    preferredRow?.ProviderAchievementId, _trackingStore, _scoreSteamAccount, _scoreRetroAccount);
                 TryApplyStoredAchievementGroups(rows);
                 ReloadPins(false);
                 RenderAchievementRows(rows, userAgent, _loadedResult.SourceLabel);
@@ -793,7 +810,8 @@ namespace PixelVaultNative
                     SortOrder = group.Min(row => row.GroupSortOrder),
                     Rows = group.ToList()
                 })
-                .OrderBy(group => group.SortOrder)
+                .OrderBy(group => AchievementOrganization.CategoryPriority(group.Name))
+                .ThenBy(group => group.SortOrder)
                 .ThenBy(group => string.Equals(group.Name, "Base Game", StringComparison.OrdinalIgnoreCase) ? 0 : 1)
                 .ThenBy(group => group.Name, StringComparer.OrdinalIgnoreCase)
                 .ToList();
@@ -805,11 +823,52 @@ namespace PixelVaultNative
             return name.Length == 0 ? "Base Game" : name;
         }
 
+        internal static string AchievementContentName(GameAchievementsFetchService.AchievementRow row)
+        {
+            var name = AchievementOrganization.DlcName(row?.DlcName, row?.GroupName);
+            return name.Length == 0 ? "Base Game" : name.Equals("DLC", StringComparison.OrdinalIgnoreCase) ? "DLC" : "DLC: " + name;
+        }
+
+        internal static string AchievementCategoryKey(string content, string category) => "category:" + content.Length + ":" + content + category;
+
+        internal static List<AchievementGroupSummary> BuildAchievementContentGroups(IEnumerable<GameAchievementsFetchService.AchievementRow> rows,
+            IReadOnlyList<string> categoryOrder = null)
+        {
+            return (rows ?? Enumerable.Empty<GameAchievementsFetchService.AchievementRow>()).Where(row => row != null)
+                .GroupBy(AchievementContentName, StringComparer.OrdinalIgnoreCase)
+                .OrderBy(group => group.Key.Equals("Base Game", StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+                .ThenBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
+                .Select(group => new AchievementGroupSummary
+                {
+                    Name = group.Key, Key = group.Key, IsContentGroup = true, Rows = group.ToList(),
+                    Categories = group.GroupBy(row => AchievementOrganization.CategoryName(row.GroupName), StringComparer.OrdinalIgnoreCase)
+                        .Select(category => new AchievementGroupSummary
+                        {
+                            Name = category.Key, Key = AchievementCategoryKey(group.Key, category.Key), ParentName = group.Key, IsCategory = true,
+                            Rows = category.ToList(), SortOrder = category.Min(row => row.GroupSortOrder)
+                        })
+                        .OrderBy(category => AchievementOrganization.CategoryOrderIndex(category.Name, categoryOrder))
+                        .ThenBy(category => category.Name.Equals("Uncategorized", StringComparison.OrdinalIgnoreCase) ? 1 : 0)
+                        .ThenBy(category => category.SortOrder).ThenBy(category => category.Name, StringComparer.OrdinalIgnoreCase).ToList()
+                }).ToList();
+        }
+
+        IEnumerable<AchievementGroupSummary> ExpandedAchievementSections(IEnumerable<GameAchievementsFetchService.AchievementRow> rows)
+        {
+            foreach (var content in BuildAchievementContentGroups(rows, _categoryOrder))
+            {
+                yield return content;
+                if (_collapsedGroups.Contains(content.Key)) continue;
+                foreach (var category in content.Categories) yield return category;
+            }
+        }
+
         internal static Button BuildAchievementGroupHeader(
             AchievementGroupSummary group,
             bool collapsed,
             Action toggle)
         {
+            if (group?.IsCategory == true) return BuildAchievementCategoryHeader(group, collapsed, toggle);
             var grid = new Grid();
             grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -830,7 +889,7 @@ namespace PixelVaultNative
             var title = new TextBlock
             {
                 Text = group?.Name ?? "Base Game",
-                FontSize = 15,
+                FontSize = group?.IsContentGroup == true ? 17 : group?.IsCategory == true ? 13 : 15,
                 FontWeight = FontWeights.SemiBold,
                 Foreground = Brushes.White,
                 TextWrapping = TextWrapping.Wrap
@@ -860,7 +919,7 @@ namespace PixelVaultNative
             var button = new Button
             {
                 Content = grid,
-                Margin = new Thickness(0, 8, 0, 2),
+                Margin = new Thickness(group?.IsCategory == true ? 20 : 0, 8, 0, 2),
                 Padding = new Thickness(10, 7, 10, 7),
                 Background = UiBrushHelper.FromHex("#17242B"),
                 BorderBrush = UiBrushHelper.FromHex("#31505D"),
@@ -873,7 +932,51 @@ namespace PixelVaultNative
             AccessibilityUi.TryApplyFocusVisualStyle(button);
             AutomationProperties.SetName(
                 button,
-                (collapsed ? "Expand " : "Collapse ") + (group?.Name ?? "Base Game") + " achievement group");
+                (collapsed ? "Expand " : "Collapse ") + (group?.Name ?? "Base Game")
+                    + (group?.IsCategory == true ? " category in " + group.ParentName : " achievement group"));
+            return button;
+        }
+
+        static Button BuildAchievementCategoryHeader(AchievementGroupSummary group, bool collapsed, Action toggle)
+        {
+            var muted = SystemParameters.HighContrast ? SystemColors.WindowTextBrush : UiBrushHelper.FromHex("#99ADBA");
+            var grid = new Grid();
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            grid.Children.Add(new TextBlock
+            {
+                Text = collapsed ? "\u25B8" : "\u25BE", Width = 18, FontSize = 11,
+                Foreground = muted, VerticalAlignment = VerticalAlignment.Center
+            });
+            var title = new TextBlock
+            {
+                Text = group.Name, FontSize = 13, FontWeight = FontWeights.SemiBold,
+                Foreground = SystemParameters.HighContrast ? SystemColors.WindowTextBrush : UiBrushHelper.FromHex("#BAD2DF"),
+                VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap
+            };
+            Grid.SetColumn(title, 1);
+            grid.Children.Add(title);
+            var count = new TextBlock
+            {
+                Text = group.Percent.HasValue ? group.Earned + " / " + group.Total + " · " + group.Percent + "%"
+                    : group.Total + " achievements · progress unavailable",
+                Foreground = muted, FontSize = 11, Margin = new Thickness(12, 0, 0, 0),
+                MaxWidth = 220, TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center
+            };
+            Grid.SetColumn(count, 2);
+            grid.Children.Add(count);
+            var button = new Button
+            {
+                Content = grid, Background = Brushes.Transparent, MinHeight = 32,
+                BorderBrush = SystemParameters.HighContrast ? SystemColors.WindowTextBrush : UiBrushHelper.FromHex("#293840"),
+                BorderThickness = new Thickness(0, 0, 0, 1), Margin = new Thickness(20, 12, 0, 3),
+                Padding = new Thickness(2, 5, 4, 5), HorizontalContentAlignment = HorizontalAlignment.Stretch,
+                ToolTip = (collapsed ? "Expand " : "Collapse ") + group.Name + " in " + group.ParentName
+            };
+            button.Click += (_, __) => toggle?.Invoke();
+            AccessibilityUi.TryApplyFocusVisualStyle(button);
+            AutomationProperties.SetName(button, (collapsed ? "Expand " : "Collapse ") + group.Name + " category in " + group.ParentName);
             return button;
         }
 

@@ -29,42 +29,18 @@ namespace PixelVaultNative
             return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text)));
         }
     }
-    enum TrackerAutomationMode { Manual, OnOpen, SaveChanges, Periodic }
-    sealed class TrackerAutomationSettings
-    {
-        public string Id { get; set; }
-        public string BindingId { get; set; }
-        public TrackerAutomationMode Mode { get; set; }
-        public int IntervalMinutes { get; set; } = 5;
-        public bool Paused { get; set; }
-    }
-    sealed class TrackerAutomationState
-    {
-        public long LastCheckUtc { get; set; }
-        public string Message { get; set; } = "Automatic refresh is off.";
-        public string NoticeKey { get; set; }
-        public int Failures { get; set; }
-        public bool ReviewPending { get; set; }
-    }
     sealed record TrackerAutomationNotice(string TrackerId, string Account, string Title, string Message, bool NeedsReview);
 
     sealed partial class AchievementTrackingStore
     {
         internal TrackerAutomationMonitor AutomationMonitor { get; set; }
-        internal event Action AutomationChanged;
+
 
         internal IReadOnlyList<TrackerSourceBinding> Sources()
         {
             using var c = Open(); using var cmd = c.CreateCommand(); cmd.CommandText = "SELECT binding FROM tracker_source";
             using var r = cmd.ExecuteReader(); var result = new List<TrackerSourceBinding>();
             while (r.Read()) result.Add(FromJson<TrackerSourceBinding>(r.GetString(0))); return result;
-        }
-        static (TrackerAutomationSettings Settings, TrackerAutomationState State) ReadAutomation(SqliteConnection c, SqliteTransaction tx, string tracker, string account)
-        {
-            using var cmd = c.CreateCommand(); cmd.Transaction = tx;
-            cmd.CommandText = "SELECT settings,state FROM tracker_automation WHERE tracker_id=$t AND account=$a";
-            cmd.Parameters.AddWithValue("$t", tracker); cmd.Parameters.AddWithValue("$a", account); using var r = cmd.ExecuteReader();
-            return r.Read() ? (FromJson<TrackerAutomationSettings>(r.GetString(0)), FromJson<TrackerAutomationState>(r.GetString(1))) : (new(), new());
         }
         internal (TrackerAutomationSettings Settings, TrackerAutomationState State) Automation(string tracker, string account)
         {
@@ -92,23 +68,7 @@ namespace PixelVaultNative
             using var cmd = c.CreateCommand(); cmd.Transaction = tx;
             cmd.CommandText = "INSERT INTO tracker_automation(tracker_id,account,settings,state) VALUES($t,$a,$s,$r) ON CONFLICT(tracker_id,account) DO UPDATE SET settings=$s,state=$r";
             cmd.Parameters.AddWithValue("$t", tracker); cmd.Parameters.AddWithValue("$a", account); cmd.Parameters.AddWithValue("$s", Json(settings)); cmd.Parameters.AddWithValue("$r", Json(state)); cmd.ExecuteNonQuery(); tx.Commit();
-            AutomationChanged?.Invoke();
-        }
-        static void RequireAutomation(SqliteConnection c, SqliteTransaction tx, string tracker, string account, string bindingId, string id)
-        {
-            var settings = ReadAutomation(c, tx, tracker, account).Settings;
-            if (settings.Id != id || settings.BindingId != bindingId || settings.Paused || settings.Mode == TrackerAutomationMode.Manual)
-                throw new OperationCanceledException("Automatic refresh settings changed. Saved progress was preserved.");
-        }
-        static void ClearAutomationReview(SqliteConnection c, SqliteTransaction tx, string tracker, string account)
-        {
-            var previous = ReadAutomation(c, tx, tracker, account);
-            if (!previous.State.ReviewPending) return;
-            previous.State.ReviewPending = false; previous.State.NoticeKey = null;
-            previous.State.Message = "Manual refresh reviewed. Automatic refresh can resume.";
-            using var cmd = c.CreateCommand(); cmd.Transaction = tx;
-            cmd.CommandText = "UPDATE tracker_automation SET state=$s WHERE tracker_id=$t AND account=$a";
-            cmd.Parameters.AddWithValue("$s", Json(previous.State)); cmd.Parameters.AddWithValue("$t", tracker); cmd.Parameters.AddWithValue("$a", account); cmd.ExecuteNonQuery();
+            NotifyAutomationChanged();
         }
         internal bool RecordAutomatic(TrackerSourceBinding binding, string settingsId, TrackerAutomationState state, TrackerRefreshPlan plan = null,
             TrackerRefreshOutcome? outcome = null, bool acknowledge = false)

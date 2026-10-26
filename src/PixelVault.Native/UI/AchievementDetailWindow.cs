@@ -26,8 +26,12 @@ namespace PixelVaultNative
         readonly Func<bool> isGamePinned;
         readonly Action toggleGamePin;
         readonly StackPanel guidePanel = new StackPanel();
+        readonly AchievementInlineTrackers linkedTrackers = new AchievementInlineTrackers();
+        readonly GameMapLinks mapLinks = new GameMapLinks();
         readonly Button nextUp = new Button();
         readonly Button gamePin = new Button();
+        TextBlock categoryFact;
+        TextBlock contentFact;
         internal bool OpenGameRequested { get; private set; }
 
         internal AchievementDetailWindow(Window owner, AchievementHubGame game, GameAchievementsFetchService.AchievementRow row,
@@ -55,6 +59,15 @@ namespace PixelVaultNative
             if (counter != null) body.Children.Add(counter);
             body.Children.Add(Section("Details", BuildFacts(savedUtc)));
             body.Children.Add(Section("Guide", guidePanel));
+            mapLinks.Bind(trackingStore, game.Provider, game.Id, game.Title, game.Provider == "steam" ? trackingAccount : null, game.Provider == "retroachievements" ? trackingAccount : null, achievement: row.ProviderAchievementId);
+            body.Children.Add(mapLinks);
+            linkedTrackers.Bind(trackingStore, game.Provider, game.Id, row.ProviderAchievementId, trackingAccount);
+            body.Children.Add(linkedTrackers);
+            Activated += (_, __) =>
+            {
+                linkedTrackers.Reload();
+                mapLinks.Bind(trackingStore, game.Provider, game.Id, game.Title, game.Provider == "steam" ? trackingAccount : null, game.Provider == "retroachievements" ? trackingAccount : null, achievement: row.ProviderAchievementId);
+            };
             body.Children.Add(BuildActions());
             Content = new ScrollViewer { Content = body, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                 HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
@@ -156,7 +169,20 @@ namespace PixelVaultNative
                 Add("Game completion", progress);
             }
             else Add("Game completion", Value("Progress unavailable"));
-            Add("Group", Value(AchievementsInfoWindow.EffectiveAchievementGroupName(row)));
+            contentFact = Value(AchievementsInfoWindow.AchievementContentName(row));
+            Add("Game / DLC", contentFact);
+            categoryFact = Value(AchievementOrganization.CategoryName(row.GroupName));
+            var category = new WrapPanel();
+            categoryFact.Margin = new Thickness(0, 4, 10, 6);
+            category.Children.Add(categoryFact);
+            if (guides != null)
+            {
+                var changeCategory = AchievementsInfoWindow.BuildCategoryPickerButton(() => row, () => gameRows,
+                    ChangeCategory, () => row.HasStableProviderIdentity, this, () => guides.LoadCategoryNames());
+                changeCategory.Margin = new Thickness(0, 0, 0, 8);
+                category.Children.Add(changeCategory);
+            }
+            Add("Category", category);
             Add("Provider", Value(Provider));
             if (savedUtc > 0 && savedUtc <= DateTime.UtcNow.Ticks)
                 Add("Progress saved", Value(new DateTime(savedUtc, DateTimeKind.Utc).ToLocalTime().ToString("g", CultureInfo.CurrentCulture)));
@@ -179,6 +205,9 @@ namespace PixelVaultNative
             else if (!hasGuide) guidePanel.Children.Add(Text("No guide written for this achievement yet.", 13));
             if (entry != null)
             {
+                row.GroupName = entry.GroupName; row.DlcName = entry.DlcName; row.GroupSortOrder = entry.GroupSortOrder;
+                categoryFact.Text = AchievementOrganization.CategoryName(row.GroupName);
+                contentFact.Text = AchievementsInfoWindow.AchievementContentName(row);
                 var tags = AchievementGuideWindow.GuideReadTags(entry.Tags, entry.IsMissable, row.Unlocked);
                 if (tags.Count > 0)
                 {
@@ -215,11 +244,25 @@ namespace PixelVaultNative
         {
             try
             {
-                AchievementGuideWindow.ShowModal(this, guides, game.Title, game.Folder?.GameId ?? string.Empty, gameRows, row.ProviderAchievementId);
+                AchievementGuideWindow.ShowModal(this, guides, game.Title, game.Folder?.GameId ?? string.Empty, gameRows, row.ProviderAchievementId,
+                    trackingStore, game.Provider == "steam" ? trackingAccount : null, game.Provider == "retroachievements" ? trackingAccount : null);
             }
             catch (Exception ex) { MessageBox.Show(this, "The guide could not be opened: " + ex.Message, "Achievement guide"); }
             RenderGuide();
             RenderPinButtons();
+        }
+
+        void ChangeCategory(GameAchievementsFetchService.AchievementRow achievement, string name)
+        {
+            try
+            {
+                guides.SyncDefinitionsAndLoadGuides(game.Folder?.GameId ?? "", gameRows);
+                var order = gameRows.FirstOrDefault(r => string.Equals(r.GroupName, name, StringComparison.OrdinalIgnoreCase))?.GroupSortOrder ?? 0;
+                var saved = AchievementsInfoWindow.SaveCategory(guides, achievement, name, order);
+                achievement.GroupName = saved.GroupName; achievement.GroupSortOrder = saved.GroupSortOrder; achievement.DlcName = saved.DlcName;
+                RenderGuide();
+            }
+            catch (Exception ex) { MessageBox.Show(this, "Could not save the achievement category. " + ex.Message, "Achievement category", MessageBoxButton.OK, MessageBoxImage.Error); }
         }
 
         FrameworkElement BuildActions()

@@ -48,6 +48,13 @@ namespace PixelVaultNative
                 Environment.ExitCode = DeathStrandingSaveWorker.Run(args[1]);
                 return;
             }
+            if(args.Length>0 && args[0]=="--companion")
+            {
+                if(args.Length is not (1 or 2)){Environment.ExitCode=2;return;}
+                var companionApp=new Application();MergeGlobalScrollBarTheme(companionApp);
+                companionApp.Run(new CompanionWindow(null,args.Length==2?Path.GetFullPath(args[1]):CompanionDesktopSettings.DefaultRoot));
+                return;
+            }
             // PV-PLN-DIST-001 §5.3: Velopack bootstrap (no-op when not installed via vpk). Same vpk major as NuGet Velopack.
             VelopackApp.Build().SetArgs(args).Run();
 

@@ -12,7 +12,7 @@ using PixelVaultNative.UI.Design;
 namespace PixelVaultNative
 {
     /// <summary>Owns Settings and Path Settings modal UI; <see cref="MainWindow"/> supplies <see cref="SettingsShellDependencies"/>.</summary>
-    public sealed class SettingsShellHost
+    public sealed partial class SettingsShellHost
     {
         readonly SettingsShellDependencies d;
 
@@ -407,6 +407,7 @@ namespace PixelVaultNative
                 return ScrollPage(stack);
             });
             AddLazyPage(tabs, "Run history", () => BuildHistoryPage(window));
+            AddLazyPage(tabs, "Achievements", BuildAchievementsSettings);
             return root;
         }
 

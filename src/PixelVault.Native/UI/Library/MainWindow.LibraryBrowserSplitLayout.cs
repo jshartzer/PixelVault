@@ -44,6 +44,8 @@ namespace PixelVaultNative
             if (panes.RefreshThisFolderButton != null) panes.RefreshThisFolderButton.Visibility = hideGameChrome ? Visibility.Collapsed : Visibility.Visible;
             if (panes.PhotoAchievementsButton != null)
                 panes.PhotoAchievementsButton.Visibility = hideGameChrome ? Visibility.Collapsed : (isPhoto ? Visibility.Visible : Visibility.Collapsed);
+            if (panes.PhotoTrackersButton != null)
+                panes.PhotoTrackersButton.Visibility = isPhoto && !hideGameChrome ? Visibility.Visible : Visibility.Collapsed;
             if (panes.PhotoAchievementsSummary != null)
             {
                 if (!isPhoto || hideGameChrome)

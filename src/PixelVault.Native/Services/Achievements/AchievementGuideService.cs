@@ -27,6 +27,7 @@ namespace PixelVaultNative
         public bool IsMissable;
         public long GuideUpdatedUtcTicks;
         public string GroupName;
+        public string DlcName;
         public int GroupSortOrder;
     }
 
@@ -39,11 +40,16 @@ namespace PixelVaultNative
         public string Tags;
         public bool IsMissable;
         public string GroupName;
+        public string DlcName;
         public int GroupSortOrder;
     }
 
     interface IAchievementGuideService
     {
+        IReadOnlyList<string> LoadCategoryNames();
+        void SaveCategoryOrder(IEnumerable<string> names);
+        IReadOnlyList<string> LoadDlcNames(string provider, string providerGameId);
+        AchievementGuideEntry AssignAchievementDlc(GameAchievementsFetchService.AchievementRow row, string name);
         void LoadSavedAchievementGroups(IEnumerable<GameAchievementsFetchService.AchievementRow> rows);
         IReadOnlyList<AchievementGuideEntry> LoadPinnedAchievements(string provider, string providerGameId);
         AchievementPinChange SetAchievementPinned(GameAchievementsFetchService.AchievementRow row, bool pinned);
@@ -151,6 +157,7 @@ CREATE TABLE IF NOT EXISTS achievement_guide (
 
             EnsureDefinitionColumn(connection, "group_name", "TEXT NOT NULL DEFAULT ''");
             EnsureDefinitionColumn(connection, "group_sort_order", "INTEGER NOT NULL DEFAULT 0");
+            InitializeDlcOrganization(connection);
             InitializePinTable(connection);
             InitializeScoreTables(connection);
         }
@@ -195,19 +202,19 @@ CREATE TABLE IF NOT EXISTS achievement_guide (
                 .GroupBy(r => (Provider: NormalizeProvider(r.Provider), Game: r.ProviderGameId.Trim())))
             {
                 using var command = connection.CreateCommand();
-                command.CommandText = @"SELECT d.provider_achievement_id, d.group_name, d.group_sort_order, COALESCE(g.is_missable, 0)
+                command.CommandText = @"SELECT d.provider_achievement_id, d.group_name, d.group_sort_order, COALESCE(g.is_missable, 0), d.dlc_name
 FROM achievement_definition d LEFT JOIN achievement_guide g ON g.achievement_id = d.achievement_id
 WHERE d.provider = $provider AND d.provider_game_id = $game;";
                 command.Parameters.AddWithValue("$provider", game.Key.Provider);
                 command.Parameters.AddWithValue("$game", game.Key.Game);
-                var groups = new Dictionary<string, (string Name, int Order, bool Missable)>(StringComparer.Ordinal);
+                var groups = new Dictionary<string, (string Name, int Order, bool Missable, string Dlc)>(StringComparer.Ordinal);
                 using var reader = command.ExecuteReader();
-                while (reader.Read()) groups[reader.GetString(0)] = (reader.GetString(1), reader.GetInt32(2), reader.GetInt32(3) != 0);
+                while (reader.Read()) groups[reader.GetString(0)] = (reader.GetString(1), reader.GetInt32(2), reader.GetInt32(3) != 0, reader.GetString(4));
                 foreach (var row in game)
                 {
                     row.IsMissable = false;
                     if (groups.TryGetValue(row.ProviderAchievementId.Trim(), out var group))
-                    { row.GroupName = group.Name; row.GroupSortOrder = group.Order; row.IsMissable = group.Missable; }
+                    { row.GroupName = group.Name; row.GroupSortOrder = group.Order; row.IsMissable = group.Missable; row.DlcName = group.Dlc; }
                 }
             }
         }
@@ -300,6 +307,7 @@ ON CONFLICT(provider, provider_game_id, provider_achievement_id) DO UPDATE SET
                     if (entry != null)
                     {
                         row.GroupName = entry.GroupName ?? string.Empty;
+                        row.DlcName = entry.DlcName ?? string.Empty;
                         row.GroupSortOrder = entry.GroupSortOrder;
                         row.IsMissable = entry.IsMissable;
                         result.Add(entry);
@@ -316,6 +324,11 @@ ON CONFLICT(provider, provider_game_id, provider_achievement_id) DO UPDATE SET
             if (!IsOptionalHttpUrl(edit.SourceUrl))
                 throw new ArgumentException("Source URL must be a complete http:// or https:// address.", nameof(edit));
 
+            var category = NormalizeGroupName(edit.GroupName);
+            var dlc = edit.DlcName;
+            var legacyDlc = AchievementOrganization.DlcName(null, category);
+            if (legacyDlc.Length > 0) { dlc ??= legacyDlc; category = ""; }
+            if (dlc != null) dlc = AchievementOrganization.NormalizeDlcName(dlc);
             var now = DateTime.UtcNow.Ticks;
             using (var connection = OpenDatabase())
             using (var transaction = connection.BeginTransaction())
@@ -360,12 +373,15 @@ ON CONFLICT(achievement_id) DO UPDATE SET
                     saveGroup.CommandText = @"
 UPDATE achievement_definition
 SET group_name = $group_name,
+    dlc_name = COALESCE($dlc_name, dlc_name),
     group_sort_order = $group_sort_order
 WHERE achievement_id = $achievement_id;";
                     saveGroup.Parameters.AddWithValue("$achievement_id", edit.AchievementId);
-                    saveGroup.Parameters.AddWithValue("$group_name", NormalizeGroupName(edit.GroupName));
+                    saveGroup.Parameters.AddWithValue("$group_name", category);
+                    saveGroup.Parameters.AddWithValue("$dlc_name", dlc == null ? DBNull.Value : dlc);
                     saveGroup.Parameters.AddWithValue("$group_sort_order", NormalizeGroupSortOrder(edit.GroupSortOrder));
                     saveGroup.ExecuteNonQuery();
+                    RegisterAchievementOrganization(connection, transaction, edit.AchievementId);
                 }
 
                 transaction.Commit();
@@ -506,7 +522,7 @@ SELECT d.achievement_id, d.provider, d.provider_game_id, d.provider_achievement_
        d.is_hidden, d.is_active,
        COALESCE(g.guide_text, ''), COALESCE(g.source_url, ''), COALESCE(g.source_title, ''),
        COALESCE(g.tags, ''), COALESCE(g.is_missable, 0), COALESCE(g.updated_utc_ticks, 0),
-       d.group_name, d.group_sort_order
+       d.group_name, d.group_sort_order, d.dlc_name
 FROM achievement_definition d
 LEFT JOIN achievement_guide g ON g.achievement_id = d.achievement_id";
             return command;
@@ -534,7 +550,8 @@ LEFT JOIN achievement_guide g ON g.achievement_id = d.achievement_id";
                 IsMissable = reader.GetInt32(15) != 0,
                 GuideUpdatedUtcTicks = reader.GetInt64(16),
                 GroupName = reader.GetString(17),
-                GroupSortOrder = reader.GetInt32(18)
+                GroupSortOrder = reader.GetInt32(18),
+                DlcName = reader.GetString(19)
             };
         }
     }

@@ -818,6 +818,19 @@ namespace PixelVaultNative
             }
             cluster.Children.Add(artCircle);
 
+            var trackersLink = GameMapsWindow.Button("Trackers", "Open this game's trackers");
+            trackersLink.FontSize = 12;trackersLink.Margin = new Thickness(10, 0, 0, 0);
+            trackersLink.Click += (_, __) => LibraryBrowserShowGameTrackers(profileWindow, view);
+            cluster.Children.Add(trackersLink);
+            var mapsLink = GameMapsWindow.Button("Maps", "Open saved maps for this game");
+            mapsLink.FontSize = 12;mapsLink.Margin = new Thickness(8, 0, 0, 0);
+            mapsLink.Click += (_, __) =>
+            {
+                var game = BuildTrackerLibraryGame(view) ?? new AchievementHubGame { Provider = "library", Id = folder.GameId ?? folder.FolderPath, Title = view.Name };
+                new GameMapsWindow(profileWindow, achievementTrackingStore, game, CurrentSteamUserId64(), CurrentRetroAchievementsUsername()).Show();
+            };
+            cluster.Children.Add(mapsLink);
+
             return cluster;
         }
 
@@ -1568,7 +1581,7 @@ namespace PixelVaultNative
                         achievementGuideService,
                         result?.GameTitle ?? view?.Name ?? folder?.Name ?? "Game",
                         folder?.GameId ?? view?.GameId ?? string.Empty,
-                        rows);
+                        rows, trackingStore: achievementTrackingStore, steamAccount: CurrentSteamUserId64(), retroAccount: CurrentRetroAchievementsUsername());
                 }
                 catch (Exception ex)
                 {

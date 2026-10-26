@@ -16,6 +16,7 @@ namespace PixelVaultNative
             internal readonly List<LibraryFolderInfo> Folders = new List<LibraryFolderInfo>();
             internal readonly List<LibraryBrowserFolderView> ViewFolders = new List<LibraryBrowserFolderView>();
             internal LibraryBrowserFolderView Current;
+            internal CaptureGroupScope ActiveCaptureGroupScope;
             internal readonly HashSet<string> CollapsedPlatformSections = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             /// <summary>Photo workspace: normalized console labels whose captures are hidden in the main photo pane (badges appear dimmed).</summary>
             internal readonly HashSet<string> PhotoRailExcludedConsoleLabels = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

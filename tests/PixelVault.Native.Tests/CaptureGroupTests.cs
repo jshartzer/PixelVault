@@ -196,6 +196,124 @@ public sealed class CaptureGroupTests
         }
     }
 
+    static GameIndexEditorRow[] PlatformRows() => new[]
+    {
+        new GameIndexEditorRow { GameId = "xbox", Name = "A game", PlatformLabel = "Xbox", StorageGroupId = "SG-game" },
+        new GameIndexEditorRow { GameId = "steam", Name = "A game", PlatformLabel = "Steam", StorageGroupId = "SG-game" },
+        new GameIndexEditorRow { GameId = "ps5", Name = "A game", PlatformLabel = "PS5", StorageGroupId = "SG-game" },
+        new GameIndexEditorRow { GameId = "other", Name = "A game", PlatformLabel = "PC", StorageGroupId = "SG-other" }
+    };
+
+    static LibraryBrowserFolderView PlatformView(string primary, bool combined = true) => new()
+    {
+        Name = "A game", GameId = combined ? "" : primary, IsMergedAcrossPlatforms = combined,
+        PrimaryFolder = new LibraryFolderInfo { GameId = primary }, ViewKey = combined ? "all|name|A game" : "console|" + primary
+    };
+
+    [Fact]
+    public void PlatformPrimaryChange_DoesNotChangeScope_AndRecoversOldPlatformGroups()
+    {
+        using var scope = new Scope();
+        var files = new[] { scope.File("one.png"), scope.File("two.png") };
+        scope.Store.Assign(scope.Root, "xbox", files, "Cinematic");
+        foreach (var primary in new[] { "xbox", "steam", "ps5" })
+        {
+            // Mirrors the physical-folder projection: only the current primary platform is available on the view.
+            var view = PlatformView(primary);
+            view.SourceFolders.Add(view.PrimaryFolder);
+            var game = CaptureGroupScope.ForFolder(view, PlatformRows());
+            Assert.Equal("storage:SG-game", game.Key);
+            var restored = scope.Store.LoadScope(scope.Root, game);
+            Assert.Contains("Cinematic", restored.Names);
+            Assert.All(files, file => Assert.Equal("Cinematic", restored.Resolve(file, false)));
+            Assert.Single(restored.Project(files, false));
+        }
+        // Recovery reads do not rewrite or remove the legacy data.
+        Assert.Equal(2, scope.Store.Load(scope.Root, "xbox").Assignments.Count);
+        Assert.Empty(scope.Store.Load(scope.Root, "storage:SG-game").Assignments);
+    }
+
+    [Fact]
+    public void NewAssignmentsAndExplicitRemoval_OverrideLegacyMembershipAcrossPlatforms()
+    {
+        using var scope = new Scope();
+        var a = scope.File("a.png"); var b = scope.File("b.png");
+        scope.Store.Assign(scope.Root, "xbox", new[] { a, b }, "Cinematic");
+        var game = CaptureGroupScope.ForFolder(PlatformView("steam"), PlatformRows());
+        scope.Store.Assign(scope.Root, game.Key, new[] { a }, "Highlights");
+        scope.Store.Assign(scope.Root, game.Key, new[] { b }, "");
+        var consoleScope = CaptureGroupScope.ForFolder(PlatformView("ps5", combined: false), PlatformRows());
+        var reopened = new CaptureGroupStore(scope.Database).LoadScope(scope.Root, consoleScope);
+        Assert.Equal("Highlights", reopened.Resolve(a, false));
+        Assert.Empty(reopened.Resolve(b, true)); // Removal also wins over Roblox automatic fallback.
+        Assert.Equal(new[] { "Cinematic", "Highlights" }, reopened.Names.OrderBy(name => name));
+        Assert.Equal("Cinematic", scope.Store.Load(scope.Root, "xbox").Resolve(b, false));
+    }
+
+    [Fact]
+    public void GroupViewPreference_IsStableAcrossPrimaryChangesAndConsoleViews()
+    {
+        using var scope = new Scope();
+        scope.Store.SetGrouped(scope.Root, "xbox", true);
+        scope.Store.SetGrouped(scope.Root, "steam", false);
+        var xbox = CaptureGroupScope.ForFolder(PlatformView("xbox"), PlatformRows());
+        var steam = CaptureGroupScope.ForFolder(PlatformView("steam"), PlatformRows());
+        Assert.Equal(scope.Store.LoadScope(scope.Root, xbox).Grouped, scope.Store.LoadScope(scope.Root, steam).Grouped);
+        scope.Store.SetGrouped(scope.Root, steam.Key, true);
+        Assert.True(scope.Store.LoadScope(scope.Root, xbox).Grouped);
+        scope.Store.SetGrouped(scope.Root, xbox.Key, false);
+        var ps5 = CaptureGroupScope.ForFolder(PlatformView("ps5", false), PlatformRows());
+        Assert.False(scope.Store.LoadScope(scope.Root, ps5).Grouped);
+    }
+
+    [Fact]
+    public void Recovery_UsesStableStorageIdentity_AndNeverLeaksToAnotherGameOrLibrary()
+    {
+        using var scope = new Scope();
+        var file = scope.File("a.png");
+        scope.Store.Assign(scope.Root, "xbox", new[] { file }, "Cinematic");
+        var other = CaptureGroupScope.ForFolder(PlatformView("other"), PlatformRows());
+        Assert.Equal("storage:SG-other", other.Key);
+        Assert.Empty(scope.Store.LoadScope(scope.Root, other).Names);
+        var game = CaptureGroupScope.ForFolder(PlatformView("steam"), PlatformRows());
+        Assert.Empty(scope.Store.LoadScope(Path.Combine(scope.Root, "other-library"), game).Names);
+        var renamedRows = PlatformRows();
+        foreach (var row in renamedRows) row.Name = "Renamed game";
+        Assert.Equal(game.Key, CaptureGroupScope.ForFolder(PlatformView("ps5"), renamedRows).Key);
+        Assert.Null(CaptureGroupScope.ForFolder(new LibraryBrowserFolderView { IsTimelineProjection = true }, PlatformRows()));
+        Assert.Null(CaptureGroupScope.ForFolder(new LibraryBrowserFolderView { IsSessionProjection = true }, PlatformRows()));
+        Assert.Null(CaptureGroupScope.ForFolder(new LibraryBrowserFolderView { PendingGameAssignment = true }, PlatformRows()));
+    }
+
+    [Fact]
+    public void GroupMenu_OnTheNewPrimary_OffersTheRecoveredGroup()
+    {
+        AchievementCollectionAccessTests.OnSta(() =>
+        {
+            using var scope = new Scope();
+            var a = scope.File("a.png"); var b = scope.File("b.png");
+            var store = new CaptureGroupStore(Path.Combine(scope.Root, "capture-groups.sqlite"));
+            store.Assign(scope.Root, "xbox", new[] { a }, "Cinematic");
+            var host = (MainWindow)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(MainWindow));
+            var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+            typeof(MainWindow).GetField("dataRoot", flags)!.SetValue(host, scope.Root);
+            typeof(MainWindow).GetField("libraryRoot", flags)!.SetValue(host, scope.Root);
+            var folder = PlatformView("steam"); folder.FilePaths = new[] { a, b };
+            var game = CaptureGroupScope.ForFolder(folder, PlatformRows());
+            var ws = new MainWindow.LibraryBrowserWorkingSet { Current = folder, ActiveCaptureGroupScope = game };
+            ws.DetailFilesDisplayOrder.Add(b); ws.SelectedDetailFiles.Add(b);
+            var tile = new System.Windows.Controls.Border { ContextMenu = new System.Windows.Controls.ContextMenu() };
+            var redraws = 0;
+            typeof(MainWindow).GetMethod("AttachCaptureGroupMenu", flags)!.Invoke(host, new object[] { tile, ws, folder, b, (Action)(() => redraws++) });
+            tile.ContextMenu.RaiseEvent(new System.Windows.RoutedEventArgs(System.Windows.Controls.ContextMenu.OpenedEvent));
+            var add = (System.Windows.Controls.MenuItem)tile.ContextMenu.Items[0];
+            var cinematic = add.Items.OfType<System.Windows.Controls.MenuItem>().Single(item => item.Header is System.Windows.Controls.TextBlock text && text.Text == "Cinematic");
+            cinematic.RaiseEvent(new System.Windows.RoutedEventArgs(System.Windows.Controls.MenuItem.ClickEvent));
+            Assert.Equal("Cinematic", store.LoadScope(scope.Root, game).Resolve(b, false));
+            Assert.Equal(1, redraws);
+        });
+    }
+
     sealed class Scope : IDisposable
     {
         public string Root { get; } = Path.Combine(Path.GetTempPath(), "pv-capture-groups-" + Guid.NewGuid().ToString("N"));

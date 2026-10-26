@@ -128,7 +128,8 @@ namespace PixelVaultNative
                     if (live != null) OpenAchievementGuide(live, _userAgent);
                     else
                     {
-                        AchievementGuideWindow.ShowStoredModal(this, _guideService, _loadedResult?.GameTitle ?? _folder?.Name, entry);
+                        AchievementGuideWindow.ShowStoredModal(this, _guideService, _loadedResult?.GameTitle ?? _folder?.Name, entry,
+                            _trackingStore, _scoreSteamAccount, _scoreRetroAccount);
                         ReloadPins(false);
                         RenderAchievementRows(_loadedResult?.Rows, _userAgent, _loadedResult?.SourceLabel);
                     }

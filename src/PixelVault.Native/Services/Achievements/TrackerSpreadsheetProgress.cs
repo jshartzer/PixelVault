@@ -12,25 +12,6 @@ using System.Xml.Linq;
 
 namespace PixelVaultNative
 {
-    sealed class TrackerSpreadsheetMapping
-    {
-        public string Worksheet { get; set; }
-        public string Name { get; set; }
-        public string Category { get; set; }
-        public string Target { get; set; }
-        public string Detail { get; set; }
-        public string Id { get; set; }
-        public string Current { get; set; }
-        public string Completed { get; set; }
-        public string Availability { get; set; }
-        public string Note { get; set; }
-        public string Group { get; set; }
-        public string Milestone { get; set; }
-        public List<TrackerMilestoneColumn> CompletionColumns { get; set; } = new();
-        internal string[] Headers => new[] { Name, Category, Target, Detail, Id, Current, Completed, Availability, Note,Group,Milestone }
-            .Concat((CompletionColumns ?? new()).Select(c => c?.Header)).ToArray();
-        internal bool HasProgress => Headers.Skip(5).Take(4).Any(h => !string.IsNullOrEmpty(h)) || (CompletionColumns?.Any(c => !string.IsNullOrEmpty(c?.Header)) ?? false);
-    }
     sealed class TrackerSpreadsheetDraft
     {
         internal List<AchievementTrackerItem> Items;

@@ -48,7 +48,7 @@ namespace PixelVaultNative
                 if (request?.Version != 1 || !Path.IsPathFullyQualified(request.GameDirectory ?? "") || !DeathStrandingTrackerSource.IsSteamAccount(request.Account)
                     || request.ObservedUtc <= 0 || request.ObservedUtc > DateTime.UtcNow.AddMinutes(5).Ticks || string.IsNullOrWhiteSpace(request.SourceName)
                     || request.SourceName.Length > 240 || request.SkippedNewer < 0 || request.SkippedNewer > 128
-                    || request.TrackerId != AchievementTrackingCatalog.DeathStrandingId && !DeathStrandingWorldReader.Supports(request.TrackerId) && !DeathStrandingOrderReader.Supports(request.TrackerId) && !DeathStrandingChipReader.Supports(request.TrackerId))
+                    || request.TrackerId != AchievementTrackingCatalog.DeathStrandingId && !DeathStrandingWorldReader.Supports(request.TrackerId) && !DeathStrandingOrderReader.Supports(request.TrackerId) && !DeathStrandingChipReader.Supports(request.TrackerId) && !DeathStrandingInterviewReader.Supports(request.TrackerId))
                     throw new InvalidDataException("The save read request is invalid.");
                 if (!File.Exists(Path.Combine(request.GameDirectory, "ds.exe"))) throw new FileNotFoundException("Choose the Director's Cut installation containing ds.exe.");
                 var dllPath = Path.Combine(request.GameDirectory, "oo2core_7_win64.dll");
@@ -80,6 +80,9 @@ namespace PixelVaultNative
                         ? DeathStrandingSaveReader.ReadCatalogue(data, request.Account, request.ObservedUtc, sourceLabel, evidence)
                         : DeathStrandingOrderReader.Supports(request.TrackerId)
                         ? DeathStrandingOrderReader.Read(data, request.Account, request.ObservedUtc, sourceLabel,
+                            "Read-only copied save; matching Steam account; decompressed MD5 verified. Game DLL SHA-256 " + dllHash + ".")
+                        : DeathStrandingInterviewReader.Supports(request.TrackerId)
+                        ? DeathStrandingInterviewReader.Read(data, request.Account, request.ObservedUtc, sourceLabel,
                             "Read-only copied save; matching Steam account; decompressed MD5 verified. Game DLL SHA-256 " + dllHash + ".")
                         : DeathStrandingChipReader.Supports(request.TrackerId)
                         ? DeathStrandingChipReader.Read(data, request.Account, request.ObservedUtc, sourceLabel,

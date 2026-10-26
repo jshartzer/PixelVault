@@ -14,6 +14,11 @@ namespace PixelVaultNative
             window.Foreground=UiBrushHelper.FromHex("#D9E6ED");
             window.Resources.MergedDictionaries.Add((ResourceDictionary)XamlReader.Parse(Resources));
         }
+        internal static void ApplyScoped(FrameworkElement host)
+        {
+            if (!SystemParameters.HighContrast)
+                host.Resources.MergedDictionaries.Add((ResourceDictionary)XamlReader.Parse(Resources));
+        }
         const string Resources="""
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
  <Style TargetType="DockPanel"><Setter Property="Background" Value="#11181D"/></Style>

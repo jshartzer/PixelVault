@@ -33,6 +33,8 @@ namespace PixelVaultNative
                 AppVersion = AppVersion,
                 ChangelogPath = changelogPath,
                 LogsRoot = logsRoot,
+                LoadAchievementCategories = () => achievementGuideService.LoadCategoryNames(),
+                SaveAchievementCategoryOrder = names => achievementGuideService.SaveCategoryOrder(names),
                 Brush = Brush,
                 Btn = Btn,
                 OpenFolder = OpenFolder,

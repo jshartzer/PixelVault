@@ -1,0 +1,12 @@
+[
+  { "provider": "steam", "game": "292030", "group": "Hearts of Stone", "dlc": "Hearts of Stone" },
+  { "provider": "steam", "game": "292030", "group": "Blood and Wine", "dlc": "Blood and Wine" },
+  { "provider": "steam", "game": "241930", "group": "Lord of the Hunt", "dlc": "Lord of the Hunt" },
+  { "provider": "steam", "game": "241930", "group": "The Bright Lord", "dlc": "The Bright Lord" },
+  { "provider": "steam", "game": "356190", "group": "The Blade of Galadriel", "dlc": "The Blade of Galadriel" },
+  { "provider": "steam", "game": "356190", "group": "The Desolation of Mordor", "dlc": "The Desolation of Mordor" },
+  { "provider": "steam", "game": "2561580", "group": "The Frozen Wilds", "dlc": "The Frozen Wilds" },
+  { "provider": "steam", "game": "238010", "group": "The Missing Link", "dlc": "The Missing Link" },
+  { "provider": "steam", "game": "3035570", "group": "Valley of Memory", "dlc": "Valley of Memory" },
+  { "provider": "steam", "game": "3159330", "group": "DLC", "dlc": "Claws of Awaji" }
+]

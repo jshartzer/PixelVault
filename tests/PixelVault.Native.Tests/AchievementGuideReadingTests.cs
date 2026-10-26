@@ -74,6 +74,49 @@ public sealed class AchievementGuideReadingTests
     }
 
     [Fact]
+    public void ReadCategoryButton_SavesSelectedCategoryAndKeepsDlcAndNotes_WithoutDiscardingEdits()
+    {
+        WithGuide((window, service, rows) =>
+        {
+            service.AssignAchievementDlc(rows[0], "Expansion");
+            typeof(AchievementGuideWindow).GetMethod("ReloadEntries", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .Invoke(window, new object?[] { service.LoadGuideEntry("steam", "123", "ONE").AchievementId, null });
+            new System.Windows.Interop.WindowInteropHelper(window).EnsureHandle();
+            var button = Field<Button>(window, "_categoryButton");
+            Assert.True(button.IsEnabled);
+            button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            var menu = button.ContextMenu;
+            Assert.Equal(new[] { "Story", "Actions" }, menu.Items.OfType<MenuItem>().Take(2).Select(item => (string)item.Header));
+            var notes = service.LoadGuideEntry("steam", "123", "ONE").GuideText;
+            Field<HashSet<string>>(window, "_collapsedGroups").Add("Actions");
+            menu.Items.OfType<MenuItem>().Single(item => Equals(item.Header, "Actions")).RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+            menu.IsOpen = false;
+            var saved = service.LoadGuideEntry("steam", "123", "ONE");
+            Assert.Equal("Actions", saved.GroupName); Assert.Equal("Expansion", saved.DlcName); Assert.Equal(notes, saved.GuideText);
+            Assert.Contains("ACTIONS", Field<TextBlock>(window, "_groupPillText").Text);
+            Assert.Equal("One", Field<TextBlock>(window, "_officialTitle").Text);
+            AchievementDlcTests.SavePreview(window, "category-guide-1000.png", 1000, 850);
+            AchievementDlcTests.SavePreview(window, "category-guide-840.png", 840, 850);
+            Assert.Empty(service.LoadGuideEntry("steam", "123", "TWO").GroupName);
+            var list = Field<ListBox>(window, "_achievementList");
+            list.SelectedItem = list.Items.OfType<FrameworkElement>().Last(item => item.Tag != null);
+            Assert.Equal("Two", Field<TextBlock>(window, "_officialTitle").Text);
+            button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            menu = button.ContextMenu;
+            menu.Items.OfType<MenuItem>().Single(item => Equals(item.Header, "Story")).RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+            menu.IsOpen = false;
+            Assert.Equal("Story", service.LoadGuideEntry("steam", "123", "TWO").GroupName);
+            Assert.Equal("Actions", service.LoadGuideEntry("steam", "123", "ONE").GroupName);
+            Click(window, "_edit");
+            Field<TextBox>(window, "_guideText").Text = "Unsaved notes";
+            Assert.False(button.IsEnabled);
+            button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert.Equal("Unsaved notes", Field<TextBox>(window, "_guideText").Text);
+            Assert.Equal(notes, service.LoadGuideEntry("steam", "123", "ONE").GuideText);
+        });
+    }
+
+    [Fact]
     public void UnsavedSaveChoice_PersistsBeforeNavigatingToAnotherGuide()
     {
         WithGuide((window, service, rows) =>

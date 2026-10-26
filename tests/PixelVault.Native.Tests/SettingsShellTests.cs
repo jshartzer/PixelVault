@@ -37,7 +37,7 @@ public sealed class SettingsShellTests(ITestOutputHelper output)
                 Assert.Equal(0, historyReads);
                 var tabs = root.Children.OfType<TabControl>().Single();
                 Assert.Equal(Dock.Top, tabs.TabStripPlacement);
-                Assert.Equal(new[] { "Folders & tools", "Accounts", "Import & tray", "Library", "Diagnostics", "Run history" }, tabs.Items.Cast<TabItem>().Select(t => (string)t.Header));
+                Assert.Equal(new[] { "Folders & tools", "Accounts", "Import & tray", "Library", "Diagnostics", "Run history", "Achievements" }, tabs.Items.Cast<TabItem>().Select(t => (string)t.Header));
                 Assert.Null(((TabItem)tabs.Items[5]).Content);
                 var folderGrid = PageGrid((TabItem)tabs.Items[0]);
                 var destination = folderGrid.Children.OfType<TextBox>().Single(b => Grid.GetRow(b) == 1);
@@ -71,6 +71,58 @@ public sealed class SettingsShellTests(ITestOutputHelper output)
             }
             finally { window.Close(); }
         });
+    }
+
+    [Fact]
+    public void AchievementsTab_ReordersAsDraft_AndSavesIndependentlyOfOtherSettings()
+    {
+        OnSta(() =>
+        {
+            using var scope = new AchievementPinTests.PinScope();
+            var deps = Dependencies();
+            var loads = 0; var categorySaves = 0; var generalSaves = 0;
+            deps.LoadAchievementCategories = () => { loads++; return scope.Service.LoadCategoryNames(); };
+            deps.SaveAchievementCategoryOrder = names => { categorySaves++; scope.Service.SaveCategoryOrder(names); };
+            deps.SaveSettings = () => generalSaves++;
+            var window = new Window();
+            try
+            {
+                var root = Build(deps, window);
+                var tabs = root.Children.OfType<TabControl>().Single();
+                Assert.Equal(0, loads);
+                var tab = tabs.Items.Cast<TabItem>().Single(item => Equals(item.Header, "Achievements"));
+                tabs.SelectedItem = tab;
+                Assert.Equal(1, loads);
+                var list = Descendants(tab).OfType<ListBox>().Single();
+                var down = Descendants(tab).OfType<Button>().Single(button => Equals(button.Content, "Move down"));
+                var save = Descendants(tab).OfType<Button>().Single(button => Equals(button.Content, "Save order"));
+                Assert.False(save.IsEnabled);
+                down.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                Assert.Equal(new[] { "Actions", "Story" }, list.Items.Cast<string>().Take(2));
+                Assert.Equal(new[] { "Story", "Actions" }, scope.Service.LoadCategoryNames().Take(2));
+                tabs.SelectedIndex = 0; tabs.SelectedItem = tab;
+                Assert.Same(list, Descendants(tab).OfType<ListBox>().Single());
+                Assert.True(save.IsEnabled);
+                save.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                Assert.Equal(1, categorySaves); Assert.Equal(0, generalSaves);
+                Assert.False(save.IsEnabled);
+                Assert.Equal(new[] { "Actions", "Story" }, new AchievementGuideService(scope.Path).LoadCategoryNames().Take(2));
+                foreach (var width in new[] { 1152d, 852d })
+                {
+                    Layout(root, width, width < 900 ? 460 : 750);
+                    Assert.True(save.TranslatePoint(new Point(0, 0), root).Y + save.ActualHeight <= root.ActualHeight);
+                    SavePreview(root, "settings-achievements-" + width + ".png");
+                }
+            }
+            finally { window.Close(); }
+        });
+    }
+
+    static IEnumerable<DependencyObject> Descendants(DependencyObject root)
+    {
+        yield return root;
+        foreach (var child in LogicalTreeHelper.GetChildren(root).OfType<DependencyObject>())
+            foreach (var descendant in Descendants(child)) yield return descendant;
     }
 
     static Grid Build(SettingsShellDependencies deps, Window window) =>

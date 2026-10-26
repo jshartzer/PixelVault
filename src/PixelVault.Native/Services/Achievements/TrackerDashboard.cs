@@ -86,11 +86,9 @@ namespace PixelVaultNative
                 foreach(var definition in matching)
                 {
                     var states=store.Load(definition.Id,account).Where(s=>!s.Item.Archived).ToList();
-                    var done=states.Count(s=>s.Complete);var total=states.Count;
-                    if(definition.CategoryTargets.Count>0)
-                    {var counts=AchievementTrackingCatalog.QualifyingRows(states);done=definition.CategoryTargets.Sum(t=>Math.Min(t.Value,counts.GetValueOrDefault(t.Key)));total=definition.CategoryTargets.Values.Sum();}
+                    var totals=TrackerTotals.Calculate(definition,states);
                     var automation=string.IsNullOrWhiteSpace(account)?(new TrackerAutomationSettings(),new TrackerAutomationState()):store.Automation(definition.Id,account);
-                    entry.Trackers.Add(new TrackerDashboardItem{Definition=definition,Completed=done,Total=total,Unconfirmed=states.Count(s=>!s.IsKnown),AccountConnected=!string.IsNullOrWhiteSpace(account),
+                    entry.Trackers.Add(new TrackerDashboardItem{Definition=definition,Completed=totals.Completed,Total=totals.Total,Unconfirmed=totals.Unknown,AccountConnected=!string.IsNullOrWhiteSpace(account),
                         AchievementTitle=string.IsNullOrEmpty(definition.AchievementId)?null:achievements.GetValueOrDefault((definition.Provider,definition.GameId,definition.AchievementId)),
                         Connection=service.Connection(definition,store.Source(definition.Id,account),automation.Item1,automation.Item2)});
                 }

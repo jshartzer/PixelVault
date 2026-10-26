@@ -1,5 +1,11 @@
 # Local app testing output (scripts/Build-PixelVault-AppTesting.ps1)
 App Testing/
+Companion Preview/
+Companion Backups/
+Companion Assets/
+PixelVaultCompanionData/
+Companion Connector/
+PixelVaultCompanionConnectorData/
 
 # Generated binaries
 dist/PixelVault-*/
@@ -90,4 +96,10 @@ Thumbs.db
 
 # Personal achievement checklist observations, notes and imported save snapshots
 /PixelVaultData/achievement-tracking/
+/PixelVaultData/game-maps/
 /tests/**/TestResults/
+
+# Companion runtime data and local deployment overrides
+/src/PixelVault.Companion/App_Data/
+/deploy/companion/compose.override.yml
+/deploy/companion/.env

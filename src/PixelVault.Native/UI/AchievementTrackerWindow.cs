@@ -33,6 +33,7 @@ namespace PixelVaultNative
         readonly TextBlock source = Text("", 15);
         readonly TextBlock description = Text("", 16);
         readonly TextBlock linkedAchievement = Text("", 16);
+        readonly GameMapLinks mapLinks = new GameMapLinks();
         readonly TextBlock connectionIndicator = Text("",14);
         readonly Button editLink;
         readonly TextBlock status = Text("", 15);
@@ -52,6 +53,8 @@ namespace PixelVaultNative
         string preferredId;
         readonly bool browseGameTrackers;
         internal Func<AchievementTrackerEditWindow, bool?> ShowEditor = dialog => dialog.ShowDialog();
+        internal Func<TrackerRenameWindow, bool?> ShowRename = dialog => dialog.ShowDialog();
+        internal Task PendingRename { get; private set; } = Task.CompletedTask;
         internal Task PendingEdit { get; private set; } = Task.CompletedTask;
 
         internal AchievementTrackerWindow(Window owner, AchievementTrackingStore store, string steamAccount, string retroAccount,
@@ -98,6 +101,9 @@ namespace PixelVaultNative
             export.Click += (_, __) => { exportMenu.PlacementTarget=export; exportMenu.IsOpen=true; }; actions.Children.Add(export);
             foreach (var action in actions.Children.OfType<Button>()) { action.MinHeight = 38; action.Padding = new Thickness(10, 6, 10, 6); action.Margin = new Thickness(0, 0, 8, 4); }
             var manage=Button("Manage tracker…","Manage achievement link, sources, progress imports and exports");var manageMenu=new ContextMenu();manage.ContextMenu=manageMenu;
+            var rename = new MenuItem { Header = "Rename tracker…", ToolTip = "Change the selected tracker's display name" };
+            rename.Click += (_, __) => PendingRename = RenameAsync();manageMenu.Items.Add(rename);
+            manageMenu.Opened += (_, __) => rename.IsEnabled = selected != null && !loadingDefinitions;
             void Manage(Button button)
             {
                 var entry=new MenuItem { Header=button.Content,ToolTip=button.ToolTip };
@@ -111,6 +117,8 @@ namespace PixelVaultNative
             Manage(import);Manage(editLink);Manage(export);actions.Children.Remove(import);actions.Children.Remove(editLink);actions.Children.Remove(export);actions.Children.Add(manage);
             manage.Click+=(_,__)=>{manageMenu.PlacementTarget=manage;manageMenu.IsOpen=true;};
             header.Children.Add(actions);
+            header.Children.Add(mapLinks);
+            Activated += (_, __) => mapLinks.Bind(store, selected?.Provider, selected?.GameId, selected?.GameTitle, steamAccount, retroAccount, tracker: selected?.Id);
             description.Visibility=Visibility.Collapsed;
             trackers.Margin = new Thickness(0, 0, 0, 6);
             AutomationProperties.SetName(trackers, "Choose achievement tracker"); header.Children.Add(trackers);
@@ -180,6 +188,27 @@ namespace PixelVaultNative
 
         string Account(AchievementTrackerDefinition definition) => definition?.Provider == "steam" ? steamAccount : retroAccount;
 
+        internal async Task RenameAsync()
+        {
+            var definition = selected;if (definition == null) return;
+            var id = definition.Id;var previousTitle = definition.Title;string title;
+            var dialog = new TrackerRenameWindow(this, previousTitle);
+            try { if (ShowRename(dialog) != true) return;title = dialog.TrackerTitle; }
+            finally { dialog.Close(); }
+            try
+            {
+                await Task.Run(() => store.RenameTracker(id, title, previousTitle));
+                foreach (var item in trackers.Items.OfType<AchievementTrackerDefinition>().Where(d => d.Id == id)) item.Title = title;
+                if (selected?.Id == id) selected.Title = title;
+                // Refresh only the selector; reloading progress would discard unsaved count/note drafts.
+                var choice = trackers.SelectedItem;var wasLoading = loadingDefinitions;loadingDefinitions = true;
+                try { trackers.SelectedItem = null;trackers.Items.Refresh();trackers.SelectedItem = choice; }
+                finally { loadingDefinitions = wasLoading; }
+                status.Text = "Tracker renamed.";
+            }
+            catch (Exception ex) { Error("Could not rename tracker. " + ex.Message); }
+        }
+
         internal async Task LoadDefinitionsAsync()
         {
             try
@@ -203,6 +232,7 @@ namespace PixelVaultNative
         internal async Task ReloadAsync(bool changeTracker = false, bool preserveDraft = false)
         {
             var generation = ++loadGeneration; var definition = selected;
+            mapLinks.Bind(store, definition?.Provider, definition?.GameId, definition?.GameTitle, steamAccount, retroAccount, tracker: definition?.Id);
             UpdateRefreshControls();
             if (definition == null)
             {
@@ -230,8 +260,9 @@ namespace PixelVaultNative
                     : "Linked achievement: " + (achievement?.Title ?? definition.AchievementId);
                 var done = states.Count(s => s.Complete); var remaining = states.Count(s => !s.Complete && s.IsKnown && s.Availability == TrackerAvailability.Available);
                 var locked = states.Count(s => !s.Complete && s.Availability == TrackerAvailability.Locked); var unknown = states.Count(s => !s.IsKnown);
-                summary.Text = done + " / " + states.Count + " " + definition.CompletionLabel.ToLowerInvariant();
-                progress.Value = states.Count == 0 ? 0 : 100.0 * done / states.Count;
+                var totals = TrackerTotals.Calculate(definition, states);
+                summary.Text = totals.Completed + " / " + totals.Total + " " + definition.CompletionLabel.ToLowerInvariant();
+                progress.Value = totals.Percent;
                 if (definition.Milestones.Count > 0 && definition.CategoryTargets.Count > 0)
                 {
                     var counts = AchievementTrackingCatalog.QualifyingRows(states);
@@ -326,7 +357,16 @@ namespace PixelVaultNative
                 title.ToolTip=state.Item.Name+"\n"+caption.Text;
                 if(state.Item.Target>1)title.Inlines.Add(new Run(" · "+(state.Current?.ToString()??"?")+"/"+state.Item.Target) { FontSize=14 });
                 if(!string.IsNullOrWhiteSpace(state.Note))title.Inlines.Add(new Run(" · Note") { FontSize=14 });
-                var actions = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center }; actions.Children.Add(ProgressToggle(state, "Complete"));
+                var actions = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+                if (!string.IsNullOrWhiteSpace(state.Item.Content))
+                {
+                    var contentButton = Button("Content", "Read the saved text for " + state.Item.Name);
+                    contentButton.FontSize = 12; contentButton.MinHeight = 24; contentButton.Height = 24; contentButton.MinWidth = 62;
+                    contentButton.Padding = new Thickness(6, 0, 6, 0); contentButton.Margin = new Thickness(0, 0, 6, 0);
+                    contentButton.Click += (_, e) => { e.Handled = true; new TrackerContentWindow(this, state.Item).Show(); };
+                    actions.Children.Add(contentButton);
+                }
+                actions.Children.Add(ProgressToggle(state, "Complete"));
                 var row = RecordRow(text, actions);
                 var item = RecordCell(row, state);
                 cells.Add(item);

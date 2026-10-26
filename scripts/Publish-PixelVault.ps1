@@ -210,6 +210,8 @@ Copy-Item $changelogPath (Join-Path $outputDir "CHANGELOG.md") -Force
 $bundleNativeDest = Join-Path $outputDir "source\src\PixelVault.Native"
 $bundleTestsDest = Join-Path $outputDir "source\tests\PixelVault.Native.Tests"
 Copy-SourceTreeForBundle -SourcePath $nativeProjectDir -DestinationPath $bundleNativeDest
+Copy-SourceTreeForBundle -SourcePath (Join-Path $repoRoot "src\PixelVault.Tracking") -DestinationPath (Join-Path $outputDir "source\src\PixelVault.Tracking")
+Copy-SourceTreeForBundle -SourcePath (Join-Path $repoRoot "src\PixelVault.Companion.Client") -DestinationPath (Join-Path $outputDir "source\src\PixelVault.Companion.Client")
 Copy-SourceTreeForBundle -SourcePath $testsProjectDir -DestinationPath $bundleTestsDest
 Write-Host "Bundled source under: $(Join-Path $outputDir 'source')"
 

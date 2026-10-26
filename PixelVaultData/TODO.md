@@ -1,5 +1,21 @@
 # PixelVault To Do
 
+**Companion Screenshot Library:** Steps 1–5 complete on NAS 0.13.0; next Step 6, full timeline and a photo-library entry. Recent-photo home strip is capped at 30, with shared viewer, retained positions and existing gallery entry. [Plan](../docs/plans/PV-PLN-WEB-002-companion-screenshot-library.md).
+
+**Companion Screenshot Library:** Steps 1–4 complete on NAS 0.12.0; next Step 5, bounded recent-photo home strip. Default-off saved grouping within dates and collapsible sections implemented. Viewer X removed; swipe down/Escape/Back retained. [Plan](../docs/plans/PV-PLN-WEB-002-companion-screenshot-library.md).
+
+**Companion Screenshot Library:** Steps1–3 complete on NAS0.11.0; next Step4 existing named groups within dates, default-off and collapsible. Original downloads retained. [Plan](../docs/plans/PV-PLN-WEB-002-companion-screenshot-library.md).
+
+**Companion Screenshot Library:** Steps1–2 complete on NAS0.9.1; next Step3 variable-size square layout. Pilot remains233 photos in one game; recurring/all-game media sync is separate. [Plan](../docs/plans/PV-PLN-WEB-002-companion-screenshot-library.md).
+
+**Companion Screenshot Library — PV-PLN-WEB-002:** Step1 media foundation complete on NAS0.9.0; next is Step2 basic gallery/viewer. Full [plan](../docs/plans/PV-PLN-WEB-002-companion-screenshot-library.md). No automatic media monitor or gallery UI yet.
+
+**October26 — Interview reference catalogue:** generic Content reader/export plus149 populated installed-English interviews added, linked to The Past Guides the Present. Existing data/automatic67/100 preserved; individual read identities still need a named gameplay control. Full Native suite1230passed. E/F remain In Progress; Companion rollout coordinated separately. [Evidence](../docs/TRACKER_CONTENT.md).
+
+**October 24 — Chip refresh correction:** #8 pre-final state 0x0B is readable and incomplete; only validated final state 0x1B completes restoration. Actual automatic before/pre-final/after control passes and live tracker refreshed to 24/56 after backup, preserving authored data/source/automation settings. Reopen the updated review build for ongoing monitoring. Existing E/F scope unchanged. [Evidence](../docs/DEATH_STRANDING_MEMORY_CHIP_RESEARCH.md).
+
+**October 24 — Saved game maps:** reusable map library, optional achievement/tracker links and profile Maps/Trackers actions implemented. Three private high-resolution Death Stranding maps carry all 56 calibrated chip pins, saved-progress colours and remaining/search filters. Generic local image/pin/link editing is available for other games. Existing tracker Phase E/F remain active. [Details](../docs/GAME_MAPS.md).
+
 **October 24 — Native memory-chip refresh connected:** all 56 restored states now read through a validated complete 190-key collector table; pickup alone does not count. Latest 22/56 restored. SaveChanges enabled after backup at the user's request; authored counts/notes, other tracker settings and all 69 original save hashes retained. Actual before/pickup/intermediate/restored automatic controls pass. Reopen `C:\Codex\App Testing\Achievement Trackers\PixelVault.exe`. 57 focused/18 private-control cases pass; full 1,146 +one temporary cleanup lock, passing targeted rerun. E remaining facilities/compatibility; F remaining headers/source handoff/Excel/OS QA. [Evidence](../docs/DEATH_STRANDING_MEMORY_CHIP_RESEARCH.md).
 
 **October 24 — Chip #52 restoration control received:** pickup and final terminal-restoration flags isolated separately (8→9→25→27), other 55 candidates unchanged. Confirmed #52 restored observation applied once after backup; manual/notes/other state/source/automatic settings retained. Next E: complete wider indexed catalogue/header/flag/layout validation before chip automation; facilities remain research. First pickup/restoration user example is now obtained. No app build/code change. [Evidence](../docs/DEATH_STRANDING_MEMORY_CHIP_RESEARCH.md).

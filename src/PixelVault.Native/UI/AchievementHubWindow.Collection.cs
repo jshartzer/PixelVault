@@ -313,6 +313,7 @@ namespace PixelVaultNative
                                 name, StringComparison.OrdinalIgnoreCase))?.GroupSortOrder ?? 0;
                             var saved = AchievementsInfoWindow.SaveCategory(guides, row, name, order);
                             row.GroupName = saved.GroupName;
+                            row.DlcName = saved.DlcName;
                             row.GroupSortOrder = saved.GroupSortOrder;
                             ApplyCollectionQuery();
                         }
@@ -321,6 +322,18 @@ namespace PixelVaultNative
                             MessageBox.Show(this, "Could not save the achievement category. " + ex.Message,
                                 "Achievement category", MessageBoxButton.OK, MessageBoxImage.Error);
                         }
+                    }, () => true, this, sharedCategories: () => guides.LoadCategoryNames());
+                AchievementsInfoWindow.AddDlcMenu(button.ContextMenu, row,
+                    () => guides.LoadDlcNames(row.Provider, row.ProviderGameId), name =>
+                    {
+                        try
+                        {
+                            var rows = collection.Entries.Where(e => e.Game.Key == game.Key).Select(e => e.Row).ToList();
+                            guides.SyncDefinitionsAndLoadGuides(game.Folder?.GameId ?? "", rows);
+                            row.DlcName = guides.AssignAchievementDlc(row, name).DlcName;
+                            ApplyCollectionQuery();
+                        }
+                        catch (Exception ex) { MessageBox.Show(this, "Could not save the achievement DLC. " + ex.Message, "Achievement DLC", MessageBoxButton.OK, MessageBoxImage.Error); }
                     }, () => true, this);
             }
             return button;

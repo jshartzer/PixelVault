@@ -8,10 +8,10 @@ using System.Text;
 namespace PixelVaultNative
 {
     /// <summary>Named binary completion columns, shared by manual and spreadsheet trackers.</summary>
-    static class TrackerMilestones
+    public static class TrackerMilestones
     {
-        internal const int Maximum = 16;
-        internal static List<string> Labels(IEnumerable<string> labels)
+        public const int Maximum = 16;
+        public static List<string> Labels(IEnumerable<string> labels)
         {
             var result = labels?.Select(s => (s ?? "").Trim()).ToList() ?? new();
             if (result.Count > Maximum || result.Any(s => s.Length == 0 || s.Length > 80)
@@ -20,10 +20,10 @@ namespace PixelVaultNative
             return result;
         }
 
-        internal static string ItemId(string recordId, string label) => "box." + Convert.ToHexString(
+        public static string ItemId(string recordId, string label) => "box." + Convert.ToHexString(
             SHA256.HashData(Encoding.UTF8.GetBytes(recordId + "\0" + label)));
 
-        internal static List<AchievementTrackerItem> Expand(IEnumerable<AchievementTrackerItem> records, IEnumerable<string> labels)
+        public static List<AchievementTrackerItem> Expand(IEnumerable<AchievementTrackerItem> records, IEnumerable<string> labels)
         {
             var names = Labels(labels); var rows = records.ToList();
             if (names.Count == 0) return rows;
@@ -32,13 +32,13 @@ namespace PixelVaultNative
             return rows.SelectMany(row => names.Select((name, index) => new AchievementTrackerItem
             {
                 Id = ItemId(row.Id, name), GroupId = row.Id, Milestone = name, Name = row.Name,
-                Category = row.Category, Detail = row.Detail, Order = row.Order * names.Count + index,
+                Category = row.Category, Detail = row.Detail, Content = row.Content, Order = row.Order * names.Count + index,
                 Identifiers = new Dictionary<string, string>(row.Identifiers)
             })).ToList();
         }
     }
 
-    sealed class TrackerMilestoneColumn
+    public sealed class TrackerMilestoneColumn
     {
         public string Label { get; set; }
         public string Header { get; set; }

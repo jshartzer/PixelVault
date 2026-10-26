@@ -212,6 +212,9 @@ namespace PixelVaultNative
             public void LibraryBrowserShowAchievementsInfo(Window owner, LibraryBrowserFolderView view) =>
                 _m.LibraryBrowserShowAchievementsInfo(owner, view);
 
+            public void LibraryBrowserShowGameTrackers(Window owner, LibraryBrowserFolderView view) =>
+                _m.LibraryBrowserShowGameTrackers(owner, view);
+
             public void LibraryBrowserOpenGameProfile(Window owner, LibraryBrowserFolderView view) =>
                 _m.LibraryBrowserOpenGameProfile(owner, view);
 

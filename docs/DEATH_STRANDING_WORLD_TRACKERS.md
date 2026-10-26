@@ -1,5 +1,7 @@
 # Death Stranding structures, upgrades and memory chips
 
+October 24 location metadata: all 56 memory-chip descriptions now start with map X/Y coordinates and Eastern/Central/Western region. Values are rounded installed-game locator positions matched by stable resource UUID; the original restoration instructions follow. Online coordinate/region references were checked, with installed data taking precedence where guide examples differ. IDs, progress, notes and source/automatic settings are unchanged. See [coordinate provenance](DEATH_STRANDING_MEMORY_CHIP_RESEARCH.md).
+
 October 24 native chip addition: the complete 190-entry collector catalogue matches installed chip/customization resources in all 58 copied saves. The bounded parser distinguishes pickup, intermediate terminal state and final restoration. Current controlled save gives 22/56 restored; the native source and SaveChanges automation reuse the existing generic implementation. See [Chip reader evidence](DEATH_STRANDING_MEMORY_CHIP_RESEARCH.md). Earlier dated validation counts and unsupported-reader statements below are historical.
 
 ACHG-004 Phase E is partly implemented in App Testing. Construction, maximum upgrades and memory-chip restoration support native save refresh. All are available from the game, Hub and the corresponding achievement's **Track progress…** entry, using the shared account-scoped notes, optional achievement links and transactional undo.

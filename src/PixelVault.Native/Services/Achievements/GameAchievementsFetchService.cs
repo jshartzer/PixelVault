@@ -61,8 +61,9 @@ namespace PixelVaultNative
             public string IconUrlColor;
             /// <summary>Steam locked icon hash URL when available; otherwise empty (UI may grayscale <see cref="IconUrlColor"/>).</summary>
             public string IconUrlGray;
-            /// <summary>Optional locally curated achievement set, such as Base Game or a DLC name.</summary>
+            /// <summary>Optional locally curated category within the base game or DLC.</summary>
             public string GroupName;
+            public string DlcName;
             /// <summary>Locally curated display order for <see cref="GroupName"/>. Lower values appear first.</summary>
             public int GroupSortOrder;
             /// <summary>Authored guide metadata, hydrated from the durable catalog rather than progress snapshots.</summary>

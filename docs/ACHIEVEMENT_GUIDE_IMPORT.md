@@ -4,6 +4,8 @@ PixelVault achievement-guide bundles use a versioned JSON contract. Open a game'
 
 ## Version 1 contract
 
+Organization metadata is independent: optional `dlcName` assigns a named DLC (empty string means Base Game; omitted means keep existing membership), while `groupName` assigns a category within that content section. `groupSortOrder` orders categories after Story, which always comes first. Organization-only entries need no guide text and preserve guide authorship. See [Achievement groups](ACHIEVEMENT_GROUPS.md).
+
 ```json
 {
   "schemaVersion": 1,

@@ -12,16 +12,32 @@ namespace PixelVaultNative
     {
         List<AchievementHubGame> BuildTrackerLibraryGames(LibraryBrowserWorkingSet ws)
         {
-            var games=new List<AchievementHubGame>();
-            foreach(var view in BuildLibraryBrowserFolderViews(ws.Folders,"console"))
+            return BuildLibraryBrowserFolderViews(ws.Folders,"console").Select(BuildTrackerLibraryGame)
+                .Where(g=>g!=null).GroupBy(g=>g.Key).Select(g=>g.First()).ToList();
+        }
+        AchievementHubGame BuildTrackerLibraryGame(LibraryBrowserFolderView view)
+        {
+            if(view==null||IsLibraryBrowserTimeProjectionView(view))return null;
+            var folder=ResolveLibraryBrowserAchievementLookupFolder(view);
+            if(!GameAchievementsFetchService.TryPickAchievementsBackend(NormalizeConsoleLabel(folder?.PlatformLabel),folder,out var steam))return null;
+            var id=steam?folder.SteamAppId:folder.RetroAchievementsGameId;
+            if(!int.TryParse(id,out var numeric)||numeric<=0)return null;
+            return new AchievementHubGame{Provider=steam?"steam":"retroachievements",Id=numeric.ToString(System.Globalization.CultureInfo.InvariantCulture),Title=view.Name,Folder=folder,ArtPath=GetLibraryArtPathForDisplayOnly(BuildLibraryBrowserDisplayFolder(view))};
+        }
+        internal void LibraryBrowserShowGameTrackers(Window owner,LibraryBrowserFolderView view)
+        {
+            if(view==null||IsLibraryBrowserTimeProjectionView(view))return;
+            var game=BuildTrackerLibraryGame(view);
+            if(game==null)
             {
-                var folder=ResolveLibraryBrowserAchievementLookupFolder(view);
-                if(!GameAchievementsFetchService.TryPickAchievementsBackend(NormalizeConsoleLabel(folder?.PlatformLabel),folder,out var steam))continue;
-                var id=steam?folder.SteamAppId:folder.RetroAchievementsGameId;
-                if(!int.TryParse(id,out var numeric)||numeric<=0)continue;
-                games.Add(new AchievementHubGame{Provider=steam?"steam":"retroachievements",Id=numeric.ToString(System.Globalization.CultureInfo.InvariantCulture),Title=view.Name,Folder=folder,ArtPath=GetLibraryArtPathForDisplayOnly(BuildLibraryBrowserDisplayFolder(view))});
+                MessageBox.Show(owner??this,"Set a Steam App ID or RetroAchievements game ID in Edit metadata to open this game's trackers.","Game trackers",MessageBoxButton.OK,MessageBoxImage.Information);
+                return;
             }
-            return games.GroupBy(g=>g.Key).Select(g=>g.First()).ToList();
+            AchievementHubSession Session()=>new(){LibraryRoot=libraryRoot,SteamAccount=CurrentSteamUserId64(),RetroAccount=CurrentRetroAchievementsUsername(),Games=new(){game}};
+            var navigation=new TrackerNavigation(achievementTrackingStore,Session,TrackerGameCover);
+            var trackers=achievementTrackingStore.Definitions().Where(d=>d.Provider==game.Provider&&d.GameId==game.Id).ToList();
+            if(trackers.Count==1)navigation.OpenTracker(owner,game,trackers[0].Id);
+            else navigation.OpenGame(owner,game);
         }
         FrameworkElement TrackerGameCover(AchievementHubGame game,double width,double height)=>CreateAsyncImageTile(game.ArtPath,
             (int)Math.Ceiling(width*2.5),width,height,Stretch.UniformToFill,game.Title,Brushes.White,new Thickness(0),new Thickness(0),Brushes.Transparent,new CornerRadius(8),Brushes.Transparent,new Thickness(0));

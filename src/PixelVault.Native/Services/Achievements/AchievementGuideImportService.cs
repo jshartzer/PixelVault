@@ -48,6 +48,7 @@ namespace PixelVaultNative
         public string SourceUrl { get; set; }
         public string SourceTitle { get; set; }
         public string GroupName { get; set; }
+        public string DlcName { get; set; }
         public int? GroupSortOrder { get; set; }
     }
 
@@ -61,6 +62,7 @@ namespace PixelVaultNative
         public string Tags;
         public bool IsMissable;
         public string GroupName;
+        public string DlcName;
         public int GroupSortOrder;
         public bool GuideChanged;
         public bool GroupChanged;
@@ -145,12 +147,15 @@ ON CONFLICT(achievement_id) DO UPDATE SET
                                 command.CommandText = @"
 UPDATE achievement_definition
 SET group_name = $group_name,
+    dlc_name = $dlc_name,
     group_sort_order = $group_sort_order
 WHERE achievement_id = $achievement_id;";
                                 command.Parameters.AddWithValue("$achievement_id", candidate.AchievementId);
                                 command.Parameters.AddWithValue("$group_name", candidate.GroupName);
+                                command.Parameters.AddWithValue("$dlc_name", candidate.DlcName);
                                 command.Parameters.AddWithValue("$group_sort_order", candidate.GroupSortOrder);
                                 command.ExecuteNonQuery();
+                                RegisterAchievementOrganization(connection, transaction, candidate.AchievementId);
                             }
                         }
                     }
@@ -248,7 +253,7 @@ WHERE achievement_id = $achievement_id;";
                     || item.IsMissable.HasValue
                     || item.SourceUrl != null
                     || item.SourceTitle != null);
-                var hasGroupPayload = item != null && (item.GroupName != null || item.GroupSortOrder.HasValue);
+                var hasGroupPayload = item != null && (item.GroupName != null || item.GroupSortOrder.HasValue || item.DlcName != null);
                 if (!hasGuidePayload && !hasGroupPayload)
                     result.Preview.ValidationErrors.Add("Achievement " + (id.Length == 0 ? "(missing ID)" : id) + " requires guide or group metadata.");
                 if (hasGuidePayload && string.IsNullOrWhiteSpace(item?.GuideText))
@@ -259,6 +264,11 @@ WHERE achievement_id = $achievement_id;";
                 {
                     try { NormalizeGroupName(item.GroupName); }
                     catch (ArgumentException ex) { result.Preview.ValidationErrors.Add("Achievement " + (id.Length == 0 ? "(missing ID)" : id) + ": " + ex.Message); }
+                }
+                if (item?.DlcName != null)
+                {
+                    try { AchievementOrganization.NormalizeDlcName(item.DlcName); }
+                    catch (ArgumentException ex) { result.Preview.ValidationErrors.Add(ex.Message); }
                 }
                 if (item?.GroupSortOrder.HasValue == true && (item.GroupSortOrder.Value < 0 || item.GroupSortOrder.Value > 100000))
                     result.Preview.ValidationErrors.Add("Achievement " + (id.Length == 0 ? "(missing ID)" : id) + " has groupSortOrder outside 0-100000.");
@@ -288,15 +298,22 @@ WHERE achievement_id = $achievement_id;";
                 var tags = hasGuidePayload ? NormalizeTags(string.Join(", ", item.Tags ?? new List<string>())) : existing.Tags ?? string.Empty;
                 var isMissable = hasGuidePayload ? item.IsMissable == true : existing.IsMissable;
                 var groupName = item.GroupName == null ? existing.GroupName ?? string.Empty : NormalizeGroupName(item.GroupName);
+                var dlcName = item.DlcName == null ? existing.DlcName ?? "" : AchievementOrganization.NormalizeDlcName(item.DlcName);
+                var legacyDlc = AchievementOrganization.DlcName(null, item.GroupName);
+                if (legacyDlc.Length > 0)
+                {
+                    if (item.DlcName == null) dlcName = legacyDlc;
+                    groupName = existing.GroupName ?? "";
+                }
                 var groupSortOrder = item.GroupSortOrder ?? existing.GroupSortOrder;
                 var guideChanged = hasGuidePayload && (!string.Equals(guideText, existing.GuideText ?? string.Empty, StringComparison.Ordinal)
                     || !string.Equals(sourceUrl, existing.SourceUrl ?? string.Empty, StringComparison.Ordinal)
                     || !string.Equals(sourceTitle, existing.SourceTitle ?? string.Empty, StringComparison.Ordinal)
                     || !string.Equals(tags, existing.Tags ?? string.Empty, StringComparison.Ordinal)
                     || isMissable != existing.IsMissable);
-                var groupChanged = (item.GroupName != null || item.GroupSortOrder.HasValue)
+                var groupChanged = (item.GroupName != null || item.GroupSortOrder.HasValue || item.DlcName != null)
                     && (!string.Equals(groupName, existing.GroupName ?? string.Empty, StringComparison.Ordinal)
-                        || groupSortOrder != existing.GroupSortOrder);
+                        || groupSortOrder != existing.GroupSortOrder || !string.Equals(dlcName, existing.DlcName ?? "", StringComparison.Ordinal));
 
                 result.Candidates.Add(new AchievementGuideImportCandidate
                 {
@@ -308,6 +325,7 @@ WHERE achievement_id = $achievement_id;";
                     Tags = tags,
                     IsMissable = isMissable,
                     GroupName = groupName,
+                    DlcName = dlcName,
                     GroupSortOrder = groupSortOrder,
                     GuideChanged = guideChanged,
                     GroupChanged = groupChanged,

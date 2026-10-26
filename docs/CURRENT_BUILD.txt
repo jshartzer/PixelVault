@@ -9,3 +9,6 @@ C:\Codex\dist\PixelVault-0.077.000\PixelVault.exe
 Shortcut that should point at the latest build:
 
 C:\Codex\PixelVault.lnk
+
+Companion NAS: 0.13.0 - http://192.168.1.99:8787/
+Companion PC connector: 0.8.0 - C:\Codex\Companion Connector\app-0.8.0\PixelVault.Companion.Connector.exe

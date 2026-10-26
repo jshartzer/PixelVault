@@ -30,7 +30,7 @@ public sealed class DeathStrandingChipReaderTests
     static AchievementTrackerSnapshot Read(byte[] data)=>DeathStrandingChipReader.Read(data,"player",DateTime.UtcNow.Ticks,"Fixture","Checked copy.");
     static int ChipPosition()=>Start+Array.IndexOf(DeathStrandingChipReader.References(),1202779670U)*12;
     [Theory]
-    [InlineData(0,0)][InlineData(8,0)][InlineData(9,0)][InlineData(25,0)][InlineData(27,1)]
+    [InlineData(0,0)][InlineData(8,0)][InlineData(9,0)][InlineData(11,0)][InlineData(25,0)][InlineData(27,1)]
     public void OnlyTerminalRestorationCounts(int flags,int expected)
     {
         var data=Payload();data[ChipPosition()+10]=(byte)flags;
@@ -41,6 +41,28 @@ public sealed class DeathStrandingChipReaderTests
         Assert.Equal(expected,result.Items.Single(i=>i.ItemId==Chip52).Current);
         Assert.Equal(expected,result.Items.Sum(i=>i.Current));
         Assert.All(result.Items,i=>Assert.Equal(TrackerAvailability.Unknown,i.Availability));
+    }
+    [Fact]
+    public void PreFinalStateDoesNotCompleteChipUntilTerminalFinalState()
+    {
+        var data=Payload();var p=ChipPosition();data[p+10]=11;
+        var before=Read(data);Assert.Equal(0,before.Items.Single(i=>i.ItemId==Chip52).Current);
+        data[p+10]=27;var after=Read(data);
+        Assert.Equal(1,after.Items.Single(i=>i.ItemId==Chip52).Current);
+        Assert.Equal(before.Items.Where(i=>i.ItemId!=Chip52).Select(i=>(i.ItemId,i.Current)),after.Items.Where(i=>i.ItemId!=Chip52).Select(i=>(i.ItemId,i.Current)));
+        Assert.Contains("0x0B",after.Evidence);Assert.Contains("0x1B",after.Evidence);
+    }
+    [Fact]
+    public void UnknownStateReportsItsChipWithoutProducingProgress()
+    {
+        var data=Payload();data[ChipPosition()+10]=13;
+        var error=Assert.Throws<NotSupportedException>(()=>Read(data));
+        Assert.Contains("table is intact",error.Message);Assert.Contains("memory chip #52",error.Message);Assert.Contains("0x0D",error.Message);Assert.Contains("preserved",error.Message);
+    }
+    [Fact]
+    public void UnknownStateCannotHideAnAmbiguousCollectorTable()
+    {
+        var first=Payload();first[ChipPosition()+10]=13;var error=Assert.Throws<NotSupportedException>(()=>Read(first.Concat(Payload()).ToArray()));Assert.Contains("ambiguous",error.Message);
     }
     [Theory]
     [InlineData("count")][InlineData("prefix")][InlineData("truncated")][InlineData("duplicate")][InlineData("unknown")]
@@ -84,6 +106,43 @@ public sealed class DeathStrandingChipReaderTests
     static IEnumerable<System.Windows.DependencyObject> Children(System.Windows.DependencyObject root)
     {
         yield return root;for(int i=0;i<System.Windows.Media.VisualTreeHelper.GetChildrenCount(root);i++)foreach(var child in Children(System.Windows.Media.VisualTreeHelper.GetChild(root,i)))yield return child;
+    }
+    [Fact]
+    public async Task PrivatePreFinalTurnInControlRefreshesAutomaticallyWithoutEarlyCredit()
+    {
+        var path=Environment.GetEnvironmentVariable("PIXELVAULT_DS_CHIP_PENDING_REVIEW");if(string.IsNullOrWhiteSpace(path))return;
+        var manifest=JsonDocument.Parse(File.ReadAllText(path)).RootElement;
+        var chip=manifest.GetProperty("ChipId").GetString()!;
+        var account=JsonDocument.Parse(File.ReadAllText(Environment.GetEnvironmentVariable("PIXELVAULT_TRACKING_REVIEW_SEED")!)).RootElement.GetProperty("Account").GetString()!;
+        var worker=Environment.GetEnvironmentVariable("PIXELVAULT_DS_CHIP_WORKER")!;var game=Environment.GetEnvironmentVariable("PIXELVAULT_DS_REVIEW_GAME")!;
+        var controls=manifest.GetProperty("Controls").EnumerateArray().ToDictionary(x=>x.GetProperty("Control").GetString()!);
+        var originals=controls.Values.ToDictionary(x=>x.GetProperty("Encrypted").GetString()!,x=>SHA256.HashData(File.ReadAllBytes(x.GetProperty("Encrypted").GetString()!)));
+        var dir=Path.Combine(Path.GetTempPath(),"PV-ChipPending-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(dir);
+        try
+        {
+            var folder=Path.Combine(dir,"saves","manualsave0");Directory.CreateDirectory(folder);var save=Path.Combine(folder,"checkpoint.dat");var observed=DateTime.UtcNow.AddMinutes(-5);
+            void Copy(string control){File.Copy(controls[control].GetProperty("Encrypted").GetString()!,save,true);observed=observed.AddMinutes(1);File.SetLastWriteTimeUtc(save,observed);}
+            Copy("before");var store=new AchievementTrackingStore(dir);var source=new DeathStrandingTrackerSource(Path.Combine(dir,"achievement-tracking"),worker);var service=new TrackerRefreshService(store,new[]{source});
+            service.Configure(Id,account,source.Id,"1",Path.Combine(dir,"saves"),gameDirectory:game);
+            var plan=await service.PrepareAsync(Id,account,default);service.Apply(plan,false,null!);
+            Assert.Equal(23,store.Load(Id,account).Count(s=>s.Complete));Assert.Equal(0,store.Load(Id,account).Single(s=>s.Item.Id==chip).Current);
+            store.SaveNote(Id,account,chip,"Keep this turn-in note");store.SaveAutomation(Id,account,store.Source(Id,account).Id,TrackerAutomationMode.SaveChanges,5,false);
+            var now=DateTime.UtcNow;using var monitor=new TrackerAutomationMonitor(store,service,()=>now);monitor.SetAccounts(account,"");
+            async Task Tick(){now=now.AddSeconds(5);await monitor.TickAsync();now=now.AddSeconds(5);await monitor.TickAsync();}
+            await Tick();var before=store.Load(Id,account).ToDictionary(s=>s.Item.Id,s=>s.Current);
+            Copy("pending");await Tick();
+            Assert.Equal(23,store.Load(Id,account).Count(s=>s.Complete));Assert.Equal(0,store.Load(Id,account).Single(s=>s.Item.Id==chip).Current);
+            Assert.Equal(0,store.Automation(Id,account).State.Failures);Assert.False(store.Automation(Id,account).State.ReviewPending);
+            Copy("after");await Tick();var after=store.Load(Id,account);
+            Assert.Equal(24,after.Count(s=>s.Complete));Assert.Equal(1,after.Single(s=>s.Item.Id==chip).Current);Assert.Equal("Keep this turn-in note",after.Single(s=>s.Item.Id==chip).Note);
+            Assert.All(after.Where(s=>s.Item.Id!=chip),s=>Assert.Equal(before[s.Item.Id],s.Current));Assert.Equal(0,store.Automation(Id,account).State.Failures);
+            Assert.All(store.Load(Id,"other"),s=>Assert.Null(s.Current));var history=store.History(Id,account).Count;await Tick();Assert.Equal(history,store.History(Id,account).Count);
+            foreach(var original in originals)Assert.Equal(original.Value,SHA256.HashData(File.ReadAllBytes(original.Key)));
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();for(int i=0;Directory.Exists(dir);i++){try{Directory.Delete(dir,true);}catch(IOException)when(i<5){Thread.Sleep(50);}}
+        }
     }
     [Fact]
     public async Task OptionalPrivateControlsValidatePickupRestorationAndAutomaticReconciliation()

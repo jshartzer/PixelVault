@@ -14,6 +14,8 @@ namespace PixelVaultNative
         public string AppVersion { get; set; }
         public string ChangelogPath { get; set; }
         public string LogsRoot { get; set; }
+        public Func<IReadOnlyList<string>> LoadAchievementCategories { get; set; }
+        public Action<IReadOnlyList<string>> SaveAchievementCategoryOrder { get; set; }
 
         public Func<string, SolidColorBrush> Brush { get; set; }
         public Func<string, RoutedEventHandler, string, Brush, Button> Btn { get; set; }

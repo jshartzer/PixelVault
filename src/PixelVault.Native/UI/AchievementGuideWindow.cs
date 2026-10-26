@@ -75,6 +75,10 @@ namespace PixelVaultNative
         readonly Button _importFile;
         readonly Button _pasteJson;
         readonly StackPanel _reader;
+        readonly AchievementInlineTrackers _linkedTrackers = new AchievementInlineTrackers();
+        readonly GameMapLinks _mapLinks = new GameMapLinks();
+        AchievementTrackingStore _trackingStore;
+        string _trackingSteamAccount, _trackingRetroAccount;
         readonly StackPanel _editorFields;
         readonly TextBlock _readGuide;
         readonly WrapPanel _readTags;
@@ -85,6 +89,7 @@ namespace PixelVaultNative
         AchievementGuideEntry _storedEntry;
         readonly Func<MessageBoxResult> _confirmUnsavedChanges;
         bool _isEditing;
+        readonly Button _categoryButton;
         string _provider;
         string _providerGameId;
         GuideListItem _current;
@@ -282,6 +287,11 @@ namespace PixelVaultNative
             _groupPill = InfoPill(_groupPillText, "#1B2B25", "#355746");
             _groupPill.Margin = new Thickness(7, 0, 0, 0);
             pills.Children.Add(_groupPill);
+            _categoryButton = AchievementsInfoWindow.BuildCategoryPickerButton(CurrentCategoryRow,
+                () => _allItems.Select(item => CategoryRowForEntry(item.Entry)),
+                ChangeCurrentCategory, () => !_isEditing && _current?.Entry != null, this, () => _service.LoadCategoryNames());
+            _categoryButton.Margin = new Thickness(7, 0, 0, 0);
+            pills.Children.Add(_categoryButton);
             selectedDetails.Children.Add(pills);
 
             _officialDescription = new TextBlock
@@ -315,6 +325,8 @@ namespace PixelVaultNative
             _readSource.MinHeight = 32;
             _readSource.Click += delegate { OpenCurrentSource(); };
             _reader.Children.Add(EditorSection("GUIDE", "Completion guide", _readGuide, _readTags, _readSource));
+            _reader.Children.Add(_linkedTrackers);
+            _reader.Children.Add(_mapLinks);
             editor.Children.Add(_reader);
             _editorFields = new StackPanel { Visibility = Visibility.Collapsed };
             editor.Children.Add(_editorFields);
@@ -340,10 +352,10 @@ namespace PixelVaultNative
             _tags.ToolTip = "Comma-separated, for example: collectible, multiplayer, difficulty";
             AutomationProperties.SetName(_tags, "Guide tags");
             _groupName = EditorTextBox(34, false);
-            _groupName.ToolTip = "Examples: Base Game, The Frozen Wilds, New Game+. Leave blank to use Base Game.";
-            AutomationProperties.SetName(_groupName, "Achievement group name");
+            _groupName.ToolTip = "Category within the base game or DLC, such as Story, Collectibles or Difficulty. Leave blank for Uncategorized. Assign DLC from the achievement's right-click menu.";
+            AutomationProperties.SetName(_groupName, "Achievement category name");
             _groupSortOrder = EditorTextBox(34, false);
-            _groupSortOrder.ToolTip = "A number from 0 to 100000. Lower-numbered groups appear first.";
+            _groupSortOrder.ToolTip = "Set the shared subcategory order in Settings → Achievements.";
             AutomationProperties.SetName(_groupSortOrder, "Achievement group display order");
 
             _missable = new CheckBox
@@ -359,7 +371,7 @@ namespace PixelVaultNative
             groupFields.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             groupFields.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(14) });
             groupFields.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(150) });
-            var groupNameField = LabeledEditor("Achievement group", _groupName);
+            var groupNameField = LabeledEditor("Achievement category", _groupName);
             groupFields.Children.Add(groupNameField);
             var groupOrderField = LabeledEditor("Display order", _groupSortOrder);
             Grid.SetColumn(groupOrderField, 2);
@@ -454,6 +466,7 @@ namespace PixelVaultNative
                 Close();
             };
             Closing += OnClosing;
+            Activated += (_, __) => RefreshLinkedTrackers();
 
             ReloadEntries(0, preferredProviderAchievementId);
         }
@@ -508,8 +521,10 @@ namespace PixelVaultNative
                 .Where(item => ReferenceEquals(item, keepDirty)
                     || MatchesGuideFilter(item?.Entry, item?.LiveRow, filterKey, searchText))
                 .ToList();
-            var visibleGroups = BuildGuideListGroups(visible);
-            var fullGroups = BuildGuideListGroups(_allItems)
+            IReadOnlyList<string> categoryOrder = null;
+            try { categoryOrder = _service.LoadCategoryNames(); } catch { }
+            var visibleGroups = BuildGuideListGroups(visible, categoryOrder);
+            var fullGroups = BuildGuideListGroups(_allItems, categoryOrder)
                 .ToDictionary(group => group.Name, StringComparer.OrdinalIgnoreCase);
             var selectable = visibleGroups
                 .Where(group => !_collapsedGroups.Contains(group.Name))
@@ -568,7 +583,7 @@ namespace PixelVaultNative
             }
         }
 
-        static List<GuideListGroup> BuildGuideListGroups(IEnumerable<GuideListItem> items)
+        static List<GuideListGroup> BuildGuideListGroups(IEnumerable<GuideListItem> items, IReadOnlyList<string> categoryOrder = null)
         {
             return (items ?? Enumerable.Empty<GuideListItem>())
                 .Where(item => item?.Entry != null)
@@ -579,7 +594,8 @@ namespace PixelVaultNative
                     SortOrder = group.Min(item => item.Entry.GroupSortOrder),
                     Items = group.ToList()
                 })
-                .OrderBy(group => group.SortOrder)
+                .OrderBy(group => AchievementOrganization.CategoryOrderIndex(group.Name, categoryOrder))
+                .ThenBy(group => group.SortOrder)
                 .ThenBy(group => string.Equals(group.Name, "Base Game", StringComparison.OrdinalIgnoreCase) ? 0 : 1)
                 .ThenBy(group => group.Name, StringComparer.OrdinalIgnoreCase)
                 .ToList();
@@ -730,19 +746,37 @@ namespace PixelVaultNative
             string title,
             string pixelVaultGameId,
             IReadOnlyList<GameAchievementsFetchService.AchievementRow> rows,
-            string preferredProviderAchievementId = null)
+            string preferredProviderAchievementId = null,
+            AchievementTrackingStore trackingStore = null, string steamAccount = null, string retroAccount = null)
         {
-            new AchievementGuideWindow(owner, service, title, pixelVaultGameId, rows, preferredProviderAchievementId).ShowDialog();
+            var window = new AchievementGuideWindow(owner, service, title, pixelVaultGameId, rows, preferredProviderAchievementId);
+            window.AttachTracking(trackingStore, steamAccount, retroAccount);
+            window.ShowDialog();
         }
 
-        internal static void ShowStoredModal(Window owner, IAchievementGuideService service, string title, AchievementGuideEntry entry)
+        internal static void ShowStoredModal(Window owner, IAchievementGuideService service, string title, AchievementGuideEntry entry,
+            AchievementTrackingStore trackingStore = null, string steamAccount = null, string retroAccount = null)
         {
             // Reading a retired target must not submit a fabricated definition to provider sync.
             var window = new AchievementGuideWindow(owner, service, title, entry.PixelVaultGameId,
                 Array.Empty<GameAchievementsFetchService.AchievementRow>(), null);
             window._storedEntry = entry;
             window.ReloadEntries(entry.AchievementId);
+            window.AttachTracking(trackingStore, steamAccount, retroAccount);
             window.ShowDialog();
+        }
+
+        internal void AttachTracking(AchievementTrackingStore trackingStore, string steamAccount, string retroAccount)
+        {
+            _trackingStore = trackingStore; _trackingSteamAccount = steamAccount; _trackingRetroAccount = retroAccount;
+            RefreshLinkedTrackers();
+        }
+        void RefreshLinkedTrackers()
+        {
+            var entry = _current?.Entry;
+            _mapLinks.Bind(_trackingStore, entry?.Provider, entry?.ProviderGameId, Title.Replace("Achievement Guide — ", ""), _trackingSteamAccount, _trackingRetroAccount, achievement: entry?.ProviderAchievementId);
+            _linkedTrackers.Bind(_trackingStore, entry?.Provider, entry?.ProviderGameId, entry?.ProviderAchievementId,
+                entry?.Provider == "steam" ? _trackingSteamAccount : _trackingRetroAccount);
         }
 
         internal static bool IsPreferredGuideEntry(
@@ -886,6 +920,7 @@ namespace PixelVaultNative
             var entry = _current?.Entry;
             if (entry == null)
             {
+                RefreshLinkedTrackers();
                 SetEditorEnabled(false);
                 return;
             }
@@ -905,6 +940,7 @@ namespace PixelVaultNative
             SetEditorEnabled(true);
             _openSource.IsEnabled = IsHttpUrl(entry.SourceUrl);
             RenderReadView(entry);
+            RefreshLinkedTrackers();
             UpdatePinAction();
             SetEditing(false);
         }
@@ -976,12 +1012,42 @@ namespace PixelVaultNative
         void SetEditing(bool editing)
         {
             _isEditing = editing && _current != null;
+            _categoryButton.IsEnabled = !_isEditing && _current?.Entry != null;
             _reader.Visibility = !_isEditing && _current != null ? Visibility.Visible : Visibility.Collapsed;
             _editorFields.Visibility = _isEditing ? Visibility.Visible : Visibility.Collapsed;
             _edit.Visibility = _isEditing ? Visibility.Collapsed : Visibility.Visible;
             _save.Visibility = _isEditing ? Visibility.Visible : Visibility.Collapsed;
             _save.IsEnabled = _isEditing;
             _cancelEdit.Visibility = _isEditing ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        GameAchievementsFetchService.AchievementRow CurrentCategoryRow()
+            => CategoryRowForEntry(_current?.Entry);
+
+        static GameAchievementsFetchService.AchievementRow CategoryRowForEntry(AchievementGuideEntry entry)
+        {
+            if (entry == null) return null;
+            return new GameAchievementsFetchService.AchievementRow
+            {
+                Provider = entry.Provider, ProviderGameId = entry.ProviderGameId, ProviderAchievementId = entry.ProviderAchievementId,
+                Title = entry.Title, GroupName = entry.GroupName, DlcName = entry.DlcName, GroupSortOrder = entry.GroupSortOrder
+            };
+        }
+
+        void ChangeCurrentCategory(GameAchievementsFetchService.AchievementRow row, string name)
+        {
+            if (_isEditing || _current?.Entry == null || row.ProviderAchievementId != _current.Entry.ProviderAchievementId
+                || row.Provider != _current.Entry.Provider || row.ProviderGameId != _current.Entry.ProviderGameId) return;
+            try
+            {
+                var order = _allItems.FirstOrDefault(item => string.Equals(item.Entry.GroupName, name, StringComparison.OrdinalIgnoreCase))?.Entry.GroupSortOrder ?? 0;
+                var saved = AchievementsInfoWindow.SaveCategory(_service, row, name, order);
+                row.GroupName = saved.GroupName; row.GroupSortOrder = saved.GroupSortOrder; row.DlcName = saved.DlcName;
+                if (_storedEntry != null) _storedEntry = saved;
+                _collapsedGroups.Remove(EffectiveGuideGroupName(saved));
+                ReloadEntries(saved.AchievementId);
+            }
+            catch (Exception ex) { MessageBox.Show(this, "Could not save the achievement category. " + ex.Message, "Achievement category", MessageBoxButton.OK, MessageBoxImage.Error); }
         }
 
         void UpdateSelectedAchievementHeader(
@@ -1009,7 +1075,8 @@ namespace PixelVaultNative
             _progressPill.BorderBrush = UiBrushHelper.FromHex(progress == "unlocked" ? "#47765C" : "#3B5965");
             _progressPill.Visibility = Visibility.Visible;
 
-            _groupPillText.Text = EffectiveGuideGroupName(entry).ToUpperInvariant();
+            _groupPillText.Text = ((string.IsNullOrWhiteSpace(entry.DlcName) ? "Base Game" : "DLC: " + entry.DlcName)
+                + " · " + AchievementOrganization.CategoryName(entry.GroupName)).ToUpperInvariant();
             _groupPill.Visibility = Visibility.Visible;
         }
 

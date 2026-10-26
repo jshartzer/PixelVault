@@ -22,9 +22,11 @@ namespace PixelVaultNative
         public string Id => AdapterId;
         public string Version => "1";
         public bool Supports(AchievementTrackerDefinition definition)=>definition?.Provider=="steam"&&definition.GameId=="1850570"
-            &&(definition.Id==AchievementTrackingCatalog.DeathStrandingId||DeathStrandingWorldReader.Supports(definition.Id)||DeathStrandingOrderReader.Supports(definition.Id)||DeathStrandingChipReader.Supports(definition.Id));
+            &&(definition.Id==AchievementTrackingCatalog.DeathStrandingId||DeathStrandingWorldReader.Supports(definition.Id)||DeathStrandingOrderReader.Supports(definition.Id)||DeathStrandingChipReader.Supports(definition.Id)||DeathStrandingInterviewReader.Supports(definition.Id));
         public string Coverage(AchievementTrackerDefinition definition)=>DeathStrandingOrderReader.Supports(definition?.Id)
             ?"Reads all 540 standard orders directly from a validated save copy. LL and LLL are independent earned ranks."
+            :DeathStrandingInterviewReader.Supports(definition?.Id)
+            ?"Reads the game's interview achievement counter from a complete validated statistic table. Individual interview read states are not inferred."
             :DeathStrandingChipReader.Supports(definition?.Id)
             ?"Reads all 56 memory chips from a validated save copy. Only restoration at a terminal counts; pickup alone does not."
             :"Reads the complete supported milestone catalogue directly from a validated copy of the game save.";
@@ -71,9 +73,11 @@ namespace PixelVaultNative
             if (binding.AdapterId != Id || binding.AdapterVersion != Version) throw new NotSupportedException("This Death Stranding adapter version is not supported.");
             if (!Supports(definition))
                 throw new NotSupportedException("The Death Stranding save reader supports fabrication, construction, maximum upgrades, premium-order ranks and memory-chip restoration.");
-            var reference = AchievementTrackingCatalog.Builtins().Single(d => d.Id == definition.Id);
+            var reference = DeathStrandingInterviewReader.Supports(definition.Id) ? DeathStrandingInterviewReader.Definition() : AchievementTrackingCatalog.Builtins().Single(d => d.Id == definition.Id);
             if (definition.Items.Count != reference.Items.Count || !definition.Items.Select(i => i.Id).ToHashSet(StringComparer.Ordinal).SetEquals(reference.Items.Select(i => i.Id)))
                 throw new NotSupportedException("The save source needs the complete bundled milestone catalogue.");
+            if (DeathStrandingInterviewReader.Supports(definition.Id) && definition.Items.Single().Target != 100)
+                throw new NotSupportedException("The interview achievement counter requires its goal of 100.");
             if (!IsSteamAccount(binding.Account)) throw new InvalidDataException("The save reader needs this tracker’s connected Steam ID.");
             if (!Path.IsPathFullyQualified(binding.Location ?? "") || !Path.IsPathFullyQualified(binding.GameDirectory ?? "")) throw new InvalidDataException("Choose full paths for the save folder and game installation.");
             if (!string.IsNullOrWhiteSpace(binding.SpecificSave) && (!Path.IsPathFullyQualified(binding.SpecificSave) || !Path.GetFileName(binding.SpecificSave).Equals("checkpoint.dat", StringComparison.OrdinalIgnoreCase)))

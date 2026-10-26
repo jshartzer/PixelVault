@@ -1,5 +1,7 @@
 # Death Stranding Director's Cut fabrication source
 
+October 24 correction: the #8 turn-in control validates pre-final 0x0B as incomplete and final 0x1B as restored. Reader v2 accepts that additional state, retains all table/integrity checks and names unvalidated record states in errors. The old bit-0x02 completion inference is superseded. Current live reconciliation is 24/56 after backup; existing source/automatic settings and authored state are preserved. See [Chip control evidence](DEATH_STRANDING_MEMORY_CHIP_RESEARCH.md).
+
 October 24 chip-reader addition: all 56 restoration observations now use a fully validated 190-entry installed collector catalogue. Full prefix, keys, sentinel, sequential index, flags, bounds and ambiguity checks precede any progress. Only restoration mask 0x02 counts; pickup and intermediate states do not. Native source setup and automatic capability use the existing shared forms/worker/reconciliation/scheduler. See [Chip reader evidence](DEATH_STRANDING_MEMORY_CHIP_RESEARCH.md).
 
 ACHG-004 native save source, implemented October 21, 2026. The legacy adapter ID `death-stranding-dc.fabrication`, version `1`, now supports the bundled Steam / game 1850570 / Homo Faber, Master Builder, Trail-Blazer, Growth of a Legend and Fount of Knowledge trackers. Automatic/background refresh is separately opt-in. Facility connections remain research.

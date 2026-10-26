@@ -1,5 +1,7 @@
 # Roblox captures
 
+October 24 group identity fix: photo groups and the grouped-view preference now use the game's stable shared storage identity. Older per-platform records remain readable across all member GameIds, so changes to the platform selected as the cover/hero primary cannot hide existing groups. This also applies to manually created groups in other games. Canonical assignments and explicit removals override older platform records, without rewriting those records during recovery reads.
+
 October 18 photo grouping: The individual-game photo view defaults to named subgame sections for Roblox. Both named conventions below are supported, including underscores/emoji in the title and collision suffixes. Existing captures and future imports use the same projection; no rename, metadata rewrite, or API call is needed for grouping. Unrecognized or unresolved names stay in Ungrouped. The Group photos checkbox switches to the combined chronological grid and saves the preference for that game/library. Right-click selected captures to add/create a group or remove membership; manual choices take priority over automatic title grouping. Group state is stored in the durable `PixelVaultData/capture-groups.sqlite` database rather than in screenshot metadata or the rebuildable photo index.
 
 Current Roblox desktop screenshots are recognized as `<account-id>_<place-id>_<13-digit-capture-token>.png`. The obsolete `RobloxScreenShot20260525_200505425.png` convention is excluded.

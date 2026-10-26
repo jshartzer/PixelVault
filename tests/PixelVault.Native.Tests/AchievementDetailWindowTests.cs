@@ -41,6 +41,35 @@ public sealed class AchievementDetailWindowTests : IDisposable
     };
 
     [Fact]
+    public void DetailCategoryButton_PersistsAndUpdatesFactsWithoutChangingDlcOrNotes()
+    {
+        AchievementCollectionAccessTests.OnSta(() =>
+        {
+            var service = new AchievementGuideService(dir);
+            var row = Row("Target", false, 25);
+            var entry = service.SyncDefinitionsAndLoadGuides("fixture", new[] { row }).Single();
+            service.SaveGuide(new AchievementGuideEdit { AchievementId = entry.AchievementId, GroupName = "Story", DlcName = "Expansion", GuideText = "Keep these notes" });
+            var window = new AchievementDetailWindow(null!, new AchievementHubGame { Provider = "steam", Id = "55", Title = "Fixture" }, row, new[] { row }, 0, service);
+            try
+            {
+                new System.Windows.Interop.WindowInteropHelper(window).EnsureHandle();
+                var button = Descendants(window.Content).OfType<Button>().Single(b => Equals(b.Content, "Change category…"));
+                button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                var menu = button.ContextMenu;
+                menu.Items.OfType<MenuItem>().Single(item => Equals(item.Header, "Actions")).RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+                menu.IsOpen = false;
+                var saved = service.LoadGuideEntry("steam", "55", "Target");
+                Assert.Equal("Actions", saved.GroupName); Assert.Equal("Expansion", saved.DlcName); Assert.Equal("Keep these notes", saved.GuideText);
+                Assert.Equal("Actions", row.GroupName);
+                Assert.Contains(Descendants(window.Content).OfType<TextBlock>(), text => text.Text == "Actions");
+                AchievementDlcTests.SavePreview(window, "category-detail-640.png", 640, 800);
+                AchievementDlcTests.SavePreview(window, "category-detail-460.png", 460, 800);
+            }
+            finally { window.Close(); }
+        });
+    }
+
+    [Fact]
     public void Window_ShowsProgressRarityContextAndGuideAndManagesPins()
     {
         AchievementCollectionAccessTests.OnSta(() =>

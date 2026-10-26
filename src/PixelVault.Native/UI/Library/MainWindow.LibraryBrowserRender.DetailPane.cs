@@ -29,12 +29,17 @@ namespace PixelVaultNative
             var renderStopwatch = Stopwatch.StartNew();
             var renderVersion = ++ws.DetailRenderSequence;
             var detailRenderCancellationToken = ws.DetailRenderCancellation.BeginRender(renderVersion);
-            var captureGroupGame = CaptureGroupGameId(ws.Current);
+            ws.ActiveCaptureGroupScope = null;
             CaptureGroupStore.CaptureGroupSnapshot captureGroupSnapshot = null;
             var robloxGroups = IsRobloxCaptureGroupGame(ws.Current);
-            if (!string.IsNullOrWhiteSpace(captureGroupGame) && !string.IsNullOrWhiteSpace(libraryRoot))
+            if (!string.IsNullOrWhiteSpace(libraryRoot))
             {
-                try { captureGroupSnapshot = CaptureGroups.Load(libraryRoot, captureGroupGame); }
+                try
+                {
+                    ws.ActiveCaptureGroupScope = ResolveCaptureGroupScope(ws.Current);
+                    if (ws.ActiveCaptureGroupScope != null)
+                        captureGroupSnapshot = CaptureGroups.LoadScope(libraryRoot, ws.ActiveCaptureGroupScope);
+                }
                 catch (Exception ex) { LogException("LoadCaptureGroups", ex); }
             }
             var showCaptureGroups = captureGroupSnapshot != null && (captureGroupSnapshot.Grouped ?? robloxGroups);

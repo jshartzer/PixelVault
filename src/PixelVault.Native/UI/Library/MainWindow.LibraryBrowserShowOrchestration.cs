@@ -421,6 +421,7 @@ namespace PixelVaultNative
                     if (panes.FolderColumnDecreaseButton != null) panes.FolderColumnDecreaseButton.IsEnabled = !isBusy;
                     if (panes.FolderColumnIncreaseButton != null) panes.FolderColumnIncreaseButton.IsEnabled = !isBusy;
                     if (panes.PhotoAchievementsButton != null) panes.PhotoAchievementsButton.IsEnabled = !isBusy && ws.Current != null;
+                    if (panes.PhotoTrackersButton != null) panes.PhotoTrackersButton.IsEnabled = !isBusy && ws.Current != null && ws.IsPhotoWorkspaceMode;
                     if (panes.PhotoRailColumnOneButton != null) panes.PhotoRailColumnOneButton.IsEnabled = !isBusy;
                     if (panes.PhotoRailColumnTwoButton != null) panes.PhotoRailColumnTwoButton.IsEnabled = !isBusy;
                     panes.ShortcutsHelpButton.IsEnabled = !isBusy;
@@ -720,6 +721,14 @@ namespace PixelVaultNative
                     {
                         if (ws.Current == null) return;
                         _shell.LibraryBrowserShowAchievementsInfo(libraryWindow, ws.Current);
+                    };
+                }
+                if (panes.PhotoTrackersButton != null)
+                {
+                    panes.PhotoTrackersButton.Click += delegate
+                    {
+                        if (ws.Current == null || ws.LibraryFoldersLoading) return;
+                        _shell.LibraryBrowserShowGameTrackers(libraryWindow, ws.Current);
                     };
                 }
                 if (panes.DetailTitle != null)

@@ -1,5 +1,13 @@
 # Achievement checklist tracking
 
+October26 reference-content addition: records can carry optional plain text and show a compact **Content** button, including within linked achievement lists. The reader supports UTF-8 Save copy without changing progress. Death Stranding has a separate149-entry English interview catalogue; automatic67/100 remains in the original counter and individual read states remain manual. See [tracker content](TRACKER_CONTENT.md).
+
+October25: desktop trackers now support Manage tracker → Rename tracker for bundled/custom catalogues. Durable display-name metadata preserves stable identities, all progress/notes/source/automatic settings and unsaved drafts. See [Tracker names](TRACKER_RENAMING.md).
+
+Shared storage update: definitions/validation, SQLite persistence, reconciliation, history and provenance now live in `src/PixelVault.Tracking`. Native `AchievementTrackingStore` retains its UI/game integration wrapper. PixelVault Companion 0.2.0 edits a verified separate workspace through revision-checked API commands; native windows have not switched databases and do not synchronize with that copy yet. See [Companion setup](COMPANION_SETUP.md).
+
+October 24: optional map links are now available from achievement detail/guide screens and full trackers. Maps use game/provider identity, with context-prefilled links and independent durable image storage; profile pages also expose Maps and Trackers. Death Stranding has all 56 chip pins across three calibrated regional maps. See [Saved game maps](GAME_MAPS.md).
+
 October 23 browsing follow-up: dashboard/game-list/tracker windows are modeless siblings, so earlier pickers can close while later trackers stay editable. Shared Group by category toggles delivery-type grouping in premium orders and categories in any game. Headers show completed/total active records plus separate capped goals; filtering preserves totals and LL/LLL count each order once. All 42 focused and 1,129 full native tests pass; normal/narrow grouped layouts inspected. See [Dashboard navigation and grouping](TRACKER_DASHBOARD.md).
 
 October 23 dashboard follow-up: Library/Hub compact cover dashboard → per-game tracker list → exact tracker, with same-game switching and a visible achievement-linked shortcut. Cards/list/forms identify native game-file connections and automatic availability/state. See [Tracker dashboard](TRACKER_DASHBOARD.md) for scope and pending reader validation.
@@ -9,6 +17,8 @@ October 23: shared dark forms and generic 1–16 named completion-column authori
 First implementation: October 21, 2026. This is an unreleased feature in the native PixelVault app.
 
 ## Access and use
+
+- Achievement guide/detail screens include linked trackers below the guide as collapsed, compact checkbox lists. Manual check-offs can be reversed; game-confirmed completions cannot be unchecked in this view. Named columns remain independent and all writes retain account scope, notes and history. See [Compact linked trackers](TRACKER_ACHIEVEMENT_INLINE.md).
 
 - **Import tracker… → Update current catalogue…** reviews custom additions, metadata changes, archives and restorations from XLSX/CSV or JSON, preserving saved counts/notes with separate catalogue undo. See [Catalogue reconciliation](TRACKER_CATALOGUE_RECONCILIATION.md).
 

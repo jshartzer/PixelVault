@@ -39,6 +39,7 @@ namespace PixelVaultNative
             internal Button EditMetadataButton;
             internal Button RefreshThisFolderButton;
             internal Button PhotoAchievementsButton;
+            internal Button PhotoTrackersButton;
             internal TextBlock PhotoAchievementsSummary;
             internal WrapPanel PhotoAchievementsRecentPanel;
             internal Button ExitTimelineButton;
@@ -591,6 +592,18 @@ namespace PixelVaultNative
             panes.PhotoAchievementsButton.Margin = new Thickness(0, 0, 0, 0);
             panes.PhotoAchievementsButton.Visibility = Visibility.Collapsed;
             AutomationProperties.SetName(panes.PhotoAchievementsButton, "Achievements");
+            panes.PhotoTrackersButton = Btn("Trackers", null, "#20343A", Brushes.White);
+            panes.PhotoTrackersButton.Content = BuildToolbarButtonContent("\uE73A", "Trackers");
+            panes.PhotoTrackersButton.ToolTip = "Open trackers for this game";
+            ApplyLibraryPillChrome(panes.PhotoTrackersButton, "#1C2A32", "#2A3C46", "#22323C", "#141E24");
+            panes.PhotoTrackersButton.Width = double.NaN;
+            panes.PhotoTrackersButton.MinWidth = 104;
+            panes.PhotoTrackersButton.Height = 38;
+            panes.PhotoTrackersButton.Padding = new Thickness(12, 0, 12, 0);
+            panes.PhotoTrackersButton.Margin = new Thickness(0, 0, 8, 0);
+            panes.PhotoTrackersButton.Visibility = Visibility.Collapsed;
+            panes.PhotoTrackersButton.IsEnabled = false;
+            AutomationProperties.SetName(panes.PhotoTrackersButton, "Open trackers for this game");
             panes.PhotoAchievementsSummary = new TextBlock
             {
                 Text = string.Empty,
@@ -621,6 +634,7 @@ namespace PixelVaultNative
             bannerActionsLeft.Children.Add(panes.OpenFolderButton);
             bannerActionsLeft.Children.Add(panes.EditMetadataButton);
             bannerActionsLeft.Children.Add(panes.RefreshThisFolderButton);
+            bannerActionsLeft.Children.Add(panes.PhotoTrackersButton);
             var photoAchievementsGroup = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
             photoAchievementsGroup.Children.Add(panes.PhotoAchievementsButton);
             photoAchievementsGroup.Children.Add(panes.PhotoAchievementsSummary);

@@ -1,0 +1,12 @@
+**
+!src/
+!src/PixelVault.Tracking/
+!src/PixelVault.Tracking/**
+!src/PixelVault.Companion/
+!src/PixelVault.Companion/**
+**/bin/
+**/obj/
+**/App_Data/
+**/*.sqlite*
+**/setup-token.txt
+**/keys/

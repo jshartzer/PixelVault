@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <Description>Platform-neutral PixelVault tracker definitions, persistence, reconciliation and guarded edits.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite.Core" Version="8.0.8" />
+    <EmbeddedResource Include="TrackingData/DeathStrandingBuildables.json" LogicalName="PixelVault.Tracking.DeathStranding.json" />
+    <EmbeddedResource Include="TrackingData/DeathStrandingWorldTrackers.json" LogicalName="PixelVault.Tracking.DeathStrandingWorld.json" />
+    <EmbeddedResource Include="TrackingData/DeathStrandingOrders.json" LogicalName="PixelVault.Tracking.DeathStrandingOrders.json" />
+  </ItemGroup>
+</Project>

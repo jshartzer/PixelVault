@@ -2,6 +2,8 @@
 
 ## Purpose
 
+Tracker reference content (October26,2026): optional item content is plain text stored with private custom definitions, outside bundled source catalogues. Viewing/exporting it never writes completion or game-read state; source-confirmed progress remains independent. Null content is omitted from JSON to preserve existing definition/source fingerprints. Both connector and server must understand content before publishing lore-bearing definitions. See [TRACKER_CONTENT.md](TRACKER_CONTENT.md) for bounds and extraction evidence.
+
 This document defines the working rules for the live `C:\Codex` PixelVault app line.
 
 Use it as the source of truth for:
@@ -315,6 +317,8 @@ Achievement guides and Next Up pins are durable local data under `PixelVaultData
 
 ### Achievement checklists
 
+Achievement guide/detail screens may embed linked trackers as compact, collapsed sections scoped to the exact provider/game/achievement and account. Browsing reads saved observations only. Compact check-offs write manual fields with history, preserving notes/reported/provider state. A game-confirmed completion cannot be unchecked through this view: determine origin from current reported fields and typed adapter history, retaining protection after source disconnection and checking again within the write transaction. Source labels alone must not imply game provenance. Full reconciliation/manual-override workflows remain separate. See docs/TRACKER_ACHIEVEMENT_INLINE.md.
+
 Tracker navigation is shared: Library/Hub dashboard → provider/game → exact tracker, with a same-game selector and direct optional achievement links. Dashboard summaries use the current account, exclude archives and preserve unique-record category goals. Browsing a dashboard must not trigger game-save reads or enable automation. Native connection and automatic-refresh indicators derive from registered adapter capabilities and saved settings; external progress sources must not be labeled direct game-file connections. Unsupported fields remain explicit until independently validated. See docs/TRACKER_DASHBOARD.md.
 
 Tracker browsing windows are modeless siblings under the outer application window. Closing an intermediate dashboard/picker must not close or disable a later tracker. Category grouping is a shared optional view over definition metadata, retaining selection and unsaved drafts. Header subtotals count each active record once across the full category; milestone boxes do not multiply records, and capped achievement goals remain separate from full catalogue totals. Filters must not manufacture different full-category completion totals. Presentation changes must not write tracker progress, definitions, sources or automatic settings.
@@ -438,3 +442,8 @@ Any future handoff should update:
 `C:\Codex\docs\HANDOFF.md` should summarize the current stop point.
 
 `C:\Codex\docs\POLICY.md` should remain the durable rulebook.
+
+
+## Saved game-map media
+
+Game maps and their links are durable local data under `PixelVaultData/game-maps`, separate from rebuildable caches and personal tracker observations. Original images are copied into private content-addressed storage. Maps/pins are game-scoped; optional pin completion reads only same-game/provider tracker state for the current account. Map browsing never reads saves, changes progress or enables source automation. Forms stay game-independent; location adapters/metadata own game-specific coordinate transforms. Private game raster assets and personal map state are not committed or bundled. See [Saved game maps](GAME_MAPS.md).

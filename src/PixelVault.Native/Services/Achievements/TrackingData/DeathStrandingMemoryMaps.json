@@ -1,0 +1,681 @@
+[
+  {
+    "Id": "death-stranding-dc.memory-chips.area01",
+    "Provider": "steam",
+    "GameId": "1850570",
+    "GameTitle": "Death Stranding Director's Cut",
+    "Title": "Eastern Region · Memory chips",
+    "Region": "Eastern Region",
+    "ImageFile": "death-stranding-eastern.png",
+    "PixelWidth": 8192,
+    "PixelHeight": 8192,
+    "Source": "Local installed game map textures · Kojima Productions / 505 Games. Online reference: https://deathstrandingpc.505games.com/en/interactive-map/",
+    "Calibration": "Installed map-area resource: 7168 × 7168 metres, centred at (0, 0). X east, Y north. High-resolution tiles matched to the overview texture.",
+    "AchievementIds": [
+      "035"
+    ],
+    "TrackerIds": [
+      "death-stranding-dc.fount-of-knowledge"
+    ],
+    "Markers": [
+      {
+        "Id": "memory-chip-1",
+        "Label": "#01",
+        "Detail": "#01 — Frame Arms: Byakko\nMap coordinates (X, Y): 305.3, 1109.3 - Eastern Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.5425926947069301,
+        "Y": 0.34524571397820314,
+        "WorldX": 305.304435659275,
+        "WorldY": 1109.27872220424,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "b81bb254-453d-6749-a29e-ffea2602870f"
+      },
+      {
+        "Id": "memory-chip-2",
+        "Label": "#02",
+        "Detail": "#02 — Frame Arms Girls: Byakko\nMap coordinates (X, Y): -1526.3, 647.8 - Eastern Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.2870724184240527,
+        "Y": 0.40961982450689954,
+        "WorldX": -1526.26490473639,
+        "WorldY": 647.845097934544,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "c670b652-776f-354d-bd61-1f6eef239646"
+      },
+      {
+        "Id": "memory-chip-15",
+        "Label": "#15",
+        "Detail": "#15 — Big Fish\nMap coordinates (X, Y): -2061.4, -634.6 - Eastern Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.2124168451887221,
+        "Y": 0.5885321244183507,
+        "WorldX": -2061.39605368724,
+        "WorldY": -634.598267830737,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "9f2429fc-5f67-764a-bdd1-3399f4bd2346"
+      },
+      {
+        "Id": "memory-chip-18",
+        "Label": "#18",
+        "Detail": "#18 — The Seven Samurai\nMap coordinates (X, Y): -522.4, -59.7 - Eastern Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.4271268333706041,
+        "Y": 0.5083298214844295,
+        "WorldX": -522.35485839951,
+        "WorldY": -59.7081604003904,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "7959eee1-aa47-dd44-a7b7-ee2fe14c85f9"
+      },
+      {
+        "Id": "memory-chip-41",
+        "Label": "#41",
+        "Detail": "#41 — Death Stranding/Low Roar\nMap coordinates (X, Y): -1734.2, -523.3 - Eastern Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.25806349471601564,
+        "Y": 0.5730072235544209,
+        "WorldX": -1734.2008698756,
+        "WorldY": -523.315778438089,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "3d4daa50-cfbf-614b-9a12-bc90e3096ccf"
+      },
+      {
+        "Id": "memory-chip-42",
+        "Label": "#42",
+        "Detail": "#42 — Lucio Fulci's Horror & Thriller Compilation\nMap coordinates (X, Y): 464.5, 233.5 - Eastern Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.5647960432936812,
+        "Y": 0.46742872893810283,
+        "WorldX": 464.458038329107,
+        "WorldY": 233.470870971679,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "fb297b60-c33f-3e42-952b-d1c58d07a5ce"
+      },
+      {
+        "Id": "memory-chip-43",
+        "Label": "#43",
+        "Detail": "#43 — Profondo Rosso Original Motion Picture Soundtrack\nMap coordinates (X, Y): 1602.6, 1007.9 - Eastern Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.7235727806736189,
+        "Y": 0.3593840608079534,
+        "WorldX": 1602.5696918685,
+        "WorldY": 1007.93505212859,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "9acc638e-460e-2542-816b-0d96e8d3f88b"
+      },
+      {
+        "Id": "memory-chip-45",
+        "Label": "#45",
+        "Detail": "#45 — dawn/SILENT POETS\nMap coordinates (X, Y): -1345.3, -23.8 - Eastern Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.3123122283388895,
+        "Y": 0.503319629867162,
+        "WorldX": -1345.34594726684,
+        "WorldY": -23.795106887817198,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "4cb19ee0-ca6d-244f-a576-9ca57127497c"
+      },
+      {
+        "Id": "memory-chip-49",
+        "Label": "#49",
+        "Detail": "#49 — God of War Original Video Game Soundtrack\nMap coordinates (X, Y): -1035.3, 447.5 - Eastern Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.35556983947743026,
+        "Y": 0.43756497332028,
+        "WorldX": -1035.27539062578,
+        "WorldY": 447.534271240233,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "52daa341-7137-d84a-8cf8-89e035972a61"
+      }
+    ]
+  },
+  {
+    "Id": "death-stranding-dc.memory-chips.area02",
+    "Provider": "steam",
+    "GameId": "1850570",
+    "GameTitle": "Death Stranding Director's Cut",
+    "Title": "Central Region · Memory chips",
+    "Region": "Central Region",
+    "ImageFile": "death-stranding-central.png",
+    "PixelWidth": 8192,
+    "PixelHeight": 8192,
+    "Source": "Local installed game map textures · Kojima Productions / 505 Games. Online reference: https://deathstrandingpc.505games.com/en/interactive-map/",
+    "Calibration": "Installed map-area resource: 7168 × 7168 metres, centred at (0, 0). X east, Y north. High-resolution tiles matched to the overview texture.",
+    "AchievementIds": [
+      "035"
+    ],
+    "TrackerIds": [
+      "death-stranding-dc.fount-of-knowledge"
+    ],
+    "Markers": [
+      {
+        "Id": "memory-chip-3",
+        "Label": "#03",
+        "Detail": "#03 — Frame Arms: Kagetora\nMap coordinates (X, Y): 2763.3, 1994.9 - Central Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.8855065102431975,
+        "Y": 0.22169702519487164,
+        "WorldX": 2763.31066542324,
+        "WorldY": 1994.87572340316,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "935648a7-65bd-0746-a080-114801eae5dc"
+      },
+      {
+        "Id": "memory-chip-4",
+        "Label": "#04",
+        "Detail": "#04 — Frame Arms: Genbu\nMap coordinates (X, Y): 19.3, -235.9 - Central Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.5026936107980353,
+        "Y": 0.5329045270170484,
+        "WorldX": 19.3078022003174,
+        "WorldY": -235.859649658203,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "4599b026-321b-c348-afd5-ddcfa0066944"
+      },
+      {
+        "Id": "memory-chip-5",
+        "Label": "#05",
+        "Detail": "#05 — Frame Arms: Mingwu\nMap coordinates (X, Y): 1038.2, -950.3 - Central Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.644838156940092,
+        "Y": 0.6325690592815472,
+        "WorldX": 1038.19990894658,
+        "WorldY": -950.25501693013,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "821d7ad9-3a07-3644-9641-eaa13cab0bcc"
+      },
+      {
+        "Id": "memory-chip-6",
+        "Label": "#06",
+        "Detail": "#06 — Kotobukiya Ludens Girl Model\nMap coordinates (X, Y): -1785.7, 1939.8 - Central Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.2508750774657394,
+        "Y": 0.22937906639833286,
+        "WorldX": -1785.72744472558,
+        "WorldY": 1939.81085205675,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "78a7727c-84cb-c843-b820-259fd1865fe3"
+      },
+      {
+        "Id": "memory-chip-7",
+        "Label": "#07",
+        "Detail": "#07 — Prime 1 Studio 1/2 Scale Ludens Statue\nMap coordinates (X, Y): -1045.1, 618.4 - Central Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.3541972304576339,
+        "Y": 0.41372686135235626,
+        "WorldX": -1045.11425207968,
+        "WorldY": 618.40585782631,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "4e42c2ac-e555-7043-9e22-9648ebe75952"
+      },
+      {
+        "Id": "memory-chip-8",
+        "Label": "#08",
+        "Detail": "#08 — Sentinel 1/6 Ludens Action Figurine\nMap coordinates (X, Y): -1714.7, 390.1 - Central Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.26077864730063754,
+        "Y": 0.4455705963512006,
+        "WorldX": -1714.73865614903,
+        "WorldY": 390.149965354594,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "6b3238cc-6004-bb4f-ba6c-28601c223648"
+      },
+      {
+        "Id": "memory-chip-9",
+        "Label": "#09",
+        "Detail": "#09 — Max Factory Ludens figma\nMap coordinates (X, Y): 1673.2, -1227.6 - Central Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.7334196796364173,
+        "Y": 0.671256964288344,
+        "WorldX": 1673.15226363384,
+        "WorldY": -1227.56992001885,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "33b12840-0d75-2245-9eac-fff85b039012"
+      },
+      {
+        "Id": "memory-chip-11",
+        "Label": "#11",
+        "Detail": "#11 — Christine\nMap coordinates (X, Y): 1849.8, 799.6 - Central Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.7580662942458553,
+        "Y": 0.38844911454461944,
+        "WorldX": 1849.81919715429,
+        "WorldY": 799.596746944168,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "708c4975-e214-2c41-ae39-72fe5a741f33"
+      },
+      {
+        "Id": "memory-chip-12",
+        "Label": "#12",
+        "Detail": "#12 — Godzilla\nMap coordinates (X, Y): -1194.9, 181.0 - Central Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.33329819251035014,
+        "Y": 0.47475122505964423,
+        "WorldX": -1194.91855608581,
+        "WorldY": 180.98321877247,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "5ca48443-6c9e-4241-8a5c-8569cda0fc38"
+      },
+      {
+        "Id": "memory-chip-13",
+        "Label": "#13",
+        "Detail": "#13 — The Walk\nMap coordinates (X, Y): -260.5, 763.2 - Central Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.46366133435813855,
+        "Y": 0.39352000224108535,
+        "WorldX": -260.475555320863,
+        "WorldY": 763.2486239359,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "90a81977-f00b-8541-a758-d7ae71a7fc25"
+      },
+      {
+        "Id": "memory-chip-14",
+        "Label": "#14",
+        "Detail": "#14 — Stand By Me\nMap coordinates (X, Y): -351.4, 2292.2 - Central Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.4509713439306335,
+        "Y": 0.18021531573948385,
+        "WorldX": -351.437406705219,
+        "WorldY": 2292.21661677938,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "29f17497-9d73-d649-93c6-0c75d26f7f2e"
+      },
+      {
+        "Id": "memory-chip-16",
+        "Label": "#16",
+        "Detail": "#16 — Fright Night\nMap coordinates (X, Y): 887.7, 1808.6 - Central Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.623837372933318,
+        "Y": 0.2476870595758524,
+        "WorldX": 887.666289186023,
+        "WorldY": 1808.57915696029,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "2e972cf3-a5d0-b247-a7b3-e7cb530dffdd"
+      },
+      {
+        "Id": "memory-chip-17",
+        "Label": "#17",
+        "Detail": "#17 — Matango\nMap coordinates (X, Y): 2184.7, 502.8 - Central Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.8047875630859627,
+        "Y": 0.42985831291309134,
+        "WorldX": 2184.71725220018,
+        "WorldY": 502.775613038961,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "ce14e59c-ccb6-2f48-83ab-607683150208"
+      },
+      {
+        "Id": "memory-chip-19",
+        "Label": "#19",
+        "Detail": "#19 — The Bridge on the River Kwai\nMap coordinates (X, Y): 644.8, -1223.7 - Central Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.5899563098820294,
+        "Y": 0.6707129876094363,
+        "WorldX": 644.806829234387,
+        "WorldY": -1223.67069518444,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "6093efcf-b2b2-0844-aa27-8c936d1b163e"
+      },
+      {
+        "Id": "memory-chip-20",
+        "Label": "#20",
+        "Detail": "#20 — Dr. Strangelove\nMap coordinates (X, Y): -1047.6, -339.9 - Central Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.35384917693589146,
+        "Y": 0.5474140044583851,
+        "WorldX": -1047.60909972353,
+        "WorldY": -339.863583957704,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "95266a52-e7f0-9742-a4e0-73da6dd8fd19"
+      },
+      {
+        "Id": "memory-chip-21",
+        "Label": "#21",
+        "Detail": "#21 — Eggshell Carving\nMap coordinates (X, Y): 2446.9, 1384.4 - Central Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.8413643914100558,
+        "Y": 0.30685906963547016,
+        "WorldX": 2446.89995762728,
+        "WorldY": 1384.43418885295,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "23962a12-f1ac-f94b-ba43-d1daa866d43b"
+      },
+      {
+        "Id": "memory-chip-22",
+        "Label": "#22",
+        "Detail": "#22 — Glasscraft\nMap coordinates (X, Y): 1682.0, 1317.8 - Central Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.7346595525737961,
+        "Y": 0.316148791994368,
+        "WorldX": 1682.03967284897,
+        "WorldY": 1317.84545898437,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "2877485b-b968-5548-b597-83c42484b177"
+      },
+      {
+        "Id": "memory-chip-23",
+        "Label": "#23",
+        "Detail": "#23 — Coffee Cup\nMap coordinates (X, Y): 338.7, -1230.9 - Central Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.5472477008664333,
+        "Y": 0.6717207673546651,
+        "WorldX": 338.671519810594,
+        "WorldY": -1230.89446039824,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "9eab17bb-e0e8-4a45-9def-dfbd5e6b54d3"
+      },
+      {
+        "Id": "memory-chip-24",
+        "Label": "#24",
+        "Detail": "#24 — Soap Bubble\nMap coordinates (X, Y): 86.2, -1588.7 - Central Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.5120263978984543,
+        "Y": 0.7216317120385128,
+        "WorldX": 86.2052201361201,
+        "WorldY": -1588.65611189206,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "d8cf2f56-6d19-3d41-a30e-3340fd083bd0"
+      },
+      {
+        "Id": "memory-chip-25",
+        "Label": "#25",
+        "Detail": "#25 — Frozen Soap Bubble\nMap coordinates (X, Y): -1276.0, -222.6 - Central Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.3219905110012026,
+        "Y": 0.5310489325035551,
+        "WorldX": -1275.97201714338,
+        "WorldY": -222.558748185483,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "689262f1-f58a-554d-87e4-f35cddaa42dc"
+      },
+      {
+        "Id": "memory-chip-26",
+        "Label": "#26",
+        "Detail": "#26 — Dandelion Seeds\nMap coordinates (X, Y): -449.5, 559.5 - Central Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.43729426635247587,
+        "Y": 0.421944783596674,
+        "WorldX": -449.474698785453,
+        "WorldY": 559.499791179041,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "d5cb3487-2af3-694c-996e-f8a8d647e226"
+      },
+      {
+        "Id": "memory-chip-27",
+        "Label": "#27",
+        "Detail": "#27 — Wine Glass\nMap coordinates (X, Y): -1246.0, 958.0 - Central Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.3261726658320829,
+        "Y": 0.3663548550496957,
+        "WorldX": -1245.99433131563,
+        "WorldY": 957.968399003781,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "4807e499-da27-484a-9f23-b14d621817c6"
+      },
+      {
+        "Id": "memory-chip-28",
+        "Label": "#28",
+        "Detail": "#28 — Pottery\nMap coordinates (X, Y): 1124.3, -1103.4 - Central Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.6568548057191546,
+        "Y": 0.6539369433493359,
+        "WorldX": 1124.3352473949,
+        "WorldY": -1103.42000992804,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "2dd582bb-87bd-384d-8082-131357e4d499"
+      },
+      {
+        "Id": "memory-chip-29",
+        "Label": "#29",
+        "Detail": "#29 — Snow Crystal\nMap coordinates (X, Y): -1009.1, 162.6 - Central Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.35922574145441544,
+        "Y": 0.47731000185012823,
+        "WorldX": -1009.06988525475,
+        "WorldY": 162.641906738281,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "6e1eceed-efd4-354b-89a9-acef85aa6721"
+      },
+      {
+        "Id": "memory-chip-30",
+        "Label": "#30",
+        "Detail": "#30 — Fused Silica\nMap coordinates (X, Y): -1371.0, -1338.8 - Central Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.3087400158605427,
+        "Y": 0.6867770641830511,
+        "WorldX": -1370.95156631163,
+        "WorldY": -1338.81799606411,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "77900f54-dcdd-2b4c-9067-f73154b2e730"
+      },
+      {
+        "Id": "memory-chip-31",
+        "Label": "#31",
+        "Detail": "#31 — Reverse Trike: \"Ride\" Type\nMap coordinates (X, Y): 466.1, -859.3 - Central Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.5650181557444167,
+        "Y": 0.6198813063757755,
+        "WorldX": 466.050140375979,
+        "WorldY": -859.309204101559,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "47991c4b-91bc-1e46-b712-55360f0bc4e1"
+      },
+      {
+        "Id": "memory-chip-32",
+        "Label": "#32",
+        "Detail": "#32 — Honda NSR250R\nMap coordinates (X, Y): 1623.5, 1046.4 - Central Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.7264887035540737,
+        "Y": 0.3540108885081111,
+        "WorldX": 1623.4710270756,
+        "WorldY": 1046.44995117386,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "30c2a0ec-93a4-6e4c-8ddc-1ad818b773fe"
+      },
+      {
+        "Id": "memory-chip-33",
+        "Label": "#33",
+        "Detail": "#33 — Honda Rebel 500\nMap coordinates (X, Y): 10.5, -1250.5 - Central Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.5014674695474761,
+        "Y": 0.674462284360614,
+        "WorldX": 10.5188217163086,
+        "WorldY": -1250.54565429688,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "92710b65-25f7-ae4c-9638-d5bfdf3c15af"
+      },
+      {
+        "Id": "memory-chip-34",
+        "Label": "#34",
+        "Detail": "#34 — Triumph Bonneville Bobber\nMap coordinates (X, Y): 1460.2, 184.9 - Central Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.7037059820463881,
+        "Y": 0.47420904340379055,
+        "WorldX": 1460.16447930851,
+        "WorldY": 184.869576881629,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "32211799-2ee5-b849-9f92-22d36ee2a757"
+      },
+      {
+        "Id": "memory-chip-35",
+        "Label": "#35",
+        "Detail": "#35 — Triumph Street Triple RS\nMap coordinates (X, Y): 1640.1, -297.2 - Central Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.7288018702457827,
+        "Y": 0.5414688844155806,
+        "WorldX": 1640.05180592177,
+        "WorldY": -297.248963490882,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "263f037b-1e96-1c44-8fe5-9956d36908fb"
+      },
+      {
+        "Id": "memory-chip-36",
+        "Label": "#36",
+        "Detail": "#36 — Yamaha MT-09\nMap coordinates (X, Y): 574.0, 884.5 - Central Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.5800812074116298,
+        "Y": 0.3766049657549177,
+        "WorldX": 574.022094726563,
+        "WorldY": 884.49560546875,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "043107d2-8d67-9c4c-9958-f724d9765131"
+      },
+      {
+        "Id": "memory-chip-37",
+        "Label": "#37",
+        "Detail": "#37 — Yamaha RD500LC\nMap coordinates (X, Y): -722.0, 1791.9 - Central Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.39927739065956275,
+        "Y": 0.25001107278967216,
+        "WorldX": -721.979663752254,
+        "WorldY": 1791.92063024363,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "fae179e5-96e6-6044-88a3-bc2fdeeea178"
+      },
+      {
+        "Id": "memory-chip-38",
+        "Label": "#38",
+        "Detail": "#38 — Kawasaki Z1 (900 Super Four)\nMap coordinates (X, Y): -1695.4, 1255.0 - Central Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.2634704314909794,
+        "Y": 0.3249214641842578,
+        "WorldX": -1695.44394707266,
+        "WorldY": 1254.96294472724,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "38bc0721-6568-cd44-a3ad-aefbf884479f"
+      },
+      {
+        "Id": "memory-chip-39",
+        "Label": "#39",
+        "Detail": "#39 — Kawasaki Ninja H2R\nMap coordinates (X, Y): -1912.1, -1412.3 - Central Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.23325126511699495,
+        "Y": 0.6970311232975543,
+        "WorldX": -1912.05493164138,
+        "WorldY": -1412.31909179687,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "76569d99-42d2-4649-8790-0f2f6fef5dab"
+      },
+      {
+        "Id": "memory-chip-44",
+        "Label": "#44",
+        "Detail": "#44 — Thelma Original Motion Picture Soundtrack\nMap coordinates (X, Y): 670.9, 1502.6 - Central Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.5935955643602308,
+        "Y": 0.2903700917198968,
+        "WorldX": 670.893005334134,
+        "WorldY": 1502.62718255178,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "63c4fcb5-1c61-6647-9a41-a0132eeffdc8"
+      },
+      {
+        "Id": "memory-chip-46",
+        "Label": "#46",
+        "Detail": "#46 — Low Roar/Low Roar\nMap coordinates (X, Y): 25.0, -968.7 - Central Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.5034850096335147,
+        "Y": 0.6351442397017808,
+        "WorldX": 24.9805490530335,
+        "WorldY": -968.713910182365,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "6971b24b-09d1-0147-b7ee-e2627dd6441f"
+      },
+      {
+        "Id": "memory-chip-47",
+        "Label": "#47",
+        "Detail": "#47 — 0/Low Roar\nMap coordinates (X, Y): 2617.5, 1675.7 - Central Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.8651650292529366,
+        "Y": 0.2662215232849135,
+        "WorldX": 2617.50292968505,
+        "WorldY": 1675.72412109374,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "dc1ec632-5dfc-ea4f-bc61-7a6dee45c11e"
+      },
+      {
+        "Id": "memory-chip-48",
+        "Label": "#48",
+        "Detail": "#48 — Once In A Long, Long While…/Low Roar\nMap coordinates (X, Y): 2098.5, 287.5 - Central Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.7927645504016644,
+        "Y": 0.4598891036830121,
+        "WorldX": 2098.53629727913,
+        "WorldY": 287.514904800169,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "938add69-7a63-ef4b-89db-8fe177db9a54"
+      },
+      {
+        "Id": "memory-chip-50",
+        "Label": "#50",
+        "Detail": "#50 — Bronson Soundtrack\nMap coordinates (X, Y): -108.5, 1790.6 - Central Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.48486614393460714,
+        "Y": 0.2501979299177037,
+        "WorldX": -108.479480276736,
+        "WorldY": 1790.5812383499,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "f289ddde-3bcd-ec45-880e-d0b1aafbd085"
+      },
+      {
+        "Id": "memory-chip-51",
+        "Label": "#51",
+        "Detail": "#51 — Valhalla Rising: Original Soundtrack, by Peter Peter & Peter Kyed\nMap coordinates (X, Y): 404.0, -2105.1 - Central Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.5563631483485334,
+        "Y": 0.7936735153198214,
+        "WorldX": 404.011047362287,
+        "WorldY": -2105.05175781248,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "a91994c4-9221-c24a-9ee1-e097faea4c86"
+      },
+      {
+        "Id": "memory-chip-52",
+        "Label": "#52",
+        "Detail": "#52 — Nicolas Winding Refn The Wicked Die Young\nMap coordinates (X, Y): -914.8, 78.6 - Central Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.3723808782440629,
+        "Y": 0.4890392646193505,
+        "WorldX": -914.773864746557,
+        "WorldY": 78.5665512084958,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "af6d917f-2d09-064b-a4a4-2809694ea0d6"
+      },
+      {
+        "Id": "memory-chip-54",
+        "Label": "#54",
+        "Detail": "#54 — An Unknown Man's Journal: Part 1\nMap coordinates (X, Y): 1236.3, 1677.8 - Central Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.6724739074706668,
+        "Y": 0.26593194689069616,
+        "WorldX": 1236.29296874974,
+        "WorldY": 1677.79980468749,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "91ac3ae5-6bf2-ae43-b6c7-3a643d95c30b"
+      },
+      {
+        "Id": "memory-chip-55",
+        "Label": "#55",
+        "Detail": "#55 — An Unknown Man's Journal: Part 2\nMap coordinates (X, Y): 1188.6, -622.5 - Central Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.6658218452362709,
+        "Y": 0.5868441306254478,
+        "WorldX": 1188.61098665359,
+        "WorldY": -622.49872832321,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "fd513963-6d41-f14b-92ce-82aa116139bb"
+      },
+      {
+        "Id": "memory-chip-56",
+        "Label": "#56",
+        "Detail": "#56 — An Unknown Man's Journal: Part 3\nMap coordinates (X, Y): 1783.2, 1962.4 - Central Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.7487779935700711,
+        "Y": 0.22623335661694477,
+        "WorldX": 1783.24065791027,
+        "WorldY": 1962.35929976974,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "eba279fa-1181-484e-84fc-0c4b18518641"
+      }
+    ]
+  },
+  {
+    "Id": "death-stranding-dc.memory-chips.area04",
+    "Provider": "steam",
+    "GameId": "1850570",
+    "GameTitle": "Death Stranding Director's Cut",
+    "Title": "Western Region · Memory chips",
+    "Region": "Western Region",
+    "ImageFile": "death-stranding-western.png",
+    "PixelWidth": 4096,
+    "PixelHeight": 4096,
+    "Source": "Local installed game map textures · Kojima Productions / 505 Games. Online reference: https://deathstrandingpc.505games.com/en/interactive-map/",
+    "Calibration": "Installed map-area resource: 3584 × 3584 metres, centred at (0, 0). X east, Y north. High-resolution tiles matched to the overview texture.",
+    "AchievementIds": [
+      "035"
+    ],
+    "TrackerIds": [
+      "death-stranding-dc.fount-of-knowledge"
+    ],
+    "Markers": [
+      {
+        "Id": "memory-chip-10",
+        "Label": "#10",
+        "Detail": "#10 — Good Smile Company Nendoroid Jumbo Ludens\nMap coordinates (X, Y): -634.3, 118.8 - Western Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.323016601467846,
+        "Y": 0.4668479908712698,
+        "WorldX": -634.30850033924,
+        "WorldY": 118.816800717369,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "1f3f4799-561f-034e-985a-1e43b5188c95"
+      },
+      {
+        "Id": "memory-chip-40",
+        "Label": "#40",
+        "Detail": "#40 — Harley-Davidson Pan America 1250\nMap coordinates (X, Y): -90.6, 859.4 - Western Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.47470833210452984,
+        "Y": 0.26020518960755135,
+        "WorldX": -90.6453377373651,
+        "WorldY": 859.424600446536,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "01a80203-ec30-d946-bf8a-aa9d33045b94"
+      },
+      {
+        "Id": "memory-chip-53",
+        "Label": "#53",
+        "Detail": "#53 — My Life Directed By Nicolas Winding Refn\nMap coordinates (X, Y): -480.1, 486.9 - Western Region.\n\nPick up this memory chip, then restore its data at a facility terminal. Mark this item only after restoration; finding or carrying the chip is not completion. You can record pickup details in its note.",
+        "X": 0.36604959884564453,
+        "Y": 0.36413290922892266,
+        "WorldX": -480.07823773721,
+        "WorldY": 486.947653323541,
+        "TrackerId": "death-stranding-dc.fount-of-knowledge",
+        "ItemId": "991cdb5e-8470-f24a-a51f-1a2298c62a1e"
+      }
+    ]
+  }
+]

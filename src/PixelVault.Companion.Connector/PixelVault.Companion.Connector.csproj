@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0-windows</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>disable</Nullable><Version>0.10.0</Version></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../PixelVault.Tracking/PixelVault.Tracking.csproj" />
+    <ProjectReference Include="../../scripts/PixelVault.Companion.Export/PixelVault.Companion.Export.csproj" />
+    <Compile Include="../PixelVault.Companion/ConnectorContracts.cs" Link="ConnectorContracts.cs" />
+    <Compile Include="../PixelVault.Native/Services/Achievements/DeathStrandingTrackerSource.cs" Link="Readers/DeathStrandingTrackerSource.cs" />
+    <Compile Include="../PixelVault.Native/Services/Achievements/DeathStrandingSaveWorker.cs" Link="Readers/DeathStrandingSaveWorker.cs" />
+    <Compile Include="../PixelVault.Native/Services/Achievements/DeathStrandingSaveReader.cs" Link="Readers/DeathStrandingSaveReader.cs" />
+    <Compile Include="../PixelVault.Native/Services/Achievements/DeathStrandingWorldReader.cs" Link="Readers/DeathStrandingWorldReader.cs" />
+    <Compile Include="../PixelVault.Native/Services/Achievements/DeathStrandingOrderReader.cs" Link="Readers/DeathStrandingOrderReader.cs" />
+    <Compile Include="../PixelVault.Native/Services/Achievements/DeathStrandingChipReader.cs" Link="Readers/DeathStrandingChipReader.cs" />
+    <Compile Include="../PixelVault.Native/Services/Achievements/DeathStrandingInterviewReader.cs" Link="Readers/DeathStrandingInterviewReader.cs" />
+    <EmbeddedResource Include="../PixelVault.Native/Services/Achievements/TrackingData/DeathStrandingAchievementCounters.json" LogicalName="PixelVault.Tracking.DeathStrandingAchievementCounters.json" />
+    <EmbeddedResource Include="../PixelVault.Native/Services/Achievements/TrackingData/DeathStrandingFacts.json" LogicalName="PixelVault.Tracking.DeathStrandingFacts.json" />
+    <EmbeddedResource Include="../PixelVault.Native/Services/Achievements/TrackingData/DeathStrandingCollectors.json" LogicalName="PixelVault.Tracking.DeathStrandingCollectors.json" />
+    <EmbeddedResource Include="../PixelVault.Native/Services/Achievements/TrackingData/DeathStrandingCatalogueKeys.json" LogicalName="PixelVault.Tracking.DeathStrandingKeys.json" />
+  </ItemGroup>
+</Project>

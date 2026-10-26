@@ -46,11 +46,14 @@ public sealed class AchievementPinUiTests
                     }
                     finally { dialog.Close(); }
                 }));
-                Assign(Card(grid, "A"), "DLC");
-                Assert.Equal("DLC: Frozen Wilds", a.GroupName);
+                AssignDlc(Card(grid, "A"), "Create New DLC…");
+                Assert.Equal("Frozen Wilds", a.DlcName);
+                Assign(Card(grid, "A"), "Story");
+                Assert.Equal("Frozen Wilds", a.DlcName);
                 var categories = Card(grid, "A").ContextMenu.Items.OfType<MenuItem>()
                     .Single(i => Equals(i.Header, "Assign category")).Items.OfType<MenuItem>().ToList();
-                Assert.True(categories.Single(i => Equals(i.Header, "DLC")).IsChecked);
+                Assert.True(categories.Single(i => Equals(i.Header, "Story")).IsChecked);
+                Assert.DoesNotContain(categories, i => Equals(i.Header, "DLC") || Equals(i.Header, "Base Game"));
                 Assert.DoesNotContain(categories, i => Equals(i.Header, "DLC: Frozen Wilds"));
                 Click(Field<Button>(window, "_listView"));
                 Assign(Card(Field<ListBox>(window, "_list"), "B"), "Difficulty");
@@ -58,7 +61,8 @@ public sealed class AchievementPinUiTests
                 var restarted = new AchievementGuideService(scope.Path);
                 var fresh = new[] { AchievementPinTests.Row("A"), AchievementPinTests.Row("B") };
                 restarted.SyncDefinitionsAndLoadGuides("fixture", fresh);
-                Assert.Equal(new[] { "DLC: Frozen Wilds", "Difficulty" }, fresh.Select(r => r.GroupName));
+                Assert.Equal(new[] { "Story", "Difficulty" }, fresh.Select(r => r.GroupName));
+                Assert.Equal("Frozen Wilds", fresh[0].DlcName);
                 var saved = restarted.LoadGuideEntry("steam", "123", "A");
                 Assert.Equal("Keep this note", saved.GuideText);
                 Assert.Equal("missable", saved.Tags);
@@ -66,8 +70,10 @@ public sealed class AchievementPinUiTests
                 Assert.Equal("https://example.com/guide", saved.SourceUrl);
                 Assert.Equal("Guide", saved.SourceTitle);
                 Assert.Single(restarted.LoadPinnedAchievements("steam", "123"));
-                Assign(Card(Field<ListBox>(window, "_list"), "A"), "Base Game");
-                Assert.Equal("Base Game", scope.Service.LoadGuideEntry("steam", "123", "A").GroupName);
+                AssignDlc(Card(Field<ListBox>(window, "_list"), "A"), "Base Game");
+                Assert.Empty(scope.Service.LoadGuideEntry("steam", "123", "A").DlcName);
+                Assert.Equal("Story", scope.Service.LoadGuideEntry("steam", "123", "A").GroupName);
+                Assert.Contains("Frozen Wilds", scope.Service.LoadDlcNames("steam", "123"));
             }
             finally { window.Close(); }
         });
@@ -77,6 +83,13 @@ public sealed class AchievementPinUiTests
             var menu = card.ContextMenu.Items.OfType<MenuItem>().Single(i => Equals(i.Header, "Assign category"));
             menu.Items.OfType<MenuItem>().Single(i => Equals(i.Header, name))
                 .RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+        }
+        static void AssignDlc(Border card, string name)
+        {
+            var menu = card.ContextMenu.Items.OfType<MenuItem>().Single(i => Equals(i.Header, "Assign DLC"));
+            menu.RaiseEvent(new RoutedEventArgs(MenuItem.SubmenuOpenedEvent));
+            var item = menu.Items.OfType<MenuItem>().Single(i => Equals(i.Header, name) || i.Header is TextBlock text && text.Text == name);
+            item.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
         }
     }
 

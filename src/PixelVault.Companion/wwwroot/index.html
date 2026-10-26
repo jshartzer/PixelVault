@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101519">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="PixelVault">
+  <meta name="description" content="Your games, progress and moments. PixelVault, close at hand.">
+  <title>PixelVault Companion</title>
+  <link rel="icon" href="/brand.png" type="image/png">
+  <link rel="apple-touch-icon" href="/brand.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="stylesheet" href="/app.css?v=0.13.1">
+  <link rel="stylesheet" href="/profile.css?v=0.13.1">
+  <link rel="stylesheet" href="/achievements.css?v=0.13.1">
+  <link rel="stylesheet" href="/screenshots.css?v=0.13.1">
+  <script src="/library.js?v=0.13.1" defer></script>
+  <script src="/navigation.js?v=0.13.1" defer></script>
+  <script src="/updates.js?v=0.13.1" defer></script>
+  <script src="/achievements.js?v=0.13.1" defer></script>
+  <script src="/screenshots.js?v=0.13.1" defer></script>
+  <script src="/app.js?v=0.13.1" defer></script>
+</head>
+<body>
+  <header class="topbar"><div class="header-leading"><button id="menu-open" class="quiet menu-toggle" aria-label="Open menu" aria-controls="side-menu" aria-haspopup="dialog" aria-expanded="false" hidden><span aria-hidden="true">☰</span></button><button id="navigate-back" class="quiet header-back" aria-label="Back" title="Back · You can also swipe right" hidden>‹</button><a class="brand" href="#"><img class="brand-icon" src="/brand.png" alt="" width="45" height="45"><span>PixelVault<small>COMPANION</small></span></a></div></header>
+  <dialog id="side-menu" aria-labelledby="menu-title"><div class="menu-heading"><h2 id="menu-title">Companion</h2><button id="menu-close" class="quiet" aria-label="Close menu">×</button></div><div id="pc-status-bar" class="pc-status-bar" hidden><span id="pc-status-dot" class="pc-status-dot" aria-hidden="true"></span><div><strong id="pc-status-title"></strong><small id="pc-status-detail"></small></div><button id="automatic-toggle" class="quiet">Pause</button></div><div class="menu-bottom"><p id="menu-error" class="error" role="alert"></p><button id="logout" class="quiet" hidden>Sign out</button></div></dialog>
+  <div id="swipe-back-hint" aria-hidden="true">‹ Back</div>
+  <main id="main" tabindex="-1">
+    <p id="status" role="status" aria-live="polite">Connecting to your companion…</p>
+    <section id="auth" class="auth" hidden>
+      <p class="eyebrow">YOUR VAULT, WITH YOU</p>
+      <h1 id="auth-title">Welcome back.</h1>
+      <p id="auth-intro" class="muted">Sign in to open your library.</p>
+      <form id="auth-form">
+        <div id="token-field" hidden><label for="token">Setup token</label><input id="token" name="token" autocomplete="off" maxlength="128" spellcheck="false"><p class="hint">Open setup-token.txt in the Companion data folder on your server.</p></div>
+        <label for="name">Name</label><input id="name" name="name" autocomplete="username" maxlength="80" required>
+        <label for="password">Password</label><input id="password" name="password" type="password" autocomplete="current-password" maxlength="128" required>
+        <button id="submit" class="primary" type="submit">Sign in</button>
+        <p id="auth-error" class="error" role="alert"></p>
+      </form>
+      <p class="footnote">A private connection to your PixelVault.</p>
+    </section>
+    <section id="workspace" hidden>
+      <div id="sample-banner" class="banner" hidden><span class="sample-dot"></span><span id="workspace-label"><strong>Sample workspace</strong> · Read-only preview. Your desktop library is separate.</span></div>
+      <nav id="breadcrumbs" aria-label="Breadcrumb"></nav>
+      <div class="page-heading" id="page-heading"><div><p class="eyebrow" id="eyebrow">YOUR COLLECTION</p><h1 id="page-title">Your games.</h1><p class="muted" id="page-subtitle">Choose a game to pick up where you left off.</p></div><span id="page-count" class="badge"></span></div>
+      <section id="recent-photos" class="recent-photos" aria-labelledby="recent-photos-title" hidden><div class="recent-heading"><h2 id="recent-photos-title">Recent photos</h2><div class="recent-arrows"><button id="recent-left" class="quiet" aria-label="Scroll recent photos left" disabled>‹</button><button id="recent-right" class="quiet" aria-label="Scroll recent photos right" disabled>›</button></div></div><p id="recent-status" class="hint" role="status">Loading photos…</p><button id="recent-retry" class="quiet" hidden>Retry photos</button><div id="recent-strip" data-native-scroll class="recent-strip" tabindex="0" role="region" aria-label="Recent screenshots, scroll horizontally" hidden></div></section>
+      <div id="library-tools" class="library-tools" hidden><label class="library-search" for="game-search"><span class="sr-only">Search games</span><input id="game-search" type="search" placeholder="Find a game…" autocomplete="off"></label><label class="sr-only" for="game-platform">Platform</label><select id="game-platform"><option value="">All platforms</option></select><label class="sr-only" for="game-sort">Sort games</label><select id="game-sort"><option value="screenshot-newest">Newest screenshot</option><option value="screenshot-oldest">Oldest screenshot</option><option value="title-az">Title: A–Z</option><option value="title-za">Title: Z–A</option><option value="last-played">Last played</option><option value="playtime">Most played</option></select><span id="game-results" class="hint" aria-live="polite"></span></div>
+      <section id="games" class="game-grid" aria-label="Games"></section>
+      <section id="game-profile" hidden><div id="game-hero"></div><div class="profile-controls"><label id="profile-platform-label" for="profile-platform" hidden>Platform <select id="profile-platform"></select></label><button id="refresh-game" class="quiet">Refresh from PC</button></div><p id="refresh-status" class="hint" role="status" hidden></p><div id="game-stats" class="game-stats"></div><div class="sections-heading"><h2>Explore this game</h2><button id="arrange-sections" class="quiet" aria-haspopup="dialog">Reorder sections</button></div><div id="game-sections"></div></section>
+      <section id="achievements-page" hidden></section>
+      <section id="screenshots-page" hidden></section>
+      <section id="detail" hidden>
+        <div class="summary" id="summary"></div>
+        <div class="detail-actions"><button id="history-open" class="quiet" hidden>History / undo</button><button id="reload-tracker" class="quiet">Reload saved progress</button></div>
+        <div class="toolbar"><label class="search-label" for="search"><span>Search items</span><input id="search" type="search" placeholder="Search names, details or notes…" autocomplete="off"></label><label for="filter"><span>Show</span><select id="filter"><option value="all">All items</option><option value="remaining">Remaining</option><option value="completed">Completed</option><option value="unknown">No saved progress</option><option value="ready">Available</option><option value="locked">Locked</option></select></label></div>
+        <p id="results" class="hint" aria-live="polite"></p>
+        <div id="items"></div>
+        <button id="more" class="quiet load-more" hidden>Show more items</button>
+        <section id="completed-items-section" class="completed-items-section" aria-labelledby="completed-items-title" hidden><h2 id="completed-items-title" class="completed-heading"><span aria-hidden="true">✓</span> Completed <span id="completed-items-count"></span></h2><div id="completed-items"></div><button id="more-completed" class="quiet load-more" hidden>Show more completed items</button></section>
+      </section>
+      <section id="empty" class="empty" hidden><span aria-hidden="true">◇</span><h2>Your library starts here.</h2><p>Games will appear here when your library is added.</p></section>
+    </section>
+  </main>
+  <dialog id="conflict-dialog" aria-labelledby="conflict-title"><h2 id="conflict-title">Review the latest value</h2><p id="conflict-message" class="muted"></p><label for="saved-value">Saved value</label><textarea id="saved-value" rows="3" readonly></textarea><label for="draft-value">Your edit</label><textarea id="draft-value" rows="3" readonly></textarea><div class="dialog-actions"><button id="use-saved">Use saved value</button><button id="keep-edit">Save my edit</button></div></dialog>
+  <dialog id="history-dialog" aria-labelledby="history-title"><div class="dialog-heading"><h2 id="history-title">Tracker history</h2><button id="history-close" class="quiet">Close</button></div><p id="history-status" role="status" class="hint"></p><div id="history-rows"></div></dialog>
+  <dialog id="sections-dialog" aria-labelledby="sections-title"><h2 id="sections-title">Make it yours</h2><p class="muted">Move sections into your preferred order. This layout applies to all games, on all your devices.</p><ol id="section-order" class="section-order"></ol><p id="section-order-status" class="hint" role="status" aria-live="polite"></p><div class="dialog-actions"><button id="sections-cancel" class="quiet">Cancel</button><button id="sections-reload" class="quiet" hidden>Reload saved order</button><button id="sections-save">Save order</button></div></dialog>
+  <dialog id="refresh-review" aria-labelledby="refresh-review-title"><h2 id="refresh-review-title">Review save changes</h2><p class="muted">Applying updates the game-save observations. Your manual progress and existing notes stay as they are.</p><div id="refresh-review-changes"></div><label id="refresh-older-label" hidden><input id="refresh-older" type="checkbox"> Allow older save observations</label><p id="refresh-review-status" class="hint" role="status"></p><div class="dialog-actions"><button id="refresh-review-close" class="quiet">Keep current progress</button><button id="refresh-review-apply" class="primary">Apply save changes</button></div></dialog>
+  <dialog id="refresh-summary" aria-labelledby="refresh-summary-title" aria-describedby="refresh-summary-message refresh-summary-dismiss"><button id="refresh-summary-close" class="quiet" aria-label="Dismiss refresh summary">×</button><div class="refresh-summary-icon" aria-hidden="true">✓</div><h2 id="refresh-summary-title">Trackers updated</h2><p id="refresh-summary-message" class="muted"></p><div id="refresh-summary-list"></div><p id="refresh-summary-dismiss" class="hint">Tap anywhere to dismiss</p></dialog>
+  <dialog id="achievement-group-dialog" aria-labelledby="achievement-group-title"><h2 id="achievement-group-title">Achievement groups</h2><p id="achievement-group-status" class="muted" role="status"></p><form id="achievement-group-form"><label for="achievement-category">Category</label><input id="achievement-category" list="achievement-category-options" placeholder="Uncategorized" maxlength="120" autocomplete="off"><datalist id="achievement-category-options"></datalist><label for="achievement-dlc">DLC / expansion</label><input id="achievement-dlc" list="achievement-dlc-options" placeholder="Base Game" maxlength="120" autocomplete="off"><datalist id="achievement-dlc-options"></datalist><p class="hint">Choose an existing name or enter a new one. Leave DLC blank for Base Game.</p><div class="dialog-actions"><button id="achievement-group-cancel" type="button" class="quiet">Cancel</button><button id="achievement-use-desktop" type="button" class="quiet" hidden>Use desktop groups</button><button id="achievement-group-save" type="submit">Save groups</button></div></form></dialog>
+  <dialog id="tracker-content" aria-labelledby="tracker-content-title"><div class="dialog-heading"><h2 id="tracker-content-title">Content</h2><button id="tracker-content-close" class="quiet">Close</button></div><p id="tracker-content-detail" class="hint"></p><div id="tracker-content-body" class="tracker-content-body"></div></dialog>
+  <dialog id="photo-viewer" aria-labelledby="photo-viewer-title"><h2 id="photo-viewer-title" class="sr-only" tabindex="-1" autofocus>Screenshot viewer</h2><div id="photo-stage" role="button" tabindex="0" aria-label="Show photo information"><img id="photo-image" alt="" draggable="false"></div><p id="photo-loading" role="status">Loading photo…</p><button id="photo-retry" class="quiet" hidden>Retry photo</button><div id="photo-info" hidden><div id="photo-info-content"></div><div class="photo-navigation"><button id="photo-previous" class="quiet" aria-label="Previous photo">← Previous</button><button id="photo-next" class="quiet" aria-label="Next photo">Next →</button></div></div></dialog>
+  <footer><span>PIXELVAULT COMPANION</span><span>Companion · 0.13.1</span></footer>
+  <template id="photo-download-template"><a id="photo-download" class="quiet" download>↓ Download original</a></template>
+</body>
+</html>

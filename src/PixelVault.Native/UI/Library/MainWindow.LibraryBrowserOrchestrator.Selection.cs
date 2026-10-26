@@ -178,6 +178,8 @@ namespace PixelVaultNative
                 {
                     panes.PhotoAchievementsButton.IsEnabled = !timelineMode && ws.Current != null && !ws.LibraryFoldersLoading;
                 }
+                if (panes.PhotoTrackersButton != null)
+                    panes.PhotoTrackersButton.IsEnabled = !timelineMode && ws.Current != null && !ws.LibraryFoldersLoading;
                 if (panes.ExitTimelineButton != null)
                 {
                     panes.ExitTimelineButton.IsEnabled = !ws.LibraryFoldersLoading;

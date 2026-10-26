@@ -1,0 +1,153 @@
+# PixelVault Companion on the NAS
+
+October 26 — Companion Screenshot Library Step 5 complete on NAS **0.13.0**. Recent photos appears above the home game grid: up to 30 saved square thumbnails, horizontal touch/keyboard/arrow scrolling, and direct opening in the shared viewer. Page and strip position survive dismissal; next/previous stay within recent photos. Browse photos opens the enabled game gallery until the full timeline lands in Step 6. The authenticated recent API returns bounded metadata without requiring the PC; the game grid renders independently. 70 server and 32 JS checks pass; phone/landscape/desktop QA has no overflow/runtime errors. All 1376 stable data entries match fresh backup `pre-0.13.0-20261026T205538Z.tar`, NAS/protected-PC SHA256 `65B0C1BC4C7604DE7272399E1E0ED89EFB3B09DAD86931FF732B6ADFA852C43F`. Normal connector remains 0.8.0. [Plan/evidence](plans/PV-PLN-WEB-002-companion-screenshot-library.md).
+
+October 26 — Companion Screenshot Library Step 4 complete on NAS **0.12.0**. Group photos defaults off, remembers the browser choice, and displays existing named/Ungrouped sections independently inside each capture date. Collapse state survives photo navigation, grouping toggles, filtering and pagination within the app. All 233 photos and 18 authored memberships retained. Removed the viewer X; swipe down, Escape and browser Back still dismiss. 30 JS cases and the shell/cache check pass; phone/landscape/desktop QA passes in both densities, with exact viewer-return scroll and no overlaps/overflow/errors. All 1376 stable data entries match fresh backup `pre-0.12.0-20261026T204330Z.tar`, with matching NAS/protected-PC SHA256 `1CCD17C3ADE564FD4137F10D8DB93A1761C1089D273088A24F9CBCB172BCF530`. Normal connector 0.8.0 restored; no extraction or original-file changes. Next: Step 5, bounded home thumbnail strip. [Plan/evidence](plans/PV-PLN-WEB-002-companion-screenshot-library.md).
+
+October26 — Companion Screenshot Library Step3 complete on NAS0.11.0: mixed small/large squares, Comfortable/Compact density saved per browser, balanced edge-to-edge final rows and retained date/source order. Packing reuses thumbnail nodes, handles width changes and keeps gallery/viewport navigation stable.28JS cases cover8000 packing combinations; shell/cache check and desktop/phone/landscape QA pass. Xbox102 unique rows, no overlaps/overflow/runtime errors, and direct-tap return3982→3982 verified. All1376 prior data entries match backup pre-0.11.0-20261026T200813Z.tar; SHA25614D586054045FB400E2AFA1DFF4465A9A083D4EFDD3A51E6E4946EBBB892EC23. Existing connector0.8.0 restored, originals/downloads unchanged. Step4 existing groups is next. [Plan/evidence](plans/PV-PLN-WEB-002-companion-screenshot-library.md).
+
+October26 — Companion0.10.0 original downloads live. Tap photo → show info → Download original. All233 original files are on NAS (1,607,576,615bytes), with original filename/format/full resolution and embedded metadata untouched. Native browser PNG/JPEG downloads and all233 NAS originals match source hashes; network-disabled NAS-only audit passes. Browsing still uses derivatives, originals fetched only on request.69server+9connector+26JS checks pass. Existing1142 entries unchanged; only photo catalogue adds Original descriptors, with every prior photo field verified unchanged;233 original files added. Existing connector0.8.0 restored; one-shot tool0.10.0. File-system dates depend on the downloading OS; app-only groups stay in PixelVault. [Operation/evidence](COMPANION_ORIGINAL_DOWNLOADS.md). Step3 variable layout is still next.
+
+October26 — Companion Screenshot Library Step2 is live on NAS0.9.1. The233-photo Director's Cut pilot opens a date-based square gallery with native console icons, server-wide console filtering and60-row pages. Full-screen uncropped viewing copies start with info hidden; tap toggles info, swipe down dismisses, horizontal gestures/arrow keys navigate loaded filtered photos, and Close/Escape/Back return to retained gallery state. Late page loads resume safely after photo round trips.68server+26JS tests and desktop/mobile viewport QA pass; direct taps restore exact scroll, no overflow/runtime errors. All1143 prior data entries match. Backup pre-0.9.1-20261026T183520Z.tar, SHA256 C2C3CF82AF86C1648D8DDBD751EB8BAC021756D29AC0C3FEACDD5746992F8CBD, protected PC copy retained. Installed connector remains0.8.0. No new media watcher or broader-game sync. Step3 variable tile layout is next. [Plan](plans/PV-PLN-WEB-002-companion-screenshot-library.md).
+
+October26 — Companion Screenshot Library (PV-PLN-WEB-002): Step1 complete on NAS0.9.0. Read-only desktop export and atomic authenticated NAS media store contain233 Director's Cut screenshots (Steam121/Xbox102/PS5 10),408 distinct JPEG derivatives/94,969,378bytes, exact indexed dates and18 group memberships;7videos excluded. All original selected images unchanged, every uploaded asset and metadata row verified, unchanged retry uploads0. NAS network-disabled read passed while PC connector stopped; public API401. All734 prior entries retained,409 media files added.68server+9connector tests pass. Existing installed connector0.8.0 restored; the one-shot pilot0.9.0 is separate and has no automatic media loop. Screenshots remains Coming soon until Step2 (basic gallery/viewer). [Plan and operational evidence](plans/PV-PLN-WEB-002-companion-screenshot-library.md).
+
+October 26 — Companion 0.8.2 corrects achievement completion grouping: each Base Game/DLC category now contains Not obtained followed by Obtained. There is no global completion section. Cards/List, guides, category order, full totals and filtering are retained. 23 JS and 2 shell/cache tests pass; isolated cards/list browser QA confirms Story 7/8 then Actions 2/33. NAS health 0.8.2; connector stays 0.8.0. All 734 prior stable entries match exactly. Backup backups/pre-0.8.2-20261026T124526Z.tar and protected C:/Codex/Companion Backups/pre-0.8.2-20261026T124526Z/ retained; SHA256 BF939206C5618D9EBC4305CD2904F4CCAF4CBECE074088261A23332063A84916. Image sha256:3e6f7dda3b1f78d1cdecf63caefccf35486cf6564697b1db88b1b2d58e2a8531; image archive retained. QA server stopped, tab closed. Preview proof C:/Codex/tmp/companion-achievement-within-groups-0.8.2.png. Release log synced to Notion Companion 0.8.2.
+
+Current server: **0.13.0**. Companion 0.8.1 is deployed on the NAS. Unchecked tracker boxes are blank; completed boxes show a checkmark. Right-side labels show Completed (including manual completion), or Locked/Available only with a linked source and an actual observation. No Not Checked badge. Achievements default to cards, with a persisted Cards/List choice, the exact desktop bronze/silver/gold/uber-rare palettes, and unfinished-then-completed rows inside each DLC/category retaining assignments, full totals and guides.
+
+Fresh backup: backups/pre-0.8.1-20261026T123922Z.tar; protected PC copy: C:/Codex/Companion Backups/pre-0.8.1-20261026T123922Z/. SHA256 E6E4C59024B4E5404C57D838CF10CED18CE7184FFC7395EB10E3C5F2AA820652 matches. 697/699 stable entries match exactly. The other two tables contain one concurrent web category/DLC edit for Steam3035570/ACMirage_Ach_48 and its new receipt; a private per-row comparison confirms only web/baseline/pending assignment fields differ. Guide, progress, desktop groups and all other achievement fields are unchanged. Preserve the live edit and queued group changes. Tracker notes/progress and pairing permissions match. Image sha256:7c1645d2c245f4dd9161cfb43489b4f41d7c4244e0f3cf32a6a62f47c8fcaa76; releases/pixelvault-companion-0.8.1-amd64.tar retained.
+
+
+Installed October25,2026; updated to **0.13.0** on October26. Tracking is the first module of the broader **PixelVault Companion** application.
+
+## Open Companion
+
+**[http://192.168.1.99:8787](http://192.168.1.99:8787)**
+
+If an existing phone tab still displays 0.3, open **[the fresh home page](http://192.168.1.99:8787/?v=0.13.0)** once. The phone had cached the old HTML while the updated API returned the expanded library. Version0.4.1 prohibits caching of HTML, scripts, styles and the manifest and uses new asset URLs. No browser-data reset or account setup is needed. The footer should say0.13.0; the home page shows covers and selecting one opens the game profile. Tracker deep links remain usable.
+
+Use the same Companion login created on the PC. This is separate from the NAS administrator account. Access is on the home network, using HTTP as explicitly selected for this first installation. The PC can be off for browsing and manual tracking. Automatic PC updates require it awake and signed in. HTTPS/domain setup and access from outside the home network remain separate work.
+
+The current Companion workspace, owner, notes, progress, history, request receipts and keys were transferred. All fourteen database-table/file entries matched before the NAS service started. The source had 1,267 tracker state rows and 52 history entries. Future phone edits are stored on the NAS.
+
+The existing native desktop tracker's original database and automatic game readers are still separate. Automatic observations and add-only custom-definition publication now run through the paired PC connection. The final native tracker cutover remains planned.
+
+## Installation
+
+| Item | Value |
+| --- | --- |
+| NAS | QNAP TS-464, `HomeServer`, x86-64 |
+| QTS | 6.1.0, build 20261007 |
+| Container Station | 3.1.3.1854 |
+| Docker / Compose | 27.1.2-qnap9 / 2.29.1-qnap2 |
+| Project / container | `pixelvault-companion` |
+| Image | `pixelvault-companion:0.13.0` |
+| Verified image ID | `sha256:4dd8a6fe1b28f59c91794be8acf34ce2171f96d77b9a213b0e371dbdd35807d1` |
+| Private installation directory | `/share/CACHEDEV1_DATA/Container/pixelvault-companion` |
+| Persistent data | Installation directory's `data/`, mounted at `/data` |
+| Settings | Installation directory's `.env` and `docker-compose.yml` |
+| Deployment record | Installation directory's `deployment.json` |
+| Container user | UID 1000 / GID 100, matching the folder's NAS owner |
+| Host listener | `192.168.1.99:8787` |
+| Restart policy | `unless-stopped` |
+| Runtime limits | 512 MiB, one CPU |
+
+The process runs without root privileges/capabilities, with a read-only application filesystem and writable persistent data/temporary mounts. The private data directories are mode 700 and transferred files mode 600. The application permits the NAS IP and loopback hostnames; authentication is still required for tracker data.
+
+SSH uses the existing key with `ssh admin1@192.168.1.99`. Docker is installed at `/share/CACHEDEV1_DATA/.qpkg/container-station/bin/docker`. Use the installation's private Docker configuration directory with `--config`; the package's default CLI configuration directory is not writable by this account. No sudo password is needed for Docker access through the existing administrators group.
+
+The image build normalizes published artifact read/traverse permissions, so private source-file modes inherited during extraction do not prevent the non-root app from loading its configuration.
+
+## Backups and validation
+
+Companion/connector0.8.0 publish and display private tracker Content. The Death Stranding catalogue has149 full English texts/12 subjects, identical Native/NAS checksum and175,776 characters. Existing67/100 automatic progress remains intact; individual catalogue states are manual, with zero inferred rows or save binding. All609 prior file/table digests matched before connector sync; afterward all original tracking state/history/source/automatic/link/import data, old custom definitions, manual notes/counts, paired permissions and achievement guides/groups still match.65 service,8 connector and20 JS cases pass; isolated mobile text-safety/draft/focus QA passed.
+
+Complete backup:`backups/pre-0.8.0-20261026T120257Z.tar`, protected PC:`C:\Codex\Companion Backups\pre-0.8.0-20261026T120257Z\`; SHA256`8CFB0866EBD3C823D070D0272BE1E7038CD171AC7E701385FFA64CDB58EFEA94`. Image archive:`releases/pixelvault-companion-0.8.0-amd64.tar`. Private connector config/start backup:`PixelVaultCompanionConnectorData\backups\pre-0.8.0-20261026T120424Z`. Username Josh, password, workspace and device token retained. Full prose is in private persistent definitions/backups, not the source package or image. [Content operation and downgrade limits](TRACKER_CONTENT.md).
+
+Companion0.7.3 moves PC connection status to the top of the hamburger menu's left shelf and Sign out to the bottom. Pause/Resume remains beside the status; tap outside, Close or Escape to dismiss.64 server/20 JS cases and390/1080px QA pass. All585 prior file/table digests match exactly. Fresh NAS backup:`backups/pre-0.7.3-20261026T112817Z.tar`; protected PC:`C:\Codex\Companion Backups\pre-0.7.3-20261026T112817Z\`; SHA256`6DF27EAFE0E1F5F2928E6FB9DC0EBB1AC82571D0E51CCF532B3C8A451E7CE2D7`. Image archive:`releases/pixelvault-companion-0.7.3-amd64.tar`. Existing owner/pairing and connector0.7.1 retained.
+
+Companion0.7.2 adds a+X badge to update-popup cards for distinct items with increased progress since the browser's acknowledged view. All585 prior file/table digests match exactly; no data/schema migration was needed.64 server and20 JS checks pass, with390px+1/+0 and dismiss-anywhere QA. Fresh NAS backup:`backups/pre-0.7.2-20261026T112035Z.tar`; protected PC:`C:\Codex\Companion Backups\pre-0.7.2-20261026T112035Z\`; SHA256`A6A60174C9C87A1749922D47B726A075A6963A934826069FAA0067CF6ACAAC4C`. Image archive:`releases/pixelvault-companion-0.7.2-amd64.tar`. Existing owner/pairing and connector0.7.1 retained.
+
+Companion0.7.1 synchronizes bundled/custom desktop tracker names as separate metadata. All583 prior file/table digests matched before PC sync; only the two title metadata tables were added. After sync, the complete original tracker state/history/source/automation/link/import table digests and all19 manual-value/note rows still matched. The existing owner/session, token, exact paired source config and workspace scope were retained. The live road tracker changed **Road Bultin â†’ Road Building**, retaining52 items and the19/52 already present in this backup. Earlier4/52 observations preceded later user check-offs and must not be restored over19/52. Achievement metadata remains7,413 rows/676 guides with its prior digest.64 server,7 connector and17 JS tests pass; packaged conflict/draft checks and live390px rendering passed.
+
+Fresh complete backup: NAS`backups/pre-0.7.1-20261026T011200Z.tar`, protected PC`C:\Codex\Companion Backups\pre-0.7.1-20261026T011200Z\`; SHA256`26A08ED6E99ED386C76915BAE507EC83EBFD46FC56649B1464D2C1D5382E1DD5`. Image archive:`releases/pixelvault-companion-0.7.1-amd64.tar`. Connector private config/start backup:`PixelVaultCompanionConnectorData\backups\pre-0.7.1-20261026T011322Z`. UTC artifact stamps fall on October26; the local deployment date is October25. See [name sync and conflict behavior](COMPANION_CONNECTOR.md).
+
+Companion0.7.0 adds [achievement lists, guides and two-way group editing](COMPANION_ACHIEVEMENTS.md). All544 prior file/table entries were retained before sync; tracker notes/manual progress still match afterward. Full backup: NAS`backups/pre-0.7.0-20261026T001823Z.tar`, protected PC copy under`Companion Backups`; SHA256`2F5D2E2796A6588649AB10E5B09719E4E215BAB48D7F1DC9E5EE9EEA2C2C086A`. Image archive:`releases/pixelvault-companion-0.7.0-amd64.tar`. New metadata115 games/7,413 achievements/676 guides matches the PC digest exactly. Existing owner, pairing and startup are retained.
+
+
+The0.6.0 automatic-connection release retained541 prior stable file/table digests before automatic updates were enabled, excluding only heartbeat; connector activity/publication tables are additive. The existing owner/session/pairing were retained. After live source updates and the new interview tracker publication, every existing manual value and note still matched. The live interview counter is67/100, PC/library/source/publication status is healthy and there are no pending reviews. Full backup: NAS`backups/pre-0.6.0-20261025T231407Z.tar`, protected PC`C:\Codex\Companion Backups\pre-0.6.0-20261025T231407Z\`; SHA256`37C6CE7D4BF637310593DA2CB44C9D09A8CAF3992A9AC153217F642EE49A8468`. Current image archive:`releases/pixelvault-companion-0.6.0-amd64.tar`.53 server,4 connector and13 JS tests pass; actual packaged Windows/QNAP/browser verification passed. See [automatic PC operation and publication limits](COMPANION_CONNECTOR.md).
+
+The0.5.2 refresh-summary update retained541 stable table/file digests; only the live PC heartbeat was excluded. Full backup: NAS`backups/pre-0.5.2-20261025T222712Z.tar`, protected PC`C:\Codex\Companion Backups\pre-0.5.2-20261025T222712Z\`; SHA256`6EF8BEA7B9BD5FAC01AB1D8A2F02CC128F08DE3012E155E5A810F39F2189B3BF`. Image archive:`releases/pixelvault-companion-0.5.2-amd64.tar`. Existing owner, PC pairing and tracker data are retained; no schema migration is needed.49 service/client tests and13 JS cases pass.
+
+The0.5.1 UI/navigation update retained541 table/file digests; only the continuously changing PC heartbeat was excluded from comparison. Full backup: NAS`backups/pre-0.5.1-20261025T220638Z.tar`, protected PC`C:\Codex\Companion Backups\pre-0.5.1-20261025T220638Z\`. SHA256:`DFE0A441C8BC4DBA7F088D483832676EF9380A5385B7412E269EA9D6AA386F66`. Current image archive:`releases/pixelvault-companion-0.5.1-amd64.tar`. Existing owner and PC pairing are retained; NAS health and PC online status passed after restart. No data/schema migration is involved.
+
+The0.5.0 upgrade backup is NAS`backups/pre-0.5.0-20261025T183417Z.tar`, copied to protected PC`C:\Codex\Companion Backups\pre-0.5.0-20261025T183417Z\`. SHA256:`9661B5B864858FAAF72E00B8AA06876218CD58B0C6052F301C007CDE606AEE30`. After installation, **539 existing table/file digests were preserved**; only the expected library catalogue snapshot changed. Existing owner, keys, tracker state/history and section preferences are intact. The new scoped PC pairing and refresh-job tables are additive. Current image archive:`releases/pixelvault-companion-0.5.0-amd64.tar`. Full Native storage has not been cut over.
+
+The0.4.1 cache fix has its own full pre-upgrade data backup: NAS `backups/pre-0.4.1-20261025T180840Z.tar`, protected PC `C:\Codex\Companion Backups\pre-0.4.1-20261025T180840Z\`. The uncompressed archive includes the library as well as databases/manifest/keys. All42 Companion tests pass, including root/query/direct HTML and shell-asset cache-header checks. Live NAS responses at both `/` and `/?v=0.4.1` contain the new profile shell and `no-cache, no-store, must-revalidate` headers.
+
+The 0.4.0 upgrade preserved all fourteen pre-upgrade table/file digests, including the owner, keys, manifest, 1,267 tracker state rows and 52 history entries. Current pre-upgrade backup: NAS `backups/pre-0.4.0-20261025T175619Z.tar.gz`, copied with restricted permissions to `C:\Codex\Companion Backups\pre-0.4.0-20261025T175619Z\`. Its SHA-256 is `1D9C98C494D53DFFC202425879DF03FC207B17AB7D67239DA4109773B0A72136`. The previous image and Compose backup remain available. A verification mount initially disallowed SQLite's WAL sidecar creation; the failure handler restarted 0.3.0, then the corrected verification and upgrade completed successfully.
+
+The updated container is healthy, retains its existing owner, runs as UID1000:GID100 with a read-only root, and requires authentication for game metadata, artwork and preferences. Unknown HTTP hosts are rejected. Forty-one Companion tests and isolated browser QA passed, including section ordering persistence/concurrent-save review and tracker draft/save/undo regressions. No real-user password was automated.
+
+The verified pre-migration snapshot is retained in:
+
+- PC: `C:\Codex\Companion Backups\nas-migration-20261025T164321Z\` â€” protected workspace snapshot, archive, comparisons and deployment record.
+- NAS: installation directory's `backups/nas-migration-20261025T164321Z.tar.gz`.
+- NAS: installation directory's `releases/pixelvault-companion-0.3.0-amd64.tar.gz` â€” the installed image archive, separate from personal data.
+- NAS: installation directory's `releases/pixelvault-companion-0.4.0-amd64.tar.gz` â€” prior application image, also separate from personal data.
+- NAS: installation directory's `releases/pixelvault-companion-0.4.1-amd64.tar` â€” current cache-fixed image, separate from personal data.
+
+Validation used a disposable NAS workspace first: login, reads, progress/note saves, repeated-request receipts, guarded undo and session persistence through restart. The live workspace then passed full migration comparison, container restart, retained owner setup, health checks, anonymous-data rejection and unexpected-host rejection. Its only data mount is NAS-local, and the former PC service is stopped. A complete NAS reboot was not performed.
+
+For later backups, pause only this service, archive the entire data folder, restart it and copy the protected archive off the NAS as well. From SSH:
+
+```sh
+set -eu
+umask 077
+base=/share/CACHEDEV1_DATA/Container/pixelvault-companion
+docker=/share/CACHEDEV1_DATA/.qpkg/container-station/bin/docker
+cd "$base"
+"$docker" --config "$base/docker-config" compose stop -t 10 companion
+trap '"$docker" --config "$base/docker-config" compose start companion >/dev/null' EXIT
+stamp=$(date -u +%Y%m%dT%H%M%SZ)
+tar -czf "$base/backups/workspace-$stamp.tar.gz" -C "$base/data" .
+"$docker" --config "$base/docker-config" compose start companion
+trap - EXIT
+```
+
+For recovery, stop Companion and preserve the current data folder before restoring a backup into a fresh private folder with the correct ownership. Restore the complete data, including the owner DB, manifest and keys, and use the matching image/schema. Verify it before selecting it as the live mount. Once the NAS has accepted edits, the earlier PC snapshot is a historical backup; switching back requires carrying over the newer NAS edits.
+
+## Library snapshot and layout
+
+Version0.5.2 shows a simple refresh-summary popup with the names of changed trackers. Tap anywhere in the popup or on its backdrop to dismiss; Escape/close also work. Manual PC refresh reports no changes, review or failures honestly. Reloading the app shows new changes since this browser's last acknowledged view; first visits establish a baseline silently. Acknowledged updates do not repeat. Ordinary local edits/undo are acknowledged without redundant popups. Since0.7.2, the browser stores workspace-scoped tracker revisions and minimal item/group IDs with effective progress values to count distinct increases. It stores no notes, credentials or unsaved drafts. Multi-column records count once; decreases do not cancel increases. Note-only/decrease-only changes show+0. Legacy revision-only baselines cannot supply a historical count and gain the new baseline on acknowledgement or unchanged startup. The authenticated tracker listing adds a semantic revision that ignores source timestamp/provenance-only refreshes, so re-reading an unchanged save is not mislabeled as progress updates.
+
+Version0.5.1 highlights completed tracker cards and item rows in green with check marks, grouped beneath **Completed** after active entries. Full tracker completion uses its existing goal total; empty totals are excluded. A multi-column item stays active until every column is complete. Active and completed rows paginate independently, and search/filter totals, notes, versioned saves and undo retain their existing behavior.
+
+Swipe right over non-control page content to return to the previous screen; a visible Back button provides the same action. Navigation restores prior scroll positions and retains unsaved tracker drafts. Form controls, open dialogs, multi-touch, vertical scrolling and in-flight saves do not trigger swipe navigation. Native Safari edge-back is left alone; standalone/Home Screen mode can handle that edge itself. Direct tracker bookmarks fall back to their game profile rather than leaving Companion. Touch recognition/history are covered by automated tests; physical iPhone gesture checks were not performed.
+
+Version0.5.0 consolidates316 console/platform editions into281 cards, retaining their separate stats under a profile platform selector. Punctuation/case differences normalize together; sequels and named remastered editions remain distinct. Sorting defaults to **Newest screenshot**, using the latest actual image date across editions (315 editions have dates; missing dates go last). Other sorts are Oldest screenshot, Title Aâ€“Z/Zâ€“A, Last played and Most played. Star buttons pin/unpin a consolidated card above the selected sort. Sort/pins persist for the owner across devices; independent changes merge atomically. Existing section ordering remains separate.
+
+Tracker status boxes are now inline checkboxes; binary/count items can be checked or unchecked without expanding their details. Multi-column trackers expose an individual checkbox for each column. Existing game-confirmed completion protection, field versions, drafts, history and retry rules remain intact.
+
+**Refresh from PC** now checks the configured save sources through a paired Windows connection, with offline and conflict/older-save review states. The installed PC process starts at Windows sign-in and has been verified online against the live NAS. See [PC connection, recovery and revocation](COMPANION_CONNECTOR.md). It monitors stable save changes and also accepts manual refresh requests; the original Native tracker database remains separate.
+
+The library snapshot contains316 platform editions, displayed as281 consolidated cards with cover art and search/platform filters. A game profile shows its available banner, compact playtime/achievement counts and live Companion tracker totals. Trackers expand below; Achievements opens the grouped achievement list and saved guides. Screenshots remains Coming soon. **Reorder sections** saves one owner-wide order for every game/device. Stale changes require reloading the saved order.
+
+Private metadata is stored in `data/library/catalog.json`, with 524 unique resized JPEGs in `data/library/assets/` (316 covers, 274 banners). It is bound to the approved workspace identity and served only after authentication. The export has 91 achievement summaries and 97 playtime summaries; unavailable stats stay unknown. The PC connector now refreshes this snapshot automatically when indexed inputs change and refreshes provider playtime periodically. No screenshots, provider API keys or source PC paths are in this catalogue.
+
+To prepare a fresh snapshot on Windows, run the exporter with the existing NAS workspace manifest copied privately to the PC and a new output directory:
+
+```powershell
+dotnet run --project C:\Codex\scripts\PixelVault.Companion.Export -- C:\Codex\PixelVaultData <private-workspace-manifest> <new-private-export-directory>
+```
+
+The exporter reads the configured desktop library/cache and approved-account achievement summaries. If configured, it fetches Steam playtime using the desktop's key in memory; that key is never exported. Back up the current NAS data, transfer only the resulting catalogue/assets into a staged private library folder, verify the manifest identity, replace the previous library while Companion is stopped, and restart. Keep directories mode700/files600 under the NAS data owner. Source-only application ZIPs and Docker images contain no personal catalogue or artwork. The source ZIP is `C:\Codex\Companion Preview\PixelVaultCompanion-0.8.0-source.zip`.
+
+## Former PC preview
+
+The PC workspace remains at `C:\Codex\PixelVaultCompanionData`. Its `hosting.json` marker tells current launchers that this workspace moved to the NAS. Both ordinary and phone PC launchers print the NAS address and leave the local database stopped. Rebuilds preserve that marker. The desktop Companion connection's saved destination also points to the NAS, where applicable.
+
+Use the NAS URL for bookmarks and the phone. The previous PC address `192.168.1.69:8787` is no longer the Companion server.
+
+See [setup and architecture limits](COMPANION_SETUP.md) and [the implementation plan](plans/PV-PLN-WEB-001-nas-web-companion.md).

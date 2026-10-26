@@ -1,0 +1,46 @@
+# Explicit trusted-home-network deployment. Use compose.qnap.yml as the HTTPS/proxy starting point.
+name: pixelvault-companion
+services:
+  companion:
+    image: pixelvault-companion:0.13.1
+    container_name: pixelvault-companion
+    platform: linux/amd64
+    user: "${COMPANION_UID:-1000}:${COMPANION_GID:-100}"
+    restart: unless-stopped
+    ports:
+      - "${COMPANION_LAN_IP:-192.168.1.99}:8787:8080"
+    volumes:
+      - "${COMPANION_DATA_DIR:-/share/Container/pixelvault-companion/data}:/data"
+    environment:
+      Companion__DataRoot: /data
+      Companion__DemoEnabled: "false"
+      Companion__AllowHttp: "true"
+      AllowedHosts: "localhost;127.0.0.1;${COMPANION_LAN_IP:-192.168.1.99}"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    mem_limit: 512m
+    cpus: 1.0
+    healthcheck:
+      test:
+        - CMD
+        - /bin/bash
+        - -ec
+        - >-
+          exec 3<>/dev/tcp/127.0.0.1/8080;
+          printf 'GET /health HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n' >&3;
+          read -r status <&3;
+          [[ "$$status" == *" 200 "* ]]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

@@ -1,5 +1,7 @@
 # PixelVault
 
+**PixelVault Companion (0.5.2):** Installed on the NAS at [http://192.168.1.99:8787](http://192.168.1.99:8787) for home-network access. Start with a searchable game-cover grid, then open a banner profile with saved playtime/achievement counts, live tracker totals and reorderable feature sections. Trackers support edits, notes, conflicts and history/undo; Achievements and Screenshots are marked Coming soon. See [NAS operation and backups](docs/COMPANION_NAS.md), [setup/current limits](docs/COMPANION_SETUP.md), and [plan PV-PLN-WEB-001](docs/plans/PV-PLN-WEB-001-nas-web-companion.md). Full native tracker cutover, periodic PC observations and automatic library metadata refresh remain pending.
+
 PixelVault is a native Windows desktop app for organizing, tagging, indexing, and browsing game screenshots and clips.
 
 The live app line is based in:

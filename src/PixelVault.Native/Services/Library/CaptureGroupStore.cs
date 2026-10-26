@@ -6,6 +6,39 @@ using Microsoft.Data.Sqlite;
 
 namespace PixelVaultNative
 {
+    /// <summary>Stable game-wide identity, independent of the platform chosen for the cover/hero.</summary>
+    internal sealed class CaptureGroupScope
+    {
+        internal string Key;
+        internal string[] LegacyGameIds = Array.Empty<string>();
+
+        internal static CaptureGroupScope ForFolder(LibraryBrowserFolderView folder, IEnumerable<GameIndexEditorRow> savedRows)
+        {
+            if (folder == null || folder.IsTimelineProjection || folder.IsSessionProjection || folder.PendingGameAssignment) return null;
+            var sources = folder.SourceFolders.Concat(new[] { folder.PrimaryFolder }).Where(source => source != null).ToList();
+            var ids = sources.Select(source => source.GameId).Append(folder.GameId)
+                .Where(id => !string.IsNullOrWhiteSpace(id)).Select(id => id.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            var rows = (savedRows ?? Enumerable.Empty<GameIndexEditorRow>()).Where(row => row != null).ToList();
+            var storageIds = sources.Select(source => source.StorageGroupId)
+                .Concat(rows.Where(row => ids.Contains(row.GameId, StringComparer.OrdinalIgnoreCase)).Select(row => row.StorageGroupId))
+                .Where(id => !string.IsNullOrWhiteSpace(id)).Select(id => id.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            if (storageIds.Count == 1)
+            {
+                ids.AddRange(rows.Where(row => string.Equals(row.StorageGroupId?.Trim(), storageIds[0], StringComparison.OrdinalIgnoreCase))
+                    .Select(row => row.GameId).Where(id => !string.IsNullOrWhiteSpace(id)));
+            }
+            var orderedIds = ids.Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(id => id, StringComparer.OrdinalIgnoreCase).ToArray();
+            if (orderedIds.Length == 0) return null;
+            return new CaptureGroupScope
+            {
+                Key = storageIds.Count == 1 ? "storage:" + storageIds[0] : orderedIds[0],
+                LegacyGameIds = orderedIds
+            };
+        }
+    }
+
     /// <summary>Authored organization lives outside the rebuildable photo index and file metadata.</summary>
     internal sealed class CaptureGroupStore
     {
@@ -45,20 +78,49 @@ CREATE TABLE IF NOT EXISTS capture_group_view (
         }
 
         internal CaptureGroupSnapshot Load(string root, string game)
+            => LoadScope(root, new CaptureGroupScope { Key = game });
+
+        internal CaptureGroupSnapshot LoadScope(string root, CaptureGroupScope scope)
         {
             using var connection = Open();
+            using var transaction = connection.BeginTransaction(deferred: true);
             var snapshot = new CaptureGroupSnapshot(root);
-            using (var command = Command(connection, "SELECT name FROM capture_group WHERE root=$root AND game=$game ORDER BY name COLLATE NOCASE", root, game))
-            using (var reader = command.ExecuteReader())
-                while (reader.Read()) snapshot.Names.Add(reader.GetString(0));
-            using (var command = Command(connection, "SELECT file,name FROM capture_group_member WHERE root=$root AND game=$game", root, game))
-            using (var reader = command.ExecuteReader())
-                while (reader.Read()) snapshot.Assignments[reader.GetString(0)] = reader.GetString(1);
-            using (var command = Command(connection, "SELECT grouped FROM capture_group_view WHERE root=$root AND game=$game", root, game))
+            // Read old per-platform records without rewriting them. Explicit game-wide writes take precedence,
+            // including an empty assignment (Remove from Group) and the user's saved combined-view choice.
+            var keys = scope.LegacyGameIds.Where(id => !string.Equals(id, scope.Key, StringComparison.OrdinalIgnoreCase))
+                .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(id => id, StringComparer.OrdinalIgnoreCase)
+                .Append(scope.Key);
+            foreach (var game in keys)
             {
-                var value = command.ExecuteScalar();
-                if (value != null) snapshot.Grouped = Convert.ToInt32(value) != 0;
+                var canonical = string.Equals(game, scope.Key, StringComparison.OrdinalIgnoreCase);
+                using (var command = Command(connection, "SELECT name FROM capture_group WHERE root=$root AND game=$game ORDER BY name COLLATE NOCASE", root, game))
+                {
+                    command.Transaction = transaction;
+                    using var reader = command.ExecuteReader();
+                    while (reader.Read())
+                    {
+                        var name = reader.GetString(0);
+                        if (!snapshot.Names.Contains(name, StringComparer.OrdinalIgnoreCase)) snapshot.Names.Add(name);
+                    }
+                }
+                using (var command = Command(connection, "SELECT file,name FROM capture_group_member WHERE root=$root AND game=$game", root, game))
+                {
+                    command.Transaction = transaction;
+                    using var reader = command.ExecuteReader();
+                    while (reader.Read())
+                    {
+                        var file = reader.GetString(0);
+                        if (canonical || !snapshot.Assignments.ContainsKey(file)) snapshot.Assignments[file] = reader.GetString(1);
+                    }
+                }
+                using (var command = Command(connection, "SELECT grouped FROM capture_group_view WHERE root=$root AND game=$game", root, game))
+                {
+                    command.Transaction = transaction;
+                    var value = command.ExecuteScalar();
+                    if (value != null && (canonical || !snapshot.Grouped.HasValue)) snapshot.Grouped = Convert.ToInt32(value) != 0;
+                }
             }
+            transaction.Commit();
             return snapshot;
         }
 

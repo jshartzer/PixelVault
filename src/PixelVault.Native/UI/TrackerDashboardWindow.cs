@@ -36,11 +36,13 @@ namespace PixelVaultNative
             var root=new DockPanel{Margin=new Thickness(24),Background=Background};Content=root;
             var header=new StackPanel();DockPanel.SetDock(header,Dock.Top);root.Children.Add(header);
             header.Children.Add(AchievementTrackerWindow.Text("Trackers",28,true));
-            header.Children.Add(AchievementTrackerWindow.Text("Choose a game to see its trackers.",16));
+            header.Children.Add(AchievementTrackerWindow.Text("Local desktop trackers · choose a game to see its trackers.",16));
             var actions=new WrapPanel{Margin=new Thickness(0,12,0,0)};header.Children.Add(actions);
             var create=AchievementTrackerWindow.Button("New checklist","Create a tracker for any game");actions.Children.Add(create);
             var import=navigation.ImportButton(this,ReloadAsync);actions.Children.Add(import);
             var reload=AchievementTrackerWindow.Button("Update dashboard","Reload saved tracker progress without reading game files");actions.Children.Add(reload);
+            var companion=AchievementTrackerWindow.Button("Open Companion…","Sign into the prepared Companion workspace shared with your browser");actions.Children.Add(companion);
+            companion.Click+=(_,__)=>new CompanionWindow(this,CompanionDesktopSettings.DefaultRoot).Show();
             create.Click+=async(_,__)=>{navigation.Create(this);await ReloadAsync();};reload.Click+=async(_,__)=>await ReloadAsync();
             AchievementTrackerWindow.DressEditor(search);search.ToolTip="Search tracked games";AutomationProperties.SetName(search,"Search tracked games");
             var searchHost=new Grid();searchHost.Children.Add(search);var hint=AchievementTrackerWindow.Text("Search games…",15);hint.Margin=new Thickness(12,0,0,8);hint.VerticalAlignment=VerticalAlignment.Center;hint.IsHitTestVisible=false;searchHost.Children.Add(hint);header.Children.Add(searchHost);

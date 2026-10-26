@@ -1,0 +1,26 @@
+# Build/import the image first. Edit the host folder and AllowedHosts before using Container Station > Create Application.
+services:
+  companion:
+    image: pixelvault-companion:0.13.1
+    platform: linux/amd64
+    restart: unless-stopped
+    ports:
+      - "8787:8080"
+    volumes:
+      # EXAMPLE: replace with the actual NAS-local directory; grant container UID 1654 read/write access.
+      - /share/Container/pixelvault-companion:/data
+    environment:
+      Companion__DataRoot: /data
+      Companion__DemoEnabled: "true"
+      # Trusted LAN preview only. Use HTTPS + a configured trusted proxy before enabling real data.
+      Companion__AllowHttp: "true"
+      AllowedHosts: "localhost;127.0.0.1;192.168.1.99"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

@@ -18,9 +18,11 @@ namespace PixelVaultNative
             catch (Exception ex) { LogException("MoveCaptureGroupFile", ex); }
         }
 
-        static string CaptureGroupGameId(LibraryBrowserFolderView folder) =>
-            folder == null || folder.IsTimelineProjection || folder.IsSessionProjection || folder.PendingGameAssignment
-                ? null : !string.IsNullOrWhiteSpace(folder.GameId) ? folder.GameId : folder.PrimaryFolder?.GameId;
+        CaptureGroupScope ResolveCaptureGroupScope(LibraryBrowserFolderView folder)
+        {
+            if (folder == null || folder.IsTimelineProjection || folder.IsSessionProjection || folder.PendingGameAssignment) return null;
+            return CaptureGroupScope.ForFolder(folder, gameIndexService?.GetSavedRowsForRoot(libraryRoot));
+        }
 
         static bool IsRobloxCaptureGroupGame(LibraryBrowserFolderView folder) =>
             string.Equals(folder?.Name?.Trim(), RobloxCaptureNaming.GameTitle, StringComparison.OrdinalIgnoreCase);
@@ -35,11 +37,11 @@ namespace PixelVaultNative
 
         void ToggleCaptureGroupView(LibraryBrowserWorkingSet ws, Action redraw)
         {
-            var game = CaptureGroupGameId(ws.Current);
-            if (string.IsNullOrWhiteSpace(game)) return;
+            var scope = ws.ActiveCaptureGroupScope ?? ResolveCaptureGroupScope(ws.Current);
+            if (scope == null) return;
             try
             {
-                CaptureGroups.SetGrouped(libraryRoot, game, ws.Panes.CaptureGroupsToggle.IsChecked == true);
+                CaptureGroups.SetGrouped(libraryRoot, scope.Key, ws.Panes.CaptureGroupsToggle.IsChecked == true);
                 ws.PreserveDetailScrollOnNextRender = true;
                 ws.PreservedDetailScrollOffset = 0;
                 ws.DetailSelectionAnchorIndex = -1;
@@ -55,8 +57,8 @@ namespace PixelVaultNative
         void AttachCaptureGroupMenu(Border tile, LibraryBrowserWorkingSet ws, LibraryBrowserFolderView folder,
             string file, Action redraw)
         {
-            var game = CaptureGroupGameId(folder);
-            if (string.IsNullOrWhiteSpace(game) || tile.ContextMenu == null) return;
+            var scope = ws.ActiveCaptureGroupScope ?? ResolveCaptureGroupScope(folder);
+            if (scope == null || tile.ContextMenu == null) return;
             var menu = new MenuItem { Header = "Add to Group…" };
             var remove = new MenuItem { Header = "Remove from Group" };
             tile.ContextMenu.Items.Insert(0, menu);
@@ -71,9 +73,9 @@ namespace PixelVaultNative
             {
                 try
                 {
-                    CaptureGroups.Assign(root, game, SelectedFiles(), name);
-                    if (!string.IsNullOrEmpty(name) && CaptureGroups.Load(root, game).Grouped == null)
-                        CaptureGroups.SetGrouped(root, game, true);
+                    CaptureGroups.Assign(root, scope.Key, SelectedFiles(), name);
+                    if (!string.IsNullOrEmpty(name) && CaptureGroups.LoadScope(root, scope).Grouped == null)
+                        CaptureGroups.SetGrouped(root, scope.Key, true);
                     ws.DetailSelectionAnchorIndex = -1;
                     redraw();
                     ShowLibraryBrowserToast(ws, string.IsNullOrEmpty(name) ? "Removed from group" : "Added to " + name);
@@ -86,7 +88,7 @@ namespace PixelVaultNative
                 menu.Items.Clear();
                 try
                 {
-                    var snapshot = CaptureGroups.Load(root, game);
+                    var snapshot = CaptureGroups.LoadScope(root, scope);
                     var names = snapshot.Names.Concat((folder.FilePaths ?? Array.Empty<string>()).Select(path => snapshot.Resolve(path, roblox)))
                         .Where(name => !string.IsNullOrWhiteSpace(name)).Distinct(StringComparer.OrdinalIgnoreCase)
                         .OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToList();
