@@ -1,4 +1,4 @@
-param([string]$PublishedApp='C:\Codex\Companion Preview\connector-0.8.0',[string]$Version='0.8.0',
+param([string]$PublishedApp='C:\Codex\Companion Preview\connector-0.16.0',[string]$Version='0.16.0',
       [string]$InstallRoot='C:\Codex\Companion Connector',[string]$DataRoot='C:\Codex\PixelVaultCompanionConnectorData',
       [string]$DesktopDataRoot='C:\Codex\PixelVaultData',[string]$Manifest='C:\Codex\PixelVaultCompanionData\workspace.json')
 $ErrorActionPreference='Stop'

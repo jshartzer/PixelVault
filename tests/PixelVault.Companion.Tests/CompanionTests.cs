@@ -22,9 +22,10 @@ public sealed partial class CompanionTests
         private readonly bool allowHttp;
         private readonly bool ownsRoot;
         private readonly string screenshotPilot;
-        public Host(bool demo = true, bool allowHttp = true, string? root = null,string screenshotPilot="")
+        private readonly bool screenshotLibrary;
+        public Host(bool demo = true, bool allowHttp = true, string? root = null,string screenshotPilot="",bool screenshotLibrary=false)
         {
-            this.screenshotPilot=screenshotPilot;
+            this.screenshotPilot=screenshotPilot;this.screenshotLibrary=screenshotLibrary;
             this.demo = demo; this.allowHttp = allowHttp; ownsRoot = root is null;
             Root = root ?? Path.Combine(Path.GetTempPath(), "PixelVaultCompanionTests", Guid.NewGuid().ToString("N"));
         }
@@ -34,7 +35,7 @@ public sealed partial class CompanionTests
             {
                 ["Companion:DataRoot"] = Root, ["Companion:DemoEnabled"] = demo.ToString(),
                 ["Companion:AllowHttp"] = allowHttp.ToString(), ["Logging:LogLevel:Default"] = "None"
-                ,["Companion:ScreenshotPilot"]=screenshotPilot
+                ,["Companion:ScreenshotPilot"]=screenshotPilot,["Companion:ScreenshotLibraryEnabled"]=screenshotLibrary.ToString()
             }));
         protected override void Dispose(bool disposing)
         {

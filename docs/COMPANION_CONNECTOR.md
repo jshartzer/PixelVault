@@ -1,6 +1,14 @@
 # Companion PC connection
 
-The NAS UI is now **0.13.0**; the installed PC connector remains **0.8.0**. This UI update requires no connector upgrade or extraction changes.
+October 26 — **Companion and PC connector 0.16.0** synchronize intentional Native photo deletions to the web. Only an exact successful Native delete log record plus absent file/index/inventory, an accessible non-linked capture root and settled/rechecked source state creates a removal. Missing/offline sources and Forget-row operations retain photos. Removed IDs are scoped per workspace/game and stored as a recoverable overlay; galleries, timeline/banner, counts and direct image/original routes exclude them. Old/staged uploads cannot resurrect them. Same-edition reimports restore archived metadata; stale/concurrent mutations retry against a versioned receipt. No Native binary update or raw-file eviction.
+
+74 server and18 connector tests pass, including last-photo deletion, restart, old client/staging suppression, original-byte recovery, source outages, failed Native delete, index settling, reimport/edition isolation, failed requests and existing auto sync. Live validation removed exactly one Director’s Cut photo (opaque ID c74b85a…); direct thumbnail link is404. Three concurrent new captures were preserved and synced, yielding5,839 photos/282 collections and235 Director’s Cut photos at audit time. Network-disabled NAS audit confirms all active references/order; all19 manual progress/note rows match exactly. The deleted photo’s two JPEGs and original are retained and hash-verified. No removal/restore actions remain pending. Credentials/workspace/source bindings/sign-in startup retained; connector ready, error log empty. Protected NAS/PC state/catalogue backup pre-0.16.0-20261027T030057Z; PC connection rollback pre-0.16.0-20261027T030310Z. [Operation](COMPANION_SCREENSHOTS.md).
+
+Connector 0.15.0 final live check: all 282 checkpoints survive a process restart, the next poll is ready with zero republishing, and the error log is empty. All 282 NAS catalogues are byte-identical; 33 table digests match exactly and the remaining three differ only in captured/updated/synced/last_seen timestamps, verified column by column. Private release evidence and deployment record: PixelVaultCompanionConnectorData/backups/connector-0.15.0-verification.
+
+**Installed PC connector: 0.15.0; NAS/web: 0.14.0.** Automatic photo syncing now follows indexed captures, group edits and XMP metadata using a 30-second metadata poll and settled per-game publication. It reuses unchanged originals and verifies newly uploaded files, with persistent checkpoints, shared manual/automatic exclusion and existing Pause/Resume controls. Desktop intake/indexing must discover new captures first. [Photo operation and limits](COMPANION_SCREENSHOTS.md).
+
+The NAS UI is now **0.14.0**; the installed PC connector remains **0.8.0**. This UI update requires no connector upgrade or extraction changes.
 
 
 Updated with Companion/connector **0.8.0** on October26,2026. The NAS remains the authoritative Companion workspace. A small Windows process monitors approved save sources, refreshes the indexed library, publishes newly created desktop tracker definitions and synchronizes desktop tracker names. It reads desktop definitions/bindings through a read-only SQLite connection; achievement export is read-only, and the explicit achievement-group outbox writes only Native guide category/DLC metadata after backup. The original Native tracker database and game saves remain read-only.
@@ -28,7 +36,7 @@ If the PC is offline, the request reports that immediately. A PC that disconnect
 
 ## Installed files
 
-- Application: `C:\Codex\Companion Connector\app-0.8.0\PixelVault.Companion.Connector.exe`.
+- Application: `C:\Codex\Companion Connector\app-0.15.0\PixelVault.Companion.Connector.exe`.
 - Start script: `C:\Codex\Companion Connector\Start-Connector.ps1`.
 - Private configuration, snapshots, PID and logs: `C:\Codex\PixelVaultCompanionConnectorData\`.
 - Automatic start: current user's Startup folder, `PixelVault Companion Connector.lnk`.
@@ -73,3 +81,5 @@ Version0.6.0 passes53 server tests,4 connector tests and13 JS cases, including e
 The initial0.5.0 validation passed48 Companion tests and three JS grouping/sort cases. Its first five-source read was applied only to an isolated QA copy (143→148); installation at that earlier release did not refresh production progress. Version0.6.0 now intentionally enables live automatic observations under the user's authorization. Physical iPhone touch/reboot behavior has not been exercised by the agent; the user previously confirmed the phone web app works.
 
 Automatic source observations, add-only tracker publication and indexed library/artwork/provider-stat synchronization are implemented. Full native tracker routing/reconciliation remains separate work. Screenshot sorting uses image capture dates from the native index with file-time fallback; videos do not determine that sort. With the PC off, saved data and manual tracking remain available on the NAS; new PC observations resume after reconnecting.
+
+To roll back connector 0.15.0, stop only the verified installed connector PID, restore Start-Connector.ps1 from the protected pre-0.15.0-20261027T022417Z backup and run it. The prior app-0.8.0 directory is retained. Pairing/source bindings are unchanged; existing NAS media remains readable. No NAS image rollback is required.

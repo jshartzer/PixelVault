@@ -72,7 +72,7 @@ public sealed class GameLibrary(CompanionOptions options,TrackerWorkspace worksp
     public IReadOnlyList<GameCard> Games()
     {
         var current=Volatile.Read(ref metadata);
-        var screenshots=ScreenshotLibrary.Available(options,workspace);
+        var screenshots=ScreenshotLibrary.AvailableAll(options,workspace);
         var totals=workspace.Overview().GroupBy(t=>Key(t.Definition.Provider,t.Definition.GameId)).ToDictionary(g=>g.Key,g=>new
         {
             Provider=g.First().Definition.Provider,GameId=g.First().Definition.GameId,Title=g.First().Definition.GameTitle,
@@ -84,9 +84,10 @@ public sealed class GameLibrary(CompanionOptions options,TrackerWorkspace worksp
             return new GameCard(game?.Provider??tracker!.Provider,game?.GameId??tracker!.GameId,game?.Title??tracker!.Title,
                 game?.Platform??(tracker!.Provider=="steam"?"Steam":tracker.Provider=="retroachievements"?"RetroAchievements":"Sample"),
                 tracker?.Count??0,tracker?.Completed??0,tracker?.Total??0,ArtUrl(game,"cover"),ArtUrl(game,"banner"),game?.Stats??new(),workspace.Sample)
-                {GroupId=GroupKey(game?.Title??tracker!.Title),Screenshots=screenshots?.Provider==(game?.Provider??tracker!.Provider)&&screenshots.GameId==(game?.GameId??tracker!.GameId)?screenshots:null};
+                {GroupId=GroupKey(game?.Title??tracker!.Title),Screenshots=screenshots.GetValueOrDefault((game?.Provider??tracker!.Provider)+"\n"+(game?.GameId??tracker!.GameId))};
         }).OrderBy(g=>g.Title,StringComparer.CurrentCultureIgnoreCase).ThenBy(g=>g.Provider,StringComparer.Ordinal).ToList();
     }
+    internal string MediaTitle(string provider,string id)=>Volatile.Read(ref metadata).TryGetValue(Key(provider,id),out var game)?game.Title:Games().FirstOrDefault(g=>g.Provider==provider&&g.GameId==id)?.Title??throw new KeyNotFoundException();
     public GameCard Game(string provider,string id)=>Games().FirstOrDefault(g=>g.Provider==provider&&g.GameId==id)??throw new KeyNotFoundException();
     public (string Path,string ContentType) Artwork(string provider,string id,string kind)
     {

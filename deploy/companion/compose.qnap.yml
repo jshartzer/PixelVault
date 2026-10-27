@@ -1,7 +1,7 @@
 # Build/import the image first. Edit the host folder and AllowedHosts before using Container Station > Create Application.
 services:
   companion:
-    image: pixelvault-companion:0.13.1
+    image: pixelvault-companion:0.16.0
     platform: linux/amd64
     restart: unless-stopped
     ports:

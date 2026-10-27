@@ -12,7 +12,7 @@ public sealed partial class CompanionTests
     public async Task BrowserShellAndScriptsCannotStayCachedAcrossAnUpgrade()
     {
         using var host=new Host();using var client=host.Client();
-        foreach(var path in new[]{"/","/?v=0.13.1","/index.html","/app.js?v=0.13.1","/library.js?v=0.13.1","/navigation.js?v=0.13.1","/updates.js?v=0.13.1","/app.css?v=0.13.1","/profile.css?v=0.13.1","/screenshots.js?v=0.13.1","/screenshots.css?v=0.13.1","/manifest.webmanifest"})
+        foreach(var path in new[]{"/","/?v=0.16.0","/index.html","/app.js?v=0.16.0","/library.js?v=0.16.0","/navigation.js?v=0.16.0","/updates.js?v=0.16.0","/app.css?v=0.16.0","/profile.css?v=0.16.0","/screenshots.js?v=0.16.0","/screenshots.css?v=0.16.0","/manifest.webmanifest"})
         {
             using var response=await client.GetAsync(path);
             Assert.Equal(HttpStatusCode.OK,response.StatusCode);
@@ -20,9 +20,9 @@ public sealed partial class CompanionTests
             Assert.True(response.Headers.CacheControl?.NoCache,path);
             Assert.True(response.Headers.CacheControl?.MustRevalidate,path);
         }
-        var html=await client.GetStringAsync("/?v=0.13.1");
-        Assert.Contains("/app.js?v=0.13.1",html);
-        Assert.Contains("/profile.css?v=0.13.1",html);
+        var html=await client.GetStringAsync("/?v=0.16.0");
+        Assert.Contains("/app.js?v=0.16.0",html);
+        Assert.Contains("/profile.css?v=0.16.0",html);
         Assert.Contains("id=\"game-profile\"",html);
     }
     static void LibraryFixture(string root,string? scope=null,string? image=null)

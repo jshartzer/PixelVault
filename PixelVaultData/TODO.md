@@ -1,5 +1,9 @@
 # PixelVault To Do
 
+**Companion automatic photo sync — installed in connector 0.15.0.** New indexed photos/group edits/XMP now publish automatically with verified checkpoints and existing pause controls. NAS stays 0.14.0; all 282 current collections reconciled unchanged. [Operation](../docs/COMPANION_SCREENSHOTS.md).
+
+**Companion Screenshot Library — implemented:** Steps 1–6 and full current-library rollout are live in 0.14.0: 5,837 photos/282 collections. Next follow-up: automatic new-photo/group/metadata syncing; physical iPhone review remains user validation. [Plan](../docs/plans/PV-PLN-WEB-002-companion-screenshot-library.md).
+
 **Companion Screenshot Library:** Steps 1–5 complete on NAS 0.13.0; next Step 6, full timeline and a photo-library entry. Recent-photo home strip is capped at 30, with shared viewer, retained positions and existing gallery entry. [Plan](../docs/plans/PV-PLN-WEB-002-companion-screenshot-library.md).
 
 **Companion Screenshot Library:** Steps 1–4 complete on NAS 0.12.0; next Step 5, bounded recent-photo home strip. Default-off saved grouping within dates and collapsible sections implemented. Viewer X removed; swipe down/Escape/Back retained. [Plan](../docs/plans/PV-PLN-WEB-002-companion-screenshot-library.md).

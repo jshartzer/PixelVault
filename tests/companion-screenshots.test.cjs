@@ -10,6 +10,13 @@ test('capture-day grouping keeps dates supplied by the desktop without local tim
   assert.deepEqual(s.groupDays(rows).map(g=>[g.day,g.photos.map(p=>p.id)]),[['2026-10-26',['a','b']],['2026-10-25',['c']],['unknown',['d']]]);
   assert.match(s.dayLabel('2026-10-26'),/26/);assert.equal(s.dayLabel(null),'Date unavailable');assert.equal(s.dayLabel('not-a-date'),'Date unavailable');
 });
+test('timeline paging retains separate games with colliding photo IDs and identical group names',()=>{
+  const feed={version:'v',nextOffset:null,photos:[{provider:'steam',gameId:'1',title:'One',photo:{id:'same',captureDay:'2026-10-26',group:'Favorites'}},{provider:'library',gameId:'2',title:'Two',photo:{id:'same',captureDay:'2026-10-26',group:'Favorites'}}]};
+  const rows=s.timelineRows(feed),merged=s.mergePage({rows:[]},{...feed,photos:rows},false);assert.equal(merged.rows.length,2);assert.notEqual(s.photoKey(rows[0]),s.photoKey(rows[1]));
+  const day=s.photoSections(rows,true)[0];assert.equal(day.groups.length,2);assert.deepEqual(day.groups.map(g=>g.title),['One','Two']);assert.notEqual(day.groups[0].key,day.groups[1].key);
+  assert.equal(s.photoSections(rows,false)[0].groups.length,1);assert.equal(s.timelineHash(rows[1]),'timeline-photo/library/2/same');
+  const next=s.mergePage(merged,{version:'v',photos:[rows[0]],nextOffset:null},true);assert.equal(next.rows.length,2);
+});
 test('paged gallery merges without duplicates and refuses to mix library versions',()=>{
   const first=s.mergePage({filter:'Xbox',rows:[]},{version:'a',photos:[{id:'1'},{id:'2'}],nextOffset:2},false);
   const next=s.mergePage(first,{version:'a',photos:[{id:'2'},{id:'3'}],nextOffset:null},true);

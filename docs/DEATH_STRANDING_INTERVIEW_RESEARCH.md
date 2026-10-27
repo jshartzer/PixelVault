@@ -1,5 +1,13 @@
 # Death Stranding interview achievement tracker
 
+## October26 named Journal #9 control
+
+The user supplied a photo highlighting **Journal #9** under **An Unknown Man's Journal** and reported manual saves before/after reading it. The read-only copied pair `manualsave1` (2026-10-27T02:59:28.6391661Z) and `manualsave2` (2026-10-27T03:01:13.4348748Z), corresponding to the user's October26 evening in America/Chicago, both pass account/decompression/checksum guards. The complete supported achievement-statistic table shows **67 → 68**. Installed catalogue identity: `8bda2df5-d58b-dd48-b69c-dffca05cc7ad`, Higgs's Journals, display priority208.
+
+Private evidence: `C:/GameDataExtractor/Backup Data/Death Stranding Director's Cut/Reference/InterviewSaves-20261027-031526057`, including16 copied payloads, `diagnostic.json`, and `named-journal9-diff.json`. The manual payloads are equal length (6,339,151 bytes) but contain10,469 byte differences, including repeated timing/transient data; the scalar counter is identifiable. The interview UUID is absent in both raw UUID byte orders. A DS2-style section-directory assumption does not apply directly: this DS1 payload ends in a different trailer/layout. No per-title flag, index ordering or cross-catalogue mapping has been established by this inspection. The named control is useful evidence, not proof that the other148 items can be automatically marked. No tracker definitions, manual states, source bindings or application builds were changed by this investigation.
+
+Presentation consolidation can independently show the automatic100-interview goal and manual149-entry reference catalogue together. Reliable automatic item refresh still requires an identity/state mapping, independent named controls and read-versus-unlocked validation. Earlier dated sections below describe their historical baselines.
+
 October26,2026 — added a separate linked **Interview catalogue** with149 populated English titles, twelve subject groups, author/date/location metadata and full locally stored prose. Nine empty resources are excluded. Generic Content buttons and UTF-8 Save copy are available on desktop; coordinated Companion publication uses the same optional plain-text field. The original automatic67/100 counter and all existing data are preserved. Individual read flags remain unvalidated and checklist states are manual. The supplied illustrative save-schema document does not establish per-title read identities. See [tracker content](TRACKER_CONTENT.md) for extraction, privacy, validation and evidence. Earlier dated descriptions below are historical.
 
 October25,2026 — tracker implemented on Native and live Companion0.6.0, with automatic custom-definition publication and save-source refresh.

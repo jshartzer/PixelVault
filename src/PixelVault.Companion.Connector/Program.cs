@@ -8,7 +8,28 @@ using PixelVaultNative;
 using PixelVault.Companion.Connector;
 using PixelVault.Companion.Export;
 
+if(args.Length==2&&args[0]=="--inspect-screenshot-removals")
+{
+    var file=Path.GetFullPath(args[1]);var options=new JsonSerializerOptions(JsonSerializerDefaults.Web);var pairing=JsonSerializer.Deserialize<ConnectorPairing>(File.ReadAllText(file),options)??throw new InvalidDataException("Missing pairing.");
+    var removalOrigin=new Uri(pairing.Url);if(removalOrigin.Scheme is not ("http" or "https")||removalOrigin.AbsolutePath!="/"||!string.IsNullOrEmpty(removalOrigin.Query)||!string.IsNullOrEmpty(removalOrigin.UserInfo)||pairing.Token.Length!=64)throw new InvalidDataException("Invalid PC pairing.");
+    using var client=new HttpClient(new HttpClientHandler{AllowAutoRedirect=false}){BaseAddress=removalOrigin};client.DefaultRequestHeaders.Authorization=new("Bearer",pairing.Token);
+    var evidence=ScreenshotSnapshotExporter.ReadDeletionEvidence(pairing.DesktopDataRoot,pairing.WorkspaceId);var root=Path.GetFullPath(File.ReadLines(Path.Combine(pairing.DesktopDataRoot,"PixelVault.settings.ini")).First(l=>l.StartsWith("library=",StringComparison.OrdinalIgnoreCase)).Split('=',2)[1].Trim());
+    var inventory=await client.GetFromJsonAsync<ScreenshotRemovalGame[]>("connector/v1/screenshots/removals",options)??throw new InvalidDataException("Missing photo inventory.");
+    var plans=inventory.Select(g=>{var p=PhotoRemovalSync.Plan(g,pairing.WorkspaceId,root,evidence);return new{g.Provider,g.GameId,RemoveIds=p.Remove,RestoreIds=p.Restore};}).Where(p=>p.RemoveIds.Length+p.RestoreIds.Length>0).ToArray();
+    Console.WriteLine(JsonSerializer.Serialize(new{ReadOnly=true,Games=inventory.Length,Remove=plans.Sum(p=>p.RemoveIds.Length),Restore=plans.Sum(p=>p.RestoreIds.Length),Actions=plans},options));return 0;
+}
+if(args.Length==2&&args[0]=="--inspect-screenshot-library")
+{
+    var clock=System.Diagnostics.Stopwatch.StartNew();var file=Path.GetFullPath(args[1]);var options=new JsonSerializerOptions(JsonSerializerDefaults.Web);
+    var pairing=JsonSerializer.Deserialize<ConnectorPairing>(File.ReadAllText(file),options)??throw new InvalidDataException("Missing pairing.");
+    var catalogue=JsonSerializer.Deserialize<GameCatalogue>(File.ReadAllText(Path.Combine(Path.GetDirectoryName(file)!,"library-cache","catalog.json")),options)??throw new InvalidDataException("Missing approved catalogue.");
+    var changes=ScreenshotSnapshotExporter.ObserveLibrary(pairing.DesktopDataRoot,pairing.WorkspaceId,catalogue);
+    Console.WriteLine(JsonSerializer.Serialize(new{Games=changes.Count,ElapsedMilliseconds=clock.ElapsedMilliseconds,OriginalBytesRead=0}));return 0;
+}
 if(args.Length==2&&args[0]=="--death-stranding-read")return DeathStrandingSaveWorker.Run(args[1]);
+if(args.Length==2&&args[0]=="--prepare-screenshot-library")return await ScreenshotPilot.Library(args[1],true);
+if(args.Length==2&&args[0]=="--publish-prepared-screenshot-library")return await ScreenshotPilot.Library(args[1],false,true);
+if(args.Length==2&&args[0]=="--sync-screenshot-library")return await ScreenshotPilot.Library(args[1],false);
 if(args.Length==5&&args[0]=="--sync-screenshot-pilot")return await ScreenshotPilot.Run(args[1],args[2],args[3],int.Parse(args[4]));
 if(args.Length==4&&args[0]=="--configure-automatic")
 {
@@ -34,6 +55,7 @@ var automatic=new AutomaticConnection(http,config,data,reader);
 var monitor=automatic.MonitorAsync(stop.Token);var librarySync=automatic.LibraryAsync(stop.Token);
 var publication=automatic.PublicationAsync(stop.Token);
 var achievements=automatic.AchievementsAsync(stop.Token);
+var photos=new AutomaticPhotoSync(config,data).RunAsync(stop.Token);
 var heartbeat=Task.Run(async()=>{
     while(!stop.IsCancellationRequested){try{using var response=await http.PostAsync("connector/v1/heartbeat",null,stop.Token);if(response.StatusCode==System.Net.HttpStatusCode.Unauthorized)Log("PC pairing is no longer valid.");}catch(HttpRequestException){}catch(TaskCanceledException){}try{await Task.Delay(10000,stop.Token);}catch(OperationCanceledException){}}
 });
@@ -75,5 +97,5 @@ while(!stop.IsCancellationRequested)
     catch(Exception error)when(error is HttpRequestException or TaskCanceledException or JsonException or InvalidOperationException)
     {Log("Companion is unavailable or its pairing changed. Retrying shortly.");try{await Task.Delay(15000,stop.Token);}catch(OperationCanceledException){break;}}
 }
-stop.Cancel();await Task.WhenAll(heartbeat,monitor,librarySync,publication,achievements);return 0;
+stop.Cancel();await Task.WhenAll(heartbeat,monitor,librarySync,publication,achievements,photos);return 0;
 static void Log(string message)=>Console.WriteLine(DateTime.UtcNow.ToString("o")+" "+message);

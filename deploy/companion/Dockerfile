@@ -1,4 +1,4 @@
-# Build from the repository root: docker build -f deploy/companion/Dockerfile -t pixelvault-companion:0.13.1 .
+# Build from the repository root: docker build -f deploy/companion/Dockerfile -t pixelvault-companion:0.16.0 .
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /source
 COPY src/PixelVault.Tracking/ src/PixelVault.Tracking/

@@ -14,7 +14,10 @@ if($LASTEXITCODE -ne 0){throw 'Windows Companion publish failed. Stop an existin
 & dotnet publish $companionProject -c Release -r linux-x64 --self-contained false -o $companionLinux --nologo
 if($LASTEXITCODE -ne 0){throw 'Linux Companion publish failed.'}
 if($IncludeConnector){
-    & dotnet publish (Join-Path $companionRepo 'src\PixelVault.Companion.Connector\PixelVault.Companion.Connector.csproj') -c Release -r win-x64 --self-contained false -o (Join-Path $OutputRoot "connector-$companionVersion") --nologo
+    $connectorProject=Join-Path $companionRepo 'src\PixelVault.Companion.Connector\PixelVault.Companion.Connector.csproj'
+    [xml]$connectorProjectXml=Get-Content -LiteralPath $connectorProject -Raw
+    $connectorVersion=[string]$connectorProjectXml.Project.PropertyGroup.Version
+    & dotnet publish $connectorProject -c Release -r win-x64 --self-contained false -o (Join-Path $OutputRoot "connector-$connectorVersion") --nologo
     if($LASTEXITCODE -ne 0){throw 'PC connector publish failed.'}
 }
 

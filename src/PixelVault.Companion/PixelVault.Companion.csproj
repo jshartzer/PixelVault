@@ -3,7 +3,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Version>0.13.1</Version>
+    <Version>0.16.0</Version>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../PixelVault.Tracking/PixelVault.Tracking.csproj" />

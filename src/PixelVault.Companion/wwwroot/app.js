@@ -120,7 +120,7 @@ async function route() {
     await achievementUI.open(parts);
   } else if (parts[0] === 'recent-photo') {
     renderHome();await screenshotUI.open(parts);
-  } else if (parts[0] === 'screenshots' || parts[0] === 'photo') {
+  } else if (parts[0] === 'screenshots' || parts[0] === 'photo' || parts[0] === 'timeline' || parts[0] === 'timeline-photo') {
     await screenshotUI.open(parts);
   } else if (parts[0] === 'tracker') {
     try { const incoming = await api('/trackers/' + encodeURIComponent(parts[1])); if (version !== routeVersion) return; detail = incoming; }

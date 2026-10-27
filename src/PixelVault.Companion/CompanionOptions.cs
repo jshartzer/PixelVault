@@ -6,5 +6,6 @@ public sealed class CompanionOptions
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PixelVaultCompanion");
     public bool DemoEnabled { get; set; }
     public bool AllowHttp { get; set; }
+    public bool ScreenshotLibraryEnabled { get; set; }
     public string ScreenshotPilot { get; set; } = "";
 }

@@ -181,7 +181,7 @@ app.Use(async (context, next) =>
     await next();
 });
 
-app.MapGet("/health", () => Results.Ok(new { status = "ok", service = "PixelVault Companion", version = "0.13.1" }));
+app.MapGet("/health", () => Results.Ok(new { status = "ok", service = "PixelVault Companion", version = "0.16.0" }));
 var api = app.MapGroup("/api/v1");
 api.AddEndpointFilter(async (context,next)=>
 {
@@ -203,7 +203,7 @@ api.MapGet("/session", (HttpContext c, OwnerStore store, TrackerWorkspace worksp
     demoEnabled = settings.DemoEnabled,
     readOnly = workspace.ReadOnly,
     workspaceMode = workspace.Sample?"sample":workspace.Manifest?.Mode??"empty",
-    version = "0.13.1"
+    version = "0.16.0"
 }));
 api.MapPost("/setup", async (SetupRequest request, HttpContext c, OwnerStore store) =>
 {
@@ -273,10 +273,12 @@ api.MapPost("/trackers/{id}/history/{historyId:long}/undo",(string id,long histo
     return Results.Ok(new{result,tracker=workspace.View(id)});
 }).RequireAuthorization();
 var pc=app.MapGroup("/connector/v1");
+api.MapGet("/screenshots/timeline",(int? offset,int? limit,string? console,string? through,string? version,ScreenshotLibrary media)=>Results.Ok(media.Timeline(offset??0,limit??60,console,through,version))).RequireAuthorization();
 api.MapGet("/screenshots/recent",(int? limit,ScreenshotLibrary media)=>Results.Ok(media.Recent(limit??30))).RequireAuthorization();
 api.MapGet("/screenshots/{provider}/{game}",(string provider,string game,int? offset,int? limit,string? console,string? version,ScreenshotLibrary media)=>Results.Ok(media.Page(provider,game,offset??0,limit??60,console,version))).RequireAuthorization();
 api.MapGet("/screenshots/{provider}/{game}/photos/{id}",(string provider,string game,string id,ScreenshotLibrary media)=>Results.Ok(media.Photo(provider,game,id))).RequireAuthorization();
 api.MapGet("/screenshots/{provider}/{game}/{id}/original",OriginalPhoto).RequireAuthorization();
+api.MapGet("/screenshots/{provider}/{game}/{id}/metadata",(string provider,string game,string id,string? asset,ScreenshotLibrary media)=>PhotoDownload(provider,game,id,asset,media,true)).RequireAuthorization();
 api.MapGet("/screenshots/{provider}/{game}/{id}/{kind}",(string provider,string game,string id,string kind,ScreenshotLibrary media)=>Results.File(media.Image(provider,game,id,kind),"image/jpeg")).RequireAuthorization();
 pc.AddEndpointFilter(async(context,next)=>
 {
@@ -305,6 +307,9 @@ pc.MapPost("/library/{id}/assets/{name}",async(string id,string name,HttpRequest
     using var buffer=new MemoryStream();await request.Body.CopyToAsync(buffer,request.HttpContext.RequestAborted);sync.Upload(id,name,buffer.ToArray());return Results.Ok(new{ok=true});
 });
 pc.MapPost("/library/{id}/commit",(string id,ConnectorLibrarySync sync)=>Results.Ok(sync.Commit(id)));
+pc.MapGet("/screenshots/capabilities",(CompanionOptions options)=>Results.Ok(new{libraryEnabled=options.ScreenshotLibraryEnabled,metadata=true,retention=true,removals=true}));
+pc.MapGet("/screenshots/removals",(ScreenshotLibrary media)=>Results.Ok(media.RemovalInventory()));
+pc.MapPost("/screenshots/removals/{provider}/{game}",(string provider,string game,ScreenshotRemovalRequest request,ScreenshotLibrary media)=>Results.Ok(media.SetRemovals(provider,game,request)));
 pc.MapPost("/screenshots/prepare",(ScreenshotCatalogue catalog,ScreenshotLibrary media)=>Results.Ok(media.Prepare(catalog)));
 pc.MapPost("/screenshots/{id}/assets/{name}",async(string id,string name,HttpRequest request,ScreenshotLibrary media)=>{
     using var buffer=new MemoryStream();await request.Body.CopyToAsync(buffer,request.HttpContext.RequestAborted);media.Upload(id,name,buffer.ToArray());return Results.Ok(new{ok=true});
@@ -312,14 +317,16 @@ pc.MapPost("/screenshots/{id}/assets/{name}",async(string id,string name,HttpReq
 pc.MapPost("/screenshots/{id}/commit",(string id,ScreenshotLibrary media)=>Results.Ok(media.Commit(id)));
 pc.MapPost("/screenshots/{id}/originals/{name}",async(string id,string name,HttpRequest request,ScreenshotLibrary media)=>{await media.UploadOriginal(id,name,request.Body,request.HttpContext.RequestAborted);return Results.Ok(new{ok=true});});
 pc.MapGet("/screenshots/{provider}/{game}/{id}/original",OriginalPhoto);
+pc.MapGet("/screenshots/{provider}/{game}/{id}/metadata",(string provider,string game,string id,string? asset,ScreenshotLibrary media)=>PhotoDownload(provider,game,id,asset,media,true));
 pc.MapGet("/screenshots/{provider}/{game}",(string provider,string game,int? offset,int? limit,ScreenshotLibrary media)=>Results.Ok(media.Page(provider,game,offset??0,limit??60)));
 pc.MapGet("/screenshots/{provider}/{game}/{id}/{kind}",(string provider,string game,string id,string kind,ScreenshotLibrary media)=>Results.File(media.Image(provider,game,id,kind),"image/jpeg"));
 pc.MapPost("/jobs/{id}/{tracker}",(string id,string tracker,ConnectorObservation observation,PcConnector connector)=>Results.Ok(connector.Result(id,tracker,observation)));
 app.Run();
 
-static IResult OriginalPhoto(string provider,string game,string id,string? asset,ScreenshotLibrary media)
+static IResult OriginalPhoto(string provider,string game,string id,string? asset,ScreenshotLibrary media)=>PhotoDownload(provider,game,id,asset,media,false);
+static IResult PhotoDownload(string provider,string game,string id,string? asset,ScreenshotLibrary media,bool metadata)
 {
-    var download=media.Original(provider,game,id);var original=download.Original;
+    var download=media.Original(provider,game,id,metadata);var original=download.Original;
     if(!string.IsNullOrEmpty(asset)&&asset!=original.Asset)return Results.Conflict(new{error="The original photo changed. Refresh photos and try again."});
     return Results.File(download.Path,original.ContentType,fileDownloadName:original.FileName,lastModified:new DateTimeOffset(original.LastWriteUtcTicks,TimeSpan.Zero),entityTag:new Microsoft.Net.Http.Headers.EntityTagHeaderValue("\""+original.Asset[..64]+"\""),enableRangeProcessing:true);
 }
