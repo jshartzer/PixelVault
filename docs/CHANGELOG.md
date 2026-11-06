@@ -1,3 +1,619 @@
+## 0.125.009 — November 5, 2026
+
+- Keep tracker details focused on game information. Show the yellow achievement-style Missable label beside Content in the PC and web apps.
+- Mark The Symbiotic Surveillance Society as missable in Death Stranding Director's Cut and document the Lake Knot City unlock condition.
+
+## 0.125.005 — November 5, 2026
+
+- Refresh and organize the Library toolbar: align imports right, group progress and view controls, and place Sort/filter beside search. Preserve existing artwork and import colors; stack toolbar groups at narrower widths.
+- Move Game Index and Photo Index access into Settings > Library > Library tools.
+- Keep Save order visible in Settings > Achievements when the window is short or Xbox status text wraps; scroll the content above the footer. Preserve category drafts and independent saving.
+
+## 0.125.000 — November 5, 2026
+
+- Speed up initial Library cover preparation using saved folder summaries; retain All and By Console projections between grouping switches while invalidating changed data.
+- Reduce import preparation to one source walk and move discovery off the UI thread in both import paths. Reuse cached thumbnails and decode disk images through bounded background workers.
+- Skip hidden capture/detail work while browsing covers and cancel it when leaving the view. Preserve deferred scroll restoration.
+- Open profiles with a loading state, prepare capture dates on a worker, reuse the snapshot for metrics and sessions, and enrich missing metadata asynchronously. Keep achievement sections loading when content arrives after the window opens.
+- Read tracker dashboard definitions, progress, sources and automation together in one fresh transaction. Preserve account isolation and current progress.
+- Preserve the PC app's existing artwork, cover treatments, rich layouts and completion decoration.
+
+## Companion browser 0.48.1-single-checkbox / TCG tracker data — November 5, 2026
+
+- Base the four TCG collection trackers on Collected (ever obtained) only. Remove In Binder from the visible fields; retain pull-rate text and all stored observations/history.
+- Standardize single binary fields as plain web checkboxes, including expanded editors. Keep accessible names, keyboard operation, protected/read-only states and safe saves. Numeric inputs, multi-field labels and PC button text are unchanged.
+
+## Companion 0.48.1 — November 5, 2026
+
+- Speed up tracker opening by resolving account and source identities without deserializing every tracker catalogue. Keep current account scope and deletion checks.
+- Create tracker editors when their row is expanded; preserve note and settings drafts. Prioritize visible cover images and retain them when progress badges refresh.
+- Fix library refresh on returning home after the tracker-group update.
+
+## TCG tracker data — November 5, 2026
+
+- Add exact-variant pull percentages to all 4,460 cards in the Tetramon, Destiny, Ghost and Ascension tracker details. Name the pack and show the chance of at least one copy per pack, including special packs.
+- Preserve progress and notes; the shared definitions appear in PC and web. No application version change.
+
+## Companion browser 0.48.0-pc-group-order — November 5, 2026
+
+- Remove Order groups and its dialog from the web app. Reorder groups on PC; the web still reads and follows the shared workspace order.
+- Static update only; Native 0.124.000 and Companion service 0.48.0 remain unchanged.
+
+## 0.124.000 / Companion 0.48.0 — November 5, 2026
+
+- Separate trackers into Achievement-linked trackers, Manual trackers, and Centurian Achievements, in that default order. Keep completed trackers at the bottom of each group.
+- Add Order groups on PC and web. The shared preference applies across games and follows changes from either app without altering progress, notes or achievement links.
+
+## Companion 0.47.1 — November 5, 2026
+
+- Keep new achievement and tracker artwork loading when the download cache fills. Evict the oldest replaceable downloads with headroom, serialize cache writes, and preserve imported artwork.
+- Recover all six linked TCG tracker images from the previously full cache. Twenty-two focused artwork/cache tests pass.
+
+## 0.123.000 — November 5, 2026
+
+- Show card milestone buttons as Collected and In Binder; color and accessible status convey completion. Refresh renamed milestone metadata in open tracker windows.
+- Restore automatic achievement artwork for the six linked TCG Card Shop Simulator trackers, preserving all imported progress.
+- Add Delete tracker to PC custom tracker menus, with confirmation, a recovery copy of all affected accounts, and protection against changes during confirmation. Built-in trackers cannot be deleted.
+
+## Companion 0.47.0 — November 4, 2026
+
+- Reduce idle requests with change revisions; batch tracker summaries, cache unchanged editor reads and shrink browsing payloads.
+- Render the library progressively, skip offscreen card layout, load map resources on demand and parallelize map reads.
+- Add sharp 960/1280px photo sizes, private image revalidation, bounded prefetch/preparation, fingerprinted static caching and text compression.
+- Keep achievement text independent of artwork storage; use asynchronous artwork encoding and cached cover-directory metadata.
+- 198 Companion tests, 36 related Native tests and 92 frontend checks pass (including affected-fixture reruns). Windows/Linux packages and photo worker built. Installed and verified on the PC service: local/LAN health, served asset hashes, compression, static caching and anonymous-access denial pass. See `COMPANION_PERFORMANCE_REVIEW.md`.
+
+## Companion browser 0.46.2-photo-detail — November 3, 2026
+
+- Sharpen photo timeline and game-gallery tiles by selecting higher-resolution previews when tile size, square cropping or screen density exceeds thumbnail detail. Preserve lazy loading and fall back to thumbnails if previews fail.
+- Twelve targeted unit/browser checks pass. Static update installed and served hashes verified; backend remains 0.46.2.
+
+## 0.122.003 — November 3, 2026
+
+- Restore the game logo on the right side of the profile header at standard window widths. Long titles continue to wrap and remain fully visible.
+
+## 0.122.002 — November 3, 2026
+
+- Simplify the native game profile: remove related series/publisher shelves and the favorite, showcase and 100% header buttons.
+- Align equal-width Trackers, Maps and Platform buttons on the right. Platform reveals the existing default-platform, sync and Xbox-link controls; achievements still load on opening the profile.
+- Let full titles wrap and the header grow; reserve decorative logo space only on wider windows.
+
+## Xbox edition metadata repair — November 3, 2026
+
+- Link Destiny and modern, Windows and classic Xbox One Minecraft capture profiles to verified Xbox title IDs; preserve edition separation.
+- Correct classic Minecraft's category, image tags, inherited artwork ID and gallery ownership while preserving pixels and capture dates.
+- Use richer Xbox titlehub names when achievement-history names collide. Fifteen bridge tests and four canonical profile/browser helper checks pass.
+
+## Companion browser 0.46.2-console-audit — November 3, 2026
+
+- Present one platform choice for a console's capture record and linked achievement provider. Console-filtered cards use that same provider choice.
+- Preserve linked cover/banner artwork and same-console capture counts on synced profiles. Keep provider achievement progress isolated.
+- Audit all885 entries across718 groups: provider counts match detail rows; all profiles pass mobile/desktop rendering checks.
+
+## Companion 0.46.2 — November 3, 2026
+
+- Restore All Consoles grouping for capture entries on different consoles. Death Stranding Director's Cut reunites PS5, Xbox and Steam while distinct releases from the same provider or conflicting catalogue identities stay separate.
+- Preserve pins when previously split console cards reunite. All Consoles opens the edition with saved tracker/progress data, with the other editions available in the profile selector.
+- Correct the layout and message for profiles with no linked achievement provider; never point to a hidden selector. Retain the linked-profile achievement-summary fix.
+
+## Companion browser 0.46.1-profile-summary — November 3, 2026
+
+- Fix capture profiles displaying “Not synced” when their linked platform has saved achievements. The summary and achievement link now use the same provider, while capture counts stay on the capture record.
+- Preserve selected Steam/Xbox progress independently, show unknown progress accurately, and require a platform choice when linked providers are ambiguous.
+
+## 0.122.001 — November 3, 2026
+
+- Keep original games and same-named remakes separate in Companion 0.46.1. Group by provider identity, require an unambiguous Xbox match, and use catalogue platform metadata to distinguish Xbox 360 from modern releases.
+- Correct Dead Space: its Steam remake groups with the modern Xbox title, while the Xbox 360 original retains its own achievements and platform label. Split groups do not inherit duplicate pins.
+- Apply the same conservative matching to native profile choices and Xbox 360 categorization. Explicit links take precedence without pulling in additional same-name titles; the link picker shows generation and title ID.
+
+## 0.122.000 — November 3, 2026
+
+- Import Xbox 360 achievement artwork from the official HTTPS legacy image endpoint using title/image IDs. Preserve square artwork and keep legacy downloads bound to the requested title in Companion.
+- Import actual Xbox title-history play timestamps, with legacy lastPlayed fallback. Never treat unlock or sync dates as play activity; native recent games and Companion sorting use the new dates.
+- Companion 0.46.0 groups Xbox editions using native profile links and shared Roman-number aliases. Keep achievement progress, accounts and completion scoped to each edition; preserve existing pins when cards merge or refresh.
+- Refresh existing native Xbox links in Companion without restarting the service. Retain native-only Default Platform and sync controls.
+
+## 0.121.000 — November 3, 2026
+
+- Add Xbox 360 as a built-in native category, with its own library section, importer/review checkbox, filename-rule option, platform labels and Xbox styling.
+- Preserve Xbox 360 tags through import, metadata editing and platform switching; a generic Xbox tag no longer hides the more specific generation.
+- Classify existing Xbox entries using the API's Legacy flag and explicit title links or unambiguous normalized title matches. Back up the canonical index before changing only the platform category; preserve other editions and ambiguous matches.
+- Show Xbox 360 labels in achievement shelves, details and profile platform choices while retaining the shared Xbox provider/account identity.
+
+## 0.120.006 — November 3, 2026
+
+- Allow Xbox games to be pinned and unpinned in the Achievement Hub.
+- Stop bulk Xbox sync on rate limits or authentication failures even when a game has cached progress. Keep the interactive saved-progress fallback.
+- Companion 0.45.1 accepts official Xbox achievement images up to 8 MiB and matches native widescreen/Kabuto Park crops in cards and details. Other provider limits and platform progress isolation remain intact.
+
+## 0.120.005 — November 3, 2026
+
+- Display Xbox widescreen achievement artwork as centered square badges throughout Native.
+- Crop Kabuto Park's verified widescreen layout to its inner badge, removing the surrounding blurred backdrop.
+- Crop at source resolution before resizing and locked-state grayscale. Preserve original downloaded artwork, other providers, and square/portrait images.
+
+## 0.120.000 — November 3, 2026
+
+- Link library achievement windows to the game profile's saved Default Platform and account-scoped achievement cache. Fix Kabuto Park opening Steam while its profile shows Xbox progress.
+- Add platform switching to linked achievement windows. Remember the selection and refresh the open profile when the window closes; keep each platform's unlocks, points and trackers separate.
+- Cancel superseded display requests and ignore late results when switching platforms. Retain successful progress on refresh failures and show the saved retrieval timestamp.
+- Match Platform, Sort and Missable selectors to the profile's dark controls, with wrapping at narrow window widths.
+
+## 0.119.010 — November 3, 2026
+
+- Restyle native profile platform controls as a compact dark panel with matching dropdown, buttons and readable disabled states.
+- Fix Xbox title linking: use selectable list rows, enable the link action after selection, and add Show all games plus clear search-empty feedback.
+- Match trailing Roman/Arabic sequel numbers, including Alan Wake 2 / Alan Wake II, in platform choices and Xbox search. Preserve distinct editions and ambiguous matches.
+- Show No linked platform when a profile has no mapped provider instead of offering an empty dropdown.
+
+## 0.119.005 — November 3, 2026
+
+- Fix missing Diablo IV and other large Xbox achievement artwork. Allow up to 8 MB from the Xbox image host while retaining the standard limit for other hosts and bounding the shared in-memory image cache to approximately 64 MB.
+- Existing synced artwork URLs work after restarting; no achievement resync is required.
+
+## 0.119.000 — November 3, 2026
+
+- Move full Xbox achievement sync into Settings > Achievements, with progress and cancellation.
+- Add a persistent Default Platform selector and Sync game to native game profiles. Steam, RetroAchievements and Xbox retain separate achievement identities and account-scoped snapshots.
+- Match Xbox titles by name, with an explicit Link Xbox game picker for differing names and ambiguous editions. Switching platform cancels the previous display request.
+- Fix Xbox 360 achievement ordering values that exceed Int32, including Batman: AA GOTY. Invalid rows preserve saved progress and do not stop the rest of a library sync.
+
+## 0.118.000 / Companion 0.45.0 — November 3, 2026
+
+- Include connected Xbox games and synced achievements in the combined Achievement Hub, unlock timeline and durable account-scoped PV scoring.
+- Add Sync achievements to the Xbox browser; retain saved progress on failures and use the separate Xbox 360 earned endpoint.
+- Share Xbox titles and achievement snapshots with Companion, with explicit account scope, correct Xbox labels and game-profile access. Microsoft tokens remain encrypted on the PC.
+
+## 0.117.016 / Companion 0.44.3 — November 2, 2026
+
+- Change Nothing Left to Deliver to require Legend or higher in a Premium Delivery for all 540 standard orders. Validate Normal-difficulty Legend against the saved order 430 rank change.
+
+## 0.117.006 / Companion 0.44.1 — November 2, 2026
+
+- Lower The Weight of a Nation to 50,000 kg. Preserve its existing tracker identity, observations, notes and first-earned date.
+- Count this cumulative goal as one tracker item in combined game totals and web cover badges, while keeping its kilogram counter and partial progress visible on the tracker and achievement.
+
+## 0.117.001 / Companion browser 0.44.0-mail-icons2 — November 2, 2026
+
+- Halve email emoticon width and height in tracker row titles on PC and web. Preserve their size in email details and full content.
+
+## 0.117.000 / Companion 0.44.0 — November 2, 2026
+
+- Add independent Missable and Required for completion item settings to PC and web trackers. Optional items remain visible and leave completion totals; settings are shared by tracker across accounts.
+- Evaluate attached Centurian requirements from required items in approved game-source observations. Manual checks, imports and settings edits cannot award points. Preserve earned dates and require a fresh verified check to apply changed requirements.
+- Mark all four Mountaineer timing emails as missable and optional, including We're Halfway Done. Keep every other catalogue row required by default.
+- Protect concurrent item setting edits and prevent an empty completion goal.
+
+## 0.116.021 / Companion 0.43.2 — November 2, 2026
+
+- Rename the Century Achievements display group to **Centurian Achievements** and rename **No Mail Left Unread** to **Complete Correspondence**.
+- Fix the PC game-profile shelf to show each Century achievement's locked artwork until it is earned, then show its unlocked artwork.
+- Publish the updated Century catalogue and browser labels in Companion 0.43.2 with fresh cache keys; preserve its existing PC data roots, worker paths, and retired NAS block rules.
+
+## 0.116.020 / Companion browser 0.43.1-heritage1 — November 1, 2026
+
+- Apply the approved Heritage completion frames and badges in Native and Companion: matching slim rails, shallow edge ornaments, and smaller emblems tucked into the lower-right corner.
+- Keep gold's engraved medallion and two small leaf accents, emerald's jewel settings, and diamond's platinum crystal details. Remove the bulky gold badge laurels.
+- Reserve cover holofoil for diamond (base game + DLC + Century achievements), including completion-case covers. Gold and emerald retain their original artwork colors. Preserve completion eligibility, cover controls, motion preferences, and high-contrast presentation.
+
+## 0.116.015 / Companion 0.43.1 — November 1, 2026
+
+- Redesign The Whole Story and No Mail Left Unread achievement artwork with detailed monochrome courier-world illustrations, etched silver frames and restrained cyan accents.
+- Refresh the Companion Century-art cache identity and publish the matching artwork in both apps.
+
+## 0.116.010 / Companion browser 0.43.0-century-trackers1 — November 1, 2026
+
+- Give Century-linked trackers their own counted Century Achievements section in the PC tracker list and Companion game profiles, alongside Game Trackers.
+- Keep unfinished trackers first and a separate Completed subgroup at the bottom of each section. Use achievement links for membership, keeping official counters and unlinked checklists in Game Trackers.
+- Retain exact tracker navigation, saved progress/notes, profile expansion and cached artwork through refreshes. Omit empty sections.
+
+## 0.116.005 — November 1, 2026
+
+- Simplify the PC game-profile Century shelf by removing the progress row beneath each badge.
+- Increase badges from 82 to 100 px and fill their rounded frames with the artwork, trimming the built-in outer rim. Adjust narrow-window wrapping to keep the larger badges and titles comfortable.
+- Retain progress in tooltips and achievement details, along with the existing locks and earned foil finish.
+
+## 0.116.000 / Companion 0.43.0 — November 1, 2026
+
+- Add The Weight of a Nation, the fifth 100-point Century achievement: deliver 60,000 kg of cargo.
+- Add its linked automatic whole-kilogram tracker, using the validated lifetime delivered-weight counter. Existing official goals and other tracker data stay separate.
+- Replace Nothing Left to Deliver artwork with an intricate weathered courier-and-cargo badge and three stars; add matching truck artwork for the weight goal. Refresh artwork cache identities.
+- Publish Native 0.116.000 and Companion 0.43.0. Live weight progress is 16,503/60,000 kg; automatic refresh, health and served artwork revision pass. Preserve other tracker rows and automatic policy, with app-only/NAS backup verified. Companion packaging now explicitly includes its reader's native SQLite dependency and validates the outer access protocol.
+
+## 0.115.000 / Companion 0.42.0 — November 1, 2026
+
+- Add Nothing Left to Deliver, a 100-point Century achievement for earning Legend of Legends of Legends on all 540 standard orders.
+- Add a dedicated linked LLL tracker with one requirement per order and full progress across all four delivery categories. Keep the official Growth of a Legend tracker and its LL/LLL columns unchanged.
+- Reuse the validated order reader, recording Century progress only from complete account-matched LLL observations. LL ranks, manual checkmarks and category thresholds cannot award this goal.
+- Add parcel-and-three-stars artwork; fill the fourth Century shelf slot and retain the fifth placeholder.
+- Publish Native 0.115.000 and Companion 0.42.0. Live tracker connection verifies 138/540 and a fresh automatic check, with existing tracker rows and automatic policy preserved; app-only backup and NAS copy verified.
+
+## Companion 0.41.1 map viewer refinements — November 1, 2026
+
+- Replace the profile Maps text link with a small monochrome folded-map icon and label.
+- Make Open fullscreen use the browser Fullscreen API, with the expanded layout retained as a fallback; clear fullscreen state when exiting or navigating away.
+- In landscape, size the map and pin list to use the available height, keeping the list readable beside the map on wider screens and below it on narrower screens.
+- Publish as Companion 0.41.1. Live service/account checks, served asset hashes, original map hashes, automatic policy, backup schedule and the verified app-only/NAS backup pass. Native remains 0.114.005.
+
+## Companion 0.41.0 maps release — November 1, 2026
+
+- Package the map viewer, private cached tiles, searchable pins, saved-progress filters and tracker/achievement links. Include Leaflet's license in both runtime and source packages; retain existing headless reader binaries unchanged.
+- Verify all three private regional images and 56 pins in an isolated published-app rehearsal, including adjacent tracker/guide/photo workflows and recovery. Originals and saved progress remain unchanged. All 158 Companion tests, 18 Native map tests, 54 selected JS/browser checks, six installer simulations and six receipt checks pass.
+- Install with an app-only backup and verified NAS copy, preserved automatic/backup policy and rollback protection. The running service verifies map-file and cache access itself, removing dependence on external Windows process-token inspection. Live 0.41.0 LAN health, worker/photo readiness and served assets pass. Native remains 0.114.005; actual phone acceptance is pending.
+
+## Unreleased — Companion map pins and saved progress — November 1, 2026
+
+- Complete Step 4 of [PV-PLN-WEB-004](plans/PV-PLN-WEB-004-companion-maps.md): numbered pins, searchable accessible list, descriptions/counts, All/Remaining/Completed filters and links between maps, trackers and achievement guides.
+- Read only approved same-game/provider saved tracker state; distinguish unknown, unavailable and unlinked pins. Preserve tiles, viewport, selection and search focus through progress changes, with retry and workspace/navigation guards.
+- Verify all 155 Companion tests, 18 Native map regressions and 52 selected JavaScript/browser checks, including all 56 seed identities/coordinates and phone/desktop production-CSP behavior. Source only; Step 5 integration rehearsal, packaging and rollout follow.
+
+## Unreleased — Companion map viewer — November 1, 2026
+
+- Complete Step 3 of [PV-PLN-WEB-004](plans/PV-PLN-WEB-004-companion-maps.md): Maps profile action, region navigation, touch pan/zoom, reset and full-screen viewing using locally bundled Leaflet.
+- Remember regional viewports; preserve map gestures, keyboard navigation and back behavior; handle resizing, delayed responses and failed tile retries.
+- Verify phone/desktop browser scenarios under production CSP, geometry, library/navigation regressions and static-shell cache behavior. Source only; pins/progress filters and rollout follow.
+
+## Unreleased — Companion map tiles — November 1, 2026
+
+- Complete Step 2 of [PV-PLN-WEB-004](plans/PV-PLN-WEB-004-companion-maps.md): authenticated tile manifests, private JPEG delivery and conditional caching for existing saved maps.
+- Generate padded 512-pixel tile pyramids in an isolated worker; reuse a bounded cache with atomic publication, cancellation, quota eviction, version checks and recovery from missing/corrupt derivatives.
+- Validate all 148 Companion tests, rerun all 8 tile cases after final padding changes, and reconstruct tiles from all three existing regional images while preserving original hashes. Source only; browser viewer and deployment are upcoming.
+
+## Unreleased — Companion map foundation — November 1, 2026
+
+- Complete Step 1 of [PV-PLN-WEB-004](plans/PV-PLN-WEB-004-companion-maps.md): share saved-map models, validation and read-only SQLite queries between Native and Companion while retaining desktop import/edit behavior.
+- Add authenticated, game-scoped map list/detail APIs with achievement/tracker link filters and normalized pins. Keep internal image paths/provenance private; distinguish empty libraries from unavailable stores without creating or migrating map databases.
+- Validate all 140 Companion tests, including 15 map cases, and all 18 Native map regressions. Tile delivery and the browser viewer remain upcoming. Not deployed; current release versions are unchanged.
+
+## 0.114.005 — October 31, 2026
+
+- Match the game tracker list to the web app: unfinished trackers first, then a counted Completed section with green cards and completion checkmarks.
+- Keep alphabetical order within each section and move trackers back up when progress becomes incomplete. Zero-target and unknown-progress trackers remain unfinished.
+- Preserve tracker artwork, icon selection, navigation, notes and source rules; retain system colors in high contrast.
+- Validation: 24 tracker/icon/dashboard/navigation tests pass, including rendered normal/narrow layouts and completion/reversal without changing saved progress.
+
+## Companion 0.40.0 — October 31, 2026
+
+- Browser revision `0.40.0-trackers1`: stop rebuilding unchanged tracker cards and retain loaded art through progress updates; scrolling/polling and manual icon regressions pass at phone/desktop widths.
+
+- Reuse unchanged PC library/achievement projections while detecting committed database changes, Native writes and account changes.
+- Make connection polling use batched scoped sources and lightweight metadata; batch achievement group/revision reads.
+- Serve saved photo counts at startup while background validation maintains the derived photo index, preserving original-file safety checks.
+- Validate 125 Companion tests, final source-scope/removal regression, isolated before/after timing and actual service/worker/photo readiness. Owner confirms much quicker startup; tracker-art phone retest pending.
+
+## Companion 0.39.2 — October 31, 2026
+
+- Allow private one-hour HTTP caching and conditional image responses for achievement/Century art.
+- Browser revision `0.39.2-artwork2` stores artwork on the phone and displays it on reopening; older images remain visible during background refresh. Keep workspace/source/state identities separate and bound storage.
+- Validation: four affected backend integration tests and eleven achievement/browser tests pass. Actual phone persistent-cache retest pending.
+
+## Companion 0.39.1 — October 31, 2026
+
+- Serve smaller cached covers; 44 covers decrease from 30.65 MB to 1.61 MB while preserving originals.
+- Browser revision `0.39.1-artwork1`: stop rebuilding unchanged achievement pages during background polling and retain unchanged artwork through progress updates.
+- Validation: 120 Companion tests, 10 achievement JS tests and Chrome phone/desktop refresh regression pass. Actual phone retest of artwork stability remains pending.
+
+## 0.114.000 — October 31, 2026
+
+- Move Companion hosting to the always-on PC with Companion 0.39.0, serving canonical app data and photo originals directly from their existing PC drives.
+- Coordinate Native and local service readers through shared source/account locks, background ownership and durable On Open signals; preserve tracker permissions, manual notes, reviews, history and account scope.
+- Retire NAS connector replication/recovery startup, retain the stopped NAS installation for rollback, and preserve the existing Companion owner, keys and preferences.
+- Enable app-only PC backups, including real Companion authentication/queue state, at 03:00 local time with 14 daily/eight weekly points, verified NAS copies and retry. Exclude capture originals and generated previews.
+- Validate 118 Companion, 1,387 serial Native and 29 migration/backup/cutover gates, plus isolated canonical apply and real-reader/photo recovery. Existing phone owner login and library/tracker/photo loading pass; slow initial app loading is under performance follow-up.
+## 0.113.000 — October 30, 2026
+
+- Add prismatic holofoil reflection and mouse-controlled perspective tilt to game covers with gold, emerald or diamond achievement completion in the library, game profile and completion case.
+- Preserve cover colors and existing frame artwork; the cover and its frame tilt together. Keep normal click, double-click and context-menu behavior.
+- Settle flat when the pointer leaves, stop effects when hidden/unloaded, and respect Windows animation and high-contrast preferences.
+
+## 0.112.005 — October 30, 2026
+
+- Give earned Century achievement badges the approved prismatic foil finish and reflective gold border in the game profile shelf, achievement cards and details.
+- Move the reflection with the pointer and play a single light sweep on click. Retain a static finish with Windows animations disabled and preserve high-contrast presentation.
+- Keep locked achievements, question-mark slots, saved progress and points unchanged.
+
+## 0.112.000 — October 30, 2026
+
+- Add the approved dedicated Century Achievements shelf to game profiles, between the official achievement summary and badge grid. Reserve five slots per game, filling undefined slots with question-mark placeholders.
+- Show each defined goal’s artwork, earned/locked state and saved progress, and open its existing achievement details on click. Refresh on profile activation and while visible.
+- Keep placeholders out of achievement totals, points, saved progress and completion awards. Browsing reads existing Century observations only.
+
+## 0.111.000 / Companion 0.38.0 — October 30, 2026
+
+- Add No Mail Left Unread, a 100-point Century achievement for reading the entire 240-entry email catalogue. Link the existing catalogue and update progress automatically from its verified item states, independently of the official 100-mail achievement.
+- Preserve all 240 requirements, including the entry whose read state is currently unknown. Manual checks and received-but-unread mail do not award completion.
+- Use a matching envelope badge and simple player-facing requirements in desktop and Companion; retain account isolation, first-verification unlock dates and saved progress on read failure.
+
+## 0.110.010 / Companion 0.37.2 — October 30, 2026
+
+- Apply the same player-facing presentation to the email achievement and shared achievement views: retain unlock descriptions, points, progress and earned dates while removing source/verification explanations, technical timestamps and sync chatter.
+- Keep backend counter evidence out of embedded achievement checklist tooltips; full tracker management and recorded progress are unchanged.
+
+## 0.110.005 / Companion 0.37.1 — October 30, 2026
+
+- Simplify Century achievement cards and details to player-facing unlock requirements, points and progress. Remove save connections, verification explanations, technical timestamps and implementation/planning wording.
+
+## 0.110.000
+
+- Connect All Roads Lead Home to verified Death Stranding Director's Cut saves: all 51 UC Route sections drive progress, independently of manual checklist edits.
+- Persist account-scoped evidence and first verified unlock dates; award the fixed 100 Century PV points once, preserve earned status and last verified progress through failures, and include verified unlocks in the desktop timeline.
+- Companion 0.37.0 displays the same saved road achievement progress, state, artwork, filters and details. Existing approved road refresh schedules are reused; interview Century progress remains unconnected.
+
+## Companion 0.36.7 — October 29, 2026
+
+- Omit achievement-linked trackers from update notifications when their known completion total meets or exceeds the unlock threshold. Further email changes show the email catalogue without repeating the completed 100-mail achievement tracker.
+- Continue showing unlinked catalogue changes and linked goals below their threshold. Silenced trackers retain acknowledgement baselines; review, failure and offline messages stay visible. Progress and source settings are unchanged.
+- Validation: 13 notification unit checks, two actual-app browser checks at390px, and two API/cache checks pass. Live health/shell/script hashes match. All138 audited entries are retained,136 unchanged; only routine connector activity differs. Media catalogue hashes match. Protected verified NAS/PC backup: `pre-0.36.7-20261030T015509Z`.
+
+## 0.109.000 — October 29, 2026
+
+- Add validated automatic per-email reading states for the Death Stranding Director’s Cut email catalogue. Receiving an email or clearing its notification does not complete it.
+- Map 239 populated runtime email identities; preserve unknown progress for The Cold, Hard Truth, which is absent from the installed runtime mail order. Preserve manual values by default, notes, full content and tracker links. The user explicitly enabled game-over-manual authority for the live email catalogue only.
+- Discovery verified against 160 copied payloads, independent Roboticist and Photographer reading controls, and the user’s First Prepper unread confirmation. Connector 0.24.0 shares the reader; Companion server remains 0.36.6.
+
+- Deployed to desktop and NAS: 140 read, 239 known states, zero mapped manual overrides. SaveChanges monitor succeeds with no failures or review pending. Prior credentials, source permissions and other tracker progress are preserved; consistent backups verified.
+- Validation: 1,361 Native and 29 connector tests; 17 checks against each actual packaged worker, including automatic refresh.
+
+## Companion 0.36.6 — October 29, 2026
+
+- Show the actual quantity gained for standalone count trackers. Reading two interviews now shows +2 in both the interview catalogue and official achievement tracker. Checklist/milestone counting remains unchanged.
+- Unknown counter baselines omit numeric claims; accessible badges say how much progress increased.
+- Validation: ten JS/browser and two API/cache checks pass. Live 0.36.6 shell and changed scripts match; both saved interview totals are 72. All 113 audit entries and media catalogue hashes retained; only routine connector activity changes. Protected recovery: `pre-0.36.6-20261030T001745Z`.
+
+## Companion 0.36.5 — October 29, 2026
+
+- Align achievement and tracker percentage labels on the same horizontal line beneath each cover.
+- Show the filled pin star in yellow; retain the existing unfilled star and compact visibility switch.
+- Verification: actual-app rendering at 320/390/768/1280px reports zero vertical offset between the percentage labels and the selected-star color `#ffd45c`. The existing cover-controls browser regression and shell/cache check pass.
+- NAS health, shell and stylesheet hash verify 0.36.5. All 113 audited entries remain present, with only routine connector heartbeat/activity changes; media catalogue hashes match. Protected NAS/PC recovery: `pre-0.36.5-20261029T215452Z`.
+
+## Companion 0.36.4 — October 29, 2026
+
+- Fix swipe-back skipping the previous menu or showing a blank transition in the Home Screen app. Keep the app's history session and parent scroll positions across reloads, allow one back transition at a time, and avoid duplicating a browser-owned gesture. App cards and photo thumbnails now permit page-back swipes; controls, downloads, external links and horizontal photo strips stay protected.
+- Show cached parent game profiles and the library immediately; prepare tracker data before hiding the current page. Returning from an achievement guide shows the saved list while refreshing, with workspace-scoped caching and stale-response guards. Photo dismissal continues through the shared back path.
+- Validation: five new regressions fail against 0.36.3 and pass with the fix. All 39 affected JavaScript checks, four browser cases and the shell/cache check pass, including Home Screen reloads, guides, game/timeline photos, repeated gestures and delayed/offline requests. Phone behavior was emulated in Chromium; physical iPhone verification remains with the user.
+- NAS health and all four changed served assets verify 0.36.4. All 113 audit entries remain present, 111 unchanged; only routine connector heartbeat/activity entries differ. Screenshot catalogue hashes match. Restricted recovery: `pre-0.36.4-20261029T201052Z`. Native and PC connector binaries are unchanged.
+
+## Companion 0.36.3 — October 29, 2026
+
+- Replace game-title/platform text below covers with a row of achievement and tracker-item percentages on the left and a borderless pin star on the right. Keep the approved filled symbols, percentage spacing and completion artwork.
+- Add a small unlabeled switch beside the sort menu to show/hide the entire cover-control row. It has an accessible name and tooltip, defaults to shown and remembers its state on that browser/device. Toggling preserves cover nodes and existing pin order without a server write.
+- Keep game identity in accessible link names and hover titles. Preserve space for completion-frame ornaments even with controls hidden, and retain the library's entry/resume-only refresh policy.
+- Validation: 18 library/navigation/browser checks and the server shell/cache check pass. Actual cover-grid rendering passes 320/390/768/1280px layouts across completion tiers. Browser checks verify reload/navigation persistence, blocked-storage fallback, pin/unpin without cover navigation, and toggling without replacing cover nodes or sending a server write.
+- NAS health and served shell/app.js/profile.css verify 0.36.3. All 113 saved-data audit entries and media catalogue hashes are unchanged. Verified restricted NAS/PC recovery: `pre-0.36.3-20261029T193149Z`.
+
+## Companion 0.36.2 — October 29, 2026
+
+- Refresh the library on app opening, returning to the library screen and app resume. The periodic connection-health check no longer fetches or redraws library content while browsing.
+- Keep unchanged cover nodes and images intact. On refresh, preserve the visible cover through additions/removals/reordering, keep keyboard focus and retain the current library during an offline retry. Recent-photo changes on app resume also preserve the visible cover.
+- Regression reproduces replacement of unchanged covers in 0.36.1. Fixed behavior passes phone/desktop browser cases for repeated timer checks, entry/resume updates, scrolling during an in-flight request, additions, removals, sorting, focus and offline handling. Navigation, screenshot and library checks pass (27 JavaScript/browser cases).
+- NAS deployment verified at 0.36.2: shell/cache check passes and all three changed served assets match source hashes. All 113 audited saved-data entries and screenshot catalogue hashes are unchanged. Protected NAS/PC recovery: `pre-0.36.2-20261029T190852Z`.
+
+## Companion 0.36.1 — October 29, 2026
+
+- Replace cover-art tracker-count labels with the approved solid gold trophy and thick green checkmark, with overlaid percentages, a filled trophy pedestal and separated percent signs.
+- Achievement percentages use saved obtained/total counts. Tracker percentages combine completed/total individual tracker items across a game's trackers; tooltips show completed and remaining items. Platform filtering scopes both indicators to that platform. Missing progress displays —; incomplete totals never round up to 100%.
+- Keep completion decorations visible by positioning the indicators above their lower ornaments. Validate item arithmetic, grouped/platform-scoped progress, missing/zero states and responsive layouts.
+- Validation: 95 server tests, 17 library/showcase JavaScript tests and actual-app browser checks at 320/390/768/1280px pass. NAS health/shell and all four changed asset hashes confirm 0.36.1. All 113 audited data entries and screenshot catalogue hashes are unchanged. Verified protected NAS/PC backup: `pre-0.36.1-20261029T185151Z`.
+
+## 0.108.000 / connector 0.23.0 — October 29, 2026
+
+- Add the Email catalogue:240 populated messages from45 senders with private plain-text content on desktop and companion. Individual checkboxes remain manual pending validated per-email flags.
+- Add automatic139/100 mail-reading progress linked to The Post Guides the Present, using verified statistic38. Both packaged workers pass the user's138→139 save transition through the automatic scheduler. This ninth shared projection preserves independent interview progress.
+- Full Native1,344 and connector29 tests pass. Live desktop and NAS refresh verified; existing tracker data, notes, manual values and pairing preserved. Companion stays0.36.0. See [mail evidence](DEATH_STRANDING_MAIL_RESEARCH.md).
+
+## 0.107.000 / Companion 0.36.0 / connector 0.22.0 — October 29, 2026
+
+- Support newer Death Stranding interview saves with 50 typed achievement statistics, including optional boolean statistic 41. Preserve strict identity, type, duplicate, boolean, range and ambiguity checks for older saves.
+- Add an independent itemized interview reader using the installed archive's explicit 158-resource ordering and supported saved states. Validate the read-state total against statistic 39; exclude nine empty resources. Only read interviews count toward the 149-entry Century checklist; unlocked unread entries remain available and incomplete.
+- Keep the official 100-interview reading counter and the Century catalogue separate, with automatic save-change refresh for both. Preserve existing item identities, prose, notes, manual values and achievement links. Both readers reuse the shared decoded checkpoint.
+
+- Deployment verified on desktop and NAS at69/100 and69/149. Full Native1,341, server95 and connector29 tests pass; both packaged workers pass the actual 68→69 scheduler control. All88 deployment audit entries and media catalogue hashes are unchanged.
+
+## Companion 0.35.0 / connector 0.21.0 — October 28, 2026
+
+- Enable automatic save-based refresh for the existing Road Building tracker. All51 supported sections are known, with28restored. Fresh save values replace its manual checkmarks at the user's request; notes and other trackers remain protected. Archive only the unsupported41-34row with reversible history.
+- Keep replacement authority scoped to its explicitly approved tracker and exact existing save paths. Normalize source-revision formatting across Windows/Linux without changing saved Linux permissions or credentials.
+- Validation:95server and29connector tests pass. Direct NAS audit verifies51known/28restored,19active manual overrides cleared, and matching note/protected-manual/definition/link/title/icon/pair-credential hashes. Native0.106.000 and its existing1,327tests remain verified. Other configured-reader warnings are outside this road-state feature.
+
+## Companion 0.34.2 — October 28, 2026
+
+- Fix deleted PC photos remaining visible in cached web galleries. Game galleries and the global photo timeline now check their version on the existing 15-second refresh and when returning to a cached gallery. Changed collections replace the loaded range, removing deleted tiles and empty dates/groups while preserving console/date filters, grouping, pagination and scroll anchors.
+- Keep the current collection during offline or concurrent-update retries; defer refresh while viewing a full-screen photo. Existing verified Native deletion synchronization and retained original files are unchanged.
+- Validation: 90 server tests, nine photo JavaScript checks and a headless browser regression pass. NAS health and served assets confirm 0.34.2. All 63 tables remain present, with only ordinary connector heartbeat/activity differences; all screenshot catalogue hashes match. Protected recovery: `pre-0.34.2-20261029T015737Z`. PC connector stays 0.20.0.
+
+## 0.106.000 — October 28, 2026
+
+- Connect the existing Death Stranding Road Building checklist to validated per-section save facts. The 51 supported routes refresh automatically; restored roads count regardless of builder. Archive the unmatched UC Route 41-34 row with reversible catalogue history, retaining its identity, manual state and notes.
+- Add an explicit source policy allowing fresh known save values to replace manual progress. Other sources retain manual-conflict review; unknown rows, older saves, undo guards and notes stay protected. Connected tracker labels explain the policy.
+- Validation: 1,327 Native tests, 90 focused reader/refresh checks and a packaged-worker scheduler check pass. The controlled save pair changes 27 to 28 restored routes, clears an incorrect manual check and preserves notes and archived unknown state. Native 0.106.000 is published; Companion road connection and connector rollout are pending.
+
+## 0.105.000 — October 28, 2026
+
+- Add a shared Death Stranding save-analysis foundation: one decode produces independent validated results for the six supported trackers. Unchanged saves reuse a bounded in-memory cache across tracker/source instances; cache misses are serialized and workers run at lower priority.
+- Match actual save contents, account, installation and compression-library hash before reuse. Keep source-specific observation times, existing preview/reconciliation rules and optional diagnostic retention. Save copying/change probes now permit concurrent game writes while retaining stability/integrity checks.
+- Century road and full-interview unlock rules remain awaiting field validation. No progress, points, automation opt-ins or tracker links are changed by this release. NAS stays 0.34.1 and installed connector stays 0.20.0; shared connector source compiles with the foundation for its next upgrade.
+- Validation: 169 Native and 28 connector tests pass. Packaged-worker review: all six shared projections match the individual-reader results on the same existing private save copy; source copy hash unchanged and temporary raw review copies removed.
+
+## 0.104.005 — October 28, 2026
+
+- Simplify both Century achievement illustrations to match the official Death Stranding grayscale ink/splatter badge style: one marked road emblem for All Roads Lead Home and a document stack for The Whole Story.
+- Add a distinctive pale ice-blue notched border to both unlocked images and the shared white-lock-on-gray image. The border is part of the artwork, so it appears consistently in achievement cards, trackers, details and eligible timeline tiles.
+- Publish the art update in Native and Companion 0.34.1. Achievement definitions, 100 PV point values, links and progress behavior are unchanged. Earlier artwork candidates are retained under artifacts/century-achievements.
+- Validation: five Native Century/artwork/timeline integration checks and two Companion art/cache checks pass; both unlocked badges and the shared locked icon were inspected in the actual Native card renderer at normal size.
+## 0.104.000 — October 28, 2026
+
+- Add **The Whole Story**, Death Stranding Director's Cut's second Century Achievement: collect every interview, worth **100 PV points**. Century Achievements now shows 2 of 5 planned definitions.
+- Link it to the existing full itemized **Interview catalogue** on desktop and Companion 0.34.0. Keep the catalogue's identity, contents, progress and notes, and retain the separate automatic 100-read tracker while the user consolidates them.
+- Add unlocked archive artwork through the established shared card/tracker/detail/timeline art resolver; reuse the standard white-lock-on-gray artwork while locked. Trackers use the unlocked image. Per-interview game-data verification remains pending; the existing 100-read statistic does not complete this collection goal.
+- Validation: 36 focused Native, 5 Companion API/artwork/cache/completion and 12 JavaScript checks pass. Pre-link SQLite backups retained; seven non-cosmetic tracker tables and the separate counter definition verified unchanged by linking.
+## 0.103.000 — October 28, 2026
+
+- Link All Roads Lead Home to the existing 52-section Road Building tracker on Native and Companion 0.33.0, using its existing identity and preserving all accounts' progress, notes, history and source settings. Automatic tracker imagery uses the unlocked road artwork.
+- Resolve Century artwork through the shared achievement-art loader and normal authenticated icon/unlocked-icon routes. Custom tracker icons keep priority. Century definitions are offered in the tracker achievement picker without becoming provider progress or rarity-scored awards.
+- Open Century cards into normal achievement details, show their fixed 100 PV point value/requirements and linked trackers, and support confirmed dated Century rows in the native achievement timeline renderer. Unknown/locked/undated progress creates no timeline event; actual save-reading and unlock recording remain deferred.
+- Validation: 94 focused Native, 6 Companion API/artwork/cache/completion and 12 JavaScript checks pass. Browser fixture verifies the Century card → details → linked Road Building flow with the lock on the achievement and unlocked road artwork on the tracker, 100 PV pts and no mobile overflow. Consistent pre-link backups retained on both installations; seven non-cosmetic tracker tables verified identical after linking.
+## 0.102.000 — October 28, 2026
+
+- Present Century Achievements using the normal Native achievement grid/list card builders and Companion 0.32.0 tile/list styles, with square artwork, title and points.
+- Set every Century achievement to a fixed **100 PV points**. Values are displayed without creating an award; automatic source linking remains deferred.
+- Add All Roads Lead Home artwork candidates: a white padlock on gray while locked; a completed asphalt network with white pavement markings, blue roadside markers and black chiral tendrils when unlocked. Earlier drafts and a labelled two-state mockup are retained under `artifacts/century-achievements`.
+- Keep unknown source progress separate from the locked artwork, and expose bundled artwork through an authenticated game-scoped endpoint. Definitions and artwork never become provider achievement progress.
+- Validation: 61 Native artwork/scoring/Century checks, 5 Companion API/artwork/cache/completion checks and 22 JavaScript checks pass. Native actual card mockup rendered; web tiles/list verified at 390/1280px with loaded art, 100 PV pts, no overflow and no CSP/console errors.
+## 0.101.000 — October 28, 2026
+
+- Rename the PV achievement group to **Century Achievements** in Native and Companion 0.31.0.
+- Define Death Stranding Director's Cut's first Century goal, **All Roads Lead Home**: rebuild every road section, including the mountain routes, with online contributions counting toward the built network in the save.
+- Show 1 of 5 planned achievements defined and **Awaiting save connection**. The shared authored catalogue adds no personal completion, provider progress, manual check-offs or diamond award. Save reading and automatic unlocking will be connected after road-state validation.
+- Validation: 19 focused Native tests, 7 Companion API/group/completion/cache tests and 22 JavaScript tests pass. Native cards rendered at 360/750px; web renderer verified at 390/1280px with working search/status filters, no overflow and no CSP/console errors.
+## 0.100.000 — October 28, 2026
+
+- Add the approved platinum, cut-crystal and ice-blue diamond completion frame and third completion shelf in Native and Companion 0.30.0. Round brilliant gems, geometric corner mounts, compact corner badge, inset plaque line and bounded shelf ledges match the approved coded concept.
+- Add a separate, empty PV achievements section alongside Base Game and DLC. No manual achievement definitions, editing or progress are introduced in this release.
+- Diamond requires every actual official achievement plus a nonempty, fully known and earned PV set. Empty PV sets, index flags and aggregate provider counts never award diamond. Gold and emerald remain unchanged. The shared classifier accepts separate PV progress for the future manual-achievements project; current callers supply none.
+- Keep Large covers and the user-selected desktop opening size. Responsive shelves fill from the left, wrap into new floors and retain hover details and achievement navigation.
+- Validation: 23 Native completion/rendering tests, 21 JavaScript tests and 11 Companion achievement/completion checks pass. Browser checks cover 12 viewport/cover-size combinations under production CSP, including 320px, plus navigation, empty PV state and wrapping.
+
+## 0.099.005 — October 28, 2026
+
+- Open the desktop Completion case at the user's resized dimensions (1779 × 1249 logical units, matching the observed 1767 × 1243 visible window), with Large 200 × 300 covers selected. Keep the existing working-area limit for smaller displays.
+- Verify opening dimensions, initial Large selection and all three cover sizes in the completion-window regression checks. Companion remains 0.29.1.
+
+## Companion 0.29.1 — October 28, 2026
+
+- Fix completion covers collapsing into one column and overlapping the following shelf. Set each floor's column count through the app's layout code; the live content security policy blocks HTML style attributes. Keep that policy unchanged.
+- Browser regression checks now use the production security policy and verify every cover's row alignment, separate position and cabinet bounds. Desktop shelf layout checks pass; Native remains 0.099.000.
+- Verification: the live app passes 15 viewport/cover-size combinations under production CSP with separate cover positions, correct rows and no policy errors or writes. Seven Native, 13 JavaScript and two server cache/version checks pass. Saved data and photo catalogues are retained.
+
+## 0.099.000 — October 27, 2026
+
+- Implement the approved coded completion-case design in Native and Companion 0.29.0: continuous beveled gold/emerald metalwork, sculpted scrolls and leaves, faceted jewels, concealed lighting and glass shelves with cover reflections.
+- Reserve actual drawing space above the emerald crown so its tip and bezel remain visible at narrow and desktop widths. Gold stays above emerald; extra floors extend the same case and keep the outer ornaments at its edges.
+- Start with small covers as in the preview. Fixed cover sizes, centered rounded artwork, left-to-right filling, hover/keyboard captions and achievement navigation remain available. Completion awards still use verified saved achievement progress.
+- Verification: 18 Native rendering/completion checks, 12 JavaScript checks and five server completion/cache/version checks pass. Phone/desktop browser QA verifies all three cover sizes, full crown-tip rendering, responsive floors, hover/focus and mouse/touch navigation. All 37 audited table digests and all photo catalogue hashes are identical after NAS deployment.
+
+## 0.098.000 — October 27, 2026
+
+- Achievement-linked tracker cards and headers always display the unlocked image, preferring imported or bundled high-resolution artwork even while the achievement is locked or progress is unavailable. Custom tracker icons retain priority.
+- Companion 0.28.2 uses a separate authenticated unlocked-art endpoint for trackers. Achievement lists/details retain their locked-art behavior, and tracker artwork never changes achievement progress.
+- Verification: 23 Native tracker/artwork checks, the server artwork/permissions and tracker image checks, and 11 JavaScript achievement/icon checks pass.
+
+## Companion 0.28.1 — October 27, 2026
+
+- Center fullscreen photos within the viewport and prevent image grid sizing from exceeding the screen height. Landscape phone photos use the full available height without cropping.
+- Checked four phone/desktop viewports, info toggling and Escape dismissal; nine screenshot checks and the shell/cache check pass. NAS deployment preserves saved data and photo catalogues.
+
+## 0.097.000 — October 27, 2026
+
+- Keep the original provider-supplied locked artwork until an achievement is earned, even when imported or bundled high-resolution unlocked artwork exists. Unknown progress also retains locked art. Without a locked image, Native grayscales the original provider icon.
+- Apply higher-resolution unlocked art only to earned achievements. Artwork imports leave visible locked badges alone, and pending downloads cannot overwrite a badge after its state changes.
+- Companion 0.28.0 and PC connector 0.20.0 sync the locked image separately and select the correct image in the authenticated icon endpoint. Browser image URLs change with unlock state.
+- Verification: 89 server tests, 28 connector tests, 11 JavaScript achievement/icon checks, and Native artwork/achievement regression checks pass.
+
+## 0.096.000 — October 27, 2026
+
+- Center completion-case artwork vertically within each shelf's visible upper and lower edges, including the first row beneath the banner. Left-to-right filling, responsive floors and hover details are retained.
+- Draw desktop case fronts and corner embellishments above the covers and hover captions, without intercepting cover clicks. The web case explicitly keeps its floor contents behind the ornament layer.
+- Match the main library's rounded artwork: 12-pixel desktop corners, with 10-pixel web corners on phones. Cover imagery and hover captions share the rounded clipping.
+- Companion 0.27.0 includes the same spacing and clipping refinements.
+
+## 0.095.000 — October 27, 2026
+
+- Move completion-case titles, earned/total counts and platform labels onto the cover fronts. Details appear on hover or keyboard focus; covers retain double-click/Enter achievement navigation.
+- Replace the segmented metal surround with one continuous outline and keep shelf ends inside it. Remove the lower diamond from the emerald header, and remove the oval lamps while retaining their ambient glow.
+- Start every shelf at the left edge and fill to the right, including partial rows. Cover-only cards shorten the cases while keeping responsive added floors and fixed outer ornaments.
+- Companion 0.26.0 includes the same refinements and versioned header assets.
+
+## 0.094.000 — October 27, 2026
+
+- Build the Completions view as two lit display cases, with gold above emerald. Each case has a continuous metallic surround, outer corner ornaments, a single 100% Complete plaque and shelves beneath the covers.
+- The window width and selected cover size determine how many games fit on a floor. Additional games add floors and extend the case; only shelves and lights repeat. Bottom ornaments follow the lower edge while the header and upper corners stay at the top.
+- Counts beneath artwork, double-click/Enter achievement navigation, saved completion rules and the larger default window remain in place. The main library's individual completed-cover frames are unchanged.
+- Companion 0.25.0 uses the same case ornaments and adapts its floors when the dialog resizes.
+
+## 0.093.000 — October 27, 2026
+
+- Inset completed-cover titles and capture counts between the new corner ornaments and medallions.
+
+## 0.092.000 — October 27, 2026
+
+- Match the supplied completion-frame reference with polished gold rails, sculpted scrollwork and a round 100% medallion; emerald rails use faceted corner jewels, leaf accents and a diamond 100% badge. The desktop uses retained vector drawings with no animated effects.
+- Return Completions to individual framed covers while retaining gold/emerald headings, earned/total counts, fixed sizes and double-click achievement navigation. Unchanged refreshes preserve frames, focus and scroll.
+- Companion 0.24.0 shares the same vector ornament paths. Both apps keep their cover artwork unchanged; frame assets scale with the cover.
+
+## 0.091.000 — October 27, 2026
+
+- Keep completion borders in a retained vector drawing, replacing the layout-time removal and rebuilding that could make gold and emerald group frames flicker. Unchanged collection refreshes retain their existing covers, borders, scroll position and focus.
+- Regression checks verify both metallic frames stay visible through repeated redraws and window size changes. Companion remains 0.23.0.
+
+## 0.090.000 — October 27, 2026
+
+- Promote Frame preview to **Completions**, a real collection of games with verified base achievement completion. Gold and emerald groups share ornamental metallic frames; individual covers are plain. Counts beneath each cover use the same saved platform edition that earned the award.
+- Double-click a cover (or press Enter) to open that game's achievements. Companion 0.23.0 supports the same grouping and navigation, including touch activation on phones.
+- The desktop default matches the resized preview window (1484×1107) and starts with 200×300 covers. All three fixed cover sizes remain available; the web dialog expands to the available viewport.
+
+## 0.089.000 — October 27, 2026
+
+- Show the game title in the completion preview's themed cover picker.
+
+## 0.088.000 — October 27, 2026
+
+- Added **Frame preview** to the desktop library's main toolbar. The Completion preview window displays one selected library cover in Regular, Base complete, and Base + DLC complete sample states using the production ornamental renderer. Covers have fixed 120×180, 160×240, and 200×300 size presets.
+- Companion 0.22.0 adds the same Frame preview button to its home page with the simplified web frame renderer, cover picker, fixed sizes and a responsive dialog. Preview states are labeled and isolated from saved completion flags, earned achievements and library layout.
+
+## 0.087.000 — October 27, 2026
+
+- Completed-game frames now require verified saved achievement progress for supported provider games. Old completion flags cannot override locked or unknown base achievements, and tiles do not briefly show gold while verification loads.
+- Reconcile automatic completion flags in both directions when the library loads or progress updates. Known locked base achievements clear stale completion flags and dates; missing or unknown observations leave index flags alone. Categories such as Story or Progression remain part of the base game unless explicitly assigned to DLC.
+- Companion 0.21.1 removes the aggregate-stat fallback for completion frames; saved achievement rows remain authoritative. The desktop repair covers Death Stranding Director's Cut (44/63 base) and Assassin's Creed Mirage (48/50 base), without changing earned achievements.
+
+## 0.086.000 — October 27, 2026
+
+- Replaced completed-game holofoil with a metallic frame and compact ornamental plinth on desktop library tiles and game-profile covers. Gold marks base completion; emerald/platinum marks earned base and DLC completion, with stepped metalwork and a faceted clasp. Artwork retains its original colors; grid spacing is unchanged.
+- Companion 0.21.0 adds the simplified web frame, slim rail and 100% clasp. Completion uses saved account-scoped achievement progress and current DLC assignments, stays within individual platform editions, and never treats tracker goals or unknown progress as completed achievements. Games without DLC keep the gold treatment.
+- Automatic desktop base completion now respects DLC membership independently of achievement categories.
+
+## 0.085.000 — October 27, 2026
+
+- Achievement artwork matching prefers exact titles before the punctuation-insensitive fallback. Death Stranding's `BB...` (005) and `"BB"` (008) now match separately. Curly quotes, ellipsis typography, case and whitespace normalize without erasing distinguishing punctuation. Genuine duplicate/missing names still require review; descriptions remain informational.
+
+## 0.084.000 — October 27, 2026
+
+- Native achievement grid cards keep their 154×174 size while expanding artwork up to 112 pixels and moving the title toward the bottom. Long titles and missable markers remain contained; optional counter-progress cards retain their existing size.
+- Companion 0.20.0 enlarges achievement artwork to 96 pixels on desktop cards and 88 pixels on phones, removes the Remaining/Earned and Guide badges from cards, and retains accessible status, filters, completion grouping and full guide details. List artwork also increases to 76 pixels.
+- PC connector 0.19.0 automatically publishes imported achievement artwork to the paired NAS during achievement sync. SHA-256 receipts/inventory avoid repeat uploads, repair missing/corrupt assets, retain other games and preserve source/achievement/account scope. Pausing automatic updates pauses artwork sync. Existing imported art is picked up without reimporting; web views refresh through their normal polling.
+
+## 0.083.000 — October 27, 2026
+
+- Added live progress to achievement artwork preview/import: an animated bar while preparing/reading the source, then a processed-image count and current achievement while downloading/checking images. Every processed image advances the count, including failures. The bar reaches completion after verified images are installed; cancellation/failure stops animation and preserves the partial count.
+
+## 0.082.000 — October 27, 2026
+
+- Achievement artwork imports match unique achievement names within the selected game, ignoring case, spacing and punctuation. Different or missing descriptions no longer block a match; descriptions remain reference information. Duplicate names, multiple source matches, missing names and unmatched entries still require review. Preview the source again to re-evaluate older description-only review entries.
+
+## 0.081.000 — October 27, 2026
+
+- Added **Import achievement artwork…** beside the Achievements heading on the PC game profile. It uses the current Steam game's definitions, remembers its trophy page and offers public-page, saved-HTML, reviewed-mapping and bundled-reviewed sources. Preview shows accepted matches and entries needing review; Import downloads and verifies only the accepted preview.
+- Imports refresh badges in open Native views, preserve other games' artwork and leave tracker/achievement progress intact. Cancelling or blocked access retains installed art; a blocked page explains how to use saved HTML. The importer is embedded in the app and runs in a hidden cancellable process using Python with Pillow. Images are installed on this PC; NAS imports remain separate. Companion stays 0.19.0; connector stays 0.18.0.
+
+## 0.080.000 — October 27, 2026
+
+- Prefer available high-resolution achievement artwork throughout Native: list/grid views, achievement details, hub cards, pins, guides, game profiles and achievement tiles in the photo timeline. All surfaces use the shared badge loader and the configured artwork import directory. High-resolution images retain their source pixels on large tiles and high-DPI displays; locked achievements remain grayscale and explicit tracker type icons remain selected.
+- Older Steam CDN URLs in stored pins/guides resolve to the same replacement artwork. Missing or invalid replacements retain the provider-image fallback. Companion 0.19.0 already serves the replacements through its common achievement icon endpoint; no NAS or connector upgrade is required.
+
+## 0.079.000 — October 27, 2026
+
+- Native tracker cards and headers use verified 240×240 artwork for six Death Stranding Director's Cut achievements. Companion 0.19.0 uses the same replacements and revalidates cached icon responses. Explicit generic icon selections and all progress remain intact; PC connector stays at 0.18.0.
+- Added a cached artwork importer for public Exophase trophy lists, browser-saved HTML and reviewed mappings. Unique names/descriptions match automatically; uncertain entries go to a review report. Downloads must be a genuine resolution upgrade and pass image/hash checks; failed imports retain prior artwork. See [artwork import and installation](ACHIEVEMENT_ARTWORK.md).
+
+## 0.078.000 — October 27, 2026
+
+- Native tracker windows notice externally synchronized web check-offs/counts/notes without reopening, while retaining unsaved drafts.
+- Manage tracker → Review web edits compares independently changed PC/web fields and offers guarded Keep PC / Use web choices. Source-confirmed completion remains protected.
+- Tracker cards and individual headers include achievement artwork or saved type icons, with a square right-click icon picker and dedicated tracker windows.
+- Companion/PC connector 0.18.0 adds an explicitly enabled, account-scoped web-to-PC manual edit return path with verified SQLite backups, durable per-field receipts, undo/clear support and conflict preservation. Source observations, save files, unrelated accounts and catalogue identities are retained. PC-authored manual edits remain a separate workflow.
+
 ## Unreleased — PixelVault Companion
 
 October 26 — **Companion and PC connector 0.16.0** synchronize intentional Native photo deletions to the web. Only an exact successful Native delete log record plus absent file/index/inventory, an accessible non-linked capture root and settled/rechecked source state creates a removal. Missing/offline sources and Forget-row operations retain photos. Removed IDs are scoped per workspace/game and stored as a recoverable overlay; galleries, timeline/banner, counts and direct image/original routes exclude them. Old/staged uploads cannot resurrect them. Same-edition reimports restore archived metadata; stale/concurrent mutations retry against a versioned receipt. No Native binary update or raw-file eviction.
@@ -1456,3 +2072,7 @@ October 26 — **Companion 0.14.1** fixes the timeline date field overlapping Al
 - Fixed the persistent data-root resolver so `PixelVault-current` uses the shared `C:\Codex\PixelVaultData` store instead of drifting into per-build settings, cache, and index files.
 - Updated startup data migration to copy newer settings, cache, and log files forward into the shared data store instead of only filling missing files.
 - Changed `Fetch Covers` in the Library to refresh only the selected folder by default, with an explicit confirmation before running a full-library cover refresh.
+## 0.117.011 / Companion 0.44.2 — November 2, 2026
+
+- Count both validated memory-chip restoration states, fixing chips 3 and 47 remaining unchecked after terminal turn-in.
+- Clear web save-review requests superseded by successful newer checks. Show actionable differences and manual conflicts, omitting identical older rows; retain genuine older changes and undo review.

@@ -110,8 +110,9 @@ namespace PixelVaultNative
         }
         void UpdateCard(Card card)
         {
-            var states = store.Load(card.Definition.Id, account).Where(s => !s.Item.Archived).ToList();
             bool connected = !string.IsNullOrEmpty(account);
+            var editor=connected?store.ReadEditor(card.Definition.Id,account):null;
+            var states = (editor?.States??store.Load(card.Definition.Id, account)).Where(s => !s.Item.Archived).ToList();
             var groups = states.GroupBy(s => string.IsNullOrEmpty(s.Item.GroupId) ? s.Item.Id : s.Item.GroupId).ToList();
             var totals = TrackerTotals.Calculate(card.Definition, states);
             long completed = totals.Completed, total = totals.Total;
@@ -122,7 +123,8 @@ namespace PixelVaultNative
                 total = card.Definition.CategoryTargets.Values.Sum(t => (long)t);
             }
             card.Header.Text = card.Definition.Title + (connected ? " · " + completed + " / " + total : " · Connect account");
-            card.Status.Text = connected ? "Game-confirmed checks stay checked. Hover an item for details." : "Connect an account to edit this tracker.";
+            card.Status.Text = connected ? "" : "Connect an account to edit this tracker.";
+            card.Status.Visibility = connected ? Visibility.Collapsed : Visibility.Visible;
             card.List.IsEnabled = true;
             if (!card.Expander.IsExpanded) return;
             var native = store.InlineGameCompletions(card.Definition.Id, account, states);
@@ -132,7 +134,7 @@ namespace PixelVaultNative
             var rows = groups.Select(g =>
             {
                 var row = new Row { States = g.ToList() };
-                row.Build = () => BuildRow(card, row.States, native, connected);
+                row.Build = () => BuildRow(card, row.States, native, connected,editor?.Versions);
                 return row;
             }).ToList();
             card.List.ItemsSource = rows;
@@ -147,7 +149,7 @@ namespace PixelVaultNative
                 }
             }));
         }
-        FrameworkElement BuildRow(Card card, List<AchievementTrackerState> states, HashSet<string> native, bool connected)
+        FrameworkElement BuildRow(Card card, List<AchievementTrackerState> states, HashSet<string> native, bool connected,IReadOnlyDictionary<string,TrackerFieldVersions> versions)
         {
             var first = states[0];
             var grid = new Grid { MinHeight = 25, Margin = new Thickness(0, 1, 0, 1) };
@@ -155,6 +157,8 @@ namespace PixelVaultNative
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             var title = new TextBlock { Text = first.Item.Name, FontSize = 12.5, Foreground = Ink("#D9E6ED"), VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, 0, 10, 0), TextTrimming = TextTrimming.CharacterEllipsis, ToolTip = first.Item.Name + "\n" + first.Item.Detail };
+            MailIconText.Apply(title, first.Item.Name);
+            title.ToolTip = MailIconText.Plain(first.Item.Name + "\n" + first.Item.Detail);
             grid.Children.Add(title);
             var boxes = new WrapPanel { Orientation = Orientation.Horizontal, MaxWidth = 240, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
             Grid.SetColumn(boxes, 1); grid.Children.Add(boxes);
@@ -171,16 +175,21 @@ namespace PixelVaultNative
                     FontSize = 12, IsChecked = state.Complete, IsEnabled = connected && !(state.Complete && confirmed),
                     Foreground = Ink("#D9E6ED"), Margin = new Thickness(4, 3, 4, 3), VerticalContentAlignment = VerticalAlignment.Center, Tag = state.Item.Id };
                 box.ToolTip = state.Item.Name + (string.IsNullOrEmpty(state.Item.Milestone) ? "" : " · " + state.Item.Milestone)
-                    + (confirmed ? "\nConfirmed by game data; cannot be unchecked here." : "\n" + (state.IsKnown ? state.Current + " / " + state.Item.Target : "Not checked")) + "\n" + state.Item.Detail;
+                    + "\n" + (state.IsKnown ? state.Current + " / " + state.Item.Target : "Not checked")
+                    + (state.Item.Identifiers?.ContainsKey("AchievementStatisticId") == true ? "" : "\n" + state.Item.Detail);
                 ToolTipService.SetShowOnDisabled(box, true);
                 AutomationProperties.SetName(box, state.Item.Name + (string.IsNullOrEmpty(state.Item.Milestone) ? "" : " · " + state.Item.Milestone));
-                if (confirmed) AutomationProperties.SetHelpText(box, "Confirmed by game data; cannot be unchecked here.");
+                if (confirmed) AutomationProperties.SetHelpText(box, "Completed");
                 AccessibilityUi.TryApplyFocusVisualStyle(box);
                 box.Click += (_, __) =>
                 {
                     card.List.SelectedItem = card.List.Items.OfType<Row>().FirstOrDefault(r => r.States.Any(s => s.Item.Id == state.Item.Id));
                     string error = null;
-                    try { store.SetInlineCompletion(card.Definition.Id, account, state.Item.Id, box.IsChecked == true); }
+                    try {
+                        if(versions is null||!versions.TryGetValue(state.Item.Id,out var version))throw new InvalidOperationException("Reload the tracker before saving.");
+                        var restore=confirmed&&box.IsChecked==true;
+                        store.Edit(card.Definition.Id,account,new(state.Item.Id,restore?"source":"progress",restore?null:box.IsChecked==true?state.Item.Target:0,null,version.Progress,Guid.NewGuid().ToString("N")));
+                    }
                     catch (Exception ex) { error = ex.Message; }
                     finally { card.Revision = null; Reload(); if (error != null) card.Status.Text = error; }
                 };

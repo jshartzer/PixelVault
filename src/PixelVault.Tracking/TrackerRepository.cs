@@ -14,11 +14,13 @@ namespace PixelVaultNative
     {
         protected readonly string path;
         private readonly bool pooling;
+        private readonly bool initializeSchema;
         public string ImportDirectory { get; }
         public string DatabasePath => path;
-        public TrackerRepository(string dataRoot, bool pooling = true)
+        public TrackerRepository(string dataRoot, bool pooling = true, bool initializeSchema = true)
         {
             this.pooling = pooling;
+            this.initializeSchema = initializeSchema;
             if (string.IsNullOrWhiteSpace(dataRoot)) throw new ArgumentException("A persistent data root is required.");
             var root = Path.Combine(Path.GetFullPath(dataRoot), "achievement-tracking");
             path = Path.Combine(root, "pixelvault-tracking.sqlite");
@@ -27,18 +29,23 @@ namespace PixelVaultNative
 
         protected SqliteConnection Open()
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(path));
-            var c = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = path, Pooling = pooling }.ToString());
+            if(initializeSchema)Directory.CreateDirectory(Path.GetDirectoryName(path));
+            var c = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = path, Pooling = pooling,Mode=initializeSchema?SqliteOpenMode.ReadWriteCreate:SqliteOpenMode.ReadWrite,DefaultTimeout=5 }.ToString());
             c.Open();
+            if(!initializeSchema){using var busy=c.CreateCommand();busy.CommandText="PRAGMA busy_timeout=5000; PRAGMA synchronous=FULL";busy.ExecuteNonQuery();return c;}
             using var cmd = c.CreateCommand();
             cmd.CommandText = @"
 PRAGMA journal_mode=WAL;
 PRAGMA synchronous=FULL;
 PRAGMA busy_timeout=5000;
 CREATE TABLE IF NOT EXISTS tracker_definition (id TEXT PRIMARY KEY, definition TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS century_progress(provider TEXT NOT NULL,game TEXT NOT NULL,id TEXT NOT NULL,account TEXT NOT NULL,value TEXT NOT NULL,PRIMARY KEY(provider,game,id,account));
 CREATE TABLE IF NOT EXISTS tracker_catalogue_history(id INTEGER PRIMARY KEY AUTOINCREMENT,tracker_id TEXT NOT NULL,before_definition TEXT NOT NULL,after_definition TEXT NOT NULL,created_utc INTEGER NOT NULL,undone_utc INTEGER NOT NULL DEFAULT 0,source TEXT NOT NULL,fingerprint TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS tracker_link (tracker_id TEXT PRIMARY KEY, achievement_id TEXT NULL);
 CREATE TABLE IF NOT EXISTS tracker_title (tracker_id TEXT PRIMARY KEY, title TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS tracker_icon (tracker_id TEXT PRIMARY KEY, icon_id TEXT NULL);
+CREATE TABLE IF NOT EXISTS tracker_group_order (id INTEGER PRIMARY KEY CHECK(id=1), value TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS tracker_item_rule (tracker_id TEXT NOT NULL,item_id TEXT NOT NULL,missable INTEGER NOT NULL,excluded INTEGER NOT NULL,PRIMARY KEY(tracker_id,item_id));
 CREATE TABLE IF NOT EXISTS tracker_source (tracker_id TEXT NOT NULL, account TEXT NOT NULL, binding TEXT NOT NULL, status TEXT NOT NULL,
  PRIMARY KEY(tracker_id,account));
 CREATE TABLE IF NOT EXISTS tracker_automation (tracker_id TEXT NOT NULL, account TEXT NOT NULL, settings TEXT NOT NULL, state TEXT NOT NULL,
@@ -59,6 +66,30 @@ CREATE TABLE IF NOT EXISTS tracker_import (tracker_id TEXT NOT NULL,account TEXT
  PRIMARY KEY(tracker_id,account,digest));";
             cmd.ExecuteNonQuery();
             return c;
+        }
+
+        public void InitializeSharedSchema()
+        {
+            if(!initializeSchema)throw new InvalidOperationException("Only the schema owner may initialize the shared store.");
+            using var c=Open();EnsureRequests(c,null);EnsureWebSync(c);
+        }
+        public void ValidateSharedSchema()
+        {
+            using var c=Open();using var command=c.CreateCommand();
+            command.CommandText="SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('tracker_definition','tracker_item_state','tracker_history','tracker_client_request','tracker_source','century_progress','tracker_item_rule')";
+            if(Convert.ToInt32(command.ExecuteScalar())!=7)throw new InvalidDataException("The shared tracker store needs schema preparation by the migration owner.");
+        }
+
+        public void SetAchievementLink(string trackerId, string achievementId)
+        {
+            var definition = Definition(trackerId);
+            if (achievementId?.StartsWith("century.", StringComparison.Ordinal) == true
+                && PixelVault.Tracking.CenturyAchievementCatalog.Find(definition.Provider, definition.GameId, achievementId) == null)
+                throw new InvalidDataException("Choose a Century achievement from this tracker's game.");
+            using var c = Open(); using var command = c.CreateCommand();
+            command.CommandText = "INSERT INTO tracker_link(tracker_id,achievement_id) VALUES($t,$a) ON CONFLICT(tracker_id) DO UPDATE SET achievement_id=$a";
+            command.Parameters.AddWithValue("$t", trackerId); command.Parameters.AddWithValue("$a", (object)achievementId ?? DBNull.Value);
+            command.ExecuteNonQuery();
         }
 
         public IReadOnlyList<AchievementTrackerDefinition> Definitions()
@@ -88,7 +119,35 @@ CREATE TABLE IF NOT EXISTS tracker_import (tracker_id TEXT NOT NULL,account TEXT
                 var definition = definitions.FirstOrDefault(d => d.Id == titles.GetString(0));
                 if (definition != null) definition.Title = titles.GetString(1);
             }
+            titles.Close();
+            cmd.CommandText = "SELECT tracker_id,icon_id FROM tracker_icon";
+            using var icons = cmd.ExecuteReader();
+            while (icons.Read())
+            {
+                var definition = definitions.FirstOrDefault(d => d.Id == icons.GetString(0));
+                if (definition != null) definition.IconId = icons.IsDBNull(1) ? null : icons.GetString(1);
+            }
+            icons.Close();
+            foreach (var definition in definitions.Where(d => d.Id == PixelVault.Tracking.CenturyMailCatalogue.TrackerId))
+            foreach (var item in definition.Items)
+            {
+                item.Missable = PixelVault.Tracking.CenturyMailCatalogue.IsMissable(item.Id);
+                item.ExcludedFromTotal = PixelVault.Tracking.CenturyMailCatalogue.IsExcludedFromTotal(item.Id);
+            }
+            ReadItemRules(c, tx, definitions);
             return definitions;
+        }
+
+        /// <summary>Save a display icon independently of account progress and catalogue updates. Null uses achievement artwork.</summary>
+        public void SetTrackerIcon(string tracker, string iconId)
+        {
+            if (iconId != null && !TrackerIconIds.All.Contains(iconId)) throw new InvalidDataException("Choose an available tracker icon.");
+            using var c = Open();using var tx = c.BeginTransaction();
+            _ = ReadDefinitions(c, tx).FirstOrDefault(d => d.Id == tracker) ?? throw new InvalidDataException("The tracker was not found.");
+            using var cmd = c.CreateCommand();cmd.Transaction = tx;
+            cmd.CommandText = "INSERT INTO tracker_icon(tracker_id,icon_id) VALUES($id,$icon) ON CONFLICT(tracker_id) DO UPDATE SET icon_id=excluded.icon_id";
+            cmd.Parameters.AddWithValue("$id", tracker);cmd.Parameters.AddWithValue("$icon", (object)iconId ?? DBNull.Value);cmd.ExecuteNonQuery();
+            tx.Commit();
         }
 
         /// <summary>Change only a display name, including for bundled catalogues; tracker identities remain stable.</summary>

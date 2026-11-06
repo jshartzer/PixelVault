@@ -107,10 +107,28 @@ public sealed class SettingsShellTests(ITestOutputHelper output)
                 Assert.Equal(1, categorySaves); Assert.Equal(0, generalSaves);
                 Assert.False(save.IsEnabled);
                 Assert.Equal(new[] { "Actions", "Story" }, new AchievementGuideService(scope.Path).LoadCategoryNames().Take(2));
-                foreach (var width in new[] { 1152d, 852d })
+                var contentScroll = Descendants(tab).OfType<ScrollViewer>().Single();
+                var content = (Grid)contentScroll.Content;
+                var heading = content.Children.OfType<StackPanel>().Single();
+                var syncStatus = heading.Children.OfType<TextBlock>().First();
+                foreach (var (width, height) in new[] { (1152d, 750d), (852d, 460d), (720d, 420d) })
                 {
-                    Layout(root, width, width < 900 ? 460 : 750);
-                    Assert.True(save.TranslatePoint(new Point(0, 0), root).Y + save.ActualHeight <= root.ActualHeight);
+                    foreach (var message in new[] { "", string.Join(" ", Enumerable.Repeat("Sync is waiting for the provider to respond.", 12)) })
+                    {
+                        syncStatus.Text = message;
+                        Layout(root, width, height);
+                        var card = (Border)tab.Content;
+                        var saveTop = save.TranslatePoint(new Point(), card).Y;
+                        Assert.True(saveTop >= card.Padding.Top);
+                        Assert.True(saveTop + save.ActualHeight <= card.ActualHeight - card.Padding.Bottom);
+                        Assert.True(save.TranslatePoint(new Point(), root).Y + save.ActualHeight <= root.ActualHeight);
+                        contentScroll.ScrollToEnd();
+                        root.UpdateLayout();
+                        Assert.Equal(saveTop, save.TranslatePoint(new Point(), card).Y);
+                    }
+                    syncStatus.Text = "";
+                    contentScroll.ScrollToTop();
+                    Layout(root, width, height);
                     SavePreview(root, "settings-achievements-" + width + ".png");
                 }
             }

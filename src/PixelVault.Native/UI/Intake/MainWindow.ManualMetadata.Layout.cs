@@ -44,6 +44,7 @@ namespace PixelVaultNative
             public CheckBox Ps5Box;
             public CheckBox SwitchBox;
             public CheckBox XboxBox;
+            public CheckBox Xbox360Box;
             public CheckBox OtherBox;
             public TextBox OtherPlatformBox;
             public CheckBox UseCustomTimeBox;
@@ -175,6 +176,7 @@ namespace PixelVaultNative
             h.Ps5Box = new CheckBox { Content = "PS5", Foreground = Brush("#1F2A30"), Margin = new Thickness(0, 0, 18, 10), IsThreeState = true };
             h.SwitchBox = new CheckBox { Content = "Switch", Foreground = Brush("#1F2A30"), Margin = new Thickness(0, 0, 18, 10), IsThreeState = true };
             h.XboxBox = new CheckBox { Content = "Xbox", Foreground = Brush("#1F2A30"), Margin = new Thickness(0, 0, 18, 10), IsThreeState = true };
+            h.Xbox360Box = new CheckBox { Content = "Xbox 360", Foreground = Brush("#1F2A30"), Margin = new Thickness(0, 0, 18, 10), IsThreeState = true };
             h.OtherBox = new CheckBox { Content = "Other", Foreground = Brush("#1F2A30"), Margin = new Thickness(0, 0, 12, 10), IsThreeState = true };
             h.OtherPlatformBox = new TextBox { Width = 190, Margin = new Thickness(0, 0, 0, 10), Background = Brushes.White, BorderBrush = Brush("#D7E1E8"), BorderThickness = new Thickness(1), Padding = new Thickness(10, 6, 10, 6), FontSize = 13, IsEnabled = false };
             var tagToggleRow = new WrapPanel { Margin = new Thickness(0, 0, 0, 4) };
@@ -186,6 +188,7 @@ namespace PixelVaultNative
             tagToggleRow.Children.Add(h.Ps5Box);
             tagToggleRow.Children.Add(h.SwitchBox);
             tagToggleRow.Children.Add(h.XboxBox);
+            tagToggleRow.Children.Add(h.Xbox360Box);
             tagToggleRow.Children.Add(h.OtherBox);
             tagToggleRow.Children.Add(h.OtherPlatformBox);
             h.UseCustomTimeBox = new CheckBox { Content = "Use custom date/time", Foreground = Brush("#1F2A30"), Margin = new Thickness(0, 0, 0, 8), IsThreeState = true };

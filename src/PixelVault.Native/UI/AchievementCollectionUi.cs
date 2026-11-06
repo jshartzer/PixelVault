@@ -14,7 +14,7 @@ namespace PixelVaultNative
         internal static FrameworkElement WithMissableOverlay(Border icon, GameAchievementsFetchService.AchievementRow row)
         {
             if (!ShowMissable(row)) return icon;
-            var host = new Grid { Width = icon.Width, Height = icon.Height, Margin = icon.Margin,
+            var host = new Grid { Width = icon.Width, Height = icon.Height, MaxWidth = icon.MaxWidth, MaxHeight = icon.MaxHeight, Margin = icon.Margin,
                 HorizontalAlignment = icon.HorizontalAlignment, VerticalAlignment = icon.VerticalAlignment };
             icon.Margin = new Thickness(0);
             host.Children.Add(icon);
@@ -36,9 +36,11 @@ namespace PixelVaultNative
             return host;
         }
 
-        internal static TextBlock MissableLabel(GameAchievementsFetchService.AchievementRow row)
+        internal static TextBlock MissableLabel(GameAchievementsFetchService.AchievementRow row) =>
+            ShowMissable(row) ? MissableLabel() : null;
+
+        internal static TextBlock MissableLabel()
         {
-            if (!ShowMissable(row)) return null;
             return new TextBlock { Text = "Missable", FontSize = 11, Margin = new Thickness(0, 4, 0, 0),
                 Tag = "AchievementMissable", Foreground = SystemParameters.HighContrast ? SystemColors.WindowTextBrush : UiBrushHelper.FromHex("#EFBD63"),
                 ToolTip = "Can be missed during a playthrough." };
@@ -48,7 +50,7 @@ namespace PixelVaultNative
         {
             var chip = TagChip(AchievementScoring.PointText(row));
             chip.Margin = new Thickness(0, 3, 0, 0);
-            chip.ToolTip = AchievementScoring.Explanation(row);
+            chip.ToolTip = AchievementScoring.Label(row);
             AutomationProperties.SetName(chip, AchievementScoring.Label(row));
             return chip;
         }

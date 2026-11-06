@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -12,21 +13,18 @@ namespace PixelVaultNative
 {
     public sealed partial class MainWindow
     {
-        internal void LibraryBrowserShowAchievementsInfo(Window owner, LibraryBrowserFolderView view)
+        internal static Button BuildGameProfileArtworkButton(Action open)
+        {
+            var button = GameMapsWindow.Button("Import achievement artwork…", "Load this game's achievements to enable artwork import");
+            button.FontSize = 12; button.Margin = new Thickness(12, 0, 0, 0); button.Click += (_, __) => open();
+            AutomationProperties.SetName(button, "Import achievement artwork");
+            return button;
+        }
+        internal void LibraryBrowserShowAchievementsInfo(Window owner, LibraryBrowserFolderView view, bool remainingOnly = false)
         {
             if (owner == null || view == null) return;
-            var folder = ResolveLibraryBrowserAchievementLookupFolder(view);
-            var normalized = NormalizeConsoleLabel(folder == null ? string.Empty : folder.PlatformLabel);
-            AchievementsInfoWindow.ShowModal(
-                owner,
-                normalized,
-                folder,
-                CurrentSteamWebApiKey(),
-                CurrentRetroAchievementsApiKey(),
-                CurrentSteamUserId64(),
-                CurrentRetroAchievementsUsername(),
-                "PixelVault/" + AppVersion,
-                achievementGuideService, trackingStore: achievementTrackingStore);
+            var folder = BuildLibraryBrowserDisplayFolder(view);
+            ShowLinkedGameAchievements(owner, folder, (view.SourceFolders ?? new()).Concat(new[] { view.PrimaryFolder }), remainingOnly);
         }
 
         LibraryFolderInfo ResolveLibraryBrowserAchievementLookupFolder(LibraryBrowserFolderView view)

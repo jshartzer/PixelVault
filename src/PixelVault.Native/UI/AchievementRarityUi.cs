@@ -30,6 +30,7 @@ namespace PixelVaultNative
         internal static void Apply(Border card, Border icon, TextBlock title,
             GameAchievementsFetchService.AchievementRow row, bool list = false)
         {
+            if (CenturyAchievementFinish.Apply(icon, row)) return;
             var tier = Tier(row?.GlobalUnlockPercent);
             if (tier == AchievementRarity.Common) return;
             bool earned = row.ProgressKnown && row.Unlocked;

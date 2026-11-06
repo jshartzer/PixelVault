@@ -54,6 +54,7 @@ public sealed partial class ScreenshotLibrary
     }
     public (string Path,ScreenshotOriginal Original) Original(string provider,string game,string id,bool metadata=false)
     {
+        if(options.DirectLocal)throw new InvalidOperationException("Use the checked local original stream.");
         lock(gate)
         {
             var photo=Photo(provider,game,id);var original=(metadata?photo.Metadata:photo.Original)??throw new KeyNotFoundException();

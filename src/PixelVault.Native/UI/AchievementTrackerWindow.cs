@@ -46,25 +46,34 @@ namespace PixelVaultNative
         readonly ListBox list = new() { Background = Color("#101A21"), BorderThickness = new Thickness(0), HorizontalContentAlignment = HorizontalAlignment.Stretch };
         readonly Button import, saveNote, saveCount, reset;
         List<AchievementTrackerState> states = new();
+        IReadOnlyDictionary<string,TrackerFieldVersions> editorVersions = new Dictionary<string,TrackerFieldVersions>();
         AchievementTrackerDefinition selected;
         AchievementTrackerState selectedItem;
         int loadGeneration;
         bool closed, loadingDefinitions;
         string preferredId;
         readonly bool browseGameTrackers;
+        readonly string fixedTrackerId;
+        readonly TextBlock trackerTitle=Text("Achievement trackers",26,true);
+        readonly Border trackerImage=new(){Width=72,Height=72,Margin=new Thickness(0,0,16,0),Visibility=Visibility.Collapsed};
+        internal Func<TrackerIconPicker,bool?> ShowIconPicker=dialog=>dialog.ShowDialog();
+        internal Task PendingIcon { get; private set; }=Task.CompletedTask;
         internal Func<AchievementTrackerEditWindow, bool?> ShowEditor = dialog => dialog.ShowDialog();
         internal Func<TrackerRenameWindow, bool?> ShowRename = dialog => dialog.ShowDialog();
         internal Task PendingRename { get; private set; } = Task.CompletedTask;
         internal Task PendingEdit { get; private set; } = Task.CompletedTask;
+        internal Task PendingDelete { get; private set; } = Task.CompletedTask;
+        internal Func<TrackerDeletionPreview, bool> ConfirmDeletion;
 
         internal AchievementTrackerWindow(Window owner, AchievementTrackingStore store, string steamAccount, string retroAccount,
             IEnumerable<AchievementHubGame> games = null, string provider = null, string gameId = null, string achievementId = null,
             IEnumerable<GameAchievementsFetchService.AchievementRow> achievements = null,string trackerId=null,bool browseGameTrackers=false)
         {
             this.store = store ?? throw new ArgumentNullException(nameof(store));
+            ConfirmDeletion = preview => TrackerDeletionUi.Confirm(this, preview);
             this.steamAccount = steamAccount; this.retroAccount = retroAccount; this.provider = provider;
             this.gameId = gameId; this.achievementId = achievementId;
-            preferredId=trackerId;this.browseGameTrackers=browseGameTrackers;
+            preferredId=trackerId;fixedTrackerId=trackerId;this.browseGameTrackers=browseGameTrackers;
             this.achievements = (achievements ?? Enumerable.Empty<GameAchievementsFetchService.AchievementRow>()).Where(r => r != null).ToList();
             this.games = (games ?? Enumerable.Empty<AchievementHubGame>()).Where(g => g != null).GroupBy(g => g.Key).Select(g => g.First()).ToList();
             owner=TrackerNavigation.BrowseOwner(owner);if (owner?.IsVisible == true) Owner = owner;
@@ -75,7 +84,8 @@ namespace PixelVaultNative
             progress.Foreground = UiBrushHelper.FromHex("#72BFC8"); progress.Background = UiBrushHelper.FromHex("#263C48");
             foreach (var editor in new[] { search, notes, current }) DressEditor(editor);
             var header = new StackPanel(); DockPanel.SetDock(header, Dock.Top); root.Children.Add(header);
-            header.Children.Add(Text("Achievement trackers", 26, true));
+            var identity=new DockPanel{Margin=new Thickness(0,0,0,fixedTrackerId==null?0:10)};DockPanel.SetDock(trackerImage,Dock.Left);identity.Children.Add(trackerImage);trackerTitle.VerticalAlignment=VerticalAlignment.Center;identity.Children.Add(trackerTitle);header.Children.Add(identity);
+            trackerImage.ContextMenu=TrackerIconVisual.Menu(()=>PendingIcon=SelectIconAsync());
             var actions = new WrapPanel { Margin = new Thickness(0, 10, 0, 0) };
             definitionActions = actions;
             var create = Button("New checklist", "Create a checklist for a game or achievement");
@@ -104,6 +114,12 @@ namespace PixelVaultNative
             var rename = new MenuItem { Header = "Rename tracker…", ToolTip = "Change the selected tracker's display name" };
             rename.Click += (_, __) => PendingRename = RenameAsync();manageMenu.Items.Add(rename);
             manageMenu.Opened += (_, __) => rename.IsEnabled = selected != null && !loadingDefinitions;
+            var imageEntry=new MenuItem{Header="Select Image..."};imageEntry.Click+=(_,__)=>PendingIcon=SelectIconAsync();manageMenu.Items.Add(imageEntry);
+            manageMenu.Opened+=(_,__)=>imageEntry.IsEnabled=selected!=null&&!loadingDefinitions;
+            var deleteEntry=new MenuItem{Header="Delete tracker…",ToolTip="Delete this custom tracker and its saved progress for all accounts. A recovery copy is saved first."};
+            deleteEntry.Click+=(_,__)=>PendingDelete=DeleteTrackerAsync();manageMenu.Items.Add(deleteEntry);
+            manageMenu.Opened+=(_,__)=>{deleteEntry.Visibility=selected!=null&&store.CanEditCatalogue(selected.Id)?Visibility.Visible:Visibility.Collapsed;deleteEntry.IsEnabled=selected!=null&&!loadingDefinitions&&!refreshing&&PendingDelete.IsCompleted;};
+            var webReview=new MenuItem{Header="Review web edits…"};manageMenu.Items.Add(webReview);webReview.Click+=async(_,__)=>{if(selected==null||HasDraft())return;new TrackerWebSyncWindow(this,store,selected,Account(selected)).ShowDialog();await ReloadAsync();};manageMenu.Opened+=(_,__)=>webReview.IsEnabled=selected!=null&&!string.IsNullOrWhiteSpace(Account(selected));
             void Manage(Button button)
             {
                 var entry=new MenuItem { Header=button.Content,ToolTip=button.ToolTip };
@@ -117,11 +133,12 @@ namespace PixelVaultNative
             Manage(import);Manage(editLink);Manage(export);actions.Children.Remove(import);actions.Children.Remove(editLink);actions.Children.Remove(export);actions.Children.Add(manage);
             manage.Click+=(_,__)=>{manageMenu.PlacementTarget=manage;manageMenu.IsOpen=true;};
             header.Children.Add(actions);
+            if(fixedTrackerId!=null){actions.Children.Remove(create);actions.Children.Remove(spreadsheet);var catalogue=new MenuItem{Header="Update current catalogue…"};catalogue.Click+=async(_,__)=>await ManageCatalogueAsync();manageMenu.Items.Add(catalogue);}
             header.Children.Add(mapLinks);
             Activated += (_, __) => mapLinks.Bind(store, selected?.Provider, selected?.GameId, selected?.GameTitle, steamAccount, retroAccount, tracker: selected?.Id);
             description.Visibility=Visibility.Collapsed;
             trackers.Margin = new Thickness(0, 0, 0, 6);
-            AutomationProperties.SetName(trackers, "Choose achievement tracker"); header.Children.Add(trackers);
+            AutomationProperties.SetName(trackers, "Choose achievement tracker"); if(fixedTrackerId==null)header.Children.Add(trackers);else trackers.Visibility=Visibility.Collapsed;
             linkedAchievement.Margin = new Thickness(0, 0, 0, 4); header.Children.Add(linkedAchievement);
             connectionIndicator.Margin=new Thickness(0,0,0,6);header.Children.Add(connectionIndicator);
             header.Children.Add(summary); header.Children.Add(progress); header.Children.Add(source);source.MaxHeight=22;source.TextTrimming=TextTrimming.CharacterEllipsis;source.TextWrapping=TextWrapping.NoWrap;
@@ -177,7 +194,7 @@ namespace PixelVaultNative
             saveNote.Click += async (_, __) => await (PendingEdit = SaveNoteAsync());
             reset = Button("Use imported progress", "Remove the manual count and return to the latest imported observation"); detail.Children.Add(reset);
             reset.Click += async (_, __) => { if (selectedItem != null) await (PendingEdit = SetProgressAsync(selectedItem, null)); };
-            detail.Children.Add(Text("Checklists help you plan. Provider achievement status is tracked separately.", 15));
+            BuildItemRules(detail);
             trackers.SelectionChanged += async (_, __) => { if (!loadingDefinitions) { selected = trackers.SelectedItem as AchievementTrackerDefinition; await ReloadAsync(true); } };
             filter.SelectionChanged += (_, __) => RenderList(); category.SelectionChanged += (_, __) => RenderList(); search.TextChanged += (_, __) => RenderList();
             list.SelectionChanged += (_, __) => ShowItem((list.SelectedItem as ListBoxItem)?.Tag as AchievementTrackerState);
@@ -187,6 +204,30 @@ namespace PixelVaultNative
         }
 
         string Account(AchievementTrackerDefinition definition) => definition?.Provider == "steam" ? steamAccount : retroAccount;
+
+        void UpdateTrackerIdentity()
+        {
+            if(fixedTrackerId==null){Title=trackerTitle.Text="Achievement trackers";trackerImage.Visibility=Visibility.Collapsed;return;}
+            if(selected==null){trackerTitle.Text=fixedTrackerId==null?"Achievement trackers":"Tracker unavailable";trackerImage.Visibility=Visibility.Collapsed;return;}
+            Title=trackerTitle.Text=selected.Title;
+            var achievement=achievements.FirstOrDefault(r=>r.Provider==selected.Provider&&r.ProviderGameId==selected.GameId&&r.ProviderAchievementId==selected.AchievementId);
+            trackerImage.Child=TrackerIconVisual.Create(selected.IconId,achievement,System.IO.Path.GetDirectoryName(System.IO.Path.GetDirectoryName(store.DatabasePath)));trackerImage.Visibility=Visibility.Visible;
+            trackerImage.ToolTip="Right-click to select a tracker image";
+        }
+        async Task SelectIconAsync()
+        {
+            var definition=selected;if(definition==null)return;
+            var achievement=achievements.FirstOrDefault(r=>r.Provider==definition.Provider&&r.ProviderGameId==definition.GameId&&r.ProviderAchievementId==definition.AchievementId);
+            var dialog=new TrackerIconPicker(this,definition.IconId,achievement);
+            try
+            {
+                if(ShowIconPicker(dialog)!=true)return;
+                await Task.Run(()=>store.SetTrackerIcon(definition.Id,dialog.SelectedIconId));
+                if(selected?.Id==definition.Id){selected.IconId=dialog.SelectedIconId;UpdateTrackerIdentity();status.Text="Tracker image saved.";}
+            }
+            catch(Exception ex){Error("Could not save tracker image. "+ex.Message);}
+            finally{dialog.Close();}
+        }
 
         internal async Task RenameAsync()
         {
@@ -200,6 +241,7 @@ namespace PixelVaultNative
                 await Task.Run(() => store.RenameTracker(id, title, previousTitle));
                 foreach (var item in trackers.Items.OfType<AchievementTrackerDefinition>().Where(d => d.Id == id)) item.Title = title;
                 if (selected?.Id == id) selected.Title = title;
+                UpdateTrackerIdentity();
                 // Refresh only the selector; reloading progress would discard unsaved count/note drafts.
                 var choice = trackers.SelectedItem;var wasLoading = loadingDefinitions;loadingDefinitions = true;
                 try { trackers.SelectedItem = null;trackers.Items.Refresh();trackers.SelectedItem = choice; }
@@ -221,6 +263,7 @@ namespace PixelVaultNative
                 achievements = achievements.Concat(savedAchievements).GroupBy(r => (r.Provider, r.ProviderGameId, r.ProviderAchievementId)).Select(g => g.First()).ToList();
                 var choices = all.Where(d => (string.IsNullOrEmpty(provider) || d.Provider == provider)
                     && (string.IsNullOrEmpty(gameId) || d.GameId == gameId)
+                    && (fixedTrackerId==null || d.Id==fixedTrackerId)
                     && (browseGameTrackers || string.IsNullOrEmpty(achievementId) || d.AchievementId == achievementId || d.Id == preferredId)).ToList();
                 loadingDefinitions = true; trackers.ItemsSource = choices;
                 selected = choices.FirstOrDefault(d => d.Id == preferredId) ?? choices.FirstOrDefault(); trackers.SelectedItem = selected; loadingDefinitions = false;
@@ -232,6 +275,7 @@ namespace PixelVaultNative
         internal async Task ReloadAsync(bool changeTracker = false, bool preserveDraft = false)
         {
             var generation = ++loadGeneration; var definition = selected;
+            UpdateTrackerIdentity();
             mapLinks.Bind(store, definition?.Provider, definition?.GameId, definition?.GameTitle, steamAccount, retroAccount, tracker: definition?.Id);
             UpdateRefreshControls();
             if (definition == null)
@@ -245,11 +289,20 @@ namespace PixelVaultNative
                 var loaded = await Task.Run(() =>
                 {
                     var warnings = new List<string>(); store.ImportPending(definition.Id, account, warnings.Add);
-                    return (States: store.Load(definition.Id, account).ToList(), Warnings: warnings, Binding: store.Source(definition.Id, account), SourceStatus: store.SourceStatus(definition.Id, account), Automatic: string.IsNullOrWhiteSpace(account) ? (new TrackerAutomationSettings(), new TrackerAutomationState()) : store.Automation(definition.Id, account));
+                    var editor=string.IsNullOrWhiteSpace(account)?null:store.ReadEditor(definition.Id,account);
+                    return (States: (editor?.States??store.Load(definition.Id, account)).ToList(), Definition:editor?.Definition??definition, Versions:editor?.Versions, Warnings: warnings, Binding: store.Source(definition.Id, account), SourceStatus: store.SourceStatus(definition.Id, account), Automatic: string.IsNullOrWhiteSpace(account) ? (new TrackerAutomationSettings(), new TrackerAutomationState()) : store.Automation(definition.Id, account));
                 });
                 if (closed || generation != loadGeneration) return;
                 if (preserveDraft && DraftPending()) return;
-                states = loaded.States.Where(s=>!s.Item.Archived).ToList(); description.Text = definition.Description ?? definition.Title; description.ToolTip = description.Text;
+                states = loaded.States.Where(s=>!s.Item.Archived).ToList();
+                editorVersions=loaded.Versions??new Dictionary<string,TrackerFieldVersions>();
+                definition.Title=loaded.Definition.Title;definition.IconId=loaded.Definition.IconId;definition.AchievementId=loaded.Definition.AchievementId;
+                definition.Items=loaded.Definition.Items;
+                definition.Milestones=loaded.Definition.Milestones;definition.CategoryTargets=loaded.Definition.CategoryTargets;
+                definition.Description=loaded.Definition.Description;definition.CompletionLabel=loaded.Definition.CompletionLabel;
+                definition.AggregateAsSingleItem=loaded.Definition.AggregateAsSingleItem;
+                description.Text = definition.Description ?? definition.Title; description.ToolTip = description.Text;
+                UpdateTrackerIdentity();
                 description.MaxHeight = definition.Milestones.Count > 0 ? 66 : 44;
                 activeSource = loaded.Binding; activeSourceStatus = loaded.SourceStatus;
                 (activeAutomation, activeAutomaticState) = loaded.Automatic;
@@ -305,9 +358,9 @@ namespace PixelVaultNative
 
         void Regroup()
         {
-            var id=selectedItem?.Item.Id;var note=notes.Text;var count=current.Text;bool draft=DraftPending();
+            var id=selectedItem?.Item.Id;var note=notes.Text;var count=current.Text;var missable=itemMissable.IsChecked;var required=itemRequired.IsChecked;bool draft=DraftPending();
             RenderList();
-            if(draft&&selectedItem?.Item.Id==id){notes.Text=note;current.Text=count;}
+            if(draft&&selectedItem?.Item.Id==id){notes.Text=note;current.Text=count;itemMissable.IsChecked=missable;itemRequired.IsChecked=required;}
         }
 
         internal void RenderList()
@@ -331,12 +384,14 @@ namespace PixelVaultNative
                     var members = group.ToList(); var state = members.FirstOrDefault(s => s.Item.Id == selectedId) ?? members[0];
                     var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
                     var title=RecordTitle(state.Item.Name);text.Children.Add(title);
+                    AddOptionalFlag(title, state.Item);
                     var caption = Text(state.Item.Category + (members.Any(s => !string.IsNullOrWhiteSpace(s.Note)) ? " · Has note" : "")
                         + (members.Any(s => s.HasConflict) ? " · Manual conflict" : ""), 15);
                     caption.Margin = new Thickness(0, 3, 0, 0); caption.TextWrapping = TextWrapping.NoWrap; caption.TextTrimming = TextTrimming.CharacterEllipsis;
-                    title.ToolTip=state.Item.Name+"\n"+caption.Text;
+                    title.ToolTip=MailIconText.Plain(state.Item.Name)+"\n"+caption.Text;
                     if(members.Any(s=>!string.IsNullOrWhiteSpace(s.Note)))title.Inlines.Add(new Run(" · Note") { FontSize=14 });
                     var ranks = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+                    AddMissableLabel(ranks, state.Item);
                     foreach (var milestone in selected.Milestones)
                     {
                         var rank = members.Single(s => s.Item.Milestone == milestone);
@@ -351,13 +406,15 @@ namespace PixelVaultNative
             else foreach (var state in visible)
             {
                 var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center }; var title=RecordTitle(state.Item.Name);text.Children.Add(title);
+                AddOptionalFlag(title, state.Item);
                 var caption = Text((state.Item.Category ?? "Other") + (state.Item.Target > 1 ? " · " + (state.Current?.ToString() ?? "?") + "/" + state.Item.Target : "")
                     + (state.IsManual ? " · Manual" : "") + (state.HasConflict ? " · Manual conflict" : "") + (string.IsNullOrWhiteSpace(state.Note) ? "" : " · Has note"), 15);
                 caption.Margin = new Thickness(0, 3, 0, 0); caption.TextWrapping = TextWrapping.NoWrap; caption.TextTrimming = TextTrimming.CharacterEllipsis;
-                title.ToolTip=state.Item.Name+"\n"+caption.Text;
+                title.ToolTip=MailIconText.Plain(state.Item.Name)+"\n"+caption.Text;
                 if(state.Item.Target>1)title.Inlines.Add(new Run(" · "+(state.Current?.ToString()??"?")+"/"+state.Item.Target) { FontSize=14 });
                 if(!string.IsNullOrWhiteSpace(state.Note))title.Inlines.Add(new Run(" · Note") { FontSize=14 });
                 var actions = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+                AddMissableLabel(actions, state.Item);
                 if (!string.IsNullOrWhiteSpace(state.Item.Content))
                 {
                     var contentButton = Button("Content", "Read the saved text for " + state.Item.Name);
@@ -395,7 +452,20 @@ namespace PixelVaultNative
 
         static TextBlock RecordTitle(string name)
         {
-            var title = Text(name, 18, true); title.MaxHeight = 24; title.TextWrapping=TextWrapping.NoWrap; title.TextTrimming = TextTrimming.CharacterEllipsis; title.ToolTip = name; return title;
+            var title = Text(name, 18, true, 0.5); title.MaxHeight = 24; title.TextWrapping=TextWrapping.NoWrap; title.TextTrimming = TextTrimming.CharacterEllipsis; title.ToolTip = MailIconText.Plain(name); return title;
+        }
+        static void AddOptionalFlag(TextBlock title, AchievementTrackerItem item)
+        {
+            if (item.ExcludedFromTotal) title.Inlines.Add(new Run("  Optional") { FontSize = 12, Foreground = Color("#9EADB2") });
+        }
+
+        static void AddMissableLabel(Panel actions, AchievementTrackerItem item)
+        {
+            if (!item.Missable) return;
+            var label = AchievementCollectionUi.MissableLabel();
+            label.Margin = new Thickness(0, 0, 8, 0);
+            label.VerticalAlignment = VerticalAlignment.Center;
+            actions.Children.Add(label);
         }
         sealed class CategoryGroupConverter : IValueConverter
         {
@@ -407,7 +477,8 @@ namespace PixelVaultNative
         {
             return states.GroupBy(s=>CategoryName(s.Item.Category)).ToDictionary(g=>g.Key,g=>
             {
-                var records=selected?.Milestones.Count>0?g.GroupBy(s=>s.Item.GroupId).Select(r=>r.Any(s=>s.Complete)).ToList():g.Select(s=>s.Complete).ToList();
+                var included=g.Where(s=>!s.Item.ExcludedFromTotal);
+                var records=selected?.Milestones.Count>0?included.GroupBy(s=>s.Item.GroupId).Select(r=>r.Any(s=>s.Complete)).ToList():included.Select(s=>s.Complete).ToList();
                 int done=records.Count(complete=>complete),total=records.Count;
                 string text=done+" / "+total+" complete";
                 if(selected!=null&&selected.CategoryTargets.TryGetValue(g.Key,out var target))text+=" · Goal "+Math.Min(done,target)+" / "+target;
@@ -426,7 +497,7 @@ namespace PixelVaultNative
             public object Convert(object value,Type targetType,object parameter,CultureInfo culture)=>Math.Max((double)parameter,(double)value-30);
             public object ConvertBack(object value,Type targetType,object parameter,CultureInfo culture)=>throw new NotSupportedException();
         }
-        static double MilestoneWidth(string label)=>Math.Max(132,Math.Min(140,(label?.Length??0)*7)+94);
+        static double MilestoneWidth(string label)=>Math.Max(94,Math.Min(220,(label?.Length??0)*7+24));
 
         static Grid RecordRow(FrameworkElement text, FrameworkElement indicators)
         {
@@ -457,13 +528,12 @@ namespace PixelVaultNative
                 IsEnabled = selected != null && !string.IsNullOrWhiteSpace(Account(selected)), Tag = state };
             var value = state.Complete ? "Completed" : "Not Complete";
             var ranked = !string.IsNullOrEmpty(state.Item.Milestone);
-            var content = new StackPanel { Orientation=Orientation.Horizontal }; var title = Text(ranked ? label : value, ranked ? 13 : 14, true); var statusText = Text(value, 13);
-            title.TextWrapping=statusText.TextWrapping=TextWrapping.NoWrap;
-            if(ranked){button.Width=MilestoneWidth(label);title.MaxWidth=button.Width-94;title.TextTrimming=TextTrimming.CharacterEllipsis;statusText.Margin=new Thickness(4,0,0,0);}
-            title.HorizontalAlignment = statusText.HorizontalAlignment = HorizontalAlignment.Center;
+            var content = new StackPanel { Orientation=Orientation.Horizontal }; var title = Text(ranked ? label : value, ranked ? 13 : 14, true);
+            title.TextWrapping=TextWrapping.NoWrap;
+            if(ranked){button.MinWidth=94;button.Width=MilestoneWidth(label);title.MaxWidth=button.Width-12;title.TextTrimming=TextTrimming.CharacterEllipsis;}
+            title.HorizontalAlignment = HorizontalAlignment.Center;
             title.SetBinding(TextBlock.ForegroundProperty, new System.Windows.Data.Binding("Foreground") { Source = button });
-            statusText.SetBinding(TextBlock.ForegroundProperty, new System.Windows.Data.Binding("Foreground") { Source = button });
-            content.Children.Add(title); if (ranked) content.Children.Add(statusText); button.Content = content;
+            content.Children.Add(title); button.Content = content;
             button.ToolTip = state.Item.Name + " · " + label + ": " + value + (state.IsManual ? " · Manual" : "")
                 + (state.HasConflict ? " · Manual conflict" : !state.IsKnown ? " · No completion observation yet" : "")
                 + "\nClick to " + (state.Complete ? "mark remaining" : "mark complete") + ". Focus this button to view its details and notes.";
@@ -502,29 +572,35 @@ namespace PixelVaultNative
         {
             selectedItem = item; detailTitle.Text = item == null ? "Select an item" : item.Item.Name + (string.IsNullOrEmpty(item.Item.Milestone) ? "" : " · " + item.Item.Milestone); current.Text = item?.Current?.ToString(CultureInfo.CurrentCulture) ?? ""; notes.Text = item?.Note ?? "";
             var enabled = item != null && selected != null && !string.IsNullOrWhiteSpace(Account(selected));
+            ShowItemRules(item, enabled);
             saveNote.IsEnabled = saveCount.IsEnabled = notes.IsEnabled = current.IsEnabled = enabled; reset.IsEnabled = enabled && item.IsManual;
             countEditor.Visibility = item?.Item.Target > 1 ? Visibility.Visible : Visibility.Collapsed;
             reset.Visibility = item?.IsManual == true ? Visibility.Visible : Visibility.Collapsed;
-            itemSource.Text = item == null ? "Choose a row to view its details or add a note." : item.Status + (item.Item.Target > 1 ? " · Target " + item.Item.Target : "")
-                + (item.IsManual ? "\nManual count: " + item.ManualCurrent + " · Source count: " + (item.ReportedCurrent?.ToString() ?? "Unknown")
-                    + (item.HasConflict ? "\nThese values differ. Keep manual progress or use the latest source." : "\nManual progress overrides the imported count.")
-                    : item.ObservedUtcTicks > 0 ? "\nFrom imported progress." : "\nProgress has not been checked.")
+            itemSource.Text = item == null ? "" : item.Status + (item.Item.Target > 1 ? " · Target " + item.Item.Target : "")
                 + (string.IsNullOrWhiteSpace(item.Item.Detail) ? "" : "\n\n" + item.Item.Detail);
+            reset.ToolTip = item?.IsManual == true
+                ? "Use imported progress · Manual: " + item.ManualCurrent + " · Imported: " + (item.ReportedCurrent?.ToString() ?? "Unknown")
+                : null;
+            MailIconText.Apply(itemSource, itemSource.Text);
         }
 
         async Task SaveNoteAsync()
         {
             if (selectedItem == null || selected == null) return;
             var id = selected.Id; var account = Account(selected); var itemId = selectedItem.Item.Id; var text = notes.Text;
-            try { await Task.Run(() => store.SaveNote(id, account, itemId, text)); await ReloadAsync(); status.Text = "Note saved."; }
+            if(!editorVersions.TryGetValue(itemId,out var version))return;
+            var edit=new TrackerEdit(itemId,"note",null,text,version.Note,Guid.NewGuid().ToString("N"));
+            try { await Task.Run(() => store.Edit(id, account, edit)); await ReloadAsync(); status.Text = "Note saved."; }
             catch (Exception ex) { Error(ex.Message); }
         }
 
         async Task SetProgressAsync(AchievementTrackerState item, int? count)
         {
             var definition = selected; if (definition == null) return;
-            try { await Task.Run(() => store.SetManualProgress(definition.Id, Account(definition), item.Item.Id, count)); await ReloadAsync(); }
-            catch (Exception ex) { await ReloadAsync(); Error("Could not save progress. " + ex.Message); }
+            if(!editorVersions.TryGetValue(item.Item.Id,out var version))return;
+            var edit=new TrackerEdit(item.Item.Id,count.HasValue?"progress":"source",count,null,version.Progress,Guid.NewGuid().ToString("N"));
+            try { await Task.Run(() => store.Edit(definition.Id, Account(definition),edit)); await ReloadAsync(); }
+            catch (Exception ex) { await ReloadAsync(preserveDraft:true); Error("Could not save progress. " + ex.Message); }
         }
 
         async Task CreateAsync(bool spreadsheet = false)
@@ -576,8 +652,8 @@ namespace PixelVaultNative
 
         void Error(string message) { status.Text = message; status.Foreground = Color("#F0B7A6"); }
         internal static Brush Color(string hex) => SystemParameters.HighContrast ? SystemColors.WindowTextBrush : UiBrushHelper.FromHex(hex);
-        internal static TextBlock Text(string text, double size, bool bold = false) => new() { Text = text, FontSize = Math.Max(14,size), FontWeight = bold ? FontWeights.SemiBold : FontWeights.Normal,
-            Foreground = SystemParameters.HighContrast ? SystemColors.WindowTextBrush : UiBrushHelper.FromHex("#D9E6ED"), TextWrapping = TextWrapping.Wrap };
+        internal static TextBlock Text(string text, double size, bool bold = false, double iconScale = 1) => MailIconText.Apply(new TextBlock { Text = text, FontSize = Math.Max(14,size), FontWeight = bold ? FontWeights.SemiBold : FontWeights.Normal,
+            Foreground = SystemParameters.HighContrast ? SystemColors.WindowTextBrush : UiBrushHelper.FromHex("#D9E6ED"), TextWrapping = TextWrapping.Wrap }, text, iconScale);
         internal static void DressEditor(TextBox editor)
         {
             editor.Background = SystemParameters.HighContrast ? SystemColors.WindowBrush : UiBrushHelper.FromHex("#151F25");

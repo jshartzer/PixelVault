@@ -23,19 +23,30 @@ public sealed partial class CompanionTests
         private readonly bool ownsRoot;
         private readonly string screenshotPilot;
         private readonly bool screenshotLibrary;
-        public Host(bool demo = true, bool allowHttp = true, string? root = null,string screenshotPilot="",bool screenshotLibrary=false)
+        private readonly string? applicationRoot,cacheRoot,photoWorker;
+        private readonly ILocalReaderClient? testReader;
+        public Host(bool demo = true, bool allowHttp = true, string? root = null,string screenshotPilot="",bool screenshotLibrary=false,string? applicationRoot=null,string? cacheRoot=null,string? photoWorker=null,ILocalReaderClient? testReader=null)
         {
+            this.testReader=testReader;this.applicationRoot=applicationRoot;this.cacheRoot=cacheRoot;this.photoWorker=photoWorker;
             this.screenshotPilot=screenshotPilot;this.screenshotLibrary=screenshotLibrary;
             this.demo = demo; this.allowHttp = allowHttp; ownsRoot = root is null;
             Root = root ?? Path.Combine(Path.GetTempPath(), "PixelVaultCompanionTests", Guid.NewGuid().ToString("N"));
         }
         protected override void ConfigureWebHost(IWebHostBuilder builder) => builder.UseEnvironment("Testing")
-            .ConfigureServices(services => services.AddSingleton<IStartupFilter, TestRemoteAddress>())
+            .ConfigureServices(services => {
+                services.AddSingleton<IStartupFilter,TestRemoteAddress>();
+                if(testReader is not null)
+                {
+                    services.AddSingleton<ILocalReaderClient>(testReader);
+                    var scheduled=services.FirstOrDefault(d=>d.ImplementationType==typeof(LocalRuntimeHost));if(scheduled is not null)services.Remove(scheduled);
+                }
+            })
             .ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Companion:DataRoot"] = Root, ["Companion:DemoEnabled"] = demo.ToString(),
                 ["Companion:AllowHttp"] = allowHttp.ToString(), ["Logging:LogLevel:Default"] = "None"
                 ,["Companion:ScreenshotPilot"]=screenshotPilot,["Companion:ScreenshotLibraryEnabled"]=screenshotLibrary.ToString()
+                ,["Companion:StorageMode"]=applicationRoot is null?"isolated-copy":"direct-local",["Companion:ApplicationDataRoot"]=applicationRoot,["Companion:CacheRoot"]=cacheRoot,["Companion:PhotoWorkerPath"]=photoWorker,["Companion:LocalWorkersEnabled"]=(testReader is not null).ToString()
             }));
         protected override void Dispose(bool disposing)
         {

@@ -74,11 +74,11 @@ namespace PixelVaultNative
             this.store = store;
             this.adapters = (adapters ?? new ITrackerDataSource[] { new JsonFileTrackerSource(), new SpreadsheetTrackerSource(), new DeathStrandingTrackerSource(Path.GetDirectoryName(store.DatabasePath)) }).ToDictionary(a => a.Id, StringComparer.Ordinal);
         }
-        internal void Configure(string trackerId, string account, string adapterId, string version, string location, string profile = "", string gameDirectory = null, string specificSave = null, bool keepSnapshots = true, TrackerSpreadsheetMapping spreadsheet = null)
+        internal void Configure(string trackerId, string account, string adapterId, string version, string location, string profile = "", string gameDirectory = null, string specificSave = null, bool keepSnapshots = true, TrackerSpreadsheetMapping spreadsheet = null, bool replaceManualProgress = false)
         {
             var definition = store.Definitions().First(d => d.Id == trackerId);
             if (!adapters.TryGetValue(adapterId, out var adapter)) throw new NotSupportedException("This tracker source is not installed.");
-            var binding = new TrackerSourceBinding { TrackerId = trackerId, Account = account, AdapterId = adapterId, AdapterVersion = version, Location = location, Profile = profile ?? "", GameDirectory = gameDirectory, SpecificSave = specificSave, KeepSnapshots = keepSnapshots, Spreadsheet = spreadsheet };
+            var binding = new TrackerSourceBinding { TrackerId = trackerId, Account = account, AdapterId = adapterId, AdapterVersion = version, Location = location, Profile = profile ?? "", GameDirectory = gameDirectory, SpecificSave = specificSave, KeepSnapshots = keepSnapshots, Spreadsheet = spreadsheet, ReplaceManualProgress = replaceManualProgress };
             adapter.Validate(binding, definition); store.SaveSource(binding);
         }
         internal string ChangeSignature(TrackerSourceBinding binding) => adapters.TryGetValue(binding.AdapterId, out var source) && source is ITrackerSourceChangeDetector detector
@@ -97,6 +97,8 @@ namespace PixelVaultNative
                 token.ThrowIfCancellationRequested(); binding = store.Source(trackerId, account) ?? throw new InvalidDataException("Configure a source before refreshing.");
                 if (automatic && store.SourceStatus(trackerId, account)?.Outcome is TrackerRefreshOutcome.Reading or TrackerRefreshOutcome.AwaitingReview)
                     return null; // A manual read/review owns this source until it finishes.
+                using var sourceLease = await TrackerSourceLease.AcquireAsync(store.DatabasePath, binding, token).ConfigureAwait(false);
+                if (automatic && store.SourceStatus(trackerId, account)?.Outcome is TrackerRefreshOutcome.Reading or TrackerRefreshOutcome.AwaitingReview) return null;
                 attempt = store.StartRefresh(binding);
                 if (!adapters.TryGetValue(binding.AdapterId, out var adapter) || binding.AdapterVersion != adapter.Version
                     || !adapter.Capabilities.HasFlag(TrackerSourceCapabilities.Refresh)) throw new NotSupportedException("This tracker source or adapter version is not supported.");

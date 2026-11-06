@@ -19,6 +19,7 @@ namespace PixelVaultNative
         public bool TagSwitch;
         public bool TagPs5;
         public bool TagXbox;
+        public bool TagXbox360;
         public bool DeleteBeforeProcessing;
     }
 
@@ -43,6 +44,7 @@ namespace PixelVaultNative
         public bool TagPs5;
         public bool TagSwitch;
         public bool TagXbox;
+        public bool TagXbox360;
         public bool TagOther;
         public string CustomPlatformTag;
         public string OriginalGameId;
@@ -60,6 +62,7 @@ namespace PixelVaultNative
         public bool OriginalTagPs5;
         public bool OriginalTagSwitch;
         public bool OriginalTagXbox;
+        public bool OriginalTagXbox360;
         public bool OriginalTagOther;
         public string OriginalCustomPlatformTag;
         /// <summary>Import-and-edit: delete file before rest of workflow (shown only in that mode).</summary>

@@ -1,5 +1,9 @@
 # Death Stranding standard-order rank research
 
+## Legend-rank calibration — November 2
+
+The user confirmed order430 was completed at Normal difficulty and saved. The validated reader reports its Century rank item incomplete in the prior autosave (`autosave6`, 20:57:24) and complete in the subsequent manual save (`manualsave16`, 20:58:10). The source observation identifies earned-rank bit6 as Legend, alongside existing LL bit7 and LLL bit8. This confirms Legend-or-higher behavior on a real saved order. The reader still evaluates only the approved current full save snapshot for Century awards.
+
 Growth of a Legend now supports direct save-file refresh in the unreleased App Testing build. LL and LLL are independent observations for all 540 standard orders. The common reconciliation, history and opt-in automatic scheduling mechanisms are reused; no game-specific form is required.
 
 ## Native order reader — October 23

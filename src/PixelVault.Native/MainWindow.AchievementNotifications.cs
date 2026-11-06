@@ -104,6 +104,13 @@ namespace PixelVaultNative
                 var changed = MarkCompletedAchievementGames(copy, rows);
                 if (changed.Count == 0) return;
                 librarySession.PersistGameIndexRows(rows);
+                ApplyReconciledAchievementCompletion(changed);
+            }
+            catch (Exception ex) { LogException("AchievementCompletion.Refresh", ex); }
+        }
+
+        void ApplyReconciledAchievementCompletion(IEnumerable<GameIndexEditorRow> changed)
+        {
                 var ws = _libraryBrowserLiveWorkingSet;
                 foreach (var row in changed)
                 {
@@ -111,7 +118,7 @@ namespace PixelVaultNative
                     void Update(LibraryFolderInfo folder)
                     {
                         if (folder != null && folder.GameId == row.GameId)
-                        { folder.IsCompleted100Percent = true; folder.CompletedUtcTicks = row.CompletedUtcTicks; }
+                        { folder.IsCompleted100Percent = row.IsCompleted100Percent; folder.CompletedUtcTicks = row.CompletedUtcTicks; }
                     }
                     if (ws != null)
                     {
@@ -121,14 +128,16 @@ namespace PixelVaultNative
                             Update(view.PrimaryFolder);
                             foreach (var folder in view.SourceFolders) Update(folder);
                             if (view.GameId == row.GameId || view.SourceFolders.Any(f => f?.GameId == row.GameId))
-                            { view.IsCompleted100Percent = true; view.CompletedUtcTicks = row.CompletedUtcTicks; }
+                            {
+                                var sources = GetLibraryBrowserActionFolders(view);
+                                view.IsCompleted100Percent = sources.Any(f => f.IsCompleted100Percent);
+                                view.CompletedUtcTicks = sources.Where(f => f.IsCompleted100Percent).Select(f => f.CompletedUtcTicks).DefaultIfEmpty().Max();
+                            }
                         }
                     }
                     AchievementCompletionUpdated?.Invoke(completed);
                 }
                 ws?.RerenderFolderList?.Invoke();
-            }
-            catch (Exception ex) { LogException("AchievementCompletion.Refresh", ex); }
         }
 
         internal static List<GameIndexEditorRow> MarkCompletedAchievementGames(
@@ -136,21 +145,24 @@ namespace PixelVaultNative
         {
             var changed = new List<GameIndexEditorRow>();
             if (result == null || result.IsError || !string.IsNullOrEmpty(result.ProgressErrorMessage)
-                || result.Rows == null || result.Rows.Any(r => r == null || !r.HasStableProviderIdentity)
-                || !LibraryGameProfileAchievementsAreFullyUnlocked(result.Rows)) return changed;
+                || result.Rows == null || result.Rows.Count == 0 || result.Rows.Any(r => r == null || !r.HasStableProviderIdentity)) return changed;
+            var baseRows = result.Rows.Where(r => string.IsNullOrWhiteSpace(AchievementOrganization.DlcName(r.DlcName, r.GroupName))).ToArray();
+            // Missing, unknown or DLC-only observations cannot clear a saved flag.
+            // Known locked base achievements are authoritative and revoke stale automatic awards.
+            if (baseRows.Length == 0 || baseRows.Any(r => !r.ProgressKnown)) return changed;
+            var isComplete = LibraryGameProfileAchievementsAreFullyUnlocked(result.Rows);
             var identity = result.Rows[0];
             if (result.Rows.Any(r => r.Provider != identity.Provider || r.ProviderGameId != identity.ProviderGameId)) return changed;
             foreach (var row in games ?? Enumerable.Empty<GameIndexEditorRow>())
             {
-                if (row == null || row.IsCompleted100Percent) continue;
+                if (row == null || row.IsCompleted100Percent == isComplete) continue;
                 var folder = BuildLibraryFolderInfoFromGameIndexRow(row);
                 if (!GameAchievementsFetchService.TryPickAchievementsBackend(NormalizeConsoleLabel(row.PlatformLabel), folder, out var steam)) continue;
                 if ((steam ? GameAchievementsFetchService.SteamProvider : GameAchievementsFetchService.RetroAchievementsProvider) != identity.Provider) continue;
                 if (!string.Equals((steam ? row.SteamAppId : row.RetroAchievementsGameId)?.Trim(), identity.ProviderGameId.Trim(), StringComparison.Ordinal)) continue;
-                row.IsCompleted100Percent = true;
-                var earnedTicks = result.Rows.Where(r => string.Equals(AchievementsInfoWindow.EffectiveAchievementGroupName(r), "Base Game", StringComparison.OrdinalIgnoreCase))
-                    .Max(r => r.UnlockUtcTicks);
-                row.CompletedUtcTicks = earnedTicks > 0 && earnedTicks <= DateTime.UtcNow.Ticks ? earnedTicks : DateTime.UtcNow.Ticks;
+                row.IsCompleted100Percent = isComplete;
+                var earnedTicks = baseRows.Max(r => r.UnlockUtcTicks);
+                row.CompletedUtcTicks = !isComplete ? 0 : earnedTicks > 0 && earnedTicks <= DateTime.UtcNow.Ticks ? earnedTicks : DateTime.UtcNow.Ticks;
                 changed.Add(row);
             }
             return changed;
@@ -202,14 +214,23 @@ namespace PixelVaultNative
                     if (string.IsNullOrWhiteSpace(account) || string.IsNullOrWhiteSpace(steam ? CurrentSteamWebApiKey() : CurrentRetroAchievementsApiKey())) continue;
                     var key = (steam ? "steam|" + game.SteamAppId : "retro|" + game.RetroAchievementsGameId) + "|" + account;
                     if (_achievementLastCheck.TryGetValue(key, out var next) && DateTime.UtcNow < next) continue;
-                    var result = await GameAchievementsFetchService.FetchAsync(platform, game, CurrentSteamWebApiKey(),
+                    GameAchievementsFetchService.FetchResult result;
+                    if(achievementTrackingStore!=null && TrackerSourceLease.BackgroundOwned(achievementTrackingStore.DatabasePath))
+                    {
+                        var provider=steam?"steam":"retroachievements";var gameId=steam?game.SteamAppId:game.RetroAchievementsGameId;
+                        var saved=await _achievementHubStore.LoadAsync(provider,account,token);
+                        if(!saved.Games.TryGetValue(gameId,out var snapshot))continue;
+                        result=new(){Rows=snapshot.Rows,NotificationOnly=true,CapturedUtcTicks=snapshot.UpdatedUtc,GameTitle=game.Name};
+                        AchievementProgressObserved(result,account);
+                    }
+                    else result = await GameAchievementsFetchService.FetchAsync(platform, game, CurrentSteamWebApiKey(),
                         CurrentRetroAchievementsApiKey(), CurrentSteamUserId64(), CurrentRetroAchievementsUsername(), "PixelVault/" + AppVersion, token, notificationsOnly: true);
                     var failed = result.IsError || !string.IsNullOrEmpty(result.ProgressErrorMessage);
                     checkedCount++; if (failed) failures++;
                     _achievementLastCheck[key] = DateTime.UtcNow.AddMinutes(failed ? 30 : Math.Max(5, _achievementNotifications.Data.IntervalMinutes));
                     await Task.Delay(TimeSpan.FromSeconds(2), token);
                 }
-                var rarity = libraryRoot == root && _achievementNotifications.Data.Enabled ? await BackfillHubRarityAsync(token) : 0;
+                var rarity = (achievementTrackingStore==null || !TrackerSourceLease.BackgroundOwned(achievementTrackingStore.DatabasePath)) && libraryRoot == root && _achievementNotifications.Data.Enabled ? await BackfillHubRarityAsync(token) : 0;
                 _achievementMonitorStatus = "Last check " + DateTime.Now.ToString("t") + ": " + checkedCount + " game(s), " + failures + " unavailable."
                     + (rarity > 0 ? " Rarity checked for " + rarity + " game(s)." : "");
             }

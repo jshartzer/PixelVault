@@ -7,7 +7,9 @@ namespace PixelVaultNative
 {
     public sealed partial class MainWindow
     {
-        DateTime GetLibraryFolderNewestDate(LibraryFolderInfo folder)
+        DateTime GetLibraryFolderNewestDate(LibraryFolderInfo folder) => GetLibraryFolderNewestDate(folder, null);
+
+        DateTime GetLibraryFolderNewestDate(LibraryFolderInfo folder, Dictionary<string, LibraryMetadataIndexEntry> index)
         {
             if (folder == null) return DateTime.MinValue;
             if (folder.NewestCaptureUtcTicks > 0)
@@ -27,7 +29,7 @@ namespace PixelVaultNative
             {
                 newestSource = folder.PreviewImagePath;
             }
-            var newest = string.IsNullOrWhiteSpace(newestSource) ? DateTime.MinValue : ResolveIndexedLibraryDate(libraryRoot, newestSource);
+            var newest = string.IsNullOrWhiteSpace(newestSource) ? DateTime.MinValue : ResolveIndexedLibraryDate(libraryRoot, newestSource, index);
             if (newest > DateTime.MinValue) folder.NewestCaptureUtcTicks = newest.ToUniversalTime().Ticks;
             return newest;
         }

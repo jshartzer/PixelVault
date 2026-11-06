@@ -3,10 +3,14 @@ namespace PixelVault.Companion;
 public sealed record ScreenshotPhoto(string Id,string EditionId,string Console,long CaptureUtcTicks,string? CaptureDay,
     string Group,int Width,int Height,string Thumbnail,string Preview)
 {
+    [System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public bool ResponsiveThumbnails { get; init; }
     [System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public ScreenshotOriginal? Original { get; init; }
     [System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public ScreenshotOriginal? Metadata { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? Availability { get; init; }
 }
 public sealed record ScreenshotOriginal(string Asset,string FileName,long Bytes,string ContentType,long LastWriteUtcTicks);
 public sealed record ScreenshotCatalogue(int Version,string WorkspaceId,string Provider,string GameId,string Title,

@@ -576,8 +576,10 @@ namespace PixelVaultNative
             var wrap = new WrapPanel { Orientation = Orientation.Horizontal };
             Action<Button> styleToolBtn = delegate(Button b) { b.Margin = new Thickness(0, 0, 10, 8); };
             var gameIndexBtn = SettingsButton("Game Index", delegate { d.OpenGameIndexEditor(); }, DesignTokens.ActionSecondaryFill, Brushes.White);
+            gameIndexBtn.ToolTip = "Edit game identities, platform links and storage groups.";
             styleToolBtn(gameIndexBtn);
             var photoIndexBtn = SettingsButton("Photo Index", delegate { d.OpenPhotoIndexEditor(); }, DesignTokens.ActionSecondaryFill, Brushes.White);
+            photoIndexBtn.ToolTip = "Edit capture metadata, stars, tags and capture dates.";
             styleToolBtn(photoIndexBtn);
             var mergeBtn = SettingsButton("Merge folders", delegate { d.OpenLibraryStorageMergeTool?.Invoke(d.OwnerWindow); }, DesignTokens.ActionShortcutDismissFill, Brushes.White);
             mergeBtn.ToolTip = "Preview and apply moving captures into shared storage folders (same storage group).";

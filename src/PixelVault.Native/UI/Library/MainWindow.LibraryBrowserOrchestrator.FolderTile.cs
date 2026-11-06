@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -399,9 +399,8 @@ namespace PixelVaultNative
             var completedInnerCorner = coverCorner;
             var coverRoot = new Grid { Width = tileWidth, Height = tileHeight };
             var showCompletedCardTreatment = folder != null
-                && folder.IsCompleted100Percent
+                && (folder.IsCompleted100Percent || HasLibraryAchievementSource(displayFolder))
                 && ws?.WorkspaceMode != LibraryWorkspaceMode.Photo;
-            var foilVisual = showCompletedCardTreatment ? CreateLibraryTileCompletionFoil(tileWidth, tileHeight) : null;
             var coverArt = CreateAsyncImageTile(
                 GetLibraryArtPathForDisplayOnly(displayFolder),
                 CalculateLibraryFolderArtDecodeWidth(tileWidth, ResolveLibraryDpiScale()),
@@ -417,7 +416,6 @@ namespace PixelVaultNative
                 Brushes.Transparent,
                 new Thickness(0));
             coverRoot.Children.Add(coverArt);
-            foilVisual?.AttachArtwork(coverArt);
             var overlayPadRight = showPlatformBadgeOnTile ? 84d : 10d;
             var titleBlock = new TextBlock
             {
@@ -464,7 +462,12 @@ namespace PixelVaultNative
                 Child = overlayStack
             };
             coverRoot.Children.Add(footerScrim);
-            if (showPlatformBadgeOnTile) coverRoot.Children.Add(BuildLibraryTilePlatformBadge(badgePlatformLabel));
+            FrameworkElement platformBadge = null;
+            if (showPlatformBadgeOnTile)
+            {
+                platformBadge = BuildLibraryTilePlatformBadge(badgePlatformLabel);
+                coverRoot.Children.Add(platformBadge);
+            }
             var contentInset = showCompletedCardTreatment ? completedCardInset : 0d;
             var cardHost = new Grid
             {
@@ -490,160 +493,17 @@ namespace PixelVaultNative
             if (roundedCoverClip.CanFreeze) roundedCoverClip.Freeze();
             imageBorder.Clip = roundedCoverClip;
             cardHost.Children.Add(imageBorder);
-            if (showCompletedCardTreatment) cardHost.Children.Add(BuildLibraryTileCompletionFrameOverlay(tileWidth, tileHeight, coverCorner));
+            HolofoilCover coverFinish = null;
+            var completionDecoration = showCompletedCardTreatment
+                ? CreateLibraryCompletionDecoration(folder, tileWidth, tileHeight, coverCorner, tier =>
+                {
+                    var complete = tier != PixelVault.Tracking.AchievementCompletionTier.None;
+                    coverFinish?.SetTier(tier);
+                    footerScrim.Padding = new Thickness(complete ? Math.Clamp(tileWidth * .14, 18, 44) : 10, 18,
+                        complete ? Math.Max(overlayPadRight, tileWidth * .25) : overlayPadRight, complete ? 32 : 8);
+                    if (platformBadge != null) platformBadge.Margin = new Thickness(0, 0, 10, complete ? 29 : 10);
+                }) : null;
             tile.Content = cardHost;
-            if (foilVisual != null)
-            {
-                ScrollViewer foilScrollHost = null;
-                ScrollChangedEventHandler foilScrollChanged = null;
-                MouseWheelEventHandler foilPreviewMouseWheel = null;
-                EventHandler foilRendering = null;
-                var foilLastScrollOffset = double.NaN;
-                var foilScrollBiasY = 0d;
-                var foilRenderIdleFrames = 0;
-                var foilHovering = false;
-
-                Point ResolveTileViewportCenter()
-                {
-                    if (foilScrollHost == null || imageBorder == null || imageBorder.ActualWidth <= 0 || imageBorder.ActualHeight <= 0)
-                        return new Point(0.5, 0.5);
-
-                    try
-                    {
-                        var center = imageBorder.TranslatePoint(new Point(imageBorder.ActualWidth * 0.5, imageBorder.ActualHeight * 0.5), foilScrollHost);
-                        var viewportWidth = Math.Max(1, foilScrollHost.ViewportWidth);
-                        var viewportHeight = Math.Max(1, foilScrollHost.ViewportHeight);
-                        return new Point(
-                            Math.Max(0, Math.Min(1, center.X / viewportWidth)),
-                            Math.Max(0, Math.Min(1, center.Y / viewportHeight)));
-                    }
-                    catch
-                    {
-                        return new Point(0.5, 0.5);
-                    }
-                }
-
-                void UpdateFoilFromViewport(bool animate)
-                {
-                    var viewportCenter = ResolveTileViewportCenter();
-                    var blendedY = foilHovering
-                        ? viewportCenter.Y
-                        : Math.Max(0, Math.Min(1, viewportCenter.Y + foilScrollBiasY));
-                    foilVisual.Update(viewportCenter.X, blendedY, animate);
-                }
-
-                void StopFoilRendering()
-                {
-                    if (foilRendering == null) return;
-                    CompositionTarget.Rendering -= foilRendering;
-                    foilRendering = null;
-                }
-
-                void EnsureFoilRendering()
-                {
-                    if (foilRendering != null) return;
-                    foilRendering = delegate
-                    {
-                        if (foilScrollHost == null || !tile.IsLoaded || imageBorder == null || imageBorder.ActualWidth <= 0 || imageBorder.ActualHeight <= 0)
-                        {
-                            StopFoilRendering();
-                            return;
-                        }
-
-                        if (Math.Abs(foilScrollBiasY) > 0.002d)
-                        {
-                            foilScrollBiasY *= 0.82d;
-                            if (Math.Abs(foilScrollBiasY) < 0.002d) foilScrollBiasY = 0d;
-                            UpdateFoilFromViewport(false);
-                            return;
-                        }
-
-                        if (foilRenderIdleFrames > 0)
-                        {
-                            foilRenderIdleFrames--;
-                            UpdateFoilFromViewport(false);
-                            return;
-                        }
-
-                        StopFoilRendering();
-                    };
-                    CompositionTarget.Rendering += foilRendering;
-                }
-
-                void EnsureFoilScrollHost()
-                {
-                    if (foilScrollHost != null) return;
-                    for (DependencyObject current = tile; current != null; current = VisualTreeHelper.GetParent(current))
-                    {
-                        if (current is ScrollViewer scrollViewer)
-                        {
-                            foilScrollHost = scrollViewer;
-                            break;
-                        }
-                    }
-                    if (foilScrollHost == null) return;
-
-                    foilScrollChanged = delegate(object _, ScrollChangedEventArgs se)
-                    {
-                        var delta = Math.Abs(se.VerticalChange) > 0.001d
-                            ? se.VerticalChange
-                            : (double.IsNaN(foilLastScrollOffset) ? 0d : se.VerticalOffset - foilLastScrollOffset);
-                        foilLastScrollOffset = se.VerticalOffset;
-                        foilScrollBiasY = Math.Max(-0.6d, Math.Min(0.6d, delta / 48d));
-                        if (foilRenderIdleFrames < 6) foilRenderIdleFrames = 6;
-                        EnsureFoilRendering();
-                        UpdateFoilFromViewport(false);
-                    };
-                    foilScrollHost.ScrollChanged += foilScrollChanged;
-
-                    foilPreviewMouseWheel = delegate
-                    {
-                        if (foilRenderIdleFrames < 8) foilRenderIdleFrames = 8;
-                        EnsureFoilRendering();
-                    };
-                    foilScrollHost.PreviewMouseWheel += foilPreviewMouseWheel;
-                }
-
-                tile.Loaded += delegate
-                {
-                    EnsureFoilScrollHost();
-                    UpdateFoilFromViewport(false);
-                };
-                tile.Unloaded += delegate
-                {
-                    if (foilScrollHost != null && foilScrollChanged != null)
-                        foilScrollHost.ScrollChanged -= foilScrollChanged;
-                    if (foilScrollHost != null && foilPreviewMouseWheel != null)
-                        foilScrollHost.PreviewMouseWheel -= foilPreviewMouseWheel;
-                    StopFoilRendering();
-                    foilScrollHost = null;
-                    foilScrollChanged = null;
-                    foilPreviewMouseWheel = null;
-                    foilLastScrollOffset = double.NaN;
-                    foilScrollBiasY = 0d;
-                    foilRenderIdleFrames = 0;
-                    foilHovering = false;
-                };
-                tile.MouseEnter += delegate
-                {
-                    foilHovering = true;
-                };
-                tile.MouseMove += delegate(object _, MouseEventArgs e)
-                {
-                    if (imageBorder == null || imageBorder.ActualWidth <= 0 || imageBorder.ActualHeight <= 0) return;
-                    foilHovering = true;
-                    var position = e.GetPosition(imageBorder);
-                    foilVisual.Update(
-                        Math.Max(0, Math.Min(1, position.X / imageBorder.ActualWidth)),
-                        Math.Max(0, Math.Min(1, position.Y / imageBorder.ActualHeight)),
-                        true);
-                };
-                tile.MouseLeave += delegate
-                {
-                    foilHovering = false;
-                    UpdateFoilFromViewport(true);
-                };
-            }
             tile.Click += delegate
             {
                 showFolder(folder);
@@ -810,6 +670,17 @@ namespace PixelVaultNative
                 };
             }
             tile.Margin = tileMargin;
+            if (completionDecoration != null)
+            {
+                // WPF clips oversized button content to the chrome's inner arrange slot.
+                // Keep the projecting metalwork beside the button, within the existing tile margin.
+                tile.Margin = new Thickness(0);
+                var completedContainer = new Grid { Width = tileWidth, Height = tileHeight, Margin = tileMargin, ClipToBounds = false };
+                completedContainer.Children.Add(tile);
+                completedContainer.Children.Add(completionDecoration);
+                coverFinish = new HolofoilCover(completedContainer, coverArt);
+                return coverFinish;
+            }
             return tile;
         }
 
@@ -842,6 +713,15 @@ namespace PixelVaultNative
                     ws.ScrollPhotoRailSelectionToTopPending = true;
                     ws.PhotoRailExcludedConsoleLabels.Clear();
                 }
+            }
+            if (ws.IsFolderWorkspaceMode)
+            {
+                ws.Current = info;
+                activeSelectedLibraryFolder = CloneLibraryFolderInfo(GetLibraryBrowserPrimaryFolder(info));
+                PersistLibraryBrowserLastSelection(info);
+                ws.DetailRenderCancellation.CancelCurrent();
+                // Retain PendingRestoreDetailScrollAfterShow until captures are visible.
+                return;
             }
             ws.ResetDetailRowsToLoadingOnNextRender = selectionChanged;
             ws.PreserveDetailScrollOnNextRender = false;

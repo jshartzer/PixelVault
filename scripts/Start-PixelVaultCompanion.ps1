@@ -10,7 +10,7 @@ $companionRepo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 . (Join-Path $PSScriptRoot 'CompanionPreview.Network.ps1')
 if ([string]::IsNullOrWhiteSpace($DataRoot)) { $DataRoot = Join-Path $companionRepo 'PixelVaultCompanionData' }
 $companionRelocated=Get-CompanionRelocatedUrl -DataRoot $DataRoot
-if($companionRelocated){Write-Host "PixelVault Companion now runs on the NAS: $companionRelocated";Write-Host 'The former PC workspace is retained as a backup and was not started.';return}
+if($companionRelocated){Write-Host "PixelVault Companion runs at: $companionRelocated";Write-Host 'The historical workspace was not started.';return}
 $companionNetwork=Get-CompanionPreviewNetwork -Port $Port -HomeNetwork:$HomeNetwork -ListenAddress $ListenAddress
 Enable-CompanionPreviewPhoneAccess -Network $companionNetwork -Port $Port -FirewallScript (Join-Path $PSScriptRoot 'Enable-PixelVaultCompanionPhone.ps1')
 if ([string]::IsNullOrWhiteSpace($DataRoot)) {

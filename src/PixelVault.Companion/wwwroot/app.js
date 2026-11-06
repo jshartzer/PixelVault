@@ -1,4 +1,5 @@
 'use strict';
+let pollTimer, initialization=0, initializing=false, appliedVersions={}, viewVersions=new Map();
 const $ = id => document.getElementById(id);
 function closeSideMenu(){if($('side-menu').open)$('side-menu').close();}
 $('menu-open').addEventListener('click',()=>{
@@ -12,17 +13,39 @@ $('side-menu').addEventListener('click',event=>{
   if(event.target===$('side-menu')&&(event.clientX<box.left||event.clientX>box.right||event.clientY<box.top||event.clientY>box.bottom))closeSideMenu();
 });
 let session, csrf, trackers = [], games = [], detail, profile, sectionOrder, sectionDraft, sectionSaving = false, limit = 60, completedLimit = 30, routeVersion = 0;
+let trackerGroupOrder=PixelVaultLibrary.normalizeTrackerGroupOrder();
 let libraryLayout={sort:'screenshot-newest',pins:[]},librarySaving=false;
+let coverControlsVisible=true;
+try{coverControlsVisible=localStorage.getItem('PixelVault.Companion.cover-controls')!=='hidden';}catch{/* Keep the default when browser storage is unavailable. */}
+function applyCoverControlsVisibility(){
+  $('games').classList.toggle('cover-controls-hidden',!coverControlsVisible);
+  $('cover-controls-toggle').checked=coverControlsVisible;
+  sizeGameCards();
+}
+function sizeGameCards(){
+  const grid=$('games');if(grid.hidden)return;
+  const width=parseFloat(getComputedStyle(grid).gridTemplateColumns);if(!Number.isFinite(width))return;
+  const height=width*1.5+(coverControlsVisible?Math.max(14,width*.13)+44:width*.13);
+  grid.style.setProperty('--game-card-height',height+'px');
+}
+if(typeof ResizeObserver!=='undefined')new ResizeObserver(sizeGameCards).observe($('games'));
+applyCoverControlsVisibility();
+$('cover-controls-toggle').addEventListener('change',()=>{
+  coverControlsVisible=$('cover-controls-toggle').checked;applyCoverControlsVisibility();
+  try{localStorage.setItem('PixelVault.Companion.cover-controls',coverControlsVisible?'shown':'hidden');}catch{/* The current view can still be changed without storage. */}
+});
 let pcConnection={paired:false,online:false,supported:[]},refreshJob,refreshingGroup;
 let updateScope='',pendingUpdateSummary,visibleUpdateSummary,summaryDismissed=false;
 const libraryGroups=()=>PixelVaultLibrary.groupGames(games);
+const completionShowcase=PixelVaultShowcase.create({getGames:()=>games});
 const profileGroup=()=>libraryGroups().find(g=>g.id===profile?.groupId);
 const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const pct = (done, total) => total ? Math.min(100, Math.max(0, done * 100 / total)) : 0;
 const progressBar = (done, total) => `<div class="progress" role="meter" aria-label="Completion" aria-valuemin="0" aria-valuemax="${Math.max(total, 1)}" aria-valuenow="${done}"><div class="progress-value" data-percent="${pct(done, total)}"></div></div>`;
 function paintBars() { document.querySelectorAll('[data-percent]').forEach(e => { e.style.width = `${Number(e.dataset.percent)}%`; }); }
 async function api(path, body) {
-  const response = await fetch('/api/v1' + path, { credentials: 'same-origin', cache: 'no-store',
+  const requestPath=!body&&/^\/trackers\/[^/?]+$/.test(path)?path+'?compact=true':path;
+  const response = await fetch('/api/v1' + requestPath, { credentials: 'same-origin', cache: 'no-store',
     headers: body ? {'Content-Type':'application/json','X-CSRF-TOKEN':csrf ?? ''} : {},
     method: body ? 'POST' : 'GET', body: body ? JSON.stringify(body) : undefined });
   if (!response.ok) {
@@ -34,13 +57,23 @@ async function api(path, body) {
     }
     const failure = new Error(message); failure.status = response.status; throw failure;
   }
-  return response.json();
+  const result=await response.json();
+  if(result?.definition?.items&&result.states?.some(s=>s.itemId)){const items=new Map(result.definition.items.map(i=>[i.id,i]));result.states=result.states.map(s=>s.itemId?{...s,item:items.get(s.itemId)}:s);}
+  return result;
 }
 function status(message, error = false) { $('status').hidden = !message; $('status').textContent = message; $('status').className = error ? 'error' : ''; }
-const achievementUI=PixelVaultAchievements.create({api,heading,progressBar,paintBars,status,getGames:()=>games,getTrackers:()=>trackers,newRequestId:requestId});
+const trackerCard=(t,platform='')=>PixelVaultTrackerIcons.card(t,{platform,readOnly:!!session?.readOnly});
+const trackerImageUI=PixelVaultTrackerIcons.create({api,getTracker:id=>detail?.definition.id===id?detail.definition:trackers.find(t=>t.id===id),isReadOnly:()=>!!session?.readOnly,onSaved:(id,iconId)=>{
+  const t=trackers.find(t=>t.id===id);if(t)t.iconId=iconId;
+  if(detail?.definition.id===id)detail.definition.iconId=iconId;
+}});
+const achievementUI=PixelVaultAchievements.create({api,heading,progressBar,paintBars,status,getGames:()=>games,getTrackers:()=>trackers,getWorkspace:()=>updateScope,newRequestId:requestId,trackerCard});
 const screenshotUI=PixelVaultScreenshots.create({api,heading,getGames:()=>games,navigate:(hash,replace)=>navigation.go(hash,replace),back:()=>navigation.back()});
+const mapUI=PixelVaultMaps.create({api,heading,getGames:()=>games,navigate:hash=>navigation.go(hash)});
 function showAuth(setup) {
-  screenshotUI.clear();
+  initialization++;initializing=false;clearInterval(pollTimer);appliedVersions={};viewVersions.clear();games=[];trackers=[];
+  mapUI.clear();
+  screenshotUI.clear();trackerImageUI.close();
   $('menu-open').hidden=true;
   updateScope='';pendingUpdateSummary=undefined;visibleUpdateSummary=undefined;
   $('navigate-back').hidden=true;
@@ -54,26 +87,36 @@ function showAuth(setup) {
   $('auth-form').dataset.setup = String(setup);
 }
 async function initialize() {
+  const generation=++initialization;initializing=true;clearInterval(pollTimer);appliedVersions={};viewVersions.clear();
   try {
-    session = await api('/session');
-    csrf = (await api('/antiforgery')).token;
-    status('');
-    if (!session.authenticated) { showAuth(session.setupRequired); return; }
-    $('auth').hidden = true; $('auth-error').textContent = ''; $('logout').hidden = false; $('menu-open').hidden=false;
-    $('workspace').hidden = false; $('sample-banner').hidden = !session.demoEnabled;
-    $('workspace-label').textContent = session.demoEnabled ? 'Sample workspace · Read-only preview. Your desktop library is separate.' : 'Separate Companion workspace · Edits save here. Desktop synchronization is not connected yet.';
-    let workspace;
-    [games, trackers, sectionOrder,libraryLayout,pcConnection,workspace] = await Promise.all([api('/games'), api('/trackers'), api('/preferences/game-sections'),api('/preferences/library'),api('/refresh/connection'),api('/workspace')]);
-    updateScope=workspace.id;
-    screenshotUI.setWorkspace(updateScope);
-    renderConnectionStatus();
+    const bootstrap=await Promise.all([api('/session'),api('/antiforgery')]);if(generation!==initialization)return;
+    session=bootstrap[0];csrf=bootstrap[1].token;status('');
+    if(!session.authenticated){showAuth(session.setupRequired);return;}
+    $('auth').hidden=true;$('auth-error').textContent='';$('logout').hidden=false;$('menu-open').hidden=false;
+    $('workspace').hidden=false;$('sample-banner').hidden=!session.demoEnabled;
+    const requiredReads=Promise.all([api('/games'),api('/preferences/game-sections'),api('/preferences/library'),api('/workspace'),api('/preferences/tracker-groups')]);
+    const optional=Promise.allSettled([api('/trackers'),api('/refresh/connection')]);
+    const required=await requiredReads;
+    if(generation!==initialization)return;
+    trackerGroupOrder=PixelVaultLibrary.normalizeTrackerGroupOrder(required[4]?.groups);
+    const workspace=required[3];games=required[0];sectionOrder=required[1];libraryLayout=required[2];trackers=[];
+    updateScope=workspace.id;session.workspaceMode=workspace.mode;
+    $('workspace-label').textContent=workspace.mode==='direct-local'?'Saved on this PC.':session.demoEnabled?'Sample workspace · Read-only preview. Your desktop library is separate.':'Separate Companion workspace';
+    screenshotUI.setWorkspace(updateScope);mapUI.setWorkspace(updateScope);
     $('game-sort').value=libraryLayout.sort;
-    const platform = $('game-platform').value;
-    $('game-platform').innerHTML = '<option value="">All platforms</option>' + [...new Set(games.map(g=>g.platform))].sort().map(p=>`<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('');
-    $('game-platform').value = platform;
-    await route();
+    const platform=$('game-platform').value;
+    $('game-platform').innerHTML='<option value="">All platforms</option>'+[...new Set(games.map(g=>g.platform))].sort().map(p=>`<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('');
+    $('game-platform').value=platform;
+    await route({refreshLibrary:false});
+    const extras=await optional;if(generation!==initialization)return;
+    if(extras[0].status==='fulfilled')trackers=extras[0].value;
+    if(extras[1].status==='fulfilled')pcConnection=extras[1].value;
+    renderConnectionStatus();
+    if(!unsafeToRefresh()){if(profile)renderGameProfile();else if(!location.hash.slice(1))renderGameGrid({preservePosition:true});}
     checkForTrackerUpdates();
-  } catch (error) { status(error.message || 'Cannot reach Companion. Check your connection and reload.', true); }
+    pollTimer=setInterval(()=>pollConnection(),workspace.mode==='direct-local'?5000:15000);
+  } catch(error){if(generation===initialization)status(error.message||'Cannot reach Companion. Check your connection and reload.',true);}
+  finally{if(generation===initialization)initializing=false;}
 }
 $('auth-form').addEventListener('submit', async event => {
   event.preventDefault(); $('submit').disabled = true; $('auth-error').textContent = '';
@@ -93,28 +136,52 @@ $('logout').addEventListener('click', async () => {
   finally{$('logout').disabled=false;}
 });
 function heading(title, subtitle, eyebrow = 'KEEP YOUR PLACE') {
+  $('tracker-heading-image').hidden=true;$('page-heading').classList.remove('has-tracker-image');
   $('page-title').textContent = title; $('page-subtitle').textContent = subtitle; $('eyebrow').textContent = eyebrow;
 }
-async function route() {
+function trackerHeading(){
+  const d=detail.definition;
+  heading(d.title, d.description, d.gameTitle.toUpperCase());
+  const trackerImage=$('tracker-heading-image');trackerImage.hidden=false;trackerImage.disabled=!!detail.readOnly;trackerImage.dataset.selectTrackerImage=d.id;trackerImage.dataset.trackerIconOwner=d.id;
+  const restore=PixelVaultTrackerIcons.retainImages(trackerImage);
+  trackerImage.innerHTML=`<span class="tracker-image" data-tracker-image="${escapeHtml(d.id)}">${PixelVaultTrackerIcons.image(d)}</span>`;restore();$('page-heading').classList.add('has-tracker-image');
+  $('select-tracker-image').hidden=!!detail.readOnly;$('select-tracker-image').dataset.selectTrackerImage=d.id;
+}
+async function route({refreshLibrary=true}={}) {
   const version = ++routeVersion;
   if (!session?.authenticated) return;
-  closeSideMenu();
+  let parts,incomingGame,incomingTracker;
+  try { parts = location.hash.slice(1).split('/').map(decodeURIComponent); }
+  catch { status('That tracker link is invalid.', true); return; }
+  // Prepare data before hiding the current screen. Parent game cards are already in the library.
+  try{
+    if(parts[0]==='game')incomingGame=games.find(g=>g.provider===parts[1]&&g.gameId===parts[2])||await api(`/games/${encodeURIComponent(parts[1])}/${encodeURIComponent(parts[2])}`);
+    if(parts[0]==='tracker'){incomingTracker=await api('/trackers/'+encodeURIComponent(parts[1]));if(session?.workspaceMode==='direct-local')void api('/refresh/opened/'+encodeURIComponent(parts[1]),{}).catch(()=>{});}
+    if(version!==routeVersion)return;
+  }catch(error){if(version===routeVersion)status(error.message,true);return;}
+  closeSideMenu();trackerImageUI.close();
+  completionShowcase.close();$('showcase-open').hidden=true;
   if($('tracker-content').open)$('tracker-content').close();
   $('navigate-back').hidden=!location.hash.slice(1);
-  status(''); captureDrafts(); detail = undefined; profile = undefined;achievementUI.reset();screenshotUI.reset();
+  status(''); captureDrafts(); detail = undefined; profile = undefined;achievementUI.reset();screenshotUI.reset();mapUI.reset();
   if ($('sections-dialog').open) $('sections-dialog').close();
   for (const id of ['games','game-profile','detail','empty','library-tools']) $(id).hidden = true;
   $('page-heading').hidden = false;
   $('breadcrumbs').innerHTML = ''; $('page-count').textContent = '';
   $('breadcrumbs').hidden = !location.hash.slice(1);
-  let parts;
-  try { parts = location.hash.slice(1).split('/').map(decodeURIComponent); }
-  catch { status('That tracker link is invalid.', true); return; }
   if (!parts[0]) {
     renderHome();
+    if(refreshLibrary){
+      try{
+        const [nextGames,nextTrackers,nextGroups]=await Promise.all([api('/games'),api('/trackers'),api('/preferences/tracker-groups')]);
+        if(version!==routeVersion)return;
+        trackerGroupOrder=PixelVaultLibrary.normalizeTrackerGroupOrder(nextGroups?.groups);games=nextGames;trackers=nextTrackers;
+      }catch(error){if(version!==routeVersion)return;status('Could not refresh your library. Your previous library is kept.',true);}
+    }
+    $('empty').hidden=!!games.length;$('games').hidden=!games.length;$('library-tools').hidden=!games.length;
+    renderGameGrid({preservePosition:true});$('page-count').textContent=`${libraryGroups().length} games`;
   } else if (parts[0] === 'game') {
-    try { const game = await api(`/games/${encodeURIComponent(parts[1])}/${encodeURIComponent(parts[2])}`); if(version !== routeVersion)return; profile = game; }
-    catch(error) { if(version === routeVersion) status(error.message,true); return; }
+    profile=incomingGame;
     renderGameProfile();
   } else if (parts[0] === 'achievements' || parts[0] === 'achievement') {
     await achievementUI.open(parts);
@@ -122,11 +189,12 @@ async function route() {
     renderHome();await screenshotUI.open(parts);
   } else if (parts[0] === 'screenshots' || parts[0] === 'photo' || parts[0] === 'timeline' || parts[0] === 'timeline-photo') {
     await screenshotUI.open(parts);
+  } else if (parts[0] === 'maps' || parts[0] === 'map') {
+    await mapUI.open(parts);
   } else if (parts[0] === 'tracker') {
-    try { const incoming = await api('/trackers/' + encodeURIComponent(parts[1])); if (version !== routeVersion) return; detail = incoming; }
-    catch (error) { if (version === routeVersion) status(error.message, true); return; }
+    detail=incomingTracker;
     const d = detail.definition;
-    heading(d.title, d.description, d.gameTitle.toUpperCase());
+    trackerHeading();
     $('breadcrumbs').innerHTML = `<a href="#">All games</a><span>/</span><a href="#game/${encodeURIComponent(d.provider)}/${encodeURIComponent(d.gameId)}">${escapeHtml(d.gameTitle)}</a><span>/</span><span aria-current="page">Tracker</span>`;
     renderSummary();
     $('detail').hidden = false; $('search').value = ''; $('filter').value = 'all'; limit = 60; completedLimit = 30; renderItems();
@@ -134,38 +202,84 @@ async function route() {
   paintBars();
 }
 function renderHome() {
+    $('showcase-open').hidden=false;
     heading('Your games.', 'Choose a game to pick up where you left off.', 'YOUR COLLECTION');
     const count=libraryGroups().length;$('page-count').textContent = `${count} ${count === 1 ? 'game' : 'games'}`;
     if (!games.length) { $('empty').hidden = false; return; }
     $('games').hidden = false; $('library-tools').hidden = false; renderGameGrid();
-    void screenshotUI.showHome();
+    void screenshotUI.showHome({refresh:true});
 }
-function renderGameGrid() {
+const renderedGameMarkup=new WeakMap();
+let lastGameGridMarkup;
+function updateGameGrid(markup,preservePosition){
+  const grid=$('games');
+  if(markup===lastGameGridMarkup)return;
+  const current=[...grid.children],anchors=preservePosition&&window.scrollY>0?current.filter(card=>{
+    const rect=card.getBoundingClientRect();return rect.bottom>0&&rect.top<window.innerHeight;
+  }).map(card=>({id:card.dataset.gameCard,top:card.getBoundingClientRect().top})):[];
+  const focused=grid.contains(document.activeElement)?document.activeElement:null;
+  const focusedId=focused?.closest('[data-game-card]')?.dataset.gameCard;
+  const existing=new Map(current.map(card=>[card.dataset.gameCard,card]));
+  const template=document.createElement('template');template.innerHTML=markup;
+  const retained=new Set(),nextCards=new Map();let cursor=grid.firstElementChild;
+  for(const next of [...template.content.children]){
+    const html=next.outerHTML,old=existing.get(next.dataset.gameCard);
+    const card=old&&renderedGameMarkup.get(old)===html?old:next;
+    if(card===next){
+      const oldImage=old?.querySelector('.cover-frame img'),newImage=card.querySelector('.cover-frame img');
+      if(oldImage&&newImage&&oldImage.getAttribute('src')===newImage.getAttribute('src'))newImage.replaceWith(oldImage);
+      renderedGameMarkup.set(card,html);handleMissingArtwork(card);
+    }
+    if(card===cursor)cursor=cursor.nextElementSibling;else grid.insertBefore(card,cursor);
+    retained.add(card);nextCards.set(card.dataset.gameCard,card);
+  }
+  for(const card of current)if(!retained.has(card))card.remove();
+  if(focused&&!focused.isConnected)nextCards.get(focusedId)?.querySelector(focused.matches('.pin-game')?'.pin-game':'a')?.focus({preventScroll:true});
+  for(const anchor of anchors){
+    const card=nextCards.get(anchor.id);if(!card)continue;
+    const delta=card.getBoundingClientRect().top-anchor.top;if(Math.abs(delta)>.5)window.scrollBy(0,delta);
+    break;
+  }
+  lastGameGridMarkup=markup;
+}
+function renderGameGrid({preservePosition=false}={}) {
+  sizeGameCards();
   const query = $('game-search').value.trim().toLocaleLowerCase(), platform = $('game-platform').value;
   const visible = PixelVaultLibrary.sortGames(libraryGroups().filter(g=>g.editions.some(e=>e.title.toLocaleLowerCase().includes(query)) && (!platform || g.platforms.includes(platform))),libraryLayout.sort,libraryLayout.pins);
   $('game-results').textContent = `${visible.length} ${visible.length === 1 ? 'game' : 'games'}`;
-  $('games').innerHTML = visible.map(g=>{
-    const pinned=libraryLayout.pins.includes(g.id),selected=platform?g.editions.find(e=>e.platform===platform):g;
-    return `<article class="game-card cover-card ${pinned?'is-pinned':''}"><button class="pin-game" data-game="${escapeHtml(g.id)}" aria-label="${pinned?'Unpin':'Pin'} ${escapeHtml(g.title)}" aria-pressed="${pinned}" ${librarySaving?'disabled':''} title="${pinned?'Unpin':'Pin to top'}"><span aria-hidden="true">${pinned?'★':'☆'}</span></button><a href="#game/${encodeURIComponent(selected.provider)}/${encodeURIComponent(selected.gameId)}"><div class="cover-frame"><span class="cover-fallback" aria-hidden="true">${escapeHtml(g.title.split(/\s+/).map(w=>w[0]).slice(0,3).join(''))}</span>${g.coverUrl ? `<img src="${escapeHtml(g.coverUrl)}" alt="" loading="lazy" decoding="async" width="480" height="720">` : ''}${g.trackerCount ? `<span class="cover-tracker-count">${g.trackerCount} ${g.trackerCount === 1 ? 'tracker' : 'trackers'}</span>` : ''}</div><h2>${escapeHtml(g.title)}</h2><p>${escapeHtml(g.platforms.join(' · '))}</p></a></article>`;
+  const markup = visible.map((g,index)=>{
+    const pinned=PixelVaultLibrary.isPinned(g,libraryLayout.pins),selected=platform?PixelVaultLibrary.platformChoices(g.editions).find(c=>c.edition.platform===platform)?.edition||g:g;
+    const completion=PixelVaultLibrary.completionTier(platform?selected:g);
+    const label=escapeHtml(g.title+' · '+g.platforms.join(' · '));
+    return `<article data-game-card="${escapeHtml(g.id)}" aria-label="${escapeHtml(g.title)}" class="game-card cover-card completion-${completion} ${pinned?'is-pinned':''}"><a href="#game/${encodeURIComponent(selected.provider)}/${encodeURIComponent(selected.gameId)}" aria-label="${label}" title="${label}"><div class="completion-cover"><div class="cover-frame"><span class="cover-fallback" aria-hidden="true">${escapeHtml(g.title.split(/\s+/).map(w=>w[0]).slice(0,3).join(''))}</span>${g.coverUrl ? `<img src="${escapeHtml(g.coverUrl)}" alt="" loading="${index<6?'eager':'lazy'}" fetchpriority="${index<6?'high':'auto'}" decoding="async" width="480" height="720">` : ''}</div>${PixelVaultLibrary.completionDecoration(completion)}</div></a><div class="cover-actions">${PixelVaultLibrary.coverProgressBadges(platform?selected:g,trackers)}<button class="pin-game" data-game="${escapeHtml(g.id)}" aria-label="${pinned?'Unpin':'Pin'} ${escapeHtml(g.title)}" aria-pressed="${pinned}" ${librarySaving?'disabled':''} title="${pinned?'Unpin':'Pin to top'}"><span aria-hidden="true">${pinned?'★':'☆'}</span></button></div></article>`;
   }).join('') || '<p class="muted">No games match your search.</p>';
-  handleMissingArtwork($('games'));
+  updateGameGrid(markup,preservePosition);
 }
 function handleMissingArtwork(root) { root.querySelectorAll('img').forEach(img=>img.addEventListener('error',()=>{img.hidden = true;},{once:true})); }
 function stat(label,value) { return `<div class="game-stat"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`; }
 function formatPlaytime(minutes) { return minutes < 60 ? `${minutes}m` : `${new Intl.NumberFormat(undefined,{maximumFractionDigits:1}).format(minutes/60)}h`; }
 function renderGameProfile() {
-  if(!profile)return; const g = profile, s = g.stats || {};
+  if(!profile)return;
+  const restore=PixelVaultTrackerIcons.retainImages($('game-profile'));
+  renderGameProfileContents();restore();
+}
+function renderGameProfileContents() {
+  if(!profile)return;
+  const group=profileGroup(),editions=group?.editions || [profile],g=PixelVaultLibrary.profilePresentation(profile,editions),s=g.stats || {};
   $('page-heading').hidden = true; $('game-profile').hidden = false;
+  $('profile-maps').href=`#maps/${encodeURIComponent(g.provider)}/${encodeURIComponent(g.gameId)}`;
   $('breadcrumbs').innerHTML = `<a href="#">All games</a><span>/</span><span aria-current="page">${escapeHtml(g.title)}</span>`;
   $('game-hero').innerHTML = `<div class="profile-hero">${g.bannerUrl || g.coverUrl ? `<img src="${escapeHtml(g.bannerUrl || g.coverUrl)}" alt="" decoding="async" fetchpriority="high">` : ''}<div class="hero-shade"></div><div class="profile-title"><span class="platform-pill">${escapeHtml(g.platform || g.provider)}</span><h1>${escapeHtml(g.title)}</h1></div></div>`;
   handleMissingArtwork($('game-hero'));
-  const group=profileGroup(),editions=group?.editions || [g];
-  $('profile-platform-label').hidden=editions.length<2;
-  $('profile-platform').innerHTML=editions.map(e=>`<option value="${escapeHtml(e.provider+':'+e.gameId)}" ${e.provider===g.provider&&e.gameId===g.gameId?'selected':''}>${escapeHtml(e.platform || e.provider)}</option>`).join('');
+  const choices=PixelVaultLibrary.platformChoices(editions);
+  $('profile-platform-label').hidden=choices.length<2;
+  $('profile-platform').innerHTML=choices.map(c=>`<option value="${escapeHtml(c.edition.provider+':'+c.edition.gameId)}" ${c.members.some(e=>e.provider===g.provider&&e.gameId===g.gameId)?'selected':''}>${escapeHtml(c.label)}</option>`).join('');
   renderRefreshStatus();
   const stats = [];
+  const achievement=PixelVaultLibrary.achievementEdition(g,editions),achievementStats=achievement?.stats || {};
+  const achievementLabel=achievement&&achievement.platform!==g.platform?`Achievements · ${achievement.platform || achievement.provider}`:'Achievements';
   if(s.playtimeMinutes !== null && s.playtimeMinutes !== undefined) stats.push(stat('Playtime',formatPlaytime(s.playtimeMinutes)));
-  stats.push(stat('Achievements',s.achievementTotal !== null && s.achievementTotal !== undefined ? `${s.achievementUnlocked ?? '—'} / ${s.achievementTotal}` : 'Not synced'));
+  stats.push(stat(achievementLabel,achievementStats.achievementTotal !== null && achievementStats.achievementTotal !== undefined ? `${achievementStats.achievementUnlocked ?? '—'} / ${achievementStats.achievementTotal}` : achievement?'Not synced':editions.some(e=>['steam','retroachievements','xbox'].includes(e.provider))?'Choose a platform':'Not available'));
   if(g.total)stats.push(stat('Tracker goals',`${g.completed} / ${g.total}`));
   else if(s.captures !== null && s.captures !== undefined)stats.push(stat('Captures',String(s.captures)));
   $('game-stats').innerHTML = stats.join('');$('game-stats').setAttribute('aria-label','Saved game statistics');$('game-stats').title = 'Playtime and achievements are from your saved library snapshot. Tracker goals reflect saved Companion progress.';
@@ -178,20 +292,23 @@ const sectionInfo = {
 };
 function renderSections() {
   if(!profile)return;
+  const restore=PixelVaultTrackerIcons.retainImages($('game-sections'));
   const scope = profile.provider + ':' + profile.gameId;
   const wasOpen = $('game-sections').dataset.game === scope && !!$('game-sections').querySelector('.tracker-section[open]');
   $('game-sections').dataset.game = scope;
   const editions=profileGroup()?.editions || [profile];
   const matching = trackers.filter(t=>editions.some(e=>t.provider===e.provider&&t.gameId===e.gameId));
-  const trackerGroups=PixelVaultLibrary.partition(matching,PixelVaultLibrary.trackerComplete);
-  const trackerCard=t=>{
-    const complete=PixelVaultLibrary.trackerComplete(t);
-    return `<a class="tracker-card ${complete?'is-complete':''}" href="#tracker/${encodeURIComponent(t.id)}"><div><h4>${escapeHtml(t.title)}</h4>${editions.length>1?`<p class="hint">${escapeHtml(editions.find(e=>e.provider===t.provider&&e.gameId===t.gameId)?.platform || t.provider)}</p>`:''}</div><div class="tracker-progress"><strong>${t.totals.completed} <span class="muted">/ ${t.totals.total}</span></strong>${progressBar(t.totals.completed,t.totals.total)}</div><span class="${complete?'completion-check':'arrow'}" ${complete?'aria-label="Completed"':'aria-hidden="true"'}>${complete?'✓':'›'}</span></a>`;
-  };
+  const trackerSections=PixelVaultLibrary.trackerSections(matching,trackerGroupOrder);
+  const gameTrackerCard=t=>trackerCard(t,editions.length>1?editions.find(e=>e.provider===t.provider&&e.gameId===t.gameId)?.platform || t.provider:'');
+  const trackerSection=group=>`<section class="tracker-group tracker-group-${group.id}" data-tracker-group="${group.id}" aria-label="${group.title}"><h4 class="tracker-group-heading">${group.title}<span class="section-count">${group.count}</span></h4>${group.active.map(gameTrackerCard).join('')}${group.completed.length?`<h5 class="completed-heading"><span aria-hidden="true">✓</span> Completed <span>${group.completed.length}</span></h5>${group.completed.map(gameTrackerCard).join('')}`:''}</section>`;
   $('game-sections').innerHTML = (sectionOrder?.sections || Object.keys(sectionInfo)).map(id=>{
     const section = sectionInfo[id]; if(!section)return '';
     if(id==='achievements'){
-      const eligible=e=>e.provider==='steam'||e.provider==='retroachievements';const selected=eligible(profile)?profile:editions.find(eligible)||profile;
+      const selected=PixelVaultLibrary.achievementEdition(profile,editions);
+      if(!selected){
+        const message=editions.some(e=>['steam','retroachievements','xbox'].includes(e.provider))?'Choose a platform above to view its achievements.':'No achievement platform is linked to this game. You can link one in PixelVault.';
+        return `<section class="profile-section coming-section" data-section="achievements"><div class="section-icon" aria-hidden="true">${section.icon}</div><div><h3>Achievements</h3><p>${message}</p></div></section>`;
+      }
       return `<a class="profile-section achievement-section-link" data-section="achievements" href="#achievements/${encodeURIComponent(selected.provider)}/${encodeURIComponent(selected.gameId)}"><div class="section-icon" aria-hidden="true">${section.icon}</div><div><h3>Achievements</h3><p>Progress, saved groups and individual guides.${selected.provider!==profile.provider?' · '+escapeHtml(selected.platform||selected.provider):''}</p></div><span class="section-chevron" aria-hidden="true">›</span></a>`;
     }
     if(id==='screenshots'){
@@ -199,8 +316,8 @@ function renderSections() {
       if(photos)return `<a class="profile-section screenshot-section-link" data-section="screenshots" href="#screenshots/${encodeURIComponent(photos.provider)}/${encodeURIComponent(photos.gameId)}"><div class="section-icon" aria-hidden="true">${section.icon}</div><div><h3>Screenshots <span class="section-count">${photos.count}</span></h3><p>Your photos, organized by capture date.</p></div><span class="section-chevron" aria-hidden="true">›</span></a>`;
     }
     if(id !== 'trackers')return `<section class="profile-section coming-section" data-section="${id}"><div class="section-icon" aria-hidden="true">${section.icon}</div><div><h3>${section.title}</h3><p>${section.description}</p></div><span class="coming-label">Coming soon</span></section>`;
-    return `<details class="profile-section tracker-section" data-section="trackers" ${wasOpen?'open':''}><summary class="section-title"><span class="section-icon" aria-hidden="true">${section.icon}</span><span><h3>Trackers <span class="section-count">${matching.length}</span></h3><span class="section-description">${matching.length?'Keep your progress moving.':'No trackers available yet.'}</span></span><span class="section-chevron" aria-hidden="true">›</span></summary><div class="tracker-list">${trackerGroups.active.map(trackerCard).join('')}${trackerGroups.completed.length?`<h4 class="completed-heading"><span aria-hidden="true">✓</span> Completed <span>${trackerGroups.completed.length}</span></h4>${trackerGroups.completed.map(trackerCard).join('')}`:''}${matching.length?'':'<p class="section-empty">No trackers are available for this game yet.</p>'}</div></details>`;
-  }).join(''); paintBars();
+    return `<details class="profile-section tracker-section" data-section="trackers" ${wasOpen?'open':''}><summary class="section-title"><span class="section-icon" aria-hidden="true">${section.icon}</span><span><h3>Trackers <span class="section-count">${matching.length}</span></h3><span class="section-description">${matching.length?'Keep your progress moving.':'No trackers available yet.'}</span></span><span class="section-chevron" aria-hidden="true">›</span></summary><div class="tracker-list">${trackerSections.map(trackerSection).join('')}${matching.length?'':'<p class="section-empty">No trackers are available for this game yet.</p>'}</div></details>`;
+  }).join('');restore();paintBars();
 }
 $('game-search').addEventListener('input',renderGameGrid);
 $('game-platform').addEventListener('change',renderGameGrid);
@@ -217,13 +334,14 @@ async function saveLibraryPreference(path,body,message){
 $('game-sort').addEventListener('change',()=>saveLibraryPreference('sort',{sort:$('game-sort').value},'Sort saved.'));
 $('games').addEventListener('click',event=>{
   const pin=event.target.closest('button[data-game]');if(!pin)return;
-  saveLibraryPreference('pins',{gameId:pin.dataset.game,pinned:!libraryLayout.pins.includes(pin.dataset.game)},libraryLayout.pins.includes(pin.dataset.game)?'Game unpinned.':'Game pinned to the top.');
+  const pinned=pin.getAttribute('aria-pressed')==='true';
+  saveLibraryPreference('pins',{gameId:pin.dataset.game,pinned:!pinned},pinned?'Game unpinned.':'Game pinned to the top.');
 });
 function renderRefreshStatus(){
   if(!profile)return;const supported=pcConnection.supported.includes(profile.groupId),busy=refreshingGroup===profile.groupId;
   $('refresh-game').disabled=!supported || busy;
   $('refresh-game').textContent=busy?'Checking PC…':'Refresh from PC';
-  $('refresh-game').title=supported?'Read the configured save files on your paired PC.':pcConnection.paired?'No supported PC save source is configured for this game.':'The PC connection has not been paired.';
+  $('refresh-game').title=supported?(pcConnection.local?'Read the configured local save files.':'Read the configured save files on your paired PC.'):pcConnection.paired||pcConnection.local?'No supported PC save source is configured for this game.':'The PC connection has not been paired.';
   const active=refreshJob?.groupId===profile.groupId;
   $('refresh-status').hidden=!supported && !active;
   $('refresh-status').textContent=active?refreshJob.message:pcConnection.online?'PC online · Ready to check its save files.':'PC offline · Turn it on to check its save files.';
@@ -239,13 +357,14 @@ function timeSince(ticks){
   return minutes<1?'just now':minutes<60?`${minutes}m ago`:minutes<1440?`${Math.floor(minutes/60)}h ago`:`${Math.floor(minutes/1440)}d ago`;
 }
 function renderConnectionStatus(){
-  $('pc-status-bar').hidden=false;$('automatic-toggle').hidden=!pcConnection.paired;
+  $('pc-status-bar').hidden=false;$('automatic-toggle').hidden=!(pcConnection.paired||pcConnection.local&&pcConnection.online);
   $('pc-status-dot').classList.toggle('online',!!pcConnection.online);
-  $('pc-status-title').textContent=pcConnection.paired?`PC ${pcConnection.online?'online':'offline'} · Automatic updates ${pcConnection.automaticEnabled?'on':'paused'}`:'PC not connected';
+  $('pc-status-title').textContent=pcConnection.local?`PC ${pcConnection.online?'connected':'readers unavailable'} · Automatic updates ${pcConnection.automaticEnabled?'on':'paused'}`:pcConnection.paired?`PC ${pcConnection.online?'online':'offline'} · Automatic updates ${pcConnection.automaticEnabled?'on':'paused'}`:'PC not connected';
   const details=[];
+  if(pcConnection.webTrackerEditsEnabled){if(pcConnection.trackerEditConflicts)details.push(pcConnection.trackerEditConflicts+' web edits need review on PC');else if(pcConnection.lastTrackerEditSyncUtc)details.push('Web edits synced to PC '+timeSince(pcConnection.lastTrackerEditSyncUtc));if(pcConnection.trackerEditsError)details.push(pcConnection.trackerEditsError);}
   if(pcConnection.lastSaveCheckUtc)details.push('Saves checked '+timeSince(pcConnection.lastSaveCheckUtc));
   if(pcConnection.lastLibraryCheckUtc)details.push('Library synced '+timeSince(pcConnection.lastLibraryCheckUtc));
-  if(!details.length)details.push(pcConnection.paired?(pcConnection.online?'Waiting for the first automatic check.':'Showing saved NAS data.'):'Connect your PC to enable automatic updates.');
+  if(!details.length)details.push(pcConnection.local?'Using saved PC data.':pcConnection.paired?(pcConnection.online?'Waiting for the first automatic check.':'Showing saved NAS data.'):'Connect your PC to enable automatic updates.');
     if(pcConnection.sourceError)details.push('A save source is unavailable');if(pcConnection.libraryError)details.push('Library update pending');if(pcConnection.publicationError)details.push('Tracker sync pending');if(pcConnection.trackerTitleConflicts)details.push('Tracker name conflict: NAS names kept');if(pcConnection.achievementError)details.push('Achievement sync pending');
   if(pcConnection.reviewJobs?.length)details.push('Save changes need review');
   $('pc-status-detail').textContent=details.join(' · ');
@@ -275,8 +394,17 @@ $('refresh-game').addEventListener('click',async()=>{
   }catch(error){rememberRefresh({message:error.message,canReview:false},groupId);showTrackerUpdateSummary({title:'Refresh unavailable',message:error.message,updated:[],review:[],failed:[]});}
   finally{refreshingGroup=undefined;renderRefreshStatus();}
 });
-function openRefreshReview(){
+async function openRefreshReview(){
   if(!refreshJob?.canReview)return;
+  const {id,groupId}=refreshJob;
+  try{
+    const current=await api('/refresh/'+encodeURIComponent(id));
+    if(refreshJob?.id!==id)return;
+    if(!current.canReview)pcConnection.reviewJobs=pcConnection.reviewJobs?.filter(j=>j.id!==id);
+    rememberRefresh(current,groupId);renderConnectionStatus();
+  }
+  catch(error){status(error.message,true);return;}
+  if(!refreshJob.canReview){if($('refresh-review').open)$('refresh-review').close();return;}
   $('refresh-older').checked=false;$('refresh-review-status').textContent=refreshJob.message;
   $('refresh-older-label').hidden=!refreshJob.hasOlder;
   $('refresh-review-changes').innerHTML=refreshJob.tasks.filter(t=>t.status==='review').map(t=>`<section><h3>${escapeHtml(t.title)}</h3><p class="hint">${t.conflicts} manual conflicts · ${t.older} older observations</p><ul>${t.changes.map(c=>`<li><strong>${escapeHtml(c.name)}</strong>: saved ${c.previous??'unknown'} → incoming ${c.incoming??'unknown'}${c.manual!==null?' · your manual value '+c.manual:''}${c.older?' · older save':''}</li>`).join('')}</ul>${t.changes.length===80?'<p class="hint">Showing the first 80 differences.</p>':''}</section>`).join('');
@@ -305,12 +433,12 @@ function acknowledgeTracker(id){
   const tracker=trackers.find(t=>t.id===id);if(!tracker?.updateVersion)return;
   const seen=readSeenTrackerVersions() || PixelVaultUpdates.snapshot(trackers);seen[id]=PixelVaultUpdates.snapshot([tracker])[id];writeSeenTrackerVersions(seen);
 }
-function checkForTrackerUpdates(){
-  const seen=readSeenTrackerVersions();
+function checkForTrackerUpdates(previous=null){
+  const seen=(visibleUpdateSummary?.scope===updateScope?visibleUpdateSummary?.versions:null) || readSeenTrackerVersions() || previous;
   if(!seen){writeSeenTrackerVersions(PixelVaultUpdates.snapshot(trackers));return;}
   const summary=PixelVaultUpdates.summary(seen,trackers);
   if(summary.updated.length)showTrackerUpdateSummary(summary);
-  else writeSeenTrackerVersions(PixelVaultUpdates.snapshot(trackers));
+  else if(!visibleUpdateSummary && !pendingUpdateSummary)writeSeenTrackerVersions(PixelVaultUpdates.snapshot(trackers));
 }
 function showTrackerUpdateSummary(summary){
   if(!session?.authenticated || !updateScope)return;
@@ -321,10 +449,19 @@ function flushTrackerUpdateSummary(){
   visibleUpdateSummary=pendingUpdateSummary;pendingUpdateSummary=undefined;summaryDismissed=false;
   const summary=visibleUpdateSummary.summary;
   $('refresh-summary-title').textContent=summary.title;$('refresh-summary-message').textContent=summary.message;
-  $('refresh-summary-list').innerHTML=(summary.updated.length?`<ul>${summary.updated.map(t=>`<li><span aria-hidden="true">✓</span><div><strong>${escapeHtml(t.title)}</strong><small>${escapeHtml(t.gameTitle)}</small></div>${Number.isInteger(t.increased)?`<span class="update-increase" aria-label="${t.increased} ${t.increased===1?'item':'items'} increased">+${t.increased}</span>`:''}</li>`).join('')}</ul>`:'')
+  $('refresh-summary-list').innerHTML=PixelVaultUpdates.groupByGame(summary.updated,games).map(group=>
+    `<section class="update-game"><h3>${escapeHtml(group.title)}</h3><ul>${group.trackers.map(renderTrackerUpdate).join('')}</ul></section>`).join('')
     +(summary.review.length?`<p class="hint">Needs review: ${summary.review.map(escapeHtml).join(', ')}. Your current progress is kept.</p>`:'')
     +(summary.failed.length?`<p class="hint">Could not check: ${summary.failed.map(escapeHtml).join(', ')}. Saved progress is kept.</p>`:'');
   $('refresh-summary').showModal();
+}
+function renderTrackerUpdate(tracker){
+  const title=escapeHtml(tracker.title);
+  if(tracker.completed){
+    return `<li class="update-completed"><span class="update-trophy" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8m-4-4v4M7 4h10v6a5 5 0 0 1-10 0V4ZM7 6H4v2a4 4 0 0 0 4 4m9-6h3v2a4 4 0 0 1-4 4"/></svg><span class="update-sparkle">✦</span></span><div><strong>${title}</strong><span class="update-completion-label">Tracker completed</span></div></li>`;
+  }
+  const increase=Number.isInteger(tracker.increased)?`<span class="update-increase" aria-label="Progress increased by ${tracker.increased}">+${tracker.increased}</span>`:'';
+  return `<li><span class="update-check" aria-hidden="true">✓</span><div><strong>${title}</strong></div>${increase}</li>`;
 }
 $('refresh-summary').addEventListener('click',event=>{event.preventDefault();event.stopPropagation();summaryDismissed=true;$('refresh-summary').close();});
 $('refresh-summary').addEventListener('cancel',()=>{summaryDismissed=true;});
@@ -377,8 +514,23 @@ function matches(state, query, filter) {
     || filter === 'unknown' && !state.isKnown || filter === 'ready' && !state.complete && PixelVaultLibrary.trackerStatus([state],detail.sourceLinked)==='Available' || filter === 'locked' && !state.complete && PixelVaultLibrary.trackerStatus([state],detail.sourceLinked)==='Locked');
 }
 function contentButtons(row){
-  return row.filter(s=>typeof s.item.content==='string'&&s.item.content.trim()).map(s=>`<button type="button" class="quiet content-open" data-content-item="${escapeHtml(s.item.id)}" aria-haspopup="dialog" aria-label="Read content: ${escapeHtml(s.item.name)}${s.item.milestone?' · '+escapeHtml(s.item.milestone):''}">Content${row.length>1&&s.item.milestone?' · '+escapeHtml(s.item.milestone):''}</button>`).join('');
+  return row.filter(s=>typeof s.item.content==='string'&&s.item.content.trim()).map(({item})=>{
+    const missable=item.missable?'<span class="achievement-row-meta"><span class="missable">Missable</span></span>':'';
+    return `<span class="content-action">${missable}<button type="button" class="quiet content-open" data-content-item="${escapeHtml(item.id)}" aria-haspopup="dialog" aria-label="Read content: ${escapeHtml(item.name)}${item.milestone?' · '+escapeHtml(item.milestone):''}">Content${row.length>1&&item.milestone?' · '+escapeHtml(item.milestone):''}</button></span>`;
+  }).join('');
 }
+function renderItemBody(row) {
+  const state=row[0],grouped=row.length>1;
+  const notes = row.filter(s => s.note).map(s => `<p><strong>${grouped ? escapeHtml(s.item.milestone) + ' · ' : ''}Note</strong><br>${escapeHtml(s.note)}</p>`).join('');
+  const gameDetails=state.item.detail?.trim()? `<p>${mailIconText(state.item.detail)}</p>` : '';
+  return `${grouped?`<div class="columns">${row.map(s=>`<span class="column-chip ${s.complete?'complete':''}">${escapeHtml(s.item.milestone)}${PixelVaultLibrary.trackerStatus([s],detail.sourceLinked)?' · '+escapeHtml(PixelVaultLibrary.trackerStatus([s],detail.sourceLinked)):''}</span>`).join('')}</div>`:''}<div class="item-body">${gameDetails}${notes}${contentButtons(row)}${editorControls(row)}</div>`;
+}
+$('detail').addEventListener('toggle',event=>{
+  const item=event.target;if(!detail||!item.matches?.('details.item')||!item.open)return;
+  const content=item.querySelector(':scope > .item-content');if(!content||content.dataset.loaded)return;
+  const row=detail.states.filter(s=>(s.item.groupId||s.item.id)===item.dataset.record&&!s.item.archived);
+  content.innerHTML=renderItemBody(row);content.dataset.loaded='true';restoreDrafts();
+},true);
 function renderItems(skipCapture = false) {
   if (!detail) return;
   if (!skipCapture) captureDrafts();
@@ -408,13 +560,14 @@ function renderItems(skipCapture = false) {
   }
   return [...categories.entries()].map(([category, records]) => {
     const full = [...rows.values()].filter(row => (row[0].item.category || 'Other') === category);
-    const completeRows = full.filter(row => row.some(s => s.complete)).length;
+    const included = full.filter(row=>!row.every(s=>s.item.excludedFromTotal));
+    const completeRows = included.filter(row => row.some(s => s.complete)).length;
     const goal = detail.definition.categoryTargets[category];
-    return `<section aria-label="${escapeHtml(category)}"><h3 class="category-heading">${escapeHtml(category)}<span>${completeRows} / ${full.length} records${goal ? ` · Goal ${Math.min(goal,completeRows)} / ${goal}` : ''}</span></h3>${records.map(row => {
+    return `<section aria-label="${escapeHtml(category)}"><h3 class="category-heading">${escapeHtml(category)}<span>${completeRows} / ${included.length} records${goal ? ` · Goal ${Math.min(goal,completeRows)} / ${goal}` : ''}</span></h3>${records.map(row => {
       const state = row[0], grouped = row.length > 1, completed = PixelVaultLibrary.recordComplete(row);
       const label = PixelVaultLibrary.trackerStatus(row,detail.sourceLinked);
-      const notes = row.filter(s => s.note).map(s => `<p><strong>${grouped ? escapeHtml(s.item.milestone) + ' · ' : ''}Note</strong><br>${escapeHtml(s.note)}</p>`).join('');
-      return `<details class="item ${completed?'is-complete':''}" data-record="${escapeHtml(state.item.groupId || state.item.id)}"><summary>${headerChecks(row)}<span class="item-name">${escapeHtml(state.item.name)}${notes?'<small>Has a note</small>':''}</span>${label?`<span class="state-label">${completed?'<span class="completion-label">✓ Completed</span>':escapeHtml(label)}</span>`:''}</summary>${grouped?`<div class="columns">${row.map(s=>`<span class="column-chip ${s.complete?'complete':''}">${escapeHtml(s.item.milestone)}${PixelVaultLibrary.trackerStatus([s],detail.sourceLinked)?' · '+escapeHtml(PixelVaultLibrary.trackerStatus([s],detail.sourceLinked)):''}</span>`).join('')}</div>`:''}<div class="item-body"><p>${escapeHtml(state.item.detail || 'No additional details.')}</p>${notes}${contentButtons(row)}<p>${row.some(s=>s.isManual)?'Includes saved manual progress. ':''}${row.some(s=>s.reportedCurrent!==null)?'Includes a saved source observation. ':''}${detail.readOnly ? 'Read-only sample.' : 'Saved source observations stay separate from manual edits.'}</p>${editorControls(row)}</div></details>`;
+      const flags=`${state.item.missable?'<span class="tracker-item-flag missable">Missable</span>':''}${state.item.excludedFromTotal?'<span class="tracker-item-flag excluded">Optional</span>':''}`;
+      return `<details class="item ${completed?'is-complete':''}" data-record="${escapeHtml(state.item.groupId || state.item.id)}"><summary>${headerChecks(row)}<span class="item-name">${mailIconText(state.item.name)}${flags}${row.some(s=>s.note)?'<small>Has a note</small>':''}</span>${label?`<span class="state-label">${completed?'<span class="completion-label">✓ Completed</span>':escapeHtml(label)}</span>`:''}</summary><div class="item-content"${openRows.has(state.item.groupId||state.item.id)?' data-loaded="true"':''}>${openRows.has(state.item.groupId||state.item.id)?renderItemBody(row):''}</div></details>`;
     }).join('')}</section>`;
   }).join('');
   };
@@ -430,6 +583,7 @@ window.addEventListener('online', () => initialize());
 initialize();
 // Editor state is scoped to this browser session. Drafts are never written to localStorage.
 const drafts = new Map(), pendingSaves = new Map();
+const ruleDrafts = new Map();
 let saving = false, conflict;
 const fieldKey = (tracker,item,field) => JSON.stringify([tracker,item,field]);
 function requestId() {
@@ -439,6 +593,7 @@ function requestId() {
   return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
 }
 function captureDrafts() {
+  captureRuleDrafts();
   document.querySelectorAll('#detail form[data-field]').forEach(form => {
     const input = form.querySelector('textarea,input'); if (!input) return;
     const key = fieldKey(form.dataset.tracker,form.dataset.item,form.dataset.field);
@@ -449,6 +604,7 @@ function captureDrafts() {
   });
 }
 function restoreDrafts() {
+  restoreRuleDrafts();
   document.querySelectorAll('#detail form[data-field]').forEach(form => {
     const draft = drafts.get(fieldKey(form.dataset.tracker,form.dataset.item,form.dataset.field));
     if (draft) { form.querySelector('textarea,input').value = draft.value; form.dataset.version = draft.version; }
@@ -457,10 +613,39 @@ function restoreDrafts() {
 function renderSummary() {
   if (!detail) return;
   const d = detail.definition;
+  $('tracker-maps').href=`#maps/${encodeURIComponent(d.provider)}/${encodeURIComponent(d.gameId)}/tracker/${encodeURIComponent(d.id)}`;
   $('page-count').textContent = detail.readOnly ? 'Read-only preview' : 'Saved to Companion';
   $('history-open').hidden = detail.readOnly;
-  $('summary').innerHTML = `<div><strong>${detail.totals.completed} <span class="muted">/ ${detail.totals.total}</span></strong><p class="hint">${Object.keys(d.categoryTargets).length ? 'Qualifying records / goal' : d.milestones.length ? 'Completion boxes' : 'Items completed'}</p></div><div class="progress-wrap">${progressBar(detail.totals.completed,detail.totals.total)}<p class="hint">${detail.totals.unknown} without saved progress · Full tracker totals</p></div>`;
+  $('summary').innerHTML = `<div><strong>${detail.totals.completed} <span class="muted">/ ${detail.totals.total}</span></strong><p class="hint">${Object.keys(d.categoryTargets).length ? 'Qualifying records / goal' : d.milestones.length ? 'Completion boxes' : 'Items completed'}</p></div><div class="progress-wrap">${progressBar(detail.totals.completed,detail.totals.total)}<p class="hint">${detail.totals.unknown} without saved progress · Full tracker totals</p>${detail.replaceManualProgress?'<p class="hint">Save replaces manual checks · Notes stay saved</p>':''}</div>`;
   paintBars();
+}
+function itemRulesEditor(state) {
+  const item=state.item;
+  return `<details class="item-rules"><summary>Item settings</summary><form data-item-rules data-tracker="${escapeHtml(detail.definition.id)}" data-item="${escapeHtml(item.id)}" data-version="${escapeHtml(detail.rulesVersions[item.id])}"><label class="rule-option"><input type="checkbox" name="missable" ${item.missable?'checked':''}>Missable</label><label class="rule-option"><input type="checkbox" name="required" ${item.excludedFromTotal?'':'checked'}>Required for completion</label><button type="submit">Save item settings</button><button type="button" class="quiet" data-rules-reload="${escapeHtml(item.id)}">Reload item settings</button></form></details>`;
+}
+function captureRuleDrafts() {
+  document.querySelectorAll('#detail form[data-item-rules]').forEach(form=>{
+    const key=fieldKey(form.dataset.tracker,form.dataset.item,'rules'), m=form.elements.missable, r=form.elements.required;
+    if(m.checked!==m.defaultChecked||r.checked!==r.defaultChecked)ruleDrafts.set(key,{missable:m.checked,required:r.checked,version:form.dataset.version});else ruleDrafts.delete(key);
+  });
+}
+function restoreRuleDrafts() {
+  document.querySelectorAll('#detail form[data-item-rules]').forEach(form=>{
+    const draft=ruleDrafts.get(fieldKey(form.dataset.tracker,form.dataset.item,'rules'));
+    if(draft){form.elements.missable.checked=draft.missable;form.elements.required.checked=draft.required;form.dataset.version=draft.version;form.closest('details').open=true;}
+  });
+}
+async function saveItemRules(form) {
+  if(saving)return;
+  const tracker=form.dataset.tracker, key=fieldKey(tracker,form.dataset.item,'rules');
+  const command={itemId:form.dataset.item,missable:form.elements.missable.checked,requiredForCompletion:form.elements.required.checked,expectedVersion:form.dataset.version};
+  const inputs=[...form.querySelectorAll('input')];setBusy(true);inputs.forEach(i=>i.disabled=true);
+  try{
+    const response=await api(`/trackers/${encodeURIComponent(tracker)}/item-rules`,command);
+    if(detail?.definition.id===tracker)acceptSnapshot(response.tracker,null,key);
+    status('Item settings saved. Centurian progress updates after the next game check.');await refreshLists();
+  }catch(error){status(error.status===409?'Item settings changed. Use Reload item settings to review the saved choices.':error.message,true);}
+  finally{setBusy(false);inputs.forEach(i=>i.disabled=false);}
 }
 function editorControls(row) {
   if (detail.readOnly) return '';
@@ -468,13 +653,21 @@ function editorControls(row) {
   return `<div class="editors">${row.map(state=>{
     const id=escapeHtml(state.item.id), label=escapeHtml(state.item.milestone || state.item.name), versions=detail.versions[state.item.id];
     const locked=protectedItems.has(state.item.id), toggleLocked=locked && state.complete;
-    const progress=state.item.target===1
+    const progress=row.length===1&&state.item.target===1?singleCheckbox(state):state.item.target===1
       ? `<button type="button" data-action="toggle" data-item="${id}" data-value="${state.complete?0:1}" data-locked="${toggleLocked}" ${toggleLocked?'disabled':''}>${toggleLocked?'Confirmed by game':state.complete?'Mark incomplete':'Mark complete'}</button>`
       : `<form data-tracker="${tracker}" data-item="${id}" data-field="progress" data-version="${versions.progress}"><label>Count<input type="number" inputmode="numeric" min="0" max="1000000" step="1" name="current" value="${state.current ?? ''}" required></label><button type="submit">Save count</button><p class="editor-status" role="status"></p></form>`;
-    return `<fieldset><legend>${label}</legend><p class="hint">Saved source: ${state.reportedCurrent === null ? 'No saved data' : state.reportedCurrent + ' / ' + state.item.target}${state.isManual ? ' · Manual: ' + state.manualCurrent : ''}</p>${state.hasConflict ? '<p class="conflict-hint">Manual progress overrides a different source value.</p>' : ''}${progress}${state.manualCurrent!==null?`<button type="button" class="quiet" data-action="source" data-item="${id}">${state.reportedCurrent === null ? 'Clear manual progress' : 'Use source progress'}</button>`:''}${locked?'<p class="hint">Game-confirmed completion is protected.</p>':''}<form data-tracker="${tracker}" data-item="${id}" data-field="note" data-version="${versions.note}"><label>Note<textarea name="note" rows="3" maxlength="20000">${escapeHtml(state.note)}</textarea></label><button type="submit">Save note</button><p class="editor-status" role="status"></p></form></fieldset>`;
+    const resetLabel=state.reportedCurrent === null ? 'Clear manual progress' : 'Use source progress';
+    const sourceCounts=`Manual: ${state.manualCurrent} · Imported: ${state.reportedCurrent ?? 'Unknown'}`;
+    return `<fieldset><legend>${label}</legend>${progress}${state.manualCurrent!==null?`<button type="button" class="quiet" data-action="source" data-item="${id}" title="${sourceCounts}">${resetLabel}</button>`:''}<form data-tracker="${tracker}" data-item="${id}" data-field="note" data-version="${versions.note}"><label>Note<textarea name="note" rows="3" maxlength="20000">${escapeHtml(state.note)}</textarea></label><button type="submit">Save note</button><p class="editor-status" role="status"></p></form>${itemRulesEditor(state)}</fieldset>`;
   }).join('')}</div>`;
 }
+function singleCheckbox(state){
+  const locked=detail.readOnly || (state.complete && (detail.protectedItems||[]).includes(state.item.id));
+  const label=state.item.name+(state.item.milestone?' · '+state.item.milestone:'');
+  return `<label class="tracker-check-target" title="${detail.readOnly?'Read-only':locked?'Confirmed by game':escapeHtml(label)}"><input type="checkbox" class="tracker-checkbox" aria-label="${escapeHtml(label)}" data-action="toggle" data-item="${escapeHtml(state.item.id)}" data-locked="${locked}" ${state.complete?'checked':''} ${locked||saving?'disabled':''}></label>`;
+}
 function headerChecks(row){
+  if(row.length===1&&row[0].item.target===1)return singleCheckbox(row[0]);
   const protectedItems=new Set(detail.protectedItems || []);
   return `<span class="header-checks">${row.map(state=>{
     const locked=detail.readOnly || (state.complete && protectedItems.has(state.item.id));
@@ -482,15 +675,16 @@ function headerChecks(row){
     return `<button type="button" role="checkbox" aria-checked="${state.complete}" aria-label="${escapeHtml(label)}" class="header-check ${state.complete?'complete':''}" data-action="toggle" data-item="${escapeHtml(state.item.id)}" data-value="${state.complete?0:state.item.target}" data-locked="${locked}" ${locked?'disabled':''} title="${locked?'Confirmed by game':escapeHtml(label)}"><span aria-hidden="true">${state.complete?'✓':''}</span>${row.length>1?`<small>${escapeHtml(state.item.milestone)}</small>`:''}</button>`;
   }).join('')}</span>`;
 }
-function acceptSnapshot(snapshot, clearKey) {
+function acceptSnapshot(snapshot, clearKey, clearRulesKey) {
   if (detail?.definition.id !== snapshot.definition.id) return;
   captureDrafts(); if (clearKey) drafts.delete(clearKey);
-  detail=snapshot; heading(detail.definition.title,detail.definition.description,detail.definition.gameTitle.toUpperCase()); renderSummary(); renderItems(true);
+  if(clearRulesKey)ruleDrafts.delete(clearRulesKey);
+  detail=snapshot; trackerHeading(); renderSummary(); renderItems(true);
 }
 function setBusy(value) {
   saving=value;
   $('history-open').disabled=value; $('reload-tracker').disabled=value;
-  document.querySelectorAll('#items button,#completed-items button').forEach(button=>{button.disabled=value || button.dataset.locked==='true';});
+  document.querySelectorAll('#items button,#completed-items button,#detail .tracker-checkbox').forEach(button=>{button.disabled=value || button.dataset.locked==='true';});
 }
 async function refreshLists() { [games,trackers]=await Promise.all([api('/games'),api('/trackers')]); }
 async function saveCommand(tracker,command,form) {
@@ -522,22 +716,41 @@ async function saveCommand(tracker,command,form) {
   } finally { setBusy(false); controls.forEach(e=>{e.disabled=false;}); }
 }
 $('detail').addEventListener('input',captureDrafts);
+$('detail').addEventListener('click',event=>{
+  if(event.target.closest('.tracker-check-target'))event.stopPropagation();
+});
+$('detail').addEventListener('change',event=>{
+  const input=event.target;
+  if(!input.matches('.tracker-checkbox')||!detail||detail.readOnly||saving||input.disabled)return;
+  const state=detail.states.find(s=>s.item.id===input.dataset.item);
+  if(!state||state.item.target!==1)return;
+  const current=input.checked?1:0;
+  // Keep the last confirmed state while saving, and on failures/conflicts.
+  input.checked=state.complete;
+  void saveCommand(detail.definition.id,{itemId:state.item.id,field:'progress',current,note:null,expectedVersion:detail.versions[state.item.id].progress});
+});
 $('detail').addEventListener('submit',event=>{
   event.preventDefault(); const form=event.target; captureDrafts();
+  if(form.matches('[data-item-rules]')){void saveItemRules(form);return;}
   const command={itemId:form.dataset.item,field:form.dataset.field,current:null,note:null,expectedVersion:form.dataset.version};
   if (command.field==='note') command.note=form.elements.note.value;
   else { command.current=Number(form.elements.current.value); if(!Number.isInteger(command.current))return; }
   saveCommand(form.dataset.tracker,command,form);
 });
 $('detail').addEventListener('click',event=>{
+  const reloadRules=event.target.closest('button[data-rules-reload]');
+  if(reloadRules&&detail&&!detail.readOnly){
+    event.preventDefault();event.stopPropagation();const tracker=detail.definition.id,key=fieldKey(tracker,reloadRules.dataset.rulesReload,'rules');
+    void api('/trackers/'+encodeURIComponent(tracker)).then(snapshot=>{if(detail?.definition.id===tracker){acceptSnapshot(snapshot,null,key);status('Saved item settings reloaded.');}}).catch(error=>status(error.message,true));return;
+  }
   const content=event.target.closest('button[data-content-item]');
   if(content&&detail){
     event.preventDefault();event.stopPropagation();
     const item=detail.states.find(s=>s.item.id===content.dataset.contentItem&&!s.item.archived)?.item;
     if(!item?.content?.trim())return;
-    $('tracker-content-title').textContent=item.name;
-    $('tracker-content-detail').textContent=item.detail || '';
-    $('tracker-content-body').textContent=item.content;
+    $('tracker-content-title').innerHTML=mailIconText(item.name);
+    $('tracker-content-detail').innerHTML=mailIconText(item.detail || '');
+    $('tracker-content-body').innerHTML=mailIconText(item.content);
     $('tracker-content').showModal();return;
   }
   const button=event.target.closest('button[data-action]'); if(!button || !detail || detail.readOnly)return;
@@ -583,7 +796,7 @@ $('history-rows').addEventListener('click',async event=>{
   }catch(error){$('history-status').textContent=error.message;}
   finally{setBusy(false);document.querySelectorAll('#history-rows button').forEach(b=>{b.disabled=false;});}
 });
-window.addEventListener('beforeunload',event=>{captureDrafts();if(drafts.size){event.preventDefault();event.returnValue='';}});
+window.addEventListener('beforeunload',event=>{captureDrafts();if(drafts.size||ruleDrafts.size){event.preventDefault();event.returnValue='';}});
 
 const navigation=PixelVaultNavigation.create(window,{
   onNavigate:route,
@@ -591,6 +804,7 @@ const navigation=PixelVaultNavigation.create(window,{
   fallback:()=>{
     if(achievementUI.active)return achievementUI.fallback();
     if(screenshotUI.active)return screenshotUI.fallback();
+    if(mapUI.active)return mapUI.fallback();
     const parts=location.hash.slice(1).split('/');
     if(parts[0]==='tracker'){
       let id;try{id=decodeURIComponent(parts[1] || '');}catch{return '#';}
@@ -604,26 +818,51 @@ const navigation=PixelVaultNavigation.create(window,{
 $('navigate-back').addEventListener('click',()=>navigation.back());
 
 let pollingConnection=false;
-function unsafeToRefresh(){return saving || librarySaving || sectionSaving || refreshingGroup || achievementUI.busy || pendingSaves.size || (detail && drafts.size) || document.querySelector('dialog[open]') || document.activeElement?.matches('input,textarea,select,[contenteditable="true"]');}
-async function pollConnection(){
-  if(pollingConnection || !session?.authenticated || document.visibilityState==='hidden')return;pollingConnection=true;
+function unsafeToRefresh(){return saving || librarySaving || sectionSaving || refreshingGroup || achievementUI.busy || pendingSaves.size || (detail && (drafts.size||ruleDrafts.size)) || document.querySelector('dialog[open]') || document.activeElement?.matches('input,textarea,select,[contenteditable="true"]');}
+async function pollConnection({refreshLibrary=false}={}){
+  if(initializing || pollingConnection || !session?.authenticated || document.visibilityState==='hidden')return;pollingConnection=true;
   try{
-    pcConnection=await api('/refresh/connection');renderConnectionStatus();
+    pcConnection=await api('/refresh/connection');
+    if(pcConnection.local&&refreshJob?.canReview&&!pcConnection.reviewJobs?.some(j=>j.id===refreshJob.id))refreshJob=undefined;
+    renderConnectionStatus();renderRefreshStatus();
     if(pcConnection.workspaceId && pcConnection.workspaceId!==updateScope){await initialize();return;}
-    captureDrafts();if(unsafeToRefresh())return;
-    if(achievementUI.active){await achievementUI.refresh();return;}
-    if(screenshotUI.active)return;
-    const currentRoute=location.hash,previous=PixelVaultUpdates.snapshot(trackers);
-    const [nextGames,nextTrackers]=await Promise.all([api('/games'),api('/trackers')]);
-    captureDrafts();if(unsafeToRefresh() || currentRoute!==location.hash)return;
-    games=nextGames;trackers=nextTrackers;
-    if(profile){profile=games.find(g=>g.provider===profile.provider&&g.gameId===profile.gameId)||profile;renderGameProfile();}
-    else if(detail){const id=detail.definition.id;const snapshot=await api('/trackers/'+encodeURIComponent(id));captureDrafts();if(!unsafeToRefresh()&&currentRoute===location.hash&&detail?.definition.id===id)acceptSnapshot(snapshot);}
-    else{renderGameGrid();$('page-count').textContent=`${libraryGroups().length} games`;if(!location.hash.slice(1))void screenshotUI.showHome();}
-    const summary=PixelVaultUpdates.summary(readSeenTrackerVersions() || previous,trackers);
-    if(summary.updated.length)showTrackerUpdateSummary(summary);
+    const versions=pcConnection.versions,currentRoute=location.hash,viewKey=JSON.stringify(versions);
+    const changed=key=>!versions||appliedVersions[key]!==versions[key];
+    if(!mapUI.active){captureDrafts();if(unsafeToRefresh())return;}
+    if(mapUI.active||achievementUI.active||screenshotUI.active){
+      if(refreshLibrary||!versions||viewVersions.get(currentRoute)!==viewKey){
+        const refreshed=mapUI.active?await mapUI.refresh():achievementUI.active?await achievementUI.refresh():await screenshotUI.refresh();
+        if(refreshed!==false&&currentRoute===location.hash)viewVersions.set(currentRoute,viewKey);
+      }
+      return;
+    }
+    if(!location.hash.slice(1)&&!refreshLibrary&&!versions)return;
+    const previous=PixelVaultUpdates.snapshot(trackers);
+    const getGames=refreshLibrary||changed('library')||changed('trackers')||changed('photos');
+    const getTrackers=refreshLibrary||changed('trackers');
+    const getDetail=detail&&(refreshLibrary||!versions||viewVersions.get(currentRoute)!==viewKey);
+    if(!getGames&&!getTrackers&&!getDetail)return;
+    const [nextGames,nextTrackers,nextDetail,nextGroupOrder]=await Promise.all([getGames?api('/games'):games,getTrackers?api('/trackers'):trackers,getDetail?api('/trackers/'+encodeURIComponent(detail.definition.id)):null,getTrackers?api('/preferences/tracker-groups'):{groups:trackerGroupOrder}]);
+    captureDrafts();if(unsafeToRefresh()||currentRoute!==location.hash)return;
+    const nextOrder=PixelVaultLibrary.normalizeTrackerGroupOrder(nextGroupOrder?.groups);
+    const listsChanged=JSON.stringify(trackerGroupOrder)!==JSON.stringify(nextOrder)||JSON.stringify(games)!==JSON.stringify(nextGames)||JSON.stringify(trackers)!==JSON.stringify(nextTrackers);
+    const photosChanged=refreshLibrary||changed('photos');
+    trackerGroupOrder=nextOrder;games=nextGames;trackers=nextTrackers;if(versions)appliedVersions={...versions};
+    if(listsChanged)completionShowcase.refresh();
+    if(profile){profile=games.find(g=>g.provider===profile.provider&&g.gameId===profile.gameId)||profile;if(listsChanged)renderGameProfile();}
+    else if(detail){if(nextDetail&&detail.definition.id===nextDetail.definition.id){if(JSON.stringify(nextDetail)!==JSON.stringify(detail))acceptSnapshot(nextDetail);viewVersions.set(currentRoute,viewKey);}}
+    else{if(listsChanged){renderGameGrid({preservePosition:true});$('page-count').textContent=`${libraryGroups().length} games`;}if(photosChanged&&!location.hash.slice(1))void screenshotUI.showHome({refresh:true,preservePosition:true});}
+    checkForTrackerUpdates(previous);
   }catch{/* Retain the current screen during a temporary network interruption. */}
   finally{pollingConnection=false;}
 }
-setInterval(pollConnection,15000);
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')pollConnection();});
+
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')pollConnection({refreshLibrary:true});});
+
+// Escape all text first; only the game's allowlisted icon tokens become images.
+function mailIconText(value) {
+  return escapeHtml(value ?? '').replace(/&lt;icon\s+name=\s*(faceicon_(?:bad|cry|death|good|love|please|smile|sweat|think|whale)|gaiji_tutorial_prio_(?:etc|quality|quantity|speed|bridgelink))\s*&gt;/g,
+    (_,name)=>`<img class="mail-inline-icon" src="/mail-icons/${name}.png" alt="[${name.replace('faceicon_','').replace('gaiji_tutorial_prio_','')}]">`);
+}
+
+

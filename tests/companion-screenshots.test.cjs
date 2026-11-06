@@ -1,4 +1,19 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');const s=require('../src/PixelVault.Companion/wwwroot/screenshots.js');
+test('tile resolution accounts for square crops, display density and original dimensions',()=>{
+  const landscape={width:1920,height:1080,preview:'preview.jpg'};
+  assert.equal(s.tileImageKind(landscape,250,1),'thumbnail');
+  assert.equal(s.tileImageKind(landscape,300,1),'preview');
+  assert.equal(s.tileImageKind(landscape,150,2),'preview');
+  assert.equal(s.tileImageKind({...landscape,width:1080,height:1920},150,2),'preview');
+  assert.equal(s.tileImageKind({...landscape,width:1920,height:1920},150,2),'thumbnail');
+  assert.equal(s.tileImageKind({...landscape,width:3440,height:1440},210,1),'preview');
+  assert.equal(s.tileImageKind({...landscape,width:320,height:180},200,1),'preview');
+  assert.equal(s.tileImageKind({preview:'preview.jpg'},100,1),'preview');
+  assert.equal(s.tileImageKind({},500,3),'thumbnail');
+  assert.equal(s.tileImageKind({...landscape,responsiveThumbnails:true},150,3),'tile960');
+  assert.equal(s.tileImageKind({...landscape,responsiveThumbnails:true},220,3),'tile1280');
+  assert.equal(s.tileImageKind({...landscape,responsiveThumbnails:true},300,3),'preview');
+});
 test('recent strip stays capped, carries each photo scope and encodes bookmark paths',()=>{
   const photos=Array.from({length:40},(_,i)=>({provider:i%2?'steam':'other',gameId:'game / '+i,title:'Game '+i,photo:{id:'photo#'+i,console:'Xbox',original:{asset:'a.png'}}}));
   const rows=s.recentRows({photos});assert.equal(rows.length,30);assert.equal(rows[0].title,'Game 0');assert.equal(rows[1].provider,'steam');assert.equal(rows[0].original.asset,'a.png');

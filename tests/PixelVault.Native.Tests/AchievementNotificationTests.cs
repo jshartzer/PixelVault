@@ -103,7 +103,7 @@ public sealed class AchievementNotificationTests : IDisposable
         var initial = Progress(0, 72);
         var definitions = guides.SyncDefinitionsAndLoadGuides("game", initial.Rows);
         foreach (var entry in definitions.Where(e => int.Parse(e.ProviderAchievementId) > 52))
-            guides.SaveGuide(new AchievementGuideEdit { AchievementId = entry.AchievementId, GroupName = "Expansion" });
+            guides.SaveGuide(new AchievementGuideEdit { AchievementId = entry.AchievementId, DlcName = "Expansion" });
         var fresh = Progress(52, 72);
         fresh.Rows[51].UnlockUtcTicks = DateTime.UtcNow.AddMinutes(-3).Ticks;
         var game = new GameIndexEditorRow { GameId = "game", SteamAppId = "123", PlatformLabel = "Steam" };

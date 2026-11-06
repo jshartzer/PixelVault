@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
@@ -17,16 +17,47 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="UI\MailIconText.cs" />
+    <EmbeddedResource Include="..\PixelVault.Companion\wwwroot\mail-icons\*.png" LogicalName="PixelVault.MailIcons.%(Filename)%(Extension)" />
+    <Compile Include="UI\AchievementsInfoWindow.Century.cs" />
+    <Compile Include="UI\CenturyAchievementFinish.cs" />
+    <Compile Include="UI\Library\HolofoilCover.cs" />
+    <Compile Include="UI\Effects\CenturyPrismaticEffect.cs" />
+    <EmbeddedResource Include="UI\Effects\CenturyPrismatic.ps" LogicalName="PixelVault.CenturyPrismatic.ps" />
+    <Compile Include="UI\Library\MainWindow.LibraryGameProfile.Century.cs" />
+    <Compile Include="UI\Library\CompletionOrnaments.g.cs" />
+    <Compile Include="UI\Library\HeritageCompletionOrnaments.g.cs" />
+    <Compile Include="UI\Library\CompletionCasePanel.cs" />
+    <Compile Include="UI\Library\CompletionCaseArtwork.cs" />
+    <EmbeddedResource Include="UI\Library\CompletionCaseReliefs.json" LogicalName="PixelVault.CompletionCaseReliefs.json" />
+    <Compile Include="Services\Achievements\AchievementArtworkImport.cs" />
+    <Compile Include="UI\AchievementArtworkImportWindow.cs" />
+    <EmbeddedResource Include="..\..\scripts\Import-AchievementArtwork.py" LogicalName="PixelVault.ArtworkImporter.py" />
     <Compile Include="Services\Achievements\GameMaps.cs" />
     <Compile Include="Services\Achievements\DeathStrandingInterviewReader.cs" />
+    <Compile Include="Services\Achievements\DeathStrandingCargoReader.cs" />
+    <Compile Include="Services\Achievements\DeathStrandingFacilityReader.cs" />
+    <EmbeddedResource Include="Services\Achievements\TrackingData\DeathStrandingFacilities.json" LogicalName="PixelVault.Tracking.DeathStrandingFacilities.json" />
+    <Compile Include="Services\Achievements\DeathStrandingMailReader.cs" />
+    <Compile Include="Services\Achievements\DeathStrandingMailCatalogueReader.cs" />
+    <EmbeddedResource Include="Services\Achievements\TrackingData\DeathStrandingMails.json" LogicalName="PixelVault.Tracking.DeathStrandingMails.json" />
+    <Compile Include="Services\Achievements\DeathStrandingInterviewCatalogueReader.cs" />
+    <EmbeddedResource Include="Services\Achievements\TrackingData\DeathStrandingInterviews.json" LogicalName="PixelVault.Tracking.DeathStrandingInterviews.json" />
+    <Compile Include="Services\Achievements\DeathStrandingRoadReader.cs" />
+    <EmbeddedResource Include="Services\Achievements\TrackingData\DeathStrandingRoads.json" LogicalName="PixelVault.Tracking.DeathStrandingRoads.json" />
     <EmbeddedResource Include="Services\Achievements\TrackingData\DeathStrandingAchievementCounters.json" LogicalName="PixelVault.Tracking.DeathStrandingAchievementCounters.json" />
     <Compile Include="UI\GameMapsWindow.cs" />
     <Compile Include="UI\GameMapEditors.cs" />
     <Compile Include="UI\TrackerRenameWindow.cs" />
+    <Compile Include="UI\AchievementTrackerWindow.Deletion.cs" />
+    <Compile Include="Services\Achievements\AchievementTrackingDeletion.cs" />
     <Compile Include="UI\TrackerContentWindow.cs" />
+    <Compile Include="UI\AchievementTrackerWindow.ItemRules.cs" />
     <EmbeddedResource Include="Services\Achievements\TrackingData\DeathStrandingMemoryMaps.json" LogicalName="PixelVault.Maps.DeathStranding.json" />
     <Compile Include="UI\AchievementRarityUi.cs" />
     <Compile Include="UI\Effects\TradingCardFoilEffect.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryCompletion.cs" />
+    <Compile Include="UI\Library\MainWindow.CompletionShowcase.cs" />
     <EmbeddedResource Include="UI\Effects\TradingCardFoil.ps" LogicalName="PixelVault.TradingCardFoil.ps" />
     <Compile Include="Services\Achievements\AchievementNotifications.cs" />
     <Compile Include="UI\AchievementFullscreenGuard.cs" />
@@ -64,6 +95,14 @@
     <Compile Include="Services\Library\LibraryStorageMergeModels.cs" />
     <Compile Include="Services\Library\LibraryStorageMergePlanner.cs" />
     <Compile Include="Services\Achievements\GameAchievementsFetchService.cs" />
+    <Compile Include="Services\Achievements\XboxAchievementService.cs" />
+    <Compile Include="Services\Achievements\Xbox360LibraryMigration.cs" />
+    <Compile Include="Services\Achievements\GameProfilePlatformStore.cs" />
+    <Compile Include="UI\Library\MainWindow.LibraryGameProfile.Platforms.cs" />
+    <Compile Include="UI\Library\GameProfilePlatformUi.cs" />
+    <Compile Include="UI\XboxAchievementsWindow.cs" />
+    <None Include="Xbox\bridge.py" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="Xbox\requirements.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Compile Include="Services\Achievements\AchievementGuideService.cs" />
     <Compile Include="Services\Achievements\AchievementGuideDlc.cs" />
     <EmbeddedResource Include="Services\Achievements\TrackingData\LegacyAchievementDlcGroups.json" LogicalName="PixelVault.LegacyAchievementDlcGroups.json" />
@@ -73,6 +112,8 @@
     <Compile Include="UI\CompanionWindow.cs" />
     <Compile Include="Services\Config\CompanionDesktopSettings.cs" />
     <Compile Include="UI\TrackerGameWindow.cs" />
+    <Compile Include="UI\TrackerIconPicker.cs" />
+    <Compile Include="UI\TrackerWebSyncWindow.cs" />
     <Compile Include="UI\TrackerNavigation.cs" />
     <Compile Include="UI\Library\MainWindow.TrackerDashboard.cs" />
     <Compile Include="UI\TrackerMilestoneEditor.cs" />
@@ -97,8 +138,10 @@
     <Compile Include="UI\AchievementTrackerWindow.Automation.cs" />
     <Compile Include="MainWindow.TrackerAutomation.cs" />
     <Compile Include="Services\Achievements\DeathStrandingTrackerSource.cs" />
+    <Compile Include="Services\Achievements\SharedSaveAnalysisCache.cs" />
     <Compile Include="Services\Achievements\DeathStrandingSaveReader.cs" />
     <Compile Include="Services\Achievements\DeathStrandingSaveWorker.cs" />
+    <Compile Include="Services\Achievements\CompanionReaderWorker.cs" />
     <Compile Include="Services\Achievements\TrackerSpreadsheetImport.cs" />
     <Compile Include="UI\TrackerAchievementPicker.cs" />
     <Compile Include="UI\TrackerSpreadsheetForm.cs" />
@@ -153,6 +196,7 @@
     <Compile Include="Services\Metadata\IgdbProbeService.cs" />
     <Compile Include="Storage\IndexDatabaseStorage.cs" />
     <Compile Include="UI\AchievementsInfoWindow.cs" />
+    <Compile Include="UI\AchievementsInfoWindow.Platforms.cs" />
     <Compile Include="UI\AchievementHubWindow.cs" />
     <Compile Include="UI\AchievementHubWindow.Score.cs" />
     <Compile Include="UI\Library\MainWindow.LibraryTimelineAchievements.cs" />
@@ -285,6 +329,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\PixelVault.Tracking\PixelVault.Tracking.csproj" />
+    <ProjectReference Include="..\PixelVault.Maps\PixelVault.Maps.csproj" />
     <ProjectReference Include="..\PixelVault.Companion.Client\PixelVault.Companion.Client.csproj" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.8" />
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.6" />

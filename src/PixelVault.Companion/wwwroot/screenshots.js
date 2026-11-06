@@ -14,6 +14,16 @@
   const timelineRows=feed=>feed.photos.map(p=>({...p.photo,provider:p.provider,gameId:p.gameId,title:p.title}));
   const recentHash=p=>`recent-photo/${encodeURIComponent(p.provider)}/${encodeURIComponent(p.gameId)}/${encodeURIComponent(p.id)}`;
   const recentRows=feed=>feed.photos.slice(0,30).map(p=>({...p.photo,provider:p.provider,gameId:p.gameId,title:p.title}));
+  function tileImageKind(photo,size,pixelRatio=1){
+    if(!photo.preview)return 'thumbnail';
+    // The 480px derivative preserves the full frame; a square cover crop only uses its short edge.
+    const width=Number(photo.width),height=Number(photo.height);
+    const shortEdge=width>0&&height>0?Math.min(width,height)*Math.min(1,480/Math.max(width,height)):0;
+    const pixels=size*Math.max(1,Number(pixelRatio)||1);
+    if(pixels<=shortEdge)return 'thumbnail';
+    if(photo.responsiveThumbnails&&width>0&&height>0){const needed=pixels*Math.max(width,height)/Math.min(width,height);if(needed<=960)return 'tile960';if(needed<=1280)return 'tile1280';}
+    return 'preview';
+  }
   function photoGesture({dx,dy,maxX=Math.abs(dx),maxY=Math.abs(dy),duration,startX=100,width=390,zoom=1,multi=false}){
     if(multi||zoom>1.05||duration<40||duration>800)return null;
     if(dy>=90&&maxX<=45&&dy>Math.abs(dx)*2.5)return 'dismiss';
@@ -58,13 +68,13 @@
   const consoleIcon=name=>{const key=({'Steam':'steam','Xbox':'xbox','PS5':'ps5','PC':'pc','Switch':'switch','Emulation':'emulation'})[name];return key?`<img src="/platforms/${key}.png" alt="" width="24" height="24" aria-hidden="true">`:'<span aria-hidden="true">▧</span>';};
   function create({api,heading,getGames,navigate,back}){
     const $=id=>document.getElementById(id),cache=new Map();let workspace='',scope,state,layoutState,active=false,openedId,photo,epoch=0,ticket=0,busy=false,touch,suppressClick=0,recentView=false,recent,recentRequest,recentLoaded=0,recentGeneration=0,stripVersion,timelineView=false,moreObserver;
-    const page=$('screenshots-page'),dialog=$('photo-viewer'),stage=$('photo-stage'),image=$('photo-image');
-    const home=$('recent-photos'),strip=$('recent-strip');
+    const page=$('screenshots-page'),dialog=$('photo-viewer'),stage=$('photo-stage'),image=$('photo-image'),tilePhotos=new WeakMap();
+    const home=$('recent-photos'),strip=$('recent-strip'),prefetched=new Map();
     const gamePath=()=>`/screenshots/${encodeURIComponent(scope.provider)}/${encodeURIComponent(scope.game)}`;
     const path=()=>timelineView?'/screenshots/timeline':gamePath();
     const galleryHash=()=>timelineView?'timeline':`screenshots/${encodeURIComponent(scope.provider)}/${encodeURIComponent(scope.game)}`;
     const photoHash=p=>timelineView?timelineHash(p):`photo/${encodeURIComponent(scope.provider)}/${encodeURIComponent(scope.game)}/${encodeURIComponent(p.id)}`;
-    const imageUrl=(p,kind)=>`/api/v1/screenshots/${encodeURIComponent(p.provider??scope.provider)}/${encodeURIComponent(p.gameId??scope.game)}/${encodeURIComponent(p.id)}/${kind}`;
+    const imageUrl=(p,kind)=>`/api/v1/screenshots/${encodeURIComponent(p.provider??scope.provider)}/${encodeURIComponent(p.gameId??scope.game)}/${encodeURIComponent(p.id)}/${kind}`+(['thumbnail','preview','tile960','tile1280'].includes(kind)&&(p[kind]||p.preview)?'?asset='+encodeURIComponent(p[kind]||p.preview):'');
     const title=()=>timelineView?(openedId?(photo?.title||state?.rows.find(p=>p.id===openedId&&p.provider===scope.provider&&p.gameId===scope.game)?.title||getGames().find(g=>g.provider===scope.provider&&g.gameId===scope.game)?.title||'Game screenshots'):'All games'):recentView?(state?.rows.find(p=>p.id===openedId&&p.provider===scope.provider&&p.gameId===scope.game)?.title||getGames().find(g=>g.provider===scope.provider&&g.gameId===scope.game)?.title||'Game screenshots'):(state?.meta?.title||getGames().find(g=>g.provider===scope.provider&&g.gameId===scope.game)?.title||'Game screenshots');
     const valid=version=>active&&epoch===version;
     const imageObserver=typeof IntersectionObserver==='undefined'?null:new IntersectionObserver(entries=>{
@@ -83,8 +93,11 @@
       recentRequest=request;return request;
     }
     function stripArrows(){const max=strip.scrollWidth-strip.clientWidth;$('recent-left').disabled=strip.scrollLeft<=1;$('recent-right').disabled=strip.scrollLeft>=max-1;}
-    function paintRecent(feed){
-      if(!feed.rows.length){home.hidden=true;return;}
+    function paintRecent(feed,preservePosition=false){
+      const anchor=preservePosition&&root.scrollY>0?Array.from($('games').querySelectorAll('[data-game-card]')).find(card=>{const r=card.getBoundingClientRect();return r.bottom>0&&r.top<root.innerHeight;}):null;
+      const anchorTop=anchor?.getBoundingClientRect().top;
+      const restorePosition=()=>{if(anchor?.isConnected){const delta=anchor.getBoundingClientRect().top-anchorTop;if(Math.abs(delta)>.5)root.scrollBy(0,delta);}};
+      if(!feed.rows.length){home.hidden=true;restorePosition();return;}
       home.hidden=false;$('recent-status').hidden=true;$('recent-retry').hidden=true;strip.hidden=false;
       if(stripVersion!==feed.meta.version){
         stripVersion=feed.meta.version;
@@ -92,11 +105,13 @@
         strip.querySelectorAll('img').forEach(img=>img.addEventListener('error',()=>{img.hidden=true;img.nextElementSibling.hidden=false;},{once:true}));
       }
       root.requestAnimationFrame(stripArrows);
+      restorePosition();
     }
-    async function showHome(){
-      const version=epoch;home.hidden=false;document.documentElement.classList.add('recent-home-open');
-      if(recent)paintRecent(recent);
-      try{const feed=await recentFeed();if(epoch===version&&!active)paintRecent(feed);}
+    async function showHome({refresh=false,preservePosition=false}={}){
+      if(refresh)recentLoaded=0;
+      const version=epoch;if(!recent)home.hidden=false;document.documentElement.classList.add('recent-home-open');
+      if(recent)paintRecent(recent,preservePosition);
+      try{const feed=await recentFeed();if(epoch===version&&!active)paintRecent(feed,preservePosition);}
       catch{if(epoch!==version||active)return;if(!recent){$('recent-status').hidden=false;$('recent-status').textContent='Photos could not be loaded.';$('recent-retry').hidden=false;}}
     }
     $('recent-left').addEventListener('click',()=>strip.scrollBy({left:-Math.max(120,strip.clientWidth*.8),behavior:root.matchMedia?.('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'}));
@@ -120,14 +135,18 @@
         const width=grid.getBoundingClientRect().width;if(width<=0)return;
         const items=Array.from(grid.querySelectorAll('.screenshot-tile')),layout=squareLayout(items.length,width,density,6);
         grid.classList.add('screenshot-quilt');grid.style.height=layout.height+'px';
-        for(const tile of layout.tiles){const el=items[tile.index];Object.assign(el.style,{left:tile.x+'px',top:tile.y+'px',width:tile.size+'px',height:tile.size+'px'});el.dataset.laidOut='true';el.classList.toggle('screenshot-large',tile.span===2);}
+        for(const tile of layout.tiles){const el=items[tile.index];Object.assign(el.style,{left:tile.x+'px',top:tile.y+'px',width:tile.size+'px',height:tile.size+'px'});el.dataset.laidOut='true';el.classList.toggle('screenshot-large',tile.span===2);
+          const img=el.querySelector('img'),p=tilePhotos.get(el),kind=img.dataset.previewFailed?'thumbnail':tileImageKind(p,tile.size,root.devicePixelRatio),src=imageUrl(p,kind);
+          if(img.dataset.thumbSrc!==src){img.dataset.thumbSrc=src;delete img.dataset.failed;img.hidden=false;img.nextElementSibling.hidden=true;if(img.hasAttribute('src')||!imageObserver)img.src=src;}
+        }
       });
       lastWidth=page.getBoundingClientRect().width;
+      watchImages();
       if(anchor&&anchor.element.isConnected){const delta=anchor.element.getBoundingClientRect().top-anchor.top;if(Math.abs(delta)>.5)root.scrollBy(0,delta);}
     }
     function requestLayout(){if(layoutFrame)root.cancelAnimationFrame(layoutFrame);layoutFrame=root.requestAnimationFrame(()=>{layoutFrame=0;layoutPhotos(true);});}
     if(typeof ResizeObserver!=='undefined')new ResizeObserver(()=>{const width=page.getBoundingClientRect().width;if(active&&!openedId&&width>0&&Math.abs(width-lastWidth)>.5)requestLayout();}).observe(page);
-    else root.addEventListener('resize',requestLayout);
+    root.addEventListener('resize',requestLayout);
     function reset(){if(openedId&&state){state.lastPhoto=openedId;const last=state.rows.find(p=>p.id===openedId&&(!(recentView||timelineView)||p.provider===scope.provider&&p.gameId===scope.game));state.lastPhotoKey=last?photoKey(last):null;}if(busy&&state)state.interrupted=true;epoch++;ticket++;active=false;recentView=false;timelineView=false;moreObserver?.disconnect();imageObserver?.disconnect();page.querySelectorAll('img[data-thumb-src]').forEach(img=>img.removeAttribute('src'));busy=false;openedId=photo=touch=undefined;page.hidden=true;home.hidden=true;if(layoutFrame)root.cancelAnimationFrame(layoutFrame);layoutFrame=0;if(dialog.open)dialog.close();document.documentElement.classList.remove('photo-open','screenshot-gallery-open','recent-home-open');image.removeAttribute('src');image.onload=image.onerror=null;}
     function shell(){
       heading(timelineView?'Photo timeline':'Screenshots',timelineView?'All your games, in capture order.':title(),'YOUR MOMENTS');$('page-heading').classList.add('screenshot-heading');$('page-count').textContent=state.meta?`${state.meta.total} photos`:'';
@@ -159,11 +178,17 @@
     function appendPhotos(){
       const positions=new Map(state.rows.map((p,i)=>[photoKey(p),i+1]));
       const days=$('screenshot-days'),anchor=rememberTile(),tiles=new Map(Array.from(days.querySelectorAll('[data-photo-id]'),el=>[el.dataset.photoKey||el.dataset.photoId,el]));
-      for(const {day,groups} of photoSections(state.rows,grouped)){
+      // A refreshed collection can remove or move tiles as well as append them.
+      for(const [key,tile] of tiles)if(!positions.has(key)){imageObserver?.unobserve(tile);tile.remove();}
+      const sections=photoSections(state.rows,grouped);
+      for(const section of Array.from(days.children))if(!sections.some(s=>s.day===section.dataset.day))section.remove();
+      for(const [dayIndex,{day,groups}] of sections.entries()){
         let section=Array.from(days.children).find(el=>el.dataset.day===day);
         if(!section){section=document.createElement('section');section.className='screenshot-day';section.dataset.day=day;section.innerHTML=`<h2>${esc(dayLabel(day))}</h2>`;days.append(section);}
+        if(days.children[dayIndex]!==section)days.insertBefore(section,days.children[dayIndex]||null);
         if(section.dataset.grouped!==String(grouped)){section.querySelectorAll(':scope > :not(h2)').forEach(el=>el.remove());section.dataset.grouped=String(grouped);}
-        for(const group of groups){
+        for(const bucket of Array.from(section.children))if(bucket.dataset.groupKey&&!groups.some(g=>g.key===bucket.dataset.groupKey))bucket.remove();
+        for(const [groupIndex,group] of groups.entries()){
           let bucket=Array.from(section.children).find(el=>el.dataset.groupKey===group.key),grid;
           if(!bucket){
             bucket=document.createElement(grouped?'details':'div');bucket.dataset.groupKey=group.key;
@@ -173,22 +198,29 @@
             }
             grid=document.createElement('div');grid.className='screenshot-grid';bucket.append(grid);section.append(bucket);
           }else grid=bucket.querySelector('.screenshot-grid');
+          if(section.children[groupIndex+1]!==bucket)section.insertBefore(bucket,section.children[groupIndex+1]||null);
           if(grouped)bucket.querySelector('small').textContent=`${group.photos.length} loaded`;
-          for(const p of group.photos){
+          for(const [photoIndex,p] of group.photos.entries()){
             let tile=tiles.get(photoKey(p));
-            if(!tile){tile=document.createElement('a');tile.className='screenshot-tile';tile.dataset.photoId=p.id;tile.dataset.photoKey=photoKey(p);tile.href='#'+photoHash(p);tile.setAttribute('aria-label',`Open ${p.title?p.title+', ':''}${p.console} screenshot, ${dayLabel(p.captureDay)}, photo ${positions.get(photoKey(p))}`);tile.innerHTML=`<img src="${imageUrl(p,'thumbnail')}" alt="" loading="lazy" decoding="async" width="480" height="480"><span class="screenshot-thumb-error" hidden>Open photo</span>`;}
-            if(tile.parentElement!==grid)grid.append(tile);
+            if(!tile){tile=document.createElement('a');tile.className='screenshot-tile';tile.dataset.photoId=p.id;tile.dataset.photoKey=photoKey(p);tile.href='#'+photoHash(p);tile.setAttribute('aria-label',`Open ${p.title?p.title+', ':''}${p.console} screenshot, ${dayLabel(p.captureDay)}, photo ${positions.get(photoKey(p))}`);tile.innerHTML='<img alt="" loading="lazy" decoding="async" width="480" height="480"><span class="screenshot-thumb-error" hidden>Open photo</span>';}
+            const previous=tilePhotos.get(tile);if(previous&&(previous.thumbnail!==p.thumbnail||previous.preview!==p.preview))delete tile.querySelector('img').dataset.previewFailed;
+            tilePhotos.set(tile,p);
+            if(grid.children[photoIndex]!==tile)grid.insertBefore(tile,grid.children[photoIndex]||null);
           }
         }
       }
-      days.querySelectorAll('img:not([data-watched])').forEach(img=>{img.dataset.watched='true';img.dataset.thumbSrc=img.getAttribute('src');img.addEventListener('error',()=>{if(!img.getAttribute('src'))return;img.dataset.failed='true';img.hidden=true;img.nextElementSibling.hidden=false;});});
+      days.querySelectorAll('img:not([data-watched])').forEach(img=>{img.dataset.watched='true';img.addEventListener('error',()=>{if(!img.getAttribute('src'))return;
+        const p=tilePhotos.get(img.closest('.screenshot-tile'));
+        if(!img.dataset.previewFailed&&img.dataset.thumbSrc!==imageUrl(p,'thumbnail')){img.dataset.previewFailed='true';img.dataset.thumbSrc=imageUrl(p,'thumbnail');img.src=img.dataset.thumbSrc;return;}
+        img.dataset.failed='true';img.hidden=true;img.nextElementSibling.hidden=false;
+      });});
       layoutPhotos(false);watchImages();
       if(anchor&&anchor.element.isConnected&&anchor.element.getBoundingClientRect().height>0)root.scrollBy(0,anchor.element.getBoundingClientRect().top-anchor.top);
     }
     function counts(){
       $('screenshot-results').textContent=state.meta?`${state.rows.length} of ${state.meta.filteredTotal} ${state.filter?state.filter+' ':''}screenshots${state.meta.total<state.meta.eligible?' · Recent selection':''}`:busy?'Loading photos…':'Photos unavailable. Try refreshing.';
       $('screenshot-more').hidden=state.nextOffset===null;$('screenshot-more').disabled=busy;$('screenshot-more').textContent=busy?'Loading…':'Show more photos';$('screenshot-refresh').disabled=busy;
-      if(state.meta&&!state.rows.length&&!busy)$('screenshot-days').innerHTML=`<p class="muted">${timelineView?(state.meta.total?'No photos match these filters.':'No photos have been synced yet.'):'No screenshots for this console.'}</p>`;
+      if(state.meta&&!state.rows.length&&!busy)$('screenshot-days').innerHTML=`<p class="muted">${timelineView?(state.meta.total?'No photos match these filters.':'No photos are available yet.'):'No screenshots for this console.'}</p>`;
     }
     async function load(fresh){
       const version=epoch,current=++ticket;busy=true;state.interrupted=false;state.autoError=false;$('screenshot-error').hidden=true;
@@ -198,8 +230,30 @@
         const query=`?offset=${offset}&limit=60${state.filter?'&console='+encodeURIComponent(state.filter):''}${timelineView&&state.through?'&through='+encodeURIComponent(state.through):''}${!fresh&&state.meta?'&version='+encodeURIComponent(state.meta.version):''}`;
         let result=await api(path()+query);if(!valid(version)||current!==ticket)return;if(timelineView)result={...result,eligible:result.total,photos:timelineRows(result)};
         Object.assign(state,mergePage(state,result,!fresh));filters();appendPhotos();$('page-count').textContent=`${state.meta.total} photos`;
-      }catch(error){if(valid(version)&&current===ticket){state.autoError=true;$('screenshot-error').textContent=error.status===404?'Screenshots have not been synced for this game yet.':error.message;$('screenshot-error').hidden=false;}}
+      }catch(error){if(valid(version)&&current===ticket){state.autoError=true;$('screenshot-error').textContent=error.status===404?'No screenshots are available for this game yet.':error.message;$('screenshot-error').hidden=false;}}
       finally{if(valid(version)&&current===ticket){busy=false;counts();if(!state.autoError)observeMore();}}
+    }
+    let checking=false;
+    async function refresh(){
+      if(!active||recentView||openedId||busy||checking||!state?.meta)return;
+      const version=epoch,current=ticket,collection=state,endpoint=path();
+      const selection=`${state.filter?'&console='+encodeURIComponent(state.filter):''}${timelineView&&state.through?'&through='+encodeURIComponent(state.through):''}`;
+      const currentScreen=()=>valid(version)&&current===ticket&&state===collection&&!openedId&&!busy;
+      checking=true;
+      try{
+        const probe=await api(endpoint+'?offset=0&limit=1'+selection);
+        if(!currentScreen())return false;if(probe.version===state.meta.version)return true;
+        // Collect the loaded range before replacing anything, keeping the old view on failure.
+        const wanted=Math.max(60,state.rows.length);let next={...state,rows:[],meta:null,nextOffset:0};
+        do{
+          let result=await api(endpoint+`?offset=${next.nextOffset}&limit=60${selection}&version=${encodeURIComponent(probe.version)}`);
+          if(!currentScreen())return;
+          if(timelineView)result={...result,eligible:result.total,photos:timelineRows(result)};
+          next=mergePage(next,result,next.meta!==null);
+        }while(next.nextOffset!==null&&next.rows.length<wanted);
+        Object.assign(state,next);recentLoaded=0;filters();appendPhotos();counts();$('page-count').textContent=`${state.meta.total} photos`;observeMore();return true;
+      }catch{return false;/* Keep the loaded collection during offline or changing-library retries. */}
+      finally{checking=false;}
     }
     function showInfo(show){$('photo-info').hidden=!show;stage.setAttribute('aria-label',show?'Hide photo information':'Show photo information');}
     function neighbors(){const i=state.rows.findIndex(p=>p.id===openedId&&(!(recentView||timelineView)||p.provider===scope.provider&&p.gameId===scope.game));return {previous:i>0?state.rows[i-1]:null,next:i>=0&&i+1<state.rows.length?state.rows[i+1]:null};}
@@ -207,7 +261,7 @@
     function closePhoto(){if(!dialog.open)return;dialog.close();document.documentElement.classList.remove('photo-open');back();}
     function viewer(row,version){
       if(!valid(version))return;photo=row;showInfo(false);$('photo-loading').hidden=false;$('photo-loading').textContent='Loading photo…';$('photo-retry').hidden=true;image.hidden=false;
-      image.alt=`Screenshot from ${title()}`;image.onload=()=>{if(valid(version)&&openedId===row.id)$('photo-loading').hidden=true;};image.onerror=()=>{if(valid(version)&&openedId===row.id){image.hidden=true;$('photo-loading').textContent='This photo could not be loaded.';$('photo-retry').hidden=false;}};image.src=imageUrl(row,'preview');
+      image.alt=`Screenshot from ${title()}`;image.onload=()=>{if(valid(version)&&openedId===row.id){$('photo-loading').hidden=true;if(!root.navigator?.connection?.saveData){for(const next of Object.values(neighbors()))if(next){const url=imageUrl(next,'preview');if(!prefetched.has(url)){const preload=new Image();preload.decoding='async';preload.src=url;prefetched.set(url,preload);while(prefetched.size>2){const oldest=prefetched.keys().next().value;prefetched.get(oldest).removeAttribute('src');prefetched.delete(oldest);}}}}}};image.onerror=()=>{if(valid(version)&&openedId===row.id){image.hidden=true;$('photo-loading').textContent='This photo could not be loaded.';$('photo-retry').hidden=false;}};image.src=imageUrl(row,'preview');
       $('photo-info-content').innerHTML=`<h2>${esc(title())}</h2><p>${esc(row.console)} · ${esc(dayLabel(row.captureDay))}</p>${row.group?`<p>${esc(row.group)}</p>`:''}<p class="photo-dimensions">${row.width} × ${row.height}</p>`;
       const n=neighbors();$('photo-previous').disabled=!n.previous;$('photo-next').disabled=!n.next;
       $('photo-download')?.remove();$('photo-metadata')?.remove();
@@ -228,9 +282,10 @@
     return {
       get active(){return active;},get busy(){return busy;},
       showHome,
+      refresh,
       reset(){reset();$('page-heading').classList.remove('screenshot-heading');},
-      clear(){reset();recentGeneration++;recent=recentRequest=stripVersion=undefined;recentLoaded=0;strip.innerHTML='';strip.hidden=true;$('recent-status').textContent='Loading photos…';$('recent-status').hidden=false;$('recent-retry').hidden=true;cache.clear();layoutState=state=undefined;page.innerHTML='';},
-      setWorkspace(id){if(id!==workspace){this.clear();workspace=id;}},
+      clear(){for(const img of prefetched.values())img.removeAttribute('src');prefetched.clear();reset();recentGeneration++;recent=recentRequest=stripVersion=undefined;recentLoaded=0;strip.innerHTML='';strip.hidden=true;$('recent-status').textContent='Loading photos…';$('recent-status').hidden=false;$('recent-retry').hidden=true;cache.clear();layoutState=state=undefined;page.innerHTML='';},
+      setWorkspace(id){if(workspace!==id){for(const img of prefetched.values())img.removeAttribute('src');prefetched.clear();}if(id!==workspace){this.clear();workspace=id;}},
       fallback(){return active&&scope?recentView?'#':timelineView?(openedId?'timeline':'#'):openedId?galleryHash():`game/${encodeURIComponent(scope.provider)}/${encodeURIComponent(scope.game)}`:null;},
       async open(parts){
         const version=++epoch;active=true;scope={provider:parts[1],game:parts[2]};recentView=parts[0]==='recent-photo';timelineView=parts[0]==='timeline'||parts[0]==='timeline-photo';openedId=parts[0]==='photo'||parts[0]==='timeline-photo'||recentView?parts[3]:undefined;
@@ -247,9 +302,9 @@
         if(!cache.has(key))cache.set(key,{filter:'',rows:[],meta:null,nextOffset:0,through:'',collapsed:new Set()});state=cache.get(key);shell();
         if(!state.meta)await load(true);else if(!openedId&&state.interrupted)await load(state.rows.length===0);if(!valid(version))return;
         if(openedId){try{const row=state.rows.find(p=>p.id===openedId&&(!timelineView||p.provider===scope.provider&&p.gameId===scope.game))||{...await api(gamePath()+'/photos/'+encodeURIComponent(openedId)),...(timelineView?{provider:scope.provider,gameId:scope.game,title:getGames().find(g=>g.provider===scope.provider&&g.gameId===scope.game)?.title}: {})};viewer(row,version);}catch(error){if(valid(version)){$('screenshot-error').textContent='This photo is unavailable. Return to the gallery or refresh photos.';$('screenshot-error').hidden=false;}}}
-        else{layoutPhotos(false);if(state.lastPhoto)Array.from(page.querySelectorAll('[data-photo-id]')).find(el=>state.lastPhotoKey?el.dataset.photoKey===state.lastPhotoKey:el.dataset.photoId===state.lastPhoto)?.focus({preventScroll:true});}
+        else{layoutPhotos(false);if(state.lastPhoto)Array.from(page.querySelectorAll('[data-photo-id]')).find(el=>state.lastPhotoKey?el.dataset.photoKey===state.lastPhotoKey:el.dataset.photoId===state.lastPhoto)?.focus({preventScroll:true});await refresh();}
       }
     };
   }
-  const api={dayLabel,groupDays,photoSections,photoKey,timelineHash,timelineRows,recentRows,recentHash,photoGesture,mergePage,squareLayout,create};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.PixelVaultScreenshots=api;
+  const api={dayLabel,groupDays,photoSections,photoKey,timelineHash,timelineRows,recentRows,recentHash,tileImageKind,photoGesture,mergePage,squareLayout,create};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.PixelVaultScreenshots=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

@@ -26,6 +26,18 @@ if(args.Length==2&&args[0]=="--inspect-screenshot-library")
     var changes=ScreenshotSnapshotExporter.ObserveLibrary(pairing.DesktopDataRoot,pairing.WorkspaceId,catalogue);
     Console.WriteLine(JsonSerializer.Serialize(new{Games=changes.Count,ElapsedMilliseconds=clock.ElapsedMilliseconds,OriginalBytesRead=0}));return 0;
 }
+if(args.Length==2&&args[0]=="--enable-web-tracker-edits")
+{
+    var file=Path.GetFullPath(args[1]);var settings=new JsonSerializerOptions(JsonSerializerDefaults.Web);var pair=JsonSerializer.Deserialize<ConnectorPairing>(File.ReadAllText(file),settings)??throw new InvalidDataException("Missing pairing.");
+    if(pair.Accounts is null||string.IsNullOrWhiteSpace(pair.DesktopDataRoot))throw new InvalidDataException("Configure approved PC accounts first.");
+    File.WriteAllText(file+".tmp",JsonSerializer.Serialize(pair with{WebTrackerEditsEnabled=true},settings));File.Move(file+".tmp",file,true);Console.WriteLine("Web tracker edits enabled for the existing approved workspace/accounts.");return 0;
+}
+if(args.Length==2&&args[0] is "--sync-web-tracker-edits" or "--preview-web-tracker-edits")
+{
+    var file=Path.GetFullPath(args[1]);var pair=JsonSerializer.Deserialize<ConnectorPairing>(File.ReadAllText(file),new JsonSerializerOptions(JsonSerializerDefaults.Web))??throw new InvalidDataException("Missing pairing.");
+    using var client=new HttpClient(new HttpClientHandler{AllowAutoRedirect=false}){BaseAddress=new Uri(pair.Url),Timeout=TimeSpan.FromSeconds(35)};client.DefaultRequestHeaders.Authorization=new("Bearer",pair.Token);
+    var result=await TrackerWebSync.OnceAsync(client,pair,Path.GetDirectoryName(file)!,default,args[0]=="--preview-web-tracker-edits");Console.WriteLine(JsonSerializer.Serialize(result));return 0;
+}
 if(args.Length==2&&args[0]=="--death-stranding-read")return DeathStrandingSaveWorker.Run(args[1]);
 if(args.Length==2&&args[0]=="--prepare-screenshot-library")return await ScreenshotPilot.Library(args[1],true);
 if(args.Length==2&&args[0]=="--publish-prepared-screenshot-library")return await ScreenshotPilot.Library(args[1],false,true);
@@ -54,6 +66,7 @@ var data=Path.GetDirectoryName(configPath)!;var reader=new DeathStrandingTracker
 var automatic=new AutomaticConnection(http,config,data,reader);
 var monitor=automatic.MonitorAsync(stop.Token);var librarySync=automatic.LibraryAsync(stop.Token);
 var publication=automatic.PublicationAsync(stop.Token);
+var trackerEdits=automatic.TrackerEditsAsync(stop.Token);
 var achievements=automatic.AchievementsAsync(stop.Token);
 var photos=new AutomaticPhotoSync(config,data).RunAsync(stop.Token);
 var heartbeat=Task.Run(async()=>{
@@ -97,5 +110,5 @@ while(!stop.IsCancellationRequested)
     catch(Exception error)when(error is HttpRequestException or TaskCanceledException or JsonException or InvalidOperationException)
     {Log("Companion is unavailable or its pairing changed. Retrying shortly.");try{await Task.Delay(15000,stop.Token);}catch(OperationCanceledException){break;}}
 }
-stop.Cancel();await Task.WhenAll(heartbeat,monitor,librarySync,publication,achievements,photos);return 0;
+stop.Cancel();await Task.WhenAll(heartbeat,monitor,librarySync,publication,achievements,photos,trackerEdits);return 0;
 static void Log(string message)=>Console.WriteLine(DateTime.UtcNow.ToString("o")+" "+message);

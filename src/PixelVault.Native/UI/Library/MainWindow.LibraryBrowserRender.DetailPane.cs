@@ -25,8 +25,16 @@ namespace PixelVaultNative
             Action redrawSelectedFolderDetail,
             Action renderFolderTiles)
         {
+            // Restoring a cover selection must not scan/decode an invisible capture
+            // pane. Photo and timeline entry will render using the restored state.
+            if (ws.IsFolderWorkspaceMode)
+            {
+                ws.DetailRenderCancellation.CancelCurrent();
+                return;
+            }
             var panes = ws.Panes;
             var renderStopwatch = Stopwatch.StartNew();
+            var lifecycleStopwatch = Stopwatch.StartNew();
             var renderVersion = ++ws.DetailRenderSequence;
             var detailRenderCancellationToken = ws.DetailRenderCancellation.BeginRender(renderVersion);
             ws.ActiveCaptureGroupScope = null;
@@ -167,7 +175,7 @@ namespace PixelVaultNative
                 {
                     LogTroubleshooting(area,
                         "renderVersion=" + renderVersion
-                        + "; elapsedMs=" + renderStopwatch.ElapsedMilliseconds
+                        + "; elapsedMs=" + lifecycleStopwatch.ElapsedMilliseconds
                         + "; " + (details ?? string.Empty)
                         + (string.IsNullOrWhiteSpace(details) ? string.Empty : "; ")
                         + BuildLibraryBrowserTroubleshootingLabel(renderFolder));

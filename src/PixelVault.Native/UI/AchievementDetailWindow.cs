@@ -54,11 +54,13 @@ namespace PixelVaultNative
 
             var body = new StackPanel { Margin = new Thickness(24, 22, 24, 24) };
             body.Children.Add(BuildHeader());
+            var century = PixelVault.Tracking.CenturyAchievementCatalog.Find(game.Provider, game.Id, row.CenturyDefinitionId);
+            if (century != null) body.Children.Add(Section("Requirements", Text(century.Requirement, 14)));
             if(trackerNavigation!=null)body.Children.Add(BuildTrackingAction());
             var counter = BuildCounter();
             if (counter != null) body.Children.Add(counter);
             body.Children.Add(Section("Details", BuildFacts(savedUtc)));
-            body.Children.Add(Section("Guide", guidePanel));
+            if (century == null) body.Children.Add(Section("Guide", guidePanel));
             mapLinks.Bind(trackingStore, game.Provider, game.Id, game.Title, game.Provider == "steam" ? trackingAccount : null, game.Provider == "retroachievements" ? trackingAccount : null, achievement: row.ProviderAchievementId);
             body.Children.Add(mapLinks);
             linkedTrackers.Bind(trackingStore, game.Provider, game.Id, row.ProviderAchievementId, trackingAccount);
@@ -108,7 +110,7 @@ namespace PixelVaultNative
             return card;
         }
 
-        string Provider => game.Provider == "steam" ? "Steam" : "RetroAchievements";
+        string Provider => row.CenturyDefinitionId != null ? PixelVault.Tracking.CenturyAchievementCatalog.GroupName : game.PlatformLabel;
 
         string Status => !row.ProgressKnown ? "Progress unknown"
             : !row.Unlocked ? "Not earned yet"
@@ -126,7 +128,6 @@ namespace PixelVaultNative
                 Foreground = Color("#6EAFBF", SystemColors.HighlightBrush), Background = Color("#263C48", SystemColors.ControlBrush) };
             AutomationProperties.SetName(bar, "Counter progress " + AchievementsInfoWindow.CounterLabel(row));
             panel.Children.Add(bar);
-            panel.Children.Add(Text("Latest counter reported to Steam for this account. Unlock status is reported separately.", 12));
             return Section("Current progress", panel);
         }
 
@@ -144,7 +145,7 @@ namespace PixelVaultNative
             }
             TextBlock Value(string text) { var t = Text(text, 13, true); t.Margin = new Thickness(0, 0, 0, 10); return t; }
 
-            if (row.Points.HasValue) Add("Achievement points", Value(AchievementScoring.Explanation(row)));
+            if (row.Points.HasValue) Add("Achievement points", Value(AchievementScoring.Label(row)));
 
             var percent = AchievementCollectionStats.ValidPercent(row.GlobalUnlockPercent) ? row.GlobalUnlockPercent : null;
             var tier = AchievementRarityUi.Label(row);
@@ -184,8 +185,6 @@ namespace PixelVaultNative
             }
             Add("Category", category);
             Add("Provider", Value(Provider));
-            if (savedUtc > 0 && savedUtc <= DateTime.UtcNow.Ticks)
-                Add("Progress saved", Value(new DateTime(savedUtc, DateTimeKind.Utc).ToLocalTime().ToString("g", CultureInfo.CurrentCulture)));
             return grid;
         }
 

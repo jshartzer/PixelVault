@@ -53,7 +53,7 @@ namespace PixelVaultNative
 
         /// <summary>
         /// Stable sort order for platform groups in the intake preview, folder tile badges, and
-        /// library folder list. Unknown labels sort after everything else (<c>8</c>).
+        /// library folder list. Unknown labels sort after everything else (<c>9</c>).
         /// </summary>
         public static int PlatformGroupOrder(string label)
         {
@@ -64,10 +64,11 @@ namespace PixelVaultNative
                 case "PS5": return 2;
                 case "Switch": return 3;
                 case "Xbox": return 4;
-                case "PC": return 5;
-                case "Multiple Tags": return 6;
-                case "Other": return 7;
-                default: return 8;
+                case "Xbox 360": return 5;
+                case "PC": return 6;
+                case "Multiple Tags": return 7;
+                case "Other": return 8;
+                default: return 9;
             }
         }
 
@@ -76,6 +77,7 @@ namespace PixelVaultNative
         {
             switch (label)
             {
+                case "Xbox 360":
                 case "Xbox": return UiBrushHelper.FromHex("#2E8B57");
                 case "Steam": return UiBrushHelper.FromHex("#2F6FDB");
                 case "Emulation": return UiBrushHelper.FromHex("#B26A3C");

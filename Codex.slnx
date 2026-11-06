@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/PixelVault.Tracking/PixelVault.Tracking.csproj" />
+    <Project Path="src/PixelVault.Maps/PixelVault.Maps.csproj" />
     <Project Path="src/PixelVault.Companion/PixelVault.Companion.csproj" />
     <Project Path="src/PixelVault.Companion.Client/PixelVault.Companion.Client.csproj" />
     <Project Path="src/PixelVault.LibraryAssets/PixelVault.LibraryAssets.csproj" />

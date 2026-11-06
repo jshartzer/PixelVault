@@ -120,12 +120,6 @@ public static partial class ScreenshotSnapshotExporter
         }
         return result;
     }
-    static string Derivative(Image image,int max,string output)
-    {
-        var scale=Math.Min(1,(double)max/Math.Max(image.Width,image.Height));using var bitmap=new Bitmap(Math.Max(1,(int)(image.Width*scale)),Math.Max(1,(int)(image.Height*scale)),PixelFormat.Format24bppRgb);
-        using(var g=Graphics.FromImage(bitmap)){g.Clear(Color.Black);g.InterpolationMode=InterpolationMode.HighQualityBicubic;g.DrawImage(image,0,0,bitmap.Width,bitmap.Height);}
-        using var stream=new MemoryStream();var codec=ImageCodecInfo.GetImageEncoders().Single(c=>c.MimeType=="image/jpeg");using var parameters=new EncoderParameters(1);parameters.Param[0]=new EncoderParameter(System.Drawing.Imaging.Encoder.Quality,max==480?80L:88L);bitmap.Save(stream,codec,parameters);
-        var bytes=stream.ToArray();if(bytes.Length>6*1024*1024)throw new InvalidDataException("A viewing copy exceeds the pilot limit.");var name=Hash(bytes)+".jpg";var file=Path.Combine(output,"assets",name);if(!File.Exists(file))File.WriteAllBytes(file,bytes);return name;
-    }
+    static string Derivative(Image image,int max,string output)=>PixelVault.Media.PhotoCodec.Derivative(image,max,output);
     sealed record Cached(string Fingerprint,int Width,int Height,string Thumbnail,string Preview,string? Conversion=null);
 }

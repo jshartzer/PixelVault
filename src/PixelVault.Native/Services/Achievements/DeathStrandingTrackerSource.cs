@@ -19,23 +19,43 @@ namespace PixelVaultNative
         internal const string AdapterId = "death-stranding-dc.fabrication";
         internal const ulong SteamBase = 76561197960265728;
         readonly string storageRoot, workerPath;
+        static readonly SharedSaveAnalysisCache SharedAnalysis = new();
+        readonly SharedSaveAnalysisCache analysisCache;
+        readonly Func<string, CancellationToken, Task<DeathStrandingReadResult>> readWorker;
         public string Id => AdapterId;
         public string Version => "1";
         public bool Supports(AchievementTrackerDefinition definition)=>definition?.Provider=="steam"&&definition.GameId=="1850570"
-            &&(definition.Id==AchievementTrackingCatalog.DeathStrandingId||DeathStrandingWorldReader.Supports(definition.Id)||DeathStrandingOrderReader.Supports(definition.Id)||DeathStrandingChipReader.Supports(definition.Id)||DeathStrandingInterviewReader.Supports(definition.Id));
-        public string Coverage(AchievementTrackerDefinition definition)=>DeathStrandingOrderReader.Supports(definition?.Id)
-            ?"Reads all 540 standard orders directly from a validated save copy. LL and LLL are independent earned ranks."
+            &&(DeathStrandingFacilityReader.Supports(definition)||PixelVault.Tracking.CenturyCargoGoal.Matches(definition)||DeathStrandingMailCatalogueReader.Supports(definition)||definition.Id==DeathStrandingMailReader.TrackerId||definition.Id==AchievementTrackingCatalog.DeathStrandingId||DeathStrandingWorldReader.Supports(definition.Id)||DeathStrandingOrderReader.Supports(definition.Id)||DeathStrandingChipReader.Supports(definition.Id)||DeathStrandingInterviewReader.Supports(definition.Id)||DeathStrandingInterviewCatalogueReader.Supports(definition)||DeathStrandingRoadReader.Supports(definition));
+        public string Coverage(AchievementTrackerDefinition definition)=>definition?.Id==PixelVault.Tracking.CenturyCargoGoal.TrackerId
+            ?"Reads the cumulative delivered cargo weight in whole kilograms from the validated saved statistic table."
+            :definition?.Id==DeathStrandingFacilityReader.TrackerId
+            ?"Reads the saved whole-star connection level for all 36 Best Beloved facilities."
+            :definition?.Id==DeathStrandingMailReader.TrackerId
+            ?"Reads the saved mail-reading total from the complete validated statistic table. Per-email flags are not inferred."
+            :DeathStrandingMailCatalogueReader.Supports(definition)
+            ?"Reads verified opened states for 239 emails. Received unread mail remains incomplete; one catalogue title absent from the runtime list stays unknown."
+            :DeathStrandingOrderReader.Supports(definition?.Id)
+            ?definition.Id == PixelVault.Tracking.CenturyLegendsCatalogue.TrackerId
+                ?"Reads a Legend or higher evaluation for every one of the 540 standard orders."
+                :"Reads all 540 standard orders directly from a validated save copy. LL and LLL are independent earned ranks."
             :DeathStrandingInterviewReader.Supports(definition?.Id)
             ?"Reads the game's interview achievement counter from a complete validated statistic table. Individual interview read states are not inferred."
+            :DeathStrandingInterviewCatalogueReader.Supports(definition)
+            ?"Reads all 149 populated interview entries from validated save data. Only read interviews count toward the Century achievement; unlocked unread entries remain incomplete."
             :DeathStrandingChipReader.Supports(definition?.Id)
             ?"Reads all 56 memory chips from a validated save copy. Only restoration at a terminal counts; pickup alone does not."
+            :DeathStrandingRoadReader.Supports(definition)
+            ?"Reads all 51 restored UC Route sections directly from validated save data, regardless of builder. Archived unmatched records are not inferred."
             :"Reads the complete supported milestone catalogue directly from a validated copy of the game save.";
         public TrackerSourceCapabilities Capabilities => TrackerSourceCapabilities.Refresh | TrackerSourceCapabilities.ExternalObservationTime;
-        public string ChangeSignature(TrackerSourceBinding binding) => TrackerSourceFiles.Signature(Candidates(ResolveProfileRoot(binding.Location, binding.Account), binding.SpecificSave), 16 * 1024 * 1024);
-        internal DeathStrandingTrackerSource(string trackingDirectory, string workerPath = null)
+        public string ChangeSignature(TrackerSourceBinding binding) => TrackerSourceFiles.Signature(Candidates(ResolveProfileRoot(binding.Location, binding.Account), binding.SpecificSave), DeathStrandingSaveReader.MaxFile, allowConcurrentWrites: true);
+        internal DeathStrandingTrackerSource(string trackingDirectory, string workerPath = null,
+            SharedSaveAnalysisCache analysisCache = null, Func<string, CancellationToken, Task<DeathStrandingReadResult>> readWorker = null)
         {
             storageRoot = Path.Combine(Path.GetFullPath(trackingDirectory), "sources", "death-stranding-dc");
             this.workerPath = workerPath ?? Path.Combine(AppContext.BaseDirectory, "PixelVault.exe");
+            this.analysisCache = analysisCache ?? SharedAnalysis;
+            this.readWorker = readWorker ?? RunWorkerAsync;
         }
         internal static bool IsSteamAccount(string account) => account?.Length == 17 && ulong.TryParse(account, NumberStyles.None, CultureInfo.InvariantCulture, out var id) && id >= SteamBase && id - SteamBase <= uint.MaxValue;
         internal static string ProfileNumber(string account)
@@ -72,11 +92,15 @@ namespace PixelVaultNative
         {
             if (binding.AdapterId != Id || binding.AdapterVersion != Version) throw new NotSupportedException("This Death Stranding adapter version is not supported.");
             if (!Supports(definition))
-                throw new NotSupportedException("The Death Stranding save reader supports fabrication, construction, maximum upgrades, premium-order ranks and memory-chip restoration.");
-            var reference = DeathStrandingInterviewReader.Supports(definition.Id) ? DeathStrandingInterviewReader.Definition() : AchievementTrackingCatalog.Builtins().Single(d => d.Id == definition.Id);
+                throw new NotSupportedException("This Death Stranding checklist does not match a supported save catalogue.");
+            if (definition.Id == PixelVault.Tracking.CenturyLegendsCatalogue.TrackerId && !PixelVault.Tracking.CenturyLegendsCatalogue.Matches(definition))
+                throw new NotSupportedException("The LLL source requires all 540 original standard orders with one LLL requirement per order.");
+            bool roads = DeathStrandingRoadReader.Supports(definition);
+            var reference = definition.Id==DeathStrandingMailReader.TrackerId ? DeathStrandingMailReader.Definition() : DeathStrandingMailCatalogueReader.Supports(definition) ? DeathStrandingMailCatalogueReader.Definition() : roads || definition.Id == DeathStrandingFacilityReader.TrackerId ? definition : DeathStrandingInterviewCatalogueReader.Supports(definition) ? DeathStrandingInterviewCatalogueReader.Definition()
+                : DeathStrandingInterviewReader.Supports(definition.Id) ? DeathStrandingInterviewReader.Definition() : AchievementTrackingCatalog.Builtins().Single(d => d.Id == definition.Id);
             if (definition.Items.Count != reference.Items.Count || !definition.Items.Select(i => i.Id).ToHashSet(StringComparer.Ordinal).SetEquals(reference.Items.Select(i => i.Id)))
                 throw new NotSupportedException("The save source needs the complete bundled milestone catalogue.");
-            if (DeathStrandingInterviewReader.Supports(definition.Id) && definition.Items.Single().Target != 100)
+            if ((DeathStrandingInterviewReader.Supports(definition.Id)||definition.Id==DeathStrandingMailReader.TrackerId) && definition.Items.Single().Target != 100)
                 throw new NotSupportedException("The interview achievement counter requires its goal of 100.");
             if (!IsSteamAccount(binding.Account)) throw new InvalidDataException("The save reader needs this tracker’s connected Steam ID.");
             if (!Path.IsPathFullyQualified(binding.Location ?? "") || !Path.IsPathFullyQualified(binding.GameDirectory ?? "")) throw new InvalidDataException("Choose full paths for the save folder and game installation.");
@@ -123,7 +147,9 @@ namespace PixelVaultNative
                     var before = new FileInfo(path); var length = before.Length; var time = before.LastWriteTimeUtc;
                     if (length < 24 || length > DeathStrandingSaveReader.MaxFile) throw new InvalidDataException("The checkpoint size is invalid or unsupported.");
                     var bytes = new byte[(int)length];
-                    using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 8192, FileOptions.Asynchronous);
+                    // Do not deny the game write/delete access while copying. A concurrent
+                    // save is rejected by stamp/length checks and the container checksum.
+                    using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, 8192, FileOptions.Asynchronous);
                     if (stream.Length != length) throw new IOException("The checkpoint changed during copying.");
                     await stream.ReadExactlyAsync(bytes, token).ConfigureAwait(false);
                     var after = new FileInfo(path);
@@ -139,6 +165,12 @@ namespace PixelVaultNative
             Validate(binding, definition);
             if (!File.Exists(workerPath)) throw new FileNotFoundException("The packaged save-reader executable is missing. Rebuild or reinstall PixelVault.");
             if (!File.Exists(Path.Combine(binding.GameDirectory, "ds.exe")) || !File.Exists(Path.Combine(binding.GameDirectory, "oo2core_7_win64.dll"))) throw new FileNotFoundException("Choose the game installation containing ds.exe and oo2core_7_win64.dll.");
+            string dllHash;
+            using (var dll = new FileStream(Path.Combine(binding.GameDirectory, "oo2core_7_win64.dll"), FileMode.Open, FileAccess.Read, FileShare.Read))
+            {
+                if (dll.Length > 64 * 1024 * 1024) throw new InvalidDataException("The game compression library is too large.");
+                dllHash = Convert.ToHexString(SHA256.HashData(dll));
+            }
             var root = ResolveProfileRoot(binding.Location, binding.Account); var candidates = Candidates(root, binding.SpecificSave);
             var scope = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(binding.TrackerId + "\n" + binding.Account)));
             var runs = Path.Combine(storageRoot, scope); Directory.CreateDirectory(runs);
@@ -149,35 +181,84 @@ namespace PixelVaultNative
                 foreach (var candidate in candidates)
                 {
                     deadline.Token.ThrowIfCancellationRequested();
-                    var run = Path.Combine(runs, "run-" + DateTime.UtcNow.ToString("yyyyMMddTHHmmssfffffff", CultureInfo.InvariantCulture) + "-" + Guid.NewGuid().ToString("N"));
-                    Directory.CreateDirectory(run);
-                    using var lease = new FileStream(Path.Combine(run, ".lock"), FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None);
                     try
                     {
                         var read = await ReadStableAsync(candidate.FullName, deadline.Token).ConfigureAwait(false);
                         var digest = Convert.ToHexString(SHA256.HashData(read.Bytes));
-                        await File.WriteAllBytesAsync(Path.Combine(run, "input.dat"), read.Bytes, deadline.Token).ConfigureAwait(false);
-                        var request = new DeathStrandingReadRequest { TrackerId = definition.Id, Account = binding.Account, GameDirectory = binding.GameDirectory, ObservedUtc = read.Ticks,
-                            SourceName = Path.GetRelativePath(root, candidate.FullName), SkippedNewer = skipped };
-                        await File.WriteAllTextAsync(Path.Combine(run, "request.json"), JsonSerializer.Serialize(request, AchievementTrackingCatalog.Json), deadline.Token).ConfigureAwait(false);
-                        await File.WriteAllTextAsync(Path.Combine(run, "manifest.json"), JsonSerializer.Serialize(new { Source = candidate.FullName, Sha256 = digest, SourceUtc = read.Ticks, Adapter = Id, Version }, AchievementTrackingCatalog.Json), deadline.Token).ConfigureAwait(false);
-                        var result = await RunWorkerAsync(run, deadline.Token).ConfigureAwait(false);
-                        if (!string.IsNullOrEmpty(result.ErrorCode))
+                        bool roads = DeathStrandingRoadReader.Supports(definition);
+                        var request = new DeathStrandingReadRequest { TrackerId = roads ? DeathStrandingRoadReader.TrackerId : definition.Id, Account = binding.Account, GameDirectory = binding.GameDirectory, ObservedUtc = read.Ticks,
+                            SourceName = Path.GetRelativePath(root, candidate.FullName), SkippedNewer = skipped, AnalyzeAll = true };
+                        var key = AnalysisKey(storageRoot, workerPath, binding.GameDirectory, binding.Account, digest, dllHash);
+                        var serialized = await analysisCache.GetAsync(key, async ct =>
                         {
-                            if (result.ErrorCode == "InvalidSave") { skipped++; lastInvalid = result.Error; continue; }
-                            if (result.ErrorCode == "UnsupportedFormat") throw new NotSupportedException(result.Error);
-                            throw new DeathStrandingReaderException(result.ErrorCode, result.Error);
-                        }
-                        if (result.Fingerprint != digest || result.Snapshot?.Account != binding.Account || result.Snapshot.TrackerId != definition.Id || result.Snapshot.Items?.Count != definition.Items.Count)
-                            throw new InvalidDataException("The isolated reader returned inconsistent save identity or coverage.");
-                        return new TrackerSourceObservation { Fingerprint = digest, SnapshotJson = JsonSerializer.Serialize(result.Snapshot, AchievementTrackingCatalog.Json) };
+                            var run = Path.Combine(runs, "run-" + DateTime.UtcNow.ToString("yyyyMMddTHHmmssfffffff", CultureInfo.InvariantCulture) + "-" + Guid.NewGuid().ToString("N"));
+                            Directory.CreateDirectory(run);
+                            using var lease = new FileStream(Path.Combine(run, ".lock"), FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None);
+                            try
+                            {
+                                await File.WriteAllBytesAsync(Path.Combine(run, "input.dat"), read.Bytes, ct).ConfigureAwait(false);
+                                await File.WriteAllTextAsync(Path.Combine(run, "request.json"), JsonSerializer.Serialize(request, AchievementTrackingCatalog.Json), ct).ConfigureAwait(false);
+                                await File.WriteAllTextAsync(Path.Combine(run, "manifest.json"), JsonSerializer.Serialize(new { Source = candidate.FullName, Sha256 = digest, SourceUtc = read.Ticks, Adapter = Id, Version }, AchievementTrackingCatalog.Json), ct).ConfigureAwait(false);
+                                var result = await readWorker(run, ct).ConfigureAwait(false);
+                                ThrowReaderError(result.ErrorCode, result.Error);
+                                ValidateAnalysis(result, binding.Account, digest, dllHash);
+                                return JsonSerializer.Serialize(result, AchievementTrackingCatalog.Json);
+                            }
+                            finally { lease.Dispose(); Prune(runs, binding.KeepSnapshots ? 3 : 0); }
+                        }, deadline.Token).ConfigureAwait(false);
+                        // Deserialize per consumer: rebasing metadata or reconciliation must
+                        // never mutate another tracker's cached observation.
+                        var shared = JsonSerializer.Deserialize<DeathStrandingReadResult>(serialized, AchievementTrackingCatalog.Json);
+                        var projection = shared.Projections[roads ? DeathStrandingRoadReader.TrackerId : definition.Id];
+                        ThrowReaderError(projection.ErrorCode, projection.Error);
+                        var snapshot = roads ? DeathStrandingRoadReader.Project(projection.Snapshot, definition) : projection.Snapshot;
+                        if (snapshot.Items?.Count != definition.Items.Count) throw new InvalidDataException("The isolated reader returned inconsistent target coverage.");
+                        snapshot.ObservedUtcTicks = read.Ticks;
+                        snapshot.Source = DeathStrandingSaveWorker.SourceLabel(request);
+                        return new TrackerSourceObservation { Fingerprint = digest, SnapshotJson = JsonSerializer.Serialize(snapshot, AchievementTrackingCatalog.Json) };
                     }
                     catch (InvalidDataException ex) { skipped++; lastInvalid = ex.Message; }
-                    finally { lease.Dispose(); Prune(runs, binding.KeepSnapshots ? 3 : 0); }
+                    finally { if (!binding.KeepSnapshots) Prune(runs, 0); }
                 }
                 throw new InvalidDataException("No valid checkpoint could be read. " + lastInvalid);
             }
             catch (OperationCanceledException) when (!token.IsCancellationRequested) { throw new TimeoutException("The save read timed out. Saved tracker progress was preserved."); }
+        }
+        internal static string AnalysisKey(string storage, string worker, string game, string account, string fingerprint, string dllHash)
+            => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes("death-stranding-dc.analysis-v7\n"
+                + Path.GetFullPath(storage).ToUpperInvariant() + "\n" + Path.GetFullPath(worker).ToUpperInvariant() + "\n"
+                + Path.GetFullPath(game).ToUpperInvariant() + "\n" + account + "\n" + fingerprint + "\n" + dllHash)));
+        static void ThrowReaderError(string code, string message)
+        {
+            if (string.IsNullOrEmpty(code)) return;
+            if (code == "InvalidSave") throw new InvalidDataException(message);
+            if (code == "UnsupportedFormat") throw new NotSupportedException(message);
+            throw new DeathStrandingReaderException(code, message);
+        }
+        internal static void ValidateAnalysis(DeathStrandingReadResult result, string account, string fingerprint, string dllHash)
+        {
+            var expectedCounts = AchievementTrackingCatalog.Builtins().Where(d => d.Id == AchievementTrackingCatalog.DeathStrandingId
+                || DeathStrandingWorldReader.Supports(d.Id) || DeathStrandingOrderReader.Supports(d.Id) || DeathStrandingChipReader.Supports(d.Id) || PixelVault.Tracking.CenturyCargoGoal.Matches(d))
+                .Append(DeathStrandingMailCatalogueReader.Definition()).Append(DeathStrandingMailReader.Definition()).Append(DeathStrandingInterviewReader.Definition()).Append(DeathStrandingInterviewCatalogueReader.Definition()).Append(DeathStrandingRoadReader.Definition()).ToDictionary(d => d.Id, d => d.Items.Count, StringComparer.Ordinal);
+            expectedCounts.Add(DeathStrandingFacilityReader.TrackerId, DeathStrandingFacilityReader.FacilityCount);
+            if (result.Version != 1 || result.Fingerprint != fingerprint || result.GameDllSha256 != dllHash || result.Projections == null
+                || !expectedCounts.Keys.ToHashSet(StringComparer.Ordinal).SetEquals(result.Projections.Keys))
+                throw new InvalidDataException("The isolated reader returned inconsistent save identity or coverage.");
+            foreach (var pair in result.Projections)
+            {
+                var projection = pair.Value;
+                if (projection == null || (projection.ErrorCode != null && projection.ErrorCode != "InvalidSave" && projection.ErrorCode != "UnsupportedFormat"))
+                    throw new InvalidDataException("The isolated reader returned an invalid table outcome.");
+                if (!string.IsNullOrEmpty(projection.ErrorCode))
+                {
+                    if (projection.Snapshot != null) throw new InvalidDataException("The isolated reader returned ambiguous table evidence.");
+                    continue;
+                }
+                var snapshot = projection.Snapshot;
+                if (snapshot?.Account != account || snapshot.Provider != "steam" || snapshot.GameId != "1850570" || snapshot.TrackerId != pair.Key
+                    || snapshot.Items?.Count != expectedCounts[pair.Key])
+                    throw new InvalidDataException("The isolated reader returned inconsistent table identity or coverage.");
+            }
         }
         async Task<DeathStrandingReadResult> RunWorkerAsync(string run, CancellationToken token)
         {

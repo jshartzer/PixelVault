@@ -13,4 +13,5 @@
     <ProjectReference Include="../../src/PixelVault.Companion/PixelVault.Companion.csproj" />
     <ProjectReference Include="../../src/PixelVault.Companion.Client/PixelVault.Companion.Client.csproj" />
   </ItemGroup>
+  <ItemGroup><ProjectReference Include="../../src/PixelVault.Companion.Media/PixelVault.Companion.Media.csproj" ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" /></ItemGroup>
 </Project>

@@ -72,6 +72,7 @@ namespace PixelVaultNative
         }
         bool HasDraft()
         {
+            if (ItemRulesDraftPending()) { Error("Save your item settings before continuing."); return true; }
             if (selectedItem != null && notes.Text != selectedItem.Note) { Error("Save your note before continuing with source changes or history."); return true; }
             if (selectedItem?.Item.Target > 1 && current.Text != (selectedItem.Current?.ToString() ?? "")) { Error("Save the progress count before continuing with source changes or history."); return true; }
             return false;

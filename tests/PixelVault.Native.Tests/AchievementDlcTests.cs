@@ -65,7 +65,8 @@ public sealed class AchievementDlcTests
         using (var connection = new SqliteConnection("Data Source=" + scope.Service.DatabasePath))
         {
             connection.Open(); using var command = connection.CreateCommand();
-            command.CommandText = "UPDATE achievement_definition SET group_name='DLC: Frozen Wilds' WHERE provider_achievement_id='A'; ALTER TABLE achievement_definition DROP COLUMN dlc_name;";
+            // Simulate the complete legacy schema, before shared-store revision triggers existed.
+            command.CommandText = "DROP TRIGGER IF EXISTS achievement_group_revision_update;DROP TABLE IF EXISTS achievement_group_revision;DROP TABLE IF EXISTS achievement_group_request;UPDATE achievement_definition SET group_name='DLC: Frozen Wilds' WHERE provider_achievement_id='A'; ALTER TABLE achievement_definition DROP COLUMN dlc_name;";
             command.ExecuteNonQuery();
         }
         var restart = new AchievementGuideService(scope.Path);

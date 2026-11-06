@@ -62,6 +62,16 @@ public sealed class TrackerDashboardTests : IDisposable
         Assert.Null(new TrackerDashboardGame().Percent);
     }
     [Fact]
+    public void CargoIsOneGoalInCombinedDashboardProgressWhileItsCardKeepsKilograms()
+    {
+        var cargo = new TrackerDashboardItem { Definition = PixelVault.Tracking.CenturyCargoGoal.Definition(), Completed = 16503, Total = 50000, AccountConnected = true };
+        var game = new TrackerDashboardGame { Trackers = new() { cargo, new() { Completed = 1, Total = 2, AccountConnected = true } } };
+        Assert.Equal(100.0 / 3, game.Percent);
+        Assert.Contains("16503 / 50000 kg delivered", cargo.Progress);
+        cargo.Completed = 50000; Assert.Equal(200.0 / 3, game.Percent);
+        Assert.True(cargo.Complete);
+    }
+    [Fact]
     public void CategoryGoalsCountEachQualifyingRecordOnceAndIgnoreArchives()
     {
         var store=Store();var d=Definition();d.Milestones=new(){"Found","Perfect"};d.CategoryTargets=new(){{"Puzzles",1}};
@@ -92,7 +102,7 @@ public sealed class TrackerDashboardTests : IDisposable
     [Theory]
     [InlineData(720)]
     [InlineData(1100)]
-    public void LibraryButtonIsCenteredEquidistantBetweenSortAndAll(double width)
+    public void LibraryActionButtonsAreCenteredEquidistantBetweenSortAndAll(double width)
     {
         AchievementCollectionAccessTests.OnSta(()=>
         {
@@ -100,11 +110,51 @@ public sealed class TrackerDashboardTests : IDisposable
             var grid=new Grid();grid.ColumnDefinitions.Add(new(){Width=GridLength.Auto});grid.ColumnDefinitions.Add(new());grid.ColumnDefinitions.Add(new(){Width=GridLength.Auto});grid.Children.Add(panes.SortFilterMenuButton);Grid.SetColumn(panes.GroupAllButton,2);grid.Children.Add(panes.GroupAllButton);MainWindow.AddLibraryTrackerButton(grid,panes);
             grid.Measure(new Size(width,40));grid.Arrange(new Rect(0,0,width,40));grid.UpdateLayout();
             var sort=panes.SortFilterMenuButton.TranslatePoint(new Point(),grid);var tracker=panes.TrackersButton.TranslatePoint(new Point(),grid);var all=panes.GroupAllButton.TranslatePoint(new Point(),grid);
-            var left=tracker.X-(sort.X+panes.SortFilterMenuButton.ActualWidth);var right=all.X-(tracker.X+panes.TrackersButton.ActualWidth);Assert.InRange(Math.Abs(left-right),0,.1);Assert.True(left>=8);Assert.Equal(34,panes.TrackersButton.ActualHeight);
+            var showcase=panes.ShowcaseButton.TranslatePoint(new Point(),grid);
+            var left=tracker.X-(sort.X+panes.SortFilterMenuButton.ActualWidth);var right=all.X-(showcase.X+panes.ShowcaseButton.ActualWidth);Assert.InRange(Math.Abs(left-right),0,.1);Assert.True(left>=8);Assert.Equal(34,panes.TrackersButton.ActualHeight);
+            Assert.True(showcase.X>=tracker.X+panes.TrackersButton.ActualWidth+8);Assert.Equal(34,panes.ShowcaseButton.ActualHeight);
         });
     }
     [Fact]
-    public void DashboardGameTrackerNavigationSelectsTheChosenTrackerAndKeepsTheGameSwitcher()
+    public void TrackerGroupsFollowSharedOrderAndKeepCompletionAndProgressIndependent()
+    {
+        var store=Store();
+        var official=Definition("custom.official",game:"1850570",achievement:"039");official.Title="Century in the official title";
+        var century=Definition("custom.century",game:"1850570",achievement:PixelVault.Tracking.CenturyAchievementCatalog.DeathStrandingRoadsId);century.Title="Road goal";
+        var unlinked=Definition("custom.notes",game:"1850570",achievement:null!);unlinked.Title="Century notes";
+        foreach(var definition in new[]{official,century,unlinked})store.AddDefinition(definition);
+        foreach(var definition in new[]{official,century})foreach(var item in definition.Items)store.SetManualProgress(definition.Id,Account,item.Id,1);
+        store.SaveNote(century.Id,Account,century.Items[0].Id,"Keep this note");
+        var game=Game(id:"1850570");game.Title="Death Stranding Director's Cut";
+        var saved=store.Definitions().ToDictionary(d=>d.Id,d=>System.Text.Json.JsonSerializer.Serialize(store.Load(d.Id,Account)));
+        AchievementCollectionAccessTests.OnSta(()=>
+        {
+            SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(Dispatcher.CurrentDispatcher));
+            var window=new TrackerGameWindow(null!,new TrackerNavigation(store,()=>Session(game)),game);
+            try
+            {
+                Pump(window.ReloadAsync());
+                var rows=Field<StackPanel>(window,"rows").Children.Cast<FrameworkElement>().ToList();
+                int divider=rows.FindIndex(e=>Equals(e.Tag,"centuryTrackerSection"));Assert.True(divider>0);
+                int manual=rows.FindIndex(e=>Equals(e.Tag,"manualTrackerSection"));Assert.True(manual>0&&manual<divider);
+                Assert.Equal("achievementTrackerSection",rows[0].Tag);
+                Assert.Contains(rows.Take(manual).OfType<Button>(),b=>((TrackerDashboardItem)b.Tag).Definition.Id==official.Id);
+                Assert.Contains(rows.Skip(manual).Take(divider-manual).OfType<Button>(),b=>((TrackerDashboardItem)b.Tag).Definition.Id==unlinked.Id);
+                Assert.All(rows.Skip(divider).OfType<Button>(),b=>Assert.True(Assert.IsType<TrackerDashboardItem>(b.Tag).Century));
+                Assert.True(rows.OfType<TextBlock>().Count(t=>t.Text=="✓ Completed · 1")==2,string.Join(" | ",rows.OfType<TextBlock>().Select(t=>t.Text)));
+                var shared=new TrackerRepository(dir,pooling:false);shared.MoveTrackerGroup("century",-1);shared.MoveTrackerGroup("century",-1);
+                Pump(window.ReloadAsync());Assert.Equal("centuryTrackerSection",Field<StackPanel>(window,"rows").Children.Cast<FrameworkElement>().First().Tag);
+                Assert.Equal(new[]{"century","achievement","manual"},store.TrackerGroupOrder());
+                Render(window,"century-tracker-groups-game",760,680);
+                var scroll=Children((DependencyObject)window.Content).OfType<ScrollViewer>().First();scroll.ScrollToVerticalOffset(rows[divider].TranslatePoint(new Point(),Field<StackPanel>(window,"rows")).Y);
+                Render(window,"century-tracker-groups-century",760,680);Render(window,"century-tracker-groups-narrow",520,680);
+            }
+            finally{window.Close();}
+        });
+        foreach(var pair in saved)Assert.Equal(pair.Value,System.Text.Json.JsonSerializer.Serialize(store.Load(pair.Key,Account)));
+    }
+    [Fact]
+    public void DashboardGameTrackerNavigationOpensOnlyTheChosenTracker()
     {
         var store=Store();store.AddDefinition(Definition());store.AddDefinition(Definition("custom.two",achievement:"B"));store.AddDefinition(Definition("custom.other",game:"99"));
         AchievementCollectionAccessTests.OnSta(()=>
@@ -112,7 +162,7 @@ public sealed class TrackerDashboardTests : IDisposable
             SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(Dispatcher.CurrentDispatcher));
             var coverSizes=new List<(double,double)>();var navigation=new TrackerNavigation(store,()=>Session(Game()),(g,w,h)=>{coverSizes.Add((w,h));return new Border{Width=w,Height=h,Background=Brushes.DarkSlateBlue};});
             var dashboard=new TrackerDashboardWindow(null!,navigation);var opened=false;
-            navigation.ShowTracker=tracker=>{try{Pump(tracker.LoadDefinitionsAsync());Assert.Equal("custom.two",Field<AchievementTrackerDefinition>(tracker,"selected").Id);Assert.Equal(2,Field<ComboBox>(tracker,"trackers").Items.Count);Assert.All(Field<ComboBox>(tracker,"trackers").Items.OfType<AchievementTrackerDefinition>(),d=>Assert.Equal("42",d.GameId));opened=true;}finally{tracker.Close();}};
+            navigation.ShowTracker=tracker=>{try{Pump(tracker.LoadDefinitionsAsync());Assert.Equal("custom.two",Field<AchievementTrackerDefinition>(tracker,"selected").Id);Assert.Single(Field<ComboBox>(tracker,"trackers").Items);Assert.Equal(Visibility.Collapsed,Field<ComboBox>(tracker,"trackers").Visibility);Assert.Equal("Find every secret",tracker.Title);Assert.All(Field<ComboBox>(tracker,"trackers").Items.OfType<AchievementTrackerDefinition>(),d=>Assert.Equal("42",d.GameId));opened=true;}finally{tracker.Close();}};
             navigation.ShowGame=game=>
             {
                 try{Pump(game.ReloadAsync());Render(game,"tracker-game-list");var chosen=Children((DependencyObject)game.Content).OfType<Button>().Single(b=>b.Tag is TrackerDashboardItem t&&t.Definition.Id=="custom.two");chosen.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));Pump(game.PendingNavigation);}finally{game.Close();}
@@ -135,7 +185,7 @@ public sealed class TrackerDashboardTests : IDisposable
             SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(Dispatcher.CurrentDispatcher));
             var row=new GameAchievementsFetchService.AchievementRow{Provider="steam",ProviderGameId="42",ProviderAchievementId="A",Title="Puzzle mastery"};
             var detail=new AchievementDetailWindow(null!,Game(),row,new[]{row},0,null!,trackingStore:store,trackingAccount:Account);
-            var opened=false;detail.TrackingNavigation.ShowTracker=window=>{try{Pump(window.LoadDefinitionsAsync());Assert.Equal("custom.one",Field<AchievementTrackerDefinition>(window,"selected").Id);Assert.Equal(2,Field<ComboBox>(window,"trackers").Items.Count);opened=true;}finally{window.Close();}};
+            var opened=false;detail.TrackingNavigation.ShowTracker=window=>{try{Pump(window.LoadDefinitionsAsync());Assert.Equal("custom.one",Field<AchievementTrackerDefinition>(window,"selected").Id);Assert.Single(Field<ComboBox>(window,"trackers").Items);Assert.Equal(Visibility.Collapsed,Field<ComboBox>(window,"trackers").Visibility);opened=true;}finally{window.Close();}};
             try{var button=Children((DependencyObject)detail.Content).OfType<Button>().Single(b=>Equals(b.Content,"Open tracker"));button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));Assert.True(opened);Render(detail,"achievement-linked-tracker",600,730);}finally{detail.Close();}
             store.SetAchievementLink("custom.two",row);
             var navigation=new TrackerNavigation(store,()=>Session(Game()));bool choice=false;navigation.ShowTracker=_=>throw new Exception("Do not choose an arbitrary linked tracker");navigation.ShowGame=window=>{try{Pump(window.ReloadAsync());Assert.Equal(2,Children((DependencyObject)window.Content).OfType<Button>().Count(b=>b.Tag is TrackerDashboardItem));choice=true;}finally{window.Close();}};
@@ -164,7 +214,7 @@ public sealed class TrackerDashboardTests : IDisposable
         foreach(var id in nativeIds){service.Configure(id,Account,DeathStrandingTrackerSource.AdapterId,"1",dir,gameDirectory:dir);var definition=store.Definitions().Single(d=>d.Id==id);store.SetManualProgress(id,Account,definition.Items[0].Id,1);}
         var auto=AchievementTrackingCatalog.DeathStrandingId;store.SaveAutomation(auto,Account,store.Source(auto,Account).Id,TrackerAutomationMode.SaveChanges,5,false);
         var game=new AchievementHubGame{Provider="steam",Id="1850570",Title="Death Stranding Director's Cut"};var session=Session(game);var data=TrackerDashboard.Load(store,session);
-        Assert.Single(data);Assert.Equal(5,data[0].Trackers.Count);Assert.Equal(3,data[0].Trackers.Count(t=>t.Connection.GameFilesConnected));Assert.Single(data[0].Trackers,t=>t.Connection.AutomaticEnabled);
+        Assert.Single(data);Assert.Equal(7,data[0].Trackers.Count);Assert.Equal(3,data[0].Trackers.Count(t=>t.Connection.GameFilesConnected));Assert.Single(data[0].Trackers,t=>t.Connection.AutomaticEnabled);
         AchievementCollectionAccessTests.OnSta(()=>
         {
             SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(Dispatcher.CurrentDispatcher));

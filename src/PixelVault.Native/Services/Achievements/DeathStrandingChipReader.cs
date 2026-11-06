@@ -72,13 +72,13 @@ namespace PixelVaultNative
             }
             var snapshot = new AchievementTrackerSnapshot { TrackerId = definition.Id, Provider = definition.Provider, GameId = definition.GameId,
                 Account = account, ObservedUtcTicks = observed, Source = source,
-                Evidence = evidence + " Chip reader v2: full installed 190-key collector catalogue, serialization prefix, sentinels and sequential indices verified; all 56 chip targets covered. Only validated final restoration state 0x1B completes a chip; pre-final state 0x0B, pickup and other intermediate states do not count. Availability is unknown." };
+                Evidence = evidence + " Chip reader v3: full installed 190-key collector catalogue, serialization prefix, sentinels and sequential indices verified; all 56 chip targets covered. Validated restoration states 0x0B and 0x1B complete a chip. Pickup 0x09 and intermediate 0x19 do not count. Availability is unknown." };
             foreach (var item in definition.Items)
             {
                 uint hash = unchecked((uint)int.Parse(item.Identifiers["HashId"], CultureInfo.InvariantCulture));
-                // The #8 turn-in control changes 0x0B -> 0x1B. Bit 0x02 alone
-                // can precede the final terminal state and must not award credit.
-                snapshot.Items.Add(new AchievementTrackerProgress { ItemId = item.Id, Current = found[hash] == 0x1B ? 1 : 0, Availability = TrackerAvailability.Unknown });
+                // #3/#47 confirmed turn-in: 0x09 -> 0x0B, retained in three saves.
+                // The extra 0x10 bit is not required for terminal restoration.
+                snapshot.Items.Add(new AchievementTrackerProgress { ItemId = item.Id, Current = found[hash] is 0x0B or 0x1B ? 1 : 0, Availability = TrackerAvailability.Unknown });
             }
             return snapshot;
         }

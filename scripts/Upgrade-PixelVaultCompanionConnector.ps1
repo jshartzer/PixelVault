@@ -1,6 +1,6 @@
-param([string]$PublishedApp='C:\Codex\Companion Preview\connector-0.16.0',[string]$Version='0.16.0',
+param([string]$PublishedApp='C:\Codex\Companion Preview\connector-0.21.0',[string]$Version='0.21.0',
       [string]$InstallRoot='C:\Codex\Companion Connector',[string]$DataRoot='C:\Codex\PixelVaultCompanionConnectorData',
-      [string]$DesktopDataRoot='C:\Codex\PixelVaultData',[string]$Manifest='C:\Codex\PixelVaultCompanionData\workspace.json')
+      [string]$DesktopDataRoot='C:\Codex\PixelVaultData',[string]$Manifest='C:\Codex\PixelVaultCompanionData\workspace.json',[switch]$EnableWebTrackerEdits)
 $ErrorActionPreference='Stop'
 if($Version -notmatch '^\d+\.\d+\.\d+$'){throw 'Use an explicit connector release version.'}
 $install=[IO.Path]::GetFullPath($InstallRoot);$newApp=Join-Path $install "app-$Version";$config=Join-Path $DataRoot 'connector.json'
@@ -15,6 +15,7 @@ Copy-Item -Path (Join-Path $PublishedApp '*') -Destination $newApp -Recurse
 $newExe=Join-Path $newApp 'PixelVault.Companion.Connector.exe'
 & $newExe --configure-automatic $config $DesktopDataRoot $Manifest
 if($LASTEXITCODE -ne 0){throw 'The approved library could not be configured; the running connector was left alone.'}
+if($EnableWebTrackerEdits){ & $newExe --enable-web-tracker-edits $config; if($LASTEXITCODE -ne 0){throw 'Web edit permission could not be enabled; running connector was left alone.'} }
 $pidFile=Join-Path $DataRoot 'connector.pid'
 if(Test-Path -LiteralPath $pidFile){
     $previous=Get-Process -Id ([int](Get-Content -LiteralPath $pidFile)) -ErrorAction SilentlyContinue

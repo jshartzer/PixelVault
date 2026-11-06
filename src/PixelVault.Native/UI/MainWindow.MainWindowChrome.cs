@@ -142,6 +142,7 @@ namespace PixelVaultNative
                 case "Nintendo":
                 case "Switch":
                     return ResolveWorkspaceAssetPath("Nintendo Library Icon.png");
+                case "Xbox 360":
                 case "Xbox":
                     return ResolveWorkspaceAssetPath("Xbox Library Logo.png");
                 case "PC":
@@ -166,6 +167,7 @@ namespace PixelVaultNative
                 case "Nintendo":
                 case "Switch":
                     return Brush("#E94B43");
+                case "Xbox 360":
                 case "Xbox":
                     return Brush("#69B157");
                 case "PC":
@@ -267,95 +269,6 @@ namespace PixelVaultNative
                     TextAlignment = TextAlignment.Center
                 }
             };
-        }
-        Brush BuildLibraryTileCompletionBorderBrush()
-        {
-            var brush = new LinearGradientBrush
-            {
-                StartPoint = new Point(0, 0),
-                EndPoint = new Point(1, 1)
-            };
-            brush.GradientStops.Add(new GradientStop(Brush("#FFF2BF").Color, 0));
-            brush.GradientStops.Add(new GradientStop(Brush("#E0B44A").Color, 0.28));
-            brush.GradientStops.Add(new GradientStop(Brush("#F8D979").Color, 0.62));
-            brush.GradientStops.Add(new GradientStop(Brush("#936915").Color, 1));
-            if (brush.CanFreeze) brush.Freeze();
-            return brush;
-        }
-        sealed class LibraryTileCompletionFoilVisual
-        {
-            readonly TradingCardFoilEffect effect;
-
-            internal LibraryTileCompletionFoilVisual(double width, double height)
-            {
-                effect = new TradingCardFoilEffect { Size = new Point(width, height) };
-            }
-
-            internal void AttachArtwork(UIElement artwork)
-            {
-                if (artwork == null || SystemParameters.HighContrast) return;
-                artwork.Effect = effect;
-            }
-
-            internal void Update(double normalizedX, double normalizedY, bool animate)
-            {
-                var light = new Point(Math.Clamp(normalizedX, 0, 1), Math.Clamp(normalizedY, 0, 1));
-                if (animate && SystemParameters.ClientAreaAnimation)
-                {
-                    var from = effect.Light;
-                    effect.BeginAnimation(TradingCardFoilEffect.LightProperty, new PointAnimation
-                    {
-                        From = from,
-                        To = light,
-                        Duration = TimeSpan.FromMilliseconds(110),
-                        EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut },
-                        FillBehavior = FillBehavior.HoldEnd
-                    }, HandoffBehavior.SnapshotAndReplace);
-                    return;
-                }
-
-                effect.Light = light;
-                effect.BeginAnimation(TradingCardFoilEffect.LightProperty, null);
-            }
-        }
-        FrameworkElement BuildLibraryTileCompletionFrameOverlay(double width, double height, CornerRadius cornerRadius)
-        {
-            var frame = new Grid
-            {
-                Width = width,
-                Height = height,
-                IsHitTestVisible = false
-            };
-            var frameRadius = cornerRadius.TopLeft;
-            var frameClip = new RectangleGeometry(new Rect(0, 0, width, height), frameRadius, frameRadius);
-            if (frameClip.CanFreeze) frameClip.Freeze();
-            frame.Clip = frameClip;
-
-            frame.Children.Add(new Border
-            {
-                CornerRadius = cornerRadius,
-                Background = Brushes.Transparent,
-                BorderBrush = BuildLibraryTileCompletionBorderBrush(),
-                BorderThickness = new Thickness(2)
-            });
-            frame.Children.Add(new Border
-            {
-                Margin = new Thickness(1),
-                CornerRadius = new CornerRadius(
-                    Math.Max(0, cornerRadius.TopLeft - 1),
-                    Math.Max(0, cornerRadius.TopRight - 1),
-                    Math.Max(0, cornerRadius.BottomRight - 1),
-                    Math.Max(0, cornerRadius.BottomLeft - 1)),
-                Background = Brushes.Transparent,
-                BorderBrush = Brush("#6EF6DE7A"),
-                BorderThickness = new Thickness(2)
-            });
-
-            return frame;
-        }
-        LibraryTileCompletionFoilVisual CreateLibraryTileCompletionFoil(double width, double height)
-        {
-            return new LibraryTileCompletionFoilVisual(width, height);
         }
         FrameworkElement BuildLibrarySectionHeader(string platformLabel, int folderCount, bool sectionCollapsed, Action toggleSectionCollapse)
         {

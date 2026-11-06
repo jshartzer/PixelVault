@@ -29,9 +29,8 @@ namespace PixelVaultNative
         }
         internal static bool Supports(string id) => id == AchievementTrackingCatalog.DeathStrandingBuildId || id == AchievementTrackingCatalog.DeathStrandingUpgradeId;
 
-        internal static AchievementTrackerSnapshot Read(byte[] data, string trackerId, string account, long observed, string source, string evidence)
+        internal static (Dictionary<Guid, bool> Values, int Count) ReadFacts(byte[] data)
         {
-            if (!Supports(trackerId)) throw new NotSupportedException("This save reader supports construction and maximum-upgrade milestones only.");
             if (data == null || data.Length < 32 || data.Length > DeathStrandingSaveReader.MaxPayload) throw new InvalidDataException("Unsupported persistent-fact payload size.");
             var facts = References(); var known = facts.Select(f => Guid.Parse(f.Id)).ToHashSet();
             var anchor = Guid.Parse(facts.Single(f => f.Name == "ldfp_builded_post").Id).ToByteArray();
@@ -56,6 +55,12 @@ namespace PixelVaultNative
                 found = candidate; foundCount = (int)count;
             }
             if (found == null) throw new NotSupportedException("The save does not contain the supported counted persistent-fact table.");
+            return (found, foundCount);
+        }
+        internal static AchievementTrackerSnapshot Read(byte[] data, string trackerId, string account, long observed, string source, string evidence)
+        {
+            if (!Supports(trackerId)) throw new NotSupportedException("This save reader supports construction and maximum-upgrade milestones only.");
+            var facts = References(); var (found, foundCount) = ReadFacts(data);
             var definition = AchievementTrackingCatalog.Builtins().Single(d => d.Id == trackerId);
             var result = new AchievementTrackerSnapshot { TrackerId = trackerId, Provider = "steam", GameId = "1850570", Account = account,
                 ObservedUtcTicks = observed, Source = source, Evidence = evidence + " Counted persistent boolean map: " + foundCount

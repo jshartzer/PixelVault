@@ -6,33 +6,38 @@
   function create(host,{onNavigate,allowed=()=>true,fallback=()=>null,hint=()=>{}}){
     const doc=host.document,history=host.history,positions=new Map();
     const edge=host.navigator?.standalone || host.matchMedia?.('(display-mode: standalone)').matches?0:24;
-    let session=Date.now().toString(36)+Math.random().toString(36).slice(2),index=0,lastUrl=host.location.href,touch;
+    const saved=history.state?.pixelVaultNavigation;
+    const restored=typeof saved?.session==='string'&&Number.isSafeInteger(saved.index)&&saved.index>=0;
+    let session=restored?saved.session:Date.now().toString(36)+Math.random().toString(36).slice(2),index=restored?saved.index:0,lastUrl=host.location.href,touch;
+    let rendering=false,backPending=false,renderVersion=0;
     const hash=value=>value && value!=='#'?'#'+value.replace(/^#/,''):'#';
     const mark=()=>({...history.state,pixelVaultNavigation:{session,index}});
-    const remember=()=>positions.set(index,{x:host.scrollX || 0,y:host.scrollY || 0});
+    const remember=()=>{const position={x:host.scrollX || 0,y:host.scrollY || 0};positions.set(index,position);history.replaceState({...mark(),pixelVaultNavigation:{session,index,position}},'');};
     history.replaceState(mark(),'');history.scrollRestoration='manual';
     async function render(position={x:0,y:0}){
-      const url=host.location.href;lastUrl=url;
-      await onNavigate();if(host.location.href===url)host.scrollTo(position.x,position.y);
+      const url=host.location.href,current=++renderVersion;lastUrl=url;rendering=true;
+      try{await onNavigate();if(current===renderVersion&&host.location.href===url)host.scrollTo(position.x,position.y);}
+      finally{if(current===renderVersion){rendering=false;backPending=false;}}
     }
     function go(value,replace=false){
       const target=hash(value);if(target===hash(host.location.hash))return;
       remember();if(!replace)index++;
       history[replace?'replaceState':'pushState'](mark(),'',target);return render();
     }
-    function canBack(){return allowed() && (index>0 || !!fallback());}
+    function canBack(){const parent=fallback();return !rendering&&!backPending&&allowed() && (index>0 || !!parent&&hash(parent)!==hash(host.location.hash));}
     function back(){
       if(!canBack())return false;
-      remember();if(index>0)history.back();else go(fallback(),true);return true;
+      remember();backPending=true;if(index>0)history.back();else go(fallback(),true);return true;
     }
     function reset(value='#'){
-      session=Date.now().toString(36)+Math.random().toString(36).slice(2);index=0;positions.clear();
+      session=Date.now().toString(36)+Math.random().toString(36).slice(2);index=0;positions.clear();backPending=false;
       history.replaceState(mark(),'',hash(value));lastUrl=host.location.href;return render();
     }
     host.addEventListener('popstate',()=>{
       const state=history.state?.pixelVaultNavigation;
-      index=state?.session===session?state.index:0;
-      return render(positions.get(index));
+      const known=state?.session===session&&Number.isSafeInteger(state.index)&&state.index>=0;
+      index=known?state.index:0;
+      return render(known?(positions.get(index)||state.position):undefined);
     });
     host.addEventListener('hashchange',()=>{
       if(lastUrl===host.location.href)return;
@@ -43,7 +48,11 @@
       if(!link || event.defaultPrevented || event.button!==0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || link.hasAttribute('download') || link.target && link.target!=='_self')return;
       event.preventDefault();go(link.getAttribute('href'));
     });
-    const blocked=target=>!!target.closest?.('input,textarea,select,button,a,[contenteditable="true"],[role="slider"],[role="checkbox"],[data-native-scroll],video,audio');
+    const blocked=target=>{
+      if(target.closest?.('input,textarea,select,button,[contenteditable="true"],[role="slider"],[role="checkbox"],[data-native-scroll],video,audio'))return true;
+      const link=target.closest?.('a');
+      return !!link&&(link.hasAttribute('download')||!link.getAttribute('href')?.startsWith('#'));
+    };
     const clear=()=>{touch=undefined;hint(false);};
     doc.addEventListener('touchstart',event=>{
       clear();if(event.touches.length!==1 || blocked(event.target) || !canBack() || doc.getSelection?.()?.isCollapsed===false)return;
@@ -59,7 +68,7 @@
       hint(isBackSwipe({dx,dy,maxY:touch.maxY,duration:event.timeStamp-touch.time,width:host.innerWidth,startX:touch.x,edge}));
     },{passive:false});
     doc.addEventListener('touchend',event=>{
-      const start=touch;clear();if(!start || event.touches.length!==0 || event.changedTouches.length!==1 || start.url!==host.location.href || !canBack())return;
+      const start=touch;clear();if(!start || !event.cancelable || event.defaultPrevented || event.touches.length!==0 || event.changedTouches.length!==1 || start.url!==host.location.href || !canBack())return;
       const point=event.changedTouches[0];
       if(isBackSwipe({dx:point.clientX-start.x,dy:point.clientY-start.y,maxY:start.maxY,duration:event.timeStamp-start.time,width:host.innerWidth,startX:start.x,edge})){
         if(event.cancelable)event.preventDefault();back();

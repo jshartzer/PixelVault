@@ -91,7 +91,7 @@ namespace PixelVaultNative
                 .Count(g => g.All(e => e.Row.ProgressKnown && e.Row.Unlocked));
             scorePerfect.Text = hasProgress ? perfect.ToString("N0", CultureInfo.CurrentCulture) : "—";
             var coverage = collection.LibraryGames == 0
-                ? "Connect a Steam or RetroAchievements account to start your score."
+                ? "Connect a Steam, Xbox or RetroAchievements account to start your score."
                 : "Connected accounts · current library · " + collection.GamesWithProgress.ToString("N0", CultureInfo.CurrentCulture)
                     + " of " + collection.LibraryGames.ToString("N0", CultureInfo.CurrentCulture) + " games synced · totals ignore filters";
             scoreTotal.ToolTip = "Saved PV points. Finalized awards stay fixed." + Environment.NewLine + coverage

@@ -41,7 +41,9 @@ namespace PixelVaultNative
         {
             if (ws?.Panes?.TileScroll == null) return;
             _libraryBrowserPersistedFolderScroll = Math.Max(0, ws.Panes.TileScroll.VerticalOffset);
-            if (ws.Panes.ThumbScroll != null)
+            if (ws.PendingRestoreDetailScrollAfterShow > 0.1d)
+                _libraryBrowserPersistedDetailScroll = ws.PendingRestoreDetailScrollAfterShow;
+            else if (!ws.IsFolderWorkspaceMode && ws.Panes.ThumbScroll != null)
                 _libraryBrowserPersistedDetailScroll = Math.Max(0, ws.Panes.ThumbScroll.VerticalOffset);
             SaveSettings();
         }

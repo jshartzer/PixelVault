@@ -234,4 +234,24 @@ public sealed class TrackerRefreshTests : IDisposable
         Assert.Empty(store.History(Tracker, Account)); Assert.All(store.Load(Tracker, Account), s => Assert.Null(s.Current));
     }
 
+
+    [Fact]
+    public async Task ExplicitSourceAuthorityReplacesKnownManualValuesButPreservesUnknownNotesAndUndo()
+    {
+        var observation=Snapshot(first:0);observation.Items[1].Current=null;Write(observation);var service=Configure();
+        service.Configure(Tracker,Account,JsonFileTrackerSource.AdapterId,"1",FilePath,replaceManualProgress:true);
+        store.SetManualProgress(Tracker,Account,"one",1);store.SetManualProgress(Tracker,Account,"two",3);store.SetManualProgress(Tracker,Account,"three",1);store.SaveNote(Tracker,Account,"one","Authored note");
+        var plan=await service.PrepareAsync(Tracker,Account,default);Assert.True(plan.ReplaceManualProgress);service.Apply(plan,false,Array.Empty<string>());
+        Assert.Equal(0,State().Current);Assert.Null(State().ManualCurrent);Assert.Equal(3,State("two").ManualCurrent);Assert.Equal(1,State("three").ManualCurrent);Assert.Equal("Authored note",State().Note);
+        store.Undo(Tracker,Account,store.History(Tracker,Account).First().Id);Assert.Equal(1,State().ManualCurrent);Assert.Equal("Authored note",State().Note);
+    }
+    [Fact]
+    public async Task AuthorityNeedsCurrentBoundSourceAndNeverOverridesOlderRows()
+    {
+        var current=Snapshot(first:1);Write(current);var service=Configure();service.Configure(Tracker,Account,JsonFileTrackerSource.AdapterId,"1",FilePath,replaceManualProgress:true);
+        service.Apply(await service.PrepareAsync(Tracker,Account,default),false,Array.Empty<string>());store.SetManualProgress(Tracker,Account,"one",1);
+        var older=Snapshot(current.ObservedUtcTicks-10,0);Write(older);var plan=await service.PrepareAsync(Tracker,Account,default);Assert.True(plan.HasRollback);service.Apply(plan,false,Array.Empty<string>());Assert.Equal(1,State().ManualCurrent);Assert.Equal(1,State().ReportedCurrent);
+        var unbound=store.Preview(Write(Snapshot(first:0)),Tracker,Account,JsonFileTrackerSource.AdapterId,"1","unbound");store.ApplyRefresh(unbound,false,Array.Empty<string>(),default);Assert.Equal(1,State().ManualCurrent);
+        Assert.DoesNotContain("ReplaceManualProgress",JsonSerializer.Serialize(new TrackerSourceBinding(),AchievementTrackingCatalog.Json));Assert.Contains("ReplaceManualProgress",JsonSerializer.Serialize(new TrackerSourceBinding{ReplaceManualProgress=true},AchievementTrackingCatalog.Json));
+    }
 }

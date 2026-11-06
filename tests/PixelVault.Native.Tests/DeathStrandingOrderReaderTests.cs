@@ -22,12 +22,38 @@ public sealed class DeathStrandingOrderReaderTests
             int p=Start+i*96;data[p]=8;data[p+2]=1;data[p+4]=1;data[p+24]=2;data[p+25]=255;
             BinaryPrimitives.WriteUInt64LittleEndian(data.AsSpan(p+16,8),i<ids.Length?ids[i]:0);
         }
-        Set(data,ids[0],0x80);Set(data,ids[1],0x100);Set(data,ids[2],0x188);
+        Set(data,ids[0],0x80);Set(data,ids[1],0x100);Set(data,ids[2],0x188);Set(data,ids[3],0x40);Set(data,ids[4],0x08);
         return data;
     }
     static int Position(byte[] data,ulong id)=>Enumerable.Range(0,1140).Select(i=>Start+i*96).Single(p=>BinaryPrimitives.ReadUInt64LittleEndian(data.AsSpan(p+16,8))==id);
     static void Set(byte[] data,ulong id,ulong rank)=>BinaryPrimitives.WriteUInt64LittleEndian(data.AsSpan(Position(data,id)+88,8),rank);
     static AchievementTrackerSnapshot Read(byte[] data)=>DeathStrandingOrderReader.Read(data,"player",DateTime.UtcNow.Ticks,"Fixture","Checked copy.");
+    [Fact]
+    public void CenturyCatalogueUsesLegendOrHigherAndSharedAnalysisProjectsItWithoutChangingTheOfficialGoal()
+    {
+        var data=Payload();
+        var official=Read(data);
+        var legends=DeathStrandingOrderReader.Read(data,"player",official.ObservedUtcTicks,"Fixture","Checked copy.",PixelVault.Tracking.CenturyLegendsCatalogue.TrackerId);
+        Assert.Equal(540,legends.Items.Count); Assert.Equal(4,legends.Items.Count(i=>i.Current==1));
+        Assert.All(legends.Items,i=>Assert.EndsWith(":LLL",i.ItemId));
+        var missionIds = AchievementTrackingCatalog.Builtins().Single(d => d.Id == Id)
+            .Items.Select(i => i.GroupId).Distinct().Reverse().ToArray();
+        for (int i = 0; i < 5; i++)
+            Assert.Equal(i < 4 ? 1 : 0, legends.Items.Single(item => item.ItemId == missionIds[i] + ":LLL").Current);
+        Assert.Equal(4,official.Items.Count(i=>i.Current==1));
+        var request=new DeathStrandingReadRequest {Account="player",ObservedUtc=official.ObservedUtcTicks,SourceName="Fixture"};
+        var analysis=DeathStrandingSaveWorker.Analyze(data,request,"save","dll");
+        DeathStrandingTrackerSource.ValidateAnalysis(analysis,"player","save","dll");
+        Assert.Equal(legends.Items.Select(i=>i.Current),analysis.Projections[legends.TrackerId].Snapshot.Items.Select(i=>i.Current));
+        Assert.Equal(1080,analysis.Projections[Id].Snapshot.Items.Count);
+        var definition=PixelVault.Tracking.CenturyLegendsCatalogue.Definition();
+        Assert.True(PixelVault.Tracking.CenturyLegendsCatalogue.Matches(definition));
+        Assert.Empty(definition.Milestones);Assert.Empty(definition.CategoryTargets);
+        var source=new DeathStrandingTrackerSource(Path.GetTempPath());
+        source.Validate(new(){AdapterId=source.Id,AdapterVersion="1",Account="76561197960265729",Location=Path.GetTempPath(),GameDirectory=Path.GetTempPath()},definition);
+        definition.Items[0].Target=2;
+        Assert.Throws<NotSupportedException>(()=>source.Validate(new(){AdapterId=source.Id,AdapterVersion="1",Account="76561197960265729",Location=Path.GetTempPath(),GameDirectory=Path.GetTempPath()},definition));
+    }
     [Fact]
     public void CountedTableReadsIndependentRanksAndMixedEarnedMasksWithoutUsingDeliveryCounters()
     {

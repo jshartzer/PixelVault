@@ -41,10 +41,11 @@ namespace PixelVaultNative
                 EnsureExifTool();
                 fileSystemService.CreateDirectory(destinationRoot);
                 var prepStopwatch = Stopwatch.StartNew();
-                var inventory = importService.BuildSourceInventory(importSearchSubfoldersForRename);
                 BeginForegroundIntakeBusy();
                 importEditModalForegroundBusy = true;
                 status.Text = "Preparing import…";
+                var includeSubfolders = importSearchSubfoldersForRename;
+                var inventory = await Task.Run(() => importService.BuildSourceInventory(includeSubfolders));
                 var prep = await Task.Run(() => BuildIntakePreparation(inventory.TopLevelMediaFiles, withReview));
                 var reviewItems = prep.ReviewItems;
                 var manualItems = prep.ManualItems;
@@ -259,10 +260,11 @@ namespace PixelVaultNative
                 EnsureExifTool();
                 fileSystemService.CreateDirectory(destinationRoot);
                 var prepStopwatch = Stopwatch.StartNew();
-                var inventory = importService.BuildSourceInventory(importSearchSubfoldersForRename);
                 BeginForegroundIntakeBusy();
                 manualIntakeModalForegroundBusy = true;
                 status.Text = "Preparing manual intake…";
+                var includeSubfolders = importSearchSubfoldersForRename;
+                var inventory = await Task.Run(() => importService.BuildSourceInventory(includeSubfolders));
                 var prep = await Task.Run(() => BuildIntakePreparation(inventory.TopLevelMediaFiles, false));
                 var manualItems = prep.ManualItems;
                 ApplyHdrPairAlternatesToManualMetadataItems(manualItems, inventory.HdrPairs);

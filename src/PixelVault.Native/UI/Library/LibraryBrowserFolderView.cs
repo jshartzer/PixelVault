@@ -25,6 +25,7 @@ namespace PixelVaultNative
         internal string PlatformSummaryText;
         internal int FileCount;
         internal string PreviewImagePath;
+        // Membership only for game covers; chronological consumers resolve dates and sort on entry.
         internal string[] FilePaths = new string[0];
         internal long NewestCaptureUtcTicks;
         internal long NewestRecentSortUtcTicks;

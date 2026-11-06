@@ -27,6 +27,8 @@ namespace PixelVaultNative
             definitions.AddRange(JsonSerializer.Deserialize<List<AchievementTrackerDefinition>>(stream, Json));
             using var orders = typeof(AchievementTrackingCatalog).Assembly.GetManifestResourceStream("PixelVault.Tracking.DeathStrandingOrders.json");
             definitions.Add(JsonSerializer.Deserialize<AchievementTrackerDefinition>(orders, Json));
+            definitions.Add(PixelVault.Tracking.CenturyLegendsCatalogue.Definition());
+            definitions.Add(PixelVault.Tracking.CenturyCargoGoal.Definition());
             return definitions;
         }
 
@@ -38,6 +40,8 @@ namespace PixelVaultNative
 
         public static void Validate(AchievementTrackerDefinition definition)
         {
+            if (definition?.IconId != null && !TrackerIconIds.All.Contains(definition.IconId))
+                throw new InvalidDataException("Choose an available tracker icon.");
             if (definition == null || string.IsNullOrWhiteSpace(definition.Id) || definition.Id.Length > 200
                 || string.IsNullOrWhiteSpace(definition.Provider) || string.IsNullOrWhiteSpace(definition.GameId)
                 || string.IsNullOrWhiteSpace(definition.GameTitle) || string.IsNullOrWhiteSpace(definition.Title)

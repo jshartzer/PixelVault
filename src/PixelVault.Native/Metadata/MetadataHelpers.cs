@@ -57,6 +57,7 @@ namespace PixelVaultNative
             if (item.TagPs5) { extraTags.Add("PS5"); extraTags.Add("PlayStation"); }
             if (item.TagSwitch) { extraTags.Add("Switch"); extraTags.Add("Nintendo"); }
             if (item.TagXbox) extraTags.Add("Xbox");
+            if (item.TagXbox360) extraTags.Add("Xbox 360");
             if (item.TagOther && !string.IsNullOrWhiteSpace(item.CustomPlatformTag)) extraTags.Add(CustomPlatformPrefix + CleanTag(item.CustomPlatformTag));
             return extraTags;
         }
@@ -122,6 +123,7 @@ namespace PixelVaultNative
                 return "PC";
             }
             if (string.Equals(label, "PlayStation", StringComparison.OrdinalIgnoreCase) || string.Equals(label, "PS5", StringComparison.OrdinalIgnoreCase)) return "PS5";
+            if (string.Equals(label, "Xbox 360", StringComparison.OrdinalIgnoreCase) || string.Equals(label, "Xbox360", StringComparison.OrdinalIgnoreCase)) return "Xbox 360";
             if (string.Equals(label, "Xbox", StringComparison.OrdinalIgnoreCase)) return "Xbox";
             if (string.Equals(label, "Multiple Tags", StringComparison.OrdinalIgnoreCase)) return "Multiple Tags";
             return CleanTag(label);
@@ -144,7 +146,8 @@ namespace PixelVaultNative
                 string.Equals(tag, "Switch", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(tag, "Nintendo", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(tag, "Nintendo Switch", StringComparison.OrdinalIgnoreCase))) labels.Add("Switch");
-            if (tagList.Any(tag => string.Equals(tag, "Xbox", StringComparison.OrdinalIgnoreCase))) labels.Add("Xbox");
+            if (tagList.Any(tag => NormalizeConsoleLabel(tag) == "Xbox 360")) labels.Add("Xbox 360");
+            else if (tagList.Any(tag => string.Equals(tag, "Xbox", StringComparison.OrdinalIgnoreCase))) labels.Add("Xbox");
             foreach (var custom in tagList.Where(tag => tag.StartsWith(CustomPlatformPrefix, StringComparison.OrdinalIgnoreCase)).Select(tag => CleanTag(tag.Substring(CustomPlatformPrefix.Length))))
             {
                 if (string.IsNullOrWhiteSpace(custom)) continue;
@@ -152,6 +155,8 @@ namespace PixelVaultNative
                 if (string.Equals(normalizedCustom, "Other", StringComparison.OrdinalIgnoreCase) || string.Equals(normalizedCustom, "Multiple Tags", StringComparison.OrdinalIgnoreCase)) continue;
                 labels.Add(normalizedCustom);
             }
+            if (labels.Contains("Xbox 360", StringComparer.OrdinalIgnoreCase))
+                labels.RemoveAll(label => string.Equals(label, "Xbox", StringComparison.OrdinalIgnoreCase));
             return labels.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         }
 
@@ -208,6 +213,7 @@ namespace PixelVaultNative
                 extras.Add("Nintendo");
             }
             else if (string.Equals(normalizedPlatform, "Xbox", StringComparison.OrdinalIgnoreCase)) extras.Add("Xbox");
+            else if (string.Equals(normalizedPlatform, "Xbox 360", StringComparison.OrdinalIgnoreCase)) extras.Add("Xbox 360");
             else if (!string.IsNullOrWhiteSpace(normalizedPlatform)
                 && !string.Equals(normalizedPlatform, "Other", StringComparison.OrdinalIgnoreCase)
                 && !string.Equals(normalizedPlatform, "Multiple Tags", StringComparison.OrdinalIgnoreCase))
@@ -301,6 +307,7 @@ namespace PixelVaultNative
             out bool tagPs5,
             out bool tagSwitch,
             out bool tagXbox,
+            out bool tagXbox360,
             out bool tagOther,
             out string customPlatformTag)
         {
@@ -310,6 +317,7 @@ namespace PixelVaultNative
             tagPs5 = false;
             tagSwitch = false;
             tagXbox = false;
+            tagXbox360 = false;
             tagOther = false;
             customPlatformTag = string.Empty;
 
@@ -354,6 +362,7 @@ namespace PixelVaultNative
                 tagXbox = true;
                 return;
             }
+            if (resolvedPlatform == "Xbox 360") { tagXbox360 = true; return; }
             tagOther = true;
             customPlatformTag = resolvedPlatform;
         }
@@ -412,6 +421,7 @@ namespace PixelVaultNative
             if (item.TagPs5) return "PS5";
             if (item.TagSwitch) return "Switch";
             if (item.TagXbox) return "Xbox";
+            if (item.TagXbox360) return "Xbox 360";
             if (item.TagOther && !string.IsNullOrWhiteSpace(item.CustomPlatformTag)) return NormalizeConsoleLabel(item.CustomPlatformTag);
             return "Other";
         }
@@ -425,6 +435,7 @@ namespace PixelVaultNative
             if (item.OriginalTagPs5) return "PS5";
             if (item.OriginalTagSwitch) return "Switch";
             if (item.OriginalTagXbox) return "Xbox";
+            if (item.OriginalTagXbox360) return "Xbox 360";
             if (item.OriginalTagOther && !string.IsNullOrWhiteSpace(item.OriginalCustomPlatformTag)) return NormalizeConsoleLabel(item.OriginalCustomPlatformTag);
             return "Other";
         }
@@ -505,6 +516,7 @@ namespace PixelVaultNative
                 || item.TagPs5 != item.OriginalTagPs5
                 || item.TagSwitch != item.OriginalTagSwitch
                 || item.TagXbox != item.OriginalTagXbox
+                || item.TagXbox360 != item.OriginalTagXbox360
                 || item.TagOther != item.OriginalTagOther
                 || !SameManualText(CleanTag(item.CustomPlatformTag), CleanTag(item.OriginalCustomPlatformTag));
         }

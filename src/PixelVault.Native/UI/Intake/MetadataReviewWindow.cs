@@ -121,6 +121,7 @@ namespace PixelVaultNative
             var ps5Box = new CheckBox { Content = "PS5", Foreground = B("#1F2A30"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0) };
             var switchBox = new CheckBox { Content = "Switch", Foreground = B("#1F2A30"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0) };
             var xboxBox = new CheckBox { Content = "Xbox", Foreground = B("#1F2A30"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0) };
+            var xbox360Box = new CheckBox { Content = "Xbox 360", Foreground = B("#1F2A30"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0) };
             var deleteBox = new CheckBox { Content = "Delete before processing", Foreground = B("#8B2F2F"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0) };
             var tagToggleRow = new WrapPanel { VerticalAlignment = VerticalAlignment.Center };
             tagToggleRow.Children.Add(photographyBox);
@@ -130,6 +131,7 @@ namespace PixelVaultNative
             tagToggleRow.Children.Add(ps5Box);
             tagToggleRow.Children.Add(switchBox);
             tagToggleRow.Children.Add(xboxBox);
+            tagToggleRow.Children.Add(xbox360Box);
             commentHeader.Children.Add(commentLabel);
             Grid.SetColumn(tagToggleRow, 1);
             commentHeader.Children.Add(tagToggleRow);
@@ -195,6 +197,7 @@ namespace PixelVaultNative
                 if (selectedItem.TagPs5) consoleTags.Add("PS5");
                 if (selectedItem.TagSwitch) consoleTags.Add("Switch");
                 if (selectedItem.TagXbox) consoleTags.Add("Xbox");
+                if (selectedItem.TagXbox360) consoleTags.Add("Xbox 360");
                 if (consoleTags.Count > 0) notes.Add("platform tags: " + string.Join(", ", consoleTags.ToArray()));
                 if (selectedItem.DeleteBeforeProcessing) notes.Add("marked for deletion");
                 commentStatus.Text = notes.Count == 0 ? "Leave blank to process normally." : string.Join(" | ", notes.ToArray()) + ".";
@@ -214,6 +217,7 @@ namespace PixelVaultNative
                 ps5Box.IsChecked = item.TagPs5;
                 switchBox.IsChecked = item.TagSwitch;
                 xboxBox.IsChecked = item.TagXbox;
+                xbox360Box.IsChecked = item.TagXbox360;
                 deleteBox.IsChecked = item.DeleteBeforeProcessing;
                 suppressCommentSync = false;
                 refreshReviewTile(item);
@@ -258,7 +262,9 @@ namespace PixelVaultNative
             switchBox.Checked += delegate { if (suppressCommentSync || selectedItem == null) return; selectedItem.TagSwitch = true; refreshReviewTile(selectedItem); refreshCommentStatus(); };
             switchBox.Unchecked += delegate { if (suppressCommentSync || selectedItem == null) return; selectedItem.TagSwitch = false; refreshReviewTile(selectedItem); refreshCommentStatus(); };
             xboxBox.Checked += delegate { if (suppressCommentSync || selectedItem == null) return; selectedItem.TagXbox = true; refreshReviewTile(selectedItem); refreshCommentStatus(); };
+            xbox360Box.Checked += delegate { if (suppressCommentSync || selectedItem == null) return; selectedItem.TagXbox360 = true; refreshReviewTile(selectedItem); refreshCommentStatus(); };
             xboxBox.Unchecked += delegate { if (suppressCommentSync || selectedItem == null) return; selectedItem.TagXbox = false; refreshReviewTile(selectedItem); refreshCommentStatus(); };
+            xbox360Box.Unchecked += delegate { if (suppressCommentSync || selectedItem == null) return; selectedItem.TagXbox360 = false; refreshReviewTile(selectedItem); refreshCommentStatus(); };
             deleteBox.Checked += delegate { if (suppressCommentSync || selectedItem == null) return; selectedItem.DeleteBeforeProcessing = true; refreshReviewTile(selectedItem); refreshCommentStatus(); };
             deleteBox.Unchecked += delegate { if (suppressCommentSync || selectedItem == null) return; selectedItem.DeleteBeforeProcessing = false; refreshReviewTile(selectedItem); refreshCommentStatus(); };
             finishButton.Click += delegate
@@ -273,6 +279,7 @@ namespace PixelVaultNative
                     selectedItem.TagPs5 = ps5Box.IsChecked == true;
                     selectedItem.TagSwitch = switchBox.IsChecked == true;
                     selectedItem.TagXbox = xboxBox.IsChecked == true;
+                    selectedItem.TagXbox360 = xbox360Box.IsChecked == true;
                     selectedItem.DeleteBeforeProcessing = deleteBox.IsChecked == true;
                 }
                 var deleteCount = items.Count(i => i.DeleteBeforeProcessing);

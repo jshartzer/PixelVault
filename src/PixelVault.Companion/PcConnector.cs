@@ -15,6 +15,7 @@ public sealed partial class PcConnector
     public PcConnector(CompanionOptions options,TrackerWorkspace workspace,GameLibrary library)
     {
         this.options=options;this.workspace=workspace;this.library=library;sync=new(options,workspace);
+        if(workspace.DirectLocal)return;
         using var c=Open();using var cmd=c.CreateCommand();cmd.CommandText="""
         CREATE TABLE IF NOT EXISTS companion_connector(id INTEGER PRIMARY KEY CHECK(id=1),workspace TEXT NOT NULL,token_hash TEXT NOT NULL,config TEXT NOT NULL,last_seen INTEGER NOT NULL);
         CREATE TABLE IF NOT EXISTS companion_refresh_job(id TEXT PRIMARY KEY,workspace TEXT NOT NULL,created INTEGER NOT NULL,value TEXT NOT NULL);
@@ -23,7 +24,8 @@ public sealed partial class PcConnector
         """;cmd.ExecuteNonQuery();
     }
     SqliteConnection Open(){var c=new SqliteConnection(new SqliteConnectionStringBuilder{DataSource=Path.Combine(options.DataRoot,"companion.sqlite"),Pooling=false}.ToString());c.Open();return c;}
-    public static string Revision(TrackerSourceBinding binding)=>Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(binding,Json))));
+    // Pairing revisions travel between Windows and Linux; indented JSON must use one newline form.
+    public static string Revision(TrackerSourceBinding binding)=>Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(binding,Json).Replace("\r\n","\n",StringComparison.Ordinal))));
     static string Hash(string value)=>Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
     ConnectorPairing? Pairing(SqliteConnection c)
     {
@@ -59,6 +61,7 @@ public sealed partial class PcConnector
     }
     public object Connection()
     {
+        if(workspace.DirectLocal)return new{paired=false,online=true,local=true,supported=Array.Empty<string>(),automaticEnabled=false,libraryEnabled=true,workspaceId=workspace.Identity};
         using var c=Open();var pair=Pairing(c);using var cmd=c.CreateCommand();cmd.CommandText="SELECT last_seen FROM companion_connector WHERE id=1 AND workspace=$w";cmd.Parameters.AddWithValue("$w",workspace.Identity);
         var last=cmd.ExecuteScalar() is long seen?seen:0;
         var games=library.Games();
@@ -73,6 +76,7 @@ public sealed partial class PcConnector
             lastTrackerPublishUtc=sync.Get("tracker-publish").Updated,publicationError=sync.Get("publication-error").Value,
             trackerTitleConflicts=TitleConflicts(c),lastTrackerTitleCheckUtc=sync.Get("tracker-title-check").Updated,
             lastAchievementSyncUtc=sync.Get("achievement-check").Updated,achievementError=sync.Get("achievement-error").Value,
+            webTrackerEditsEnabled=settings.WebTrackerEditsEnabled,lastTrackerEditSyncUtc=sync.Get("tracker-edits-check").Updated,trackerEditsError=sync.Get("tracker-edits-error").Value,trackerEditConflicts=int.TryParse(sync.Get("tracker-edits-conflicts").Value,out var conflicts)?conflicts:0,
             libraryError=sync.Get("library-error").Value,sourceError=sync.Get("source-error").Value,reviewJobs=reviews};
     }
     public void Heartbeat()
@@ -193,9 +197,9 @@ public sealed partial class PcConnector
         var plan=repo.Preview(task.Snapshot!,task.TrackerId,account,source.Binding.AdapterId,source.Binding.AdapterVersion,task.Fingerprint);
         if(source.Binding.AdapterId=="death-stranding-dc.fabrication"&&plan.Rows.Count!=source.Definition.Items.Count)throw new InvalidDataException("The save reader did not cover the complete tracker.");
         var changedBaseline=reviewed&&task.Baseline!=plan.Baseline;
-        task.Baseline=plan.Baseline;task.Conflicts=plan.Rows.Count(r=>r.Conflict);task.Older=plan.Rows.Count(r=>r.Stale);
-        task.Changes=plan.Rows.Where(r=>r.Changed||r.Conflict||r.Stale).Select(r=>new RefreshChange(r.Name,r.Previous,r.Incoming,r.Manual,r.Stale)).ToList();
-        if(changedBaseline||!reviewed&&(plan.HasRollback||task.Conflicts>0||prior?.Outcome==TrackerRefreshOutcome.Undone||prior?.SourceObservedUtc>plan.ObservedUtc))
+        task.Baseline=plan.Baseline;task.Conflicts=source.Binding.ReplaceManualProgress?0:plan.Rows.Count(r=>r.Conflict);task.Older=plan.Rows.Count(r=>r.Stale&&(!source.Binding.ReplaceManualProgress||r.Incoming.HasValue));
+        task.Changes=plan.Rows.Where(r=>(!source.Binding.ReplaceManualProgress||r.Incoming.HasValue)&&(r.Changed||r.Conflict||r.Stale)).Select(r=>new RefreshChange(r.Name,r.Previous,r.Incoming,r.Manual,r.Stale)).ToList();
+        if(changedBaseline||!reviewed&&(TrackerRefreshPolicy.HasRollback(plan,source.Binding)||TrackerRefreshPolicy.HasManualConflict(plan,source.Binding)||prior?.Outcome==TrackerRefreshOutcome.Undone||prior?.SourceObservedUtc>plan.ObservedUtc))
         {task.Status="review";task.Message=changedBaseline?"Progress changed since this review. Review the latest differences again.":"Review manual conflicts, older observations or an undone refresh.";return;}
         var attempt=repo.StartRefresh(source.Binding);
         if(!repo.FinishAttempt(source.Binding,attempt,TrackerRefreshOutcome.AwaitingReview,"PC save observations validated."))throw new InvalidOperationException("The source changed during refresh.");
@@ -205,10 +209,10 @@ public sealed partial class PcConnector
             repo.FinishAttempt(source.Binding,attempt,TrackerRefreshOutcome.ReviewRequired,"Progress changed during the PC check.");
             task.Status="review";task.Message="Progress changed during the PC check. Review again.";return;
         }
-        var meaningful=plan.Rows.Any(r=>r.Changed);
+        var meaningful=TrackerRefreshPolicy.ChangedCount(plan,source.Binding)>0;
         task.Changed=repo.ApplyRefresh(plan,reviewed&&allowOlder,[],CancellationToken.None);task.Status="complete";
         if(task.Changed>0&&meaningful)sync.Put("save-update");
-        task.Message=$"{task.Changed} observations updated. Manual progress and existing notes kept.";
+        task.Message=$"{task.Changed} observations updated. "+(source.Binding.ReplaceManualProgress?"Verified fresh save values control checkmarks; notes and unknown values kept.":"Manual progress and existing notes kept.");
         task.Snapshot=null;task.Changes.Clear();
     }
     public GameRefreshView Result(string id,string tracker,ConnectorObservation observation)

@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
@@ -15,6 +17,7 @@ namespace PixelVaultNative
         public long ObservedUtc { get; set; }
         public string SourceName { get; set; }
         public int SkippedNewer { get; set; }
+        public bool AnalyzeAll { get; set; }
     }
     sealed class DeathStrandingReadResult
     {
@@ -24,6 +27,13 @@ namespace PixelVaultNative
         public string Fingerprint { get; set; }
         public string GameDllSha256 { get; set; }
         public AchievementTrackerSnapshot Snapshot { get; set; }
+        public Dictionary<string, DeathStrandingProjection> Projections { get; set; }
+    }
+    sealed class DeathStrandingProjection
+    {
+        public AchievementTrackerSnapshot Snapshot { get; set; }
+        public string ErrorCode { get; set; }
+        public string Error { get; set; }
     }
     static class DeathStrandingSaveWorker
     {
@@ -41,6 +51,9 @@ namespace PixelVaultNative
             try
             {
                 if (OperatingSystem.IsWindows()) SetErrorMode(0x0001 | 0x0002 | 0x8000);
+                // Set priority in the child before decompression, avoiding a parent/child startup race.
+                try { using var self = Process.GetCurrentProcess(); self.PriorityClass = ProcessPriorityClass.BelowNormal; }
+                catch (System.ComponentModel.Win32Exception) { }
                 if (!Path.IsPathFullyQualified(requestPath) || Path.GetFileName(requestPath) != "request.json") return 21;
                 root = Path.GetDirectoryName(Path.GetFullPath(requestPath));
                 if (new FileInfo(requestPath).Length > 16384) throw new InvalidDataException("The save read request is too large.");
@@ -48,7 +61,7 @@ namespace PixelVaultNative
                 if (request?.Version != 1 || !Path.IsPathFullyQualified(request.GameDirectory ?? "") || !DeathStrandingTrackerSource.IsSteamAccount(request.Account)
                     || request.ObservedUtc <= 0 || request.ObservedUtc > DateTime.UtcNow.AddMinutes(5).Ticks || string.IsNullOrWhiteSpace(request.SourceName)
                     || request.SourceName.Length > 240 || request.SkippedNewer < 0 || request.SkippedNewer > 128
-                    || request.TrackerId != AchievementTrackingCatalog.DeathStrandingId && !DeathStrandingWorldReader.Supports(request.TrackerId) && !DeathStrandingOrderReader.Supports(request.TrackerId) && !DeathStrandingChipReader.Supports(request.TrackerId) && !DeathStrandingInterviewReader.Supports(request.TrackerId))
+                    || request.TrackerId != DeathStrandingFacilityReader.TrackerId && request.TrackerId != PixelVault.Tracking.CenturyCargoGoal.TrackerId && request.TrackerId != AchievementTrackingCatalog.DeathStrandingId && !DeathStrandingWorldReader.Supports(request.TrackerId) && !DeathStrandingOrderReader.Supports(request.TrackerId) && !DeathStrandingChipReader.Supports(request.TrackerId) && !DeathStrandingInterviewReader.Supports(request.TrackerId) && request.TrackerId != DeathStrandingMailCatalogueReader.TrackerId && request.TrackerId != DeathStrandingMailReader.TrackerId && request.TrackerId != DeathStrandingInterviewCatalogueReader.TrackerId && request.TrackerId != DeathStrandingRoadReader.TrackerId)
                     throw new InvalidDataException("The save read request is invalid.");
                 if (!File.Exists(Path.Combine(request.GameDirectory, "ds.exe"))) throw new FileNotFoundException("Choose the Director's Cut installation containing ds.exe.");
                 var dllPath = Path.Combine(request.GameDirectory, "oo2core_7_win64.dll");
@@ -73,19 +86,40 @@ namespace PixelVaultNative
                         return output;
                     }
                     var data = DeathStrandingSaveReader.DecodePayload(compressed, Decode);
+                    if (request.AnalyzeAll)
+                    {
+                        WriteResult(root, Analyze(data, request, fingerprint, dllHash));
+                        return 0;
+                    }
                     var sourceLabel = "Death Stranding DC · " + request.SourceName + (request.SkippedNewer > 0 ? " · skipped " + request.SkippedNewer + " newer invalid checkpoint(s)" : "");
                     var evidence = "Read-only copied save; matching Steam account; decompressed MD5 verified; one complete indexed 408-entry catalogue; 108 trophy targets. "
                         + "Fabrication flag 0x80000000; availability flag 0x20000000 remains inferred and does not guarantee facility/material support. Reader v1; game DLL SHA-256 " + dllHash + ".";
-                    var snapshot = request.TrackerId == AchievementTrackingCatalog.DeathStrandingId
+                    var snapshot = request.TrackerId == DeathStrandingFacilityReader.TrackerId
+                        ? DeathStrandingFacilityReader.Read(data, request.Account, request.ObservedUtc, sourceLabel,
+                            "Read-only copied save; matching Steam account; decompressed MD5 verified. Game DLL SHA-256 " + dllHash + ".")
+                        : request.TrackerId == PixelVault.Tracking.CenturyCargoGoal.TrackerId
+                        ? DeathStrandingCargoReader.Read(data, request.Account, request.ObservedUtc, sourceLabel,
+                            "Read-only copied save; matching Steam account; decompressed MD5 verified. Game DLL SHA-256 " + dllHash + ".")
+                        : request.TrackerId == AchievementTrackingCatalog.DeathStrandingId
                         ? DeathStrandingSaveReader.ReadCatalogue(data, request.Account, request.ObservedUtc, sourceLabel, evidence)
                         : DeathStrandingOrderReader.Supports(request.TrackerId)
                         ? DeathStrandingOrderReader.Read(data, request.Account, request.ObservedUtc, sourceLabel,
-                            "Read-only copied save; matching Steam account; decompressed MD5 verified. Game DLL SHA-256 " + dllHash + ".")
+                              "Read-only copied save; matching Steam account; decompressed MD5 verified. Game DLL SHA-256 " + dllHash + ".", request.TrackerId)
+                        : request.TrackerId == DeathStrandingMailCatalogueReader.TrackerId
+                        ? DeathStrandingMailCatalogueReader.Read(data,request.Account,request.ObservedUtc,sourceLabel,"Read-only copied save; account, decompression and MD5 verified. Game DLL SHA-256 "+dllHash+".")
+                        : request.TrackerId == DeathStrandingMailReader.TrackerId
+                        ? DeathStrandingMailReader.Read(data,request.Account,request.ObservedUtc,sourceLabel,"Read-only copied save; account, decompression and MD5 verified. Game DLL SHA-256 "+dllHash+".")
                         : DeathStrandingInterviewReader.Supports(request.TrackerId)
                         ? DeathStrandingInterviewReader.Read(data, request.Account, request.ObservedUtc, sourceLabel,
                             "Read-only copied save; matching Steam account; decompressed MD5 verified. Game DLL SHA-256 " + dllHash + ".")
+                        : request.TrackerId == DeathStrandingInterviewCatalogueReader.TrackerId
+                        ? DeathStrandingInterviewCatalogueReader.Read(data, request.Account, request.ObservedUtc, sourceLabel,
+                            "Read-only copied save; matching Steam account; decompressed MD5 verified. Game DLL SHA-256 " + dllHash + ".")
                         : DeathStrandingChipReader.Supports(request.TrackerId)
                         ? DeathStrandingChipReader.Read(data, request.Account, request.ObservedUtc, sourceLabel,
+                            "Read-only copied save; matching Steam account; decompressed MD5 verified. Game DLL SHA-256 " + dllHash + ".")
+                        : request.TrackerId == DeathStrandingRoadReader.TrackerId
+                        ? DeathStrandingRoadReader.Read(data, request.Account, request.ObservedUtc, sourceLabel,
                             "Read-only copied save; matching Steam account; decompressed MD5 verified. Game DLL SHA-256 " + dllHash + ".")
                         : DeathStrandingWorldReader.Read(data, request.TrackerId, request.Account, request.ObservedUtc, sourceLabel,
                             "Read-only copied save; matching Steam account; decompressed MD5 verified. World milestone reader v1; game DLL SHA-256 " + dllHash + ".");
@@ -106,6 +140,43 @@ namespace PixelVaultNative
                 return 20;
             }
         }
+        // Each independently validated table has its own outcome. An unsupported interview
+        // table must not prevent a supported fabrication/order table from being observed.
+        internal static DeathStrandingReadResult Analyze(byte[] data, DeathStrandingReadRequest request, string fingerprint, string dllHash)
+        {
+            var result = new DeathStrandingReadResult { Fingerprint = fingerprint, GameDllSha256 = dllHash,
+                Projections = new Dictionary<string, DeathStrandingProjection>(StringComparer.Ordinal) };
+            var source = SourceLabel(request);
+            var evidence = "Read-only copied save; matching Steam account; decompressed MD5 verified. Game DLL SHA-256 " + dllHash + ".";
+            void Add(string id, Func<AchievementTrackerSnapshot> read)
+            {
+                try { result.Projections.Add(id, new DeathStrandingProjection { Snapshot = read() }); }
+                catch (NotSupportedException ex) { result.Projections.Add(id, new DeathStrandingProjection { ErrorCode = "UnsupportedFormat", Error = ex.Message }); }
+                catch (InvalidDataException ex) { result.Projections.Add(id, new DeathStrandingProjection { ErrorCode = "InvalidSave", Error = ex.Message }); }
+            }
+            Add(AchievementTrackingCatalog.DeathStrandingId, () => DeathStrandingSaveReader.ReadCatalogue(data, request.Account, request.ObservedUtc, source,
+                evidence + " One complete indexed 408-entry catalogue; 108 trophy targets. Fabrication flag 0x80000000; availability flag 0x20000000 remains inferred and does not guarantee facility/material support."));
+            Add(AchievementTrackingCatalog.DeathStrandingBuildId, () => DeathStrandingWorldReader.Read(data, AchievementTrackingCatalog.DeathStrandingBuildId, request.Account, request.ObservedUtc, source, evidence));
+            Add(AchievementTrackingCatalog.DeathStrandingUpgradeId, () => DeathStrandingWorldReader.Read(data, AchievementTrackingCatalog.DeathStrandingUpgradeId, request.Account, request.ObservedUtc, source, evidence));
+            AchievementTrackerSnapshot legends = null;
+            Add(AchievementTrackingCatalog.DeathStrandingOrdersId, () =>
+                DeathStrandingOrderReader.Read(data, request.Account, request.ObservedUtc, source, evidence, out legends));
+            var orders = result.Projections[AchievementTrackingCatalog.DeathStrandingOrdersId];
+            result.Projections.Add(PixelVault.Tracking.CenturyLegendsCatalogue.TrackerId, legends != null
+                ? new DeathStrandingProjection { Snapshot = legends }
+                : new DeathStrandingProjection { ErrorCode = orders.ErrorCode, Error = orders.Error });
+            Add(AchievementTrackingCatalog.DeathStrandingChipsId, () => DeathStrandingChipReader.Read(data, request.Account, request.ObservedUtc, source, evidence));
+            Add(DeathStrandingMailCatalogueReader.TrackerId, () => DeathStrandingMailCatalogueReader.Read(data,request.Account,request.ObservedUtc,source,evidence));
+            Add(DeathStrandingMailReader.TrackerId, () => DeathStrandingMailReader.Read(data,request.Account,request.ObservedUtc,source,evidence));
+            Add(DeathStrandingInterviewReader.TrackerId, () => DeathStrandingInterviewReader.Read(data, request.Account, request.ObservedUtc, source, evidence));
+            Add(DeathStrandingInterviewCatalogueReader.TrackerId, () => DeathStrandingInterviewCatalogueReader.Read(data, request.Account, request.ObservedUtc, source, evidence));
+            Add(DeathStrandingRoadReader.TrackerId, () => DeathStrandingRoadReader.Read(data, request.Account, request.ObservedUtc, source, evidence));
+            Add(PixelVault.Tracking.CenturyCargoGoal.TrackerId, () => DeathStrandingCargoReader.Read(data, request.Account, request.ObservedUtc, source, evidence));
+            Add(DeathStrandingFacilityReader.TrackerId, () => DeathStrandingFacilityReader.Read(data, request.Account, request.ObservedUtc, source, evidence));
+            return result;
+        }
+        internal static string SourceLabel(DeathStrandingReadRequest request) => "Death Stranding DC · " + request.SourceName
+            + (request.SkippedNewer > 0 ? " · skipped " + request.SkippedNewer + " newer invalid checkpoint(s)" : "");
         static void WriteResult(string root, DeathStrandingReadResult result)
         {
             using var stream = new FileStream(Path.Combine(root, "result.json"), FileMode.CreateNew, FileAccess.Write, FileShare.None);

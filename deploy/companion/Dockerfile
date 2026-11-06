@@ -1,7 +1,8 @@
-# Build from the repository root: docker build -f deploy/companion/Dockerfile -t pixelvault-companion:0.16.0 .
+# Build from the repository root: docker build -f deploy/companion/Dockerfile -t pixelvault-companion:0.38.0 .
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /source
 COPY src/PixelVault.Tracking/ src/PixelVault.Tracking/
+COPY src/PixelVault.Maps/ src/PixelVault.Maps/
 COPY src/PixelVault.Companion/ src/PixelVault.Companion/
 RUN dotnet publish src/PixelVault.Companion/PixelVault.Companion.csproj -c Release -o /out --no-self-contained \
     && chmod -R a+rX /out

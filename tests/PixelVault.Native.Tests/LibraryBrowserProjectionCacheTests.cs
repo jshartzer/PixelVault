@@ -12,7 +12,7 @@ namespace PixelVaultNative.Tests
     /// must preserve relative to the prior in-MainWindow implementation:
     ///   1. cache hit on identical fingerprint
     ///   2. cache miss on any field that <c>ComputeLibraryBrowserFoldersMergeFingerprint</c> covers
-    ///   3. console mode never caches (always rebuilds + clears)
+    ///   3. console and All projections survive grouping changes
     ///   4. <c>Reset</c> drops the cached projection
     /// </summary>
     public class LibraryBrowserProjectionCacheTests
@@ -89,7 +89,7 @@ namespace PixelVaultNative.Tests
         }
 
         [Fact]
-        public void GetOrBuild_ConsoleGroupingNeverCachesAndClearsExistingCache()
+        public void GetOrBuild_ConsoleGroupingCachesWithoutDiscardingAll()
         {
             var cache = new LibraryBrowserProjectionCache();
             var folders = MakeFolders();
@@ -100,13 +100,12 @@ namespace PixelVaultNative.Tests
             var consoleBuildCount = 0;
             cache.GetOrBuild(folders, "console", NormalizeAllOrConsole, (raw, mode) => { consoleBuildCount++; return new List<LibraryBrowserFolderView>(); });
             cache.GetOrBuild(folders, "console", NormalizeAllOrConsole, (raw, mode) => { consoleBuildCount++; return new List<LibraryBrowserFolderView>(); });
-            Assert.Equal(2, consoleBuildCount);
-            Assert.False(cache.HasCachedProjection);
-            Assert.Equal(long.MinValue, cache.CachedFingerprint);
+            Assert.Equal(1, consoleBuildCount);
+            Assert.True(cache.HasCachedProjection);
         }
 
         [Fact]
-        public void GetOrBuild_ReturnsBuilderResultForIdenticalFingerprintAfterConsoleClear()
+        public void GetOrBuild_ReturnsOriginalAllProjectionAfterConsole()
         {
             var cache = new LibraryBrowserProjectionCache();
             var folders = MakeFolders();
@@ -117,7 +116,7 @@ namespace PixelVaultNative.Tests
             cache.GetOrBuild(folders, "all", NormalizeAllOrConsole, (raw, mode) => { buildCount++; return new List<LibraryBrowserFolderView>(); });
             cache.GetOrBuild(folders, "all", NormalizeAllOrConsole, (raw, mode) => { buildCount++; return new List<LibraryBrowserFolderView>(); });
 
-            Assert.Equal(3, buildCount);
+            Assert.Equal(2, buildCount);
         }
 
         [Fact]

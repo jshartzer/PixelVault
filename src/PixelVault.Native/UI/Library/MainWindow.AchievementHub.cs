@@ -22,7 +22,7 @@ namespace PixelVaultNative
                 var before = _achievementHubStore.Revision;
                 await _achievementHubStore.SaveGameAsync(first.Provider, account, first.ProviderGameId, result, CancellationToken.None);
                 if (_achievementHubStore.Revision != before && !Dispatcher.HasShutdownStarted)
-                    _ = Dispatcher.BeginInvoke(new Action(QueueTimelineAchievementRefresh));
+                    _ = Dispatcher.BeginInvoke(new Action(() => { QueueTimelineAchievementRefresh(); QueueLibraryCompletionRefresh(); }));
             }
             catch (Exception ex) { Log("Achievement hub snapshot could not be saved: " + ex.GetType().Name); }
         }
@@ -69,17 +69,34 @@ namespace PixelVaultNative
                 gamesAge.Restart();
                 return games;
             }
-            AchievementHubSession Session() => new AchievementHubSession
+            AchievementHubSession Session()
             {
+                var xbox = new XboxAchievementService().SavedLibrary();
+                return new AchievementHubSession {
                 LibraryRoot = libraryRoot, SteamAccount = CurrentSteamUserId64(), SteamKey = CurrentSteamWebApiKey(),
                 RetroAccount = CurrentRetroAchievementsUsername(), RetroKey = CurrentRetroAchievementsApiKey(),
-                Games = new List<AchievementHubGame>(Games())
+                XboxAccount = xbox.Xuid,
+                Games = Games().Concat(xbox.Titles.Select(t => new AchievementHubGame { Provider = "xbox", Id = t.Id, Title = t.Name, XboxTitle = t })).GroupBy(g => g.Key).Select(g => g.First()).ToList()
+                };
             };
             FrameworkElement Cover(AchievementHubGame game, double width, double height) => TrackerGameCover(game,width,height);
-            void Open(Window hub, AchievementHubGame game) => AchievementsInfoWindow.ShowModal(hub,
-                game.Provider == "steam" ? "Steam" : "Emulation", game.Folder, CurrentSteamWebApiKey(),
-                CurrentRetroAchievementsApiKey(), CurrentSteamUserId64(), CurrentRetroAchievementsUsername(),
-                "PixelVault/" + AppVersion, achievementGuideService, trackingStore: achievementTrackingStore);
+            void Open(Window hub, AchievementHubGame game)
+            {
+                var view = ws.ViewFolders.FirstOrDefault(v => GameProfilePlatformStore.NameKey(v.Name) == GameProfilePlatformStore.NameKey(game.Title));
+                if (view != null)
+                {
+                    var display = BuildLibraryBrowserDisplayFolder(view);
+                    ShowLinkedGameAchievements(hub, display, (view.SourceFolders ?? new()).Concat(new[] { view.PrimaryFolder }), initialPlatform: game.Key);
+                    return;
+                }
+                if (game.Provider == "xbox")
+                {
+                    var account = Session().XboxAccount;
+                    AchievementsInfoWindow.ShowXbox(hub, game.Title, account, token => new XboxAchievementService().FetchAsync(account, game.XboxTitle, token));
+                    return;
+                }
+                ShowLinkedGameAchievements(hub, game.Folder, new[] { game.Folder }, initialPlatform: game.Key);
+            }
             _achievementHubPins ??= new AchievementHubPins(Path.Combine(dataRoot, "achievement-hub-pins.json"));
             AchievementHubWindow.ShowFor(owner, new AchievementHubService(_achievementHubStore, guides: achievementGuideService), Session, Cover, Open, _achievementHubPins, achievementGuideService, achievementTrackingStore);
         }

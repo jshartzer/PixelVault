@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -42,13 +43,18 @@ namespace PixelVaultNative
             var definition = selected; var account = Account(definition); if (string.IsNullOrWhiteSpace(account)) return;
             try
             {
-                var stamp = await Task.Run(() => { var a = store.Automation(definition.Id, account); var s = store.SourceStatus(definition.Id, account); return a.Settings.Id + "|" + a.State.LastCheckUtc + "|" + s?.Outcome + "|" + s?.AttemptId; });
+                var stamp = await Task.Run(() =>
+                {
+                    var a=store.Automation(definition.Id,account);var s=store.SourceStatus(definition.Id,account);
+                    var saved=store.Definitions().Single(d=>d.Id==definition.Id);
+                    return a.Settings.Id+"|"+a.State.LastCheckUtc+"|"+s?.Outcome+"|"+s?.AttemptId+"|"+store.InlineRevision(definition.Id,account)+"|"+System.Text.Json.JsonSerializer.Serialize(saved,AchievementTrackingCatalog.Json);
+                });
                 if (!closed && !DraftPending() && selected == definition && lastAutomaticStatus != stamp)
                 { await ReloadAsync(preserveDraft: true); if (!DraftPending()) lastAutomaticStatus = stamp; }
             }
             catch (Exception ex) { if (!closed) Error("Could not read automatic refresh status. " + ex.Message); }
         }
-        bool DraftPending() => selectedItem != null && (notes.Text != selectedItem.Note || selectedItem.Item.Target > 1 && current.Text != (selectedItem.Current?.ToString() ?? ""));
+        bool DraftPending() => selectedItem != null && (notes.Text != selectedItem.Note || selectedItem.Item.Target > 1 && current.Text != (selectedItem.Current?.ToString() ?? "") || ItemRulesDraftPending());
         void UpdateAutomationControls()
         {
             if (automationButton == null) return;
@@ -65,7 +71,7 @@ namespace PixelVaultNative
             var definition = selected; var account = Account(definition); var binding = activeSource;
             var currentSettings = await Task.Run(() => (Automatic: store.Automation(definition.Id, account), History: store.AutomationHistory(definition.Id, account)));
             if (closed) return;
-            var dialog = new TrackerAutomationWindow(this, currentSettings.Automatic.Settings, currentSettings.Automatic.State, currentSettings.History);
+            var dialog = new TrackerAutomationWindow(this, currentSettings.Automatic.Settings, currentSettings.Automatic.State, currentSettings.History, activeSource?.ReplaceManualProgress == true);
             if (ShowAutomation(dialog) != true) { dialog.Close(); return; }
             try
             {

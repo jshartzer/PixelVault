@@ -10,7 +10,9 @@ public sealed partial class ScreenshotLibrary
     static Dictionary<string,ScreenshotPhoto> Removed(string root,string provider,string game)
     {
         var file=RemovalFile(root,provider,game);
-        return File.Exists(file)?JsonSerializer.Deserialize<Dictionary<string,ScreenshotPhoto>>(File.ReadAllText(file),Json)??throw new InvalidDataException("Invalid removal record."):new(StringComparer.Ordinal);
+        if(!File.Exists(file))return new(StringComparer.Ordinal);
+        using var input=new FileStream(file,FileMode.Open,FileAccess.Read,FileShare.Read|FileShare.Delete);
+        return JsonSerializer.Deserialize<Dictionary<string,ScreenshotPhoto>>(input,Json)??throw new InvalidDataException("Invalid removal record.");
     }
     static ScreenshotCatalogue Visible(ScreenshotCatalogue c,string root)
     {

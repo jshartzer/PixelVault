@@ -107,6 +107,7 @@ foreach(var line in File.ReadLines(cache))
     if(latest<=0)latest=null;
     exported.Add(identity,new(provider,id,title,platform,coverAsset,bannerAsset,new(minutes,unlocked,total,played,updated,captures,latest)));
 }
+foreach(var xbox in PixelVault.Companion.Local.LocalAchievementReader.XboxGames(source,approved,AchievementSnapshotExporter.Read(source,workspaceId,approved)))exported["xbox:"+xbox.GameId]=xbox;
 var catalog=new GameCatalogue(1,workspaceId,DateTime.UtcNow,exported.Values.OrderBy(g=>g.Title,StringComparer.OrdinalIgnoreCase).ToList());
 if(catalog.Games.Count==0)throw new InvalidDataException("The indexed library is empty; the current NAS library was preserved.");
 var catalogTemp=Path.Combine(output,"catalog.tmp");File.WriteAllText(catalogTemp,JsonSerializer.Serialize(catalog,new JsonSerializerOptions(JsonSerializerDefaults.Web){WriteIndented=true}));File.Move(catalogTemp,Path.Combine(output,"catalog.json"),true);

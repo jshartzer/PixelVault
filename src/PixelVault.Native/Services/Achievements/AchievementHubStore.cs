@@ -52,7 +52,8 @@ namespace PixelVaultNative
             {
                 if (new FileInfo(path).Length <= 32 * 1024 * 1024)
                 {
-                    var data = JsonSerializer.Deserialize<AccountData>(File.ReadAllText(path), Json);
+                    using var input=new FileStream(path,FileMode.Open,FileAccess.Read,FileShare.Read|FileShare.Delete);
+                    var data = JsonSerializer.Deserialize<AccountData>(input, Json);
                     if ((data?.Version == 1 || data?.Version == 2) && data.Provider == provider && data.Account == AccountKey(account)
                         && data.Recent != null && data.Games != null)
                     {
@@ -119,9 +120,10 @@ namespace PixelVaultNative
             await gate.WaitAsync(token).ConfigureAwait(false);
             try
             {
+                using var processLease=await LocalStoreLease.AcquireAsync(path,token).ConfigureAwait(false);
                 await Task.Run(() =>
                 {
-                    var data = ReadCached(path, provider, account);
+                    var data = Read(path, provider, account);
                     var temp = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
                     try
                     {
@@ -177,7 +179,7 @@ namespace PixelVaultNative
         {
             if (!CanStore(provider, game, result)) return Task.CompletedTask;
             var rows = JsonSerializer.Deserialize<List<GameAchievementsFetchService.AchievementRow>>(JsonSerializer.Serialize(result.Rows, Json), Json);
-            var now = DateTime.UtcNow.Ticks;
+            var now = result.CapturedUtcTicks>0?result.CapturedUtcTicks:DateTime.UtcNow.Ticks;
             return UpdateAsync(provider, account, d =>
             {
                 d.Games.TryGetValue(game, out var prior);

@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0-windows</TargetFramework><UseWPF>true</UseWPF><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/PixelVault.Tracking/PixelVault.Tracking.csproj" />
+    <Reference Include="PixelVault"><HintPath>../../src/PixelVault.Native/bin/Release/net8.0-windows/win-x64/PixelVault.dll</HintPath></Reference>
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.6" />
+  </ItemGroup>
+</Project>

@@ -62,6 +62,7 @@ namespace PixelVaultNative
                         return;
                     }
 
+                    LibraryBrowserVm.InvalidateFolderViews();
                     ws.Folders.Clear();
                     if (loadTask.Status == TaskStatus.RanToCompletion && loadTask.Result != null)
                         ws.Folders.AddRange(loadTask.Result);
@@ -72,6 +73,7 @@ namespace PixelVaultNative
                         + "; folders=" + ws.Folders.Count);
                     TryRunPendingLibraryHeroBannerCacheRefresh(ws.Folders);
                     if (renderTiles != null) renderTiles();
+                    _ = ReconcileSavedLibraryCompletionAsync();
                 }));
             }, TaskScheduler.Default);
         }
@@ -118,6 +120,7 @@ namespace PixelVaultNative
                         ? snapshotTask.Result
                         : null;
                     if (snapshotFolders == null || snapshotFolders.Count == 0) return;
+                    LibraryBrowserVm.InvalidateFolderViews();
                     ws.Folders.Clear();
                     ws.Folders.AddRange(snapshotFolders);
                     if (status != null) status.Text = "Library ready";

@@ -31,7 +31,7 @@ namespace PixelVaultNative
             if (view == null || IsLibraryBrowserTimeProjectionView(view)) return;
             var folder = BuildLibraryBrowserDisplayFolder(view);
             if (folder == null) return;
-            ShowLibraryGameProfileWindow(owner ?? this, view, folder);
+            _ = ShowLibraryGameProfileWindow(owner ?? this, view, folder);
         }
 
         static string LibraryGameProfileWindowKey(LibraryFolderInfo folder)
@@ -43,11 +43,11 @@ namespace PixelVaultNative
             return string.Empty;
         }
 
-        void ShowLibraryGameProfileWindow(Window owner, LibraryBrowserFolderView view, LibraryFolderInfo folder)
+        async Task ShowLibraryGameProfileWindow(Window owner, LibraryBrowserFolderView view, LibraryFolderInfo folder)
         {
-            ApplyCachedIgdbMetadataToLibraryGameProfileFolder(folder);
-            EnsureLibraryGameProfileIgdbMetadataCachedBeforeOpen(folder);
+            var requestedRoot = libraryRoot;
             var key = LibraryGameProfileWindowKey(folder);
+            if (!string.IsNullOrEmpty(key)) key = (requestedRoot ?? string.Empty) + "|" + key;
             if (!string.IsNullOrEmpty(key)
                 && _libraryGameProfileWindows.TryGetValue(key, out var existing)
                 && existing != null
@@ -57,6 +57,7 @@ namespace PixelVaultNative
                 existing.Activate();
                 return;
             }
+            ApplyCachedIgdbMetadataToLibraryGameProfileFolder(folder);
 
             var title = string.IsNullOrWhiteSpace(folder.Name) ? "Game Profile" : folder.Name.Trim();
             var win = new Window
@@ -79,6 +80,7 @@ namespace PixelVaultNative
 
             // Cancels any in-flight async loads (achievements fetch, etc.) when the user closes the profile mid-load.
             var lifetimeCts = new CancellationTokenSource();
+            var lifetimeToken = lifetimeCts.Token;
             win.Closed += delegate
             {
                 try { lifetimeCts.Cancel(); } catch { }
@@ -97,156 +99,209 @@ namespace PixelVaultNative
                 win.Close();
             };
 
-            // Snapshot the file list + metadata index ONCE per open (PV-POL-GPRO-DATA-001).
-            // The hero summary, stat strip, sessions section and Recent Captures all share
-            // these inputs. Building the LibraryGameProfileSessionEntry list eagerly means
-            // the session helper (Phase D.1) and the Sessions section (Phase D.2) consume a
-            // single resolved-date snapshot - changing the threshold only re-buckets, never
-            // re-reads metadata.
-            var files = GetFilesForLibraryFolderEntry(folder, false)
-                .Where(file => !string.IsNullOrWhiteSpace(file) && File.Exists(file))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList();
-            var metadataIndex = librarySession == null || !librarySession.HasLibraryRoot
-                ? new Dictionary<string, LibraryMetadataIndexEntry>(StringComparer.OrdinalIgnoreCase)
-                : librarySession.LoadLibraryMetadataIndexForFilePaths(files);
-            var orderedFiles = files
-                .Select(file => new { File = file, Date = ResolveLibraryProfileCaptureDate(file, metadataIndex) })
-                .OrderByDescending(row => row.Date)
-                .ThenBy(row => row.File, StringComparer.OrdinalIgnoreCase)
-                .ToList();
-            var orderedFilePaths = orderedFiles.Select(row => row.File).ToList();
-            var sessionEntries = orderedFiles
-                .Select(row => new LibraryGameProfileSessionEntry(row.File, row.Date, IsVideo(row.File)))
-                .ToList();
-            var metrics = ComputeLibraryGameProfileMetrics(orderedFilePaths, metadataIndex, librarySessionThresholdMinutes);
-
-            var achievementLookupFolder = ResolveLibraryBrowserAchievementLookupFolder(view);
-            var achievementPlatformNorm = NormalizeConsoleLabel(
-                achievementLookupFolder == null ? string.Empty : achievementLookupFolder.PlatformLabel);
-            var steamStats = new LibraryGameProfileSteamStats
+            var loading = new TextBlock
             {
-                ShowSteamCards = GameAchievementsFetchService.ShouldShowSteamExtrasForProfile(
-                    achievementPlatformNorm,
-                    achievementLookupFolder ?? folder)
+                Text = title + "\nLoading captures and sessions…",
+                Foreground = Brush("#C5D2DA"), FontSize = 18, Margin = new Thickness(24),
+                TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Center
             };
-
-            var root = new Grid();
-            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-
-            // The Edit Game pill in the action toolbar mutates folder.Name /
-            // .CollectionNotes / IDs etc. and then asks us to refresh the profile in
-            // place (PV-PLN-GPRO-001 step C.3 + L3 follow-up). We rebuild the hero
-            // and re-pull the Game Notes card text from the now-mutated folder so
-            // renamed / re-IDed / re-noted games update without reopening the window.
-            //
-            // Phase D.3 adds the threshold picker, which mutates
-            // librarySessionThresholdMinutes. The Sessions stat card and the new
-            // Sessions section both depend on the picker's current value, so we
-            // slot them into ContentControl hosts and re-render only those slots
-            // (plus the hero summary line) on threshold change instead of doing a
-            // full body rebuild.
-            Action refreshHero = null;
-            Action refreshNotesCard = null;
-            Action refreshStatsSection = null;
-            Action refreshSessionsSection = null;
-            Action<int> applyThreshold = null;
-            refreshHero = delegate
-            {
-                if (root.Children.Count == 0) return;
-                FrameworkElement existingHero = null;
-                foreach (UIElement child in root.Children)
-                {
-                    if (child is FrameworkElement fe && Grid.GetRow(fe) == 0) { existingHero = fe; break; }
-                }
-                if (existingHero != null)
-                {
-                    var freshHero = BuildLibraryGameProfileHero(win, view, folder, refreshHero);
-                    var idx = root.Children.IndexOf(existingHero);
-                    root.Children.Remove(existingHero);
-                    if (idx >= 0) root.Children.Insert(idx, freshHero); else root.Children.Add(freshHero);
-                }
-                if (refreshNotesCard != null) refreshNotesCard();
-                win.Title = "PixelVault Game Profile - " + (string.IsNullOrWhiteSpace(folder.Name) ? "Game Profile" : folder.Name);
-            };
-            var heroElement = BuildLibraryGameProfileHero(win, view, folder, refreshHero);
-            void OnAchievementCompletionUpdated(LibraryFolderInfo completed)
-            {
-                if (completed == null || completed.GameId != folder.GameId) return;
-                folder.IsCompleted100Percent = view.IsCompleted100Percent = true;
-                folder.CompletedUtcTicks = view.CompletedUtcTicks = completed.CompletedUtcTicks;
-                refreshHero();
-            }
-            AchievementCompletionUpdated += OnAchievementCompletionUpdated;
-            win.Closed += (_, __) => AchievementCompletionUpdated -= OnAchievementCompletionUpdated;
-            heroElement.VerticalAlignment = VerticalAlignment.Top;
-            root.Children.Add(heroElement);
-
-            var scroll = new ScrollViewer
-            {
-                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
-                Padding = new Thickness(22, 18, 22, 24)
-            };
-            Grid.SetRow(scroll, 1);
-            var body = new StackPanel();
-            scroll.Content = body;
-            var statsHost = new ContentControl { Content = BuildLibraryGameProfileStats(metrics, steamStats) };
-            body.Children.Add(statsHost);
-            refreshStatsSection = delegate
-            {
-                statsHost.Content = BuildLibraryGameProfileStats(metrics, steamStats);
-            };
-            body.Children.Add(BuildLibraryGameProfileNotesCard(win, view, folder, out refreshNotesCard));
-            var relatedGamesHost = new ContentControl
-            {
-                Content = BuildLibraryGameProfileEmptyCard("Checking IGDB related games...")
-            };
-            body.Children.Add(relatedGamesHost);
-            BeginLoadLibraryGameProfileRelatedGames(win, relatedGamesHost, view, folder, lifetimeCts.Token);
-            body.Children.Add(BuildLibraryGameProfileCaptureFilmstrip(win, view, orderedFilePaths));
-            var achievementHost = new StackPanel { Margin = new Thickness(0, 24, 0, 0) };
-            body.Children.Add(achievementHost);
-            BeginLoadLibraryGameProfileAchievements(win, achievementHost, view, steamStats, refreshStatsSection, refreshHero, lifetimeCts.Token);
-            // Sessions live at the bottom of the body so achievements (the highest-
-            // signal "did I beat this thing" surface) sits directly under the
-            // recent-captures filmstrip. The Sessions ContentControl is still
-            // refreshed in place when the threshold changes (refreshSessionsSection).
-            var sessionsHost = new ContentControl
-            {
-                Content = BuildLibraryGameProfileSessionsSection(win, view, folder, sessionEntries, librarySessionThresholdMinutes, mins => applyThreshold(mins))
-            };
-            body.Children.Add(sessionsHost);
-            root.Children.Add(scroll);
-
-            refreshSessionsSection = delegate
-            {
-                sessionsHost.Content = BuildLibraryGameProfileSessionsSection(win, view, folder, sessionEntries, librarySessionThresholdMinutes, mins => applyThreshold(mins));
-            };
-            applyThreshold = delegate(int requestedMinutes)
-            {
-                var normalized = SettingsService.NormalizeLibrarySessionThresholdMinutes(requestedMinutes);
-                if (librarySessionThresholdMinutes != normalized)
-                {
-                    librarySessionThresholdMinutes = normalized;
-                    SaveSettings();
-                }
-                metrics = ComputeLibraryGameProfileMetrics(orderedFilePaths, metadataIndex, librarySessionThresholdMinutes);
-                refreshStatsSection();
-                refreshSessionsSection();
-                refreshHero();
-                // PV-POL-GPRO-SESSION-001: writing the same setting key the main
-                // browser uses; if the browser is open in Sessions mode it needs
-                // to re-render so its own grouping respects the new threshold.
-                try { _libraryBrowserLiveWorkingSet?.RerenderFolderList?.Invoke(); }
-                catch (Exception ex) { LogException("LibraryGameProfile.applyThreshold rerenderFolderList", ex); }
-            };
-
-            win.Content = root;
+            win.Content = loading;
             if (!string.IsNullOrEmpty(key)) _libraryGameProfileWindows[key] = win;
             win.Show();
             win.Activate();
+            var snapshotClock = Stopwatch.StartNew();
+            try
+            {
+                // Capture the root before yielding; background work never follows a later
+                // library switch. Resolve dates once for stats, filmstrip and sessions.
+                var snapshotFolder = CloneLibraryFolderInfo(folder);
+                var sessionEntries = await Task.Run(() => BuildLibraryGameProfileCaptureSnapshot(
+                    () => GetFilesForLibraryFolderEntry(snapshotFolder, false, requestedRoot),
+                    files => LoadLibraryMetadataIndexForFilePaths(requestedRoot, files),
+                    (file, index) => ResolveIndexedLibraryDate(requestedRoot, file, index),
+                    lifetimeToken), lifetimeToken);
+                if (lifetimeToken.IsCancellationRequested || !win.IsVisible) return;
+                if (!string.Equals(libraryRoot, requestedRoot, StringComparison.OrdinalIgnoreCase))
+                {
+                    loading.Text = "The library changed. Close this profile and open it from the current library.";
+                    return;
+                }
+                LogPerformanceSample("LibraryGameProfileSnapshot", snapshotClock, "captures=" + sessionEntries.Count, 0);
+                var orderedFilePaths = sessionEntries.Select(row => row.FilePath).ToList();
+                var metrics = ComputeLibraryGameProfileMetrics(sessionEntries, librarySessionThresholdMinutes);
+
+                var achievementLookupFolder = ResolveLibraryBrowserAchievementLookupFolder(view);
+                var achievementPlatformNorm = NormalizeConsoleLabel(
+                    achievementLookupFolder == null ? string.Empty : achievementLookupFolder.PlatformLabel);
+                var steamStats = new LibraryGameProfileSteamStats
+                {
+                    ShowSteamCards = GameAchievementsFetchService.ShouldShowSteamExtrasForProfile(
+                        achievementPlatformNorm,
+                        achievementLookupFolder ?? folder)
+                };
+                if(steamStats.ShowSteamCards)
+                {
+                    try
+                    {
+                        var saved=new LocalProviderSummaryStore(dataRoot).Read().FirstOrDefault(s=>s.Provider=="steam"&&s.GameId==(achievementLookupFolder??folder)?.SteamAppId&&s.Account==CurrentSteamUserId64());
+                        if(saved?.PlaytimeMinutes is not null){steamStats.SteamPlaytimeMinutes=saved.PlaytimeMinutes;steamStats.Hydrated=true;}
+                    }
+                    catch(Exception ex){LogException("LibraryGameProfile.LoadPlaytime",ex);}
+                }
+
+                var root = new Grid();
+                root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+
+                // The Edit Game pill in the action toolbar mutates folder.Name /
+                // .CollectionNotes / IDs etc. and then asks us to refresh the profile in
+                // place (PV-PLN-GPRO-001 step C.3 + L3 follow-up). We rebuild the hero
+                // and re-pull the Game Notes card text from the now-mutated folder so
+                // renamed / re-IDed / re-noted games update without reopening the window.
+                //
+                // Phase D.3 adds the threshold picker, which mutates
+                // librarySessionThresholdMinutes. The Sessions stat card and the new
+                // Sessions section both depend on the picker's current value, so we
+                // slot them into ContentControl hosts and re-render only those slots
+                // (plus the hero summary line) on threshold change instead of doing a
+                // full body rebuild.
+                Action refreshHero = null;
+                FrameworkElement platformControls = null;
+                Action togglePlatformControls = () =>
+                {
+                    if (platformControls == null) return;
+                    platformControls.Visibility = platformControls.Visibility == Visibility.Visible ? Visibility.Collapsed : Visibility.Visible;
+                    if (platformControls.Visibility == Visibility.Visible)
+                    {
+                        platformControls.BringIntoView();
+                        platformControls.MoveFocus(new TraversalRequest(FocusNavigationDirection.First));
+                    }
+                };
+                Action refreshNotesCard = null;
+                Action refreshStatsSection = null;
+                Action refreshSessionsSection = null;
+                Action<int> applyThreshold = null;
+                refreshHero = delegate
+                {
+                    if (root.Children.Count == 0) return;
+                    FrameworkElement existingHero = null;
+                    foreach (UIElement child in root.Children)
+                    {
+                        if (child is FrameworkElement fe && Grid.GetRow(fe) == 0) { existingHero = fe; break; }
+                    }
+                    if (existingHero != null)
+                    {
+                        var freshHero = BuildLibraryGameProfileHero(win, view, folder, refreshHero, togglePlatformControls);
+                        var idx = root.Children.IndexOf(existingHero);
+                        root.Children.Remove(existingHero);
+                        if (idx >= 0) root.Children.Insert(idx, freshHero); else root.Children.Add(freshHero);
+                    }
+                    if (refreshNotesCard != null) refreshNotesCard();
+                    win.Title = "PixelVault Game Profile - " + (string.IsNullOrWhiteSpace(folder.Name) ? "Game Profile" : folder.Name);
+                };
+                var heroElement = BuildLibraryGameProfileHero(win, view, folder, refreshHero, togglePlatformControls);
+                void OnAchievementCompletionUpdated(LibraryFolderInfo completed)
+                {
+                    if (completed == null || completed.GameId != folder.GameId) return;
+                    folder.IsCompleted100Percent = view.IsCompleted100Percent = completed.IsCompleted100Percent;
+                    folder.CompletedUtcTicks = view.CompletedUtcTicks = completed.CompletedUtcTicks;
+                    refreshHero();
+                }
+                AchievementCompletionUpdated += OnAchievementCompletionUpdated;
+                win.Closed += (_, __) => AchievementCompletionUpdated -= OnAchievementCompletionUpdated;
+                heroElement.VerticalAlignment = VerticalAlignment.Top;
+                root.Children.Add(heroElement);
+
+                var scroll = new ScrollViewer
+                {
+                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                    HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                    Padding = new Thickness(22, 18, 22, 24)
+                };
+                Grid.SetRow(scroll, 1);
+                var body = new StackPanel();
+                scroll.Content = body;
+                var statsHost = new ContentControl { Content = BuildLibraryGameProfileStats(metrics, steamStats) };
+                body.Children.Add(statsHost);
+                refreshStatsSection = delegate
+                {
+                    statsHost.Content = BuildLibraryGameProfileStats(metrics, steamStats);
+                };
+                body.Children.Add(BuildLibraryGameProfileNotesCard(win, view, folder, out refreshNotesCard));
+                body.Children.Add(BuildLibraryGameProfileCaptureFilmstrip(win, view, orderedFilePaths));
+                var achievementHost = new StackPanel { Margin = new Thickness(0, 24, 0, 0) };
+                body.Children.Add(achievementHost);
+                platformControls = BuildGameProfilePlatformControls(win, achievementHost, view, folder, steamStats, refreshStatsSection, refreshHero, lifetimeToken);
+                platformControls.Visibility = Visibility.Collapsed;
+                body.Children.Insert(0, platformControls);
+                // Sessions live at the bottom of the body so achievements (the highest-
+                // signal "did I beat this thing" surface) sits directly under the
+                // recent-captures filmstrip. The Sessions ContentControl is still
+                // refreshed in place when the threshold changes (refreshSessionsSection).
+                var sessionsHost = new ContentControl
+                {
+                    Content = BuildLibraryGameProfileSessionsSection(win, view, folder, sessionEntries, librarySessionThresholdMinutes, mins => applyThreshold(mins))
+                };
+                body.Children.Add(sessionsHost);
+                root.Children.Add(scroll);
+
+                refreshSessionsSection = delegate
+                {
+                    sessionsHost.Content = BuildLibraryGameProfileSessionsSection(win, view, folder, sessionEntries, librarySessionThresholdMinutes, mins => applyThreshold(mins));
+                };
+                applyThreshold = delegate(int requestedMinutes)
+                {
+                    var normalized = SettingsService.NormalizeLibrarySessionThresholdMinutes(requestedMinutes);
+                    if (librarySessionThresholdMinutes != normalized)
+                    {
+                        librarySessionThresholdMinutes = normalized;
+                        SaveSettings();
+                    }
+                    metrics = ComputeLibraryGameProfileMetrics(sessionEntries, librarySessionThresholdMinutes);
+                    refreshStatsSection();
+                    refreshSessionsSection();
+                    refreshHero();
+                    // PV-POL-GPRO-SESSION-001: writing the same setting key the main
+                    // browser uses; if the browser is open in Sessions mode it needs
+                    // to re-render so its own grouping respects the new threshold.
+                    try { _libraryBrowserLiveWorkingSet?.RerenderFolderList?.Invoke(); }
+                    catch (Exception ex) { LogException("LibraryGameProfile.applyThreshold rerenderFolderList", ex); }
+                };
+
+                win.Content = root;
+                _ = RefreshLibraryGameProfileIgdbMetadataAsync(win, folder, refreshHero, lifetimeToken);
+            }
+            catch (OperationCanceledException) when (lifetimeToken.IsCancellationRequested) { }
+            catch (Exception ex)
+            {
+                LogException("LibraryGameProfile.Load", ex);
+                if (!lifetimeToken.IsCancellationRequested && win.IsVisible)
+                    win.Content = new TextBlock { Text = "Unable to load this profile. Close it and reopen to retry.",
+                        Foreground = Brush("#C5D2DA"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(24) };
+            }
+        }
+
+        internal static List<LibraryGameProfileSessionEntry> BuildLibraryGameProfileCaptureSnapshot(
+            Func<List<string>> getFiles,
+            Func<List<string>, Dictionary<string, LibraryMetadataIndexEntry>> loadIndex,
+            Func<string, Dictionary<string, LibraryMetadataIndexEntry>, DateTime> resolveDate,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var files = getFiles().Where(file => !string.IsNullOrWhiteSpace(file))
+                .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            cancellationToken.ThrowIfCancellationRequested();
+            var index = loadIndex(files);
+            var entries = new List<LibraryGameProfileSessionEntry>(files.Count);
+            foreach (var file in files)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                entries.Add(new LibraryGameProfileSessionEntry(file, resolveDate(file, index), TextAndPathHelpers.IsVideo(file)));
+            }
+            cancellationToken.ThrowIfCancellationRequested();
+            return entries.OrderByDescending(row => row.CapturedUtc)
+                .ThenBy(row => row.FilePath, StringComparer.OrdinalIgnoreCase).ToList();
         }
 
         void ApplyCachedIgdbMetadataToLibraryGameProfileFolder(LibraryFolderInfo folder)
@@ -264,29 +319,39 @@ namespace PixelVaultNative
             }
         }
 
-        void EnsureLibraryGameProfileIgdbMetadataCachedBeforeOpen(LibraryFolderInfo folder)
+        async Task RefreshLibraryGameProfileIgdbMetadataAsync(Window window, LibraryFolderInfo folder, Action refreshHero, CancellationToken cancellationToken)
         {
             if (folder == null || !LibraryGameProfileNeedsIgdbHeroInfo(folder)) return;
             var clientId = CurrentIgdbTwitchClientId();
             var secret = CurrentIgdbTwitchClientSecret();
             if (string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(secret)) return;
+            var requestedName = folder.Name;
+            var requestedIgdbId = folder.IgdbId;
+            var requestedGameId = folder.GameId;
+            var requestedRoot = libraryRoot;
             try
             {
                 var service = new IgdbProbeService(AppVersion);
-                var metadata = Task.Run(() => service.ResolveGameMetadataAsync(
+                var metadata = await Task.Run(() => service.ResolveGameMetadataAsync(
                     clientId,
                     secret,
-                    folder.IgdbId,
-                    folder.Name,
-                    CancellationToken.None)).GetAwaiter().GetResult();
-                if (metadata == null) return;
+                    requestedIgdbId,
+                    requestedName,
+                    cancellationToken), cancellationToken);
+                // The profile may have closed or been edited while the request ran.
+                // Keep the existing artwork/layout and apply only to this identity.
+                if (cancellationToken.IsCancellationRequested || !window.IsVisible || metadata == null
+                    || libraryRoot != requestedRoot || folder.Name != requestedName
+                    || folder.GameId != requestedGameId || folder.IgdbId != requestedIgdbId) return;
                 ApplyIgdbMetadataToFolder(folder, metadata);
                 SaveLibraryGameProfileIgdbMetadataToLocalCache(folder, metadata);
                 ApplyCachedIgdbMetadataToLibraryGameProfileFolder(folder);
+                refreshHero?.Invoke();
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
             catch (Exception ex)
             {
-                LogException("Game profile | sync IGDB metadata before open", ex);
+                LogException("Game profile | refresh IGDB metadata", ex);
             }
         }
 
@@ -320,22 +385,13 @@ namespace PixelVaultNative
             public bool SteamGlobalRarityAvailable;
         }
 
-        LibraryGameProfileMetrics ComputeLibraryGameProfileMetrics(
-            IReadOnlyList<string> orderedFiles,
-            IReadOnlyDictionary<string, LibraryMetadataIndexEntry> metadataIndex,
+        static LibraryGameProfileMetrics ComputeLibraryGameProfileMetrics(
+            IReadOnlyList<LibraryGameProfileSessionEntry> snapshot,
             int sessionThresholdMinutes)
         {
-            var safeFiles = orderedFiles ?? Array.Empty<string>();
-            var entries = new List<LibraryGameProfileSessionEntry>(safeFiles.Count);
-            var videoCount = 0;
-            foreach (var file in safeFiles)
-            {
-                var isVideo = IsVideo(file);
-                if (isVideo) videoCount++;
-                var captured = ResolveLibraryProfileCaptureDate(file, metadataIndex);
-                if (captured > DateTime.MinValue)
-                    entries.Add(new LibraryGameProfileSessionEntry(file, captured, isVideo));
-            }
+            var safeEntries = snapshot ?? Array.Empty<LibraryGameProfileSessionEntry>();
+            var videoCount = safeEntries.Count(row => row.IsVideo);
+            var entries = safeEntries.Where(row => row.CapturedUtc > DateTime.MinValue).ToList();
             // PV-PLN-GPRO-001 Phase D.1: route session counting through the pure
             // LibraryGameProfileSessionMath helper so the Phase A stat card and
             // the Phase D Sessions section can never disagree about what "1
@@ -356,7 +412,7 @@ namespace PixelVaultNative
             }
             return new LibraryGameProfileMetrics
             {
-                CaptureCount = safeFiles.Count,
+                CaptureCount = safeEntries.Count,
                 VideoCount = videoCount,
                 SessionCount = sessionCount,
                 FirstCaptureDate = first,
@@ -364,20 +420,17 @@ namespace PixelVaultNative
             };
         }
 
-        FrameworkElement BuildLibraryGameProfileHero(Window window, LibraryBrowserFolderView view, LibraryFolderInfo folder, Action refreshHero)
+        FrameworkElement BuildLibraryGameProfileHero(Window window, LibraryBrowserFolderView view, LibraryFolderInfo folder, Action refreshHero, Action togglePlatformControls)
         {
             const double profileCoverHeight = 276d;
             const double contentMarginV = 12d;
             const double heroBottomChromeGap = 8d;
             const double heroBottomChromeHeight = 42d;
-            // Fixed header height: main row matches cover; second row holds Edit/Open/Art
-            // (left) vs Favorite/Showcase/100% (right). Window resize cannot grow this chrome.
+            // Allow the identity row to grow for wrapped titles; keep actions on their own row.
             var heroFixedHeight = contentMarginV + profileCoverHeight + heroBottomChromeGap + heroBottomChromeHeight + contentMarginV;
             var hero = new Grid
             {
-                Height = heroFixedHeight,
                 MinHeight = heroFixedHeight,
-                MaxHeight = heroFixedHeight,
                 Background = Brush("#111A21"),
                 ClipToBounds = true
             };
@@ -390,7 +443,12 @@ namespace PixelVaultNative
                 Opacity = 0.58,
                 Visibility = Visibility.Collapsed
             };
-            hero.Children.Add(banner);
+            // The backdrop follows the content size without contributing its natural image size.
+            var backdrop = new Canvas { ClipToBounds = true };
+            banner.SetBinding(FrameworkElement.WidthProperty, new System.Windows.Data.Binding("ActualWidth") { Source = hero });
+            banner.SetBinding(FrameworkElement.HeightProperty, new System.Windows.Data.Binding("ActualHeight") { Source = hero });
+            backdrop.Children.Add(banner);
+            hero.Children.Add(backdrop);
             QueueImageLoad(
                 banner,
                 bannerPath,
@@ -423,11 +481,12 @@ namespace PixelVaultNative
             // Avoid clipping anti-aliased pixels at rounded corners: ClipToBounds uses a
             // rectangular clip that can bite into the curved edge of the cover + shadow fringe.
             var content = new Grid { Margin = new Thickness(26, contentMarginV, 26, contentMarginV), ClipToBounds = false };
-            content.RowDefinitions.Add(new RowDefinition { Height = new GridLength(profileCoverHeight) });
+            content.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto, MinHeight = profileCoverHeight });
             content.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             content.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = 0 });
-            content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(500), MinWidth = 420 });
+            var logoColumn = new ColumnDefinition { Width = new GridLength(0) };
+            content.ColumnDefinitions.Add(logoColumn);
             const double profileCoverWidth = 184d;
             var profileCoverCorner = new CornerRadius(18);
             var coverArt = CreateAsyncImageTile(
@@ -452,57 +511,31 @@ namespace PixelVaultNative
                 profileCoverCorner.TopLeft);
             if (coverClipGeometry.CanFreeze) coverClipGeometry.Freeze();
             coverArt.Clip = coverClipGeometry;
-            // PV-PLN-GPRO-001 step C.2 follow-up: when the 100% complete toggle is on,
-            // apply the same artwork-only foil shader and gold-frame overlay as library
-            // tiles so the toggle has visible feedback next to the button
-            // (PV-POL-GPRO-REUSE-001). Animation is hover-driven here (the profile
-            // hero doesn't scroll like the tile rail does), with a centered idle
-            // state on first layout. Drop shadow stays on the wrapper so it does
-            // not replace the shader Effect on the cover.
+            // Foil preserves the cover's colors; the existing frame moves with the card.
             FrameworkElement coverHost = coverArt;
-            if (view != null && view.IsCompleted100Percent)
+            if (view != null && (view.IsCompleted100Percent || HasLibraryAchievementSource(folder)))
             {
-                var foilWrap = new Grid
-                {
-                    Width = profileCoverWidth,
-                    Height = profileCoverHeight,
-                    Clip = coverClipGeometry,
-                    SnapsToDevicePixels = true,
-                    UseLayoutRounding = true
-                };
-                foilWrap.Children.Add(coverArt);
-                var foilVisual = CreateLibraryTileCompletionFoil(profileCoverWidth, profileCoverHeight);
-                foilVisual.AttachArtwork(coverArt);
-                foilWrap.Children.Add(BuildLibraryTileCompletionFrameOverlay(profileCoverWidth, profileCoverHeight, profileCoverCorner));
-                foilWrap.Loaded += delegate { foilVisual.Update(0.5, 0.5, false); };
-                foilWrap.MouseMove += delegate(object _, MouseEventArgs e)
-                {
-                    if (foilWrap.ActualWidth <= 0 || foilWrap.ActualHeight <= 0) return;
-                    var pt = e.GetPosition(foilWrap);
-                    foilVisual.Update(
-                        Math.Max(0, Math.Min(1, pt.X / foilWrap.ActualWidth)),
-                        Math.Max(0, Math.Min(1, pt.Y / foilWrap.ActualHeight)),
-                        true);
-                };
-                foilWrap.MouseLeave += delegate { foilVisual.Update(0.5, 0.5, true); };
-                coverHost = foilWrap;
+                var completed = new Grid { Width = profileCoverWidth, Height = profileCoverHeight, ClipToBounds = false };
+                completed.Children.Add(coverArt);
+                var finish = new HolofoilCover(completed, coverArt);
+                completed.Children.Add(CreateLibraryCompletionDecoration(view, profileCoverWidth, profileCoverHeight, profileCoverCorner, finish.SetTier));
+                coverHost = finish;
             }
             coverHost.Effect = new DropShadowEffect { BlurRadius = 22, ShadowDepth = 7, Direction = 270, Color = Color.FromArgb(120, 0, 0, 0), Opacity = 0.75 };
             Grid.SetRow(coverHost, 0);
             Grid.SetColumn(coverHost, 0);
             content.Children.Add(coverHost);
 
-            // Copy column top-aligned inside fixed-height hero so long titles ellipsize
-            // instead of growing the header when the window is resized wider.
+            // Give the title the available width and wrap without truncating it.
             var copy = new StackPanel { Margin = new Thickness(24, 0, 26, 0), VerticalAlignment = VerticalAlignment.Top };
             copy.Children.Add(new TextBlock
             {
                 Text = folder.Name ?? "Game Profile",
                 Foreground = Brushes.White,
-                FontSize = 38,
+                FontSize = 34,
                 FontWeight = FontWeights.SemiBold,
-                TextWrapping = TextWrapping.NoWrap,
-                TextTrimming = TextTrimming.CharacterEllipsis,
+                TextWrapping = TextWrapping.Wrap,
+                TextTrimming = TextTrimming.None,
                 ToolTip = folder.Name ?? "Game Profile"
             });
             var badges = new WrapPanel { Margin = new Thickness(0, 10, 0, 0) };
@@ -518,7 +551,7 @@ namespace PixelVaultNative
             var heroInfo = BuildLibraryGameProfileHeroInfo(folder);
             if (heroInfo != null) copy.Children.Add(heroInfo);
             // Row 0 only: identity text + platform badges. Edit /
-            // Open / Change Art live on row 1 (left); Favorite / Showcase / 100% on row 1 (right).
+            // Open / Change Art live on row 1 (left); Trackers / Maps / Platform on the right.
             Grid.SetRow(copy, 0);
             Grid.SetColumn(copy, 1);
             content.Children.Add(copy);
@@ -530,6 +563,13 @@ namespace PixelVaultNative
                 Grid.SetColumn(logoElement, 2);
                 logoElement.VerticalAlignment = VerticalAlignment.Center;
                 content.Children.Add(logoElement);
+                content.SizeChanged += (_, __) =>
+                {
+                    var showLogo = content.ActualWidth >= 980;
+                    logoElement.Visibility = showLogo ? Visibility.Visible : Visibility.Collapsed;
+                    logoColumn.Width = new GridLength(showLogo ? 300 : 0);
+                };
+                logoElement.Visibility = Visibility.Collapsed;
             }
 
             var bottomChrome = new Grid { Margin = new Thickness(0, heroBottomChromeGap, 0, 0) };
@@ -544,13 +584,9 @@ namespace PixelVaultNative
                 bottomChrome.Children.Add(editCircles);
             }
 
-            var stateStrip = BuildLibraryGameProfileHeroStateToggleCluster(window, view, folder, refreshHero);
-            if (stateStrip != null)
-            {
-                Grid.SetColumn(stateStrip, 1);
-                if (stateStrip is FrameworkElement stateFe) stateFe.HorizontalAlignment = HorizontalAlignment.Right;
-                bottomChrome.Children.Add(stateStrip);
-            }
+            var navigation = BuildLibraryGameProfileNavigation(window, view, folder, togglePlatformControls);
+            Grid.SetColumn(navigation, 1);
+            bottomChrome.Children.Add(navigation);
 
             Grid.SetRow(bottomChrome, 1);
             Grid.SetColumnSpan(bottomChrome, 3);
@@ -562,7 +598,7 @@ namespace PixelVaultNative
 
         // Right-column logo used by BuildLibraryGameProfileHero. Returns null when no
         // logo asset is available so column 2 collapses to 0 width and the copy
-        // column gets the room. Logos render up to 320x200, vertical-centered, and
+        // column gets the room. Logos render up to 280x210, vertical-centered, and
         // fade in once the bitmap has decoded so we don't flash a placeholder.
         FrameworkElement BuildLibraryGameProfileHeroLogo(Window window, LibraryFolderInfo folder)
         {
@@ -570,14 +606,14 @@ namespace PixelVaultNative
             if (string.IsNullOrWhiteSpace(logoPath) || !File.Exists(logoPath)) return null;
             var host = new Grid
             {
-                Width = 500,
+                Width = 280,
                 HorizontalAlignment = HorizontalAlignment.Stretch,
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(38, 0, 12, 0)
+                Margin = new Thickness(8, 0, 12, 0)
             };
             var logo = new Image
             {
-                MaxWidth = 430,
+                MaxWidth = 280,
                 MaxHeight = 210,
                 Stretch = Stretch.Uniform,
                 HorizontalAlignment = HorizontalAlignment.Center,
@@ -818,18 +854,29 @@ namespace PixelVaultNative
             }
             cluster.Children.Add(artCircle);
 
+            return cluster;
+        }
+
+        FrameworkElement BuildLibraryGameProfileNavigation(Window profileWindow, LibraryBrowserFolderView view, LibraryFolderInfo folder, Action togglePlatformControls)
+        {
+            var cluster = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
+
             var trackersLink = GameMapsWindow.Button("Trackers", "Open this game's trackers");
-            trackersLink.FontSize = 12;trackersLink.Margin = new Thickness(10, 0, 0, 0);
+            trackersLink.FontSize = 12; trackersLink.Width = 112; trackersLink.Height = 40; trackersLink.Margin = new Thickness(0, 0, 8, 0);
             trackersLink.Click += (_, __) => LibraryBrowserShowGameTrackers(profileWindow, view);
             cluster.Children.Add(trackersLink);
             var mapsLink = GameMapsWindow.Button("Maps", "Open saved maps for this game");
-            mapsLink.FontSize = 12;mapsLink.Margin = new Thickness(8, 0, 0, 0);
+            mapsLink.FontSize = 12; mapsLink.Width = 112; mapsLink.Height = 40; mapsLink.Margin = new Thickness(0, 0, 8, 0);
             mapsLink.Click += (_, __) =>
             {
                 var game = BuildTrackerLibraryGame(view) ?? new AchievementHubGame { Provider = "library", Id = folder.GameId ?? folder.FolderPath, Title = view.Name };
                 new GameMapsWindow(profileWindow, achievementTrackingStore, game, CurrentSteamUserId64(), CurrentRetroAchievementsUsername()).Show();
             };
             cluster.Children.Add(mapsLink);
+            var platformLink = GameMapsWindow.Button("Platform", "Show or hide default platform, game sync and Xbox linking controls");
+            platformLink.FontSize = 12; platformLink.Width = 112; platformLink.Height = 40; platformLink.Margin = new Thickness(0);
+            platformLink.Click += (_, __) => togglePlatformControls();
+            cluster.Children.Add(platformLink);
 
             return cluster;
         }
@@ -1331,17 +1378,8 @@ namespace PixelVaultNative
         internal static bool LibraryGameProfileAchievementsAreFullyUnlocked(IReadOnlyList<GameAchievementsFetchService.AchievementRow> rows)
         {
             if (rows == null || rows.Count == 0) return false;
-            var hasBaseGameAchievements = false;
-            for (var i = 0; i < rows.Count; i++)
-            {
-                var row = rows[i];
-                if (row == null) return false;
-                if (!string.Equals(AchievementsInfoWindow.EffectiveAchievementGroupName(row), "Base Game", StringComparison.OrdinalIgnoreCase)) continue;
-                hasBaseGameAchievements = true;
-                if (!row.ProgressKnown || !row.Unlocked) return false;
-            }
-
-            return hasBaseGameAchievements;
+            if (rows.Any(row => row == null)) return false;
+            return ClassifyLibraryAchievementCompletion(rows) != PixelVault.Tracking.AchievementCompletionTier.None;
         }
 
         void TryLibraryGameProfileAutoMarkCompleteFromAchievements(
@@ -1369,9 +1407,23 @@ namespace PixelVaultNative
             LibraryGameProfileSteamStats steamStats,
             Action refreshStatsSection,
             Action refreshHero,
-            CancellationToken cancellation)
+            CancellationToken cancellation,
+            GameProfilePlatformChoice choice, bool force, Action finished)
         {
-            host.Children.Add(BuildLibraryGameProfileSectionTitle("Achievements", null));
+            var heading = new DockPanel();
+            IReadOnlyList<GameAchievementsFetchService.AchievementRow> artworkRows = null;
+            var importArtwork = BuildGameProfileArtworkButton(() =>
+            {
+                try
+                {
+                    var gameId = artworkRows.Where(r => r.Provider == "steam").Select(r => r.ProviderGameId).Distinct().Single();
+                    var importer = new AchievementArtworkImport(dataRoot, gameId, artworkRows);
+                    new AchievementArtworkImportWindow(owner, view.Name, importer, () => AchievementsInfoWindow.RefreshAchievementArtwork(owner)).ShowDialog();
+                }
+                catch (Exception ex) { MessageBox.Show(owner, ex.Message, "Import achievement artwork", MessageBoxButton.OK, MessageBoxImage.Information); }
+            });
+            importArtwork.IsEnabled = false; DockPanel.SetDock(importArtwork, Dock.Right); heading.Children.Add(importArtwork);
+            heading.Children.Add(BuildLibraryGameProfileSectionTitle("Achievements", null)); host.Children.Add(heading);
             var loading = new TextBlock
             {
                 Text = "Loading achievements...",
@@ -1380,25 +1432,26 @@ namespace PixelVaultNative
                 FontSize = 13
             };
             host.Children.Add(loading);
-            var folder = ResolveLibraryBrowserAchievementLookupFolder(view);
-            var platform = NormalizeConsoleLabel(folder == null ? string.Empty : folder.PlatformLabel);
+            var folder = choice.Folder;
+            FrameworkElement centuryShelf = choice.Provider == "xbox" ? new Border { Visibility = Visibility.Collapsed } : BuildLibraryGameProfileCenturyShelf(owner, folder);
+            host.Children.Add(centuryShelf);
+            var platform = choice.Provider == "steam" ? "Steam" : choice.Provider == "xbox" ? choice.Label : "Emulation";
             var userAgent = "PixelVault/" + AppVersion;
+            var requestedSteamAccount=CurrentSteamUserId64();var providerRequestedUtc=DateTime.UtcNow.Ticks;
+            var account = choice.Provider == "xbox" ? new XboxAchievementService().SavedLibrary().Xuid : choice.Provider == "steam" ? requestedSteamAccount : CurrentRetroAchievementsUsername();
             _ = Task.Run(async () =>
             {
                 GameAchievementsFetchService.FetchResult result;
                 try
                 {
-                    result = await GameAchievementsFetchService.FetchAsync(
-                        platform,
-                        folder,
-                        CurrentSteamWebApiKey(),
-                        CurrentRetroAchievementsApiKey(),
-                        CurrentSteamUserId64(),
-                        CurrentRetroAchievementsUsername(),
-                        userAgent,
-                        cancellation).ConfigureAwait(false);
+                    result = await FetchProfilePlatformAsync(choice, account, force, cancellation).ConfigureAwait(false);
                     if (result != null && !result.IsError && result.Rows != null)
                     {
+                        if(result.SourceLabel=="Steam"&&result.SteamPlaytimeMinutes.HasValue&&!string.IsNullOrWhiteSpace(requestedSteamAccount)&&!string.IsNullOrWhiteSpace(folder?.SteamAppId))
+                        {
+                            try{new LocalProviderSummaryStore(dataRoot).Save(new("steam",folder.SteamAppId,requestedSteamAccount,result.SteamPlaytimeMinutes,null,providerRequestedUtc));}
+                            catch(Exception ex){LogException("LibraryGameProfile.SavePlaytime",ex);}
+                        }
                         try
                         {
                             achievementGuideService?.SyncDefinitionsAndLoadGuides(folder?.GameId ?? string.Empty, result.Rows);
@@ -1423,7 +1476,9 @@ namespace PixelVaultNative
                 await owner.Dispatcher.InvokeAsync(() =>
                 {
                     if (cancellation.IsCancellationRequested || !owner.IsLoaded) return;
+                    finished?.Invoke();
                     host.Children.Remove(loading);
+                    host.Children.Remove(centuryShelf);
                     if (steamStats != null && steamStats.ShowSteamCards)
                     {
                         steamStats.Hydrated = true;
@@ -1442,14 +1497,20 @@ namespace PixelVaultNative
                     if (result == null || result.IsError)
                     {
                         host.Children.Add(BuildLibraryGameProfileEmptyCard(result == null ? "Achievements are not available for this game yet." : result.ErrorMessage));
+                        host.Children.Add(centuryShelf);
                         return;
                     }
 
+                    if (!string.IsNullOrWhiteSpace(result.ProgressErrorMessage))
+                        host.Children.Add(BuildLibraryGameProfileEmptyCard(result.ProgressErrorMessage));
                     var rows = AchievementsInfoWindow.FilterAchievementRows(result.Rows, false);
+                    artworkRows = rows;
+                    importArtwork.IsEnabled = rows.Count > 0 && rows.All(r => r.Provider == "steam") && rows.Select(r => r.ProviderGameId).Distinct().Count() == 1;
+                    importArtwork.ToolTip = importArtwork.IsEnabled ? "Import higher-resolution artwork for this game's achievements" : "Artwork import currently supports Steam achievements with matching PlayStation trophy artwork.";
                     var progressKnown = rows.Any(row => row != null && row.ProgressKnown);
                     var allProgressKnown = rows.Count > 0 && rows.All(row => row.ProgressKnown);
                     var earned = rows.Where(row => row != null && row.ProgressKnown && row.Unlocked).ToList();
-                    TryLibraryGameProfileAutoMarkCompleteFromAchievements(view, rows, refreshHero);
+                    if (choice.Provider != "xbox") TryLibraryGameProfileAutoMarkCompleteFromAchievements(view, rows, refreshHero);
                     var displayRows = rows
                         .Where(row => row != null)
                         .OrderBy(row => progressKnown && row.Unlocked ? 0 : 1)
@@ -1482,7 +1543,8 @@ namespace PixelVaultNative
                     if (progressKnown)
                     {
                         achievementActions.Children.Add(BuildLibraryGameProfileRemainingButton(
-                            owner, platform, folder, userAgent, rows));
+                            owner, platform, folder, userAgent, rows,
+                                () => LibraryBrowserShowAchievementsInfo(owner, view, remainingOnly: true)));
                     }
                     if (LibraryGameProfileCanOpenAchievementGuide(rows))
                     {
@@ -1495,6 +1557,7 @@ namespace PixelVaultNative
                     host.Children.Add(achievementActions);
                     if (percent.HasValue)
                         host.Children.Add(BuildLibraryGameProfileAchievementProgressBar(percent.Value));
+                    host.Children.Add(centuryShelf);
 
                     if (displayRows.Count == 0)
                     {
@@ -1523,7 +1586,7 @@ namespace PixelVaultNative
             string platform,
             LibraryFolderInfo folder,
             string userAgent,
-            IEnumerable<GameAchievementsFetchService.AchievementRow> rows)
+            IEnumerable<GameAchievementsFetchService.AchievementRow> rows, Action open = null)
         {
             var count = AchievementsInfoWindow.FilterAchievementRows(rows, true).Count;
             var unknown = rows.Any(row => !row.ProgressKnown);
@@ -1539,10 +1602,8 @@ namespace PixelVaultNative
             AccessibilityUi.TryApplyFocusVisualStyle(button);
             button.Click += delegate
             {
-                AchievementsInfoWindow.ShowModal(owner, platform, folder,
-                    CurrentSteamWebApiKey(), CurrentRetroAchievementsApiKey(),
-                    CurrentSteamUserId64(), CurrentRetroAchievementsUsername(),
-                    userAgent, achievementGuideService, remainingOnly: true, trackingStore: achievementTrackingStore);
+                if (open != null) { open(); return; }
+                ShowLinkedGameAchievements(owner, folder, new[] { folder }, remainingOnly: true);
             };
             return button;
         }
@@ -1581,7 +1642,7 @@ namespace PixelVaultNative
                         achievementGuideService,
                         result?.GameTitle ?? view?.Name ?? folder?.Name ?? "Game",
                         folder?.GameId ?? view?.GameId ?? string.Empty,
-                        rows, trackingStore: achievementTrackingStore, steamAccount: CurrentSteamUserId64(), retroAccount: CurrentRetroAchievementsUsername());
+                        rows, trackingStore: rows.Any(r => r.Provider == "xbox") ? null : achievementTrackingStore, steamAccount: CurrentSteamUserId64(), retroAccount: CurrentRetroAchievementsUsername());
                 }
                 catch (Exception ex)
                 {
@@ -2176,7 +2237,7 @@ namespace PixelVaultNative
                 if (e.ChangedButton != MouseButton.Left) return;
                 e.Handled = true;
                 if (inLibrary)
-                    ShowLibraryGameProfileWindow(profileWindow ?? this, null, item.LocalFolder);
+                    _ = ShowLibraryGameProfileWindow(profileWindow ?? this, null, item.LocalFolder);
                 else
                     TryOpenLibraryGameProfileExternalUrl(IgdbProbeService.BuildIgdbGameUrl(metadata.Slug));
             };
@@ -3249,15 +3310,6 @@ namespace PixelVaultNative
                 TryLibraryToast("Could not save notes: " + ex.Message, MessageBoxImage.Warning);
                 return false;
             }
-        }
-
-        DateTime ResolveLibraryProfileCaptureDate(string file, IReadOnlyDictionary<string, LibraryMetadataIndexEntry> metadataIndex)
-        {
-            if (string.IsNullOrWhiteSpace(file) || !File.Exists(file)) return DateTime.MinValue;
-            var dict = metadataIndex as Dictionary<string, LibraryMetadataIndexEntry>;
-            if (librarySession != null && librarySession.HasLibraryRoot)
-                return librarySession.ResolveIndexedLibraryDate(file, dict);
-            return GetLibraryDate(file);
         }
 
         static string FormatLibraryGameProfileDate(DateTime date)

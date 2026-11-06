@@ -19,6 +19,7 @@ namespace PixelVaultNative
         internal TrackerReconcileWindow(Window owner, TrackerRefreshPlan plan)
         {
             this.plan = plan;
+            if(plan.ReplaceManualProgress)foreach(var row in plan.Rows)row.UseSource = row.HasManual && row.Incoming.HasValue && !row.Stale;
             if (owner?.IsVisible == true) Owner = owner;
             Title = "Review tracker refresh"; Width = 930; Height = 650; MinWidth = 700; MinHeight = 440;
             WindowStartupLocation = Owner == null ? WindowStartupLocation.CenterScreen : WindowStartupLocation.CenterOwner;
@@ -29,11 +30,11 @@ namespace PixelVaultNative
             header.Children.Add(AchievementTrackerWindow.Text(plan.Summary, 14, true));
             var source = AchievementTrackerWindow.Text(plan.Source, 13); source.ToolTip = plan.Evidence; header.Children.Add(source);
             header.Children.Add(AchievementTrackerWindow.Text("Source observed: " + new DateTime(plan.ObservedUtc, DateTimeKind.Utc).ToLocalTime().ToString("g"), 12));
-            header.Children.Add(AchievementTrackerWindow.Text("Reported counts update by default. Manual counts and authored notes stay saved. Source notes only fill untouched empty notes. Select Use source only for manual counts you want to replace. Missing items stay unchanged.", 13));
+            header.Children.Add(AchievementTrackerWindow.Text(plan.ReplaceManualProgress ? "Save-authoritative source: known fresh save values replace manual checkmarks. Notes, unknown items and older observations stay protected." : "Reported counts update by default. Manual counts and authored notes stay saved. Source notes only fill untouched empty notes. Select Use source only for manual counts you want to replace. Missing items stay unchanged.", 13));
             older.Visibility = plan.HasRollback ? Visibility.Visible : Visibility.Collapsed;
             older.Foreground = AchievementTrackerWindow.Color("#F0C497"); AutomationProperties.SetName(older, "Explicitly accept an older or conflicting equal-time source"); header.Children.Add(older);
             var footer = new StackPanel { Margin = new Thickness(0, 12, 0, 0) }; DockPanel.SetDock(footer, Dock.Bottom); root.Children.Add(footer);
-            var bulk = new WrapPanel(); footer.Children.Add(bulk);
+            var bulk = new WrapPanel { Visibility = plan.ReplaceManualProgress ? Visibility.Collapsed : Visibility.Visible }; footer.Children.Add(bulk);
             var keep = AchievementTrackerWindow.Button("Keep all manual counts", "Keep every manual count during this refresh");
             keep.Click += (_, __) => { grid.CommitEdit(); foreach (var row in plan.Rows) row.UseSource = false; grid.Items.Refresh(); }; bulk.Children.Add(keep);
             var use = AchievementTrackerWindow.Button("Use source for all manual counts", "Explicitly replace all manual counts observed in this source");
@@ -51,7 +52,7 @@ namespace PixelVaultNative
             var checkStyle = new Style(typeof(CheckBox)); checkStyle.Setters.Add(new Setter(IsEnabledProperty, new Binding("HasManual")));
             var noteStyle = new Style(typeof(TextBlock)); noteStyle.Setters.Add(new Setter(ToolTipProperty,new Binding("IncomingNote")));
             grid.Columns.Add(new DataGridTextColumn { Header = "Note", Binding = new Binding("NoteAction"), IsReadOnly = true, Width = 140, ElementStyle = noteStyle });
-            grid.Columns.Add(new DataGridCheckBoxColumn { Header = "Use source", Binding = new Binding("UseSource") { Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged }, Width = 85,
+            grid.Columns.Add(new DataGridCheckBoxColumn { IsReadOnly = plan.ReplaceManualProgress, Header = "Use source", Binding = new Binding("UseSource") { Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged }, Width = 85,
                 ElementStyle = checkStyle, EditingElementStyle = checkStyle });
             grid.ItemsSource = plan.Rows; AutomationProperties.SetName(grid, "Refresh differences and manual conflict choices");
             grid.Margin = new Thickness(0, 10, 0, 0); root.Children.Add(grid);

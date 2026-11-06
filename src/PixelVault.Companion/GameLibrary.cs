@@ -9,14 +9,20 @@ public sealed record GameCard(string Provider,string GameId,string Title,string 
     string? CoverUrl,string? BannerUrl,GameStats Stats,bool Sample)
 {
     public string GroupId { get; init; } = "";
+    public string TitleGroupId { get; init; } = GameLibrary.GroupKey(Title);
+    public string EditionGroupId => GameLibrary.GroupKey("edition:"+Provider+":"+GameId);
     public ScreenshotLink? Screenshots { get; init; }
+    public string CompletionTier { get; init; } = "none";
+    public int? CompletionEarned { get; init; }
+    public int? CompletionTotal { get; init; }
 }
 
 /// <summary>Sanitized, workspace-bound desktop metadata and artwork. Never opens desktop paths or contacts providers.</summary>
-public sealed class GameLibrary(CompanionOptions options,TrackerWorkspace workspace)
+public sealed class GameLibrary(CompanionOptions options,TrackerWorkspace workspace,AchievementStore? achievements=null)
 {
     static readonly JsonSerializerOptions Json=new(JsonSerializerDefaults.Web);
     Dictionary<string,LibraryGame> metadata=Load(options,workspace);
+    readonly LocalApplicationData? local=workspace.LocalData;
     static string Key(string provider,string game)=>provider+":"+game;
     public static string GroupKey(string title)
     {
@@ -27,6 +33,7 @@ public sealed class GameLibrary(CompanionOptions options,TrackerWorkspace worksp
     static Dictionary<string,LibraryGame> Load(CompanionOptions options,TrackerWorkspace workspace)
     {
         var result=new Dictionary<string,LibraryGame>(StringComparer.Ordinal);
+        if(workspace.DirectLocal)return result;
         var file=Path.Combine(options.DataRoot,"library","catalog.json");
         if(workspace.Sample||workspace.Manifest is null||!File.Exists(file))return result;
         if(new FileInfo(file).Length>10*1024*1024)throw new InvalidDataException("The game catalogue is too large.");
@@ -58,7 +65,7 @@ public sealed class GameLibrary(CompanionOptions options,TrackerWorkspace worksp
         if(workspace.ReadOnly||catalog.WorkspaceId!=workspace.Identity||catalog.Games is null||catalog.Games.Count==0)throw new InvalidDataException("The library does not match this workspace.");
         _=Validate(catalog,workspace.Identity);
         var accounts=AchievementAccountScope.Read(options,workspace);
-        if(catalog.Games.Any(g=>g.Provider is not ("library" or "steam" or "retroachievements")
+        if(catalog.Games.Any(g=>g.Provider is not ("library" or "steam" or "retroachievements" or "xbox")
             ||g.Provider!="library"&&!accounts.ContainsKey(g.Provider)&&(g.Stats.PlaytimeMinutes is not null||g.Stats.AchievementUnlocked is not null||g.Stats.AchievementTotal is not null||g.Stats.LastPlayedUtc is not null||g.Stats.UpdatedUtc is not null)
             ||g.Cover is not null&&!SafeAsset(g.Cover)||g.Banner is not null&&!SafeAsset(g.Banner)))throw new InvalidDataException("The library contains an unapproved provider or artwork reference.");
     }
@@ -66,31 +73,48 @@ public sealed class GameLibrary(CompanionOptions options,TrackerWorkspace worksp
     string? ArtUrl(LibraryGame? game,string kind)
     {
         var asset=kind=="cover"?game?.Cover:game?.Banner;
-        if(asset is null||!File.Exists(Path.Combine(options.DataRoot,"library","assets",asset)))return null;
+        if(asset is null||!workspace.DirectLocal&&!File.Exists(Path.Combine(options.DataRoot,"library","assets",asset)))return null;
         return $"/api/v1/games/{Uri.EscapeDataString(game!.Provider)}/{Uri.EscapeDataString(game.GameId)}/art/{kind}?v={asset[..12]}";
     }
     public IReadOnlyList<GameCard> Games()
     {
-        var current=Volatile.Read(ref metadata);
+        var current=local?.Games()??Volatile.Read(ref metadata);
+        var completions=achievements?.CompletionSummaries();
         var screenshots=ScreenshotLibrary.AvailableAll(options,workspace);
         var totals=workspace.Overview().GroupBy(t=>Key(t.Definition.Provider,t.Definition.GameId)).ToDictionary(g=>g.Key,g=>new
         {
             Provider=g.First().Definition.Provider,GameId=g.First().Definition.GameId,Title=g.First().Definition.GameTitle,
-            Count=g.Count(),Completed=g.Sum(t=>t.Totals.Completed),Total=g.Sum(t=>t.Totals.Total)
+            Count=g.Count(),Completed=g.Sum(t=>t.Totals.AggregateCompleted),Total=g.Sum(t=>t.Totals.AggregateTotal)
         },StringComparer.Ordinal);
-        return current.Keys.Union(totals.Keys,StringComparer.Ordinal).Select(key=>
+        var cards=current.Keys.Union(totals.Keys,StringComparer.Ordinal).Select(key=>
         {
             current.TryGetValue(key,out var game);totals.TryGetValue(key,out var tracker);
             return new GameCard(game?.Provider??tracker!.Provider,game?.GameId??tracker!.GameId,game?.Title??tracker!.Title,
                 game?.Platform??(tracker!.Provider=="steam"?"Steam":tracker.Provider=="retroachievements"?"RetroAchievements":"Sample"),
                 tracker?.Count??0,tracker?.Completed??0,tracker?.Total??0,ArtUrl(game,"cover"),ArtUrl(game,"banner"),game?.Stats??new(),workspace.Sample)
-                {GroupId=GroupKey(game?.Title??tracker!.Title),Screenshots=screenshots.GetValueOrDefault((game?.Provider??tracker!.Provider)+"\n"+(game?.GameId??tracker!.GameId))};
+                {GroupId=workspace.DirectLocal&&game?.GroupId is not null?game.GroupId:GroupKey(game?.Title??tracker!.Title),Screenshots=screenshots.GetValueOrDefault((game?.Provider??tracker!.Provider)+"\n"+(game?.GameId??tracker!.GameId)),
+                    CompletionTier=completions?.GetValueOrDefault(key)?.Tier??"none",
+                    CompletionEarned=completions?.GetValueOrDefault(key)?.Earned,CompletionTotal=completions?.GetValueOrDefault(key)?.Total};
         }).OrderBy(g=>g.Title,StringComparer.CurrentCultureIgnoreCase).ThenBy(g=>g.Provider,StringComparer.Ordinal).ToList();
+        // A historic merged pin belongs to one retained card, never every split same-name edition.
+        var ambiguous=cards.GroupBy(g=>g.TitleGroupId).Where(g=>g.Select(c=>c.GroupId).Distinct().Count()>1).Select(g=>g.Key).ToHashSet();
+        return cards.Select(g=>ambiguous.Contains(g.TitleGroupId)?g with{TitleGroupId=g.GroupId}:g).ToArray();
     }
-    internal string MediaTitle(string provider,string id)=>Volatile.Read(ref metadata).TryGetValue(Key(provider,id),out var game)?game.Title:Games().FirstOrDefault(g=>g.Provider==provider&&g.GameId==id)?.Title??throw new KeyNotFoundException();
+    public IReadOnlyDictionary<string,string> GroupAliases()
+    {
+        if(local is null)return Games().SelectMany(g=>new[]{g.TitleGroupId,g.EditionGroupId}.Select(alias=>(Alias:alias,g.GroupId)))
+            .GroupBy(g=>g.Alias).Where(g=>g.Select(c=>c.GroupId).Distinct().Count()==1).ToDictionary(g=>g.Key,g=>g.First().GroupId);
+        var rows=local.Games().Values.Select(g=>(g.Provider,g.GameId,g.Title,GroupId:g.GroupId??GroupKey(g.Title))).ToList();
+        var present=rows.Select(g=>Key(g.Provider,g.GameId)).ToHashSet();
+        rows.AddRange(workspace.Definitions().Where(d=>!present.Contains(Key(d.Provider,d.GameId))).Select(d=>(d.Provider,d.GameId,d.GameTitle,GroupKey(d.GameTitle))));
+        return rows.SelectMany(g=>new[]{GroupKey(g.Title),GroupKey("edition:"+g.Provider+":"+g.GameId)}.Select(alias=>(Alias:alias,g.GroupId)))
+            .GroupBy(g=>g.Alias).Where(g=>g.Select(c=>c.GroupId).Distinct().Count()==1).ToDictionary(g=>g.Key,g=>g.First().GroupId);
+    }
+    internal string MediaTitle(string provider,string id)=>(local?.Games()??Volatile.Read(ref metadata)).TryGetValue(Key(provider,id),out var game)?game.Title:Games().FirstOrDefault(g=>g.Provider==provider&&g.GameId==id)?.Title??throw new KeyNotFoundException();
     public GameCard Game(string provider,string id)=>Games().FirstOrDefault(g=>g.Provider==provider&&g.GameId==id)??throw new KeyNotFoundException();
     public (string Path,string ContentType) Artwork(string provider,string id,string kind)
     {
+        if(local is not null){if(kind is not ("cover" or "banner"))throw new KeyNotFoundException();return local.Artwork(provider,id,kind);}
         if(kind is not ("cover" or "banner")||!Volatile.Read(ref metadata).TryGetValue(Key(provider,id),out var game))throw new KeyNotFoundException();
         var name=kind=="cover"?game.Cover:game.Banner;if(name is null||!SafeAsset(name))throw new KeyNotFoundException();
         var path=Path.Combine(options.DataRoot,"library","assets",name);

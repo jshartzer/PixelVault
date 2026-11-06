@@ -27,6 +27,10 @@ namespace PixelVaultNative
             internal Button OpenCapturesButton;
             internal Button SortFilterMenuButton;
             internal Button TrackersButton;
+            internal Button AchievementHubButton;
+            internal FrameworkElement ProgressToolbar;
+            internal FrameworkElement ViewModeToolbar;
+            internal Button ShowcaseButton;
             internal VirtualizedRowHost TileRows;
             internal ScrollViewer TileScroll;
             internal TextBlock ThumbLabel;
@@ -131,7 +135,9 @@ namespace PixelVaultNative
             var filterGrid = new Grid();
             filterGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             filterGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            var searchPanel = new StackPanel { Margin = new Thickness(0, 0, 0, 12) };
+            var searchPanel = new Grid { Margin = new Thickness(0, 0, 0, 12) };
+            searchPanel.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            searchPanel.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             var searchBoxShell = new Border
             {
                 Background = Brush("#182129"),
@@ -150,6 +156,7 @@ namespace PixelVaultNative
             panes.SearchBox = new TextBox { Padding = new Thickness(0, 6, 0, 6), Background = Brushes.Transparent, Foreground = Brush("#F1E9DA"), BorderThickness = new Thickness(0), FontSize = 13.5, VerticalContentAlignment = VerticalAlignment.Center };
             Grid.SetColumn(panes.SearchBox, 1);
             searchBoxRow.Children.Add(panes.SearchBox);
+            AutomationProperties.SetName(panes.SearchBox, "Search library");
             searchBoxShell.Child = searchBoxRow;
             panes.SearchDebounceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(220) };
             panes.DetailResizeDebounceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(140) };
@@ -159,74 +166,60 @@ namespace PixelVaultNative
             searchPanel.Children.Add(searchBoxShell);
             Grid.SetRow(searchPanel, 0);
             filterGrid.Children.Add(searchPanel);
-            var browserToolbar = new Grid();
-            browserToolbar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            browserToolbar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            browserToolbar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            browserToolbar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            browserToolbar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             panes.SortFilterMenuButton = Btn("Sort / filter ▾", null, "#20343A", Brushes.White);
-            panes.SortFilterMenuButton.MinWidth = 118;
-            panes.SortFilterMenuButton.Height = 34;
-            panes.SortFilterMenuButton.FontSize = 11.5;
-            panes.SortFilterMenuButton.Margin = new Thickness(0, 0, 8, 0);
-            panes.SortFilterMenuButton.Padding = new Thickness(10, 0, 10, 0);
+            panes.SortFilterMenuButton.Width = 142;
+            panes.SortFilterMenuButton.Height = 42;
+            panes.SortFilterMenuButton.FontSize = 12;
             panes.SortFilterMenuButton.ToolTip = "Sort order and visibility filter";
-            ApplyLibraryPillChrome(panes.SortFilterMenuButton, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
-            browserToolbar.Children.Add(panes.SortFilterMenuButton);
-            AddLibraryTrackerButton(browserToolbar,panes);
-            panes.GroupAllButton = Btn("All", null, "#20343A", Brushes.White);
-            panes.GroupAllButton.Width = 58;
-            panes.GroupAllButton.Height = 32;
-            panes.GroupAllButton.FontSize = 11.5;
-            panes.GroupAllButton.Margin = new Thickness(0, 0, 8, 0);
-            ApplyLibraryPillChrome(panes.GroupAllButton, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
-            panes.GroupConsoleButton = Btn("By Console", null, "#20343A", Brushes.White);
-            panes.GroupConsoleButton.Width = 94;
-            panes.GroupConsoleButton.Height = 32;
-            panes.GroupConsoleButton.FontSize = 11.5;
-            panes.GroupConsoleButton.Margin = new Thickness(0, 0, 8, 0);
-            ApplyLibraryPillChrome(panes.GroupConsoleButton, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
-            panes.GroupTimelineButton = Btn("Timeline", null, "#20343A", Brushes.White);
-            panes.GroupTimelineButton.Width = 82;
-            panes.GroupTimelineButton.Height = 32;
-            panes.GroupTimelineButton.FontSize = 11.5;
-            panes.GroupTimelineButton.Margin = new Thickness(0, 0, 8, 0);
-            ApplyLibraryPillChrome(panes.GroupTimelineButton, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
-            browserToolbar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            panes.GroupSessionsButton = Btn("Sessions", null, "#20343A", Brushes.White);
-            panes.GroupSessionsButton.Width = 86;
-            panes.GroupSessionsButton.Height = 32;
-            panes.GroupSessionsButton.FontSize = 11.5;
-            panes.GroupSessionsButton.Margin = new Thickness(0);
-            panes.GroupSessionsButton.ToolTip = "Group captures into play/photo sessions by time gap";
-            ApplyLibraryPillChrome(panes.GroupSessionsButton, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
-            Grid.SetColumn(panes.GroupAllButton, 2);
-            browserToolbar.Children.Add(panes.GroupAllButton);
-            Grid.SetColumn(panes.GroupConsoleButton, 3);
-            browserToolbar.Children.Add(panes.GroupConsoleButton);
-            Grid.SetColumn(panes.GroupTimelineButton, 4);
-            browserToolbar.Children.Add(panes.GroupTimelineButton);
-            Grid.SetColumn(panes.GroupSessionsButton, 5);
-            browserToolbar.Children.Add(panes.GroupSessionsButton);
-            browserToolbar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            panes.OpenCapturesButton = Btn("Captures", null, "#1F3340", Brushes.White);
-            panes.OpenCapturesButton.Height = 32;
-            panes.OpenCapturesButton.FontSize = 11.5;
-            panes.OpenCapturesButton.Margin = new Thickness(10, 0, 0, 0);
-            panes.OpenCapturesButton.ToolTip = "Open captures view (double-click a cover)";
-            ApplyLibraryPillChrome(panes.OpenCapturesButton, "#232B35", "#33424D", "#2A3440", "#182028", "#D7E2EA");
-            Grid.SetColumn(panes.OpenCapturesButton, 6);
-            browserToolbar.Children.Add(panes.OpenCapturesButton);
-            var toolbarScroll = new ScrollViewer
+            ApplyLibraryToolbarChrome(panes.SortFilterMenuButton, "#22323B", "#30414B", "#2A3D48", "#18242D");
+            panes.SortFilterMenuButton.Margin = new Thickness(10, 0, 0, 0);
+            Grid.SetColumn(panes.SortFilterMenuButton, 1);
+            searchPanel.Children.Add(panes.SortFilterMenuButton);
+            var progress = new WrapPanel();
+            panes.AchievementHubButton = Btn("Achievements", null, "#20343A", Brushes.White);
+            panes.AchievementHubButton.ToolTip = "Open the Achievement Hub";
+            panes.AchievementHubButton.Width = 144;
+            panes.AchievementHubButton.Content = BuildLibraryToolbarLabel("\uE734", "Achievements");
+            AutomationProperties.SetName(panes.AchievementHubButton, "Achievements");
+            progress.Children.Add(panes.AchievementHubButton);
+            AddLibraryTrackerButton(progress, panes);
+            foreach (var button in new[] { panes.AchievementHubButton, panes.TrackersButton, panes.ShowcaseButton })
             {
-                HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
-                VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
-                Margin = new Thickness(0, 4, 0, 0),
-                Content = browserToolbar
-            };
-            Grid.SetRow(toolbarScroll, 1);
-            filterGrid.Children.Add(toolbarScroll);
+                button.Height = 42; button.FontSize = 12;
+                button.Margin = new Thickness(0, 0, 8, 0);
+                ApplyLibraryToolbarChrome(button, "#232F39", "#354650", "#2E424E", "#18242D");
+                AccessibilityUi.TryApplyFocusVisualStyle(button);
+            }
+            panes.TrackersButton.Width = panes.TrackersButton.MinWidth = 110;
+            panes.ShowcaseButton.Width = panes.ShowcaseButton.MinWidth = 136;
+            panes.TrackersButton.Content = BuildLibraryToolbarLabel("\uE9D5", "Trackers");
+            panes.ShowcaseButton.Content = BuildLibraryToolbarLabel("\uE73E", "Completions");
+            panes.ShowcaseButton.Margin = new Thickness(0);
+            panes.ProgressToolbar = progress;
+            var modes = new WrapPanel();
+            Button ViewButton(string label, double width)
+            {
+                var button = Btn(label, null, "#142029", Brushes.White);
+                button.Width = width; button.Height = 34; button.FontSize = 11.5;
+                button.Margin = new Thickness(2, 0, 2, 0);
+                ApplyLibraryPillChrome(button, "#142029", "#142029", "#263B47", "#182028", "#C0D0D9");
+                AccessibilityUi.TryApplyFocusVisualStyle(button);
+                modes.Children.Add(button);
+                return button;
+            }
+            panes.GroupAllButton = ViewButton("All", 50);
+            panes.GroupConsoleButton = ViewButton("By Console", 94);
+            modes.Children.Add(new Border { Width = 1, Height = 18, Background = Brush("#34434C"), Margin = new Thickness(4, 0, 4, 0), VerticalAlignment = VerticalAlignment.Center });
+            panes.GroupTimelineButton = ViewButton("Timeline", 78);
+            panes.GroupSessionsButton = ViewButton("Sessions", 80);
+            panes.GroupSessionsButton.ToolTip = "Group captures into play/photo sessions by time gap";
+            panes.OpenCapturesButton = ViewButton("Captures", 88);
+            panes.OpenCapturesButton.ToolTip = "Open captures view (double-click a cover)";
+            var modesShell = new Border { Background = Brush("#142029"), BorderBrush = Brush("#2B3C46"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(16), Padding = new Thickness(3), Child = modes };
+            panes.ViewModeToolbar = modesShell;
+            var browserToolbar = BuildLibraryToolbarGroups(progress, modesShell, 900);
+            Grid.SetRow(browserToolbar, 1);
+            filterGrid.Children.Add(browserToolbar);
             filterShell.Child = filterGrid;
             Grid.SetRow(filterShell, 0);
             leftGrid.Children.Add(filterShell);

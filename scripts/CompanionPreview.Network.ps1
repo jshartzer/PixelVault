@@ -3,7 +3,7 @@ function Get-CompanionRelocatedUrl {
     $marker=Join-Path $DataRoot 'hosting.json'
     if(!(Test-Path -LiteralPath $marker)){return $null}
     $hosting=Get-Content -LiteralPath $marker -Raw | ConvertFrom-Json -ErrorAction Stop
-    if($hosting.version -ne 1 -or $hosting.mode -ne 'nas'){throw 'The Companion hosting marker needs review before starting a local copy.'}
+    if($hosting.version -ne 1 -or $hosting.mode -notin @('nas','pc-service')){throw 'The Companion hosting marker needs review before starting a local copy.'}
     $address=$null
     if(![Uri]::TryCreate([string]$hosting.url,[UriKind]::Absolute,[ref]$address) -or $address.Scheme -notin @('http','https') -or $address.UserInfo -or $address.AbsolutePath -ne '/' -or $address.Query -or $address.Fragment){throw 'The saved Companion server address is invalid.'}
     $address.AbsoluteUri

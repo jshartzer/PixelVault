@@ -138,12 +138,15 @@ namespace PixelVaultNative
                 if (_isVideo(fullPath))
                 {
                     var posterPath = ExistingVideoPosterPath(fullPath, normalizedDecodePixelWidth);
-                    return string.IsNullOrWhiteSpace(posterPath) ? null : LoadFrozenBitmap(posterPath, 0);
+                    if (string.IsNullOrWhiteSpace(posterPath)) return null;
+                    fullPath = posterPath;
                 }
-                var thumbnailPath = ThumbnailCachePath(fullPath, normalizedDecodePixelWidth);
-                return string.IsNullOrWhiteSpace(thumbnailPath) || !File.Exists(thumbnailPath)
-                    ? null
-                    : LoadFrozenBitmap(thumbnailPath, 0);
+                // This method runs on the dispatcher. Disk thumbnails still require
+                // decoding; leave that to LoadImageSource on the bounded worker queue.
+                // Use its exact stamped key so warm views share the frozen bitmap.
+                var info = new FileInfo(fullPath);
+                var cacheKey = fullPath + "|" + info.LastWriteTimeUtc.Ticks + "|" + info.Length + "|" + normalizedDecodePixelWidth;
+                return _tryGetCachedImage(cacheKey);
             }
             catch (Exception ex)
             {

@@ -28,8 +28,8 @@ namespace PixelVaultNative
                 :native?"Game files connected":adapter is SpreadsheetTrackerSource?"Spreadsheet connected":adapter is JsonFileTrackerSource?"Progress file connected":"Source unavailable";
             var mode=enabled?state?.ReviewPending==true?"Automatic · Review needed":"Automatic on":canAuto?automatic?.Paused==true?"Automatic paused":"Automatic available · Off":"Automatic unavailable";
             return new TrackerConnectionInfo { GameFilesConnected=native,AutomaticAvailable=canAuto,AutomaticEnabled=enabled,
-                Label=source+" · "+mode,Detail=binding==null?nativeAvailable?"Connect the game-save reader with Refresh or Manage tracker → Source. Automatic refresh is opt-in.":"No validated game-file reader is registered for this tracker. Manual tracking and external progress imports remain available."
-                    :(native?gameReader.Coverage(definition)+" ":"")+mode+". Reads use the saved account and existing reconciliation safeguards." };
+                Label=source+" · "+mode+(binding?.ReplaceManualProgress==true?" · Save replaces manual":""),Detail=binding==null?nativeAvailable?"Connect the game-save reader with Refresh or Manage tracker → Source. Automatic refresh is opt-in.":"No validated game-file reader is registered for this tracker. Manual tracking and external progress imports remain available."
+                    :(native?gameReader.Coverage(definition)+" ":"")+mode+". Reads use the saved account and existing reconciliation safeguards."+(binding.ReplaceManualProgress?" Known fresh save values replace manual checkmarks; notes and unknown values stay saved.":"") };
         }
     }
     sealed class TrackerDashboardItem
@@ -39,8 +39,12 @@ namespace PixelVaultNative
         internal bool AccountConnected;
         internal TrackerConnectionInfo Connection;
         internal string AchievementTitle;
+        internal GameAchievementsFetchService.AchievementRow Achievement;
         internal bool Complete=>Total>0&&Completed>=Total;
+        internal bool Century=>PixelVault.Tracking.CenturyAchievementCatalog.Find(Definition.Provider,Definition.GameId,Definition.AchievementId)!=null;
         internal double Percent=>Total==0?0:100.0*Completed/Total;
+        internal int AggregateCompleted=>Definition?.AggregateAsSingleItem==true?(Complete?1:0):Math.Clamp(Completed,0,Total);
+        internal int AggregateTotal=>Definition?.AggregateAsSingleItem==true?(Total>0?1:0):Total;
         internal string Progress=>AccountConnected?Completed+" / "+Total+" "+Definition.CompletionLabel.ToLowerInvariant():"Connect account to view progress";
     }
     sealed class TrackerDashboardGame
@@ -54,7 +58,7 @@ namespace PixelVaultNative
             {
                 var active=Trackers.Where(t=>t.Total>0).ToList();
                 if(active.Count==0||active.Any(t=>!t.AccountConnected))return null;
-                return 100.0*active.Sum(t=>(long)Math.Clamp(t.Completed,0,t.Total))/active.Sum(t=>(long)t.Total);
+                return 100.0*active.Sum(t=>(long)t.AggregateCompleted)/active.Sum(t=>(long)t.AggregateTotal);
             }
         }
         internal string Sources
@@ -71,26 +75,32 @@ namespace PixelVaultNative
     {
         internal static List<TrackerDashboardGame> Load(AchievementTrackingStore store,AchievementHubSession session,AchievementHubGame onlyGame=null)
         {
-            session??=new();var definitions=store.Definitions();
+            session??=new();
+            var accounts = new[] { "steam", "retroachievements", "xbox" }.ToDictionary(p => p, p => session.Account(p));
+            var snapshot = store.ReadDashboard(accounts, onlyGame?.Provider, onlyGame?.Id);
+            var definitions = snapshot.Select(r => r.Definition).ToList();
+            var reads = snapshot.ToDictionary(r => r.Definition.Id, StringComparer.Ordinal);
             var library=(session.Games??new()).Where(g=>g!=null).GroupBy(g=>g.Key).ToDictionary(g=>g.Key,g=>g.First());
             var bundled=AchievementTrackingCatalog.Builtins().Select(d=>d.Id).ToHashSet(StringComparer.Ordinal);
             var custom=definitions.Where(d=>!bundled.Contains(d.Id)).Select(d=>new AchievementHubGame{Provider=d.Provider,Id=d.GameId,Title=d.GameTitle});
             foreach(var game in custom)if(!library.ContainsKey(game.Key))library.Add(game.Key,game);
             if(onlyGame!=null)library=library.Where(p=>p.Key==onlyGame.Key).ToDictionary(p=>p.Key,p=>p.Value);
             var result=new List<TrackerDashboardGame>();var service=new TrackerRefreshService(store);
-            var achievements=store.AchievementChoices(session.SteamAccount,session.RetroAccount).GroupBy(r=>(r.Provider,r.ProviderGameId,r.ProviderAchievementId)).ToDictionary(g=>g.Key,g=>g.First().Title);
+            var achievements=store.AchievementChoices(session.SteamAccount,session.RetroAccount).GroupBy(r=>(r.Provider,r.ProviderGameId,r.ProviderAchievementId)).ToDictionary(g=>g.Key,g=>g.First());
             foreach(var game in library.Values.OrderBy(g=>g.Title,StringComparer.CurrentCultureIgnoreCase).ThenBy(g=>g.Key))
             {
                 var matching=definitions.Where(d=>d.Provider==game.Provider&&d.GameId==game.Id).OrderBy(d=>d.Title,StringComparer.CurrentCultureIgnoreCase).ToList();
                 if(matching.Count==0)continue;var entry=new TrackerDashboardGame{Game=game};var account=session.Account(game.Provider);
                 foreach(var definition in matching)
                 {
-                    var states=store.Load(definition.Id,account).Where(s=>!s.Item.Archived).ToList();
+                    var read = reads[definition.Id];
+                    var states=read.States.Where(s=>!s.Item.Archived).ToList();
                     var totals=TrackerTotals.Calculate(definition,states);
-                    var automation=string.IsNullOrWhiteSpace(account)?(new TrackerAutomationSettings(),new TrackerAutomationState()):store.Automation(definition.Id,account);
+
                     entry.Trackers.Add(new TrackerDashboardItem{Definition=definition,Completed=totals.Completed,Total=totals.Total,Unconfirmed=totals.Unknown,AccountConnected=!string.IsNullOrWhiteSpace(account),
-                        AchievementTitle=string.IsNullOrEmpty(definition.AchievementId)?null:achievements.GetValueOrDefault((definition.Provider,definition.GameId,definition.AchievementId)),
-                        Connection=service.Connection(definition,store.Source(definition.Id,account),automation.Item1,automation.Item2)});
+                        Achievement=string.IsNullOrEmpty(definition.AchievementId)?null:achievements.GetValueOrDefault((definition.Provider,definition.GameId,definition.AchievementId)),
+                        AchievementTitle=string.IsNullOrEmpty(definition.AchievementId)?null:achievements.GetValueOrDefault((definition.Provider,definition.GameId,definition.AchievementId))?.Title,
+                        Connection=service.Connection(definition,read.Source,read.Automation,read.AutomationState)});
                 }
                 result.Add(entry);
             }

@@ -138,7 +138,8 @@ public sealed class ImportServiceManualMetadataTests
     static ImportService CreateMinimalImportService(
         IEnumerable<string> sourceFiles = null,
         string destinationRoot = null,
-        string libraryRoot = null)
+        string libraryRoot = null,
+        Action<SearchOption> onEnumerate = null)
     {
         return new ImportService(new ImportServiceDependencies
         {
@@ -158,7 +159,11 @@ public sealed class ImportServiceManualMetadataTests
                 var ext = Path.GetExtension(path ?? string.Empty).ToLowerInvariant();
                 return ext is ".jpg" or ".jpeg" or ".png" or ".webp" or ".jxr" or ".mp4" or ".mkv" or ".avi" or ".mov" or ".wmv" or ".webm";
             },
-            EnumerateSourceMediaFiles = (_, predicate) => (sourceFiles ?? Array.Empty<string>()).Where(path => predicate == null || predicate(path))
+            EnumerateSourceMediaFiles = (option, predicate) =>
+            {
+                onEnumerate?.Invoke(option);
+                return (sourceFiles ?? Array.Empty<string>()).Where(path => predicate == null || predicate(path));
+            }
         });
     }
 
@@ -192,6 +197,35 @@ public sealed class ImportServiceManualMetadataTests
                 .ToArray(),
             CleanTag = s => string.IsNullOrWhiteSpace(s) ? string.Empty : s.Trim()
         });
+    }
+
+    [Theory]
+    [InlineData(false, SearchOption.TopDirectoryOnly)]
+    [InlineData(true, SearchOption.AllDirectories)]
+    public void BuildSourceInventory_SharesOneWalkForCleanupAndHdrSelection(bool recursive, SearchOption expectedOption)
+    {
+        var root = Path.Combine(Path.GetTempPath(), "pv-inventory-pass-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var png = Path.Combine(root, "capture.png");
+            var jxr = Path.Combine(root, "capture.jxr");
+            var stale = Path.Combine(root, "capture.jpg_exiftool_tmp");
+            var fresh = Path.Combine(root, "recent.jpg_exiftool_tmp");
+            foreach (var file in new[] { png, jxr, stale, fresh }) File.WriteAllBytes(file, new byte[] { 1 });
+            File.SetLastWriteTimeUtc(stale, DateTime.UtcNow.AddMinutes(-10));
+            var walks = new List<SearchOption>();
+            var service = CreateMinimalImportService(new[] { png, jxr, stale, fresh }, onEnumerate: walks.Add);
+
+            var inventory = service.BuildSourceInventory(recursive);
+
+            Assert.Equal(new[] { expectedOption }, walks);
+            Assert.Equal(new[] { jxr }, inventory.TopLevelMediaFiles);
+            Assert.Equal(png, Assert.Single(inventory.HdrPairs).AlternateFilePath);
+            Assert.False(File.Exists(stale));
+            Assert.True(File.Exists(fresh));
+        }
+        finally { Directory.Delete(root, true); }
     }
 
     [Fact]

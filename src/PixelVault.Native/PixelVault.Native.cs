@@ -43,6 +43,12 @@ namespace PixelVaultNative
         [STAThread]
         private static void Main(string[] args)
         {
+            if (args.Length == 2 && args[0] == "--classify-xbox360")
+            { Environment.ExitCode = Xbox360LibraryMigration.Run(Path.GetFullPath(args[1])); return; }
+            if (args.Length is 2 or 3 && args[0] == "--sync-xbox")
+            { Environment.ExitCode = XboxAchievementService.SyncCommand(Path.GetFullPath(args[1]), args.Length == 3 ? args[2].Split(',') : null); return; }
+            if(args.Length==2 && args[0]=="--companion-readers")
+            {Environment.ExitCode=CompanionReaderWorker.Run(args[1]);return;}
             if (args.Length == 2 && args[0] == "--death-stranding-read")
             {
                 Environment.ExitCode = DeathStrandingSaveWorker.Run(args[1]);
@@ -72,7 +78,7 @@ namespace PixelVaultNative
 
     public sealed partial class MainWindow : Window
     {
-        const string AppVersion = "0.077.000";
+        const string AppVersion = "0.125.009";
         const string GamePhotographyTag = "Game Photography";
         const string CustomPlatformPrefix = "Platform:";
         const string ClearedExternalIdSentinel = "__PV_CLEARED__";
@@ -194,6 +200,8 @@ namespace PixelVaultNative
             _diagnosticsSessionId = Guid.NewGuid().ToString("N").Substring(0, 8);
             var paths = ComputePersistentStorageLayout(appRoot, ResolvePersistentDataRoot);
             dataRoot = paths.DataRoot;
+            AchievementsInfoWindow.AchievementArtworkDataRoot = dataRoot;
+            GameAchievementsFetchService.AchievementArtworkDataRoot = dataRoot;
             logsRoot = paths.LogsRoot;
             cacheRoot = paths.CacheRoot;
             coversRoot = paths.CoversRoot;

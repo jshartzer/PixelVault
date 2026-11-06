@@ -40,7 +40,7 @@ public sealed partial class PcConnector
                     cmd.CommandText="SELECT digest FROM companion_published_tracker WHERE workspace=$w AND id=$id";
                     var original=cmd.ExecuteScalar() as string;
                     if(current.Title==title.Title||paired?.Title==current.Title||builtin?.Title==current.Title
-                        ||original==Hash(JsonSerializer.Serialize(current,Json)))baseline=current.Title;
+                        ||original==PublicationDigest(current))baseline=current.Title;
                 }
                 bool conflict=false;
                 if(current.Title!=title.Title)

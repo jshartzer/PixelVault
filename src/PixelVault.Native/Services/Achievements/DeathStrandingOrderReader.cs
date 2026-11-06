@@ -13,13 +13,22 @@ namespace PixelVaultNative
     static class DeathStrandingOrderReader
     {
         internal const int RecordCount = 1140, Stride = 96;
-        internal static bool Supports(string id) => id == AchievementTrackingCatalog.DeathStrandingOrdersId;
+        internal static bool Supports(string id) => id == AchievementTrackingCatalog.DeathStrandingOrdersId || id == PixelVault.Tracking.CenturyLegendsCatalogue.TrackerId;
 
-        internal static AchievementTrackerSnapshot Read(byte[] data, string account, long observed, string source, string evidence)
+        internal static AchievementTrackerSnapshot Read(byte[] data, string account, long observed, string source, string evidence,
+            string trackerId = AchievementTrackingCatalog.DeathStrandingOrdersId)
+        {
+            if (!Supports(trackerId)) throw new NotSupportedException("Unsupported order goal.");
+            var official = Read(data, account, observed, source, evidence, out var legends);
+            return trackerId == PixelVault.Tracking.CenturyLegendsCatalogue.TrackerId ? legends : official;
+        }
+
+        internal static AchievementTrackerSnapshot Read(byte[] data, string account, long observed, string source, string evidence,
+            out AchievementTrackerSnapshot legends)
         {
             if (data == null || data.Length < 3 + RecordCount * Stride || data.Length > DeathStrandingSaveReader.MaxPayload)
                 throw new NotSupportedException("The save does not contain the supported premium-order table.");
-            var definition = AchievementTrackingCatalog.Builtins().Single(d => Supports(d.Id));
+            var definition = AchievementTrackingCatalog.Builtins().Single(d => d.Id == AchievementTrackingCatalog.DeathStrandingOrdersId);
             var targets = definition.Items.GroupBy(i => i.GroupId).ToDictionary(g => ulong.Parse(g.Key, CultureInfo.InvariantCulture), g => g.ToList());
             if (targets.Count != 540 || definition.Items.Count != 1080 || targets.Any(p => p.Key == 0 || p.Value.Count != 2
                 || !p.Value.Select(i => i.Milestone).ToHashSet().SetEquals(new[] { "LL", "LLL" })
@@ -65,6 +74,24 @@ namespace PixelVaultNative
                 ulong mask = found[ulong.Parse(item.GroupId, CultureInfo.InvariantCulture)];
                 int bit = item.Milestone == "LL" ? 7 : 8;
                 snapshot.Items.Add(new AchievementTrackerProgress { ItemId = item.Id, Current = (mask & (1UL << bit)) != 0 ? 1 : 0, Availability = TrackerAvailability.Unknown });
+            }
+            // Keep the existing :LLL item IDs so saved notes and tracker state still match.
+            const ulong legendOrHigher = (1UL << 6) | (1UL << 7) | (1UL << 8);
+            legends = new AchievementTrackerSnapshot
+            {
+                TrackerId = PixelVault.Tracking.CenturyLegendsCatalogue.TrackerId,
+                Provider = snapshot.Provider, GameId = snapshot.GameId, Account = account,
+                ObservedUtcTicks = observed, Source = source,
+                Evidence = snapshot.Evidence + " Legend or higher: earned rank bit 6, 7 or 8."
+            };
+            foreach (var item in definition.Items.Where(i => i.Milestone == "LLL"))
+            {
+                ulong mask = found[ulong.Parse(item.GroupId, CultureInfo.InvariantCulture)];
+                legends.Items.Add(new AchievementTrackerProgress
+                {
+                    ItemId = item.Id, Current = (mask & legendOrHigher) != 0 ? 1 : 0,
+                    Availability = TrackerAvailability.Unknown
+                });
             }
             return snapshot;
         }

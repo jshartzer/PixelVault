@@ -30,7 +30,7 @@ public sealed class DeathStrandingChipReaderTests
     static AchievementTrackerSnapshot Read(byte[] data)=>DeathStrandingChipReader.Read(data,"player",DateTime.UtcNow.Ticks,"Fixture","Checked copy.");
     static int ChipPosition()=>Start+Array.IndexOf(DeathStrandingChipReader.References(),1202779670U)*12;
     [Theory]
-    [InlineData(0,0)][InlineData(8,0)][InlineData(9,0)][InlineData(11,0)][InlineData(25,0)][InlineData(27,1)]
+    [InlineData(0,0)][InlineData(8,0)][InlineData(9,0)][InlineData(11,1)][InlineData(25,0)][InlineData(27,1)]
     public void OnlyTerminalRestorationCounts(int flags,int expected)
     {
         var data=Payload();data[ChipPosition()+10]=(byte)flags;
@@ -43,14 +43,29 @@ public sealed class DeathStrandingChipReaderTests
         Assert.All(result.Items,i=>Assert.Equal(TrackerAvailability.Unknown,i.Availability));
     }
     [Fact]
-    public void PreFinalStateDoesNotCompleteChipUntilTerminalFinalState()
+    public void BothConfirmedTurnInStatesCompleteTheSameChip()
     {
         var data=Payload();var p=ChipPosition();data[p+10]=11;
-        var before=Read(data);Assert.Equal(0,before.Items.Single(i=>i.ItemId==Chip52).Current);
+        var before=Read(data);Assert.Equal(1,before.Items.Single(i=>i.ItemId==Chip52).Current);
         data[p+10]=27;var after=Read(data);
         Assert.Equal(1,after.Items.Single(i=>i.ItemId==Chip52).Current);
         Assert.Equal(before.Items.Where(i=>i.ItemId!=Chip52).Select(i=>(i.ItemId,i.Current)),after.Items.Where(i=>i.ItemId!=Chip52).Select(i=>(i.ItemId,i.Current)));
         Assert.Contains("0x0B",after.Evidence);Assert.Contains("0x1B",after.Evidence);
+    }
+    [Fact]
+    public void PrivateChip3And47TurnInCopiesChangeOnlyThoseTwoCompletions()
+    {
+        var root=Environment.GetEnvironmentVariable("PIXELVAULT_DS_CHIP3_47_CONTROL");if(string.IsNullOrWhiteSpace(root))return;
+        var before=Read(File.ReadAllBytes(Path.Combine(root,"manualsave3","data.bin")));
+        Assert.Equal(31,before.Items.Sum(i=>i.Current));
+        var ids=new[]{"935648a7-65bd-0746-a080-114801eae5dc","dc1ec632-5dfc-ea4f-bc61-7a6dee45c11e"};
+        foreach(var slot in new[]{"autosave8","quicksave21","manualsave4"})
+        {
+            var after=Read(File.ReadAllBytes(Path.Combine(root,slot,"data.bin")));
+            Assert.Equal(33,after.Items.Sum(i=>i.Current));
+            Assert.Equal(ids.Order(),after.Items.Where(i=>before.Items.Single(b=>b.ItemId==i.ItemId).Current!=i.Current).Select(i=>i.ItemId).Order());
+            Assert.All(after.Items.Where(i=>ids.Contains(i.ItemId)),i=>Assert.Equal(1,i.Current));
+        }
     }
     [Fact]
     public void UnknownStateReportsItsChipWithoutProducingProgress()
@@ -108,7 +123,7 @@ public sealed class DeathStrandingChipReaderTests
         yield return root;for(int i=0;i<System.Windows.Media.VisualTreeHelper.GetChildrenCount(root);i++)foreach(var child in Children(System.Windows.Media.VisualTreeHelper.GetChild(root,i)))yield return child;
     }
     [Fact]
-    public async Task PrivatePreFinalTurnInControlRefreshesAutomaticallyWithoutEarlyCredit()
+    public async Task PrivateTurnInControlAcceptsRestorationWithoutTheExtraFlag()
     {
         var path=Environment.GetEnvironmentVariable("PIXELVAULT_DS_CHIP_PENDING_REVIEW");if(string.IsNullOrWhiteSpace(path))return;
         var manifest=JsonDocument.Parse(File.ReadAllText(path)).RootElement;
@@ -131,7 +146,7 @@ public sealed class DeathStrandingChipReaderTests
             async Task Tick(){now=now.AddSeconds(5);await monitor.TickAsync();now=now.AddSeconds(5);await monitor.TickAsync();}
             await Tick();var before=store.Load(Id,account).ToDictionary(s=>s.Item.Id,s=>s.Current);
             Copy("pending");await Tick();
-            Assert.Equal(23,store.Load(Id,account).Count(s=>s.Complete));Assert.Equal(0,store.Load(Id,account).Single(s=>s.Item.Id==chip).Current);
+            Assert.Equal(24,store.Load(Id,account).Count(s=>s.Complete));Assert.Equal(1,store.Load(Id,account).Single(s=>s.Item.Id==chip).Current);
             Assert.Equal(0,store.Automation(Id,account).State.Failures);Assert.False(store.Automation(Id,account).State.ReviewPending);
             Copy("after");await Tick();var after=store.Load(Id,account);
             Assert.Equal(24,after.Count(s=>s.Complete));Assert.Equal(1,after.Single(s=>s.Item.Id==chip).Current);Assert.Equal("Keep this turn-in note",after.Single(s=>s.Item.Id==chip).Note);

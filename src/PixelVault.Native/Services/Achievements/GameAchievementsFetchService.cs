@@ -36,6 +36,8 @@ namespace PixelVaultNative
             public string ProviderGameId;
             /// <summary>Provider-owned achievement identity (Steam API name or RetroAchievements numeric achievement ID).</summary>
             public string ProviderAchievementId;
+            // Presentation-only Century cards never acquire provider identity or persisted provider progress.
+            [System.Text.Json.Serialization.JsonIgnore] public string CenturyDefinitionId;
             public string Title;
             public string Description;
             public string Meta;
@@ -70,17 +72,23 @@ namespace PixelVaultNative
             [System.Text.Json.Serialization.JsonIgnore] public bool IsMissable;
 
             public bool HasStableProviderIdentity =>
-                !string.IsNullOrWhiteSpace(Provider)
+                CenturyDefinitionId == null && !string.IsNullOrWhiteSpace(Provider)
                 && !string.IsNullOrWhiteSpace(ProviderGameId)
-                && !string.IsNullOrWhiteSpace(ProviderAchievementId);
+                && !string.IsNullOrWhiteSpace(ProviderAchievementId)
+                && !ProviderAchievementId.StartsWith("century.", StringComparison.Ordinal);
+            [System.Text.Json.Serialization.JsonIgnore]
+            public bool HasStableAchievementIdentity => HasStableProviderIdentity
+                || CenturyDefinitionId == ProviderAchievementId && PixelVault.Tracking.CenturyAchievementCatalog.Find(Provider, ProviderGameId, CenturyDefinitionId) != null;
         }
 
         internal const string SteamProvider = "steam";
         internal const string RetroAchievementsProvider = "retroachievements";
+        internal static string AchievementArtworkDataRoot { get; set; }
 
         public sealed class FetchResult
         {
             public bool NotificationOnly;
+            public long CapturedUtcTicks;
             public string SourceLabel;
             public string GameTitle;
             public string DetailLine;
@@ -139,10 +147,15 @@ namespace PixelVaultNative
                 };
             }
 
+            var capturedUtc=DateTime.UtcNow.Ticks;
             var result = useSteam
                 ? await FetchSteamAsync(folder, folderName, steamWebApiKey, steamUserId64, userAgent, cancellationToken, notificationsOnly).ConfigureAwait(false)
                 : await FetchRetroAsync(folder, folderName, retroAchievementsApiKey, retroAchievementsUsername, userAgent, cancellationToken).ConfigureAwait(false);
+            if (useSteam && result?.Rows != null)
+                foreach (var row in result.Rows.Where(r => string.IsNullOrWhiteSpace(r?.Description)))
+                    row.Description = AchievementArtwork.FindDescription(row.Provider, row.ProviderGameId, row.ProviderAchievementId, AchievementArtworkDataRoot);
             result.NotificationOnly = notificationsOnly;
+            result.CapturedUtcTicks=capturedUtc;
             if (!cancellationToken.IsCancellationRequested)
                 ProgressObserved?.Invoke(result, useSteam ? steamUserId64 : retroAchievementsUsername);
             return result;

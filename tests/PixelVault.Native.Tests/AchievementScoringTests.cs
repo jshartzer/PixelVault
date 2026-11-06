@@ -318,7 +318,7 @@ public sealed class AchievementScoringTests : IDisposable
     }
 
     [Fact]
-    public void GridAndListCards_ShowSavedAwardsAndExplainProvisionalPointsAccessibly()
+    public void GridAndListCards_ShowAwardValuesWithoutScoringImplementationDetails()
     {
         OnSta(() =>
         {
@@ -333,12 +333,14 @@ public sealed class AchievementScoringTests : IDisposable
                     card.Measure(new Size(name.Contains("Grid") ? 164 : 680, 220));
                     card.Arrange(new Rect(new Point(), card.DesiredSize));
                     Assert.Contains("45 PV pts earned", AutomationProperties.GetName(card));
-                    Assert.Contains("do not change", (string)card.ToolTip);
+                    Assert.Contains("45 PV pts earned", (string)card.ToolTip);
+                    Assert.DoesNotContain("do not change", (string)card.ToolTip);
                 }
                 var provisional = Achievement(null, id: "provisional"); Store().SyncAchievementScores("bob", new[] { provisional });
                 var chip = AchievementCollectionUi.ScoreChip(provisional);
                 Assert.Contains("provisional", AutomationProperties.GetName(chip));
-                Assert.Contains("finalizes", (string)chip.ToolTip);
+                Assert.Contains("provisional", (string)chip.ToolTip);
+                Assert.DoesNotContain("finalizes", (string)chip.ToolTip);
             }
             finally { window.Close(); }
         });

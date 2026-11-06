@@ -211,7 +211,11 @@ $bundleNativeDest = Join-Path $outputDir "source\src\PixelVault.Native"
 $bundleTestsDest = Join-Path $outputDir "source\tests\PixelVault.Native.Tests"
 Copy-SourceTreeForBundle -SourcePath $nativeProjectDir -DestinationPath $bundleNativeDest
 Copy-SourceTreeForBundle -SourcePath (Join-Path $repoRoot "src\PixelVault.Tracking") -DestinationPath (Join-Path $outputDir "source\src\PixelVault.Tracking")
+Copy-SourceTreeForBundle -SourcePath (Join-Path $repoRoot "src\PixelVault.Maps") -DestinationPath (Join-Path $outputDir "source\src\PixelVault.Maps")
 Copy-SourceTreeForBundle -SourcePath (Join-Path $repoRoot "src\PixelVault.Companion.Client") -DestinationPath (Join-Path $outputDir "source\src\PixelVault.Companion.Client")
+New-Item -ItemType Directory -Path (Join-Path $outputDir 'source\scripts'),(Join-Path $outputDir 'source\docs') -Force | Out-Null
+Copy-Item -LiteralPath (Join-Path $repoRoot 'scripts\Import-AchievementArtwork.py') -Destination (Join-Path $outputDir 'source\scripts')
+Copy-Item -LiteralPath (Join-Path $repoRoot 'docs\ACHIEVEMENT_ARTWORK.md') -Destination (Join-Path $outputDir 'source\docs')
 Copy-SourceTreeForBundle -SourcePath $testsProjectDir -DestinationPath $bundleTestsDest
 Write-Host "Bundled source under: $(Join-Path $outputDir 'source')"
 

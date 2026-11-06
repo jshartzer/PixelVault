@@ -15,13 +15,9 @@ namespace PixelVaultNative
         internal void SetAchievementLink(string trackerId, GameAchievementsFetchService.AchievementRow achievement)
         {
             var definition = Definition(trackerId);
-            if (achievement != null && (!achievement.HasStableProviderIdentity || achievement.Provider != definition.Provider || achievement.ProviderGameId != definition.GameId))
+            if (achievement != null && (!achievement.HasStableAchievementIdentity || achievement.Provider != definition.Provider || achievement.ProviderGameId != definition.GameId))
                 throw new InvalidDataException("Choose an achievement from this checklist's game.");
-            using var c = Open(); using var cmd = c.CreateCommand();
-            cmd.CommandText = "INSERT INTO tracker_link(tracker_id,achievement_id) VALUES($t,$a) ON CONFLICT(tracker_id) DO UPDATE SET achievement_id=$a";
-            cmd.Parameters.AddWithValue("$t", trackerId);
-            cmd.Parameters.AddWithValue("$a", (object)achievement?.ProviderAchievementId ?? DBNull.Value);
-            cmd.ExecuteNonQuery();
+            base.SetAchievementLink(trackerId, achievement?.ProviderAchievementId);
         }
 
         internal IReadOnlyList<GameAchievementsFetchService.AchievementRow> AchievementChoices(string steamAccount, string retroAccount)
@@ -34,6 +30,10 @@ namespace PixelVaultNative
                 var data = hub.LoadAsync(identity.Provider, identity.Account, System.Threading.CancellationToken.None).GetAwaiter().GetResult();
                 result.AddRange(data.Games.Values.SelectMany(s => s.Rows).Where(r => r?.HasStableProviderIdentity == true));
             }
+            foreach (var definition in PixelVault.Tracking.CenturyAchievementCatalog.All)
+                if (!string.IsNullOrWhiteSpace(definition.Provider == "steam" ? steamAccount : retroAccount))
+                    result.Add(AchievementsInfoWindow.CenturyPresentation(definition, Century(definition.Provider, definition.GameId, definition.Id,
+                        definition.Provider == "steam" ? steamAccount : retroAccount)));
             return result;
         }
 

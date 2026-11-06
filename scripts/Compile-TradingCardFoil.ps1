@@ -1,4 +1,4 @@
-# Rebuild the checked-in WPF shader after editing TradingCardFoil.hlsl.
+# Rebuild the checked-in WPF shaders after editing TradingCardFoil.hlsl or CenturyPrismatic.hlsl.
 # Uses Windows' compiler; no SDK installation or runtime compilation is needed.
 $ErrorActionPreference = 'Stop'
 Add-Type -TypeDefinition @'
@@ -25,3 +25,4 @@ public static class FoilShaderCompiler {
 '@
 $foilDirectory = Join-Path $PSScriptRoot '../src/PixelVault.Native/UI/Effects'
 [FoilShaderCompiler]::Compile((Join-Path $foilDirectory 'TradingCardFoil.hlsl'), (Join-Path $foilDirectory 'TradingCardFoil.ps'))
+[FoilShaderCompiler]::Compile((Join-Path $foilDirectory 'CenturyPrismatic.hlsl'), (Join-Path $foilDirectory 'CenturyPrismatic.ps'))

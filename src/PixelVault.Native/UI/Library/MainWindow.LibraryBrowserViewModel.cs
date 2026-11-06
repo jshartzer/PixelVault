@@ -40,7 +40,7 @@ namespace PixelVaultNative
 
             public LibraryFolderInfo CloneLibraryFolderInfo(LibraryFolderInfo folder) => _owner.CloneLibraryFolderInfo(folder);
             public bool SameLibraryFolderSelection(LibraryFolderInfo left, LibraryFolderInfo right) => _owner.SameLibraryFolderSelection(left, right);
-            public DateTime GetLibraryFolderNewestDate(LibraryFolderInfo folder) => _owner.GetLibraryFolderNewestDate(folder);
+            public DateTime GetLibraryFolderNewestDate(LibraryFolderInfo folder, Dictionary<string, LibraryMetadataIndexEntry> index = null) => _owner.GetLibraryFolderNewestDate(folder, index);
 
             public string NormalizeGameId(string value) => _owner.NormalizeGameId(value);
             public string NormalizeGameIndexName(string name, string folderPath = null) => _owner.NormalizeGameIndexName(name, folderPath);
@@ -49,6 +49,8 @@ namespace PixelVaultNative
 
             public Dictionary<string, LibraryMetadataIndexEntry> LoadLibraryMetadataIndex(string libraryRoot, bool forceDiskReload = false)
                 => _owner.LoadLibraryMetadataIndexViaSessionWhenActive(libraryRoot, forceDiskReload);
+            public Dictionary<string, LibraryMetadataIndexEntry> LoadLibraryMetadataIndexForFilePaths(string libraryRoot, IEnumerable<string> paths)
+                => _owner.LoadLibraryMetadataIndexForFilePathsViaSessionWhenActive(libraryRoot, paths);
             public DateTime ResolveIndexedLibraryDate(string libraryRoot, string file, Dictionary<string, LibraryMetadataIndexEntry> index = null)
                 => _owner.ResolveIndexedLibraryDate(libraryRoot, file, index);
             public LibraryMetadataIndexEntry TryGetLibraryMetadataIndexEntry(string libraryRoot, string file, Dictionary<string, LibraryMetadataIndexEntry> index)

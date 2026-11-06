@@ -7,9 +7,10 @@ namespace PixelVaultNative
     sealed partial class AchievementsInfoWindow
     {
         AchievementTrackingStore _trackingStore;
+        Button _trackingButton;
         Button BuildTrackingEntryButton()
         {
-            var button = AchievementTrackerWindow.Button("Trackers", "Open this game's achievement checklists");
+            var button = _trackingButton = AchievementTrackerWindow.Button("Trackers", "Open this game's achievement checklists");
             button.HorizontalAlignment = HorizontalAlignment.Left; button.Margin = new Thickness(0, 8, 0, 0);
             button.IsEnabled = false;
             Loaded += (_, __) => button.IsEnabled = _trackingStore != null;
@@ -19,7 +20,7 @@ namespace PixelVaultNative
 
         internal void AttachTrackingMenu(FrameworkElement element, GameAchievementsFetchService.AchievementRow row)
         {
-            if (_trackingStore == null || element == null || row == null || !row.HasStableProviderIdentity) return;
+            if (_trackingStore == null || element == null || row == null || !row.HasStableAchievementIdentity) return;
             element.ContextMenu ??= new ContextMenu();
             var item = new MenuItem { Header = "Track progress…" };
             item.Click += (_, __) => OpenTracking(row);

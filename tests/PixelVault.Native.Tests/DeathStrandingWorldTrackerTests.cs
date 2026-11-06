@@ -74,7 +74,7 @@ public sealed class DeathStrandingWorldTrackerTests : IDisposable
     {
         var store = Store(); var fabrication = AchievementTrackingCatalog.DeathStranding(); var ladder = fabrication.Items.Single(i => i.Name == "Ladder");
         store.SetManualProgress(fabrication.Id, "player", ladder.Id, 1); store.SaveNote(fabrication.Id, "player", ladder.Id, "Keep this"); store.SetAchievementLink(fabrication.Id, null!);
-        var reopened = Store(); Assert.Equal(5, reopened.Definitions().Count); Assert.Null(reopened.Definitions().Single(d => d.Id == fabrication.Id).AchievementId);
+        var reopened = Store(); Assert.Equal(7, reopened.Definitions().Count); Assert.Null(reopened.Definitions().Single(d => d.Id == fabrication.Id).AchievementId);
         var state = reopened.Load(fabrication.Id, "player").Single(s => s.Item.Id == ladder.Id); Assert.True(state.Complete); Assert.Equal("Keep this", state.Note);
         Assert.All(reopened.Load(AchievementTrackingCatalog.DeathStrandingBuildId, "player"), s => Assert.Null(s.Current));
     }
@@ -95,7 +95,7 @@ public sealed class DeathStrandingWorldTrackerTests : IDisposable
         foreach (var definition in Store().Definitions().Where(d => d.Id != AchievementTrackingCatalog.DeathStrandingId))
         {
             var binding = new TrackerSourceBinding { AdapterId = source.Id, AdapterVersion = source.Version, TrackerId = definition.Id, Account = "76561197960265730", Location = dir, GameDirectory = dir };
-            if (DeathStrandingWorldReader.Supports(definition.Id) || definition.Id == AchievementTrackingCatalog.DeathStrandingOrdersId || DeathStrandingChipReader.Supports(definition.Id)) source.Validate(binding, definition);
+            if (DeathStrandingWorldReader.Supports(definition.Id) || DeathStrandingOrderReader.Supports(definition.Id) || DeathStrandingChipReader.Supports(definition.Id) || PixelVault.Tracking.CenturyCargoGoal.Matches(definition)) source.Validate(binding, definition);
             else Assert.Throws<NotSupportedException>(() => source.Validate(binding, definition));
         }
     }

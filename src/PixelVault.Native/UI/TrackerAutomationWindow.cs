@@ -11,7 +11,7 @@ namespace PixelVaultNative
         internal TrackerAutomationMode Mode { get; private set; }
         internal int IntervalMinutes { get; private set; }
         internal bool Paused { get; private set; }
-        internal TrackerAutomationWindow(Window owner, TrackerAutomationSettings settings, TrackerAutomationState state, IEnumerable<string> history = null)
+        internal TrackerAutomationWindow(Window owner, TrackerAutomationSettings settings, TrackerAutomationState state, IEnumerable<string> history = null, bool replaceManualProgress = false)
         {
             if (owner?.IsVisible == true) Owner = owner;
             Title = "Automatic tracker refresh"; Width = 580; Height = 530; MinWidth = 460; MinHeight = 360;
@@ -21,7 +21,7 @@ namespace PixelVaultNative
             var footer = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right }; DockPanel.SetDock(footer, Dock.Bottom); root.Children.Add(footer);
             var body = new StackPanel(); root.Children.Add(new ScrollViewer { Content = body, VerticalScrollBarVisibility = ScrollBarVisibility.Auto });
             body.Children.Add(AchievementTrackerWindow.Text("Automatic refresh", 23, true));
-            body.Children.Add(AchievementTrackerWindow.Text("Runs only while PixelVault is open, for the connected account. Routine source updates apply automatically. Manual conflicts, older saves and undone refreshes need review through Refresh. Notes and manual progress are preserved.", 13));
+            body.Children.Add(AchievementTrackerWindow.Text(replaceManualProgress ? "Runs only while PixelVault is open, for the connected account. Verified fresh save values replace manual checkmarks. Notes and unknown values stay saved; older saves and undone refreshes still need review." : "Runs only while PixelVault is open, for the connected account. Routine source updates apply automatically. Manual conflicts, older saves and undone refreshes need review through Refresh. Notes and manual progress are preserved.", 13));
             var modes = new ComboBox { Margin = new Thickness(0, 14, 0, 8) };
             foreach (var label in new[] { "Manual only (off)", "When this tracker opens", "After save files change", "Periodically while PixelVault runs" }) modes.Items.Add(label);
             modes.SelectedIndex = (int)settings.Mode; AutomationProperties.SetName(modes, "Automatic refresh mode"); body.Children.Add(modes);

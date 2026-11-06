@@ -421,29 +421,46 @@ namespace PixelVaultNative
                         continue;
                     }
                     h = h * 397 ^ i;
-                    h = h * 397 ^ (folder.FolderPath ?? string.Empty).GetHashCode(StringComparison.OrdinalIgnoreCase);
-                    h = h * 397 ^ (folder.Name ?? string.Empty).GetHashCode(StringComparison.OrdinalIgnoreCase);
-                    h = h * 397 ^ (folder.GameId ?? string.Empty).GetHashCode(StringComparison.OrdinalIgnoreCase);
-                    h = h * 397 ^ (folder.PlatformLabel ?? string.Empty).GetHashCode(StringComparison.OrdinalIgnoreCase);
+                    h = h * 397 ^ (folder.GameId ?? string.Empty).GetHashCode(StringComparison.Ordinal);
+                    h = h * 397 ^ (folder.Name ?? string.Empty).GetHashCode(StringComparison.Ordinal);
+                    h = h * 397 ^ (folder.FolderPath ?? string.Empty).GetHashCode(StringComparison.Ordinal);
                     h = h * 397 ^ folder.FileCount;
+                    h = h * 397 ^ (folder.PreviewImagePath ?? string.Empty).GetHashCode(StringComparison.Ordinal);
+                    h = h * 397 ^ (folder.PlatformLabel ?? string.Empty).GetHashCode(StringComparison.Ordinal);
+                    var paths = folder.FilePaths ?? Array.Empty<string>();
+                    h = h * 397 ^ paths.Length;
+                    foreach (var path in paths)
+                        h = h * 397 ^ (path ?? string.Empty).GetHashCode(StringComparison.Ordinal);
                     h = h * 397 ^ folder.NewestCaptureUtcTicks;
                     h = h * 397 ^ folder.NewestRecentSortUtcTicks;
-                    h = h * 397 ^ (folder.PreviewImagePath ?? string.Empty).GetHashCode(StringComparison.OrdinalIgnoreCase);
-                    h = h * 397 ^ (folder.SteamAppId ?? string.Empty).GetHashCode(StringComparison.OrdinalIgnoreCase);
-                    h = h * 397 ^ (folder.NonSteamId ?? string.Empty).GetHashCode(StringComparison.OrdinalIgnoreCase);
-                    h = h * 397 ^ (folder.SteamGridDbId ?? string.Empty).GetHashCode(StringComparison.OrdinalIgnoreCase);
-                    h = h * 397 ^ (folder.RetroAchievementsGameId ?? string.Empty).GetHashCode(StringComparison.OrdinalIgnoreCase);
+                    h = h * 397 ^ (folder.SteamAppId ?? string.Empty).GetHashCode(StringComparison.Ordinal);
+                    h = h * 397 ^ (folder.NonSteamId ?? string.Empty).GetHashCode(StringComparison.Ordinal);
+                    h = h * 397 ^ (folder.SteamGridDbId ?? string.Empty).GetHashCode(StringComparison.Ordinal);
+                    h = h * 397 ^ (folder.RetroAchievementsGameId ?? string.Empty).GetHashCode(StringComparison.Ordinal);
+                    h = h * 397 ^ (folder.IgdbId ?? string.Empty).GetHashCode(StringComparison.Ordinal);
+                    h = h * 397 ^ (folder.IgdbSlug ?? string.Empty).GetHashCode(StringComparison.Ordinal);
+                    h = h * 397 ^ (folder.IgdbCollectionId ?? string.Empty).GetHashCode(StringComparison.Ordinal);
+                    h = h * 397 ^ (folder.IgdbCollectionName ?? string.Empty).GetHashCode(StringComparison.Ordinal);
+                    h = h * 397 ^ (folder.IgdbFranchiseId ?? string.Empty).GetHashCode(StringComparison.Ordinal);
+                    h = h * 397 ^ (folder.IgdbFranchiseName ?? string.Empty).GetHashCode(StringComparison.Ordinal);
+                    h = h * 397 ^ (folder.IgdbSummary ?? string.Empty).GetHashCode(StringComparison.Ordinal);
+                    h = h * 397 ^ (folder.IgdbReleaseDate ?? string.Empty).GetHashCode(StringComparison.Ordinal);
+                    h = h * 397 ^ (folder.IgdbGenres ?? string.Empty).GetHashCode(StringComparison.Ordinal);
+                    h = h * 397 ^ (folder.IgdbPlatforms ?? string.Empty).GetHashCode(StringComparison.Ordinal);
+                    h = h * 397 ^ (folder.IgdbDeveloper ?? string.Empty).GetHashCode(StringComparison.Ordinal);
+                    h = h * 397 ^ (folder.IgdbPublisher ?? string.Empty).GetHashCode(StringComparison.Ordinal);
+                    h = h * 397 ^ (folder.IgdbCoverImageId ?? string.Empty).GetHashCode(StringComparison.Ordinal);
+                    h = h * 397 ^ (folder.IgdbHiddenSeriesIds ?? string.Empty).GetHashCode(StringComparison.Ordinal);
+                    h = h * 397 ^ folder.IgdbFetchedUtcTicks;
                     h = h * 397 ^ (folder.SuppressSteamAppIdAutoResolve ? 1 : 0);
                     h = h * 397 ^ (folder.SuppressSteamGridDbIdAutoResolve ? 1 : 0);
+                    h = h * 397 ^ (folder.IsCompleted100Percent ? 1 : 0);
+                    h = h * 397 ^ folder.CompletedUtcTicks;
+                    h = h * 397 ^ (folder.IsFavorite ? 1 : 0);
+                    h = h * 397 ^ (folder.IsShowcase ? 1 : 0);
+                    h = h * 397 ^ (folder.CollectionNotes ?? string.Empty).GetHashCode(StringComparison.Ordinal);
                     h = h * 397 ^ (folder.PendingGameAssignment ? 1 : 0);
-                    var paths = folder.FilePaths;
-                    var len = paths == null ? 0 : paths.Length;
-                    h = h * 397 ^ len;
-                    if (len > 0)
-                    {
-                        h = h * 397 ^ (paths![0] ?? string.Empty).GetHashCode(StringComparison.OrdinalIgnoreCase);
-                        if (len > 1) h = h * 397 ^ (paths[len - 1] ?? string.Empty).GetHashCode(StringComparison.OrdinalIgnoreCase);
-                    }
+                    h = h * 397 ^ (folder.StorageGroupId ?? string.Empty).GetHashCode(StringComparison.Ordinal);
                 }
                 return h;
             }

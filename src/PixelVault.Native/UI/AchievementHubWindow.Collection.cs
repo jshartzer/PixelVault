@@ -166,7 +166,7 @@ namespace PixelVaultNative
                     collectionGame.Items.Add(new ComboBoxItem
                     {
                         Content = game.Title + (next.Games.Any(g => g != game && g.Title == game.Title)
-                            ? " (" + (game.Provider == "steam" ? "Steam" : "RetroAchievements") + ")" : ""),
+                            ? " (" + game.PlatformLabel + ")" : ""),
                         Tag = game.Key
                     });
                 collectionGame.SelectedItem = collectionGame.Items.OfType<ComboBoxItem>().FirstOrDefault(i => (string)i.Tag == selected)
@@ -364,7 +364,7 @@ namespace PixelVaultNative
             };
             var state = new TextBlock
             {
-                Text = AchievementScoring.PointText(row), ToolTip = AchievementScoring.Explanation(row),
+                Text = AchievementScoring.PointText(row), ToolTip = AchievementScoring.Label(row),
                 FontSize = 10, TextAlignment = TextAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis,
                 Margin = new Thickness(0, 2, 0, 0), Foreground = Color(earned ? "#88B8A0" : "#7D909C", SystemColors.WindowTextBrush)
             };
@@ -416,7 +416,7 @@ namespace PixelVaultNative
             var meta = new StackPanel { Margin = new Thickness(14, 0, 0, 0), Width = 190 };
             meta.Children.Add(new TextBlock { Text = entry.Game.Title, FontSize = 11, TextTrimming = TextTrimming.CharacterEllipsis,
                 Foreground = Color("#B8C9D4", SystemColors.WindowTextBrush) });
-            meta.Children.Add(new TextBlock { Text = AchievementScoring.PointText(row), ToolTip = AchievementScoring.Explanation(row),
+            meta.Children.Add(new TextBlock { Text = AchievementScoring.PointText(row), ToolTip = AchievementScoring.Label(row),
                 FontSize = 11, Margin = new Thickness(0, 3, 0, 0),
                 Foreground = Color(earned ? "#88B8A0" : "#7D909C", SystemColors.WindowTextBrush) });
             var rarity = AchievementCollectionStats.ValidPercent(row.GlobalUnlockPercent)

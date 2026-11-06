@@ -1,3 +1,9 @@
+# November 2 correction: confirmed turn-in states
+
+Reader v3 supersedes the older v2 interpretation below. Chips #3 and #47 change **0x09 → 0x0B** after user-confirmed terminal turn-in. Both retain 0x0B in autosave8, quicksave21 and manualsave4. These copies pass matching-account, encrypted-copy SHA256, decompression MD5 and complete 190-key table validation. Only those two chip records change across manualsave3 → manualsave4; the other 54 are identical. Restoration is therefore accepted at **0x0B or 0x1B**. The extra 0x10 bit is not required; its meaning is not asserted. Pickup 0x09 and intermediate 0x19 remain incomplete; unsupported values and structural ambiguity still fail without observations.
+
+This corrects the previous #8 inference that 0x0B necessarily preceded terminal restoration. Native 0.117.011 / Companion 0.44.2 include the correction. The private before/after copies read **31 → 33** restored. All three after saves agree. Evidence: `artifacts/stale-save-reviews`; private captured/decrypted copies: `C:/GameDataExtractor/Backup Data/Death Stranding Director's Cut/Analysis/Validation/chip3-47-review-20261102T1904301234484Z`.
+
 # Memory-chip pickup and restoration control
 
 Verification: 51 focused cases, the actual packaged-worker automatic turn-in control (1/1), and all 1,180 full-suite cases pass. The broad suite was rerun with collection parallelism disabled after two SQLite cleanup locks and a browsing timeout; all 50 affected-class cases also pass targeted rerun, with no relaxed assertions. Reports: chip-pre-final-focused-final.trx, chip-pre-final-packaged-auto.trx, chip-pre-final-existing-rerun.trx, chip-pre-final-full-serial.trx.

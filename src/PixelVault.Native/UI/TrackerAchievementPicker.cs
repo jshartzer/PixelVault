@@ -20,7 +20,7 @@ namespace PixelVaultNative
         internal void SelectGame(string provider, string gameId, string achievementId = null)
         {
             Items.Clear(); Items.Add(new ComboBoxItem { Content = "No achievement link — game-wide" });
-            var rows = achievements.Where(r => r.Provider == provider && r.ProviderGameId == gameId && r.HasStableProviderIdentity)
+            var rows = achievements.Where(r => r.Provider == provider && r.ProviderGameId == gameId && r.HasStableAchievementIdentity)
                 .GroupBy(r => r.ProviderAchievementId, StringComparer.Ordinal).Select(g => g.First()).ToList();
             if (!string.IsNullOrEmpty(achievementId) && !rows.Any(r => r.ProviderAchievementId == achievementId))
                 rows.Add(new GameAchievementsFetchService.AchievementRow { Provider = provider, ProviderGameId = gameId, ProviderAchievementId = achievementId, Title = "Achievement " + achievementId });

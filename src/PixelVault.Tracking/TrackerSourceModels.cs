@@ -17,6 +17,8 @@ namespace PixelVaultNative
         public string GameDirectory { get; set; }
         public string SpecificSave { get; set; }
         public bool KeepSnapshots { get; set; } = true;
+        [System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+        public bool ReplaceManualProgress { get; set; }
         public TrackerSpreadsheetMapping Spreadsheet { get; set; }
     }
 
@@ -69,9 +71,18 @@ namespace PixelVaultNative
         public long ObservedUtc { get; init; }
         public string Source { get; init; }
         public string Evidence { get; init; }
-        public bool HasRollback => Rows.Any(r => r.Stale);
+        public bool ReplaceManualProgress { get; init; }
+        public bool HasRollback => Rows.Any(r => r.Stale && (!ReplaceManualProgress || r.Incoming.HasValue));
         public string Summary => Rows.Count(r => r.Changed) + " changed · " + Rows.Count(r => !r.Changed) + " unchanged · "
             + Rows.Count(r => !r.Incoming.HasValue) + " unknown · " + Rows.Count(r => r.Stale) + " older/equal · " + Rows.Count(r => r.Conflict) + " manual conflicts · " + Rows.Count(r => r.AddNote) + " note additions";
+    }
+
+    public static class TrackerRefreshPolicy
+    {
+        public static bool HasManualConflict(TrackerRefreshPlan plan,TrackerSourceBinding binding) => binding?.ReplaceManualProgress != true && plan.Rows.Any(r=>r.Conflict);
+        public static bool HasRollback(TrackerRefreshPlan plan,TrackerSourceBinding binding) => plan.Rows.Any(r=>r.Stale && (binding?.ReplaceManualProgress != true || r.Incoming.HasValue));
+        public static int ChangedCount(TrackerRefreshPlan plan,TrackerSourceBinding binding) => plan.Rows.Count(r=>(binding?.ReplaceManualProgress != true || r.Incoming.HasValue) && (r.Changed || binding?.ReplaceManualProgress == true && r.HasManual && !r.Stale));
+        public static bool ClearsManual(TrackerRefreshPlan plan,TrackerSourceBinding binding) => binding?.ReplaceManualProgress == true && plan.Rows.Any(r=>r.HasManual && r.Incoming.HasValue && !r.Stale);
     }
 
     public sealed class TrackerSpreadsheetMapping
@@ -106,6 +117,8 @@ namespace PixelVaultNative
     }
     public sealed class TrackerAutomationState
     {
+        public string HandledSignature { get; set; }
+        public string HandledOpenSignal { get; set; }
         public long LastCheckUtc { get; set; }
         public string Message { get; set; } = "Automatic refresh is off.";
         public string NoticeKey { get; set; }

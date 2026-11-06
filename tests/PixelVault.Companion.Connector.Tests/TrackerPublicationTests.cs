@@ -1,10 +1,27 @@
 using PixelVault.Companion;
+using System.Text.Json;
 using PixelVault.Companion.Connector;
 using PixelVaultNative;
 using Xunit;
 
 public sealed class TrackerPublicationTests
 {
+    [Fact] public void ReplacementPermissionRequiresPriorApprovalForTheExactTracker()
+    {
+        var root=Path.Combine(Path.GetTempPath(),"CompanionPublicationTests",Guid.NewGuid().ToString("N"));
+        try
+        {
+            var repo=new TrackerRepository(root,pooling:false);var d=new AchievementTrackerDefinition{Id="custom.authority",Provider="steam",GameId="42",GameTitle="Journey",Title="Roads",Items=new(){new(){Id="one",Name="One"}}};repo.AddDefinition(d);
+            repo.SaveSource(new(){TrackerId=d.Id,Account="approved",AdapterId="death-stranding-dc.fabrication",AdapterVersion="1",Location=@"C:\save",GameDirectory=@"C:\game",ReplaceManualProgress=true});
+            var binding=repo.Source(d.Id,"approved")!;var other=JsonSerializer.Deserialize<TrackerSourceBinding>(JsonSerializer.Serialize(binding))!;other.TrackerId="custom.other";
+            Assert.Null(Assert.Single(DesktopTrackerPublication.Read(root,new(){["steam"]="approved"},[new(other,new(){Id=other.TrackerId,Provider="steam",GameId="42"},"revision")],(_,_)=>{})).Binding);
+            var ordinary=JsonSerializer.Deserialize<TrackerSourceBinding>(JsonSerializer.Serialize(binding))!;ordinary.ReplaceManualProgress=false;
+            Assert.True(DesktopTrackerPublication.SameReadScope(binding,ordinary));Assert.False(DesktopTrackerPublication.SamePermission(binding,ordinary));
+            Assert.Null(Assert.Single(DesktopTrackerPublication.Read(root,new(){["steam"]="approved"},[new(ordinary,d,"revision")],(_,_)=>{})).Binding);
+            Assert.True(Assert.Single(DesktopTrackerPublication.Read(root,new(){["steam"]="approved"},[new(binding,d,"revision")],(_,_)=>{})).Binding!.ReplaceManualProgress);
+        }
+        finally{Directory.Delete(root,true);}
+    }
     [Fact]
     public void ContentSurvivesReadOnlyDiscoveryAndRemainsPartOfStructuralSourceValidation()
     {

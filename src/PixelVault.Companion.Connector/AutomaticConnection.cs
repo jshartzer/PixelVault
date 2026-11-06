@@ -18,6 +18,24 @@ sealed class AutomaticConnection(HttpClient http,ConnectorPairing config,string 
     static string Hash(string value)=>Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
     static Dictionary<string,string> LoadHandled(string path){try{return JsonSerializer.Deserialize<Dictionary<string,string>>(File.ReadAllText(path))??new();}catch{return new();}}
     static void Save(string path,string value){var temp=path+".tmp";File.WriteAllText(temp,value);File.Move(temp,path,true);}
+    public async Task TrackerEditsAsync(CancellationToken token)
+    {
+        while(!token.IsCancellationRequested)
+        {
+            try
+            {
+                if(settings.AutomaticEnabled&&settings.LibraryEnabled&&settings.WebTrackerEditsEnabled&&config.WebTrackerEditsEnabled)
+                {
+                    var result=await TrackerWebSync.OnceAsync(http,config,data,token);
+                    using var health=await http.PostAsJsonAsync("connector/v1/health",new ConnectorHealth(null,null,TrackerEditsError:result.Unavailable==0?"":"catalogue-mismatch",TrackerEditConflicts:result.Conflicts),Json,token);health.EnsureSuccessStatusCode();
+                }
+            }
+            catch(OperationCanceledException)when(token.IsCancellationRequested){break;}
+            catch(Exception e)when(e is IOException or UnauthorizedAccessException or InvalidDataException or HttpRequestException or TaskCanceledException or System.Text.Json.JsonException or Microsoft.Data.Sqlite.SqliteException or InvalidOperationException)
+            {try{using var failed=await http.PostAsJsonAsync("connector/v1/health",new ConnectorHealth(null,null,TrackerEditsError:"tracker-return-unavailable"),Json,token);}catch(HttpRequestException){}catch(TaskCanceledException){}}
+            try{await Task.Delay(10000,token);}catch(OperationCanceledException){break;}
+        }
+    }
     public async Task MonitorAsync(CancellationToken token)
     {
         var monitor=new StableSourceMonitor(LoadHandled(handledFile));var nextSettings=DateTime.MinValue;var nextHealth=DateTime.MinValue;
@@ -149,7 +167,8 @@ sealed class AutomaticConnection(HttpClient http,ConnectorPairing config,string 
                 if(settings.AutomaticEnabled&&settings.LibraryEnabled&&config.Accounts is not null&&!string.IsNullOrWhiteSpace(config.DesktopDataRoot))
                 {
                     var rejected=false;
-                    foreach(var game in AchievementSnapshotExporter.Read(config.DesktopDataRoot,config.WorkspaceId,config.AchievementAccounts??config.Accounts))
+                    var achievementGames=AchievementSnapshotExporter.Read(config.DesktopDataRoot,config.WorkspaceId,config.AchievementAccounts??config.Accounts).ToArray();
+                    foreach(var game in achievementGames)
                     {
                         var key=game.Provider+":"+game.GameId;var hash=Hash(JsonSerializer.Serialize(game with{CapturedUtc=0},Json));
                         if(hashes.GetValueOrDefault(key)==hash)continue;
@@ -157,6 +176,7 @@ sealed class AutomaticConnection(HttpClient http,ConnectorPairing config,string 
                         if(response.StatusCode is System.Net.HttpStatusCode.BadRequest or System.Net.HttpStatusCode.RequestEntityTooLarge){rejected=true;Console.Error.WriteLine("Achievement snapshot rejected: "+key+" ("+(int)response.StatusCode+"). Existing data kept.");continue;}
                         response.EnsureSuccessStatusCode();hashes[key]=hash;
                     }
+                    await AchievementArtworkPublisher.Sync(http,config.DesktopDataRoot,config.WorkspaceId,achievementGames,token);
                     var changes=await http.GetFromJsonAsync<AchievementGroupChange[]>("connector/v1/achievements/groups",Json,token)??[];
                     if(changes.Length>0)foreach(var ack in DesktopAchievementGroups.Apply(config.DesktopDataRoot,data,config.AchievementAccounts??config.Accounts,changes))
                     {using var sent=await http.PostAsJsonAsync("connector/v1/achievements/groups/ack",ack,Json,token);sent.EnsureSuccessStatusCode();}
@@ -171,7 +191,7 @@ sealed class AutomaticConnection(HttpClient http,ConnectorPairing config,string 
     }
     static string LibrarySignature(string root)
     {
-        var files=new List<string>{Path.Combine(root,"PixelVault.settings.ini")};var cache=Path.Combine(root,"cache");
+        var files=new List<string>{Path.Combine(root,"PixelVault.settings.ini")};if(File.Exists(Path.Combine(root,"xbox-library.json")))files.Add(Path.Combine(root,"xbox-library.json"));var cache=Path.Combine(root,"cache");
         if(!Directory.Exists(cache))throw new DirectoryNotFoundException();
         files.AddRange(Directory.EnumerateFiles(cache).Where(f=>Path.GetFileName(f).StartsWith("library-folders-")||Path.GetFileName(f).StartsWith("pixelvault-index-")&&!f.EndsWith("-shm",StringComparison.OrdinalIgnoreCase)));
         foreach(var folder in new[]{Path.Combine(cache,"covers"),Path.Combine(root,"achievement-hub")})if(Directory.Exists(folder))files.AddRange(Directory.EnumerateFiles(folder));

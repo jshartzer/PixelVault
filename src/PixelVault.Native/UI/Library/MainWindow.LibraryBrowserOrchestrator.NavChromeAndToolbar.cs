@@ -48,12 +48,11 @@ namespace PixelVaultNative
                 ShowSettingsWindow();
                 if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge();
             };
-            navChrome.GameIndexButton.Click += delegate { OpenGameIndexEditor(); };
-            navChrome.PhotoIndexButton.Click += delegate { OpenPhotoIndexEditor(); };
             navChrome.PhotographyGalleryButton.Click += delegate { ShowPhotographyGallery(libraryWindow); };
             navChrome.MyCoversButton.Click += delegate { OpenSavedCoversFolder(); };
-            navChrome.AchievementHubButton.Click += delegate { ShowAchievementHub(libraryWindow, ws); };
+            panes.AchievementHubButton.Click += delegate { ShowAchievementHub(libraryWindow, ws); };
             panes.TrackersButton.Click += delegate { ShowTrackerDashboard(libraryWindow,ws); };
+            panes.ShowcaseButton.Click += delegate { ShowCompletionShowcase(libraryWindow,ws); };
             navChrome.ImportButton.Click += delegate { RunWorkflow(false); if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge(); };
             navChrome.ImportCommentsButton.Click += delegate { RunWorkflow(true); if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge(); };
             navChrome.ManualImportButton.Click += delegate { OpenManualIntakeWindow(); if (refreshIntakeReviewBadge != null) refreshIntakeReviewBadge(); };

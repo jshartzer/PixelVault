@@ -34,6 +34,8 @@ namespace PixelVaultNative.Tests
             public readonly Dictionary<string, LibraryMetadataIndexEntry> MetadataIndex =
                 new(StringComparer.OrdinalIgnoreCase);
             public int LoadLibraryMetadataIndexCallCount;
+            public int FullMetadataIndexCallCount;
+            public List<string> RequestedMetadataPaths = new();
             public int ResolveDateWithIndexCount;
             public int ResolveDateWithoutIndexCount;
             public int ResolveRecentWithIndexCount;
@@ -71,7 +73,7 @@ namespace PixelVaultNative.Tests
                    (left != null && right != null &&
                     string.Equals(left.FolderPath ?? "", right.FolderPath ?? "", StringComparison.OrdinalIgnoreCase));
 
-            public DateTime GetLibraryFolderNewestDate(LibraryFolderInfo folder)
+            public DateTime GetLibraryFolderNewestDate(LibraryFolderInfo folder, Dictionary<string, LibraryMetadataIndexEntry> index = null!)
             {
                 if (folder == null || folder.NewestCaptureUtcTicks <= 0) return DateTime.MinValue;
                 return new DateTime(folder.NewestCaptureUtcTicks, DateTimeKind.Utc).ToLocalTime();
@@ -92,7 +94,16 @@ namespace PixelVaultNative.Tests
             public Dictionary<string, LibraryMetadataIndexEntry> LoadLibraryMetadataIndex(string libraryRoot, bool forceDiskReload = false)
             {
                 LoadLibraryMetadataIndexCallCount++;
+                FullMetadataIndexCallCount++;
                 return new Dictionary<string, LibraryMetadataIndexEntry>(MetadataIndex, StringComparer.OrdinalIgnoreCase);
+            }
+
+            public Dictionary<string, LibraryMetadataIndexEntry> LoadLibraryMetadataIndexForFilePaths(string root, IEnumerable<string> paths)
+            {
+                LoadLibraryMetadataIndexCallCount++;
+                RequestedMetadataPaths = paths.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+                return MetadataIndex.Where(pair => RequestedMetadataPaths.Contains(pair.Key, StringComparer.OrdinalIgnoreCase))
+                    .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.OrdinalIgnoreCase);
             }
 
             public DateTime ResolveIndexedLibraryDate(string libraryRoot, string file, Dictionary<string, LibraryMetadataIndexEntry> index = null!)

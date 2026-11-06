@@ -23,7 +23,7 @@ public sealed class AchievementTests
             INSERT INTO achievement_guide VALUES(1,'Original guide text','https://example.com/guide','Original source','Missable',1);
             INSERT INTO achievement_category VALUES('Collectibles');INSERT INTO achievement_category VALUES('Actions');INSERT INTO achievement_dlc VALUES('steam','42','Expansion');
             """;cmd.ExecuteNonQuery();
-            File.WriteAllText(Path.Combine(Root,"achievement-hub","steam.json"),JsonSerializer.Serialize(new{Provider="steam",Account="approved",Games=new Dictionary<string,object>{{"42",new{UpdatedUtc=638900000000000000,Rows=new[]{new{Provider="steam",ProviderGameId="42",ProviderAchievementId="ONE",Title="Stale title",Description="Stale description",ProgressKnown=true,Unlocked=true,UnlockUtcTicks=638900000000000000,GroupName="Stale category",DlcName="",GroupSortOrder=0}}}}}}));
+            File.WriteAllText(Path.Combine(Root,"achievement-hub","steam.json"),JsonSerializer.Serialize(new{Provider="steam",Account="approved",Games=new Dictionary<string,object>{{"42",new{UpdatedUtc=638900000000000000,Rows=new[]{new{Provider="steam",ProviderGameId="42",ProviderAchievementId="ONE",Title="Stale title",Description="Stale description",IconUrlColor="https://provider.invalid/unlocked.png",IconUrlGray="https://provider.invalid/locked.png",ProgressKnown=true,Unlocked=true,UnlockUtcTicks=638900000000000000,GroupName="Stale category",DlcName="",GroupSortOrder=0}}}}}}));
         }
         public void Dispose(){SqliteConnection.ClearAllPools();Directory.Delete(Root,true);}
     }
@@ -31,7 +31,7 @@ public sealed class AchievementTests
     public void ExportReadsDurableGroupsAndGuidesInsteadOfStaleCacheWithoutWritingTheDesktopDatabase()
     {
         using var f=new NativeFixture();var before=File.ReadAllBytes(f.Database);var games=AchievementSnapshotExporter.Read(f.Root,"workspace",new(){["steam"]="approved"});var game=Assert.Single(games);var one=game.Rows.Single(r=>r.Id=="ONE");
-        Assert.Equal("One",one.Title);Assert.Equal("Collectibles",one.Groups.Category);Assert.Equal("Expansion",one.Groups.Dlc);Assert.Equal("Original guide text",one.Guide);Assert.Equal("https://example.com/guide",one.SourceUrl);Assert.True(one.Unlocked);Assert.False(game.Rows.Single(r=>r.Id=="TWO").ProgressKnown);Assert.Equal(before,File.ReadAllBytes(f.Database));
+        Assert.Equal("https://provider.invalid/unlocked.png",one.Icon);Assert.Equal("https://provider.invalid/locked.png",one.LockedIcon);Assert.Equal("",game.Rows.Single(r=>r.Id=="TWO").LockedIcon);Assert.Equal("One",one.Title);Assert.Equal("Collectibles",one.Groups.Category);Assert.Equal("Expansion",one.Groups.Dlc);Assert.Equal("Original guide text",one.Guide);Assert.Equal("https://example.com/guide",one.SourceUrl);Assert.True(one.Unlocked);Assert.False(game.Rows.Single(r=>r.Id=="TWO").ProgressKnown);Assert.Equal(before,File.ReadAllBytes(f.Database));
         var wrong=AchievementSnapshotExporter.Read(f.Root,"workspace",new(){["steam"]="different-account"});Assert.False(wrong.Single().Rows.Single(r=>r.Id=="ONE").ProgressKnown);
     }
     [Fact]

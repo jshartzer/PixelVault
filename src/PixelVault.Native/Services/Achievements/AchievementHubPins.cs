@@ -18,7 +18,7 @@ namespace PixelVaultNative
             public int Version { get; set; } = 1;
             public List<string> Games { get; set; } = new();
         }
-        static readonly Regex ValidKey = new(@"^(steam|retroachievements):[1-9][0-9]{0,9}$", RegexOptions.CultureInvariant);
+        static readonly Regex ValidKey = new(@"^(steam|retroachievements|xbox):[1-9][0-9]{0,9}$", RegexOptions.CultureInvariant);
         readonly string path;
         readonly List<string> keys = new();
         internal AchievementHubPins(string path)

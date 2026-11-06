@@ -27,22 +27,26 @@ namespace PixelVaultNative
 
         internal static List<LibraryTimelineAchievement> Select(IEnumerable<AchievementHubGame> games,
             IReadOnlyDictionary<string, AchievementHubStore.AccountData> accounts, DateTime start, DateTime end,
-            long nowUtcTicks, TimeZoneInfo zone)
+            long nowUtcTicks, TimeZoneInfo zone, AchievementTrackingStore trackingStore = null)
         {
             var result = new List<LibraryTimelineAchievement>();
             foreach (var game in games.GroupBy(g => g.Key, StringComparer.Ordinal).Select(g => g.First()))
             {
-                if (!accounts.TryGetValue(game.Provider, out var account)
-                    || !account.Games.TryGetValue(game.Id, out var snapshot) || snapshot?.Rows == null) continue;
-                foreach (var row in snapshot.Rows.Where(r => r?.HasStableProviderIdentity == true
+                if (!accounts.TryGetValue(game.Provider, out var account)) continue;
+                account.Games.TryGetValue(game.Id, out var snapshot);
+                var gameRows = (snapshot?.Rows ?? new()).ToList();
+                if (trackingStore != null)
+                    foreach (var d in PixelVault.Tracking.CenturyAchievementCatalog.ForGame(game.Provider, game.Id))
+                        gameRows.Add(AchievementsInfoWindow.CenturyPresentation(d, trackingStore.Century(game.Provider, game.Id, d.Id, account.Account)));
+                foreach (var row in gameRows.Where(r => r?.HasStableAchievementIdentity == true
                     && r.Provider == game.Provider && r.ProviderGameId == game.Id)
                     .GroupBy(r => r.ProviderAchievementId, StringComparer.Ordinal).Select(g => g.First()))
                 {
                     if (!AchievementCollectionStats.ValidUnlock(row, nowUtcTicks)) continue;
                     var local = TimeZoneInfo.ConvertTimeFromUtc(new DateTime(row.UnlockUtcTicks, DateTimeKind.Utc), zone);
                     if (!LibraryBrowserViewModelMath.LibraryTimelineRangeContainsCapture(local, start, end)) continue;
-                    result.Add(new LibraryTimelineAchievement { Game = game, Row = row, GameRows = snapshot.Rows,
-                        Account = account.Account, SavedUtc = snapshot.UpdatedUtc, UnlockLocal = local });
+                    result.Add(new LibraryTimelineAchievement { Game = game, Row = row, GameRows = gameRows,
+                        Account = account.Account, SavedUtc = snapshot?.UpdatedUtc ?? 0, UnlockLocal = local });
                 }
             }
             return result.OrderByDescending(e => e.Row.UnlockUtcTicks).ThenBy(e => e.Key, StringComparer.Ordinal).ToList();
@@ -177,7 +181,7 @@ namespace PixelVaultNative
                 catch (Exception ex) { Log("Timeline achievement progress could not be loaded: " + ex.GetType().Name); }
             }
             token.ThrowIfCancellationRequested();
-            var entries = LibraryTimelineAchievement.Select(games, accounts, start, end, DateTime.UtcNow.Ticks, TimeZoneInfo.Local);
+            var entries = LibraryTimelineAchievement.Select(games, accounts, start, end, DateTime.UtcNow.Ticks, TimeZoneInfo.Local, achievementTrackingStore);
             lock (timelineAchievementCacheGate)
             {
                 timelineAchievementCacheKey = key;
@@ -233,9 +237,7 @@ namespace PixelVaultNative
                 achievementTrackingStore, entry.Game.Provider == "steam" ? CurrentSteamUserId64() : CurrentRetroAchievementsUsername());
             detail.ShowDialog();
             if (detail.OpenGameRequested)
-                AchievementsInfoWindow.ShowModal(this, entry.Game.Provider == "steam" ? "Steam" : "Emulation", entry.Game.Folder,
-                    CurrentSteamWebApiKey(), CurrentRetroAchievementsApiKey(), CurrentSteamUserId64(), CurrentRetroAchievementsUsername(),
-                    "PixelVault/" + AppVersion, achievementGuideService, trackingStore: achievementTrackingStore);
+                ShowLinkedGameAchievements(this, entry.Game.Folder, new[] { entry.Game.Folder }, initialPlatform: entry.Game.Key);
         }
     }
 }

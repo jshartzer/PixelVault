@@ -95,6 +95,8 @@ namespace PixelVaultNative
                 trackers.Click += (_, __) => OpenTracking();
                 actions.Children.Add(trackers);
             }
+            var xbox = new Button { Content = "Xbox achievements", Padding = new Thickness(12, 10, 12, 10), Margin = new Thickness(0, 0, 0, 16), HorizontalAlignment = HorizontalAlignment.Left };
+            xbox.Click += (_, __) => XboxAchievementsWindow.ShowFor(this);
             actions.Children.Add(back);
             Grid.SetColumn(actions, 1);
             header.Children.Add(actions);
@@ -102,6 +104,7 @@ namespace PixelVaultNative
             root.Children.Add(header);
 
             var sections = new StackPanel { Margin = new Thickness(24, 0, 24, 24) };
+            sections.Children.Add(xbox);
             sections.Children.Add(BuildScoreSection());
             sections.Children.Add(new Border
             {
@@ -226,7 +229,7 @@ namespace PixelVaultNative
             collection?.SnapshotUpdated.TryGetValue(game.Key, out saved);
             var detail = new AchievementDetailWindow(this, game, row, rows, saved, guides,
                 pins == null ? null : () => pins.IsPinned(game.Key), pins == null ? null : () => TogglePin(game),
-                trackingStore, getSession?.Invoke().Account(game.Provider));
+                game.Provider == "xbox" ? null : trackingStore, getSession?.Invoke().Account(game.Provider));
             ShowAchievementDetail(detail);
             if (guides != null && collection != null)
             {

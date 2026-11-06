@@ -26,6 +26,7 @@ namespace PixelVaultNative
             if (item.TagPs5) return "PS5";
             if (item.TagSwitch) return "Switch";
             if (item.TagXbox) return "Xbox";
+            if (item.TagXbox360) return "Xbox 360";
             if (item.TagOther && !string.IsNullOrWhiteSpace(item.CustomPlatformTag)) return CleanTag(item.CustomPlatformTag);
             return "Manual";
         }
@@ -39,6 +40,7 @@ namespace PixelVaultNative
             if (string.Equals(label, "PS5", StringComparison.OrdinalIgnoreCase)) return Brush("#4F83FF");
             if (string.Equals(label, "Switch", StringComparison.OrdinalIgnoreCase)) return Brush("#E94B43");
             if (string.Equals(label, "Xbox", StringComparison.OrdinalIgnoreCase)) return Brush("#66C47A");
+            if (string.Equals(label, "Xbox 360", StringComparison.OrdinalIgnoreCase)) return Brush("#66C47A");
             return Brush("#D0A15F");
         }
 
@@ -124,7 +126,7 @@ namespace PixelVaultNative
             return "Best Guess | Mixed guesses";
         }
 
-        static void ApplyConsolePlatformToManualMetadataItems(IEnumerable<ManualMetadataItem> selection, string platform)
+        internal static void ApplyConsolePlatformToManualMetadataItems(IEnumerable<ManualMetadataItem> selection, string platform)
         {
             foreach (var item in selection)
             {
@@ -134,6 +136,7 @@ namespace PixelVaultNative
                 item.TagPs5 = string.Equals(platform, "PS5", StringComparison.OrdinalIgnoreCase);
                 item.TagSwitch = string.Equals(platform, "Switch", StringComparison.OrdinalIgnoreCase);
                 item.TagXbox = string.Equals(platform, "Xbox", StringComparison.OrdinalIgnoreCase);
+                item.TagXbox360 = string.Equals(platform, "Xbox 360", StringComparison.OrdinalIgnoreCase);
                 item.TagOther = string.Equals(platform, "Other", StringComparison.OrdinalIgnoreCase);
                 if (!item.TagOther) item.CustomPlatformTag = string.Empty;
                 item.ForceTagMetadataWrite = true;
@@ -183,6 +186,7 @@ namespace PixelVaultNative
             to.TagPs5 = from.TagPs5;
             to.TagSwitch = from.TagSwitch;
             to.TagXbox = from.TagXbox;
+            to.TagXbox360 = from.TagXbox360;
             to.TagOther = from.TagOther;
             to.CustomPlatformTag = from.CustomPlatformTag ?? string.Empty;
             to.NonSteamId = from.NonSteamId ?? string.Empty;

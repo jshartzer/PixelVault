@@ -46,7 +46,7 @@ namespace PixelVaultNative
             AchievementHubSession Session()=>new(){LibraryRoot=libraryRoot,SteamAccount=CurrentSteamUserId64(),RetroAccount=CurrentRetroAchievementsUsername(),Games=BuildTrackerLibraryGames(ws)};
             TrackerDashboardWindow.ShowFor(owner,new TrackerNavigation(achievementTrackingStore,Session,TrackerGameCover));
         }
-        internal static void AddLibraryTrackerButton(Grid toolbar,LibraryBrowserPaneRefs panes)
+        internal static void AddLibraryTrackerButton(Panel toolbar,LibraryBrowserPaneRefs panes)
         {
             panes.TrackersButton=LibraryButtonChrome.Btn("Trackers",null,"#20343A",Brushes.White);
             panes.TrackersButton.MinWidth=96;panes.TrackersButton.Height=34;panes.TrackersButton.FontSize=11.5;panes.TrackersButton.Padding=new Thickness(10,0,10,0);
@@ -54,8 +54,13 @@ namespace PixelVaultNative
             panes.TrackersButton.ToolTip="Open the tracker dashboard";AutomationProperties.SetName(panes.TrackersButton,"Open tracker dashboard");
             if(!SystemParameters.HighContrast)panes.TrackersButton.Style=LibraryButtonChrome.LibraryToolbarButtonStyle("#232B35","#33424D","#2A3440","#182028");
             AccessibilityUi.TryApplyFocusVisualStyle(panes.TrackersButton);
-            panes.SortFilterMenuButton.Margin=new Thickness(0);
-            Grid.SetColumn(panes.TrackersButton,1);toolbar.Children.Add(panes.TrackersButton);
+            panes.ShowcaseButton=LibraryButtonChrome.Btn("Completions",null,"#20343A",Brushes.White);
+            panes.ShowcaseButton.MinWidth=96;panes.ShowcaseButton.Height=34;panes.ShowcaseButton.FontSize=11.5;panes.ShowcaseButton.Padding=new Thickness(10,0,10,0);
+            panes.ShowcaseButton.Margin=new Thickness(0,0,8,0);panes.ShowcaseButton.ToolTip="Browse completed games grouped by gold, emerald and diamond";
+            AutomationProperties.SetName(panes.ShowcaseButton,"Open completion collection");AccessibilityUi.TryApplyFocusVisualStyle(panes.ShowcaseButton);
+            if(!SystemParameters.HighContrast)panes.ShowcaseButton.Style=LibraryButtonChrome.LibraryToolbarButtonStyle("#232B35","#33424D","#2A3440","#182028");
+            toolbar.Children.Add(panes.TrackersButton);
+            toolbar.Children.Add(panes.ShowcaseButton);
         }
     }
 }

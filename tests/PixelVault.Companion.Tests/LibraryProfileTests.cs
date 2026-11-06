@@ -12,18 +12,27 @@ public sealed partial class CompanionTests
     public async Task BrowserShellAndScriptsCannotStayCachedAcrossAnUpgrade()
     {
         using var host=new Host();using var client=host.Client();
-        foreach(var path in new[]{"/","/?v=0.16.0","/index.html","/app.js?v=0.16.0","/library.js?v=0.16.0","/navigation.js?v=0.16.0","/updates.js?v=0.16.0","/app.css?v=0.16.0","/profile.css?v=0.16.0","/screenshots.js?v=0.16.0","/screenshots.css?v=0.16.0","/manifest.webmanifest"})
+        foreach(var path in new[]{"/","/?v=0.38.0","/index.html","/app.js?v=0.38.0","/library.js?v=0.38.0","/navigation.js?v=0.38.0","/updates.js?v=0.38.0","/app.css?v=0.38.0","/profile.css?v=0.38.0","/screenshots.js?v=0.38.0","/screenshots.css?v=0.38.0","/tracker-icons.js?v=0.38.0","/tracker-icons.css?v=0.38.0","/showcase.js?v=0.38.0","/case-artwork.js?v=0.38.0","/diamond-artwork.js?v=0.38.0","/showcase.css?v=0.38.0","/manifest.webmanifest","/maps.js?v=maps3","/maps.css?v=maps3","/vendor/leaflet-1.9.4/leaflet.js","/vendor/leaflet-1.9.4/leaflet.css"})
         {
             using var response=await client.GetAsync(path);
             Assert.Equal(HttpStatusCode.OK,response.StatusCode);
+            Assert.Contains("img-src 'self' data:",response.Headers.GetValues("Content-Security-Policy").Single());
+            Assert.Contains("script-src 'self';",response.Headers.GetValues("Content-Security-Policy").Single());
             Assert.True(response.Headers.CacheControl?.NoStore,path);
             Assert.True(response.Headers.CacheControl?.NoCache,path);
             Assert.True(response.Headers.CacheControl?.MustRevalidate,path);
         }
-        var html=await client.GetStringAsync("/?v=0.16.0");
-        Assert.Contains("/app.js?v=0.16.0",html);
-        Assert.Contains("/profile.css?v=0.16.0",html);
+        var html=await client.GetStringAsync("/?v=0.38.0");
+        Assert.Matches(@"/app\.js\?v=[a-f0-9]{16}",html);
+        Assert.Matches(@"/profile\.css\?v=[^""\s]+",html);
+        Assert.Contains("id=\"showcase-open\"",html);Assert.Contains("id=\"completion-showcase\"",html);
         Assert.Contains("id=\"game-profile\"",html);
+        foreach(var ornament in new[]{"gold-corner","gold-scroll","gold-badge","emerald-corner","emerald-jewel","emerald-badge","gold-case-header","emerald-case-header"})
+        {
+            using var asset=await client.GetAsync("/completion-frames/"+ornament+".svg");
+            Assert.Equal(HttpStatusCode.OK,asset.StatusCode);
+            Assert.Equal("image/svg+xml",asset.Content.Headers.ContentType!.MediaType);
+        }
     }
     static void LibraryFixture(string root,string? scope=null,string? image=null)
     {

@@ -33,7 +33,7 @@ namespace PixelVaultNative
 
         LibraryFolderInfo CloneLibraryFolderInfo(LibraryFolderInfo folder);
         bool SameLibraryFolderSelection(LibraryFolderInfo left, LibraryFolderInfo right);
-        DateTime GetLibraryFolderNewestDate(LibraryFolderInfo folder);
+        DateTime GetLibraryFolderNewestDate(LibraryFolderInfo folder, Dictionary<string, LibraryMetadataIndexEntry> index = null);
 
         string NormalizeGameId(string value);
         string NormalizeGameIndexName(string name, string folderPath = null);
@@ -41,6 +41,7 @@ namespace PixelVaultNative
         string PrimaryPlatformLabel(string file);
 
         Dictionary<string, LibraryMetadataIndexEntry> LoadLibraryMetadataIndex(string libraryRoot, bool forceDiskReload = false);
+        Dictionary<string, LibraryMetadataIndexEntry> LoadLibraryMetadataIndexForFilePaths(string libraryRoot, IEnumerable<string> paths);
         DateTime ResolveIndexedLibraryDate(string libraryRoot, string file, Dictionary<string, LibraryMetadataIndexEntry> index = null);
         LibraryMetadataIndexEntry TryGetLibraryMetadataIndexEntry(string libraryRoot, string file, Dictionary<string, LibraryMetadataIndexEntry> index);
         long ResolveLibraryFileRecentSortUtcTicks(string libraryRoot, string file, Dictionary<string, LibraryMetadataIndexEntry> index = null);

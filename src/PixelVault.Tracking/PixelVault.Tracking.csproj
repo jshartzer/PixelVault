@@ -6,9 +6,12 @@
     <Description>Platform-neutral PixelVault tracker definitions, persistence, reconciliation and guarded edits.</Description>
   </PropertyGroup>
   <ItemGroup>
+    <EmbeddedResource Include="Artwork/*" LogicalName="PixelVault.Artwork.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="CenturyArtwork/*.png" LogicalName="PixelVault.CenturyArtwork.%(Filename)%(Extension)" />
     <PackageReference Include="Microsoft.Data.Sqlite.Core" Version="8.0.8" />
     <EmbeddedResource Include="TrackingData/DeathStrandingBuildables.json" LogicalName="PixelVault.Tracking.DeathStranding.json" />
     <EmbeddedResource Include="TrackingData/DeathStrandingWorldTrackers.json" LogicalName="PixelVault.Tracking.DeathStrandingWorld.json" />
     <EmbeddedResource Include="TrackingData/DeathStrandingOrders.json" LogicalName="PixelVault.Tracking.DeathStrandingOrders.json" />
+    <EmbeddedResource Include="TrackingData/DeathStrandingMails.json" LogicalName="PixelVault.Tracking.CenturyMails.json" />
   </ItemGroup>
 </Project>

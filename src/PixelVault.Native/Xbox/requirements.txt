@@ -1,0 +1,1 @@
+xbox-webapi @ https://github.com/OpenXbox/xbox-webapi-python/archive/672f34f256f18640d387147867950234fc2e140f.zip

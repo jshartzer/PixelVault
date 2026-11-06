@@ -45,6 +45,7 @@ namespace PixelVaultNative
             Value(row).ToString(CultureInfo.CurrentCulture) + " PV pts"
             + (Provisional(row) ? " (provisional)" : row.AwardedPoints.HasValue ? " earned" : "");
         internal static string Explanation(GameAchievementsFetchService.AchievementRow row) => row?.Points == null ? "" :
+            row.CenturyDefinitionId != null ? PointText(row) :
             Label(row) + ". " + (Provisional(row)
                 ? "Rarity unavailable; starts at 5 points and finalizes when rarity becomes available."
                 : row.AwardedPoints.HasValue ? "Awarded points are saved and do not change with later rarity updates."

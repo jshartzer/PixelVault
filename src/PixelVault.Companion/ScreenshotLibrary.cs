@@ -32,7 +32,7 @@ public sealed partial class ScreenshotLibrary(CompanionOptions options,TrackerWo
         if(workspace.ReadOnly||!options.ScreenshotLibraryEnabled&&options.ScreenshotPilot!=provider+":"+game)throw new KeyNotFoundException();
         if(receiving)_=library.MediaTitle(provider,game);
     }
-    void Enabled(){var s=state.Settings();if(!s.AutomaticEnabled||!s.LibraryEnabled||s.WorkspaceId!=workspace.Identity)throw new InvalidOperationException("PC library sync is paused.");}
+    void Enabled(){if(options.DirectLocal)throw new InvalidOperationException("Direct local photos do not accept uploads or connector removals.");var s=state.Settings();if(!s.AutomaticEnabled||!s.LibraryEnabled||s.WorkspaceId!=workspace.Identity)throw new InvalidOperationException("PC library sync is paused.");}
     void Validate(ScreenshotCatalogue c,bool receiving=true)
     {
         if(c.Provider is null||c.GameId is null)throw new InvalidDataException("Invalid photo scope.");
@@ -57,7 +57,11 @@ public sealed partial class ScreenshotLibrary(CompanionOptions options,TrackerWo
         if(File.Exists(Active)){var c=CachedRaw(Active);if(c.Provider==provider&&c.GameId==game)return Active;}
         return Path.Combine(CatalogueRoot,Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(provider+"\n"+game))).ToLowerInvariant()+".json");
     }
-    static ScreenshotCatalogue Raw(string file)=>JsonSerializer.Deserialize<ScreenshotCatalogue>(File.ReadAllText(file),Json)??throw new InvalidDataException("Invalid screenshot catalogue.");
+    static ScreenshotCatalogue Raw(string file)
+    {
+        using var input=new FileStream(file,FileMode.Open,FileAccess.Read,FileShare.Read|FileShare.Delete);
+        return JsonSerializer.Deserialize<ScreenshotCatalogue>(input,Json)??throw new InvalidDataException("Invalid screenshot catalogue.");
+    }
     ScreenshotCatalogue CachedRaw(string file)
     {
         var info=new FileInfo(file);if(rawManifests.TryGetValue(file,out var saved)&&saved.Stamp==info.LastWriteTimeUtc.Ticks&&saved.Length==info.Length)return saved.Catalogue;
@@ -126,7 +130,7 @@ public sealed partial class ScreenshotLibrary(CompanionOptions options,TrackerWo
         lock(gate)
         {
             Scope(provider,game);if(offset is <0 or >100000||limit is <1 or >60||console?.Length>80)throw new InvalidDataException("Invalid screenshot page.");
-            var c=Read(ActiveFor(provider,game));var digest=Digest(c);if(!string.IsNullOrEmpty(version)&&version!=digest)throw new InvalidOperationException("The photo library changed. Refresh photos to continue.");
+            var c=options.DirectLocal?workspace.LocalPhotos!.Catalogue(provider,game):Read(ActiveFor(provider,game));var digest=Digest(c);if(!string.IsNullOrEmpty(version)&&version!=digest)throw new InvalidOperationException("The photo library changed. Refresh photos to continue.");
             var photos=c.Photos.Where(p=>string.IsNullOrEmpty(console)||p.Console==console).OrderByDescending(p=>p.CaptureUtcTicks).ThenBy(p=>p.Id,StringComparer.Ordinal).ToArray();
             return new(digest,c.Title,c.Photos.Count,c.Eligible,c.SkippedVideos,c.DayTimeZone,offset+limit<photos.Length?offset+limit:null,photos.Skip(offset).Take(limit).ToArray())
                 {FilteredTotal=photos.Length,Consoles=c.Photos.GroupBy(p=>p.Console).OrderBy(g=>g.Key,StringComparer.Ordinal).Select(g=>new ScreenshotConsole(g.Key,g.Count())).ToArray()};
@@ -134,7 +138,7 @@ public sealed partial class ScreenshotLibrary(CompanionOptions options,TrackerWo
     }
     public ScreenshotPhoto Photo(string provider,string game,string id)
     {
-        lock(gate){Scope(provider,game);return Read(ActiveFor(provider,game)).Photos.FirstOrDefault(p=>p.Id==id)??throw new KeyNotFoundException();}
+        lock(gate){Scope(provider,game);return (options.DirectLocal?workspace.LocalPhotos!.Catalogue(provider,game):Read(ActiveFor(provider,game))).Photos.FirstOrDefault(p=>p.Id==id)??throw new KeyNotFoundException();}
     }
     public RecentScreenshots Recent(int limit=30)
     {
@@ -150,6 +154,7 @@ public sealed partial class ScreenshotLibrary(CompanionOptions options,TrackerWo
     static void InvalidateAvailable(CompanionOptions o,TrackerWorkspace w)=>availability.TryRemove(AvailableKey(o,w),out _);
     public static IReadOnlyDictionary<string,ScreenshotLink> AvailableAll(CompanionOptions o,TrackerWorkspace w)
     {
+        if(o.DirectLocal)return w.LocalPhotos?.Links()??new Dictionary<string,ScreenshotLink>();
         var key=AvailableKey(o,w);if(availability.TryGetValue(key,out var saved)&&DateTime.UtcNow-saved.Updated<TimeSpan.FromSeconds(2))return saved.Links;
         var links=new Dictionary<string,ScreenshotLink>(StringComparer.Ordinal);
         if(!w.ReadOnly&&(o.ScreenshotLibraryEnabled||!string.IsNullOrEmpty(o.ScreenshotPilot)))
@@ -168,6 +173,7 @@ public sealed partial class ScreenshotLibrary(CompanionOptions options,TrackerWo
     ScreenshotCatalogue[] Catalogues()
     {
         if(workspace.ReadOnly||!options.ScreenshotLibraryEnabled&&string.IsNullOrEmpty(options.ScreenshotPilot))return [];
+        if(options.DirectLocal)return workspace.LocalPhotos!.Catalogues();
         var files=(Directory.Exists(CatalogueRoot)?Directory.EnumerateFiles(CatalogueRoot,"*.json"):[]).Prepend(Active).Where(File.Exists).ToArray();
         if(files.Length>1000)throw new InvalidOperationException("Too many photo catalogues.");
         return files.Select(CachedRaw).Where(c=>options.ScreenshotLibraryEnabled||options.ScreenshotPilot==c.Provider+":"+c.GameId).Select(c=>Read(ActiveFor(c.Provider,c.GameId))).DistinctBy(c=>c.Provider+"\n"+c.GameId).ToArray();
@@ -186,11 +192,22 @@ public sealed partial class ScreenshotLibrary(CompanionOptions options,TrackerWo
     }
     public string Image(string provider,string game,string id,string kind)
     {
+        if(options.DirectLocal)throw new InvalidOperationException("Use the checked local media stream.");
         lock(gate)
         {
             Scope(provider,game);var c=Read(ActiveFor(provider,game));var photo=c.Photos.FirstOrDefault(p=>p.Id==id)??throw new KeyNotFoundException();
             var name=kind switch{"thumbnail"=>photo.Thumbnail,"preview"=>photo.Preview,_=>throw new KeyNotFoundException()};
             var file=Path.Combine(AssetRoot,name);if(!File.Exists(file)||(File.GetAttributes(file)&FileAttributes.ReparsePoint)!=0)throw new KeyNotFoundException();return file;
         }
+    }
+    public async Task<Stream> OpenImage(string provider,string game,string id,string kind,CancellationToken token)
+    {
+        Scope(provider,game);
+        return options.DirectLocal?await workspace.LocalPhotos!.Image(provider,game,id,kind,token):File.OpenRead(Image(provider,game,id,kind));
+    }
+    public bool DirectLocal=>options.DirectLocal;
+    public Task<LocalPhotoLibrary.Download> DownloadLocal(string provider,string game,string id,string? asset,bool metadata,CancellationToken token)
+    {
+        Scope(provider,game);return workspace.LocalPhotos!.DownloadOriginal(provider,game,id,asset,metadata,token);
     }
 }

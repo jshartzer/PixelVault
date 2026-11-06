@@ -52,6 +52,7 @@ namespace PixelVaultNative
             var logService = new TroubleshootingLogService(troubleshootingLog);
             var (settingsService, fileSystemService) = CreateSettingsAndFileServices();
             var achievementGuideService = new AchievementGuideService(dataRoot);
+            XboxAchievementService.Configure(dataRoot, achievementGuideService);
             var achievementTrackingStore = new AchievementTrackingStore(dataRoot);
             var coverService = CreateCoverService(host, fileSystemService, coversRoot);
             var (indexPersistenceService, filenameParserService, gameIndexEditorAssignmentService, filenameRulesService) =

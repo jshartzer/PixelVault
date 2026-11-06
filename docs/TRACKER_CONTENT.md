@@ -1,5 +1,7 @@
 # Tracker reference content
 
+October 29, 2026: the existing 149-entry interview catalogue now has validated automatic **read** observations and remains linked to Century The Whole Story. The separate official 100-read counter also refreshes automatically; both currently show69 read. Unlocked unread interviews remain incomplete. Full private content, manual values, notes and links are retained. Native0.107.000 / Companion0.36.0 / connector0.22.0 are deployed. See [current interview validation](DEATH_STRANDING_INTERVIEW_RESEARCH.md); earlier dated manual-only descriptions are historical.
+
 October26,2026 — optional plain-text content is shared by desktop and Companion tracker records.
 
 `AchievementTrackerItem.Content` stores reference text with a private custom definition. It defaults to null and is omitted when null, preserving serialization and publication/source fingerprints of existing catalogues. The shared validator limits content to100,000 characters per item and2,000,000 per tracker; existing portable-definition and connector payload limits still apply. JSON definition import/export preserves it, as does milestone expansion and catalogue reconciliation. No game-specific UI or arbitrary file-path access is required.

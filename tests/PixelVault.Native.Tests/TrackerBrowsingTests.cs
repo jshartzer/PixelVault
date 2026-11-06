@@ -42,6 +42,45 @@ public sealed class TrackerBrowsingTests : IDisposable
         var full=Path.GetFullPath(dir);Assert.StartsWith(Path.GetFullPath(Path.GetTempPath()),full,StringComparison.OrdinalIgnoreCase);
         for(int i=0;Directory.Exists(full);i++){SqliteConnection.ClearAllPools();try{Directory.Delete(full,true);}catch(IOException)when(i<5){Thread.Sleep(50);}}
     }
+    [Fact]
+    public void MissableLabelUsesAchievementStyleImmediatelyBeforeContent()
+    {
+        var store = new AchievementTrackingStore(dir);
+        var definition = new AchievementTrackerDefinition
+        {
+            Id = "custom.interviews", Provider = "steam", GameId = "42", GameTitle = "Fixture", Title = "Interviews",
+            Items = new()
+            {
+                new() { Id = "missable", Name = "Story interview", Content = "Interview text", Detail = "Author\nLocation", Missable = true },
+                new() { Id = "ordinary", Name = "Standard interview", Content = "Interview text" }
+            }
+        };
+        store.AddDefinition(definition);
+        AchievementCollectionAccessTests.OnSta(() =>
+        {
+            SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(Dispatcher.CurrentDispatcher));
+            var window = new AchievementTrackerWindow(null!, store, "player", "", trackerId: definition.Id);
+            try
+            {
+                Pump(window.LoadDefinitionsAsync());
+                var rows = Field<ListBox>(window, "list").Items.Cast<ListBoxItem>().ToArray();
+                var flagged = (Grid)((Border)rows.Single(r => ((AchievementTrackerState)r.Tag).Item.Missable).Content).Child;
+                var actions = Assert.IsType<StackPanel>(flagged.Children[1]);
+                var label = Assert.IsType<TextBlock>(actions.Children[0]);
+                Assert.Equal("Missable", label.Text);
+                Assert.Equal(AchievementCollectionUi.MissableLabel().Foreground.ToString(), label.Foreground.ToString());
+                Assert.Equal("Content", Assert.IsType<Button>(actions.Children[1]).Content);
+                var ordinary = (Grid)((Border)rows.Single(r => !((AchievementTrackerState)r.Tag).Item.Missable).Content).Child;
+                Assert.Equal("Content", Assert.IsType<Button>(Assert.IsType<StackPanel>(ordinary.Children[1]).Children[0]).Content);
+                Field<ListBox>(window, "list").SelectedItem = rows.Single(r => ((AchievementTrackerState)r.Tag).Item.Missable);
+                var details = Field<TextBlock>(window, "itemSource").Text;
+                Assert.EndsWith("Author\nLocation", details);
+                Assert.DoesNotContain("Progress has not been checked", details);
+            }
+            finally { window.Close(); }
+        });
+    }
+
     [Theory]
     [InlineData(true)]
     [InlineData(false)]

@@ -466,7 +466,20 @@ namespace PixelVaultNative
                 Close();
             };
             Closing += OnClosing;
-            Activated += (_, __) => RefreshLinkedTrackers();
+            Activated += (_, __) =>
+            {
+                try
+                {
+                    if(!IsDirty()&&_current?.Entry is {} current)
+                    {
+                        var saved=_service.LoadGuideEntry(current.Provider,current.ProviderGameId,current.ProviderAchievementId);
+                        if(saved is not null&&(saved.GroupVersion!=current.GroupVersion||saved.GuideUpdatedUtcTicks!=current.GuideUpdatedUtcTicks))
+                        {if(_storedEntry is not null)_storedEntry=saved;ReloadEntries(current.AchievementId);}
+                    }
+                }
+                catch(Exception ex)when(ex is IOException or Microsoft.Data.Sqlite.SqliteException){/* Keep the displayed values; retry on activation. */}
+                RefreshLinkedTrackers();
+            };
 
             ReloadEntries(0, preferredProviderAchievementId);
         }
@@ -1144,6 +1157,7 @@ namespace PixelVaultNative
             {
                 _current.Entry = _service.SaveGuide(new AchievementGuideEdit
                 {
+                    ExpectedGroupVersion = entry.GroupVersion,
                     AchievementId = entry.AchievementId,
                     GuideText = _guideText.Text,
                     SourceUrl = url,

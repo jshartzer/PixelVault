@@ -705,6 +705,7 @@ namespace PixelVaultNative
             {
                 var normalized = NormalizeConsoleLabel(tag);
                 if (string.Equals(normalized, "Xbox", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(normalized, "Xbox 360", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(normalized, "Steam", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(normalized, "Emulation", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(normalized, "PS5", StringComparison.OrdinalIgnoreCase)

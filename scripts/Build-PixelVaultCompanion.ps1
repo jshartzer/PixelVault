@@ -1,4 +1,4 @@
-param([string]$OutputRoot='',[switch]$IncludeDesktop,[switch]$IncludeConnector)
+param([string]$OutputRoot='',[switch]$IncludeDesktop,[switch]$IncludeConnector,[switch]$IncludeLocalReaders)
 $ErrorActionPreference='Stop'
 $companionRepo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $companionProject=Join-Path $companionRepo 'src\PixelVault.Companion\PixelVault.Companion.csproj'
@@ -11,6 +11,21 @@ $companionApp=Join-Path $OutputRoot "app-$companionVersion"
 $companionLinux=Join-Path $OutputRoot "linux-x64-$companionVersion"
 & dotnet publish $companionProject -c Release -r win-x64 --self-contained false -o $companionApp --nologo
 if($LASTEXITCODE -ne 0){throw 'Windows Companion publish failed. Stop an existing Companion preview before rebuilding.'}
+& dotnet publish (Join-Path $companionRepo 'src\PixelVault.Companion.Media\PixelVault.Companion.Media.csproj') -c Release -r win-x64 --self-contained false -o (Join-Path $companionApp 'media-worker') --nologo
+if($LASTEXITCODE -ne 0){throw 'Windows photo worker publish failed.'}
+if($IncludeLocalReaders){
+    & dotnet publish (Join-Path $companionRepo 'src\PixelVault.Native\PixelVault.Native.csproj') -c Release -r win-x64 --self-contained false -o (Join-Path $companionApp 'readers') --nologo
+    if($LASTEXITCODE -ne 0){throw 'Headless local reader publish failed.'}
+    # SQLite is a native dependency of the outer --companion-readers protocol, even
+    # when the inner save-only worker succeeds without opening a database. Keep it
+    # beside the single-file executable; service accounts must not rely on PATH.
+    [xml]$readerProjectXml=Get-Content -LiteralPath (Join-Path $companionRepo 'src\PixelVault.Native\PixelVault.Native.csproj') -Raw
+    $readerFramework=[string]$readerProjectXml.Project.PropertyGroup.TargetFramework
+    $readerSqlite=Join-Path $companionRepo "src\PixelVault.Native\bin\Release\$readerFramework\win-x64\e_sqlite3.dll"
+    if(-not (Test-Path -LiteralPath $readerSqlite -PathType Leaf)){throw 'Headless reader native SQLite dependency was not built.'}
+    Copy-Item -LiteralPath $readerSqlite -Destination (Join-Path $companionApp 'readers\e_sqlite3.dll') -Force
+    if((Get-FileHash -LiteralPath $readerSqlite).Hash -ne (Get-FileHash -LiteralPath (Join-Path $companionApp 'readers\e_sqlite3.dll')).Hash){throw 'Headless reader native SQLite dependency did not copy correctly.'}
+}
 & dotnet publish $companionProject -c Release -r linux-x64 --self-contained false -o $companionLinux --nologo
 if($LASTEXITCODE -ne 0){throw 'Linux Companion publish failed.'}
 if($IncludeConnector){
@@ -34,12 +49,12 @@ Start-Process -FilePath $companionDesktopExe -ArgumentList '--companion'
 
 $companionSource=Join-Path $OutputRoot ("source-$companionVersion-"+[Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $companionSource -Force | Out-Null
-foreach($projectName in @('PixelVault.Tracking','PixelVault.Companion')){
+foreach($projectName in @('PixelVault.Tracking','PixelVault.Maps','PixelVault.Companion','PixelVault.Companion.Media')){
     $projectSource=Join-Path $companionRepo "src\$projectName"
     foreach($file in Get-ChildItem -LiteralPath $projectSource -Recurse -File){
         $relative=[IO.Path]::GetRelativePath($projectSource,$file.FullName)
         if($relative -match '(^|[\\/])(bin|obj|App_Data|keys)([\\/]|$)'){continue}
-        if($file.Extension -notin @('.cs','.csproj','.json','.html','.css','.js','.png','.webmanifest','.md')){continue}
+        if($file.Extension -notin @('.cs','.csproj','.json','.html','.css','.js','.png','.svg','.webmanifest','.md') -and $file.Name -notin @('cover-progress-LICENSE.txt','LICENSE','README.txt')){continue}
         if($relative.StartsWith('..')){throw 'Unexpected source path outside the selected project.'}
         $target=Join-Path $companionSource "src\$projectName\$relative"
         New-Item -ItemType Directory -Path (Split-Path $target -Parent) -Force | Out-Null
@@ -51,6 +66,9 @@ foreach($file in Get-ChildItem -LiteralPath (Join-Path $companionRepo 'deploy\co
     if($file.Name -eq 'Dockerfile' -or $file.Extension -eq '.yml'){Copy-Item -LiteralPath $file.FullName -Destination (Join-Path $companionSource 'deploy\companion')}
 }
 Copy-Item -LiteralPath (Join-Path $companionRepo '.dockerignore') -Destination $companionSource
+New-Item -ItemType Directory -Path (Join-Path $companionSource 'scripts'),(Join-Path $companionSource 'docs') -Force | Out-Null
+Copy-Item -LiteralPath (Join-Path $companionRepo 'scripts\Import-AchievementArtwork.py') -Destination (Join-Path $companionSource 'scripts')
+Copy-Item -LiteralPath (Join-Path $companionRepo 'docs\ACHIEVEMENT_ARTWORK.md') -Destination (Join-Path $companionSource 'docs')
 @"
 PixelVault Companion $companionVersion — source build package
 
@@ -59,7 +77,7 @@ From this extracted folder on a Docker host (including the NAS Docker CLI if ava
 docker build --platform linux/amd64 -f deploy/companion/Dockerfile -t pixelvault-companion:$companionVersion .
 An image has not been built or pushed by this packaging script.
 Import/use the resulting image in Container Station; configure the separate persistent data mount and HTTPS/proxy before using personal data over the network.
-Browser and the explicit desktop connection can edit the same isolated workspace. The separately installed PC connector supports automatic observations and indexed library sync; full original native tracker cutover remains separate work.
+Windows direct-local hosting uses canonical PC application stores and in-place originals with a separately packaged headless Native reader and media worker. The deployed PC service replaces NAS hosting and connector replication; deployment, service identity and app-only backup configuration are separate reviewed steps. Historical copied-workspace deployments remain supported by the source.
 "@ | Set-Content -LiteralPath (Join-Path $companionSource 'README.txt')
 $companionArchive=Join-Path $OutputRoot "PixelVaultCompanion-$companionVersion-source.zip"
 Compress-Archive -Path (Join-Path $companionSource '*') -DestinationPath $companionArchive -Force
@@ -69,7 +87,7 @@ param([int]$Port=8787,[string]$DataRoot='__DATA_ROOT__',[switch]$HomeNetwork,[st
 $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot 'CompanionPreview.Network.ps1')
 $companionRelocated=Get-CompanionRelocatedUrl -DataRoot $DataRoot
-if($companionRelocated){Write-Host "PixelVault Companion now runs on the NAS: $companionRelocated";Write-Host 'The former PC workspace is retained as a backup and was not started.';return}
+if($companionRelocated){Write-Host "PixelVault Companion runs at: $companionRelocated";Write-Host 'The historical workspace was not started.';return}
 $companionNetwork=Get-CompanionPreviewNetwork -Port $Port -HomeNetwork:$HomeNetwork -ListenAddress $ListenAddress
 Enable-CompanionPreviewPhoneAccess -Network $companionNetwork -Port $Port -FirewallScript (Join-Path $PSScriptRoot 'Enable-PixelVaultCompanionPhone.ps1')
 $env:Companion__DataRoot=[IO.Path]::GetFullPath($DataRoot)

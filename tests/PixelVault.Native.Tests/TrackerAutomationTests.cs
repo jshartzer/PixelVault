@@ -106,6 +106,13 @@ public sealed class TrackerAutomationTests : IDisposable
         await Settle(monitor); Assert.Equal(0, State().ReportedCurrent); Assert.Equal(TrackerRefreshOutcome.ReviewRequired, store.SourceStatus(Id, Account).Outcome);
     }
     [Fact]
+    public async Task ABackgroundOwnerSuppressesDuplicateNativeAutomaticReadsAndReleasesAfterDisposal()
+    {
+        Enable();using var monitor=Monitor();
+        using(var owner=TrackerSourceLease.OwnBackground(store.DatabasePath)){await Settle(monitor);Assert.Null(State().ReportedCurrent);Assert.True(TrackerSourceLease.BackgroundOwned(store.DatabasePath));}
+        Assert.False(TrackerSourceLease.BackgroundOwned(store.DatabasePath));await Settle(monitor);Assert.Equal(0,State().ReportedCurrent);
+    }
+    [Fact]
     public async Task AnUndoneAutomaticBatchIsNotReappliedOnRestart()
     {
         Enable(); using (var first = Monitor()) await Settle(first);
@@ -203,5 +210,18 @@ public sealed class TrackerAutomationTests : IDisposable
         Assert.Empty(store.AutomationHistory(Id, "other"));
         using var c = new SqliteConnection("Data Source=" + store.DatabasePath); c.Open(); using var cmd = c.CreateCommand(); cmd.CommandText = "SELECT COUNT(*) FROM tracker_automation_result";
         Assert.Equal(100L, cmd.ExecuteScalar()); Assert.Single(store.History(Id, Account));
+    }
+
+    [Fact]
+    public async Task OptedInSourceReplacesWrongCheckmarksWithoutManualReviewAndLeavesNotes()
+    {
+        var binding=store.Source(Id,Account);binding.ReplaceManualProgress=true;store.SaveSource(binding);store.SetManualProgress(Id,Account,"one",1);store.SaveNote(Id,Account,"one","Keep route note");store.SetManualProgress(Id,Account,"two",1);Enable();using var monitor=Monitor();await Settle(monitor);
+        Assert.Equal(0,State().Current);Assert.Null(State().ManualCurrent);Assert.Equal("Keep route note",State().Note);Assert.Equal(1,store.Load(Id,Account).Single(s=>s.Item.Id=="two").ManualCurrent);Assert.False(store.Automation(Id,Account).State.ReviewPending);
+    }
+    [Fact]
+    public async Task PeriodicAuthorityCanResolveManualValueOnSameFingerprintButUndoAndRollbackStillRequireReview()
+    {
+        var binding=store.Source(Id,Account);binding.ReplaceManualProgress=true;store.SaveSource(binding);Enable(TrackerAutomationMode.Periodic);using var monitor=Monitor();await Settle(monitor);store.SetManualProgress(Id,Account,"one",1);now=now.AddMinutes(2);await Settle(monitor);Assert.Null(State().ManualCurrent);Assert.Equal(0,State().Current);
+        store.Undo(Id,Account,store.History(Id,Account).First().Id);now=now.AddMinutes(2);await Settle(monitor);Assert.True(store.Automation(Id,Account).State.ReviewPending);Assert.Equal(1,State().ManualCurrent);
     }
 }

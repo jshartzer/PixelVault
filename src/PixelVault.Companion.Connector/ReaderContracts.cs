@@ -15,13 +15,13 @@ interface ITrackerSourceChangeDetector {string ChangeSignature(TrackerSourceBind
 interface ITrackerGameFileSource {}
 static class TrackerSourceFiles
 {
-    internal static string Signature(IEnumerable<FileInfo> candidates,int maximumBytes)
+    internal static string Signature(IEnumerable<FileInfo> candidates,int maximumBytes,bool allowConcurrentWrites=false)
     {
         var files=candidates.ToList();if(files.Count==0)throw new InvalidDataException("No source files found.");
         var first=files[0];var length=first.Length;var stamp=first.LastWriteTimeUtc;
         if(length>maximumBytes)throw new InvalidDataException("The source exceeds its size limit.");
-        using var input=new FileStream(first.FullName,FileMode.Open,FileAccess.Read,FileShare.Read);var hash=Convert.ToHexString(SHA256.HashData(input));first.Refresh();
-        if(first.Length!=length||first.LastWriteTimeUtc!=stamp)throw new IOException("The source is being saved.");
+        using var input=new FileStream(first.FullName,FileMode.Open,FileAccess.Read,allowConcurrentWrites?FileShare.ReadWrite|FileShare.Delete:FileShare.Read);var hash=Convert.ToHexString(SHA256.HashData(input));first.Refresh();
+        if(input.Length!=length||first.Length!=length||first.LastWriteTimeUtc!=stamp)throw new IOException("The source is being saved.");
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(hash+string.Join("\n",files.Select(f=>f.FullName+f.Length+f.LastWriteTimeUtc.Ticks)))));
     }
 }

@@ -7,6 +7,7 @@ public sealed record TrackerEditor(AchievementTrackerDefinition Definition, IRea
     IReadOnlyDictionary<string, TrackerFieldVersions> Versions, IReadOnlySet<string> ProtectedItems)
 {
     public TrackerTotals Totals => TrackerTotals.Calculate(Definition, States);
+    public IReadOnlyDictionary<string, string> RulesVersions => TrackerRepository.ItemRulesVersions(Definition);
 }
 public sealed record TrackerEdit(string ItemId, string Field, int? Current, string Note, string ExpectedVersion, string RequestId);
 public sealed record TrackerMutation(long? HistoryId, bool Replayed);
@@ -29,8 +30,9 @@ public partial class TrackerRepository : ITrackerRepository
             TrackerTotals.Calculate(d,ReadStates(c,tx,d,AchievementTrackingCatalog.AccountKey(d.Provider,approved[d.Provider]))))).ToList();
         tx.Commit();return rows;
     }
-    private static void EnsureRequests(SqliteConnection c, SqliteTransaction tx)
+    private void EnsureRequests(SqliteConnection c, SqliteTransaction tx)
     {
+        if(!initializeSchema)return;
         using var cmd = c.CreateCommand(); cmd.Transaction = tx;
         cmd.CommandText = """
             CREATE TABLE IF NOT EXISTS tracker_client_request(
@@ -83,22 +85,6 @@ public partial class TrackerRepository : ITrackerRepository
     private static TrackerStoredRecord Stored(AchievementTrackerState s) => new() { Reported = s.ReportedCurrent, Manual = s.ManualCurrent,
         Availability = (int)s.Availability, Note = s.Note, Source = s.Source, Evidence = s.Evidence, ObservedUtc = s.ObservedUtcTicks, ManualUtc = s.ManualUtcTicks };
 
-    private static Dictionary<(string Item, bool Note), (long Id, long Undone)> VersionEvents(SqliteConnection c, SqliteTransaction tx, string tracker, string account)
-    {
-        using var cmd=c.CreateCommand();cmd.Transaction=tx;
-        cmd.CommandText="SELECT json_extract(j.value,'$.ItemId'),json_extract(j.value,'$.Fields'),h.id,h.undone_utc FROM tracker_history h,json_each(h.changes) j WHERE h.tracker_id=$t AND h.account=$a";
-        cmd.Parameters.AddWithValue("$t",tracker);cmd.Parameters.AddWithValue("$a",account);using var r=cmd.ExecuteReader();
-        var events=new Dictionary<(string,bool),(long,long)>();
-        while(r.Read()) foreach(var note in new[]{false,true})
-        {
-            var fields=note?TrackerChangeFields.Note:TrackerChangeFields.Manual|TrackerChangeFields.Reported;
-            if((r.GetInt32(1)&(int)fields)==0)continue;
-            var key=(r.GetString(0),note);var previous=events.GetValueOrDefault(key);
-            events[key]=(Math.Max(previous.Item1,r.GetInt64(2)),previous.Item2+(r.GetInt64(3)>0?1:0));
-        }
-        return events;
-    }
-
     private static bool GameConfirmed(SqliteConnection c, SqliteTransaction tx, string tracker, string account, AchievementTrackerItem item,
         TrackerStoredRecord prior, IReadOnlySet<string> native)
     {
@@ -114,12 +100,12 @@ public partial class TrackerRepository : ITrackerRepository
             ?? throw new InvalidDataException("The tracker was not found.");
         account = RequireAccount(definition, account);
         var states = ReadStates(c, tx, definition, account);
-        var events=VersionEvents(c,tx,tracker,account);
+        var history=ReadEditorHistory(c,tx,tracker,account);var events=history.Events;
         string Stamp(string item,bool note) {var e=events.GetValueOrDefault((item,note));return e.Id+":"+e.Undone;}
         var versions = states.Where(s => !s.Item.Archived).ToDictionary(s => s.Item.Id, s => new TrackerFieldVersions(
             Version(Stored(s),s.Item,TrackerChangeFields.Manual|TrackerChangeFields.Reported,Stamp(s.Item.Id,false),tracker,account),
             Version(Stored(s),s.Item,TrackerChangeFields.Note,Stamp(s.Item.Id,true),tracker,account)));
-        var reports = LatestInlineReports(c, tx, tracker, account);
+        var reports = history.Reports;
         var native = GameFileAdapterIds;
         var protectedItems = states.Where(s => s.ReportedCurrent >= s.Item.Target && reports.TryGetValue(s.Item.Id, out var report)
             && native.Contains(report.Adapter) && report.After.Reported == s.ReportedCurrent && report.After.ObservedUtc == s.ObservedUtcTicks

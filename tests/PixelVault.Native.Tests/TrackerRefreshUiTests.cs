@@ -45,6 +45,27 @@ public sealed class TrackerRefreshUiTests : IDisposable
     }
     AchievementTrackerWindow Window() => new(null!, store, Account, "", new[] { new AchievementHubGame { Provider = "steam", Id = "42", Title = "A game" } }, "steam", "42");
     [Fact]
+    public void ExternalWebCheckoffRefreshesAnOpenTrackerAndDefersWhileANoteDraftIsOpen()
+    {
+        AchievementCollectionAccessTests.OnSta(()=>
+        {
+            SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(Dispatcher.CurrentDispatcher));var window=Window();
+            try
+            {
+                Pump(window.LoadDefinitionsAsync());Pump(window.PollAutomaticStatusAsync());
+                var incoming=new TrackerWebField("one","Postbox",1,null!,null!,"progress",new string('A',64),0,"",1,"");
+                store.ApplyWebEdits(new string('B',64),Id,Account,new[]{incoming});Pump(window.PollAutomaticStatusAsync());
+                Assert.True(Field<List<AchievementTrackerState>>(window,"states").Single(s=>s.Item.Id=="one").Complete);
+                Field<ComboBox>(window,"filter").SelectedIndex=0;var list=Field<ListBox>(window,"list");list.SelectedItem=list.Items.OfType<ListBoxItem>().Single(i=>((AchievementTrackerState)i.Tag).Item.Id=="one");
+                var notes=Field<TextBox>(window,"notes");notes.Text="Unsent PC note";
+                store.ApplyWebEdits(new string('B',64),Id,Account,new[]{incoming with{Version=new string('C',64),Current=0}});Pump(window.PollAutomaticStatusAsync());
+                Assert.Equal("Unsent PC note",notes.Text);Assert.True(Field<List<AchievementTrackerState>>(window,"states").Single(s=>s.Item.Id=="one").Complete);
+                notes.Text=Field<AchievementTrackerState>(window,"selectedItem").Note;Pump(window.PollAutomaticStatusAsync());Assert.False(Field<List<AchievementTrackerState>>(window,"states").Single(s=>s.Item.Id=="one").Complete);
+            }
+            finally{window.Close();}
+        });
+    }
+    [Fact]
     public void RefreshRecoversTheSavedConnectionWhenItsUiCacheIsMissing()
     {
         AchievementCollectionAccessTests.OnSta(()=>

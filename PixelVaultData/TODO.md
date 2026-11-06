@@ -1,5 +1,9 @@
 # PixelVault To Do
 
+**October 31 — PC-hosted Companion is live:** Companion 0.39.0 / Native 0.114.000 share canonical data and in-place photos; actual phone owner login/library/tracker/photo loading pass. Full production app/state backups and verified NAS copies run daily. NAS hosting and old connector startup are retired. Follow up: install/retest prepared 0.39.1 smaller-cover cache for slow initial app loading, then observe normal use, edit/undo and new captures. [Cutover and acceptance](../docs/plans/PV-PLN-WEB-003-phase-6-cutover.md).
+
+**October28 — Automatic road refresh:** Native0.106.000 published and Road Building connected at28/51. Save data now controls this road binding's checks at explicit user request, preserving notes; nonexistent41-34archived with history. Full1327Native tests,90focused and actual packaged27→28scheduler control pass. Companion rollout coordinated separately. [Evidence](../docs/DEATH_STRANDING_ROAD_RESEARCH.md). Other E/F work remains open.
+
 **Companion automatic photo sync — installed in connector 0.15.0.** New indexed photos/group edits/XMP now publish automatically with verified checkpoints and existing pause controls. NAS stays 0.14.0; all 282 current collections reconciled unchanged. [Operation](../docs/COMPANION_SCREENSHOTS.md).
 
 **Companion Screenshot Library — implemented:** Steps 1–6 and full current-library rollout are live in 0.14.0: 5,837 photos/282 collections. Next follow-up: automatic new-photo/group/metadata syncing; physical iPhone review remains user validation. [Plan](../docs/plans/PV-PLN-WEB-002-companion-screenshot-library.md).

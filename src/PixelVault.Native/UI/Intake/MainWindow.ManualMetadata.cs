@@ -243,6 +243,7 @@ namespace PixelVaultNative
                         item.TagPs5 = false;
                         item.TagSwitch = false;
                         item.TagXbox = false;
+                        item.TagXbox360 = false;
                         item.TagOther = false;
                         item.CustomPlatformTag = string.Empty;
                         item.ForceTagMetadataWrite = true;
@@ -318,6 +319,8 @@ namespace PixelVaultNative
                 else if (h.Ps5Box.IsChecked == true) notes.Add("platform tag: PS5");
                 else if (h.SwitchBox.IsChecked == true) notes.Add("platform tag: Switch");
                 else if (h.XboxBox.IsChecked == true) notes.Add("platform tag: Xbox");
+                else if (h.Xbox360Box.IsChecked == true) notes.Add("platform tag: Xbox360");
+                else if (h.Xbox360Box.IsChecked == true) notes.Add("platform tag: Xbox360");
                 else if (h.OtherBox.IsChecked == true) notes.Add("platform tag: " + CleanTag(h.OtherPlatformBox.Text));
                 if (h.ImportAndEditMode && h.SelectedItems.Count > 0)
                 {
@@ -350,6 +353,7 @@ namespace PixelVaultNative
                     h.Ps5Box.IsChecked = false;
                     h.SwitchBox.IsChecked = false;
                     h.XboxBox.IsChecked = false;
+                    h.Xbox360Box.IsChecked = false;
                     h.PcBox.IsChecked = false;
                     h.EmulationBox.IsChecked = false;
                     h.OtherBox.IsChecked = false;
@@ -424,6 +428,7 @@ namespace PixelVaultNative
                 h.Ps5Box.IsChecked = GetSharedManualMetadataFieldBool(h.SelectedItems, delegate(ManualMetadataItem item) { return item.TagPs5; });
                 h.SwitchBox.IsChecked = GetSharedManualMetadataFieldBool(h.SelectedItems, delegate(ManualMetadataItem item) { return item.TagSwitch; });
                 h.XboxBox.IsChecked = GetSharedManualMetadataFieldBool(h.SelectedItems, delegate(ManualMetadataItem item) { return item.TagXbox; });
+                h.Xbox360Box.IsChecked = GetSharedManualMetadataFieldBool(h.SelectedItems, delegate(ManualMetadataItem item) { return item.TagXbox360; });
                 h.OtherBox.IsChecked = GetSharedManualMetadataFieldBool(h.SelectedItems, delegate(ManualMetadataItem item) { return item.TagOther; });
                 h.OtherPlatformBox.Text = GetSharedManualMetadataFieldText(h.SelectedItems, delegate(ManualMetadataItem item) { return item.CustomPlatformTag; });
                 if (h.ImportAndEditMode) h.DeleteBeforeBox.IsChecked = GetSharedManualMetadataFieldBool(h.SelectedItems, delegate(ManualMetadataItem item) { return item.DeleteBeforeProcessing; });
@@ -693,6 +698,25 @@ namespace PixelVaultNative
                 foreach (var item in h.SelectedItems)
                 {
                     item.TagXbox = false;
+                    item.ForceTagMetadataWrite = true;
+                }
+                refreshTileBadges();
+                refreshSelectionUi();
+            };
+            h.Xbox360Box.Checked += delegate
+            {
+                if (h.SuppressSync || h.SelectedItems.Count == 0) return;
+                ApplyConsolePlatformToManualMetadataItems(h.SelectedItems, "Xbox 360");
+                refreshTileBadges();
+                refreshSelectionUi();
+            };
+            h.Xbox360Box.Unchecked += delegate
+            {
+                if (h.SuppressSync || h.SelectedItems.Count == 0) return;
+                if (h.Xbox360Box.IsChecked != false) return;
+                foreach (var item in h.SelectedItems)
+                {
+                    item.TagXbox360 = false;
                     item.ForceTagMetadataWrite = true;
                 }
                 refreshTileBadges();

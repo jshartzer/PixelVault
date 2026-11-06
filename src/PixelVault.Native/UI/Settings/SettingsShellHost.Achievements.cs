@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Threading;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
@@ -18,17 +19,56 @@ namespace PixelVaultNative
             var text = SystemParameters.HighContrast ? SystemColors.WindowTextBrush : d.Brush(DesignTokens.TextOnInput);
             var muted = SystemParameters.HighContrast ? SystemColors.WindowTextBrush : d.Brush(DesignTokens.TextLabelMuted);
             var layout = new Grid();
+            layout.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
             layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            layout.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star), MinHeight = 70 });
-            layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            // Keep saving available when the window is short or sync messages wrap.
+            // The account controls and category editor scroll together above the footer.
+            var content = new Grid();
+            content.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            content.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star), MinHeight = 70 });
+            var contentScroll = new ScrollViewer
+            {
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                VerticalContentAlignment = VerticalAlignment.Stretch,
+                Content = content
+            };
+            layout.Children.Add(contentScroll);
             var heading = new StackPanel { Margin = new Thickness(0, 0, 0, 12) };
+            var xbox = SettingsButton("Xbox account and games…", null, DesignTokens.ActionSecondaryFill, Brushes.White);
+            xbox.HorizontalAlignment = HorizontalAlignment.Left;
+            xbox.Margin = new Thickness(0, 0, 0, 16);
+            xbox.Click += (_, __) => XboxAchievementsWindow.ShowFor(Window.GetWindow(xbox));
+            heading.Children.Add(xbox);
+            var syncActions = new WrapPanel();
+            var syncXbox = SettingsButton("Sync all Xbox achievements", null, DesignTokens.ActionPrimaryFill, Brushes.White);
+            var cancelXbox = SettingsButton("Cancel sync", null, DesignTokens.ActionSecondaryFill, Brushes.White);
+            cancelXbox.Visibility = Visibility.Collapsed;
+            var xboxStatus = new TextBlock { Foreground = muted, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 6, 0, 16) };
+            AutomationProperties.SetLiveSetting(xboxStatus, AutomationLiveSetting.Polite);
+            syncActions.Children.Add(syncXbox); syncActions.Children.Add(cancelXbox);
+            heading.Children.Add(syncActions); heading.Children.Add(xboxStatus);
+            CancellationTokenSource xboxSync = null;
+            cancelXbox.Click += (_, __) => xboxSync?.Cancel();
+            layout.Unloaded += (_, __) => xboxSync?.Cancel();
+            syncXbox.Click += async (_, __) =>
+            {
+                var service = new XboxAchievementService();
+                if (!service.Connected) { xboxStatus.Text = "Connect your account using Xbox account and games first."; return; }
+                xboxSync = new CancellationTokenSource();
+                syncXbox.IsEnabled = xbox.IsEnabled = false; cancelXbox.Visibility = Visibility.Visible;
+                try { await service.SyncLibraryAsync(message => xboxStatus.Text = message, xboxSync.Token); }
+                catch (OperationCanceledException) { xboxStatus.Text = "Xbox sync cancelled. Completed games were saved."; }
+                catch (Exception ex) { xboxStatus.Text = ex.Message; }
+                finally { xboxSync.Dispose(); xboxSync = null; syncXbox.IsEnabled = xbox.IsEnabled = true; cancelXbox.Visibility = Visibility.Collapsed; }
+            };
             heading.Children.Add(new TextBlock { Text = "Subcategory order", FontSize = 22, FontWeight = FontWeights.SemiBold, Foreground = text });
             heading.Children.Add(new TextBlock
             {
                 Text = "Choose the order used within Base Game and DLC for all games.",
                 TextWrapping = TextWrapping.Wrap, Foreground = muted, Margin = new Thickness(0, 4, 0, 0)
             });
-            layout.Children.Add(heading);
+            content.Children.Add(heading);
             var names = new ObservableCollection<string>();
             var saved = new List<string>();
             var status = new TextBlock { Foreground = muted, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(14, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
@@ -64,14 +104,14 @@ namespace PixelVaultNative
             up.Margin = new Thickness(0, 0, 0, 6); down.Margin = new Thickness(0);
             moves.Children.Add(up); moves.Children.Add(down);
             Grid.SetColumn(moves, 1); grid.Children.Add(moves);
-            Grid.SetRow(grid, 1); layout.Children.Add(grid);
+            Grid.SetRow(grid, 1); content.Children.Add(grid);
             var save = SettingsButton("Save order", null, DesignTokens.ActionPrimaryFill, Brushes.White);
             save.HorizontalAlignment = HorizontalAlignment.Left;
             var footer = new Grid { Margin = new Thickness(0, 10, 0, 0) };
             footer.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             footer.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             footer.Children.Add(save); Grid.SetColumn(status, 1); footer.Children.Add(status);
-            Grid.SetRow(footer, 2); layout.Children.Add(footer);
+            Grid.SetRow(footer, 1); layout.Children.Add(footer);
             if (!SystemParameters.HighContrast)
             {
                 up.Template = LibraryButtonChrome.BuildLibraryToolbarButtonTemplate(DesignTokens.ActionSecondaryFill, DesignTokens.BorderDefault, "#32434D", "#172127");

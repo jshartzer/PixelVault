@@ -60,6 +60,7 @@ namespace PixelVaultNative
             List<FilenameConventionRule> builtInRules = new List<FilenameConventionRule>();
             List<FilenameConventionSample> samples = new List<FilenameConventionSample>();
             List<FilenameConventionEditorSampleItem> stagedSamples = new List<FilenameConventionEditorSampleItem>();
+            var pendingSampleDismissals = new Dictionary<FilenameConventionRule, List<long>>();
             FilenameConventionRule editingRule = null;
             FilenameConventionBuilderDraft editingDraft = null;
             bool editingBuiltIn = false;
@@ -69,10 +70,10 @@ namespace PixelVaultNative
             var editorWindow = new Window
             {
                 Title = "PixelVault " + appVersion + " Renaming Rules",
-                Width = 1480,
-                Height = 980,
-                MinWidth = 1220,
-                MinHeight = 820,
+                Width = 1380,
+                Height = 920,
+                MinWidth = 1120,
+                MinHeight = 740,
                 Owner = owner,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
                 Background = B("#F3EEE4")
@@ -162,9 +163,8 @@ namespace PixelVaultNative
 
             var header = new Border { Background = B("#161C20"), CornerRadius = new CornerRadius(20), Padding = new Thickness(24), Margin = new Thickness(0, 0, 0, 18) };
             var headerStack = new StackPanel();
-            headerStack.Children.Add(new TextBlock { Text = "Renaming rules", FontSize = 30, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White });
-            headerStack.Children.Add(new TextBlock { Text = "Use recent unmatched samples to create readable rules, inspect the shipped built-ins, and save library-specific overrides with confidence.", Margin = new Thickness(0, 10, 0, 0), FontSize = 14, Foreground = B("#B7C6C0"), TextWrapping = TextWrapping.Wrap });
-            headerStack.Children.Add(new TextBlock { Text = "Readable rule examples: [appid]_[yyyy][MM][dd][HH][mm][ss][opt-counter].[ext:media], [title]_[yyyy][MM][dd].[ext:image], clip_[unixms].[ext:video], or [contains:PS5].", Margin = new Thickness(0, 10, 0, 0), FontSize = 13, Foreground = B("#D8C7A4"), TextWrapping = TextWrapping.Wrap });
+            headerStack.Children.Add(new TextBlock { Text = "Filename rules", FontSize = 30, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White });
+            headerStack.Children.Add(new TextBlock { Text = "Teach PixelVault how to read filenames the built-in rules don’t recognize. Start with a sample, shape the rule, then save it for this library.", Margin = new Thickness(0, 8, 0, 0), FontSize = 14, Foreground = B("#B7C6C0"), TextWrapping = TextWrapping.Wrap });
             header.Child = headerStack;
             root.Children.Add(header);
 
@@ -173,7 +173,6 @@ namespace PixelVaultNative
             root.Children.Add(shell);
 
             var body = new Grid();
-            body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             body.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
@@ -200,13 +199,12 @@ namespace PixelVaultNative
             Grid.SetColumn(createRuleFromSampleButton, 1);
             controlsRow.Children.Add(createRuleFromSampleButton);
 
-            var promoteFrequentButton = MakeButton("Promote Frequent", "#355F93", Brushes.White, 180);
+            var promoteFrequentButton = MakeButton("Promote Repeated", "#355F93", Brushes.White, 170);
             SetButtonToolTip(promoteFrequentButton, "Choose repeated unmatched samples and turn them into starter rule drafts.");
-            Grid.SetColumn(promoteFrequentButton, 2);
-            controlsRow.Children.Add(promoteFrequentButton);
 
             var addFromFileButton = MakeButton("Add From File...", "#275D47", Brushes.White, 180);
             SetButtonToolTip(addFromFileButton, "Pick any file and stage only its filename for guided parsing.");
+            addFromFileButton.Visibility = Visibility.Collapsed;
             Grid.SetColumn(addFromFileButton, 3);
             controlsRow.Children.Add(addFromFileButton);
 
@@ -222,7 +220,7 @@ namespace PixelVaultNative
 
             var helperText = new TextBlock
             {
-                Text = "Flow: samples at the top, then the rule editor, then known rules below. Select a sample to draft, or pick a rule to edit or inspect.",
+                Text = "Choose a filename, check the suggested parts, and save when the pattern looks right.",
                 VerticalAlignment = VerticalAlignment.Center,
                 Foreground = B("#5F6970"),
                 TextWrapping = TextWrapping.Wrap,
@@ -242,7 +240,7 @@ namespace PixelVaultNative
             persistRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             var persistHint = new TextBlock
             {
-                Text = "Create Rule From Sample adds a draft to Custom Rules below — it is not saved until you click Save Rules.",
+                Text = "Your edits stay in this window until you save.",
                 VerticalAlignment = VerticalAlignment.Center,
                 Foreground = B("#33424D"),
                 TextWrapping = TextWrapping.Wrap,
@@ -258,29 +256,37 @@ namespace PixelVaultNative
             Grid.SetRow(persistRow, 1);
             body.Children.Add(persistRow);
 
-            var sampleCard = Card("Filename Staging", "Stage recent unmatched filenames or add a filename from disk. PixelVault will suggest the shape, then you decide what each part means.", new Thickness(0, 0, 0, 14));
-            Grid.SetRow(sampleCard, 2);
-            body.Children.Add(sampleCard);
+            var workArea = new Grid { Margin = new Thickness(0, 0, 0, 14) };
+            workArea.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(360) });
+            workArea.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            Grid.SetRow(workArea, 2);
+            body.Children.Add(workArea);
+
+            var sampleCard = Card("1. Choose a filename", "Select something PixelVault didn’t recognize, or add a file to try its name.", new Thickness(0, 0, 10, 0));
+            Grid.SetRow(sampleCard, 0);
+            workArea.Children.Add(sampleCard);
             var sampleStack = (StackPanel)sampleCard.Child;
 
-            var sampleToolbar = new Grid { Margin = new Thickness(0, 0, 0, 12) };
+            var sampleToolbar = new Grid { Margin = new Thickness(0, 0, 0, 8) };
             sampleToolbar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             sampleToolbar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             sampleToolbar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             sampleStack.Children.Add(sampleToolbar);
 
-            var sampleToolbarAddButton = MakeButton("Add From File...", "#275D47", Brushes.White, 170);
+            controlsRow.Children.Remove(promoteFrequentButton);
+            var sampleToolbarAddButton = MakeButton("Add From File...", "#275D47", Brushes.White, 145);
             sampleToolbarAddButton.Margin = new Thickness(0, 0, 10, 0);
             sampleToolbar.Children.Add(sampleToolbarAddButton);
 
-            var clearStagedButton = MakeButton("Clear Staged", "#EEF2F5", B("#33424D"), 150);
+            var clearStagedButton = MakeButton("Clear staged", "#EEF2F5", B("#33424D"), 110);
+            SetButtonToolTip(clearStagedButton, "Remove filenames added from disk during this session.");
             clearStagedButton.Margin = new Thickness(0);
             Grid.SetColumn(clearStagedButton, 1);
             sampleToolbar.Children.Add(clearStagedButton);
 
             var sampleToolbarText = new TextBlock
             {
-                Text = "Recent samples stay persisted. Added filenames are session-only and use only the basename.",
+                Text = "Added names stay here until you close this window.",
                 Foreground = B("#5F6970"),
                 VerticalAlignment = VerticalAlignment.Center,
                 TextWrapping = TextWrapping.Wrap,
@@ -288,6 +294,22 @@ namespace PixelVaultNative
             };
             Grid.SetColumn(sampleToolbarText, 2);
             sampleToolbar.Children.Add(sampleToolbarText);
+
+            var frequentToolbar = new Grid { Margin = new Thickness(0, 0, 0, 10) };
+            frequentToolbar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            frequentToolbar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            Grid.SetColumn(promoteFrequentButton, 0);
+            promoteFrequentButton.Margin = new Thickness(0, 0, 10, 0);
+            frequentToolbar.Children.Add(promoteFrequentButton);
+            frequentToolbar.Children.Add(new TextBlock
+            {
+                Text = "Make starter rules from filenames PixelVault has missed more than once.",
+                Foreground = B("#5F6970"),
+                VerticalAlignment = VerticalAlignment.Center,
+                TextWrapping = TextWrapping.Wrap
+            });
+            Grid.SetColumn(frequentToolbar.Children[1], 1);
+            sampleStack.Children.Add(frequentToolbar);
 
             var sampleGrid = new DataGrid
             {
@@ -310,11 +332,9 @@ namespace PixelVaultNative
                 MaxHeight = 220,
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto
             };
-            sampleGrid.Columns.Add(new DataGridTextColumn { Header = "Source", Binding = new Binding("SourceLabel"), Width = 90 });
-            sampleGrid.Columns.Add(new DataGridTextColumn { Header = "File Name", Binding = new Binding("FileName"), Width = new DataGridLength(2.6, DataGridLengthUnitType.Star) });
-            sampleGrid.Columns.Add(new DataGridTextColumn { Header = "Suggested Platform", Binding = new Binding("SuggestedPlatformLabel"), Width = 150 });
-            sampleGrid.Columns.Add(new DataGridTextColumn { Header = "Count", Binding = new Binding("OccurrenceCount"), Width = 80 });
-            sampleGrid.Columns.Add(new DataGridTextColumn { Header = "Last Seen (UTC)", Binding = new Binding("LastSeenUtcText"), Width = 170 });
+            sampleGrid.Columns.Add(new DataGridTextColumn { Header = "File name", Binding = new Binding("FileName"), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
+            sampleGrid.Columns.Add(new DataGridTextColumn { Header = "From", Binding = new Binding("SourceLabel"), Width = 68 });
+            sampleGrid.Columns.Add(new DataGridTextColumn { Header = "Count", Binding = new Binding("OccurrenceCount"), Width = 52 });
             sampleStack.Children.Add(sampleGrid);
 
             var sampleSummaryHost = new StackPanel();
@@ -334,9 +354,10 @@ namespace PixelVaultNative
             sampleSummaryHost.Children.Add(sampleHintText);
             sampleStack.Children.Add(new Border { Background = B("#EEF3F7"), BorderBrush = B("#D7E1E8"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(12), Padding = new Thickness(14), Child = sampleSummaryHost });
 
-            var editorCard = Card("Rule Editor", "Edit one draft at a time. Built-ins load here in read-only mode so you can understand them before overriding them.", new Thickness(0, 0, 0, 14));
-            Grid.SetRow(editorCard, 3);
-            body.Children.Add(editorCard);
+            var editorCard = Card("2. Build the rule", "PixelVault suggests what each part means. Change a part’s role if the guess is wrong.", new Thickness(10, 0, 0, 0));
+            Grid.SetRow(editorCard, 0);
+            Grid.SetColumn(editorCard, 1);
+            workArea.Children.Add(editorCard);
             var editorStack = (StackPanel)editorCard.Child;
             editorCard.MinHeight = 360;
             var editorHost = new Grid();
@@ -396,7 +417,7 @@ namespace PixelVaultNative
             Grid.SetColumn(priorityField, 1);
             topFields.Children.Add(priorityField);
             var platformCombo = MakeCombo();
-            foreach (var item in new[] { "Other", "Steam", "Xbox", "PS5", "PlayStation", "Switch", "PC" }) platformCombo.Items.Add(item);
+            foreach (var item in new[] { "Other", "Steam", "Xbox", "Xbox 360", "PS5", "PlayStation", "Switch", "PC" }) platformCombo.Items.Add(item);
             var platformField = Labeled("Platform", platformCombo);
             Grid.SetColumn(platformField, 2);
             topFields.Children.Add(platformField);
@@ -409,7 +430,8 @@ namespace PixelVaultNative
             midFields.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             midFields.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             var tagsBox = MakeTextBox();
-            midFields.Children.Add(Labeled("Tags", tagsBox, "Semicolon-separated tags such as Steam;PlayStation;Nintendo."));
+            var tagsField = Labeled("Tags", tagsBox, "Semicolon-separated tags such as Steam;PlayStation;Nintendo.");
+            midFields.Children.Add(tagsField);
             var missingAppIdCombo = MakeCombo();
             missingAppIdCombo.Items.Add("Do nothing");
             missingAppIdCombo.Items.Add("Send to manual intake");
@@ -419,7 +441,8 @@ namespace PixelVaultNative
             editorFields.Children.Add(midFields);
 
             var preserveFileTimesBox = new CheckBox { Content = "Preserve file time", Foreground = B("#1B232B"), Margin = new Thickness(0, 8, 0, 0) };
-            editorFields.Children.Add(Labeled("File Time Behavior", preserveFileTimesBox));
+            var preserveFileTimesField = Labeled("File Time Behavior", preserveFileTimesBox);
+            editorFields.Children.Add(preserveFileTimesField);
 
             var autoIntakeHost = new Grid();
             autoIntakeHost.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -438,11 +461,21 @@ namespace PixelVaultNative
             Grid.SetColumn(autoIntakeBuiltInNote, 0);
             autoIntakeHost.Children.Add(autoIntakeCombo);
             autoIntakeHost.Children.Add(autoIntakeBuiltInNote);
-            editorFields.Children.Add(Labeled("Background auto-intake (custom rules)", autoIntakeHost, "Path Settings can enable folder watching; this control applies to saved custom rules only."));
+            var autoIntakeField = Labeled("Background auto-intake (custom rules)", autoIntakeHost, "Path Settings can enable folder watching; this control applies to saved custom rules only.");
+            editorFields.Children.Add(autoIntakeField);
 
             var advanced = new Expander { Header = "Advanced Parser Fields", IsExpanded = false, Margin = new Thickness(0, 4, 0, 0) };
             var advancedStack = new StackPanel { Margin = new Thickness(0, 10, 0, 0) };
             advanced.Content = advancedStack;
+            editorFields.Children.Remove(midFields);
+            editorFields.Children.Remove(preserveFileTimesField);
+            editorFields.Children.Remove(autoIntakeField);
+            midFields.Children.Remove(tagsField);
+            midFields.Children.Remove(missingField);
+            advancedStack.Children.Add(tagsField);
+            advancedStack.Children.Add(missingField);
+            advancedStack.Children.Add(preserveFileTimesField);
+            advancedStack.Children.Add(autoIntakeField);
             var conventionIdBox = MakeTextBox();
             advancedStack.Children.Add(Labeled("Convention Id", conventionIdBox));
             var advancedGroups = new Grid();
@@ -466,11 +499,18 @@ namespace PixelVaultNative
             advancedStack.Children.Add(Labeled("Raw Regex Preview", regexPreviewBox, "This is generated from the readable rule pattern. It is read-only."));
             editorFields.Children.Add(advanced);
 
-            var knownRulesGrid = new Grid { Margin = new Thickness(0, 0, 0, 8) };
+            var knownRulesGrid = new Grid { Margin = new Thickness(0, 4, 0, 8) };
             knownRulesGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             knownRulesGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            Grid.SetRow(knownRulesGrid, 4);
-            body.Children.Add(knownRulesGrid);
+            var knownRulesExpander = new Expander
+            {
+                Header = "Manage saved rules  ·  inspect built-ins or edit custom rules",
+                IsExpanded = false,
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+            knownRulesExpander.Content = knownRulesGrid;
+            Grid.SetRow(knownRulesExpander, 3);
+            body.Children.Add(knownRulesExpander);
 
             var customCard = Card("Custom Rules", "Saved for this library. Click one to load it into the editor.", new Thickness(0, 0, 8, 0));
             knownRulesGrid.Children.Add(customCard);
@@ -549,7 +589,7 @@ namespace PixelVaultNative
 
             var footerGrid = new Grid { Margin = new Thickness(0, 16, 0, 0) };
             footerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            Grid.SetRow(footerGrid, 5);
+            Grid.SetRow(footerGrid, 4);
             body.Children.Add(footerGrid);
 
             var statusText = new TextBlock { Foreground = B("#5F6970"), VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap };
@@ -665,6 +705,34 @@ namespace PixelVaultNative
                 builderPreviewText.Text = "Pattern preview: " + (editingDraft.ShapePreview ?? string.Empty)
                     + Environment.NewLine + "Platform: " + (string.IsNullOrWhiteSpace(editingDraft.PlatformLabel) ? "Other" : editingDraft.PlatformLabel)
                     + (string.IsNullOrWhiteSpace(editingDraft.TimestampFormat) ? string.Empty : Environment.NewLine + "Timestamp format: " + editingDraft.TimestampFormat);
+                var selectedSample = GetSelectedSampleItem();
+                var testFileName = !string.IsNullOrWhiteSpace(selectedSample?.FileName)
+                    ? selectedSample.FileName
+                    : editingDraft.FileName;
+                if (!string.IsNullOrWhiteSpace(testFileName))
+                {
+                    var patternToTest = string.IsNullOrWhiteSpace(patternBox.Text)
+                        ? editingDraft.ShapePreview
+                        : patternBox.Text;
+                    try
+                    {
+                        var normalizedPattern = FilenameParserService.NormalizePatternTextForStorage(patternToTest);
+                        var regexPattern = FilenameParserService.BuildRegexPattern(normalizedPattern, services.CleanTag(timestampGroupBox.Text));
+                        var matchesSample = Regex.IsMatch(testFileName, regexPattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(150));
+                        builderPreviewText.Text += Environment.NewLine + "Sample check: " + (matchesSample ? "Matches " : "Doesn’t match ") + testFileName;
+                        var simplifiedPattern = normalizedPattern.Trim();
+                        if (string.Equals(simplifiedPattern, "[title].[ext:media]", StringComparison.OrdinalIgnoreCase)
+                            || string.Equals(simplifiedPattern, "[title].[ext:image]", StringComparison.OrdinalIgnoreCase)
+                            || string.Equals(simplifiedPattern, "[title].[ext:video]", StringComparison.OrdinalIgnoreCase))
+                        {
+                            builderPreviewText.Text += Environment.NewLine + "This pattern accepts any supported filename of that media type. Add a fixed part or date token to make it more specific.";
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        builderPreviewText.Text += Environment.NewLine + "Sample check could not run: " + ex.Message;
+                    }
+                }
                 openAdvancedButton.Visibility = editingDraft.CanRoundTripInBuilder ? Visibility.Collapsed : Visibility.Visible;
 
                 foreach (var segment in editingDraft.Segments.Where(segment => segment != null))
@@ -865,17 +933,24 @@ namespace PixelVaultNative
                 saveTopButton.IsEnabled = !editingBuiltIn && editingRule != null;
             }
 
-            void DismissSamples(IEnumerable<FilenameConventionSample> handledSamples)
+            void TrackSampleDismissal(FilenameConventionRule rule, IEnumerable<FilenameConventionSample> handledSamples)
             {
+                if (rule == null) return;
                 var ids = (handledSamples ?? Enumerable.Empty<FilenameConventionSample>())
                     .Where(sample => sample != null && sample.SampleId > 0)
                     .Select(sample => sample.SampleId)
                     .Distinct()
                     .ToList();
-
                 if (ids.Count == 0) return;
-                services.RulesService.DismissSamples(libraryRoot, ids);
-                samples = samples.Where(sample => sample == null || !ids.Contains(sample.SampleId)).ToList();
+                if (!pendingSampleDismissals.TryGetValue(rule, out var existing))
+                {
+                    existing = new List<long>();
+                    pendingSampleDismissals[rule] = existing;
+                }
+                foreach (var id in ids)
+                {
+                    if (!existing.Contains(id)) existing.Add(id);
+                }
             }
 
             void RefreshLists(bool reloadSources = true)
@@ -997,6 +1072,7 @@ namespace PixelVaultNative
 
                 var wasEditing = ReferenceEquals(editingRule, selected);
                 customRules.Remove(selected);
+                pendingSampleDismissals.Remove(selected);
                 if (wasEditing)
                 {
                     customGrid.SelectedItem = null;
@@ -1034,7 +1110,7 @@ namespace PixelVaultNative
                 }
 
                 customRules.Insert(0, candidate);
-                DismissSamples(new[] { sample });
+                TrackSampleDismissal(candidate, new[] { sample });
                 dirty = true;
                 RefreshLists(true);
                 SelectCustomRule(candidate, true);
@@ -1091,7 +1167,7 @@ namespace PixelVaultNative
                 if (!item.IsSessionStaged)
                 {
                     var persistedSample = ResolvePersistedSample(item);
-                    if (persistedSample != null) DismissSamples(new[] { persistedSample });
+                    if (persistedSample != null) TrackSampleDismissal(candidate, new[] { persistedSample });
                 }
                 dirty = true;
                 RefreshLists(true);
@@ -1187,7 +1263,19 @@ namespace PixelVaultNative
                     PushEditorToRule();
                     var preserveKey = editingRule != null ? RuleSelectionKey(editingRule) : null;
                     var preserveBuiltIn = editingBuiltIn;
-                    ApplyLoadedState(services.RulesService.SaveRules(libraryRoot, customRules));
+                    var savedState = services.RulesService.SaveRules(libraryRoot, customRules);
+                    var sampleIdsToDismiss = pendingSampleDismissals
+                        .Where(entry => customRules.Contains(entry.Key))
+                        .SelectMany(entry => entry.Value)
+                        .Distinct()
+                        .ToList();
+                    if (sampleIdsToDismiss.Count > 0)
+                    {
+                        services.RulesService.DismissSamples(libraryRoot, sampleIdsToDismiss);
+                        savedState = services.RulesService.LoadState(libraryRoot);
+                    }
+                    pendingSampleDismissals.Clear();
+                    ApplyLoadedState(savedState);
                     dirty = false;
                     RefreshLists(true);
                     if (!string.IsNullOrWhiteSpace(preserveKey))
@@ -1259,6 +1347,7 @@ namespace PixelVaultNative
                 ApplyLoadedState(services.RulesService.LoadState(libraryRoot));
                 dirty = false;
                 stagedSamples = new List<FilenameConventionEditorSampleItem>();
+                pendingSampleDismissals.Clear();
                 editingDraft = null;
                 LoadRuleIntoEditor(null, false);
                 var items = BuildSampleItems();

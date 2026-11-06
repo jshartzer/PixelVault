@@ -663,15 +663,18 @@ namespace PixelVaultNative
 
         /// <summary>
         /// PV-PLN-UI-001 Step 13 Pass C: the merged "All" projection cache lives on this
-        /// instance. Console mode is un-cached (per-folder projection is cheap); "All" mode
-        /// hashes the folder list and reuses the last projection if the hash is stable.
+        /// instance. Both groupings reuse projections while the root and full folder snapshot
+        /// remain unchanged. Changing data invalidates both groupings.
         /// </summary>
+        internal void InvalidateFolderViews() => _projectionCache.Reset();
+
         public List<LibraryBrowserFolderView> GetOrBuildLibraryBrowserFolderViews(IReadOnlyList<LibraryFolderInfo> folders, string groupingMode)
             => _projectionCache.GetOrBuild(
                 folders,
                 groupingMode,
                 value => NormalizeLibraryGroupingMode(value),
-                (rawFolders, mode) => BuildLibraryBrowserFolderViews(rawFolders, mode));
+                (rawFolders, mode) => BuildLibraryBrowserFolderViews(rawFolders, mode),
+                _host.LibraryRoot);
 
         public List<LibraryBrowserFolderView> BuildLibraryBrowserFolderViews(IEnumerable<LibraryFolderInfo> folders, string groupingMode)
         {
@@ -708,6 +711,8 @@ namespace PixelVaultNative
                         IsCompleted100Percent = folder.IsCompleted100Percent,
                         CompletedUtcTicks = folder.CompletedUtcTicks,
                         IsMergedAcrossPlatforms = false,
+                        IsFavorite = folder.IsFavorite,
+                        IsShowcase = folder.IsShowcase,
                         PendingGameAssignment = folder.PendingGameAssignment,
                         CollectionNotes = folder.CollectionNotes ?? string.Empty
                     };
@@ -717,32 +722,39 @@ namespace PixelVaultNative
                 }).ToList();
             }
 
-            var projectionFiles = rawFolders
-                .SelectMany(folder => folder.FilePaths ?? new string[0])
-                .Where(path => !string.IsNullOrWhiteSpace(path))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList();
-            var metadataIndex = LoadProjectionMetadataIndex(libraryRoot, projectionFiles);
-
-            return rawFolders
+            // Cover browsing needs aggregate dates/counts and a preview, not a sorted
+            // capture index. Read metadata only for legacy/incomplete folder summaries.
+            var groups = rawFolders
                 .GroupBy(folder => BuildLibraryBrowserAllMergeKey(folder), StringComparer.OrdinalIgnoreCase)
-                .Select(group =>
+                .Select(group => new
                 {
-                    var sourceFolders = group
-                        .OrderByDescending(folder => folder.FileCount)
-                        .ThenByDescending(folder => _host.GetLibraryFolderNewestDate(folder))
-                        .ThenBy(folder => folder.Name ?? string.Empty, StringComparer.OrdinalIgnoreCase)
-                        .ToList();
-                    var primary = sourceFolders.FirstOrDefault();
-                    var pathList = sourceFolders
-                        .SelectMany(folder => folder.FilePaths ?? new string[0])
+                    Sources = group.ToList(),
+                    NeedsMetadata = group.Any(folder => folder.NewestCaptureUtcTicks <= 0
+                        || folder.NewestRecentSortUtcTicks <= 0 || string.IsNullOrWhiteSpace(folder.PreviewImagePath))
+                }).ToList();
+            var fallbackPaths = groups.Where(group => group.NeedsMetadata).SelectMany(group => group.Sources)
+                .SelectMany(folder => (folder.FilePaths ?? Array.Empty<string>()).Concat(new[] { folder.PreviewImagePath }))
+                .Where(path => !string.IsNullOrWhiteSpace(path)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+            var metadataIndex = string.IsNullOrWhiteSpace(libraryRoot) || fallbackPaths.Length == 0
+                ? new Dictionary<string, LibraryMetadataIndexEntry>(StringComparer.OrdinalIgnoreCase)
+                : _host.LoadLibraryMetadataIndexForFilePaths(libraryRoot, fallbackPaths)
+                    ?? new Dictionary<string, LibraryMetadataIndexEntry>(StringComparer.OrdinalIgnoreCase);
+
+            return groups.Select(group =>
+                {
+                    var sourceFolders = group.Sources.OrderByDescending(folder => folder.FileCount)
+                        .ThenByDescending(folder => _host.GetLibraryFolderNewestDate(folder, metadataIndex))
+                        .ThenBy(folder => folder.Name ?? string.Empty, StringComparer.OrdinalIgnoreCase).ToList();
+                    var primary = sourceFolders[0];
+                    var paths = sourceFolders.SelectMany(folder => folder.FilePaths ?? Array.Empty<string>())
                         .Where(path => !string.IsNullOrWhiteSpace(path))
-                        .Distinct(StringComparer.OrdinalIgnoreCase)
-                        .ToList();
-                    var orderedPaths = pathList
-                        .OrderByDescending(path => _host.ResolveIndexedLibraryDate(libraryRoot, path, metadataIndex))
-                        .ThenBy(path => path, StringComparer.OrdinalIgnoreCase)
-                        .ToArray();
+                        .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+                    // Detail, profile, timeline and session consumers sort on entry.
+                    // Legacy/incomplete summaries keep the existing date/preview fallback.
+                    var orderedPaths = group.NeedsMetadata
+                        ? paths.OrderByDescending(path => _host.ResolveIndexedLibraryDate(libraryRoot, path, metadataIndex))
+                            .ThenBy(path => path, StringComparer.OrdinalIgnoreCase).ToArray()
+                        : paths;
                     var pathBackedCount = orderedPaths.Length;
                     var sumFolderCounts = sourceFolders.Sum(folder => folder == null ? 0 : Math.Max(folder.FileCount, 0));
                     var platformLabels = sourceFolders
@@ -757,8 +769,8 @@ namespace PixelVaultNative
                         .Where(value => !string.IsNullOrWhiteSpace(value))
                         .Distinct(StringComparer.OrdinalIgnoreCase)
                         .ToList();
-                    var tickMax = sourceFolders.Max(folder => folder == null ? 0L : folder.NewestCaptureUtcTicks);
-                    if (tickMax == 0 && orderedPaths.Length > 0)
+                    var tickMax = sourceFolders.Max(folder => folder.NewestCaptureUtcTicks);
+                    if (tickMax <= 0 && orderedPaths.Length > 0)
                     {
                         var fromIndex = _host.ResolveIndexedLibraryDate(libraryRoot, orderedPaths[0], metadataIndex);
                         if (fromIndex > DateTime.MinValue)
@@ -772,8 +784,8 @@ namespace PixelVaultNative
                             }
                         }
                     }
-                    var tickMaxRecent = sourceFolders.Max(folder => folder == null ? 0L : folder.NewestRecentSortUtcTicks);
-                    if (tickMaxRecent == 0 && orderedPaths.Length > 0)
+                    var tickMaxRecent = sourceFolders.Max(folder => folder.NewestRecentSortUtcTicks);
+                    if (tickMaxRecent <= 0 && orderedPaths.Length > 0)
                     {
                         tickMaxRecent = orderedPaths.Max(path => _host.ResolveLibraryFileRecentSortUtcTicks(libraryRoot, path, metadataIndex));
                     }

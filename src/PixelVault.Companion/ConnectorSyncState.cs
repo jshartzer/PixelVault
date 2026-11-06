@@ -35,4 +35,9 @@ public sealed class ConnectorSyncState
     {
         var settings=Settings() with{AutomaticEnabled=enabled};Put("settings",JsonSerializer.Serialize(settings));return settings;
     }
+    public void EnableTrackerWebEdits()
+    {
+        if(workspace.ReadOnly)throw new InvalidDataException("A real workspace is required.");
+        Put("settings",JsonSerializer.Serialize(Settings() with{WebTrackerEditsEnabled=true}));
+    }
 }

@@ -10,9 +10,9 @@ namespace PixelVaultNative.Tests;
 public sealed class DeathStrandingInterviewReaderTests
 {
     const int Start = 25;
-    static byte[] Payload(int value = 67, int optional = 2)
+    internal static byte[] Payload(int value = 67, int optional = 2, bool statistic41 = false)
     {
-        var rows = DeathStrandingInterviewReader.References().Where(r => optional == 2 || r.Key != 8 && (optional == 1 || r.Key != 7)).OrderBy(r => r.Key).ToList();
+        var rows = DeathStrandingInterviewReader.References().Where(r => (statistic41 || r.Key != 41) && (optional == 2 || r.Key != 8 && (optional == 1 || r.Key != 7))).OrderBy(r => r.Key).ToList();
         var data = new byte[Start + rows.Count * 13 + 7];Convert.FromHexString("879ca01f131c7ece01").CopyTo(data, Start - 10);data[Start - 1] = (byte)rows.Count;
         for (int i = 0; i < rows.Count; i++)
         {
@@ -37,7 +37,7 @@ public sealed class DeathStrandingInterviewReaderTests
         switch (mutation)
         {
             case "prefix": data[Start - 10]++;break;
-            case "count": data[Start - 1] = 50;break;
+            case "count": data[Start - 1] = 51;break;
             case "missing": BinaryPrimitives.WriteUInt32LittleEndian(data.AsSpan(row), 99);break;
             case "duplicate": data.AsSpan(Start, 4).CopyTo(data.AsSpan(row));break;
             case "type": data[row + 4] = 5;break;
@@ -46,6 +46,17 @@ public sealed class DeathStrandingInterviewReaderTests
             case "truncated": data = data[..(Start + 48 * 13)];break;
             case "ambiguous": data = data.Concat(data).ToArray();break;
         }
+        Assert.Throws<NotSupportedException>(() => Read(data));
+    }
+    [Theory] [InlineData(0)] [InlineData(1)] [InlineData(2)]
+    public void NewBoolean41IsOptionalAndStrictlyTyped(int optional)
+    {
+        var data = Payload(69, optional, true);
+        Assert.Equal(69, Read(data).Items.Single().Current);
+        int row = Enumerable.Range(0, data[Start - 1]).Select(i => Start + i * 13)
+            .Single(p => BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(p)) == 41);
+        data[row + 4] = 2; Assert.Throws<NotSupportedException>(() => Read(data));
+        data[row + 4] = 1; BinaryPrimitives.WriteUInt64LittleEndian(data.AsSpan(row + 5), 2);
         Assert.Throws<NotSupportedException>(() => Read(data));
     }
     [Fact]

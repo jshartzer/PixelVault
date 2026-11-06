@@ -75,6 +75,7 @@ namespace PixelVaultNative
                     TagSwitch = resolvedPlatforms.Contains("Switch"),
                     TagPs5 = resolvedPlatforms.Contains("PS5"),
                     TagXbox = resolvedPlatforms.Contains("Xbox"),
+                    TagXbox360 = resolvedPlatforms.Contains("Xbox 360"),
                     DeleteBeforeProcessing = false
                 });
             }
@@ -140,9 +141,9 @@ namespace PixelVaultNative
 
             var captureTime = fileAnalysis.CaptureTime;
             var titleHint = parsed.GameTitleHint ?? string.Empty;
-            bool tagSteam, tagPc, tagEmulation, tagPs5, tagSwitch, tagXbox, tagOther;
+            bool tagSteam, tagPc, tagEmulation, tagPs5, tagSwitch, tagXbox, tagXbox360, tagOther;
             string customPlatformTag;
-            MainWindow.ApplyFilenameParseResultToManualPlatformFlags(parsed, out tagSteam, out tagPc, out tagEmulation, out tagPs5, out tagSwitch, out tagXbox, out tagOther, out customPlatformTag);
+            MainWindow.ApplyFilenameParseResultToManualPlatformFlags(parsed, out tagSteam, out tagPc, out tagEmulation, out tagPs5, out tagSwitch, out tagXbox, out tagXbox360, out tagOther, out customPlatformTag);
             return new ManualMetadataItem
             {
                 GameId = string.Empty,
@@ -161,6 +162,7 @@ namespace PixelVaultNative
                 TagPs5 = tagPs5,
                 TagSwitch = tagSwitch,
                 TagXbox = tagXbox,
+                TagXbox360 = tagXbox360,
                 TagPc = tagPc,
                 TagEmulation = tagEmulation,
                 TagOther = tagOther,
@@ -179,6 +181,7 @@ namespace PixelVaultNative
                 OriginalTagPs5 = tagPs5,
                 OriginalTagSwitch = tagSwitch,
                 OriginalTagXbox = tagXbox,
+                OriginalTagXbox360 = tagXbox360,
                 OriginalTagEmulation = tagEmulation,
                 OriginalTagOther = tagOther,
                 OriginalCustomPlatformTag = customPlatformTag,
@@ -196,6 +199,7 @@ namespace PixelVaultNative
             if (item.TagPs5) return "PS5";
             if (item.TagSwitch) return "Switch";
             if (item.TagXbox) return "Xbox";
+            if (item.TagXbox360) return "Xbox 360";
             if (item.TagOther && !string.IsNullOrWhiteSpace(item.CustomPlatformTag)) return MainWindow.NormalizeConsoleLabel(item.CustomPlatformTag);
             return "Other";
         }

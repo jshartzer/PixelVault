@@ -64,6 +64,8 @@ namespace PixelVaultNative
                 panes.SessionsFilterPanel.Visibility = isSessions ? Visibility.Visible : Visibility.Collapsed;
             if (panes.GroupAllButton != null) panes.GroupAllButton.Visibility = isPhoto ? Visibility.Collapsed : Visibility.Visible;
             if (panes.TrackersButton != null) panes.TrackersButton.Visibility = isPhoto ? Visibility.Collapsed : Visibility.Visible;
+            if (panes.ProgressToolbar != null) panes.ProgressToolbar.Visibility = isPhoto ? Visibility.Collapsed : Visibility.Visible;
+            if (panes.ViewModeToolbar != null) panes.ViewModeToolbar.Visibility = isPhoto ? Visibility.Collapsed : Visibility.Visible;
             if (panes.GroupConsoleButton != null) panes.GroupConsoleButton.Visibility = isPhoto ? Visibility.Collapsed : Visibility.Visible;
             if (panes.GroupTimelineButton != null)
                 panes.GroupTimelineButton.Visibility = isPhoto ? Visibility.Collapsed : Visibility.Visible;
@@ -107,13 +109,6 @@ namespace PixelVaultNative
                 if (panes.LibraryFooterStatusLine != null) panes.LibraryFooterStatusLine.Visibility = Visibility.Collapsed;
                 if (panes.PhotoRailColumnPickerHost != null) panes.PhotoRailColumnPickerHost.Visibility = Visibility.Visible;
                 _libraryBrowserLiveWorkingSet?.RefreshPhotoRailColumnPickerUi?.Invoke();
-                if (panes.SortFilterMenuButton != null)
-                {
-                    Grid.SetColumn(panes.SortFilterMenuButton, 0);
-                    Grid.SetColumnSpan(panes.SortFilterMenuButton, 7);
-                    panes.SortFilterMenuButton.HorizontalAlignment = HorizontalAlignment.Center;
-                    panes.SortFilterMenuButton.Margin = new Thickness(0, 0, 0, 0);
-                }
                 ApplyLibraryPhotoDetailChromeLayout(panes, true);
                 LibraryBrowserSyncOpenCapturesToolbarButton(panes);
                 return;
@@ -132,13 +127,6 @@ namespace PixelVaultNative
                 if (panes.LibraryFooterCommandsPanel != null) panes.LibraryFooterCommandsPanel.Visibility = Visibility.Visible;
                 if (panes.LibraryFooterStatusLine != null) panes.LibraryFooterStatusLine.Visibility = Visibility.Visible;
                 if (panes.PhotoRailColumnPickerHost != null) panes.PhotoRailColumnPickerHost.Visibility = Visibility.Collapsed;
-                if (panes.SortFilterMenuButton != null)
-                {
-                    Grid.SetColumnSpan(panes.SortFilterMenuButton, 1);
-                    Grid.SetColumn(panes.SortFilterMenuButton, 0);
-                    panes.SortFilterMenuButton.ClearValue(FrameworkElement.HorizontalAlignmentProperty);
-                    panes.SortFilterMenuButton.Margin = new Thickness(0);
-                }
                 ApplyLibraryPhotoDetailChromeLayout(panes, false);
                 if (panes.GroupAllButton != null) panes.GroupAllButton.Visibility = Visibility.Visible;
                 if (panes.GroupConsoleButton != null) panes.GroupConsoleButton.Visibility = Visibility.Visible;

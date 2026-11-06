@@ -88,7 +88,7 @@ namespace PixelVaultNative
             if (large) name.TextWrapping = TextWrapping.NoWrap;
             else { name.MinHeight = 32; name.MaxHeight = 32; }
             content.Children.Add(name);
-            var provider = game.Provider == "steam" ? "Steam" : "RetroAchievements";
+            var provider = game.PlatformLabel;
             var played = card.LastPlayedUtc > 0
                 ? " · " + new DateTime(card.LastPlayedUtc, DateTimeKind.Utc).ToLocalTime().ToString(large ? "g" : "d", CultureInfo.CurrentCulture) : "";
             var meta = Text(provider + played, large ? 11 : 10);

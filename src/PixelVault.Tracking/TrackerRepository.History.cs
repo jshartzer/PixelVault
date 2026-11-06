@@ -156,6 +156,22 @@ namespace PixelVaultNative
             return entry;
         }
 
+        public IReadOnlyList<(AchievementTrackerDefinition Definition,TrackerSourceBinding Binding)> SourcesForAccounts(IReadOnlyDictionary<string,string> accounts)
+        {
+            using var c=Open();using var tx=c.BeginTransaction(deferred:true);
+            var definitions=ReadDefinitions(c,tx).Where(d=>accounts.ContainsKey(d.Provider)).ToDictionary(d=>d.Id);
+            using var q=c.CreateCommand();q.Transaction=tx;q.CommandText="SELECT tracker_id,account,binding FROM tracker_source";
+            var result=new List<(AchievementTrackerDefinition,TrackerSourceBinding)>();using var rows=q.ExecuteReader();
+            while(rows.Read())
+            {
+                if(!definitions.TryGetValue(rows.GetString(0),out var d))continue;
+                var account=RequireAccount(d,accounts[d.Provider]);if(rows.GetString(1)!=account)continue;
+                var binding=FromJson<TrackerSourceBinding>(rows.GetString(2));
+                if(binding.TrackerId!=d.Id||binding.Account!=account)throw new InvalidDataException("The stored source scope is invalid.");
+                result.Add((d,binding));
+            }
+            return result;
+        }
         public void SaveSource(TrackerSourceBinding binding)
         {
             if (binding == null) throw new ArgumentNullException(nameof(binding));
@@ -166,12 +182,12 @@ namespace PixelVaultNative
             using var c = Open(); using var cmd = c.CreateCommand();
             cmd.CommandText = "INSERT INTO tracker_source(tracker_id,account,binding,status) VALUES($t,$a,$b,$s) ON CONFLICT(tracker_id,account) DO UPDATE SET binding=$b,status=$s";
             cmd.Parameters.AddWithValue("$t", binding.TrackerId); cmd.Parameters.AddWithValue("$a", binding.Account); cmd.Parameters.AddWithValue("$b", Json(binding));
-            cmd.Parameters.AddWithValue("$s", Json(new TrackerSourceStatus { BindingId = binding.Id, Message = "Source configured. Refresh to read current observations." })); cmd.ExecuteNonQuery();
+            cmd.Parameters.AddWithValue("$s", Json(new TrackerSourceStatus { BindingId = binding.Id, Message = binding.ReplaceManualProgress ? "Save-authoritative source configured. Known fresh values replace manual checkmarks; notes and unknown values stay saved." : "Source configured. Refresh to read current observations." })); cmd.ExecuteNonQuery();
             NotifyAutomationChanged();
         }
         public TrackerSourceBinding Source(string tracker, string account)
         {
-            account = AchievementTrackingCatalog.AccountKey(Definition(tracker).Provider, account);
+            account = AchievementTrackingCatalog.AccountKey(ProviderForTracker(tracker) ?? throw new InvalidDataException("The tracker was not found."), account);
             using var c = Open(); return ReadSource(c, null, tracker, account).Binding;
         }
         public void RemoveSource(string tracker, string account)
@@ -183,7 +199,7 @@ namespace PixelVaultNative
         }
         public TrackerSourceStatus SourceStatus(string tracker, string account)
         {
-            account = AchievementTrackingCatalog.AccountKey(Definition(tracker).Provider, account);
+            account = AchievementTrackingCatalog.AccountKey(ProviderForTracker(tracker) ?? throw new InvalidDataException("The tracker was not found."), account);
             using var c = Open(); return ReadSource(c, null, tracker, account).Status;
         }
         protected static (TrackerSourceBinding Binding, TrackerSourceStatus Status) ReadSource(SqliteConnection c, SqliteTransaction tx, string tracker, string account)
@@ -237,7 +253,11 @@ namespace PixelVaultNative
             cmd.Parameters.AddWithValue("$t", tracker); cmd.Parameters.AddWithValue("$a", account); using var r = cmd.ExecuteReader(); var rows = new List<object[]>();
             while (r.Read()) { var row = new object[9]; for (int i = 0; i < row.Length; i++) row[i] = r.IsDBNull(i) ? null : r.GetValue(i); rows.Add(row); }
             r.Close();using var metadata=c.CreateCommand();metadata.Transaction=tx;metadata.CommandText="SELECT definition FROM tracker_definition WHERE id=$t";metadata.Parameters.AddWithValue("$t",tracker);
-            return Digest(Json(rows)+"|"+(metadata.ExecuteScalar() as string??""));
+            var definition = metadata.ExecuteScalar() as string ?? "";
+            metadata.CommandText = "SELECT item_id,missable,excluded FROM tracker_item_rule WHERE tracker_id=$t ORDER BY item_id";
+            using var rulesReader = metadata.ExecuteReader(); var rules = new List<object[]>();
+            while (rulesReader.Read()) rules.Add(new object[] { rulesReader.GetString(0), rulesReader.GetInt32(1), rulesReader.GetInt32(2) });
+            return Digest(Json(rows)+"|"+definition+"|"+Json(rules));
         }
         public TrackerRefreshPlan Preview(string json, string tracker, string account, string adapter, string version, string fingerprint, string bindingId = null, string attempt = null)
         {
@@ -253,7 +273,8 @@ namespace PixelVaultNative
                     Availability = item.Availability, IncomingNote = item.Note, AddNote = addNote, Changed = changed, Stale = prior.ObservedUtc > snapshot.ObservedUtcTicks || prior.ObservedUtc == snapshot.ObservedUtcTicks && changed });
             }
             return new TrackerRefreshPlan { Json = json, TrackerId = tracker, Account = account, AdapterId = adapter, AdapterVersion = version, Fingerprint = fingerprint,
-                Rows = rows, Baseline = Revision(c, tx, tracker, account), BindingId = bindingId, AttemptId = attempt, ObservedUtc = snapshot.ObservedUtcTicks, Source = snapshot.Source, Evidence = snapshot.Evidence };
+                Rows = rows, Baseline = Revision(c, tx, tracker, account), BindingId = bindingId, AttemptId = attempt, ObservedUtc = snapshot.ObservedUtcTicks, Source = snapshot.Source, Evidence = snapshot.Evidence,
+                ReplaceManualProgress = bindingId != null && ReadSource(c,tx,tracker,account).Binding is {ReplaceManualProgress:true} configured && configured.Id == bindingId };
         }
 
         public int ApplyRefresh(TrackerRefreshPlan plan, bool allowOlder, IEnumerable<string> useSourceItems, CancellationToken token, string automationId = null)
@@ -267,17 +288,19 @@ namespace PixelVaultNative
             var source = ReadSource(c, tx, plan.TrackerId, plan.Account);
             if (plan.BindingId != null && (source.Binding?.Id != plan.BindingId || source.Status?.AttemptId != plan.AttemptId || source.Status.Outcome != TrackerRefreshOutcome.AwaitingReview))
                 throw new InvalidOperationException("The source changed or a newer refresh started. Refresh again.");
+            var replaceManual = plan.BindingId != null && source.Binding?.Id == plan.BindingId && source.Binding.ReplaceManualProgress;
             var changes = new List<TrackerHistoryChange>(); int applied = 0, skipped = 0;
             foreach (var item in snapshot.Items)
             {
-                token.ThrowIfCancellationRequested(); var before = ReadRecord(c, tx, plan.TrackerId, plan.Account, item.ItemId);
+                token.ThrowIfCancellationRequested(); if(replaceManual && !item.Current.HasValue)continue;
+                var before = ReadRecord(c, tx, plan.TrackerId, plan.Account, item.ItemId);
                 bool addNote = CanAddSourceNote(c,tx,plan.TrackerId,plan.Account,item.ItemId,before,item.Note);
                 bool stale = before.ObservedUtc > snapshot.ObservedUtcTicks || before.ObservedUtc == snapshot.ObservedUtcTicks
                     && (before.Reported != item.Current || before.Availability != (int)item.Availability || addNote);
                 if (stale && !allowOlder) { skipped++; continue; }
                 var fields = TrackerChangeFields.Reported;
                 if (addNote) fields |= TrackerChangeFields.Note;
-                if (accept.Contains(item.ItemId) && before.Manual.HasValue) fields |= TrackerChangeFields.Manual;
+                if ((accept.Contains(item.ItemId) || replaceManual && item.Current.HasValue && !stale) && before.Manual.HasValue) fields |= TrackerChangeFields.Manual;
                 var after = new TrackerStoredRecord { Reported = item.Current, Availability = (int)item.Availability, Source = snapshot.Source.Trim(), Evidence = snapshot.Evidence ?? "", ObservedUtc = snapshot.ObservedUtcTicks };
                 if (fields.HasFlag(TrackerChangeFields.Note)) after.Note = item.Note;
                 if (fields.HasFlag(TrackerChangeFields.Manual)) after.ManualUtc = DateTime.UtcNow.Ticks;
@@ -292,11 +315,12 @@ namespace PixelVaultNative
             if (plan.BindingId != null)
             {
                 source.Status.Outcome = skipped > 0 ? TrackerRefreshOutcome.Stale : applied > 0 ? TrackerRefreshOutcome.Success : TrackerRefreshOutcome.Unchanged;
-                source.Status.Message = applied + " observations applied; " + skipped + " older/equal observations skipped. Manual edits and notes were preserved unless explicitly resolved.";
+                source.Status.Message = applied + " observations applied; " + skipped + " older/equal observations skipped. " + (replaceManual ? "Verified fresh save values replaced manual checkmarks; notes and unknown values were preserved." : "Manual edits and notes were preserved unless explicitly resolved.");
                 if (skipped == 0) { source.Status.LastSuccessUtc = DateTime.UtcNow.Ticks; source.Status.Fingerprint = plan.Fingerprint; source.Status.SourceObservedUtc = snapshot.ObservedUtcTicks; }
                 WriteStatus(c, tx, source.Binding, source.Status);
             }
             if (automationId == null && skipped == 0) ClearAutomationReview(c, tx, plan.TrackerId, plan.Account);
+            if (skipped == 0) RecordCentury(c, tx, plan, source.Binding);
             token.ThrowIfCancellationRequested(); tx.Commit(); return applied;
         }
     }

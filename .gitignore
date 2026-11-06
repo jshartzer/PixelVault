@@ -1,5 +1,10 @@
 # Local app testing output (scripts/Build-PixelVault-AppTesting.ps1)
 App Testing/
+/App Testing Xbox/
+/artifacts/xbox-integration-20261103/
+PixelVaultData/xbox-library.json
+PixelVaultData/xbox-sync-status.json
+/App Testing Trackers/
 Companion Preview/
 Companion Backups/
 Companion Assets/
@@ -97,9 +102,21 @@ Thumbs.db
 # Personal achievement checklist observations, notes and imported save snapshots
 /PixelVaultData/achievement-tracking/
 /PixelVaultData/game-maps/
+/PixelVaultData/achievement-artwork/
 /tests/**/TestResults/
 
 # Companion runtime data and local deployment overrides
 /src/PixelVault.Companion/App_Data/
 /deploy/companion/compose.override.yml
 /deploy/companion/.env
+
+# Isolated PC service deployment rehearsal (binaries, not source)
+/Companion Service Rehearsal/
+/Companion Backup Runtime/
+/Companion Production/
+/PixelVaultCompanionLocalData/
+/PixelVaultCompanionLocalCache/
+/pv-restore-*/
+/pv-cutover-check-*/
+
+/PixelVaultData/game-profile-platforms.json

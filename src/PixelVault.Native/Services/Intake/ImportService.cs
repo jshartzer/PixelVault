@@ -797,8 +797,11 @@ namespace PixelVaultNative
             var isMedia = d.IsMedia;
             if (enumerate == null || isMedia == null) return new SourceInventory();
             var searchOption = includeSubfolders ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
-            CleanupStaleExifToolTempFiles(searchOption);
-            var candidateMediaFiles = enumerate(searchOption, isMedia)
+            // Share one directory walk between cleanup and intake. Large recursive
+            // upload folders otherwise get enumerated twice before any work starts.
+            var sourceFiles = enumerate(searchOption, file => isMedia(file) || MetadataService.IsExifToolTempPath(file)).ToList();
+            CleanupStaleExifToolTempFiles(sourceFiles.Where(MetadataService.IsExifToolTempPath));
+            var candidateMediaFiles = sourceFiles.Where(isMedia)
                 .Where(file => !IsImportParkingPath(file))
                 .Where(file => !IsHiddenFileOrInsideHiddenDirectory(file))
                 .ToList();
@@ -816,15 +819,12 @@ namespace PixelVaultNative
             };
         }
 
-        void CleanupStaleExifToolTempFiles(SearchOption searchOption)
+        void CleanupStaleExifToolTempFiles(IEnumerable<string> candidates)
         {
-            var enumerate = d.EnumerateSourceMediaFiles;
-            if (enumerate == null) return;
-
             List<string> tempFiles;
             try
             {
-                tempFiles = enumerate(searchOption, MetadataService.IsExifToolTempPath)
+                tempFiles = candidates
                     .Where(file => !string.IsNullOrWhiteSpace(file))
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .ToList();
@@ -1272,6 +1272,7 @@ namespace PixelVaultNative
             var platform = MainWindow.NormalizeConsoleLabel(parsed.PlatformLabel ?? string.Empty);
             if (string.Equals(platform, "Switch", StringComparison.OrdinalIgnoreCase)) return true;
             if (string.Equals(platform, "Xbox", StringComparison.OrdinalIgnoreCase)) return true;
+            if (string.Equals(platform, "Xbox 360", StringComparison.OrdinalIgnoreCase)) return true;
             if (string.Equals(platform, "PC", StringComparison.OrdinalIgnoreCase)) return true;
             if (string.Equals(platform, "PS5", StringComparison.OrdinalIgnoreCase)) return true;
             return (parsed.PlatformTags ?? new string[0]).Any(tag =>
@@ -1279,6 +1280,7 @@ namespace PixelVaultNative
                 || string.Equals(tag, "Nintendo", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(tag, "Nintendo Switch", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(MainWindow.NormalizeConsoleLabel(tag), "Xbox", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(MainWindow.NormalizeConsoleLabel(tag), "Xbox 360", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(MainWindow.NormalizeConsoleLabel(tag), "PC", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(MainWindow.NormalizeConsoleLabel(tag), "PS5", StringComparison.OrdinalIgnoreCase));
         }
@@ -1445,6 +1447,7 @@ namespace PixelVaultNative
                     selectedPlatformTags.Add("Nintendo");
                 }
                 if (item.TagXbox) selectedPlatformTags.Add("Xbox");
+                if (item.TagXbox360) selectedPlatformTags.Add("Xbox 360");
                 if (selectedPlatformTags.Count == 0 && item.PlatformTags != null) selectedPlatformTags.AddRange(item.PlatformTags);
                 var platformTags = selectedPlatformTags.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
                 var importParse = d.ParseFilenameForImport == null ? null : d.ParseFilenameForImport(file);
@@ -1669,6 +1672,7 @@ namespace PixelVaultNative
                 else if (tagNames.Contains("Emulation")) platform = "Emulation";
                 else if (tagNames.Contains("PS5") || tagNames.Contains("PlayStation")) platform = "PS5";
                 else if (tagNames.Contains("Switch") || tagNames.Contains("Nintendo")) platform = "Switch";
+                else if (tagNames.Contains("Xbox 360")) platform = "Xbox 360";
                 else if (tagNames.Contains("Xbox")) platform = "Xbox";
                 if (platform == null) continue;
 
@@ -1678,6 +1682,7 @@ namespace PixelVaultNative
                 item.TagPs5 = string.Equals(platform, "PS5", StringComparison.OrdinalIgnoreCase);
                 item.TagSwitch = string.Equals(platform, "Switch", StringComparison.OrdinalIgnoreCase);
                 item.TagXbox = string.Equals(platform, "Xbox", StringComparison.OrdinalIgnoreCase);
+                item.TagXbox360 = string.Equals(platform, "Xbox 360", StringComparison.OrdinalIgnoreCase);
                 item.TagOther = false;
                 item.CustomPlatformTag = string.Empty;
                 item.ForceTagMetadataWrite = true;

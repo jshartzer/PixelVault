@@ -28,11 +28,13 @@ namespace PixelVaultNative
         public long GuideUpdatedUtcTicks;
         public string GroupName;
         public string DlcName;
+        public string GroupVersion;
         public int GroupSortOrder;
     }
 
     sealed class AchievementGuideEdit
     {
+        public string ExpectedGroupVersion;
         public long AchievementId;
         public string GuideText;
         public string SourceUrl;
@@ -84,13 +86,16 @@ namespace PixelVaultNative
         readonly string _databasePath;
         const int BackupRetention = 12;
 
-        internal AchievementGuideService(string dataRoot)
+        readonly bool initializeSchema;
+        internal AchievementGuideService(string dataRoot,bool initializeSchema=true)
         {
             if (string.IsNullOrWhiteSpace(dataRoot))
                 throw new ArgumentException("A persistent PixelVault data root is required.", nameof(dataRoot));
 
             var guideRoot = Path.Combine(Path.GetFullPath(dataRoot.Trim()), "guides");
-            Directory.CreateDirectory(guideRoot);
+            this.initializeSchema=initializeSchema;
+            if(initializeSchema)Directory.CreateDirectory(guideRoot);
+            else if(!File.Exists(Path.Combine(guideRoot,"pixelvault-guides.sqlite")))throw new InvalidDataException("The canonical guide store is unavailable.");
             _databasePath = Path.Combine(guideRoot, "pixelvault-guides.sqlite");
         }
 
@@ -101,10 +106,11 @@ namespace PixelVaultNative
             var connection = new SqliteConnection(new SqliteConnectionStringBuilder
             {
                 DataSource = _databasePath,
-                Mode = SqliteOpenMode.ReadWriteCreate
+                Mode = initializeSchema?SqliteOpenMode.ReadWriteCreate:SqliteOpenMode.ReadWrite
             }.ToString());
             connection.Open();
-            InitializeDatabase(connection);
+            if(initializeSchema)InitializeDatabase(connection);
+            else {using var busy=connection.CreateCommand();busy.CommandText="PRAGMA busy_timeout=5000";busy.ExecuteNonQuery();}
             return connection;
         }
 
@@ -158,6 +164,7 @@ CREATE TABLE IF NOT EXISTS achievement_guide (
             EnsureDefinitionColumn(connection, "group_name", "TEXT NOT NULL DEFAULT ''");
             EnsureDefinitionColumn(connection, "group_sort_order", "INTEGER NOT NULL DEFAULT 0");
             InitializeDlcOrganization(connection);
+            AchievementGroupCommands.Initialize(connection);
             InitializePinTable(connection);
             InitializeScoreTables(connection);
         }
@@ -367,22 +374,9 @@ ON CONFLICT(achievement_id) DO UPDATE SET
                     save.ExecuteNonQuery();
                 }
 
-                using (var saveGroup = connection.CreateCommand())
-                {
-                    saveGroup.Transaction = transaction;
-                    saveGroup.CommandText = @"
-UPDATE achievement_definition
-SET group_name = $group_name,
-    dlc_name = COALESCE($dlc_name, dlc_name),
-    group_sort_order = $group_sort_order
-WHERE achievement_id = $achievement_id;";
-                    saveGroup.Parameters.AddWithValue("$achievement_id", edit.AchievementId);
-                    saveGroup.Parameters.AddWithValue("$group_name", category);
-                    saveGroup.Parameters.AddWithValue("$dlc_name", dlc == null ? DBNull.Value : dlc);
-                    saveGroup.Parameters.AddWithValue("$group_sort_order", NormalizeGroupSortOrder(edit.GroupSortOrder));
-                    saveGroup.ExecuteNonQuery();
-                    RegisterAchievementOrganization(connection, transaction, edit.AchievementId);
-                }
+                var currentGroups=AchievementGroupCommands.Read(connection,transaction,edit.AchievementId);
+                AchievementGroupCommands.Write(connection,transaction,edit.AchievementId,
+                    new(category,dlc??currentGroups.Groups.Dlc,NormalizeGroupSortOrder(edit.GroupSortOrder)),edit.ExpectedGroupVersion);
 
                 transaction.Commit();
             }
@@ -522,7 +516,8 @@ SELECT d.achievement_id, d.provider, d.provider_game_id, d.provider_achievement_
        d.is_hidden, d.is_active,
        COALESCE(g.guide_text, ''), COALESCE(g.source_url, ''), COALESCE(g.source_title, ''),
        COALESCE(g.tags, ''), COALESCE(g.is_missable, 0), COALESCE(g.updated_utc_ticks, 0),
-       d.group_name, d.group_sort_order, d.dlc_name
+       d.group_name, d.group_sort_order, d.dlc_name,
+       COALESCE((SELECT revision FROM achievement_group_revision v WHERE v.achievement_id=d.achievement_id),'')
 FROM achievement_definition d
 LEFT JOIN achievement_guide g ON g.achievement_id = d.achievement_id";
             return command;
@@ -551,7 +546,8 @@ LEFT JOIN achievement_guide g ON g.achievement_id = d.achievement_id";
                 GuideUpdatedUtcTicks = reader.GetInt64(16),
                 GroupName = reader.GetString(17),
                 GroupSortOrder = reader.GetInt32(18),
-                DlcName = reader.GetString(19)
+                DlcName = reader.GetString(19),
+                GroupVersion = AchievementGroupCommands.Version(new(reader.GetString(17),reader.GetString(19),reader.GetInt32(18)),reader.GetString(20))
             };
         }
     }

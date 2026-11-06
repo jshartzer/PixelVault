@@ -14,6 +14,8 @@ namespace PixelVaultNative
     {
         public string Provider, Id, Title, ArtPath;
         public LibraryFolderInfo Folder;
+        public XboxAchievementService.XboxTitle XboxTitle;
+        public string PlatformLabel => Provider == "xbox" ? (XboxTitle?.Legacy == true ? "Xbox 360" : "Xbox") : Provider == "steam" ? "Steam" : "RetroAchievements";
         public string Key => Provider + ":" + Id;
     }
     sealed class AchievementHubSession
@@ -21,11 +23,11 @@ namespace PixelVaultNative
         public List<AchievementHubGame> Games = new();
         /// <summary>Pinned game keys in pin order; not part of <see cref="Scope"/> because pins don't change whose data is shown.</summary>
         public List<string> Pinned = new();
-        public string SteamAccount, SteamKey, RetroAccount, RetroKey, LibraryRoot;
-        public string Account(string provider) => provider == "steam" ? (SteamAccount ?? "").Trim() : AchievementHubStore.AccountKey(RetroAccount);
-        public string ApiKey(string provider) => provider == "steam" ? SteamKey : RetroKey;
+        public string SteamAccount, SteamKey, RetroAccount, RetroKey, XboxAccount, LibraryRoot;
+        public string Account(string provider) => provider == "xbox" ? (XboxAccount ?? "").Trim() : provider == "steam" ? (SteamAccount ?? "").Trim() : AchievementHubStore.AccountKey(RetroAccount);
+        public string ApiKey(string provider) => provider == "xbox" ? Account(provider) : provider == "steam" ? SteamKey : RetroKey;
         public string Scope => string.Join("\n", LibraryRoot, Account("steam"), Account("retroachievements"), SteamKey, RetroKey,
-            string.Join("|", Games.Select(g => g.Key).OrderBy(k => k)));
+            Account("xbox"), string.Join("|", Games.Select(g => g.Key).OrderBy(k => k)));
     }
     sealed class AchievementHubCard
     {
@@ -68,7 +70,9 @@ namespace PixelVaultNative
             this.store = store;
             this.guides = guides;
             this.download = download ?? DownloadAsync;
-            this.fetch = fetch ?? ((game, session, token) => GameAchievementsFetchService.FetchAsync(
+            this.fetch = fetch ?? ((game, session, token) => game.Provider == "xbox"
+                ? new XboxAchievementService().FetchAsync(session.XboxAccount, game.XboxTitle, token)
+                : GameAchievementsFetchService.FetchAsync(
                 game.Provider == "steam" ? "Steam" : "Emulation", game.Folder, session.SteamKey, session.RetroKey,
                 session.SteamAccount, session.RetroAccount, "PixelVault/AchievementHub", token));
         }
@@ -84,6 +88,8 @@ namespace PixelVaultNative
         {
             data.TryGetValue(game.Provider, out var account);
             var time = account != null && account.Recent.TryGetValue(game.Id, out var last) ? last : 0;
+            if (game.Provider == "xbox" && ValidPlayed(game.XboxTitle?.LastPlayedUtc ?? 0))
+                time = Math.Max(time, game.XboxTitle.LastPlayedUtc);
             var snapshot = account != null && account.Games.TryGetValue(game.Id, out var saved) ? saved : null;
             return new AchievementHubCard { Game = game, LastPlayedUtc = time, Snapshot = snapshot };
         }
@@ -219,6 +225,8 @@ namespace PixelVaultNative
 
         async Task<Dictionary<string, long>> LoadRecentAsync(string provider, AchievementHubSession session, CancellationToken token)
         {
+            if (provider == "xbox") return session.Games.Where(g => g.Provider == "xbox" && ValidPlayed(g.XboxTitle?.LastPlayedUtc ?? 0))
+                .GroupBy(g => g.Id).ToDictionary(g => g.Key, g => g.First().XboxTitle.LastPlayedUtc);
             var account = Uri.EscapeDataString(session.Account(provider));
             var key = Uri.EscapeDataString(session.ApiKey(provider).Trim());
             if (provider == "steam")

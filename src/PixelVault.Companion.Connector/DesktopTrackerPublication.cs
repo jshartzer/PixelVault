@@ -24,7 +24,8 @@ public static class DesktopTrackerPublication
         }
         return titles.Values.OrderBy(t=>t.Id,StringComparer.Ordinal).ToArray();
     }
-    public static bool SamePermission(TrackerSourceBinding a,TrackerSourceBinding b)=>
+    public static bool SamePermission(TrackerSourceBinding a,TrackerSourceBinding b)=>a.ReplaceManualProgress==b.ReplaceManualProgress&&SameReadScope(a,b);
+    public static bool SameReadScope(TrackerSourceBinding a,TrackerSourceBinding b)=>
         a.AdapterId==b.AdapterId&&a.AdapterVersion==b.AdapterVersion&&a.Account==b.Account
         &&string.Equals(a.Location,b.Location,StringComparison.OrdinalIgnoreCase)
         &&string.Equals(a.GameDirectory??"",b.GameDirectory??"",StringComparison.OrdinalIgnoreCase)
@@ -55,7 +56,8 @@ public static class DesktopTrackerPublication
             if(command.ExecuteScalar() is string json)
             {
                 var candidate=JsonSerializer.Deserialize<TrackerSourceBinding>(json,AchievementTrackingCatalog.Json);
-                if(candidate?.TrackerId==definition.Id&&candidate.AdapterId=="death-stranding-dc.fabrication"&&approved.Any(s=>s.Definition.Provider==definition.Provider&&s.Definition.GameId==definition.GameId&&SamePermission(candidate,s.Binding)))
+                if(candidate?.TrackerId==definition.Id&&candidate.AdapterId=="death-stranding-dc.fabrication"&&approved.Any(s=>s.Definition.Provider==definition.Provider&&s.Definition.GameId==definition.GameId&&SameReadScope(candidate,s.Binding)
+                    &&(!candidate.ReplaceManualProgress || s.Definition.Id==definition.Id&&s.Binding.TrackerId==definition.Id&&s.Binding.ReplaceManualProgress)))
                     try{validate(candidate,definition);binding=candidate;}catch(Exception error)when(error is InvalidDataException or NotSupportedException){}
             }
             result.Add(new(definition,binding));

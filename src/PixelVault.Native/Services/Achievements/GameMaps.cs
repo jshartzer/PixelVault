@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Windows.Media.Imaging;
@@ -9,40 +8,6 @@ using Microsoft.Data.Sqlite;
 
 namespace PixelVaultNative
 {
-    sealed class GameMapMarker
-    {
-        public string Id { get; set; } = Guid.NewGuid().ToString("N");
-        public string Label { get; set; }
-        public string Detail { get; set; }
-        // Image-relative coordinates keep pins aligned independently of DPI, aspect ratio and zoom.
-        public double X { get; set; }
-        public double Y { get; set; }
-        public double? WorldX { get; set; }
-        public double? WorldY { get; set; }
-        public string TrackerId { get; set; }
-        public string ItemId { get; set; }
-    }
-
-    sealed class GameMapDefinition
-    {
-        public string Id { get; set; } = Guid.NewGuid().ToString("N");
-        public string Provider { get; set; }
-        public string GameId { get; set; }
-        public string GameTitle { get; set; }
-        public string Title { get; set; }
-        public string Region { get; set; }
-        public string ImageFile { get; set; }
-        public int PixelWidth { get; set; }
-        public int PixelHeight { get; set; }
-        public string Source { get; set; }
-        public string Calibration { get; set; }
-        public List<string> AchievementIds { get; set; } = new();
-        public List<string> TrackerIds { get; set; } = new();
-        public List<GameMapMarker> Markers { get; set; } = new();
-        public long Revision { get; set; }
-        public override string ToString() => Title;
-    }
-
     /// <summary>Local, game-scoped map media and links. No accounts or progress are stored here.</summary>
     sealed class GameMapStore
     {
@@ -60,18 +25,7 @@ namespace PixelVaultNative
         }
         internal List<GameMapDefinition> List(string provider, string gameId, string achievement = null, string tracker = null)
         {
-            using var c = Open();using var cmd = c.CreateCommand();
-            cmd.CommandText = "SELECT definition,revision FROM game_map WHERE provider=$p AND game_id=$g ORDER BY id";
-            cmd.Parameters.AddWithValue("$p", provider ?? "");cmd.Parameters.AddWithValue("$g", gameId ?? "");
-            using var reader = cmd.ExecuteReader();var result = new List<GameMapDefinition>();
-            while (reader.Read())
-            {
-                var map = JsonSerializer.Deserialize<GameMapDefinition>(reader.GetString(0));map.Revision = reader.GetInt64(1);
-                if ((!string.IsNullOrEmpty(achievement) && !map.AchievementIds.Contains(achievement)) ||
-                    (!string.IsNullOrEmpty(tracker) && !map.TrackerIds.Contains(tracker))) continue;
-                result.Add(map);
-            }
-            return result.OrderBy(m => m.Title, StringComparer.CurrentCultureIgnoreCase).ToList();
+            return new GameMapReader(Path.GetDirectoryName(root)).List(provider, gameId, achievement, tracker);
         }
         internal string ImagePath(GameMapDefinition map)
         {
@@ -121,19 +75,7 @@ namespace PixelVaultNative
             if (cmd.ExecuteNonQuery() != 1) throw new InvalidOperationException("This map changed in another window. Reopen it before editing.");
             map.Revision = revision;
         }
-        internal static void Validate(GameMapDefinition map)
-        {
-            if (map == null || string.IsNullOrWhiteSpace(map.Id) || string.IsNullOrWhiteSpace(map.Provider) || string.IsNullOrWhiteSpace(map.GameId) ||
-                string.IsNullOrWhiteSpace(map.Title) || map.Title.Length > 300) throw new InvalidDataException("A game and map title are required.");
-            if (map.AchievementIds == null || map.TrackerIds == null || map.Markers == null || map.Markers.Count > 10000) throw new InvalidDataException("Invalid map links or markers.");
-            if (map.Markers.Select(m => m?.Id).Distinct().Count() != map.Markers.Count) throw new InvalidDataException("Map marker IDs must be unique.");
-            foreach (var marker in map.Markers)
-                if (marker == null || string.IsNullOrWhiteSpace(marker.Id) || string.IsNullOrWhiteSpace(marker.Label) || marker.Label.Length > 300 ||
-                    !double.IsFinite(marker.X) || !double.IsFinite(marker.Y) || marker.X < 0 || marker.X > 1 || marker.Y < 0 || marker.Y > 1 ||
-                    (marker.WorldX.HasValue && !double.IsFinite(marker.WorldX.Value)) || (marker.WorldY.HasValue && !double.IsFinite(marker.WorldY.Value)) ||
-                    (!string.IsNullOrEmpty(marker.ItemId) && string.IsNullOrEmpty(marker.TrackerId)))
-                    throw new InvalidDataException("Each marker needs a name and a position inside the map.");
-        }
+        internal static void Validate(GameMapDefinition map) => GameMapValidation.Validate(map);
         internal static (double X, double Y) WorldToImage(double x, double y, double minX, double maxX, double minY, double maxY)
         {
             if (!double.IsFinite(x) || !double.IsFinite(y) || !double.IsFinite(minX) || !double.IsFinite(maxX) || !double.IsFinite(minY) || !double.IsFinite(maxY) || maxX <= minX || maxY <= minY)

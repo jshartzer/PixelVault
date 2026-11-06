@@ -7,7 +7,14 @@ namespace PixelVault.Companion;
 
 public sealed partial class PcConnector
 {
-    static bool SamePermission(TrackerSourceBinding a,TrackerSourceBinding b)=>
+    static string PublicationDigest(AchievementTrackerDefinition definition)
+    {
+        var metadata=JsonSerializer.SerializeToNode(definition,Json)!;
+        metadata.AsObject().Remove("IconId");
+        return Hash(metadata.ToJsonString(Json));
+    }
+    static bool SamePermission(TrackerSourceBinding a,TrackerSourceBinding b)=>a.ReplaceManualProgress==b.ReplaceManualProgress&&SameReadScope(a,b);
+    static bool SameReadScope(TrackerSourceBinding a,TrackerSourceBinding b)=>
         a.AdapterId==b.AdapterId&&a.AdapterVersion==b.AdapterVersion&&a.Account==b.Account
         &&string.Equals(a.Location,b.Location,StringComparison.OrdinalIgnoreCase)
         &&string.Equals(a.GameDirectory??"",b.GameDirectory??"",StringComparison.OrdinalIgnoreCase)
@@ -31,7 +38,7 @@ public sealed partial class PcConnector
             var sources=pair.Sources.ToList();var existing=workspace.Definitions().ToDictionary(d=>d.Id,StringComparer.Ordinal);int added=0;
             foreach(var item in request.Trackers)
             {
-                var definition=item.Definition;var digest=Hash(JsonSerializer.Serialize(definition,Json));
+                var definition=item.Definition;var digest=PublicationDigest(definition);
                 using var claim=c.CreateCommand();claim.CommandText="SELECT digest FROM companion_published_tracker WHERE workspace=$w AND id=$id";
                 claim.Parameters.AddWithValue("$w",workspace.Identity);claim.Parameters.AddWithValue("$id",definition.Id);
                 var reserved=claim.ExecuteScalar() as string;
@@ -44,11 +51,12 @@ public sealed partial class PcConnector
                 if(reserved!=digest)continue;
                 if(!existing.TryGetValue(definition.Id,out var current))
                 {workspace.Repository.AddDefinition(definition);existing.Add(definition.Id,definition);current=definition;added++;}
-                if(Hash(JsonSerializer.Serialize(current,Json))!=reserved)continue;
+                if(PublicationDigest(current)!=reserved)continue;
                 var binding=item.Binding;
                 if(binding is null||binding.TrackerId!=definition.Id||binding.AdapterId!="death-stranding-dc.fabrication"||binding.AdapterVersion!="1"
                     ||binding.Account!=workspace.Account(definition.Id)
-                    ||!sources.Any(s=>s.Definition.Provider==definition.Provider&&s.Definition.GameId==definition.GameId&&Current(pair,s.Definition.Id) is not null&&SamePermission(s.Binding,binding)))continue;
+                    ||!sources.Any(s=>s.Definition.Provider==definition.Provider&&s.Definition.GameId==definition.GameId&&Current(pair,s.Definition.Id) is not null&&SameReadScope(s.Binding,binding)
+                        &&(!binding.ReplaceManualProgress || s.Definition.Id==definition.Id&&s.Binding.TrackerId==definition.Id&&s.Binding.ReplaceManualProgress)))continue;
                 var saved=workspace.Repository.Source(definition.Id,binding.Account);
                 if(saved is null)
                 {var copy=JsonSerializer.Deserialize<TrackerSourceBinding>(JsonSerializer.Serialize(binding,Json),Json)!;workspace.Repository.SaveSource(copy);saved=workspace.Repository.Source(definition.Id,binding.Account)!;}

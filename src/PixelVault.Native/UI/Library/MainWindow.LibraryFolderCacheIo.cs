@@ -427,7 +427,7 @@ namespace PixelVaultNative
             return libraryWorkspace.GetCachedFolderImages(folderPath);
         }
 
-        List<string> GetFilesForLibraryFolderEntry(LibraryFolderInfo folder, bool imagesOnly)
+        List<string> GetFilesForLibraryFolderEntry(LibraryFolderInfo folder, bool imagesOnly, string rootOverride = null)
         {
             if (folder == null) return new List<string>();
             if (folder.FilePaths != null && folder.FilePaths.Length > 0)
@@ -450,9 +450,12 @@ namespace PixelVaultNative
             var desired = NormalizeConsoleLabel(folder.PlatformLabel);
             if (candidates.Count == 0) return candidates;
             Dictionary<string, LibraryMetadataIndexEntry> indexForProbe = null;
-            if (!string.IsNullOrWhiteSpace(libraryRoot))
+            var requestedRoot = rootOverride ?? libraryRoot;
+            if (!string.IsNullOrWhiteSpace(requestedRoot))
             {
-                indexForProbe = LoadLibraryMetadataIndexForFilePathsViaSessionWhenActive(libraryRoot, candidates);
+                indexForProbe = rootOverride == null
+                    ? LoadLibraryMetadataIndexForFilePathsViaSessionWhenActive(requestedRoot, candidates)
+                    : LoadLibraryMetadataIndexForFilePaths(requestedRoot, candidates);
             }
 
             return candidates

@@ -24,6 +24,7 @@ namespace PixelVaultNative
             if (ws == null || ws.WorkspaceMode != LibraryWorkspaceMode.Photo) return;
             ws.PhotoRailExcludedConsoleLabels.Clear();
             ws.WorkspaceMode = LibraryWorkspaceMode.Folder;
+            ws.DetailRenderCancellation.CancelCurrent();
             ApplyLibraryBrowserLayoutMode(ws.Panes, ws.WorkspaceMode);
             ws.RefreshSortFilterChrome?.Invoke();
             ScheduleLibraryBrowserFolderListRerenderAfterLayout(ws, renderTiles);
@@ -52,6 +53,7 @@ namespace PixelVaultNative
             if (ws.WorkspaceMode == LibraryWorkspaceMode.Photo)
                 return;
             ws.WorkspaceMode = LibraryWorkspaceMode.Folder;
+            ws.DetailRenderCancellation.CancelCurrent();
         }
 
         void ScheduleLibraryBrowserFolderListRerenderAfterLayout(LibraryBrowserWorkingSet ws, Action renderTiles)

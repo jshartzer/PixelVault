@@ -24,11 +24,18 @@ namespace PixelVaultNative
             var save = AchievementTrackerWindow.Button("Save copy…", "Save a UTF-8 text copy of this item's content"); footer.Children.Add(save);
             var close = AchievementTrackerWindow.Button("Close", "Close content"); close.IsCancel = true; close.Click += (_, __) => Close(); footer.Children.Add(close);
             var header = new StackPanel(); DockPanel.SetDock(header, Dock.Top); root.Children.Add(header);
-            header.Children.Add(new TextBlock { Text = item.Name, FontSize = 21, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap });
+            header.Children.Add(MailIconText.Apply(new TextBlock { Text = item.Name, FontSize = 21, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap }, item.Name));
             header.Children.Add(new TextBlock { Text = "Saved reference text · Viewing here does not mark it read in the game.", FontSize = 13, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 8, 0, 12) });
             var body = new TextBox { Text = item.Content ?? "", IsReadOnly = true, TextWrapping = TextWrapping.Wrap, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                 HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, FontSize = 16, Padding = new Thickness(12), AcceptsReturn = true };
-            AchievementTrackerWindow.DressEditor(body); AutomationProperties.SetName(body, "Saved content"); root.Children.Add(body);
+            AchievementTrackerWindow.DressEditor(body); AutomationProperties.SetName(body, "Saved content"); if (MailIconText.HasIcons(item.Content)) {
+                var paragraph = new System.Windows.Documents.Paragraph();
+                MailIconText.Fill(paragraph.Inlines, item.Content, 16);
+                var rich = new RichTextBox { IsReadOnly = true, FontSize = 16, Background = body.Background, Foreground = body.Foreground,
+                    BorderBrush = body.BorderBrush, Padding = new Thickness(12), VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                    Document = new System.Windows.Documents.FlowDocument(paragraph) { PagePadding = new Thickness(0) } };
+                AutomationProperties.SetName(rich, "Saved content"); root.Children.Add(rich);
+            } else root.Children.Add(body);
             save.Click += (_, __) =>
             {
                 var invalid = Path.GetInvalidFileNameChars();

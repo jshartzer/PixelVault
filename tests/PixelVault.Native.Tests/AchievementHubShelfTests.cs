@@ -33,6 +33,31 @@ public sealed class AchievementHubShelfTests : IDisposable
     }
 
     [Fact]
+    public void XboxPinsPersistAlongsideOtherPlatformsAndUnpinIndependently()
+    {
+        var pins = new AchievementHubPins(PinFile);
+        pins.Toggle("steam:2026288209");
+        pins.Toggle("xbox:2026288209");
+        pins = new AchievementHubPins(PinFile);
+        Assert.True(pins.IsPinned("xbox:2026288209"));
+        Assert.False(pins.Toggle("xbox:2026288209"));
+        Assert.Equal(new[] { "steam:2026288209" }, new AchievementHubPins(PinFile).Keys);
+        Assert.Throws<ArgumentException>(() => pins.Toggle("xbox:0"));
+        Assert.Throws<ArgumentException>(() => pins.Toggle("xbox:../42"));
+    }
+
+    [Fact]
+    public void XboxRecentShelfUsesFreshCataloguePlayDatesWithoutWaitingForCachedRecentRefresh()
+    {
+        var played=DateTime.UtcNow.AddDays(-1).Ticks;
+        var game=Game("42","xbox");game.XboxTitle=new(){Id="42",LastPlayedUtc=played};
+        var data=new Dictionary<string,AchievementHubStore.AccountData>{{"xbox",new(){Recent=new()}}};
+        Assert.Equal(played,Assert.Single(AchievementHubService.SelectRecent(new[]{game},data)).LastPlayedUtc);
+        game.XboxTitle.LastPlayedUtc=DateTime.MaxValue.Ticks;
+        Assert.Empty(AchievementHubService.SelectRecent(new[]{game},data));
+    }
+
+    [Fact]
     public void Pins_FailedSaveLeavesPinsUnchanged()
     {
         Directory.CreateDirectory(PinFile);

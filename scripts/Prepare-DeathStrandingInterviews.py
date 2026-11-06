@@ -13,6 +13,13 @@ import re
 import sys
 
 
+MISSABLE_INTERVIEWS = {
+    "e13f55c5-4b95-8f41-a8ec-65be8acf1293":
+        "Reach three stars with Lake Knot City by completing Order 23 (Retrieval: System Server). "
+        "Players report missing this interview if Lake Knot City is already at three stars."
+}
+
+
 def plain(value):
     value = re.sub(r"<br\s*/?>", "\n", value or "", flags=re.I)
     value = re.sub(r"</?color(?:\s+[^>]*)?>", "", value, flags=re.I)
@@ -32,16 +39,21 @@ def prepare(rows):
         if not body or len(body) > 100000:
             raise ValueError("Invalid body length")
         metadata = [plain(row.get(k)) for k in ("WhoText", "WhenText", "WhereText")]
-        items.append({"Id": row["ResourceUUID"], "Name": plain(row["TitleText"]),
+        identity = row["ResourceUUID"]
+        unlock_hint = MISSABLE_INTERVIEWS.get(identity)
+        detail = "\n".join(v for v in metadata if v)
+        if unlock_hint:
+            detail = "\n\n".join(v for v in (detail, unlock_hint) if v)
+        items.append({"Id": identity, "Name": plain(row["TitleText"]),
                       "Category": groups.get(row["Group"]["name"], row["Group"]["name"]),
-                      "Detail": "\n".join(v for v in metadata if v) + "\n\nIndividual read status is manual; the linked automatic counter tracks the achievement total.",
+                      "Detail": detail, "Missable": bool(unlock_hint),
                       "Content": body, "Target": 1, "Order": order,
                       "Identifiers": {"ResourceUUID": row["ResourceUUID"], "Language": "English", "ContentSource": "Installed game: ds/archives/interviews_resource.core"}})
     if not items or sum(len(i["Content"]) for i in items) > 2000000:
         raise ValueError("Empty or oversized catalogue")
     return {"Id": "death-stranding-dc.interview-catalogue", "Provider": "steam", "GameId": "1850570",
             "GameTitle": "Death Stranding Director's Cut", "AchievementId": "039", "Title": "Interview catalogue",
-            "Description": "Installed English interview reference library. Content is saved locally. Opening it does not mark interviews read in the game. Individual checkboxes are manual; use Interviews — The Past Guides the Present for the automatic 100-interview achievement counter.",
+            "Description": "Interviews from the in-game Data menu.",
             "CompletionLabel": "Marked read", "Milestones": [], "CategoryTargets": {}, "Items": items}
 
 

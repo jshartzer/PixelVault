@@ -91,6 +91,7 @@ namespace PixelVaultNative
                 && !string.Equals(normalizedCustomPlatform, "PS5", StringComparison.OrdinalIgnoreCase)
                 && !string.Equals(normalizedCustomPlatform, "Switch", StringComparison.OrdinalIgnoreCase)
                 && !string.Equals(normalizedCustomPlatform, "Xbox", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(normalizedCustomPlatform, "Xbox 360", StringComparison.OrdinalIgnoreCase)
                 && !string.Equals(normalizedCustomPlatform, "Other", StringComparison.OrdinalIgnoreCase)
                 && !string.Equals(normalizedCustomPlatform, "Multiple Tags", StringComparison.OrdinalIgnoreCase);
             var captureTime = (snapshot == null ? (DateTime?)null : snapshot.CaptureTime) ?? GetLibraryDate(file);
@@ -107,6 +108,7 @@ namespace PixelVaultNative
                 !string.Equals(tag, "Switch", StringComparison.OrdinalIgnoreCase) &&
                 !string.Equals(tag, "Nintendo", StringComparison.OrdinalIgnoreCase) &&
                 !string.Equals(tag, "Xbox", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(tag, "Xbox 360", StringComparison.OrdinalIgnoreCase) &&
                 !tag.StartsWith(CustomPlatformPrefix, StringComparison.OrdinalIgnoreCase)));
             var addPhotographyTag = tags.Any(tag => string.Equals(tag, GamePhotographyTag, StringComparison.OrdinalIgnoreCase) || string.Equals(tag, "Photography", StringComparison.OrdinalIgnoreCase));
             var tagSteam = consoleTags.Contains("Steam");
@@ -115,6 +117,7 @@ namespace PixelVaultNative
             var tagPs5 = consoleTags.Contains("PS5");
             var tagSwitch = consoleTags.Contains("Switch");
             var tagXbox = consoleTags.Contains("Xbox");
+            var tagXbox360 = consoleTags.Contains("Xbox 360");
             var customPlatformValue = useCustomPlatform ? customPlatformName : string.Empty;
             // Timeline (and similar) passes a synthetic LibraryFolderInfo whose Name is browse chrome ("Timeline") with no real folder path — do not use that as the game title.
             var folderPathUsable = folder != null
@@ -128,6 +131,10 @@ namespace PixelVaultNative
                 savedGameRow = FindSavedGameIndexRowById(rows, indexGameIdNorm);
             }
             var guessedFromPathAndName = NormalizeGameIndexName(GuessGameIndexNameForFile(file));
+            // The saved category can be more specific than an older capture's Xbox tag.
+            if ((savedGameRow?.PlatformLabel ?? folder?.PlatformLabel) == "Xbox 360"
+                && consoleTags.All(label => label == "Xbox" || label == "Xbox 360"))
+            { tagXbox = false; tagXbox360 = true; }
             var gameName = ResolveManualMetadataGameName(savedGameRow, guessedFromPathAndName, folderPathUsable, fileName, NormalizeGameIndexName, GetGameNameFromFileName);
             var steamAppId = folderPathUsable ? (folder.SteamAppId ?? string.Empty) : string.Empty;
             if (savedGameRow != null && !string.IsNullOrWhiteSpace(savedGameRow.SteamAppId))
@@ -155,6 +162,7 @@ namespace PixelVaultNative
                 TagPs5 = tagPs5,
                 TagSwitch = tagSwitch,
                 TagXbox = tagXbox,
+                TagXbox360 = tagXbox360,
                 TagOther = useCustomPlatform,
                 CustomPlatformTag = customPlatformValue,
                 OriginalGameId = indexEntry == null ? (folder == null || !folderPathUsable ? string.Empty : folder.GameId) : indexEntry.GameId,
@@ -172,6 +180,7 @@ namespace PixelVaultNative
                 OriginalTagPs5 = tagPs5,
                 OriginalTagSwitch = tagSwitch,
                 OriginalTagXbox = tagXbox,
+                OriginalTagXbox360 = tagXbox360,
                 OriginalTagOther = useCustomPlatform,
                 OriginalCustomPlatformTag = customPlatformValue
             };

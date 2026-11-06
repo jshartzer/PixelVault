@@ -17,8 +17,8 @@ public sealed class LibraryAchievementsPreviewTests
         GameAchievementsFetchService.AchievementRow[] rows =
         {
             new() { GroupName = group, ProgressKnown = true, Unlocked = true },
-            new() { GroupName = "Expansion", ProgressKnown = true, Unlocked = false },
-            new() { GroupName = "Bonus Pack", ProgressKnown = false }
+            new() { DlcName = "Expansion", ProgressKnown = true, Unlocked = false },
+            new() { DlcName = "Bonus Pack", ProgressKnown = false }
         };
         Assert.True(MainWindow.LibraryGameProfileAchievementsAreFullyUnlocked(rows));
     }
@@ -44,7 +44,7 @@ public sealed class LibraryAchievementsPreviewTests
         Assert.False(MainWindow.LibraryGameProfileAchievementsAreFullyUnlocked(Array.Empty<GameAchievementsFetchService.AchievementRow>()));
         Assert.False(MainWindow.LibraryGameProfileAchievementsAreFullyUnlocked(new GameAchievementsFetchService.AchievementRow[]
         {
-            new() { GroupName = "Expansion", ProgressKnown = true, Unlocked = true }
+            new() { DlcName = "Expansion", ProgressKnown = true, Unlocked = true }
         }));
     }
 

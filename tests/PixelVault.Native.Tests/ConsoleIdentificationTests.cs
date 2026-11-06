@@ -79,6 +79,7 @@ public sealed class ConsoleIdentificationTests
             out var tagPs5,
             out var tagSwitch,
             out var tagXbox,
+            out var tagXbox360,
             out var tagOther,
             out var customPlatformTag);
 
@@ -135,6 +136,7 @@ public sealed class ConsoleIdentificationTests
             out var tagPs5,
             out var tagSwitch,
             out var tagXbox,
+            out var tagXbox360,
             out var tagOther,
             out var customPlatformTag);
 
@@ -159,6 +161,7 @@ public sealed class ConsoleIdentificationTests
             out var tagPs5,
             out var tagSwitch,
             out var tagXbox,
+            out var tagXbox360,
             out var tagOther,
             out var customPlatformTag);
 
@@ -220,6 +223,7 @@ public sealed class ConsoleIdentificationTests
             out var tagPs5,
             out var tagSwitch,
             out var tagXbox,
+            out var tagXbox360,
             out var tagOther,
             out var customPlatformTag);
 

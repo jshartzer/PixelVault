@@ -129,12 +129,13 @@ public sealed class LibraryPlatformLabelsTests
     [InlineData("PS5", 2)]
     [InlineData("Switch", 3)]
     [InlineData("Xbox", 4)]
-    [InlineData("PC", 5)]
-    [InlineData("Multiple Tags", 6)]
-    [InlineData("Other", 7)]
-    [InlineData("PlayStation", 8)]
-    [InlineData("", 8)]
-    [InlineData("unknown label", 8)]
+    [InlineData("Xbox 360", 5)]
+    [InlineData("PC", 6)]
+    [InlineData("Multiple Tags", 7)]
+    [InlineData("Other", 8)]
+    [InlineData("PlayStation", 9)]
+    [InlineData("", 9)]
+    [InlineData("unknown label", 9)]
     public void PlatformGroupOrder_CoversAllKnownBucketsAndFallsBackAfterOther(string label, int expected)
     {
         Assert.Equal(expected, LibraryPlatformLabels.PlatformGroupOrder(label));

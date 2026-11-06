@@ -6,14 +6,16 @@ using Microsoft.Data.Sqlite;
 
 namespace PixelVault.Companion;
 
-public sealed class AchievementStore
+public sealed partial class AchievementStore
 {
     readonly CompanionOptions options;readonly TrackerWorkspace workspace;readonly ConnectorSyncState sync;readonly object gate=new();
     static readonly JsonSerializerOptions Json=new(JsonSerializerDefaults.Web);
+    readonly LocalApplicationData? local;
     public sealed record Saved(CompanionAchievement Data,AchievementGroups Desktop,AchievementGroups? Web=null,string? Pending=null,AchievementGroups? Baseline=null,bool Conflict=false);
     public AchievementStore(CompanionOptions options,TrackerWorkspace workspace,ConnectorSyncState sync)
     {
         this.options=options;this.workspace=workspace;this.sync=sync;
+        local=workspace.LocalData;if(local is not null)return;
         using var c=Open();using var cmd=c.CreateCommand();cmd.CommandText="""
         CREATE TABLE IF NOT EXISTS companion_achievement_game(workspace TEXT NOT NULL,provider TEXT NOT NULL,game TEXT NOT NULL,captured INTEGER NOT NULL,updated INTEGER NOT NULL,categories TEXT NOT NULL,category_order TEXT NOT NULL,dlcs TEXT NOT NULL,synced INTEGER NOT NULL,PRIMARY KEY(workspace,provider,game));
         CREATE TABLE IF NOT EXISTS companion_achievement(workspace TEXT NOT NULL,provider TEXT NOT NULL,game TEXT NOT NULL,id TEXT NOT NULL,value TEXT NOT NULL,PRIMARY KEY(workspace,provider,game,id));
@@ -50,23 +52,77 @@ public sealed class AchievementStore
     }
     public object Game(string provider,string game)
     {
+        if(local is not null){Scope(provider,game);return LocalGame(provider,game);}
         Scope(provider,game);lock(gate){using var c=Open();using var cmd=Command(c,"SELECT updated,categories,category_order,dlcs,synced FROM companion_achievement_game WHERE workspace=$w AND provider=$p AND game=$g",provider,game);
         long updated=0,synced=0;string[] categories=[],order=[],dlcs=[];using(var row=cmd.ExecuteReader())if(row.Read()){updated=row.GetInt64(0);categories=JsonSerializer.Deserialize<string[]>(row.GetString(1))!;order=JsonSerializer.Deserialize<string[]>(row.GetString(2))!;dlcs=JsonSerializer.Deserialize<string[]>(row.GetString(3))!;synced=row.GetInt64(4);}
         cmd.CommandText="SELECT value FROM companion_achievement WHERE workspace=$w AND provider=$p AND game=$g";var saved=new List<Saved>();using(var rows=cmd.ExecuteReader())while(rows.Read())saved.Add(JsonSerializer.Deserialize<Saved>(rows.GetString(0),Json)!);
         var registered=new List<string>();cmd.CommandText="SELECT name FROM companion_achievement_category WHERE workspace=$w";using(var names=cmd.ExecuteReader())while(names.Read())registered.Add(names.GetString(0));categories=categories.Concat(registered).ToArray();
         cmd.CommandText="SELECT name FROM companion_achievement_dlc WHERE workspace=$w AND provider=$p AND game=$g";using(var names=cmd.ExecuteReader())while(names.Read())dlcs=dlcs.Append(names.GetString(0)).ToArray();
-        return new{provider,gameId=game,progressUpdatedUtc=updated,syncedUtc=synced,categories=categories.Concat(saved.Select(s=>(s.Web??s.Desktop).Category)).Where(s=>s.Length>0).Distinct(StringComparer.OrdinalIgnoreCase),categoryOrder=order,dlcs=dlcs.Concat(saved.Select(s=>(s.Web??s.Desktop).Dlc)).Where(s=>s.Length>0).Distinct(StringComparer.OrdinalIgnoreCase),rows=saved.OrderBy(s=>s.Data.Order).Select(View)};}
+        return new{provider,gameId=game,progressUpdatedUtc=updated,syncedUtc=synced,categories=categories.Concat(saved.Select(s=>(s.Web??s.Desktop).Category)).Where(s=>s.Length>0).Distinct(StringComparer.OrdinalIgnoreCase),categoryOrder=order,dlcs=dlcs.Concat(saved.Select(s=>(s.Web??s.Desktop).Dlc)).Where(s=>s.Length>0).Distinct(StringComparer.OrdinalIgnoreCase),rows=saved.OrderBy(s=>s.Data.Order).Select(View),
+            century=new {group=PixelVault.Tracking.CenturyAchievementCatalog.GroupName,planned=PixelVault.Tracking.CenturyAchievementCatalog.PlannedPerGame,
+                status=PixelVault.Tracking.CenturyAchievementCatalog.ConnectionStatus,definitions=PixelVault.Tracking.CenturyAchievementCatalog.ForGame(provider,game).Select(d=>
+                {
+                    var p=CenturyProgress(provider,game,d.Id);
+                    return new {d.Id,d.Provider,d.GameId,d.GameTitle,d.Title,d.Description,d.Category,d.Requirement,d.Order,d.Points,
+                        progressKnown=p is not null,unlocked=p?.Unlocked??false,unlockUtc=p?.UnlockUtc??0,counterCurrent=p?.Current,counterTarget=p?.Target,
+                        earnedPoints=p?.EarnedPoints??0,verifiedUtc=p?.VerifiedUtc??0,connectionStatus=p?.Status??PixelVault.Tracking.CenturyAchievementCatalog.ConnectionStatus};
+                }).ToArray()}};}
     }
-    public object Detail(string provider,string game,string id){Scope(provider,game);lock(gate){using var c=Open();return View(Read(c,provider,game,id));}}
-    public CompanionAchievement Data(string provider,string game,string id){Scope(provider,game);lock(gate){using var c=Open();return Read(c,provider,game,id).Data;}}
+    public object Detail(string provider,string game,string id){Scope(provider,game);if(Century(provider,game,id) is {} century)return new{achievement=century,version="",groupSync="fixed",desktopGroups=century.Groups};if(local is not null)return LocalView(provider,game,LocalRow(provider,game,id));lock(gate){using var c=Open();return View(Read(c,provider,game,id));}}
+    public sealed record CompletionSummary(string Tier,int Earned,int Total);
+    public IReadOnlyDictionary<string,string> CompletionTiers()=>CompletionSummaries().ToDictionary(p=>p.Key,p=>p.Value.Tier,StringComparer.Ordinal);
+    public IReadOnlyDictionary<string,CompletionSummary> CompletionSummaries()
+    {
+        if(local is not null)return LocalCompletionSummaries();
+        var result=new Dictionary<string,CompletionSummary>(StringComparer.Ordinal);
+        if(workspace.ReadOnly)return result;
+        var accounts=AchievementAccountScope.Read(options,workspace);
+        lock(gate)
+        {
+            using var c=Open();using var cmd=c.CreateCommand();
+            cmd.CommandText="SELECT provider,game,value FROM companion_achievement WHERE workspace=$w";
+            cmd.Parameters.AddWithValue("$w",workspace.Identity);
+            var games=new Dictionary<string,List<PixelVault.Tracking.AchievementCompletionProgress>>(StringComparer.Ordinal);
+            using var rows=cmd.ExecuteReader();
+            while(rows.Read())
+            {
+                if(!accounts.ContainsKey(rows.GetString(0)))continue;
+                var saved=JsonSerializer.Deserialize<Saved>(rows.GetString(2),Json)!;
+                var key=rows.GetString(0)+":"+rows.GetString(1);
+                if(!games.TryGetValue(key,out var progress))games[key]=progress=[];
+                var dlc=(saved.Web??saved.Desktop).Dlc;
+                progress.Add(new(saved.Data.ProgressKnown,saved.Data.Unlocked,
+                    !string.IsNullOrWhiteSpace(dlc)&&!dlc.Equals("Base Game",StringComparison.OrdinalIgnoreCase)));
+            }
+            foreach(var game in games)result[game.Key]=new(PixelVault.Tracking.AchievementCompletion.Name(PixelVault.Tracking.AchievementCompletion.Classify(game.Value)),game.Value.Count(r=>r.Known&&r.Unlocked),game.Value.Count);
+        }
+        return result;
+    }
+    PixelVaultNative.CenturyProgress? CenturyProgress(string provider,string game,string id)=>
+        AchievementAccountScope.Read(options,workspace).TryGetValue(provider,out var account)?workspace.Repository.Century(provider,game,id,account):null;
+    CompanionAchievement? Century(string provider,string game,string id)
+    {
+        var definition=PixelVault.Tracking.CenturyAchievementCatalog.Find(provider,game,id);if(definition is null)return null;
+        var progress=CenturyProgress(provider,game,id);
+        return new(definition.Id,definition.Title,definition.Description,definition.Order,false,progress is not null,progress?.Unlocked??false,progress?.UnlockUtc??0,null,progress?.Current,progress?.Target,
+            PixelVault.Tracking.CenturyAchievementCatalog.ArtworkUri(id,true),definition.Requirement,"","",definition.Category,false,new(definition.Category),PixelVault.Tracking.CenturyAchievementCatalog.ArtworkUri(id,false));
+    }
+    public CompanionAchievement Data(string provider,string game,string id){Scope(provider,game);if(Century(provider,game,id) is {} century)return century;if(local is not null)return LocalRow(provider,game,id);lock(gate){using var c=Open();return Read(c,provider,game,id).Data;}}
+    public byte[] CenturyArtwork(string provider,string game,string id,string state)
+    {
+        Scope(provider,game);
+        if(state is not ("locked" or "unlocked") || !PixelVault.Tracking.CenturyAchievementCatalog.ForGame(provider,game).Any(d=>d.Id==id))throw new KeyNotFoundException();
+        return PixelVault.Tracking.CenturyAchievementCatalog.Artwork(id,state=="unlocked")??throw new KeyNotFoundException();
+    }
     public object Receive(AchievementGameSync value)
     {
+        if(local is not null)throw new InvalidOperationException("Direct-local stores do not receive achievement copies.");
         Automatic();Scope(value.Provider,value.GameId);
         if(value.WorkspaceId!=workspace.Identity||value.Account!=AchievementAccountScope.Read(options,workspace)[value.Provider]||value.Rows is null||value.Rows.Count is <1 or >5000||value.Rows.Any(r=>r is null)||value.Rows.Select(r=>r.Id).Distinct().Count()!=value.Rows.Count||value.CapturedUtc<1||value.CapturedUtc>DateTime.UtcNow.AddMinutes(5).Ticks)throw new InvalidDataException("Invalid achievement snapshot.");
         if(value.Categories is null||value.CategoryOrder is null||value.Dlcs is null||value.Categories.Count>1000||value.CategoryOrder.Count>1000||value.Dlcs.Count>1000)throw new InvalidDataException("Invalid achievement organization.");
         foreach(var name in value.Categories.Concat(value.CategoryOrder).Concat(value.Dlcs))_=Normalize(new(name,""));
         foreach(var row in value.Rows)
-        {if(row is null||string.IsNullOrWhiteSpace(row.Id)||row.Id.Length>200||row.Id.Any(char.IsControl)||string.IsNullOrWhiteSpace(row.Title)||row.Title.Length>2000||row.Description is null||row.Description.Length>20000||row.Guide is null||row.Guide.Length>500000||row.SourceUrl is null||row.SourceUrl.Length>4000||row.SourceTitle is null||row.SourceTitle.Length>1000||row.Tags is null||row.Tags.Length>10000||row.Icon is null||row.Icon.Length>4000||row.Rarity is <0 or >100||row.CounterCurrent is <0||row.CounterTarget is <0)throw new InvalidDataException("Invalid achievement.");_=Normalize(row.Groups);}
+        {if(row is null||string.IsNullOrWhiteSpace(row.Id)||row.Id.StartsWith("century.",StringComparison.Ordinal)||row.Id.Length>200||row.Id.Any(char.IsControl)||string.IsNullOrWhiteSpace(row.Title)||row.Title.Length>2000||row.Description is null||row.Description.Length>20000||row.Guide is null||row.Guide.Length>500000||row.SourceUrl is null||row.SourceUrl.Length>4000||row.SourceTitle is null||row.SourceTitle.Length>1000||row.Tags is null||row.Tags.Length>10000||row.Icon is null||row.Icon.Length>4000||row.LockedIcon is null||row.LockedIcon.Length>4000||row.Rarity is <0 or >100||row.CounterCurrent is <0||row.CounterTarget is <0)throw new InvalidDataException("Invalid achievement.");_=Normalize(row.Groups);}
         lock(gate)
         {
             using var c=Open();using var tx=c.BeginTransaction();using var cmd=Command(c,"SELECT captured,updated FROM companion_achievement_game WHERE workspace=$w AND provider=$p AND game=$g",value.Provider,value.GameId,tx:tx);
@@ -89,6 +145,7 @@ public sealed class AchievementStore
     }
     public object Edit(string provider,string game,string id,EditAchievementGroups edit)
     {
+        if(local is not null){Scope(provider,game);_=local.EditGroups(provider,game,id,edit);return LocalView(provider,game,LocalRow(provider,game,id));}
         Scope(provider,game);if(!Guid.TryParse(edit.RequestId,out _))throw new InvalidDataException("A group edit needs a request ID.");var groups=Normalize(edit.Groups);var receipt=new GroupReceipt(provider,game,id,groups);var digest=Hash(JsonSerializer.Serialize(new{receipt,edit},Json));
         lock(gate){using var c=Open();using var tx=c.BeginTransaction();var saved=Read(c,provider,game,id,tx);using var cmd=c.CreateCommand();cmd.Transaction=tx;cmd.CommandText="SELECT digest FROM companion_achievement_receipt WHERE workspace=$w AND id=$id";cmd.Parameters.AddWithValue("$w",workspace.Identity);cmd.Parameters.AddWithValue("$id",edit.RequestId);
         if(cmd.ExecuteScalar() is string previous){if(previous!=digest)throw new InvalidOperationException("This request ID was already used.");return View(saved);}
@@ -99,10 +156,12 @@ public sealed class AchievementStore
     }
     public IReadOnlyList<AchievementGroupChange> Changes()
     {
+        if(local is not null)return [];
         Automatic();lock(gate){using var c=Open();using var cmd=c.CreateCommand();cmd.CommandText="SELECT provider,game,id,value FROM companion_achievement WHERE workspace=$w";cmd.Parameters.AddWithValue("$w",workspace.Identity);using var rows=cmd.ExecuteReader();var changes=new List<AchievementGroupChange>();while(rows.Read()){var saved=JsonSerializer.Deserialize<Saved>(rows.GetString(3),Json)!;if(saved.Pending is not null&&!saved.Conflict)changes.Add(new(rows.GetString(0),rows.GetString(1),rows.GetString(2),saved.Pending,saved.Baseline!,saved.Web!));}return changes.Take(100).ToArray();}
     }
     public void Ack(AchievementGroupAck ack)
     {
+        if(local is not null)throw new InvalidOperationException("Direct-local groups do not use transport acknowledgements.");
         Automatic();Scope(ack.Provider,ack.GameId);var desktop=Normalize(ack.Desktop);if(ack.Status is not ("applied" or "conflict"))throw new InvalidDataException("Invalid group receipt.");
         lock(gate){using var c=Open();var saved=Read(c,ack.Provider,ack.GameId,ack.AchievementId);if(saved.Pending!=ack.Id){
         if(ack.Status=="applied"&&saved.Pending is not null&&!saved.Conflict&&saved.Baseline==saved.Desktop){using var cmd=c.CreateCommand();cmd.CommandText="SELECT value FROM companion_achievement_receipt WHERE workspace=$w AND id=$id";cmd.Parameters.AddWithValue("$w",workspace.Identity);cmd.Parameters.AddWithValue("$id",ack.Id);if(cmd.ExecuteScalar() is string json&&JsonSerializer.Deserialize<GroupReceipt>(json,Json)==new GroupReceipt(ack.Provider,ack.GameId,ack.AchievementId,desktop))Write(c,ack.Provider,ack.GameId,saved with{Desktop=desktop,Baseline=desktop});}return;}

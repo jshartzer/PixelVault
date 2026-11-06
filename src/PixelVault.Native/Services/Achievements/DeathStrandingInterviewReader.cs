@@ -27,11 +27,19 @@ namespace PixelVaultNative
         {
             using var stream = typeof(DeathStrandingInterviewReader).Assembly.GetManifestResourceStream("PixelVault.Tracking.DeathStrandingAchievementCounters.json");
             var refs = JsonSerializer.Deserialize<Dictionary<uint, byte>>(stream);
-            if (refs?.Count != 49 || refs.GetValueOrDefault(39u) != 2 || refs.Values.Any(t => t is not (1 or 2)))
+            if (refs?.Count != 50 || refs.GetValueOrDefault(39u) != 2 || refs.GetValueOrDefault(41u) != 1 || refs.Values.Any(t => t is not (1 or 2)))
                 throw new InvalidDataException("The achievement-statistic reference is incomplete.");
             return refs;
         }
         internal static AchievementTrackerSnapshot Read(byte[] data, string account, long observed, string source, string evidence)
+        {
+            int count = ReadCount(data);
+            return new() { TrackerId = TrackerId, Provider = "steam", GameId = "1850570", Account = account, ObservedUtcTicks = observed, Source = source,
+                Evidence = evidence + " Interview reader v2: complete 47–50-entry typed achievement-statistic table validated, including all required identities and bounded statistic 39. Optional boolean statistics 7, 8 and 41 are validated when present. Per-title state is handled by the separate catalogue reader.",
+                Items = new() { new() { ItemId = ItemId, Current = count, Availability = TrackerAvailability.Unknown } } };
+        }
+        internal static int ReadCount(byte[] data) => ReadStatistic(data,39,CatalogueCount);
+        internal static int ReadStatistic(byte[] data,uint statistic,int maximum)
         {
             if (data == null || data.Length < 10 + 47 * Stride || data.Length > DeathStrandingSaveReader.MaxPayload)
                 throw new NotSupportedException("Unsupported interview-counter payload size.");
@@ -43,23 +51,21 @@ namespace PixelVaultNative
                 int start = search + relative + prefix.Length;search = start;
                 if (++candidates > 128) throw new NotSupportedException("Too many achievement-statistic candidates.");
                 if (start >= data.Length) continue;int count = data[start++];
-                if (count < 47 || count > 49 || start > data.Length - count * Stride) continue;
+                if (count < 47 || count > 50 || start > data.Length - count * Stride) continue;
                 var seen = new HashSet<uint>();bool valid = true;ulong read = ulong.MaxValue;
                 for (int i = 0; i < count; i++)
                 {
                     var row = data.AsSpan(start + i * Stride, Stride);uint id = BinaryPrimitives.ReadUInt32LittleEndian(row);byte type = row[4];ulong value = BinaryPrimitives.ReadUInt64LittleEndian(row.Slice(5));
                     if (!reference.TryGetValue(id, out var expected) || type != expected || !seen.Add(id) || (type == 1 && value > 1)) { valid = false;break; }
-                    if (id == 39) read = value;
+                    if (id == statistic) read = value;
                 }
-                // Statistic IDs 7/8 are absent in the earlier validated saves. Every other reference is required.
-                if (!valid || reference.Keys.Any(id => id is not (7 or 8) && !seen.Contains(id)) || read > CatalogueCount) continue;
+                // These typed boolean identities appear as progress unlocks them; all other identities are required.
+                if (!valid || reference.Keys.Any(id => id is not (7 or 8 or 41) && !seen.Contains(id)) || read > (ulong)maximum) continue;
                 if (found.HasValue) throw new NotSupportedException("The interview achievement-counter table is ambiguous.");
                 found = (int)read;
             }
             if (!found.HasValue) throw new NotSupportedException("No complete supported achievement-statistic table was found. Saved interview progress was preserved.");
-            return new() { TrackerId = TrackerId, Provider = "steam", GameId = "1850570", Account = account, ObservedUtcTicks = observed, Source = source,
-                Evidence = evidence + " Interview reader v1: complete 47–49-entry typed achievement-statistic table validated, including all required identities and bounded statistic 39. The user's one-interview control changes 66 to 67. Per-title read states are not inferred.",
-                Items = new() { new() { ItemId = ItemId, Current = found.Value, Availability = TrackerAvailability.Unknown } } };
+            return found.Value;
         }
     }
 }

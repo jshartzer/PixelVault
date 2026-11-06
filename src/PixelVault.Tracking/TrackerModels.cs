@@ -16,8 +16,12 @@ namespace PixelVaultNative
         public string GameTitle { get; set; }
         public string AchievementId { get; set; }
         public string Title { get; set; }
+        [System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+        public string IconId { get; set; }
         public string Description { get; set; }
         public string CompletionLabel { get; set; } = "Completed";
+        [System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+        public bool AggregateAsSingleItem { get; set; }
         public List<string> Milestones { get; set; } = new();
         public Dictionary<string, int> CategoryTargets { get; set; } = new();
         public List<AchievementTrackerItem> Items { get; set; } = new();
@@ -37,6 +41,10 @@ namespace PixelVaultNative
         public int Order { get; set; }
         [System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
         public bool Archived { get; set; }
+        [System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+        public bool Missable { get; set; }
+        [System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+        public bool ExcludedFromTotal { get; set; }
         public string GroupId { get; set; }
         public string Milestone { get; set; }
         public Dictionary<string, string> Identifiers { get; set; } = new();
