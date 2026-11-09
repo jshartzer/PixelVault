@@ -1,14 +1,31 @@
-Current PixelVault version:
+Current PixelVault release — November 8, 2026
 
-0.077.000
+Native: 0.128.021
+Executable: C:\Codex\dist\PixelVault-0.128.021\PixelVault.exe
+Main shortcut: C:\Codex\PixelVault.lnk
+Current junction: C:\Codex\dist\PixelVault-current
+App Testing: C:\Codex\App Testing\PixelVault.exe (identical published executable)
+Companion: 0.52.2, Windows service PixelVaultCompanion
+Companion URL: http://192.168.1.69:8787/
 
-Current PixelVault build:
+Maintained source: C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex
+Release source: C:\Codex\dist\PixelVault-0.128.021\source
+C:\Codex\src is an older checkout; do not build it for production.
 
-C:\Codex\dist\PixelVault-0.077.000\PixelVault.exe
+The Death Stranding reader accepts additional valid boolean achievement flags while checking the required identities, types, and counter values. The Companion service uses the new PC reader. Live automatic refresh verified 120 read interviews, 201 opened emails, and 23,196 kg delivered. All five affected trackers cleared their failures without pending review. Manual values, notes, source bindings, and settings were preserved.
 
-Shortcut that should point at the latest build:
+Validation: 85 focused tests, older copied saves, and packaged reads of recent saves that add statistic 25. Evidence: C:\Codex\artifacts\interviews-live-check-20261108-144559.
 
-C:\Codex\PixelVault.lnk
+The PC profile uses a larger Centurion badge and five larger achievement tiles.
 
-Companion NAS: 0.16.0 - http://192.168.1.99:8787/
-Companion PC connector: 0.16.0 - C:\Codex\Companion Connector\app-0.16.0\PixelVault.Companion.Connector.exe
+Late-game Death Stranding readers support the expanded typed achievement table, compact header widths, and individual interview reads after the official counter stops at 100. The background service uses this reader. All 44 connected trackers have automatic refresh enabled.
+
+Validation: 69 recent save copies, older interview reading controls, 10 packaged-reader cases, and a packaged automatic-refresh integration test. The broader Death Stranding run passed 185 tests; two unchanged order UI width assertions failed (108 expected, 94 actual).
+Evidence: C:\Codex\artifacts\ds-reader-fix-20261108.
+
+Live verification: all five repaired trackers completed automatic refresh with zero failures and no pending review; interview catalogue 108, emails 188, delivered cargo 21,333 kg. Manual progress, notes and settings preserved.
+
+Premium order update: Growth of a Legend uses four category counters capped at 20 unique LL-or-LLL deliveries each. Extra completed-category orders no longer change this tracker; Nothing Left to Deliver retains all 540 order records. Live save: Condition20, Quantity20, Time19, Miscellaneous20 (79/80).
+Validation: 73 focused native tests and 4 Companion tests; packaged latest-save comparison preserved all 12 other projections. Evidence: C:\Codex\artifacts\premium-order-goal-20261108.
+
+Companion Cubes: six completion confirmations synced from saved mail receipt flags. Initial live progress: 2/6. Validated with 30 focused tests and a packaged read of the latest save.

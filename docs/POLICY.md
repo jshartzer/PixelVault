@@ -1,3 +1,5 @@
+Centurion compact rail (November 7, 2026): replace the profile collection with the approved compact rail on PC and web. Show the section only for game/platforms with authored Centurion definitions. Keep five icons in one row and show selected requirements underneath; retain full detail navigation, badge eligibility and separate reward notifications. See CENTURION_COMPACT_RAIL.md.
+
 # PixelVault Working Policy
 
 ## Purpose
