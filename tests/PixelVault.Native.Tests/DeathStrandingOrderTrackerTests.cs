@@ -97,8 +97,12 @@ public sealed class DeathStrandingOrderTrackerTests : IDisposable
                 var indicators = Assert.IsType<StackPanel>(row.Children[1]); Assert.Equal(1, Grid.GetColumn(indicators));
                 var checks = indicators.Children.OfType<ToggleButton>().ToList();
                 Assert.Equal(2, checks.Count); Assert.False(checks[0].IsChecked); Assert.True(checks[1].IsChecked);
-                Assert.All(checks, c => { Assert.Equal(25, c.MinHeight); Assert.Equal(108, c.MinWidth); });
-                Assert.Equal("Not Complete", ((TextBlock)((StackPanel)checks[0].Content).Children[1]).Text);
+                // Ranked milestones use compact, single-label buttons; completion is exposed accessibly.
+                Assert.All(checks, c => { Assert.Equal(25, c.MinHeight); Assert.Equal(94, c.MinWidth); Assert.Equal(94, c.Width); });
+                Assert.Equal(new[] { "LL", "LLL" }, checks.Select(c =>
+                    Assert.IsType<TextBlock>(Assert.Single(Assert.IsType<StackPanel>(c.Content).Children.Cast<UIElement>())).Text));
+                Assert.Contains("Not Complete", System.Windows.Automation.AutomationProperties.GetHelpText(checks[0]));
+                Assert.Contains("Completed", System.Windows.Automation.AutomationProperties.GetHelpText(checks[1]));
                 checks[0].RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)); Pump(window.PendingEdit);
                 Assert.True(Store().Load(Id, "player").Single(s => s.Item.Id == "212002:LL").Complete);
                 Assert.True(Store().Load(Id, "player").Single(s => s.Item.Id == "212002:LLL").Complete);
