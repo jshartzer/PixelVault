@@ -12,7 +12,7 @@
     return previous?trackers.filter(t=>{
       if(typeof t.updateVersion!=='string')return false;
       const saved=previous[t.id];
-      if(newlyCompleted(saved,t))return true;
+      if(newlyCompleted(saved,t))return !t.achievementId?.startsWith('century.');
       const linkedGoalMet=completion(t)===true && typeof t.achievementId==='string' && t.achievementId.trim().length>0;
       return !linkedGoalMet && version(saved)!==t.updateVersion;
     }):[];
@@ -37,7 +37,7 @@
   function summary(previous,trackers,job){
     const updated=changed(previous,trackers).map(t=>{
       const completed=newlyCompleted(previous[t.id],t);
-      return {title:t.title,gameTitle:t.gameTitle,provider:t.provider,gameId:t.gameId,completed,increased:completed?null:increased(previous[t.id],t)};
+      return {title:t.title,gameTitle:t.gameTitle,provider:t.provider,gameId:t.gameId,totals:t.totals,completed,increased:completed?null:increased(previous[t.id],t)};
     });
     const hasCompletion=updated.some(t=>t.completed);
     const title=hasCompletion && updated.every(t=>t.completed)?(updated.length===1?'Tracker completed':'Trackers completed'):'Trackers updated';
@@ -59,5 +59,36 @@
     }
     return [...groups.values()].map(group=>({...group,trackers:group.trackers.sort((a,b)=>Number(b.completed)-Number(a.completed))}));
   }
-  const api={snapshot,changed,summary,groupByGame};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.PixelVaultUpdates=api;
+  function achievementChanges(previous,current){
+    if(!previous || !Array.isArray(current))return [];
+    return current.flatMap(game=>{
+      const saved=previous[game.scope];
+      if(!saved || !Array.isArray(saved.locked) || !Array.isArray(saved.unlocked))return [];
+      const locked=new Set(saved.locked),earned=new Set(saved.unlocked);
+      return [...new Set(game.unlocked)].filter(id=>locked.has(id)&&!earned.has(id)).map(id=>({provider:game.provider,gameId:game.gameId,scope:game.scope,id}));
+    });
+  }
+  function achievementSnapshot(current,previous){
+    const next={...previous};
+    for(const game of current){
+      const saved=previous?.[game.scope];
+      // Keep earned identities across temporary unknown/missing data or provider resets.
+      const unlocked=[...new Set([...(Array.isArray(saved?.unlocked)?saved.unlocked:[]),...game.unlocked])];
+      const earned=new Set(unlocked);
+      next[game.scope]={locked:[...new Set([...(Array.isArray(saved?.locked)?saved.locked:[]),...game.locked])].filter(id=>!earned.has(id)),unlocked};
+    }
+    return next;
+  }
+  function progressSummary(trackerSummary,achievements=[],achievementCheckFailed=false){
+    const updated=trackerSummary.updated||[],parts=[];
+    if(updated.length){
+      const completed=updated.every(t=>t.completed);
+      parts.push(`${updated.length} ${updated.length===1?'tracker':'trackers'} ${completed?'completed':'changed'}`);
+    }
+    if(achievements.length)parts.push(`${achievements.length} ${achievements.length===1?'achievement':'achievements'} unlocked`);
+    return {...trackerSummary,achievements,achievementCheckFailed,
+      title:parts.length?'Progress updated':achievementCheckFailed&&trackerSummary.title==='Up to date'?'Refresh incomplete':trackerSummary.title,
+      message:parts.length?parts.join(' · '):trackerSummary.title==='Up to date'?(achievementCheckFailed?'Tracker progress is up to date.':'No tracker or achievement changes since the last check.'):trackerSummary.message};
+  }
+  const api={snapshot,changed,summary,groupByGame,achievementChanges,achievementSnapshot,progressSummary};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.PixelVaultUpdates=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

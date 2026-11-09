@@ -34,7 +34,13 @@ namespace PixelVaultNative
             };
             panel.Children.Add(pauseAutomatic);
             automaticStatusTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
-            automaticStatusTimer.Tick += async (_, __) => await PollAutomaticStatusAsync();
+            automaticStatusTimer.Tick += async (_, __) =>
+            {
+                automaticStatusTimer.Interval=TimeSpan.FromSeconds(store.RefreshUpdates?.IsFresh==true?30:2);
+                await PollAutomaticStatusAsync();
+            };
+            SavedRefreshSubscription.Attach(this,store.RefreshUpdates,(before,after)=>after.Changed(before,"trackers")||after.Changed(before,"sources"),
+                PollAutomaticStatusAsync,()=>refreshing||!PendingEdit.IsCompleted||DraftPending());
             Loaded += (_, __) => automaticStatusTimer.Start(); Closed += (_, __) => automaticStatusTimer.Stop();
         }
         internal async Task PollAutomaticStatusAsync()

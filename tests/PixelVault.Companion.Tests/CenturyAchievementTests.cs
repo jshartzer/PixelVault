@@ -83,7 +83,7 @@ public sealed partial class CompanionTests
         Assert.Equal(100,repo.Century("steam","1850570",PixelVault.Tracking.CenturyAchievementCatalog.DeathStrandingLegendsId,account).EarnedPoints);
         Assert.Empty(host.Services.GetRequiredService<AchievementStore>().CompletionSummaries());
         var official=repo.Definitions().Single(d=>d.Id==PixelVaultNative.AchievementTrackingCatalog.DeathStrandingOrdersId);
-        Assert.Equal("019",official.AchievementId);Assert.Equal(1080,official.Items.Count);
+        Assert.Equal("019",official.AchievementId);Assert.Equal(4,official.Items.Count);
         Assert.All(repo.Load(official.Id,account),s=>Assert.Null(s.Current));
     }
 

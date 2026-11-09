@@ -133,7 +133,7 @@ namespace PixelVaultNative
                 .ThenBy(u => u.Row.ProviderAchievementId, StringComparer.Ordinal).Take(limit).ToList();
             return timeline;
         }
-        internal async Task LoadAsync(AchievementHubSession session, bool force, Action<AchievementHubState> report, CancellationToken token)
+        internal async Task LoadAsync(AchievementHubSession session, bool force, Action<AchievementHubState> report, CancellationToken token, bool savedOnly=false)
         {
             var data = new Dictionary<string, AchievementHubStore.AccountData>();
             var providers = session.Games.Select(g => g.Provider).Distinct().ToList();
@@ -149,7 +149,8 @@ namespace PixelVaultNative
                 Pinned = SelectPinned(session.Games, session.Pinned, data),
                 Timeline = SelectUnlocks(session.Games, data, DateTime.UtcNow.Ticks),
                 Collection = AchievementHubCollection.Build(session.Games, data), Status = status });
-            Report("Showing saved progress while checking recent play…");
+            Report(savedOnly?"Saved progress updated.":"Showing saved progress while checking recent play…");
+            if(savedOnly)return;
             foreach (var provider in data.Keys.ToArray())
             {
                 token.ThrowIfCancellationRequested();

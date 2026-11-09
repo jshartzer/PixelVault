@@ -3,12 +3,13 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Version>0.48.1</Version>
+    <Version>0.52.2</Version>
   </PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="PixelVault.Companion.Tests" />
     <ProjectReference Include="../PixelVault.Tracking/PixelVault.Tracking.csproj" />
     <ProjectReference Include="../PixelVault.Maps/PixelVault.Maps.csproj" />
+    <ProjectReference Include="../PixelVault.Companion.Client/PixelVault.Companion.Client.csproj" />
     <PackageReference Include="Microsoft.Data.Sqlite.Core" Version="10.0.8" />
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.5" />
     <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.8" />

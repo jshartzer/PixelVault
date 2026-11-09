@@ -109,3 +109,47 @@ test('silenced completed goals do not suppress refresh errors, review or offline
   assert.deepEqual(summary.review,['Review save']);assert.deepEqual(summary.failed,['Read failed']);
   assert.equal(updates.summary({a:'v1'},[goal],{status:'offline'}).title,'PC unavailable');
 });
+
+const achievementGame=(scope,locked=[],unlocked=[],provider='steam',gameId='42')=>({scope,provider,gameId,locked,unlocked});
+test('achievement first visits and newly connected games baseline existing unlocks silently',()=>{
+  const current=[achievementGame('one',['locked'],['earned'])];
+  assert.deepEqual(updates.achievementChanges(null,current),[]);
+  assert.deepEqual(updates.achievementChanges({},current),[]);
+  const seen=updates.achievementSnapshot(current);
+  assert.deepEqual(updates.achievementChanges(seen,[...current,achievementGame('new',[],['old'])]),[]);
+});
+test('only confirmed locked-to-unlocked achievements alert, independently of tracker changes',()=>{
+  const seen=updates.achievementSnapshot([achievementGame('one',['new'],['old'])]);
+  const current=[achievementGame('one',[],['old','new','previously-unknown','new'])];
+  const changes=updates.achievementChanges(seen,current);
+  assert.deepEqual(changes.map(row=>row.id),['new']);
+  assert.equal(updates.progressSummary(updates.summary({},[]),changes).title,'Progress updated');
+  assert.equal(updates.progressSummary(updates.summary({},[]),changes).message,'1 achievement unlocked');
+});
+test('acknowledged unlocks never replay after provider resets, temporary missing games or unknown progress',()=>{
+  let seen=updates.achievementSnapshot([achievementGame('one',['a'],[])]);
+  const earned=[achievementGame('one',[],['a'])];
+  assert.equal(updates.achievementChanges(seen,earned).length,1);
+  seen=updates.achievementSnapshot(earned,seen);
+  seen=updates.achievementSnapshot([],seen);
+  seen=updates.achievementSnapshot([achievementGame('one',['a'],[])],seen);
+  assert.deepEqual(updates.achievementChanges(seen,earned),[]);
+});
+test('account scopes and platforms cannot share an achievement acknowledgement',()=>{
+  const seen=updates.achievementSnapshot([achievementGame('steam-account',['a']),achievementGame('xbox-account',['a'],[],'xbox')]);
+  const changed=updates.achievementChanges(seen,[achievementGame('different-steam-account',[],['a']),achievementGame('xbox-account',[],['a'],'xbox')]);
+  assert.deepEqual(changed.map(row=>row.provider),['xbox']);
+});
+test('legacy or malformed achievement storage starts a fresh baseline',()=>{
+  for(const previous of [null,{}, {one:'old'}, {one:{unlocked:[],locked:null}}])
+    assert.deepEqual(updates.achievementChanges(previous,[achievementGame('one',[],['earned'])]),[]);
+});
+test('detailed summaries combine achievements and tracker completions without losing refresh problems',()=>{
+  const summary={title:'Trackers completed',message:'',updated:[{title:'Structures',completed:true}],review:['Review'],failed:['Failed']};
+  const combined=updates.progressSummary(summary,[{id:'a'},{id:'b'}],true);
+  assert.equal(combined.message,'1 tracker completed · 2 achievements unlocked');
+  assert.deepEqual(combined.review,['Review']);assert.deepEqual(combined.failed,['Failed']);assert.equal(combined.achievementCheckFailed,true);
+  const unavailable=updates.progressSummary(updates.summary({},[]),[],true);
+  assert.equal(unavailable.title,'Refresh incomplete');assert.doesNotMatch(unavailable.message,/achievement changes/);
+  assert.equal(updates.progressSummary(updates.summary({},[],{status:'offline'})).title,'PC unavailable');
+});

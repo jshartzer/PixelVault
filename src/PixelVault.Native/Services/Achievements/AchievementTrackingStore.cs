@@ -9,6 +9,7 @@ namespace PixelVaultNative
 {
     sealed partial class AchievementTrackingStore : TrackerRepository
     {
+        internal PixelVault.Companion.Client.LocalRefreshListener RefreshUpdates { get; set; }
         internal GameMapStore Maps { get; }
         internal AchievementTrackingStore(string dataRoot) : base(dataRoot) { Maps = new GameMapStore(dataRoot); }
         protected override IReadOnlySet<string> GameFileAdapterIds => new TrackerRefreshService(this).GameFileAdapterIds;

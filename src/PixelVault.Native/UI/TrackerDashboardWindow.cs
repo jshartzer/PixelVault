@@ -50,6 +50,7 @@ namespace PixelVaultNative
             var footer=new DockPanel{Margin=new Thickness(0,12,0,0)};DockPanel.SetDock(footer,Dock.Bottom);root.Children.Add(footer);
             var close=AchievementTrackerWindow.Button("Close","Close tracker dashboard");close.Click+=(_,__)=>Close();DockPanel.SetDock(close,Dock.Right);footer.Children.Add(close);footer.Children.Add(feedback);
             root.Children.Add(new ScrollViewer{Content=games,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled});
+            SavedRefreshSubscription.Attach(this,navigation.Store.RefreshUpdates,(before,after)=>after.Changed(before,"trackers")||after.Changed(before,"achievements"),ReloadAsync);
             Loaded+=async(_,__)=>await ReloadAsync();Activated+=async(_,__)=>{if(IsLoaded)await ReloadAsync();};Closed+=(_,__)=>{closed=true;generation++;};
             PreviewKeyDown+=(_,e)=>{if(e.Key==Key.Escape)Close();if(e.Key==Key.F&&Keyboard.Modifiers==ModifierKeys.Control){search.Focus();search.SelectAll();e.Handled=true;}};
             TrackerFormStyle.Apply(this);AchievementCollectionUi.ApplyHighContrast(this);

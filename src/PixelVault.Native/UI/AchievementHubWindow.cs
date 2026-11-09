@@ -139,6 +139,8 @@ namespace PixelVaultNative
             refresh.ToolTip = "Refresh recent play and achievement progress";
             AutomationProperties.SetName(refresh, "Refresh achievements");
             refresh.Click += async (_, __) => await RefreshAsync(true);
+            SavedRefreshSubscription.Attach(this,trackingStore?.RefreshUpdates,(before,after)=>after.Changed(before,"achievements")||after.Changed(before,"trackers"),
+                ()=>RefreshAsync(false,savedOnly:true),()=>loading);
             Loaded += async delegate { back.Focus(); await RefreshAsync(false); };
             Activated += async delegate
             {
@@ -147,7 +149,7 @@ namespace PixelVaultNative
             Closed += delegate { closed = true; refreshCancellation?.Cancel(); renderThrottle?.Stop(); };
         }
 
-        internal async Task RefreshAsync(bool force, bool restart = false)
+        internal async Task RefreshAsync(bool force, bool restart = false, bool savedOnly = false)
         {
             if (closed || getSession == null || service == null) return;
             var session = getSession();
@@ -168,7 +170,7 @@ namespace PixelVaultNative
                 await service.LoadAsync(session, force, state =>
                 {
                     if (!closed && !cts.IsCancellationRequested && scope == session.Scope) QueueRender(state);
-                }, cts.Token);
+                }, cts.Token, savedOnly);
                 if (!closed && !cts.IsCancellationRequested) FlushRender();
             }
             catch (OperationCanceledException) { }

@@ -1,5 +1,5 @@
 'use strict';
-let pollTimer, initialization=0, initializing=false, appliedVersions={}, viewVersions=new Map();
+let pollTimer, refreshStream, appliedPush, initialization=0, initializing=false, appliedVersions={}, viewVersions=new Map();
 const $ = id => document.getElementById(id);
 function closeSideMenu(){if($('side-menu').open)$('side-menu').close();}
 $('menu-open').addEventListener('click',()=>{
@@ -35,7 +35,9 @@ $('cover-controls-toggle').addEventListener('change',()=>{
   try{localStorage.setItem('PixelVault.Companion.cover-controls',coverControlsVisible?'shown':'hidden');}catch{/* The current view can still be changed without storage. */}
 });
 let pcConnection={paired:false,online:false,supported:[]},refreshJob,refreshingGroup;
-let updateScope='',pendingUpdateSummary,visibleUpdateSummary,summaryDismissed=false;
+const updateBatchDelay=3000;
+let updateScope='',pendingUpdateSummary,visibleUpdateSummary,updateSummaryTimer,updateAcknowledgement=0;
+let achievementUpdateCache=null,achievementUpdateVersion=null,seenAchievementVersions=null;
 const libraryGroups=()=>PixelVaultLibrary.groupGames(games);
 const completionShowcase=PixelVaultShowcase.create({getGames:()=>games});
 const profileGroup=()=>libraryGroups().find(g=>g.id===profile?.groupId);
@@ -67,15 +69,24 @@ const trackerImageUI=PixelVaultTrackerIcons.create({api,getTracker:id=>detail?.d
   const t=trackers.find(t=>t.id===id);if(t)t.iconId=iconId;
   if(detail?.definition.id===id)detail.definition.iconId=iconId;
 }});
+const centurionUI=PixelVaultCenturion.create({api,onChange:renderCenturionShelf});
+function renderCenturionShelf(){
+  if(!profile)return;
+  const selected=PixelVaultLibrary.achievementEdition(profile,profileGroup()?.editions||[profile])||profile;
+  centurionUI.render($('centurion-profile'),selected.provider,selected.gameId);
+}
 const achievementUI=PixelVaultAchievements.create({api,heading,progressBar,paintBars,status,getGames:()=>games,getTrackers:()=>trackers,getWorkspace:()=>updateScope,newRequestId:requestId,trackerCard});
 const screenshotUI=PixelVaultScreenshots.create({api,heading,getGames:()=>games,navigate:(hash,replace)=>navigation.go(hash,replace),back:()=>navigation.back()});
 const mapUI=PixelVaultMaps.create({api,heading,getGames:()=>games,navigate:hash=>navigation.go(hash)});
 function showAuth(setup) {
+  centurionUI.reset();
+  stopRefreshStream();
   initialization++;initializing=false;clearInterval(pollTimer);appliedVersions={};viewVersions.clear();games=[];trackers=[];
   mapUI.clear();
   screenshotUI.clear();trackerImageUI.close();
   $('menu-open').hidden=true;
-  updateScope='';pendingUpdateSummary=undefined;visibleUpdateSummary=undefined;
+  updateScope='';pendingUpdateSummary=undefined;visibleUpdateSummary=undefined;clearTimeout(updateSummaryTimer);
+  achievementUpdateCache=null;achievementUpdateVersion=null;seenAchievementVersions=null;
   $('navigate-back').hidden=true;
   document.querySelectorAll('dialog[open]').forEach(dialog=>dialog.close());
   $('auth').hidden = false; $('logout').hidden = true; $('token-field').hidden = !setup; $('token').required = setup;
@@ -87,7 +98,9 @@ function showAuth(setup) {
   $('auth-form').dataset.setup = String(setup);
 }
 async function initialize() {
+  stopRefreshStream();
   const generation=++initialization;initializing=true;clearInterval(pollTimer);appliedVersions={};viewVersions.clear();
+  achievementUpdateCache=null;achievementUpdateVersion=null;seenAchievementVersions=null;
   try {
     const bootstrap=await Promise.all([api('/session'),api('/antiforgery')]);if(generation!==initialization)return;
     session=bootstrap[0];csrf=bootstrap[1].token;status('');
@@ -100,6 +113,10 @@ async function initialize() {
     if(generation!==initialization)return;
     trackerGroupOrder=PixelVaultLibrary.normalizeTrackerGroupOrder(required[4]?.groups);
     const workspace=required[3];games=required[0];sectionOrder=required[1];libraryLayout=required[2];trackers=[];
+    if(updateScope&&updateScope!==workspace.id){
+      pendingUpdateSummary=undefined;visibleUpdateSummary=undefined;clearTimeout(updateSummaryTimer);
+      if($('refresh-summary').open)$('refresh-summary').close();
+    }
     updateScope=workspace.id;session.workspaceMode=workspace.mode;
     $('workspace-label').textContent=workspace.mode==='direct-local'?'Saved on this PC.':session.demoEnabled?'Sample workspace · Read-only preview. Your desktop library is separate.':'Separate Companion workspace';
     screenshotUI.setWorkspace(updateScope);mapUI.setWorkspace(updateScope);
@@ -113,8 +130,10 @@ async function initialize() {
     if(extras[1].status==='fulfilled')pcConnection=extras[1].value;
     renderConnectionStatus();
     if(!unsafeToRefresh()){if(profile)renderGameProfile();else if(!location.hash.slice(1))renderGameGrid({preservePosition:true});}
-    checkForTrackerUpdates();
-    pollTimer=setInterval(()=>pollConnection(),workspace.mode==='direct-local'?5000:15000);
+    await checkForTrackerUpdates();
+    if(generation!==initialization)return;
+    startRefreshStream();
+    pollTimer=setInterval(()=>refreshStream?.connected?undefined:pollConnection(),workspace.mode==='direct-local'?5000:15000);
   } catch(error){if(generation===initialization)status(error.message||'Cannot reach Companion. Check your connection and reload.',true);}
   finally{if(generation===initialization)initializing=false;}
 }
@@ -283,7 +302,7 @@ function renderGameProfileContents() {
   if(g.total)stats.push(stat('Tracker goals',`${g.completed} / ${g.total}`));
   else if(s.captures !== null && s.captures !== undefined)stats.push(stat('Captures',String(s.captures)));
   $('game-stats').innerHTML = stats.join('');$('game-stats').setAttribute('aria-label','Saved game statistics');$('game-stats').title = 'Playtime and achievements are from your saved library snapshot. Tracker goals reflect saved Companion progress.';
-  renderSections();
+  renderSections();renderCenturionShelf();void centurionUI.refresh(updateScope);
 }
 const sectionInfo = {
   trackers:{title:'Trackers',description:'Your next steps, all in one place.',icon:'✓'},
@@ -389,9 +408,9 @@ $('refresh-game').addEventListener('click',async()=>{
     if(job.status!=='reading'){
       await refreshLists();
       if(profile?.groupId===groupId){profile=games.find(g=>g.provider===profile.provider&&g.gameId===profile.gameId)||profile;renderGameProfile();}
-      showTrackerUpdateSummary(PixelVaultUpdates.summary(before,trackers,job));
+      await showTrackerUpdateSummary(PixelVaultUpdates.summary(before,trackers,job),{previous:before});
     }
-  }catch(error){rememberRefresh({message:error.message,canReview:false},groupId);showTrackerUpdateSummary({title:'Refresh unavailable',message:error.message,updated:[],review:[],failed:[]});}
+  }catch(error){rememberRefresh({message:error.message,canReview:false},groupId);await showTrackerUpdateSummary({title:'Refresh unavailable',message:error.message,updated:[],review:[],failed:[]});}
   finally{refreshingGroup=undefined;renderRefreshStatus();}
 });
 async function openRefreshReview(){
@@ -418,7 +437,7 @@ $('refresh-review-apply').addEventListener('click',async()=>{
     const job=await api('/refresh/'+encodeURIComponent(refreshJob.id)+'/review',{version:refreshJob.version,allowOlder:$('refresh-older').checked});rememberRefresh(job,groupId);
     if(job.canReview)openRefreshReview();else $('refresh-review').close();
     await refreshLists();if(profile?.groupId===groupId){profile=games.find(g=>g.provider===profile.provider&&g.gameId===profile.gameId)||profile;renderGameProfile();}
-    if(!job.canReview)showTrackerUpdateSummary(PixelVaultUpdates.summary(before,trackers,job));
+    if(!job.canReview)await showTrackerUpdateSummary(PixelVaultUpdates.summary(before,trackers,job),{previous:before});
   }catch(error){$('refresh-review-status').textContent=error.message;}
   finally{$('refresh-review-apply').disabled=false;}
 });
@@ -433,42 +452,130 @@ function acknowledgeTracker(id){
   const tracker=trackers.find(t=>t.id===id);if(!tracker?.updateVersion)return;
   const seen=readSeenTrackerVersions() || PixelVaultUpdates.snapshot(trackers);seen[id]=PixelVaultUpdates.snapshot([tracker])[id];writeSeenTrackerVersions(seen);
 }
-function checkForTrackerUpdates(previous=null){
-  const seen=(visibleUpdateSummary?.scope===updateScope?visibleUpdateSummary?.versions:null) || readSeenTrackerVersions() || previous;
-  if(!seen){writeSeenTrackerVersions(PixelVaultUpdates.snapshot(trackers));return;}
-  const summary=PixelVaultUpdates.summary(seen,trackers);
-  if(summary.updated.length)showTrackerUpdateSummary(summary);
-  else if(!visibleUpdateSummary && !pendingUpdateSummary)writeSeenTrackerVersions(PixelVaultUpdates.snapshot(trackers));
+function achievementStorageKey(){return 'PixelVault.Companion.seen-achievements.'+updateScope;}
+function currentAchievementVersion(){return pcConnection.versions?(pcConnection.versions.achievements??JSON.stringify([pcConnection.versions.library,pcConnection.versions.trackers])):null;}
+function readSeenAchievementVersions(){
+  if(seenAchievementVersions)return seenAchievementVersions;
+  try{const saved=JSON.parse(localStorage.getItem(achievementStorageKey()));return saved&&typeof saved==='object'&&!Array.isArray(saved)?saved:null;}catch{return null;}
 }
-function showTrackerUpdateSummary(summary){
+function writeSeenAchievementVersions(versions){
+  if(!updateScope||!versions)return;
+  seenAchievementVersions=versions;
+  try{localStorage.setItem(achievementStorageKey(),JSON.stringify(versions));}catch{/* Keep the current session baseline when browser storage is unavailable. */}
+}
+async function readAchievementUpdates(force,seen){
+  await centurionUI.refresh(updateScope);
+  const scope=updateScope,generation=initialization;
+  const version=currentAchievementVersion();
+  try{
+    const current=!force&&version!==null&&version===achievementUpdateVersion&&achievementUpdateCache?achievementUpdateCache:await api('/achievement-updates');
+    if(scope!==updateScope||generation!==initialization)return {failed:true};
+    const changes=PixelVaultUpdates.achievementChanges(seen,current).filter(change=>!change.id.startsWith('century.'));
+    const gameKeys=[...new Set(changes.map(row=>JSON.stringify([row.provider,row.gameId])))];
+    const metadata=new Map(await Promise.all(gameKeys.map(async key=>{
+      const [provider,gameId]=JSON.parse(key);
+      const game=await api('/achievements/'+encodeURIComponent(provider)+'/'+encodeURIComponent(gameId));
+      return [key,new Map([...(game.rows||[]).map(row=>row.achievement),...(game.century?.definitions||[])].map(row=>[row.id,row]))];
+    })));
+    const unlocked=changes.map(change=>{
+      const row=metadata.get(JSON.stringify([change.provider,change.gameId]))?.get(change.id);
+      if(!row?.progressKnown||!row.unlocked)throw new Error('Achievement progress changed while checking updates.');
+      const game=games.find(game=>game.provider===change.provider&&game.gameId===change.gameId);
+      return {...change,title:row.title,gameTitle:game?.title||row.gameTitle||'Game '+change.gameId,
+        platform:game?.platform||({steam:'Steam',xbox:'Xbox',retroachievements:'RetroAchievements'}[change.provider]||change.provider)};
+    });
+    if(scope!==updateScope||generation!==initialization)return {failed:true};
+    achievementUpdateCache=current;achievementUpdateVersion=version;
+    return {unlocked,versions:PixelVaultUpdates.achievementSnapshot(current,seen),failed:false};
+  }catch{if(scope===updateScope&&generation===initialization)achievementUpdateVersion=null;return {unlocked:[],versions:null,failed:true};}
+}
+async function checkForTrackerUpdates(previous=null){
+  await showTrackerUpdateSummary(null,{automatic:true,previous});
+}
+async function showTrackerUpdateSummary(summary,{automatic=false,previous=null}={}){
   if(!session?.authenticated || !updateScope)return;
-  pendingUpdateSummary={summary,scope:updateScope,versions:PixelVaultUpdates.snapshot(trackers)};flushTrackerUpdateSummary();
+  const scope=updateScope,generation=initialization,acknowledgement=updateAcknowledgement;
+  const batch=visibleUpdateSummary||pendingUpdateSummary;
+  const trackerBase=batch?batch.trackerBase:automatic?readSeenTrackerVersions()||previous:previous||readSeenTrackerVersions();
+  const achievementBase=batch?batch.achievementBase:readSeenAchievementVersions();
+  const achievements=await readAchievementUpdates(!automatic,achievementBase);
+  if(!session?.authenticated||scope!==updateScope||generation!==initialization)return;
+  // The user can dismiss the popup while its next snapshot is being read.
+  if(acknowledgement!==updateAcknowledgement)return checkForTrackerUpdates(previous);
+  const versions=PixelVaultUpdates.snapshot(trackers);
+  const currentBatch=visibleUpdateSummary||pendingUpdateSummary;
+  const changes=PixelVaultUpdates.summary(trackerBase,trackers);
+  if(automatic){
+    summary=currentBatch?{...currentBatch.summary,updated:changes.updated}:changes;
+  }else if(currentBatch){
+    summary={...summary,updated:changes.updated};
+  }
+  const unlocked=achievements.failed?currentBatch?.summary.achievements||[]:achievements.unlocked;
+  const achievementVersions=achievements.versions||currentBatch?.achievementVersions;
+  const progress=PixelVaultUpdates.progressSummary(summary,unlocked,achievements.failed);
+  if(automatic&&!currentBatch&&!progress.updated.length&&!progress.achievements.length){
+    writeSeenTrackerVersions(versions);writeSeenAchievementVersions(achievementVersions);
+    return;
+  }
+  const next={summary:progress,scope,versions,achievementVersions,trackerBase,achievementBase,automatic,
+    showAt:automatic?(currentBatch?.showAt??Date.now()+updateBatchDelay):Date.now()};
+  if(visibleUpdateSummary&&$('refresh-summary').open){
+    const changed=JSON.stringify(visibleUpdateSummary.summary)!==JSON.stringify(progress);
+    visibleUpdateSummary=next;
+    if(changed)renderUpdateSummary(progress);
+  }else{
+    pendingUpdateSummary=next;flushTrackerUpdateSummary();
+  }
 }
 function flushTrackerUpdateSummary(){
-  if(!session?.authenticated || !pendingUpdateSummary || document.querySelector('dialog[open]'))return;
-  visibleUpdateSummary=pendingUpdateSummary;pendingUpdateSummary=undefined;summaryDismissed=false;
-  const summary=visibleUpdateSummary.summary;
-  $('refresh-summary-title').textContent=summary.title;$('refresh-summary-message').textContent=summary.message;
-  $('refresh-summary-list').innerHTML=PixelVaultUpdates.groupByGame(summary.updated,games).map(group=>
-    `<section class="update-game"><h3>${escapeHtml(group.title)}</h3><ul>${group.trackers.map(renderTrackerUpdate).join('')}</ul></section>`).join('')
-    +(summary.review.length?`<p class="hint">Needs review: ${summary.review.map(escapeHtml).join(', ')}. Your current progress is kept.</p>`:'')
-    +(summary.failed.length?`<p class="hint">Could not check: ${summary.failed.map(escapeHtml).join(', ')}. Saved progress is kept.</p>`:'');
+  clearTimeout(updateSummaryTimer);
+  if(!session?.authenticated||!pendingUpdateSummary||document.visibilityState==='hidden'||document.querySelector('dialog[open]'))return;
+  const remaining=pendingUpdateSummary.showAt-Date.now();
+  if(remaining>0||pendingUpdateSummary.automatic&&unsafeToRefresh()){
+    updateSummaryTimer=setTimeout(flushTrackerUpdateSummary,remaining>0?remaining:500);return;
+  }
+  visibleUpdateSummary=pendingUpdateSummary;pendingUpdateSummary=undefined;
+  renderUpdateSummary(visibleUpdateSummary.summary);
   $('refresh-summary').showModal();
+}
+function renderUpdateSummary(summary){
+  $('refresh-summary-title').textContent=summary.title;$('refresh-summary-message').textContent=summary.message;
+  const trackerRows=PixelVaultUpdates.groupByGame(summary.updated,games).flatMap(group=>group.trackers.map(tracker=>renderTrackerUpdate({...tracker,gameTitle:group.title}))).join('');
+  $('refresh-summary-list').innerHTML=(trackerRows?`<section class="update-section" aria-label="Tracker updates"><div class="update-section-heading"><h3>Trackers</h3><span>${summary.updated.length} updated</span></div><ul>${trackerRows}</ul></section>`:'')
+    +(summary.achievements.length?`<section class="update-section update-achievements" aria-label="Newly unlocked achievements"><div class="update-section-heading"><h3>Achievements</h3><span class="update-unlocked-count">${summary.achievements.length} unlocked</span></div><ul>${summary.achievements.map(renderAchievementUpdate).join('')}</ul></section>`:'')
+    +(summary.review.length?`<p class="hint">Needs review: ${summary.review.map(escapeHtml).join(', ')}. Your current progress is kept.</p>`:'')
+    +(summary.failed.length?`<p class="hint">Could not check: ${summary.failed.map(escapeHtml).join(', ')}. Saved progress is kept.</p>`:'')
+    +(summary.achievementCheckFailed?'<p class="hint">Achievement updates could not be checked. They will be checked again automatically.</p>':'');
+  handleMissingArtwork($('refresh-summary-list'));
+}
+function renderUpdateTotal(totals,label){
+  if(!Number.isInteger(totals?.completed)||!Number.isInteger(totals?.total)||totals.total<=0)return '';
+  return `<span class="update-total" aria-label="${totals.completed} of ${totals.total} ${label}">${totals.completed}/${totals.total}</span>`;
+}
+function renderAchievementUpdate(achievement){
+  const icon='/api/v1/achievements/'+encodeURIComponent(achievement.provider)+'/'+encodeURIComponent(achievement.gameId)+'/'+encodeURIComponent(achievement.id)+'/unlocked-icon';
+  return `<li><span class="update-achievement-art" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8m-4-4v4M7 4h10v6a5 5 0 0 1-10 0V4ZM7 6H4v2a4 4 0 0 0 4 4m9-6h3v2a4 4 0 0 1-4 4"/></svg><img src="${escapeHtml(icon)}" alt="" loading="lazy" decoding="async"></span><div><strong>${escapeHtml(achievement.title)}</strong><small>${escapeHtml(achievement.gameTitle)} · ${escapeHtml(achievement.platform)}</small></div></li>`;
 }
 function renderTrackerUpdate(tracker){
   const title=escapeHtml(tracker.title);
+  const game=`<small>${escapeHtml(tracker.gameTitle)}</small>`;
+  const total=renderUpdateTotal(tracker.totals,'complete');
   if(tracker.completed){
-    return `<li class="update-completed"><span class="update-trophy" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8m-4-4v4M7 4h10v6a5 5 0 0 1-10 0V4ZM7 6H4v2a4 4 0 0 0 4 4m9-6h3v2a4 4 0 0 1-4 4"/></svg><span class="update-sparkle">✦</span></span><div><strong>${title}</strong><span class="update-completion-label">Tracker completed</span></div></li>`;
+    return `<li class="update-completed"><span class="update-trophy" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8m-4-4v4M7 4h10v6a5 5 0 0 1-10 0V4ZM7 6H4v2a4 4 0 0 0 4 4m9-6h3v2a4 4 0 0 1-4 4"/></svg><span class="update-sparkle">✦</span></span><div><strong>${title}</strong><span class="update-completion-label">Tracker completed</span>${game}</div>${total}</li>`;
   }
   const increase=Number.isInteger(tracker.increased)?`<span class="update-increase" aria-label="Progress increased by ${tracker.increased}">+${tracker.increased}</span>`:'';
-  return `<li><span class="update-check" aria-hidden="true">✓</span><div><strong>${title}</strong></div>${increase}</li>`;
+  return `<li><span class="update-check" aria-hidden="true">✓</span><div><strong>${title}</strong>${game}</div>${increase||total?`<span class="update-metrics">${increase}${total}</span>`:''}</li>`;
 }
-$('refresh-summary').addEventListener('click',event=>{event.preventDefault();event.stopPropagation();summaryDismissed=true;$('refresh-summary').close();});
-$('refresh-summary').addEventListener('cancel',()=>{summaryDismissed=true;});
-$('refresh-summary').addEventListener('close',()=>{
-  if(summaryDismissed && visibleUpdateSummary?.scope===updateScope && session?.authenticated)writeSeenTrackerVersions(visibleUpdateSummary.versions);
+function acknowledgeUpdateSummary(){
+  if(visibleUpdateSummary?.scope===updateScope && session?.authenticated){
+    writeSeenTrackerVersions(visibleUpdateSummary.versions);writeSeenAchievementVersions(visibleUpdateSummary.achievementVersions);
+    updateAcknowledgement++;
+  }
   visibleUpdateSummary=undefined;
-});
+}
+$('refresh-summary').addEventListener('click',event=>{event.preventDefault();event.stopPropagation();acknowledgeUpdateSummary();$('refresh-summary').close();});
+$('refresh-summary').addEventListener('cancel',acknowledgeUpdateSummary);
+$('refresh-summary').addEventListener('close',()=>{if(!$('refresh-summary').open)visibleUpdateSummary=undefined;});
 document.addEventListener('close',()=>queueMicrotask(flushTrackerUpdateSummary),true);
 function renderSectionOrder() {
   if(!sectionDraft)return;
@@ -818,32 +925,51 @@ const navigation=PixelVaultNavigation.create(window,{
 $('navigate-back').addEventListener('click',()=>navigation.back());
 
 let pollingConnection=false;
-function unsafeToRefresh(){return saving || librarySaving || sectionSaving || refreshingGroup || achievementUI.busy || pendingSaves.size || (detail && (drafts.size||ruleDrafts.size)) || document.querySelector('dialog[open]') || document.activeElement?.matches('input,textarea,select,[contenteditable="true"]');}
-async function pollConnection({refreshLibrary=false}={}){
-  if(initializing || pollingConnection || !session?.authenticated || document.visibilityState==='hidden')return;pollingConnection=true;
+function stopRefreshStream(){refreshStream?.close();refreshStream=undefined;appliedPush=undefined;}
+function startRefreshStream(){
+  if(refreshStream||!pcConnection.pushEnabled||!session?.authenticated||document.visibilityState==='hidden')return;
+  refreshStream=PixelVaultRefreshStream.create({workspace:updateScope,onUpdate:async snapshot=>{
+    const result=await pollConnection({connection:snapshot.connection,push:snapshot});
+    if(result!==false)appliedPush=snapshot;
+    return result;
+  }});
+}
+function unsafeToRefresh(){return saving || librarySaving || sectionSaving || refreshingGroup || achievementUI.busy || pendingSaves.size || (detail && (drafts.size||ruleDrafts.size)) || document.querySelector('dialog[open]:not(#refresh-summary)') || document.activeElement?.matches('input,textarea,select,[contenteditable="true"]');}
+async function pollConnection({refreshLibrary=false,connection,push}={}){
+  if(initializing || pollingConnection || !session?.authenticated || document.visibilityState==='hidden')return false;pollingConnection=true;
   try{
-    pcConnection=await api('/refresh/connection');
+    pcConnection=connection||await api('/refresh/connection');startRefreshStream();
     if(pcConnection.local&&refreshJob?.canReview&&!pcConnection.reviewJobs?.some(j=>j.id===refreshJob.id))refreshJob=undefined;
     renderConnectionStatus();renderRefreshStatus();
     if(pcConnection.workspaceId && pcConnection.workspaceId!==updateScope){await initialize();return;}
     const versions=pcConnection.versions,currentRoute=location.hash,viewKey=JSON.stringify(versions);
     const changed=key=>!versions||appliedVersions[key]!==versions[key];
-    if(!mapUI.active){captureDrafts();if(unsafeToRefresh())return;}
+    const getAchievements=refreshLibrary||!achievementUpdateCache||currentAchievementVersion()===null||currentAchievementVersion()!==achievementUpdateVersion;
+    if(!mapUI.active){captureDrafts();if(unsafeToRefresh())return false;}
     if(mapUI.active||achievementUI.active||screenshotUI.active){
       if(refreshLibrary||!versions||viewVersions.get(currentRoute)!==viewKey){
         const refreshed=mapUI.active?await mapUI.refresh():achievementUI.active?await achievementUI.refresh():await screenshotUI.refresh();
         if(refreshed!==false&&currentRoute===location.hash)viewVersions.set(currentRoute,viewKey);
       }
-      return;
+      if((getAchievements||versions&&changed('trackers'))&&!unsafeToRefresh()){
+        const previous=PixelVaultUpdates.snapshot(trackers);
+        await refreshLists();
+        if(currentRoute!==location.hash||unsafeToRefresh())return false;
+        if(versions)appliedVersions.trackers=versions.trackers;
+        await checkForTrackerUpdates(previous);
+      }
+      return !unsafeToRefresh()&&(!getAchievements||achievementUpdateVersion===currentAchievementVersion());
     }
     if(!location.hash.slice(1)&&!refreshLibrary&&!versions)return;
     const previous=PixelVaultUpdates.snapshot(trackers);
     const getGames=refreshLibrary||changed('library')||changed('trackers')||changed('photos');
     const getTrackers=refreshLibrary||changed('trackers');
-    const getDetail=detail&&(refreshLibrary||!versions||viewVersions.get(currentRoute)!==viewKey);
-    if(!getGames&&!getTrackers&&!getDetail)return;
+    const getDetail=detail&&(refreshLibrary||!versions||(push&&appliedPush
+      ?push.trackers[detail.definition.id]!==appliedPush.trackers[detail.definition.id]||push.versions.sources!==appliedPush.versions.sources
+      :viewVersions.get(currentRoute)!==viewKey));
+    if(!getGames&&!getTrackers&&!getDetail&&!getAchievements)return;
     const [nextGames,nextTrackers,nextDetail,nextGroupOrder]=await Promise.all([getGames?api('/games'):games,getTrackers?api('/trackers'):trackers,getDetail?api('/trackers/'+encodeURIComponent(detail.definition.id)):null,getTrackers?api('/preferences/tracker-groups'):{groups:trackerGroupOrder}]);
-    captureDrafts();if(unsafeToRefresh()||currentRoute!==location.hash)return;
+    captureDrafts();if(unsafeToRefresh()||currentRoute!==location.hash)return false;
     const nextOrder=PixelVaultLibrary.normalizeTrackerGroupOrder(nextGroupOrder?.groups);
     const listsChanged=JSON.stringify(trackerGroupOrder)!==JSON.stringify(nextOrder)||JSON.stringify(games)!==JSON.stringify(nextGames)||JSON.stringify(trackers)!==JSON.stringify(nextTrackers);
     const photosChanged=refreshLibrary||changed('photos');
@@ -852,12 +978,16 @@ async function pollConnection({refreshLibrary=false}={}){
     if(profile){profile=games.find(g=>g.provider===profile.provider&&g.gameId===profile.gameId)||profile;if(listsChanged)renderGameProfile();}
     else if(detail){if(nextDetail&&detail.definition.id===nextDetail.definition.id){if(JSON.stringify(nextDetail)!==JSON.stringify(detail))acceptSnapshot(nextDetail);viewVersions.set(currentRoute,viewKey);}}
     else{if(listsChanged){renderGameGrid({preservePosition:true});$('page-count').textContent=`${libraryGroups().length} games`;}if(photosChanged&&!location.hash.slice(1))void screenshotUI.showHome({refresh:true,preservePosition:true});}
-    checkForTrackerUpdates(previous);
-  }catch{/* Retain the current screen during a temporary network interruption. */}
+    await checkForTrackerUpdates(previous);
+    return achievementUpdateVersion===currentAchievementVersion();
+  }catch{return false;/* Retain and retry the pending notice after a temporary interruption. */}
   finally{pollingConnection=false;}
 }
 
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')pollConnection({refreshLibrary:true});});
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible'){startRefreshStream();flushTrackerUpdateSummary();void pollConnection({refreshLibrary:true});}
+  else stopRefreshStream();
+});
 
 // Escape all text first; only the game's allowlisted icon tokens become images.
 function mailIconText(value) {

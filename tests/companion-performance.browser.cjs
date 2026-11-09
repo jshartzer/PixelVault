@@ -15,7 +15,7 @@ test('direct-local startup renders before optional reads and idle polls only req
    const responses={'/session':{authenticated:true},'/antiforgery':{token:'test'},'/games':rows,'/trackers':[],
     '/preferences/game-sections':{sections:['trackers','achievements','screenshots']},'/preferences/library':{sort:'title-az',pins:[]},
     '/refresh/connection':{local:true,paired:false,online:true,supported:[],workspaceId:'performance',versions:{library:'library',trackers:revision,photos:'photos',maps:'maps'}},
-    '/workspace':{id:'performance',mode:'direct-local'},'/screenshots/recent':{version:'photos',photos:[]}};
+    '/workspace':{id:'performance',mode:'direct-local'},'/screenshots/recent':{version:'photos',photos:[]},'/achievement-updates':[]};
    res.end(JSON.stringify(responses[endpoint]??{}));return;
   }
   const file=path.join(web,url.pathname==='/'?'index.html':url.pathname);

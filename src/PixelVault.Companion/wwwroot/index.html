@@ -12,7 +12,7 @@
   <link rel="apple-touch-icon" href="/brand.png?v=pv-monogram-2">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="stylesheet" href="/app.css?v=0.44.3-mail-icons3">
-  <link rel="stylesheet" href="/profile.css?v=0.48.1-interview-details">
+  <link rel="stylesheet" href="/profile.css?v=0.52.0-progress-batch">
   <link rel="stylesheet" href="/completion.css?v=0.43.1-heritage1">
   <link rel="stylesheet" href="/showcase.css?v=0.38.0">
   <script src="/diamond-artwork.js?v=0.38.0" defer></script>
@@ -22,9 +22,10 @@
   <link rel="stylesheet" href="/screenshots.css?v=0.38.0">
   <script src="/library.js?v=0.46.2-console-audit" defer></script>
   <script src="/navigation.js?v=0.38.0" defer></script>
-  <script src="/updates.js?v=0.38.0" defer></script>
+  <script src="/updates.js?v=0.52.0-progress-batch" defer></script>
+  <script src="/refresh-stream.js?v=0.52.0" defer></script>
   <script src="/artwork-cache.js?v=0.39.3-artwork3" defer></script>
-  <script src="/achievements.js?v=0.45.1-xbox" defer></script>
+  <script src="/achievements.js?v=0.52.1" defer></script>
   <script src="/screenshots.js?v=0.46.2-photo-detail" defer></script>
   <link rel="stylesheet" href="/tracker-icons.css?v=0.38.0">
   <script src="/tracker-icons.js?v=0.40.0-trackers1" defer></script>
@@ -32,7 +33,9 @@
   <link rel="stylesheet" href="/maps.css?v=0.41.0-maps5">
   <meta name="pixelvault-map-script" content="/vendor/leaflet-1.9.4/leaflet.js">
   <script src="/maps.js?v=0.41.0-maps5" defer></script>
-  <script src="/app.js?v=0.48.1-interview-details" defer></script>
+  <link rel="stylesheet" href="/centurion.css?v=0.52.0">
+  <script src="/centurion.js?v=0.52.0" defer></script>
+  <script src="/app.js?v=0.52.0-progress-batch" defer></script>
 </head>
 <body>
   <header class="topbar"><div class="header-leading"><button id="menu-open" class="quiet menu-toggle" aria-label="Open menu" aria-controls="side-menu" aria-haspopup="dialog" aria-expanded="false" hidden><span aria-hidden="true">☰</span></button><button id="navigate-back" class="quiet header-back" aria-label="Back" title="Back · You can also swipe right" hidden><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M15 18 9 12l6-6"/></svg></button><a class="brand" href="#"><img class="brand-icon" src="/brand.png?v=pv-monogram-2" alt="" width="45" height="45"><span>PixelVault<small>COMPANION</small></span></a></div></header>
@@ -60,7 +63,8 @@
       <section id="recent-photos" class="recent-photos" aria-labelledby="recent-photos-title" hidden><div class="recent-heading"><h2 id="recent-photos-title">Recent photos</h2><div class="recent-arrows"><button id="recent-left" class="quiet" aria-label="Scroll recent photos left" disabled>‹</button><button id="recent-right" class="quiet" aria-label="Scroll recent photos right" disabled>›</button></div></div><p id="recent-status" class="hint" role="status">Loading photos…</p><button id="recent-retry" class="quiet" hidden>Retry photos</button><div id="recent-strip" data-native-scroll class="recent-strip" tabindex="0" role="region" aria-label="Recent screenshots, scroll horizontally" hidden></div></section>
       <div id="library-tools" class="library-tools" hidden><label class="library-search" for="game-search"><span class="sr-only">Search games</span><input id="game-search" type="search" placeholder="Find a game…" autocomplete="off"></label><label class="sr-only" for="game-platform">Platform</label><select id="game-platform"><option value="">All platforms</option></select><div class="library-sort-controls"><label class="sr-only" for="game-sort">Sort games</label><select id="game-sort"><option value="screenshot-newest">Newest screenshot</option><option value="screenshot-oldest">Oldest screenshot</option><option value="title-az">Title: A–Z</option><option value="title-za">Title: Z–A</option><option value="last-played">Last played</option><option value="playtime">Most played</option></select><label class="cover-controls-option" title="Show or hide cover controls"><input id="cover-controls-toggle" type="checkbox" role="switch" aria-label="Show cover controls" aria-controls="games" checked></label></div><span id="game-results" class="hint" aria-live="polite"></span></div>
       <section id="games" class="game-grid" aria-label="Games"></section>
-      <section id="game-profile" hidden><div id="game-hero"></div><div class="profile-controls"><label id="profile-platform-label" for="profile-platform" hidden>Platform <select id="profile-platform"></select></label><a id="profile-maps" class="quiet" href="#"><svg class="profile-map-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3.5 6.5 9 4l6 2.5L20.5 4v13.5L15 20l-6-2.5-5.5 2.5V6.5Z"/><path d="M9 4v13.5m6-11v13.5"/></svg><span>Maps</span></a><button id="refresh-game" class="quiet">Refresh from PC</button></div><p id="refresh-status" class="hint" role="status" hidden></p><div id="game-stats" class="game-stats"></div><div class="sections-heading"><h2>Explore this game</h2><button id="arrange-sections" class="quiet" aria-haspopup="dialog">Reorder sections</button></div><div id="game-sections"></div></section>
+      <section id="game-profile" hidden><div id="game-hero"></div><div class="profile-controls"><label id="profile-platform-label" for="profile-platform" hidden>Platform <select id="profile-platform"></select></label><a id="profile-maps" class="quiet" href="#"><svg class="profile-map-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3.5 6.5 9 4l6 2.5L20.5 4v13.5L15 20l-6-2.5-5.5 2.5V6.5Z"/><path d="M9 4v13.5m6-11v13.5"/></svg><span>Maps</span></a><button id="refresh-game" class="quiet">Refresh from PC</button></div><p id="refresh-status" class="hint" role="status" hidden></p><div id="game-stats" class="game-stats"></div><div class="sections-heading"><h2>Explore this game</h2><button id="arrange-sections" class="quiet" aria-haspopup="dialog">Reorder sections</button></div><div id="centurion-profile"></div>
+    <div id="game-sections"></div></section>
       <section id="achievements-page" hidden></section>
       <section id="screenshots-page" hidden></section>
       <section id="maps-page" aria-label="Game maps" hidden></section>
@@ -92,7 +96,7 @@
   <dialog id="refresh-review" aria-labelledby="refresh-review-title"><h2 id="refresh-review-title">Review save changes</h2><p class="muted">Applying uses each tracker's connected save settings. Existing notes stay saved.</p><div id="refresh-review-changes"></div><label id="refresh-older-label" hidden><input id="refresh-older" type="checkbox"> Allow older save observations</label><p id="refresh-review-status" class="hint" role="status"></p><div class="dialog-actions"><button id="refresh-review-close" class="quiet">Keep current progress</button><button id="refresh-review-apply" class="primary">Apply save changes</button></div></dialog>
   <dialog id="refresh-summary" aria-labelledby="refresh-summary-title" aria-describedby="refresh-summary-message refresh-summary-dismiss">
     <button id="refresh-summary-close" class="quiet" aria-label="Dismiss refresh summary">×</button>
-    <header class="refresh-summary-heading"><span class="refresh-summary-icon" aria-hidden="true">✓</span><h2 id="refresh-summary-title">Trackers updated</h2></header>
+    <header class="refresh-summary-heading"><span class="refresh-summary-icon" aria-hidden="true">✓</span><h2 id="refresh-summary-title">Progress updated</h2></header>
     <p id="refresh-summary-message" class="muted"></p>
     <div id="refresh-summary-list"></div>
     <p id="refresh-summary-dismiss" class="hint">Tap anywhere to dismiss</p>
@@ -114,7 +118,7 @@
   <dialog id="tracker-image-dialog" aria-labelledby="tracker-image-title"><h2 id="tracker-image-title">Choose a tracker image</h2><div id="tracker-image-options" class="tracker-image-options"></div><p id="tracker-image-status" role="status" aria-live="polite"></p><div class="dialog-actions tracker-image-actions"><button type="button" id="tracker-image-automatic" class="quiet">Use achievement image</button><button type="button" id="tracker-image-cancel" class="quiet">Cancel</button></div></dialog>
   <dialog id="tracker-content" aria-labelledby="tracker-content-title"><div class="dialog-heading"><h2 id="tracker-content-title">Content</h2><button id="tracker-content-close" class="quiet">Close</button></div><p id="tracker-content-detail" class="hint"></p><div id="tracker-content-body" class="tracker-content-body"></div></dialog>
   <dialog id="photo-viewer" aria-labelledby="photo-viewer-title"><h2 id="photo-viewer-title" class="sr-only" tabindex="-1" autofocus>Screenshot viewer</h2><div id="photo-stage" role="button" tabindex="0" aria-label="Show photo information"><img id="photo-image" alt="" draggable="false"></div><p id="photo-loading" role="status">Loading photo…</p><button id="photo-retry" class="quiet" hidden>Retry photo</button><div id="photo-info" hidden><div id="photo-info-content"></div><div class="photo-navigation"><button id="photo-previous" class="quiet" aria-label="Previous photo">← Previous</button><button id="photo-next" class="quiet" aria-label="Next photo">Next →</button></div></div></dialog>
-  <footer><span>PIXELVAULT COMPANION</span><span>Companion · 0.38.0</span></footer>
+  <footer><span>PIXELVAULT COMPANION</span><span>Companion · 0.52.0</span></footer>
   <template id="photo-download-template"><a id="photo-download" class="quiet" download>↓ Download original</a></template>
 </body>
 </html>

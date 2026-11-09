@@ -90,7 +90,9 @@ public sealed class LocalRuntimeHost(CompanionOptions options,LocalRefreshServic
             }
             catch(OperationCanceledException)when(token.IsCancellationRequested){break;}
             catch{state.Put("local-provider-error","Provider refresh is temporarily unavailable. Saved data was preserved.");}
-            try{await Task.Delay(TimeSpan.FromMinutes(5),token);}catch(OperationCanceledException){break;}
+            // Due checks remain rate limited per game; revisit the schedule promptly so
+            // a completed interval does not wait up to another five minutes.
+            try{await Task.Delay(TimeSpan.FromSeconds(15),token);}catch(OperationCanceledException){break;}
         }
     }
 }

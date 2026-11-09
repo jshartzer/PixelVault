@@ -14,6 +14,17 @@ public sealed class AchievementHubTests : IDisposable
     readonly CancellationToken token = CancellationToken.None;
     public void Dispose() { Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools(); if (Directory.Exists(dir)) Directory.Delete(dir, true); }
     AchievementHubStore Store() => new(dir);
+    [Fact]
+    public async Task PushedHubRefreshReadsSavedDataWithoutCallingProviders()
+    {
+        var store=Store();var session=Session("1");
+        await store.SaveGameAsync("steam",session.SteamAccount,"1",Result("1",earned:true),token);
+        var service=new AchievementHubService(store,(_,_)=>throw new Exception("Unexpected recent-play request"),
+            (_,_,_)=>throw new Exception("Unexpected achievement request"));
+        var reports=new List<AchievementHubState>();
+        await service.LoadAsync(session,false,reports.Add,token,savedOnly:true);
+        Assert.True(Assert.Single(Assert.Single(reports).Collection.Entries).Row.Unlocked);
+    }
     static AchievementHubGame Game(string id, string provider = "steam") => new() { Id = id, Provider = provider, Title = id };
     static GameAchievementsFetchService.FetchResult Result(string id, bool earned = false) => new()
     {

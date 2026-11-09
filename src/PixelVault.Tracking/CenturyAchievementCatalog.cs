@@ -9,7 +9,7 @@ public sealed record CenturyAchievementDefinition(string Id, string Provider, st
 
 public static class CenturyAchievementCatalog
 {
-    public const string GroupName = "Centurian Achievements";
+    public const string GroupName = "Centurion Achievements";
     public const int PlannedPerGame = 5;
     public const int PointsPerAchievement = 100;
     public const string ConnectionStatus = "Awaiting save connection";

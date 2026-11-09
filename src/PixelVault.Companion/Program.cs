@@ -117,6 +117,8 @@ builder.Services.AddSingleton<MapTileCache>();
 builder.Services.AddSingleton<ScreenshotLibrary>();
 builder.Services.AddSingleton<ILocalReaderClient,LocalReaderClient>();
 builder.Services.AddSingleton<LocalRefreshService>();
+builder.Services.AddSingleton<RefreshUpdates>();
+builder.Services.AddHostedService(sp=>sp.GetRequiredService<RefreshUpdates>());
 builder.Services.AddSingleton<LocalArtworkCache>();
 builder.Services.AddHostedService<LocalRuntimeHost>();
 builder.Services.AddSingleton<GameSectionPreferences>();
@@ -325,7 +327,8 @@ api.MapPost("/preferences/game-sections",(SaveGameSectionOrder request,GameSecti
 api.MapGet("/preferences/library",(LibraryPreferences preferences,GameLibrary library)=>Results.Ok(preferences.Load(library))).RequireAuthorization();
 api.MapPost("/preferences/library/sort",(SaveLibrarySort request,LibraryPreferences preferences,GameLibrary library)=>Results.Ok(preferences.Sort(request.Sort,library))).RequireAuthorization();
 api.MapPost("/preferences/library/pins",(SaveLibraryPin request,LibraryPreferences preferences,GameLibrary library)=>Results.Ok(preferences.Pin(request.GameId,request.Pinned,library))).RequireAuthorization();
-api.MapGet("/refresh/connection",(PcConnector connector,LocalRefreshService local)=>Results.Ok(settings.DirectLocal?local.Connection():connector.Connection())).RequireAuthorization();
+api.MapGet("/refresh/connection",(PcConnector connector,LocalRefreshService local,RefreshUpdates updates)=>Results.Ok(settings.DirectLocal?(object?)updates.Current?.Connection??local.Connection():connector.Connection())).RequireAuthorization();
+api.MapGet("/refresh/events",async(HttpContext context,RefreshUpdates updates,string? workspace)=>await updates.Stream(context,workspace)).RequireAuthorization();
 api.MapPost("/refresh/automatic",(SetAutomaticUpdates request,ConnectorSyncState state)=>settings.DirectLocal&&!settings.LocalWorkersEnabled?Results.Conflict(new{error="Local readers are not enabled."}):Results.Ok(state.SetAutomatic(request.Enabled))).RequireAuthorization();
 api.MapPost("/refresh",(RequestGameRefresh request,PcConnector connector,LocalRefreshService local)=>Results.Ok(settings.DirectLocal?local.Request(request):connector.Request(request))).RequireAuthorization();
 api.MapGet("/refresh/{id}",(string id,PcConnector connector,LocalRefreshService local)=>Results.Ok(settings.DirectLocal?local.Get(id):connector.Get(id))).RequireAuthorization();
@@ -336,6 +339,12 @@ api.MapGet("/workspace", (TrackerWorkspace workspace) => Results.Ok(new
     accounts=workspace.Sample?new Dictionary<string,string>():workspace.Manifest?.Accounts??new()
 })).RequireAuthorization();
 api.MapGet("/trackers", (TrackerWorkspace workspace) => Results.Ok(workspace.Trackers())).RequireAuthorization();
+api.MapGet("/centurion",(AchievementStore achievements)=>Results.Ok(achievements.CenturionCollection())).RequireAuthorization();
+api.MapGet("/centurion/{provider}/{game}/badge",(string provider,string game,AchievementStore achievements)=>{
+    if(!achievements.CenturionCollection().Any(g=>g.Provider==provider&&g.GameId==game&&g.BadgeAvailable))return Results.NotFound();
+    return Results.File(PixelVault.Tracking.CenturionRewards.BadgeArtwork(provider,game),"image/png");
+}).RequireAuthorization();
+api.MapGet("/achievement-updates",(AchievementStore achievements)=>Results.Ok(achievements.Updates())).RequireAuthorization();
 api.MapGet("/achievements/{provider}/{game}",(string provider,string game,AchievementStore achievements)=>Results.Ok(achievements.Game(provider,game))).RequireAuthorization();
 api.MapGet("/century/{provider}/{game}/{id}/icon",(string provider,string game,string id,string state,AchievementStore achievements,HttpContext context)=>{
     var bytes=achievements.CenturyArtwork(provider,game,id,state);

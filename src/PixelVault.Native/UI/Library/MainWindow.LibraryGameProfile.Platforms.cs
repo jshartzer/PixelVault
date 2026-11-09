@@ -107,6 +107,8 @@ namespace PixelVaultNative
                 preference = store.Get(identity); Rebuild(); Load(false);
             }
             GameProfileAchievementsChanged += OnAchievementsChanged;
+            SavedRefreshSubscription.Attach(owner,localRefreshUpdates,(before,after)=>after.Changed(before,"achievements"),
+                ()=>{if(!lifetime.IsCancellationRequested)Load(false);return Task.CompletedTask;},()=>!sync.IsEnabled);
             owner.Closed += (_, __) => { GameProfileAchievementsChanged -= OnAchievementsChanged; request?.Cancel(); request?.Dispose(); };
             Rebuild();
             ScheduleLibraryGameProfileInitialLoad(owner, () => Load(false), lifetime);

@@ -74,6 +74,7 @@ namespace PixelVaultNative
             _userAgent = userAgent;
             _fetchAchievements = fetchAchievements;
             Closed += delegate { _isClosed = true; ClearUnlockFeedback(); };
+            Loaded += (_,__)=>SubscribeToSavedProgress();
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
             Title = "Achievements";
             Width = 960;

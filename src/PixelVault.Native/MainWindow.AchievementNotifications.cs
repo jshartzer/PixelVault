@@ -42,9 +42,14 @@ namespace PixelVaultNative
             _achievementNotificationTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
             _achievementNotificationTimer.Tick += (_, __) =>
             {
+                PumpCenturionRewards();
                 PumpAchievementToasts();
+                if(pendingLocalRefresh!=null)_=ReadPushedAchievementsAsync();
                 if (!_achievementPolling && DateTime.UtcNow >= _nextAchievementPoll && _achievementNotifications.Data.Enabled)
-                    _ = PollAchievementNotificationsAsync();
+                {
+                    if(localRefreshUpdates?.IsFresh==true)_nextAchievementPoll=DateTime.UtcNow.AddSeconds(30);
+                    else _ = PollAchievementNotificationsAsync();
+                }
             };
             _achievementNotificationTimer.Start();
             Closed += (_, __) =>
@@ -57,6 +62,8 @@ namespace PixelVaultNative
                 _achievementHistoryWindow?.Close();
             };
             UpdateAchievementNotificationBadge();
+            InitializeRefreshUpdates();
+            InitializeCenturionRewards();
         }
 
         void SaveAchievementNotifications()
@@ -221,7 +228,7 @@ namespace PixelVaultNative
                         var saved=await _achievementHubStore.LoadAsync(provider,account,token);
                         if(!saved.Games.TryGetValue(gameId,out var snapshot))continue;
                         result=new(){Rows=snapshot.Rows,NotificationOnly=true,CapturedUtcTicks=snapshot.UpdatedUtc,GameTitle=game.Name};
-                        AchievementProgressObserved(result,account);
+                        ObserveSavedAchievement(result,account);
                     }
                     else result = await GameAchievementsFetchService.FetchAsync(platform, game, CurrentSteamWebApiKey(),
                         CurrentRetroAchievementsApiKey(), CurrentSteamUserId64(), CurrentRetroAchievementsUsername(), "PixelVault/" + AppVersion, token, notificationsOnly: true);
@@ -291,6 +298,7 @@ namespace PixelVaultNative
         }
         void PumpAchievementToasts()
         {
+            if(centurionWindow!=null)return;
             if (_achievementToasts.Count == 0 && _achievementToastQueue.Count == 0) return;
             if (!_achievementNotifications.Data.Enabled || AchievementFullscreenGuard.Suppress()) { CloseAchievementToasts(); return; }
             foreach (var toast in _achievementToasts.Where(t => t.Expires <= DateTime.UtcNow).ToArray())

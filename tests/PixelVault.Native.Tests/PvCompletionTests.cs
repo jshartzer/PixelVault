@@ -34,7 +34,7 @@ public class PvCompletionTests
     {
         var section = AchievementsInfoWindow.CenturyAchievementContentGroup();
         Assert.Empty(section.Rows); Assert.Equal(0, section.Total); Assert.Null(section.Percent);
-        Assert.Equal("Century Achievements", section.Name); Assert.True(section.IsContentGroup);
+        Assert.Equal("Centurion Achievements", section.Name); Assert.True(section.IsContentGroup);
         var deathStranding = AchievementsInfoWindow.CenturyAchievementContentGroup("steam", "1850570");
         Assert.Equal(5, deathStranding.CenturyDefinitions.Count);
         var road = deathStranding.CenturyDefinitions.Single(d => d.Id == CenturyAchievementCatalog.DeathStrandingRoadsId);
