@@ -163,7 +163,7 @@ public sealed partial class CompanionTests
         var game = await owner.GetFromJsonAsync<JsonElement>("/api/v1/achievements/steam/1850570");
         Assert.Equal(0, game.GetProperty("rows").GetArrayLength());
         var century = game.GetProperty("century");
-        Assert.Equal("Centurian Achievements", century.GetProperty("group").GetString());
+        Assert.Equal("Centurion Achievements", century.GetProperty("group").GetString());
         Assert.Equal(5, century.GetProperty("planned").GetInt32());
         Assert.Equal("Awaiting save connection", century.GetProperty("status").GetString());
         var definitions = century.GetProperty("definitions").EnumerateArray().ToArray(); Assert.Equal(5, definitions.Length);
