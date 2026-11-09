@@ -1,249 +1,242 @@
-# Reusable local build into a fixed folder (not a release).
-# Builds from repo source only: dotnet publish on src\PixelVault.Native, then copies repo assets/ + tools/ + tools-licenses -> tools/licenses.
-# Does not read or copy from dist\ — ever.
-# Does not bump AppVersion, CHANGELOG, CURRENT_BUILD, dist/*, PixelVault-current, or repo-root PixelVault.lnk.
-#
-# Default output: <repo>\App Testing\  (overwrite each run so Taskbar pins stay valid)
-#
-# Cleanup deletes *contents* of the output folder but not the folder node itself, so an "empty" folder
-# with a directory lock (Explorer, cwd, indexer) usually still works. This script moves cwd to repo root
-# and can stop PixelVault when it was launched from this path. Use -NoClean to skip clearing entirely.
+﻿# Refresh the fixed App Testing folder from the newest published PixelVault release.
+# Uses dist\PixelVault-current; never recompiles an older source checkout.
+# Keeps this script's name/location, the App Testing path and its shortcut unchanged.
+# Existing data-root and settings files are retained. No release or main shortcut is changed.
+#Requires -Version 5.1
 [CmdletBinding()]
 param(
     [string]$OutputPath,
+    # Retained for existing callers; published binaries already have their build configuration.
     [string]$Configuration = "Release",
     [string]$RuntimeIdentifier = "win-x64",
     [switch]$SelfContained,
     [switch]$IncludeBootstrapSettings,
     [switch]$IncludeSourceBundle,
-    # Do not attempt Stop-Process on PixelVault.exe when its path is under the output folder
     [switch]$NoStopRunningInstance,
-    # Skip deleting the output folder first (not recommended; publish may leave stale files)
     [switch]$NoClean,
-    # Shortcut inside the output folder (default: PixelVault.lnk). Set to "" to skip.
     [string]$ShortcutName = "PixelVault.lnk",
-    # Optional source repository; a copy outside the repo defaults to C:\Codex.
+    # Repository containing published dist releases, not a source checkout to compile.
     [string]$RepositoryPath
 )
 
 $ErrorActionPreference = "Stop"
 
-if ([string]::IsNullOrWhiteSpace($RepositoryPath))
-{
-    $adjacentRepo = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
-    $RepositoryPath = if (Test-Path -LiteralPath (Join-Path $adjacentRepo 'src\PixelVault.Native\PixelVault.Native.csproj')) { $adjacentRepo } else { 'C:\Codex' }
+function Get-FullDirectoryPath([string]$Path) {
+    return [IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
 }
-$repoRoot = [System.IO.Path]::GetFullPath($RepositoryPath)
-$projectPath = Join-Path $repoRoot "src\PixelVault.Native\PixelVault.Native.csproj"
-if (-not (Test-Path -LiteralPath $projectPath)) { throw "PixelVault project not found: $projectPath" }
-. (Join-Path $repoRoot "scripts\Merge-BundledToolLicenses.ps1")
-$sourcePath = Join-Path $repoRoot "src\PixelVault.Native\PixelVault.Native.cs"
-$nativeProjectDir = Join-Path $repoRoot "src\PixelVault.Native"
-$testsProjectDir = Join-Path $repoRoot "tests\PixelVault.Native.Tests"
-$changelogPath = Join-Path $repoRoot "docs\CHANGELOG.md"
-$assetsPath = Join-Path $repoRoot "assets"
-$toolsPath = Join-Path $repoRoot "tools"
-$settingsPath = Join-Path $repoRoot "PixelVaultData\PixelVault.settings.ini"
-
-if ([string]::IsNullOrWhiteSpace($OutputPath))
-{
-    $OutputPath = Join-Path $repoRoot "App Testing"
+function Test-PathWithin([string]$Path, [string]$Parent) {
+    return $Path.Equals($Parent, [StringComparison]::OrdinalIgnoreCase) -or
+        $Path.StartsWith($Parent + '\', [StringComparison]::OrdinalIgnoreCase)
 }
-
-$outputDir = [System.IO.Path]::GetFullPath($OutputPath)
-$outputDirNormalized = $outputDir.TrimEnd('\', '/')
-if ([string]::IsNullOrEmpty($outputDirNormalized)) { $outputDirNormalized = $outputDir }
-
-function Stop-PixelVaultProcessesUnderPath
-{
-    param([Parameter(Mandatory)][string]$FolderPath)
-    $prefix = $FolderPath.TrimEnd('\', '/')
-    if ([string]::IsNullOrEmpty($prefix)) { return }
-
-    $stopped = $false
-    Get-Process -Name "PixelVault" -ErrorAction SilentlyContinue | ForEach-Object {
-        $proc = $_
-        try
-        {
-            $exe = $proc.Path
-            if ([string]::IsNullOrWhiteSpace($exe)) { return }
-            $exeFull = [System.IO.Path]::GetFullPath($exe)
-            if ($exeFull.StartsWith($prefix + "\", [System.StringComparison]::OrdinalIgnoreCase) -or
-                $exeFull.Equals($prefix, [System.StringComparison]::OrdinalIgnoreCase))
-            {
-                Write-Host "Stopping PixelVault locking output folder: $exeFull (PID $($proc.Id))"
-                Stop-Process -Id $proc.Id -Force -ErrorAction Stop
-                $stopped = $true
+function Assert-NoLinkedAncestors([string]$Path) {
+    $cursor = $Path
+    while (-not [string]::IsNullOrWhiteSpace($cursor)) {
+        if (Test-Path -LiteralPath $cursor) {
+            if (((Get-Item -LiteralPath $cursor -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+                throw "The testing output must not pass through a linked directory: $cursor"
             }
         }
-        catch
-        {
-            Write-Warning "Could not stop PID $($proc.Id): $($_.Exception.Message)"
+        $cursor = Split-Path -Path $cursor -Parent
+    }
+}
+function Resolve-ReleaseDirectory([string]$Path) {
+    for ($depth = 0; $depth -lt 16; $depth++) {
+        $item = Get-Item -LiteralPath $Path -Force -ErrorAction Stop
+        if (-not $item.PSIsContainer) { throw "Release path is not a directory: $Path" }
+        if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -eq 0) {
+            return Get-FullDirectoryPath $item.FullName
+        }
+        $target = [string](@($item.Target)[0])
+        if ([string]::IsNullOrWhiteSpace($target)) { throw "Cannot resolve release link: $Path" }
+        if (-not [IO.Path]::IsPathRooted($target)) { $target = Join-Path $item.Parent.FullName $target }
+        $Path = $target
+    }
+    throw "Too many linked release directories."
+}
+function Read-PublishedRelease([string]$Path) {
+    $exe = Join-Path $Path 'PixelVault.exe'
+    $source = Join-Path $Path 'PixelVault.Native.cs'
+    if (-not (Test-Path -LiteralPath $exe -PathType Leaf) -or
+        -not (Test-Path -LiteralPath $source -PathType Leaf)) { return $null }
+    $match = Select-String -LiteralPath $source -Pattern 'const string AppVersion = "([^"]+)"' | Select-Object -First 1
+    if ($null -eq $match) { return $null }
+    return [pscustomobject]@{
+        Path = $Path
+        Exe = $exe
+        Version = $match.Matches[0].Groups[1].Value
+        PublishedUtc = (Get-Item -LiteralPath $exe).LastWriteTimeUtc
+    }
+}
+function Assert-NoLinkedContents([string]$Path) {
+    if (Test-Path -LiteralPath $Path) {
+        $linked = Get-ChildItem -LiteralPath $Path -Recurse -Force |
+            Where-Object { ($_.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 } |
+            Select-Object -First 1
+        if ($null -ne $linked) { throw "Linked content cannot be copied or cleared: $($linked.FullName)" }
+    }
+}
+function Clear-TestingContents {
+    # Only the previously validated, explicit output is eligible for recursive cleanup.
+    Assert-NoLinkedAncestors $outputDir
+    Assert-NoLinkedContents $outputDir
+    foreach ($item in @(Get-ChildItem -LiteralPath $outputDir -Force)) {
+        $full = [IO.Path]::GetFullPath($item.FullName)
+        if (-not (Test-PathWithin $full $outputDir) -or $full -eq $outputDir) {
+            throw "Refusing to remove a path outside the testing output: $full"
+        }
+        Remove-Item -LiteralPath $full -Recurse -Force
+    }
+}
+
+if ([string]::IsNullOrWhiteSpace($RepositoryPath)) {
+    # Published releases live here even when this script is copied elsewhere or run from a worktree.
+    $RepositoryPath = 'C:\Codex'
+    if (-not (Test-Path -LiteralPath (Join-Path $RepositoryPath 'dist') -PathType Container)) {
+        $RepositoryPath = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
+    }
+}
+$repoRoot = Get-FullDirectoryPath $RepositoryPath
+$distRoot = Join-Path $repoRoot 'dist'
+$current = Join-Path $distRoot 'PixelVault-current'
+if (-not (Test-Path -LiteralPath $distRoot -PathType Container)) { throw "No published releases found in $distRoot" }
+
+$currentItem = Get-Item -LiteralPath $current -Force -ErrorAction SilentlyContinue
+if ($null -ne $currentItem) {
+    $releaseDir = Resolve-ReleaseDirectory $current
+    if (-not (Test-PathWithin $releaseDir $distRoot) -or $releaseDir -eq $distRoot) {
+        throw "The current release must resolve inside $distRoot"
+    }
+    $release = Read-PublishedRelease $releaseDir
+    if ($null -eq $release) { throw "The current published release is incomplete: $releaseDir. Testing output was not changed." }
+} else {
+    # Recovery for installations without the current junction. Executable build time
+    # survives copied directory timestamps and historical version-number renumbering.
+    $release = Get-ChildItem -LiteralPath $distRoot -Directory -Filter 'PixelVault-*' |
+        Where-Object { ($_.Attributes -band [IO.FileAttributes]::ReparsePoint) -eq 0 } |
+        ForEach-Object { Read-PublishedRelease $_.FullName } |
+        Sort-Object PublishedUtc -Descending | Select-Object -First 1
+    if ($null -eq $release) { throw "No complete published PixelVault release found in $distRoot" }
+    $releaseDir = Get-FullDirectoryPath $release.Path
+}
+if ([string]::IsNullOrWhiteSpace($OutputPath)) { $OutputPath = Join-Path $repoRoot 'App Testing' }
+$outputDir = Get-FullDirectoryPath $OutputPath
+if ([string]::IsNullOrWhiteSpace($outputDir) -or
+    $outputDir.TrimEnd(':') -eq [IO.Path]::GetPathRoot($outputDir).TrimEnd('\', ':') -or
+    (Test-PathWithin $repoRoot $outputDir) -or
+    (Test-PathWithin $outputDir $distRoot) -or
+    (Test-PathWithin $releaseDir $outputDir)) {
+    throw "Testing output must be separate from the repository root and published releases: $outputDir"
+}
+foreach ($protected in @('src','scripts','docs','tests','assets','tools','tools-licenses','PixelVaultData','.git')) {
+    if (Test-PathWithin $outputDir (Join-Path $repoRoot $protected)) {
+        throw "Testing output must not replace repository files or application data: $outputDir"
+    }
+}
+Assert-NoLinkedAncestors $outputDir
+Assert-NoLinkedContents $outputDir
+Assert-NoLinkedContents $releaseDir
+if (-not [string]::IsNullOrWhiteSpace($ShortcutName) -and
+    ([IO.Path]::GetFileName($ShortcutName) -ne $ShortcutName -or [IO.Path]::GetExtension($ShortcutName) -ne '.lnk')) {
+    throw "ShortcutName must be a .lnk filename inside the testing folder."
+}
+foreach ($parameter in @('Configuration','RuntimeIdentifier','SelfContained')) {
+    if ($PSBoundParameters.ContainsKey($parameter)) {
+        Write-Warning "$parameter does not rebuild or alter the published release."
+    }
+}
+
+$workRoot = Join-Path ([IO.Path]::GetTempPath()) ('PixelVault-AppTesting-' + [Guid]::NewGuid().ToString('N'))
+$stage = Join-Path $workRoot 'stage'
+$backup = Join-Path $workRoot 'previous'
+$outputChanged = $false
+$keepBackup = $false
+try {
+    New-Item -ItemType Directory -Path $stage,$backup -Force | Out-Null
+    foreach ($item in Get-ChildItem -LiteralPath $releaseDir -Force) {
+        if ($item.Name -in @('PixelVault.data-root.ini','PixelVault.settings.ini') -or $item.Extension -eq '.lnk') { continue }
+        if ($item.Name -eq 'source' -and -not $IncludeSourceBundle) { continue }
+        Copy-Item -LiteralPath $item.FullName -Destination $stage -Recurse -Force
+    }
+    foreach ($name in @('PixelVault.data-root.ini','PixelVault.settings.ini')) {
+        $existing = Join-Path $outputDir $name
+        $published = Join-Path $releaseDir $name
+        if (Test-Path -LiteralPath $existing -PathType Leaf) {
+            Copy-Item -LiteralPath $existing -Destination (Join-Path $stage $name)
+        } elseif (($name -eq 'PixelVault.data-root.ini' -or $IncludeBootstrapSettings) -and
+            (Test-Path -LiteralPath $published -PathType Leaf)) {
+            Copy-Item -LiteralPath $published -Destination (Join-Path $stage $name)
         }
     }
-    if ($stopped) { Start-Sleep -Milliseconds 500 }
-}
-
-function Clear-OutputDirectoryContents
-{
-    param(
-        [Parameter(Mandatory)][string]$Path,
-        [int]$PerItemAttempts = 6,
-        [int]$DelayMilliseconds = 400
-    )
-    if (-not (Test-Path -LiteralPath $Path)) { return }
-    $children = @(Get-ChildItem -LiteralPath $Path -Force -ErrorAction SilentlyContinue)
-    foreach ($item in $children)
-    {
-        $full = $item.FullName
-        for ($a = 1; $a -le $PerItemAttempts; $a++)
-        {
-            try
-            {
-                Remove-Item -LiteralPath $full -Recurse -Force -ErrorAction Stop
-                break
-            }
-            catch
-            {
-                if ($a -ge $PerItemAttempts)
-                {
-                    throw "Could not remove '$full' after $PerItemAttempts attempts: $($_.Exception.Message). Close PixelVault if using this folder, close Explorer here, or run with -NoClean."
-                }
-                Start-Sleep -Milliseconds $DelayMilliseconds
-            }
-        }
+    $dataRootFile = Join-Path $stage 'PixelVault.data-root.ini'
+    if (-not (Test-Path -LiteralPath $dataRootFile)) {
+        Set-Content -LiteralPath $dataRootFile -Value ('DataRoot=' + (Join-Path $repoRoot 'PixelVaultData')) -Encoding UTF8
     }
-}
-
-function Clear-ShellLocationIfUnderOutputFolder
-{
-    param(
-        [Parameter(Mandatory)][string]$OutputFolder,
-        [Parameter(Mandatory)][string]$FallbackLocation
-    )
-    $prefix = $OutputFolder.TrimEnd('\', '/')
-    if ([string]::IsNullOrEmpty($prefix) -or -not (Test-Path -LiteralPath $FallbackLocation)) { return }
-    try
-    {
-        $cwd = [System.IO.Path]::GetFullPath((Get-Location -PSProvider FileSystem).Path).TrimEnd('\', '/')
+    $dataLine = Select-String -LiteralPath $dataRootFile -Pattern '^\s*DataRoot\s*=\s*(.+?)\s*$' | Select-Object -First 1
+    if ($null -eq $dataLine) { throw "The retained data-root file does not specify DataRoot." }
+    $dataPath = $dataLine.Matches[0].Groups[1].Value
+    if (-not [IO.Path]::IsPathRooted($dataPath)) { $dataPath = Join-Path $outputDir $dataPath }
+    if (Test-PathWithin (Get-FullDirectoryPath $dataPath) $outputDir) {
+        throw "Application data is inside the testing output. Choose a separate output folder; existing files were preserved."
     }
-    catch
-    {
-        return
+    $expectedHash = (Get-FileHash -LiteralPath $release.Exe -Algorithm SHA256).Hash
+    if ((Get-FileHash -LiteralPath (Join-Path $stage 'PixelVault.exe') -Algorithm SHA256).Hash -ne $expectedHash) {
+        throw "The staged executable does not match the published release."
     }
-    if ($cwd.Equals($prefix, [System.StringComparison]::OrdinalIgnoreCase) -or
-        $cwd.StartsWith($prefix + '\', [System.StringComparison]::OrdinalIgnoreCase))
-    {
-        Write-Host "Current directory is the output folder (or inside it); switching to: $FallbackLocation"
-        Set-Location -LiteralPath $FallbackLocation
-    }
-}
-
-if (-not (Test-Path $projectPath)) { throw "Could not find project: $projectPath" }
-if (-not (Test-Path $sourcePath)) { throw "Could not find source file: $sourcePath" }
-
-$versionMatch = Select-String -Path $sourcePath -Pattern 'const string AppVersion = "([^"]+)"' | Select-Object -First 1
-if ($null -eq $versionMatch) { throw "Could not read AppVersion from $sourcePath" }
-$appVersion = $versionMatch.Matches[0].Groups[1].Value
-
-function Copy-SourceTreeForBundle
-{
-    param(
-        [Parameter(Mandatory)][string]$SourcePath,
-        [Parameter(Mandatory)][string]$DestinationPath
-    )
-
-    if (-not (Test-Path $SourcePath)) { return }
-
-    if (Test-Path $DestinationPath)
-    {
-        Remove-Item $DestinationPath -Recurse -Force
+    $exePath = Join-Path $outputDir 'PixelVault.exe'
+    if (-not [string]::IsNullOrWhiteSpace($ShortcutName)) {
+        $shell = New-Object -ComObject WScript.Shell
+        $shortcut = $shell.CreateShortcut((Join-Path $stage $ShortcutName))
+        $shortcut.TargetPath = $exePath
+        $shortcut.WorkingDirectory = $outputDir
+        $shortcut.Save()
     }
 
-    $destParent = Split-Path $DestinationPath -Parent
-    if (-not (Test-Path $destParent))
-    {
-        New-Item -ItemType Directory -Path $destParent -Force | Out-Null
+    Write-Host "App Testing — published PixelVault $($release.Version)"
+    Write-Host "Release: $releaseDir"
+    Write-Host "Output: $outputDir"
+    foreach ($process in @(Get-Process -Name 'PixelVault' -ErrorAction SilentlyContinue)) {
+        $runningPath = $process.Path
+        if ([string]::IsNullOrWhiteSpace($runningPath) -or -not (Test-PathWithin ([IO.Path]::GetFullPath($runningPath)) $outputDir)) { continue }
+        if ($NoStopRunningInstance) { throw "Close PixelVault running from $outputDir before updating it." }
+        Write-Host "Stopping PixelVault in the testing folder (PID $($process.Id))."
+        Stop-Process -Id $process.Id -Force
+        $process.WaitForExit(10000) | Out-Null
     }
-
-    & robocopy.exe $SourcePath $DestinationPath /E /NFL /NDL /NJH /NJS /XD bin obj .vs | Out-Null
-    $rc = $LASTEXITCODE
-    if ($rc -ge 8) { throw "robocopy failed ($rc) copying $SourcePath -> $DestinationPath" }
-}
-
-if (-not $NoClean -and (Test-Path -LiteralPath $outputDir))
-{
-    Clear-ShellLocationIfUnderOutputFolder -OutputFolder $outputDirNormalized -FallbackLocation $repoRoot
-    if (-not $NoStopRunningInstance)
-    {
-        Stop-PixelVaultProcessesUnderPath -FolderPath $outputDirNormalized
-    }
-    Clear-OutputDirectoryContents -Path $outputDir
-}
-
-if (-not (Test-Path $outputDir))
-{
+    if (Test-PathWithin (Get-FullDirectoryPath (Get-Location).Path) $outputDir) { Set-Location -LiteralPath $repoRoot }
     New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
+    foreach ($item in @(Get-ChildItem -LiteralPath $outputDir -Force)) {
+        Copy-Item -LiteralPath $item.FullName -Destination $backup -Recurse -Force
+    }
+    $outputChanged = $true
+    if (-not $NoClean) { Clear-TestingContents }
+    foreach ($item in Get-ChildItem -LiteralPath $stage -Force) {
+        Copy-Item -LiteralPath $item.FullName -Destination $outputDir -Recurse -Force
+    }
+    if ((Get-FileHash -LiteralPath $exePath -Algorithm SHA256).Hash -ne $expectedHash) { throw "Installed executable verification failed." }
+    Write-Host "Done. PixelVault $($release.Version): $exePath"
+    if (-not [string]::IsNullOrWhiteSpace($ShortcutName)) { Write-Host "Shortcut: $(Join-Path $outputDir $ShortcutName)" }
+} catch {
+    $failure = $_
+    if ($outputChanged) {
+        try {
+            Clear-TestingContents
+            foreach ($item in @(Get-ChildItem -LiteralPath $backup -Force)) {
+                Copy-Item -LiteralPath $item.FullName -Destination $outputDir -Recurse -Force
+            }
+        } catch {
+            $keepBackup = $true
+            Write-Warning "Recovery files were retained at $backup. Restore them before using the testing output."
+        }
+    }
+    throw $failure
+} finally {
+    if (-not $keepBackup -and (Test-Path -LiteralPath $workRoot)) {
+        $resolvedWork = Get-FullDirectoryPath $workRoot
+        $tempRoot = Get-FullDirectoryPath ([IO.Path]::GetTempPath())
+        if (-not (Test-PathWithin $resolvedWork $tempRoot) -or
+            [IO.Path]::GetFileName($resolvedWork) -notmatch '^PixelVault-AppTesting-[0-9a-f]{32}$') {
+            throw "Refusing to remove an unexpected temporary path: $resolvedWork"
+        }
+        Remove-Item -LiteralPath $resolvedWork -Recurse -Force
+    }
 }
-
-$publishArgs = @(
-    "publish",
-    $projectPath,
-    "-nodeReuse:false",
-    "-c", $Configuration,
-    "-r", $RuntimeIdentifier,
-    "-p:PublishSingleFile=true",
-    "-p:UseSharedCompilation=false",
-    ("-p:SelfContained=" + $(if ($SelfContained) { "true" } else { "false" })),
-    "-o", $outputDir
-)
-
-Write-Host "App testing build — AppVersion from source: $appVersion (not bumped)"
-Write-Host "Publishing to: $outputDir"
-
-& dotnet @publishArgs
-if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed with exit code $LASTEXITCODE" }
-
-Copy-Item $sourcePath (Join-Path $outputDir "PixelVault.Native.cs") -Force
-Copy-Item $changelogPath (Join-Path $outputDir "CHANGELOG.md") -Force
-
-if ($IncludeSourceBundle)
-{
-    $bundleNativeDest = Join-Path $outputDir "source\src\PixelVault.Native"
-    $bundleTestsDest = Join-Path $outputDir "source\tests\PixelVault.Native.Tests"
-    Copy-SourceTreeForBundle -SourcePath $nativeProjectDir -DestinationPath $bundleNativeDest
-    Copy-SourceTreeForBundle -SourcePath $testsProjectDir -DestinationPath $bundleTestsDest
-    Write-Host "Bundled source under: $(Join-Path $outputDir 'source')"
-}
-
-Copy-Item $assetsPath (Join-Path $outputDir "assets") -Recurse -Force
-if (Test-Path $toolsPath)
-{
-    Copy-Item $toolsPath (Join-Path $outputDir "tools") -Recurse -Force
-}
-else
-{
-    Write-Warning "Repo tools\ missing — exiftool.exe / ffmpeg.exe not copied (licenses still merged)."
-}
-
-Merge-PixelVaultBundledToolLicenses -RepoRoot $repoRoot -DestinationRoot $outputDir
-
-if ($IncludeBootstrapSettings -and (Test-Path $settingsPath))
-{
-    Copy-Item $settingsPath (Join-Path $outputDir "PixelVault.settings.ini") -Force
-}
-
-$exePath = Join-Path $outputDir "PixelVault.exe"
-if (-not [string]::IsNullOrWhiteSpace($ShortcutName))
-{
-    $shortcutPath = Join-Path $outputDir $ShortcutName
-    Remove-Item $shortcutPath -Force -ErrorAction SilentlyContinue
-    $shell = New-Object -ComObject WScript.Shell
-    $sc = $shell.CreateShortcut($shortcutPath)
-    $sc.TargetPath = $exePath
-    $sc.WorkingDirectory = $outputDir
-    $sc.Save()
-    Write-Host "Shortcut: $shortcutPath"
-}
-
-Write-Host "Done. Exe: $exePath"
