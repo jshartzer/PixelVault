@@ -95,7 +95,17 @@ public sealed partial class CompanionTests
         using var f=new RuntimeCase();using var host=f.Host();using var client=host.Client();await Setup(host,client);var service=host.Services.GetRequiredService<LocalRefreshService>();
         var queued=await f.Request(client);Assert.Equal("reading",queued.Status);Assert.Equal(0,f.Reader.Reads);
         await service.Tick(default);var complete=await client.GetFromJsonAsync<GameRefreshView>("/api/v1/refresh/"+queued.Id);Assert.Equal("complete",complete!.Status);Assert.Equal(1,f.Reader.Reads);
-        Assert.True((await client.GetFromJsonAsync<JsonElement>("/api/v1/refresh/connection")).GetProperty("online").GetBoolean());
+        // Connection reads use the shared one-second snapshot coordinator, not the live worker state.
+        // Wait for that committed observation instead of racing its next sample.
+        using var connectionTimeout=new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        JsonElement connection;
+        do
+        {
+            connection=await client.GetFromJsonAsync<JsonElement>("/api/v1/refresh/connection",connectionTimeout.Token);
+            if(connection.GetProperty("online").GetBoolean())break;
+            await Task.Delay(50,connectionTimeout.Token);
+        }while(true);
+        Assert.True(connection.GetProperty("online").GetBoolean());
         var row=f.Repo.Load(TrackerId,Approved).Single(s=>s.Item.Id=="first");Assert.Equal(1,row.Current);Assert.Equal("Original note",row.Note);
         Assert.Equal("Private other account note",f.Repo.Load(TrackerId,Other).Single(s=>s.Item.Id=="first").Note);
         using var anonymous=host.Client();Assert.Equal(HttpStatusCode.Unauthorized,(await anonymous.GetAsync("/api/v1/refresh/"+queued.Id)).StatusCode);
