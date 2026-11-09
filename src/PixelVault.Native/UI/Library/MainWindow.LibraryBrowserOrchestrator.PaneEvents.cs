@@ -19,25 +19,31 @@ namespace PixelVaultNative
                 applySearchFilter();
             };
 
-            panes.DetailResizeDebounceTimer.Tick += delegate
-            {
-                panes.DetailResizeDebounceTimer.Stop();
-                if (ws.Current == null) return;
-                var layout = CalculateResponsiveLibraryDetailLayout(panes.ThumbScroll);
-                if (layout.Columns == ws.LastDetailColumns && layout.TileSize == ws.LastDetailTileSize) return;
-                ws.PreservedDetailScrollOffset = panes.ThumbScroll.VerticalOffset;
-                ws.PreserveDetailScrollOnNextRender = ws.PreservedDetailScrollOffset > 0.1d;
-                renderSelectedFolder();
-            };
-            panes.FolderResizeDebounceTimer.Tick += delegate
-            {
-                panes.FolderResizeDebounceTimer.Stop();
-                var layout = CalculateResponsiveLibraryFolderLayout(panes.TileScroll);
-                if (layout.Columns == ws.LastFolderColumns && layout.TileSize == ws.LastFolderTileSize) return;
-                ws.PreservedFolderScrollOffset = panes.TileScroll.VerticalOffset;
-                ws.PreserveFolderScrollOnNextRender = ws.PreservedFolderScrollOffset > 0.1d;
-                if (renderTiles != null) renderTiles();
-            };
+                panes.DetailResizeDebounceTimer.Tick += delegate
+                {
+                    panes.DetailResizeDebounceTimer.Stop();
+                    if (ws.Current == null) return;
+                    var layout = CalculateResponsiveLibraryDetailLayout(panes.ThumbScroll);
+                    var viewportWidth = ResolveScrollViewerLayoutWidth(panes.ThumbScroll);
+                    if (layout.Columns == ws.LastDetailColumns
+                        && layout.TileSize == ws.LastDetailTileSize
+                        && Math.Abs(viewportWidth - ws.LastDetailViewportWidth) < 24d) return;
+                    ws.PreservedDetailScrollOffset = panes.ThumbScroll.VerticalOffset;
+                    ws.PreserveDetailScrollOnNextRender = ws.PreservedDetailScrollOffset > 0.1d;
+                    renderSelectedFolder();
+                };
+                panes.FolderResizeDebounceTimer.Tick += delegate
+                {
+                    panes.FolderResizeDebounceTimer.Stop();
+                    var layout = CalculateResponsiveLibraryFolderLayout(panes.TileScroll);
+                    var viewportWidth = ResolveScrollViewerLayoutWidth(panes.TileScroll);
+                    if (layout.Columns == ws.LastFolderColumns
+                        && layout.TileSize == ws.LastFolderTileSize
+                        && Math.Abs(viewportWidth - ws.LastFolderViewportWidth) < 24d) return;
+                    ws.PreservedFolderScrollOffset = panes.TileScroll.VerticalOffset;
+                    ws.PreserveFolderScrollOnNextRender = ws.PreservedFolderScrollOffset > 0.1d;
+                    if (renderTiles != null) renderTiles();
+                };
             panes.ThumbScroll.SizeChanged += delegate(object sender, SizeChangedEventArgs e)
             {
                 if (Math.Abs(e.PreviousSize.Width - e.NewSize.Width) > 1)

@@ -55,6 +55,7 @@ namespace PixelVaultNative
             var size = detailLayout.TileSize;
             ws.LastDetailColumns = targetDetailColumns;
             ws.LastDetailTileSize = size;
+            ws.LastDetailViewportWidth = ResolveScrollViewerLayoutWidth(panes == null ? null : panes.ThumbScroll);
             ws.EstimatedDetailRowHeight = Math.Max(220, size + (IsLibraryBrowserTimelineView(ws.Current) ? 176 : 96));
             var shouldRestoreDetailScroll = ws.PreserveDetailScrollOnNextRender && ws.PreservedDetailScrollOffset > 0.1d;
             var restoreDetailScrollOffset = shouldRestoreDetailScroll ? (double?)ws.PreservedDetailScrollOffset : null;
@@ -64,8 +65,7 @@ namespace PixelVaultNative
             ws.ResetDetailRowsToLoadingOnNextRender = false;
             var renderFolder = ws.Current;
             var timelineView = IsLibraryBrowserTimelineView(renderFolder);
-            var detailViewportWidth = panes?.ThumbScroll == null ? 0d : panes.ThumbScroll.ViewportWidth;
-            if (detailViewportWidth <= 0d && panes?.ThumbScroll != null) detailViewportWidth = panes.ThumbScroll.ActualWidth;
+            var detailViewportWidth = ws.LastDetailViewportWidth;
             var timelinePackedTileSize = timelineView ? CalculateLibraryTimelinePackedTileSize(size, detailViewportWidth) : size;
             if (timelineView) ws.EstimatedDetailRowHeight = Math.Max(240, timelinePackedTileSize + 184);
             var timelineRangeStart = ws.TimelineStartDate;
