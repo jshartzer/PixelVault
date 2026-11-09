@@ -1,3 +1,7 @@
+Centurion compact rail (November 7, 2026): replace the profile collection with the approved compact rail on PC and web. Show the section only for game/platforms with authored Centurion definitions. Keep five icons in one row and show selected requirements underneath; retain full detail navigation, badge eligibility and separate reward notifications. See CENTURION_COMPACT_RAIL.md.
+
+Centurion rewards (November 7, 2026): the approved slotted collection and separate reward notifications supersede earlier profile lock/checkmark and foil treatments. Require all five durable account-scoped verified unlocks for the badge, with no extra points. Preserve saved progress authority and first unlock dates. See CENTURION_REWARDS.md.
+
 # PixelVault Working Policy
 
 Single-field trackers (November 5, 2026): web rows with one binary field use native, unlabeled-visible checkboxes with accessible names; use the same checkbox in the expanded editor. Preserve read-only/source protection, saving and conflict behavior, multi-field labels and numeric count inputs. PC button text remains unchanged. TCG collections use only the saved originally obtained indicator (.ever / Collected); binder ownership is not a completion field. Keep prior binder observations/history recoverable.

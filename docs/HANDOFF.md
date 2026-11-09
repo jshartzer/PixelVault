@@ -1,3 +1,18 @@
+Native 0.128.017 adds a live, automatically refreshed Companion Cubes checklist. It uses six received confirmation emails from the structurally validated mail table. Companion 0.52.2 uses the updated reader. See CURRENT_BUILD.txt and artifacts/companion-cubes.
+
+November 7: Native 0.128.012 and Companion 0.52.2 update the premium achievement to four capped 20-delivery counters (unique LL-or-LLL orders). This limits premium notifications to achievement progress; Centurion retains every order. Saved rank history is retained. Maintained source remains this worktree. See CURRENT_BUILD.txt and artifacts/premium-order-goal-20261108.
+
+November 7: Native 0.128.001 and Companion 0.52.1 installed with original achievement ordering. Maintained source remains the pixelvault-test-source worktree. Source-order migration and checks are recorded in artifacts/achievement-original-order.
+
+November 7: Native 0.128.000 and Companion 0.52.0 are live with the compact Centurion rail and definition-based visibility. Maintained source is C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex. See CURRENT_BUILD.txt and artifacts/centurion-rail.
+
+November 7: Native 0.127.001 and Companion 0.51.1 are live. Centurion collection/rewards and equal-sided slot refinement are installed. Build from C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex; C:\Codex\src is old. Full source also ships with dist\PixelVault-0.127.001. Follow docs/CURRENT_BUILD.txt and artifacts/centurion-live.
+
+Final verification: a concurrent build replaced C:\Codex\App Testing with legacy Native 0.077.000 after the new executable had been installed and verified. Do not overwrite that separate build. Native 0.126.000 remains installed at C:\Codex\dist\PixelVault-0.126.000; C:\Codex\PixelVault.lnk and dist\PixelVault-current still select it. Launch through the main shortcut.
+
+November 7 — **Native 0.126.000 and Companion 0.50.0 installed.** Central service publishes committed tracker/achievement changes through authenticated browser SSE and a protected local desktop snapshot. Healthy browser sessions stop polling; clients catch up, coalesce pending changes and protect edits. Source leases, authority/review safeguards and provider intervals retained. Due provider scheduling now checked every 15 seconds. Native release installed; current junction and main shortcut updated. App Testing was initially verified, then replaced by a concurrent legacy build; use the main shortcut to launch the new client. Local/LAN service health, stream authentication, fresh desktop snapshot, unchanged service settings and shared DLLs verified. Source: C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex (C:\Codex source is old). Evidence: artifacts/central-refresh.
+
+November 7 — **Companion 0.49.0 detailed achievement notifications are live.** The selected Detailed popup combines tracker updates/completions with newly unlocked achievements, including artwork, game and platform. Confirmed unlock transitions only; first visits/new scopes baseline silently; dismissal persists; failures retry. Saved official and verified Centurian observations remain authoritative. All 20 JS unit, 4 browser and 24 server checks pass, including the actual installed shared DLLs. Service/local/LAN health, served assets, settings and package hashes verified. Existing data roots, worker paths, service identity/firewall protections and shared tracker/map assemblies retained; previous 0.48.1 preserved. Refresh browsers. Evidence: C:/Codex/artifacts/achievement-notification-implementation/. Implementation is in this maintained worktree; C:/Codex main remains an older source snapshot. See docs/COMPANION_UPDATE_NOTIFICATIONS.md.
 November 5 — **Native 0.125.005 published and standard App Testing rebuilt.** Includes the toolbar refresh (imports right, Game/Photo Index under Settings > Library, grouped progress/view tools, Sort/filter beside search) and the Achievements Settings fixed Save order footer. All five targeted toolbar/Settings tests pass; existing toolbar desktop smoke and Settings rendered-preview checks apply, with no new live GUI smoke for this version-only packaging. Release/test executable hashes match, source bundle verified, main shortcut/current junction updated and both sidecars retain C:\Codex\PixelVaultData. Previous releases preserved. Companion unchanged. Evidence: artifacts/toolbar-settings-release-20261105/verification.json. Earlier unshipped notes below are historical.
 
 November 5 — **Achievements Settings clipping fixed in App Testing; unshipped.** Keep Save order in a fixed footer while Xbox account/sync controls and the category editor scroll above it. Existing style and save/draft behavior preserved. Both SettingsShellTests pass, including 1152x750, 852x460 and 720x420 layouts with long sync messages and footer visibility while scrolling. WPF previews reviewed at normal and compact sizes. Standard App Testing rebuilt successfully and canonical DataRoot sidecar restored from the released copy because it was missing before this build. Release remains 0.125.000; toolbar refresh and this fix await publication. Evidence/backups/scoped patch: artifacts/settings-achievements-layout-20261105.
@@ -678,13 +693,9 @@ November 5 — Companion **0.47.1** installed after Windows elevation approval. 
 
 ## Current Published Build
 
-Current PC build: **0.125.005**, published November 5, 2026. Includes the toolbar refresh and Achievements Settings clipping fix, plus prior performance improvements. Companion remains **0.48.1**, browser revision **0.48.1-single-checkbox**.
+Native **0.128.006**, Companion **0.52.1**. Released November 7, 2026. The native release fixes late-game Death Stranding interview, mail and cargo save readers. The background service points to `C:\Codex\dist\PixelVault-0.128.006\PixelVault.exe`; the main shortcut, current junction and App Testing use the same release.
 
-- Executable: `C:\Codex\dist\PixelVault-0.125.005\PixelVault.exe`
-- Standard test build: `C:\Codex\App Testing\PixelVault.exe`
-- Main shortcut and current junction point to 0.125.005; both data-root sidecars use `C:\Codex\PixelVaultData`.
-- Release and test executables match. All five focused toolbar/Settings tests pass. Prior toolbar desktop smoke and Settings WPF previews verified; no new live GUI smoke for version-only release packaging. Full suite not repeated this release.
-- Evidence: `artifacts/toolbar-settings-release-20261105/verification.json`.
+Maintained source: `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex`. `C:\Codex\src` remains an older checkout. Evidence and private save validation: `C:\Codex\artifacts\ds-reader-fix-20261108`. See `CURRENT_BUILD.txt` and `DEATH_STRANDING_INTERVIEW_RESEARCH.md` for details.
 
 ## Current Direction
 

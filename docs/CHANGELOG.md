@@ -1,3 +1,49 @@
+## 0.128.021 — November 8, 2026
+
+- Keep Death Stranding interview, mail and cargo refresh working when late-game saves add achievement flags. The reader validates extra boolean flags without requiring each new flag ID to be registered.
+
+## 0.128.017 — Companion Cubes
+
+- Sync the six Companion Cube completions from the confirmation emails received in Death Stranding Director’s Cut saves.
+
+## 0.128.012 / Companion 0.52.2 — Premium achievement progress
+
+- Growth of a Legend now tracks only the first 20 unique LL-or-LLL deliveries in each of the four categories. Extra orders and additional ranks in completed categories no longer produce premium achievement tracker notifications; the Centurion order checklist continues tracking all 540 orders.
+
+## 0.128.007 — November 7, 2026
+
+- Enlarge the Centurion badge and five achievement tiles in PC game profiles. Stack the heading sooner on narrower profiles.
+
+## 0.128.006 — November 7, 2026
+
+- Repair late-game Death Stranding save refresh for interview totals, the interview catalogue, email totals, the email catalogue, and delivered cargo weight. Validate the expanded typed statistic table and compact header widths, and preserve individual interview reads after the official counter stops at 100.
+
+## 0.128.001 — November 7, 2026
+
+- PC and Companion 0.52.1 default to original achievement order within existing categories and completion sections. Steam schema positions are retained; refreshed web snapshots override legacy ordering.
+
+## 0.128.000 / Companion 0.52.0 — Compact Centurion rail
+
+Replace the game profile collection on PC and web with the selected compact rail: five icons, selected requirements, and full detail access. Hide the entire section for games with no authored Centurion achievements. Preserve verified progress and reward notifications. See CENTURION_COMPACT_RAIL.md.
+
+## 0.127.001 / Companion 0.51.1 — Centurion layout refinement
+
+Use a regular hexagonal badge slot with six equal sides, remove its caption, and widen the badge column so the five achievements sit farther right. Retains the slotted collection, generated Death Stranding badge and independent animated reward queue introduced in 0.127.000 / 0.51.0. Native and Companion deployed; source and App Testing updated. See CENTURION_REWARDS.md.
+
+## 0.127.000 / Companion 0.51.0 — Centurion collection and rewards
+
+Add the six-slot profile collection, Death Stranding's metal-rimmed hex badge, and separate animated achievement and badge notifications. Badge credit requires all five verified account-specific unlocks; connect the validated interview catalogue to durable Centurion progress. Preserve ordinary update delivery and saved data. See CENTURION_REWARDS.md.
+
+## 0.126.000 — Central refresh delivery
+
+Companion 0.50.0 publishes saved tracker and achievement changes to the browser and desktop from one background coordinator. Healthy browser sessions no longer poll; both apps catch up after reconnect and defer updates during edits. Existing provider intervals, save authority and review protections remain in place. See CENTRAL_REFRESH.md.
+
+## Companion 0.49.0 — November 7, 2026
+
+- Add the selected Detailed progress popup, with tracker changes/completions and newly unlocked achievements showing artwork, game and platform.
+- Keep account-scoped dismissal history, silent first-visit baselines and retry after temporary failures. Read saved official and verified Centurian progress only.
+- Installed and verified on the existing PC Companion service. 20 JS unit, 4 browser and 24 server checks passed. Retain settings, worker paths, shared tracker/map assemblies and the previous release. See `COMPANION_UPDATE_NOTIFICATIONS.md`.
+
 ## 0.125.009 — November 5, 2026
 
 - Keep tracker details focused on game information. Show the yellow achievement-style Missable label beside Content in the PC and web apps.
