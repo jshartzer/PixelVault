@@ -25,11 +25,16 @@ namespace PixelVaultNative
             using var stream = typeof(AchievementTrackingCatalog).Assembly.GetManifestResourceStream("PixelVault.Tracking.DeathStrandingWorld.json");
             var definitions = new List<AchievementTrackerDefinition> { DeathStranding() };
             definitions.AddRange(JsonSerializer.Deserialize<List<AchievementTrackerDefinition>>(stream, Json));
-            using var orders = typeof(AchievementTrackingCatalog).Assembly.GetManifestResourceStream("PixelVault.Tracking.DeathStrandingOrders.json");
-            definitions.Add(JsonSerializer.Deserialize<AchievementTrackerDefinition>(orders, Json));
+            definitions.Add(PixelVault.Tracking.DeathStrandingPremiumGoal.Definition());
             definitions.Add(PixelVault.Tracking.CenturyLegendsCatalogue.Definition());
             definitions.Add(PixelVault.Tracking.CenturyCargoGoal.Definition());
             return definitions;
+        }
+
+        public static AchievementTrackerDefinition DeathStrandingOrderCatalogue()
+        {
+            using var orders = typeof(AchievementTrackingCatalog).Assembly.GetManifestResourceStream("PixelVault.Tracking.DeathStrandingOrders.json");
+            return JsonSerializer.Deserialize<AchievementTrackerDefinition>(orders, Json);
         }
 
         public static string AccountKey(string provider, string account)
@@ -57,6 +62,9 @@ namespace PixelVaultNative
                 throw new InvalidDataException("Content supports up to 100,000 characters per item and 2,000,000 per tracker.");
             if (definition.Milestones == null || definition.CategoryTargets == null)
                 throw new InvalidDataException("Milestones and category targets must be lists.");
+            if (definition.SumItemTargets && (definition.Milestones.Count > 0 || definition.CategoryTargets.Count > 0
+                || definition.Items.Sum(i => (long)i.Target) > int.MaxValue))
+                throw new InvalidDataException("Summed targets require ungrouped counters with a bounded total.");
             if (definition.Milestones.Count > 0)
             {
                 if (definition.Milestones.Count > TrackerMilestones.Maximum || definition.Milestones.Any(string.IsNullOrWhiteSpace)

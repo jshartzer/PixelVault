@@ -22,6 +22,8 @@ namespace PixelVaultNative
         public string CompletionLabel { get; set; } = "Completed";
         [System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
         public bool AggregateAsSingleItem { get; set; }
+        [System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+        public bool SumItemTargets { get; set; }
         public List<string> Milestones { get; set; } = new();
         public Dictionary<string, int> CategoryTargets { get; set; } = new();
         public List<AchievementTrackerItem> Items { get; set; } = new();

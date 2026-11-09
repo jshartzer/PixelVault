@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -14,7 +15,19 @@ namespace PixelVaultNative
         internal const int Offset = 0x260;
         internal sealed class Interview { public string Id { get; set; } public bool Populated { get; set; } }
         internal static readonly byte[] Prefix = Convert.FromHexString("AC083BB0005AA1181A4317662FB2000000C03FC984C874B5EAB79C03");
-        static readonly byte[] EarlierPrefix = Convert.FromHexString("AC083BB00050A1181A4317662FB2000000C03FC984C874B5EAB79C03");
+        // The progress value between the fixed header and suffix uses a compact signed integer.
+        // Captured values 80..120 use one byte; 130..160 use 0x81 + Int16 and shift the table by two bytes.
+        internal static int StateOffset(byte[] data)
+        {
+            if (data == null || data.Length < Offset + 158 || data.Length > DeathStrandingSaveReader.MaxPayload
+                || !data.AsSpan(0, 5).SequenceEqual(Prefix.AsSpan(0, 5))) return -1;
+            int width = data[5] == 0x81 ? 3 : 1;
+            int progress = width == 3 ? BinaryPrimitives.ReadInt16LittleEndian(data.AsSpan(6, 2)) : data[5];
+            if (progress < 80 || progress > 160 || progress % 10 != 0 || (progress >= 128) != (width == 3)
+                || !data.AsSpan(5 + width, Prefix.Length - 6).SequenceEqual(Prefix.AsSpan(6))) return -1;
+            int offset = Offset + width - 1;
+            return data.Length >= offset + 158 ? offset : -1;
+        }
         internal static List<Interview> References()
         {
             using var stream = typeof(DeathStrandingInterviewCatalogueReader).Assembly.GetManifestResourceStream("PixelVault.Tracking.DeathStrandingInterviews.json");
@@ -36,26 +49,29 @@ namespace PixelVaultNative
 
         internal static AchievementTrackerSnapshot Read(byte[] data, string account, long observed, string source, string evidence)
         {
-            if (data == null || data.Length < Offset + 158 || data.Length > DeathStrandingSaveReader.MaxPayload
-                || !(data.AsSpan().StartsWith(Prefix) || data.AsSpan().StartsWith(EarlierPrefix)))
+            int offset = StateOffset(data);
+            if (offset < 0)
                 throw new NotSupportedException("The interview catalogue has an unsupported save layout. Saved progress was preserved.");
             var rows = References(); int read = 0, collected = 0;
             for (int i = 0; i < rows.Count; i++)
             {
-                byte flag = data[Offset + i];
+                byte flag = data[offset + i];
                 if (flag is not (0 or 0x0b or 0x0d) || !rows[i].Populated && flag != 0)
                     throw new NotSupportedException("The interview catalogue contains an unsupported state. Saved progress was preserved.");
                 if (flag == 0x0d) read++;
                 if (flag != 0) collected++;
             }
-            if (read != DeathStrandingInterviewReader.ReadCount(data))
+            int counter = DeathStrandingInterviewReader.ReadCount(data);
+            // 69 copied late-game saves corroborate equality below the trophy goal and a stopped
+            // counter of 100 while independently ordered per-title read flags continue to 103 and 108.
+            if (read != counter && !(counter == 100 && read > 100))
                 throw new NotSupportedException("Interview states disagree with the saved achievement counter. Saved progress was preserved.");
             var result = new AchievementTrackerSnapshot { TrackerId = TrackerId, Provider = "steam", GameId = "1850570", Account = account,
-                ObservedUtcTicks = observed, Source = source, Evidence = evidence + " Interview catalogue v1: supported initial layout, ordered 158-resource reference, nine empty resources and complete statistic 39 validated. States: 0x00 locked, 0x0B collected/unread, 0x0D read. "
+                ObservedUtcTicks = observed, Source = source, Evidence = evidence + " Interview catalogue v2: compact progress header, supported initial layout, ordered 158-resource reference, nine empty resources and complete statistic 39 validated, including its stopped-at-100 state. States: 0x00 locked, 0x0B collected/unread, 0x0D read. "
                 + collected + " collected, " + read + " read. Both official and Century interview progress require reading; unread entries remain incomplete." };
             for (int i = 0; i < rows.Count; i++)
                 if (rows[i].Populated) result.Items.Add(new AchievementTrackerProgress { ItemId = rows[i].Id,
-                    Current = data[Offset + i] == 0x0d ? 1 : 0, Availability = data[Offset + i] == 0 ? TrackerAvailability.Locked : TrackerAvailability.Available });
+                    Current = data[offset + i] == 0x0d ? 1 : 0, Availability = data[offset + i] == 0 ? TrackerAvailability.Locked : TrackerAvailability.Available });
             return result;
         }
     }

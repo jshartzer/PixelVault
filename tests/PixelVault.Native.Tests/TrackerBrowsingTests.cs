@@ -125,7 +125,7 @@ public sealed class TrackerBrowsingTests : IDisposable
     [InlineData(1172)]
     public void OrderGroupingTogglesDeliveryTypesWithoutChangingRanksFiltersOrNoteDrafts(int width)
     {
-        var store=new AchievementTrackingStore(dir);const string id=AchievementTrackingCatalog.DeathStrandingOrdersId;
+        var store=new AchievementTrackingStore(dir);const string id="test.premium-rank-matrix";var fixture=AchievementTrackingCatalog.DeathStrandingOrderCatalogue();fixture.Id=id;store.AddDefinition(fixture);
         store.SetManualProgress(id,"player","212002:LLL",1);int history=store.History(id,"player").Count;
         AchievementCollectionAccessTests.OnSta(()=>
         {

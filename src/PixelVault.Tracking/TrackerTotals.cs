@@ -21,7 +21,12 @@ public sealed record TrackerTotals(int Completed, int Total, int Unknown, int Re
         var active = visible.Where(s => !s.Item.ExcludedFromTotal).ToList();
         var rows = visible.GroupBy(s => definition.Milestones.Count > 0 ? s.Item.GroupId : s.Item.Id).ToList();
         int completed = active.Count(s => s.Complete), total = active.Count;
-        if (active.Count == 1 && definition.Milestones.Count == 0 && active[0].Item.Target > 1)
+        if (definition.SumItemTargets && definition.Milestones.Count == 0)
+        {
+            total = active.Sum(s => s.Item.Target);
+            completed = active.Sum(s => Math.Clamp(s.Current ?? 0, 0, s.Item.Target));
+        }
+        else if (active.Count == 1 && definition.Milestones.Count == 0 && active[0].Item.Target > 1)
         {
             total = active[0].Item.Target;completed = Math.Clamp(active[0].Current ?? 0, 0, total);
         }

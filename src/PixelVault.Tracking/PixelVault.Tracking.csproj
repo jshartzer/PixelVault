@@ -8,6 +8,7 @@
   <ItemGroup>
     <EmbeddedResource Include="Artwork/*" LogicalName="PixelVault.Artwork.%(Filename)%(Extension)" />
     <EmbeddedResource Include="CenturyArtwork/*.png" LogicalName="PixelVault.CenturyArtwork.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="TrackingData/DeathStrandingInterviews.json" LogicalName="PixelVault.Tracking.CenturyInterviews.json" />
     <PackageReference Include="Microsoft.Data.Sqlite.Core" Version="8.0.8" />
     <EmbeddedResource Include="TrackingData/DeathStrandingBuildables.json" LogicalName="PixelVault.Tracking.DeathStranding.json" />
     <EmbeddedResource Include="TrackingData/DeathStrandingWorldTrackers.json" LogicalName="PixelVault.Tracking.DeathStrandingWorld.json" />

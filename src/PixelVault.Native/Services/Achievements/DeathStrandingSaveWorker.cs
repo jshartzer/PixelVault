@@ -167,6 +167,10 @@ namespace PixelVaultNative
                 : new DeathStrandingProjection { ErrorCode = orders.ErrorCode, Error = orders.Error });
             Add(AchievementTrackingCatalog.DeathStrandingChipsId, () => DeathStrandingChipReader.Read(data, request.Account, request.ObservedUtc, source, evidence));
             Add(DeathStrandingMailCatalogueReader.TrackerId, () => DeathStrandingMailCatalogueReader.Read(data,request.Account,request.ObservedUtc,source,evidence));
+            // Cube completion uses receipt flags, independent of the total emails opened.
+            Add(DeathStrandingTrackerSource.CompanionCubesId, () => DeathStrandingTrackerSource.ProjectCompanionCubes(
+                result.Projections[DeathStrandingMailCatalogueReader.TrackerId].Snapshot
+                    ?? DeathStrandingMailCatalogueReader.Read(data, request.Account, request.ObservedUtc, source, evidence, verifyOpenedTotal: false)));
             Add(DeathStrandingMailReader.TrackerId, () => DeathStrandingMailReader.Read(data,request.Account,request.ObservedUtc,source,evidence));
             Add(DeathStrandingInterviewReader.TrackerId, () => DeathStrandingInterviewReader.Read(data, request.Account, request.ObservedUtc, source, evidence));
             Add(DeathStrandingInterviewCatalogueReader.TrackerId, () => DeathStrandingInterviewCatalogueReader.Read(data, request.Account, request.ObservedUtc, source, evidence));

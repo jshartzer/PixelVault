@@ -16,7 +16,7 @@ public sealed class DeathStrandingOrderReaderTests
     {
         var data=new byte[Start+DeathStrandingOrderReader.RecordCount*96+17];
         data[Start-3]=0x81;data[Start-2]=0x74;data[Start-1]=4;
-        var ids=AchievementTrackingCatalog.Builtins().Single(d=>d.Id==Id).Items.Select(i=>ulong.Parse(i.GroupId)).Distinct().Reverse().ToArray();
+        var ids=AchievementTrackingCatalog.DeathStrandingOrderCatalogue().Items.Select(i=>ulong.Parse(i.GroupId)).Distinct().Reverse().ToArray();
         for(int i=0;i<1140;i++)
         {
             int p=Start+i*96;data[p]=8;data[p+2]=1;data[p+4]=1;data[p+24]=2;data[p+25]=255;
@@ -27,7 +27,7 @@ public sealed class DeathStrandingOrderReaderTests
     }
     static int Position(byte[] data,ulong id)=>Enumerable.Range(0,1140).Select(i=>Start+i*96).Single(p=>BinaryPrimitives.ReadUInt64LittleEndian(data.AsSpan(p+16,8))==id);
     static void Set(byte[] data,ulong id,ulong rank)=>BinaryPrimitives.WriteUInt64LittleEndian(data.AsSpan(Position(data,id)+88,8),rank);
-    static AchievementTrackerSnapshot Read(byte[] data)=>DeathStrandingOrderReader.Read(data,"player",DateTime.UtcNow.Ticks,"Fixture","Checked copy.");
+    static AchievementTrackerSnapshot Read(byte[] data)=>DeathStrandingOrderReader.ReadCatalogue(data,"player",DateTime.UtcNow.Ticks,"Fixture","Checked copy.",out _);
     [Fact]
     public void CenturyCatalogueUsesLegendOrHigherAndSharedAnalysisProjectsItWithoutChangingTheOfficialGoal()
     {
@@ -36,7 +36,7 @@ public sealed class DeathStrandingOrderReaderTests
         var legends=DeathStrandingOrderReader.Read(data,"player",official.ObservedUtcTicks,"Fixture","Checked copy.",PixelVault.Tracking.CenturyLegendsCatalogue.TrackerId);
         Assert.Equal(540,legends.Items.Count); Assert.Equal(4,legends.Items.Count(i=>i.Current==1));
         Assert.All(legends.Items,i=>Assert.EndsWith(":LLL",i.ItemId));
-        var missionIds = AchievementTrackingCatalog.Builtins().Single(d => d.Id == Id)
+        var missionIds = AchievementTrackingCatalog.DeathStrandingOrderCatalogue()
             .Items.Select(i => i.GroupId).Distinct().Reverse().ToArray();
         for (int i = 0; i < 5; i++)
             Assert.Equal(i < 4 ? 1 : 0, legends.Items.Single(item => item.ItemId == missionIds[i] + ":LLL").Current);
@@ -45,7 +45,7 @@ public sealed class DeathStrandingOrderReaderTests
         var analysis=DeathStrandingSaveWorker.Analyze(data,request,"save","dll");
         DeathStrandingTrackerSource.ValidateAnalysis(analysis,"player","save","dll");
         Assert.Equal(legends.Items.Select(i=>i.Current),analysis.Projections[legends.TrackerId].Snapshot.Items.Select(i=>i.Current));
-        Assert.Equal(1080,analysis.Projections[Id].Snapshot.Items.Count);
+        Assert.Equal(4,analysis.Projections[Id].Snapshot.Items.Count);
         var definition=PixelVault.Tracking.CenturyLegendsCatalogue.Definition();
         Assert.True(PixelVault.Tracking.CenturyLegendsCatalogue.Matches(definition));
         Assert.Empty(definition.Milestones);Assert.Empty(definition.CategoryTargets);
@@ -57,7 +57,7 @@ public sealed class DeathStrandingOrderReaderTests
     [Fact]
     public void CountedTableReadsIndependentRanksAndMixedEarnedMasksWithoutUsingDeliveryCounters()
     {
-        var data=Payload();var d=AchievementTrackingCatalog.Builtins().Single(d=>d.Id==Id);
+        var data=Payload();var d=AchievementTrackingCatalog.DeathStrandingOrderCatalogue();
         int first=Start;BinaryPrimitives.WriteUInt16LittleEndian(data.AsSpan(first+26,2),40000);
         var result=Read(data);Assert.Equal(1080,result.Items.Count);Assert.Equal(4,result.Items.Count(i=>i.Current==1));
         Assert.Equal(2,result.Items.Count(i=>i.ItemId.EndsWith(":LL")&&i.Current==1));
@@ -93,7 +93,7 @@ public sealed class DeathStrandingOrderReaderTests
     [Fact]
     public void SourceSetupAndIndicatorsExposeTheOrderReaderAlongsideTheValidatedChipReader()
     {
-        var source=new DeathStrandingTrackerSource(Path.GetTempPath());var definition=AchievementTrackingCatalog.Builtins().Single(d=>d.Id==Id);
+        var source=new DeathStrandingTrackerSource(Path.GetTempPath());var definition=PixelVault.Tracking.DeathStrandingPremiumGoal.Definition();
         Assert.True(source.Supports(definition));Assert.True(source.Supports(AchievementTrackingCatalog.Builtins().Single(d=>d.Id==AchievementTrackingCatalog.DeathStrandingChipsId)));
         source.Validate(new(){AdapterId=source.Id,AdapterVersion="1",Account="76561197960265729",Location=Path.GetTempPath(),GameDirectory=Path.GetTempPath()},definition);
         AchievementCollectionAccessTests.OnSta(()=>
@@ -136,20 +136,20 @@ public sealed class DeathStrandingOrderReaderTests
             void Copy(string control){var r=controls[control];File.Copy(r.GetProperty("Encrypted").GetString()!,copy,true);File.SetLastWriteTimeUtc(copy,DateTime.Parse(r.GetProperty("SourceUtc").GetString()!).ToUniversalTime());}
             Copy("before");var store=new AchievementTrackingStore(dir);var source=new DeathStrandingTrackerSource(Path.Combine(dir,"achievement-tracking"),worker);
             var service=new TrackerRefreshService(store,new[]{source});service.Configure(Id,account,source.Id,"1",Path.Combine(dir,"saves"),gameDirectory:game);
-            var plan=await service.PrepareAsync(Id,account,default);Assert.Equal(1080,plan.Rows.Count);Assert.Equal(1080,service.Apply(plan,false,null!));
-            store.SaveNote(Id,account,"205101:LL","Keep this note");
+            var plan=await service.PrepareAsync(Id,account,default);Assert.Equal(4,plan.Rows.Count);Assert.Equal(4,service.Apply(plan,false,null!));
+            store.SaveNote(Id,account,"qualifying-time","Keep this note");
             store.SaveAutomation(Id,account,store.Source(Id,account).Id,TrackerAutomationMode.SaveChanges,5,false);
             var now=DateTime.UtcNow;using var monitor=new TrackerAutomationMonitor(store,service,()=>now);monitor.SetAccounts(account,"");
             await monitor.TickAsync();now=now.AddSeconds(5);await monitor.TickAsync();
             Copy("after");now=now.AddSeconds(5);await monitor.TickAsync();now=now.AddSeconds(5);await monitor.TickAsync();
-            Assert.Equal(3,store.Load(Id,account).Count(s=>s.Complete&&s.Item.Milestone=="LL"));
-            Assert.Equal(43,store.Load(Id,account).Count(s=>s.Complete&&s.Item.Milestone=="LLL"));
-            Assert.Equal("Keep this note",store.Load(Id,account).Single(s=>s.Item.Id=="205101:LL").Note);
+            var expected=DeathStrandingOrderReader.Read(File.ReadAllBytes(controls["after"].GetProperty("Data").GetString()!),account,DateTime.UtcNow.Ticks,"Fixture","");
+            Assert.Equal(expected.Items.Select(i=>i.Current),store.Load(Id,account).OrderBy(s=>Array.IndexOf(PixelVault.Tracking.DeathStrandingPremiumGoal.Categories,s.Item.Category)).Select(s=>s.ReportedCurrent));
+            Assert.Equal("Keep this note",store.Load(Id,account).Single(s=>s.Item.Id=="qualifying-time").Note);
             int history=store.History(Id,account).Count;now=now.AddSeconds(5);await monitor.TickAsync();Assert.Equal(history,store.History(Id,account).Count);
             // A changed manual value creates a review barrier; automatic reads cannot replace it.
-            store.SetManualProgress(Id,account,"205101:LL",0);File.SetLastWriteTimeUtc(copy,File.GetLastWriteTimeUtc(copy).AddSeconds(1));
+            store.SetManualProgress(Id,account,"qualifying-time",0);File.SetLastWriteTimeUtc(copy,File.GetLastWriteTimeUtc(copy).AddSeconds(1));
             now=now.AddSeconds(5);await monitor.TickAsync();now=now.AddSeconds(5);await monitor.TickAsync();
-            Assert.True(store.Automation(Id,account).State.ReviewPending);Assert.Equal(0,store.Load(Id,account).Single(s=>s.Item.Id=="205101:LL").Current);
+            Assert.True(store.Automation(Id,account).State.ReviewPending);Assert.Equal(0,store.Load(Id,account).Single(s=>s.Item.Id=="qualifying-time").Current);
             Assert.All(store.Load(Id,"other"),s=>Assert.Null(s.Current));Assert.Equal(hash,SHA256.HashData(File.ReadAllBytes(original)));
         }
         finally

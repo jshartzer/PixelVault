@@ -53,6 +53,12 @@ public partial class TrackerRepository
                     || (value.Current is not (0 or 1) && !(i.Id == CenturyMailCatalogue.UnmappedId && value.Current == null)))) return;
             id = CenturyAchievementCatalog.DeathStrandingMailsId;
         }
+        else if (definition.Id == CenturyInterviewCatalogue.TrackerId)
+        {
+            if (!CenturyInterviewCatalogue.Matches(definition)
+                || active.Any(i => !values.TryGetValue(i.Id, out var value) || value.Current is not (0 or 1))) return;
+            id = CenturyAchievementCatalog.DeathStrandingInterviewsId;
+        }
         else if (definition.Id == CenturyCargoGoal.TrackerId)
         {
             if (!CenturyCargoGoal.Matches(definition) || !values.TryGetValue(CenturyCargoGoal.ItemId, out var value)

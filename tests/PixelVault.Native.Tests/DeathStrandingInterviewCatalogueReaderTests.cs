@@ -21,6 +21,54 @@ public sealed class DeathStrandingInterviewCatalogueReaderTests
     }
     static AchievementTrackerSnapshot Read(byte[] data) => DeathStrandingInterviewCatalogueReader.Read(data, Account, DateTime.UtcNow.Ticks, "Fixture", "Verified copy.");
 
+    [Theory]
+    [InlineData(80)][InlineData(90)][InlineData(100)][InlineData(110)][InlineData(120)]
+    [InlineData(130)][InlineData(140)][InlineData(150)][InlineData(160)]
+    public void CompactHeaderWidthSelectsTheExactOrderedTable(int progress)
+    {
+        var data = Payload();
+        if (progress < 128) data[5] = (byte)progress;
+        else data = data[..5].Concat(new byte[] { 0x81, (byte)progress, 0 }).Concat(data[6..]).ToArray();
+        Assert.Equal(progress < 128 ? 0x260 : 0x262, DeathStrandingInterviewCatalogueReader.StateOffset(data));
+        Assert.Single(Read(data).Items, i => i.Current == 1);
+        data[progress < 128 ? 6 : 8] ^= 1;
+        Assert.Throws<NotSupportedException>(() => Read(data));
+    }
+
+    [Theory]
+    [InlineData(99,99,true)][InlineData(100,100,true)][InlineData(103,100,true)][InlineData(108,100,true)]
+    [InlineData(99,100,false)][InlineData(108,99,false)][InlineData(108,101,false)]
+    public void StoppedOfficialCounterDoesNotLosePostAchievementReadStates(int read, int counter, bool valid)
+    {
+        var rows = DeathStrandingInterviewCatalogueReader.References();
+        var data = new byte[DeathStrandingInterviewCatalogueReader.Offset + 158];
+        DeathStrandingInterviewCatalogueReader.Prefix.CopyTo(data, 0);
+        foreach (var index in rows.Select((r,i)=>(r,i)).Where(x=>x.r.Populated).Take(read).Select(x=>x.i)) data[0x260 + index]=0x0d;
+        data = data.Concat(DeathStrandingInterviewReaderTests.Payload(counter,2,true,true)).ToArray();
+        if(valid) Assert.Equal(read,Read(data).Items.Count(i=>i.Current==1));
+        else Assert.Throws<NotSupportedException>(()=>Read(data));
+    }
+
+    [Fact]
+    public void PrivateLateGameCopiesValidateAllFiveAffectedReaders()
+    {
+        var root=Environment.GetEnvironmentVariable("PIXELVAULT_DS_LATE_GAME_REVIEW");if(string.IsNullOrEmpty(root))return;
+        int copies=0;var variants=new HashSet<int>();bool postAchievement=false;
+        foreach(var path in Directory.EnumerateFiles(root,"input.dat.payload",SearchOption.AllDirectories))
+        {
+            var data=File.ReadAllBytes(path);int offset=DeathStrandingInterviewCatalogueReader.StateOffset(data);
+            Assert.True(offset is 0x260 or 0x262);variants.Add(offset);
+            var catalogue=Read(data);int count=catalogue.Items.Count(i=>i.Current==1);
+            Assert.Equal(Math.Min(count,100),DeathStrandingInterviewReader.ReadCount(data));postAchievement|=count>100;
+            var mails=DeathStrandingMailCatalogueReader.Read(data,Account,DateTime.UtcNow.Ticks,"Private copy","");
+            var mailCounter=DeathStrandingMailReader.Read(data,Account,DateTime.UtcNow.Ticks,"Private copy","");
+            Assert.Equal(mailCounter.Items.Single().Current,mails.Items.Count(i=>i.Current==1));
+            Assert.InRange(DeathStrandingCargoReader.Read(data,Account,DateTime.UtcNow.Ticks,"Private copy","").Items.Single().Current!.Value,1,1000000);
+            copies++;
+        }
+        Assert.True(copies>=69);Assert.Equal(2,variants.Count);Assert.True(postAchievement);
+    }
+
     [Fact]
     public void OnlyReadCountsForCenturyAndOfficialWhileUnreadRemainsAvailable()
     {

@@ -22,11 +22,40 @@ namespace PixelVaultNative
         static readonly SharedSaveAnalysisCache SharedAnalysis = new();
         readonly SharedSaveAnalysisCache analysisCache;
         readonly Func<string, CancellationToken, Task<DeathStrandingReadResult>> readWorker;
+        internal const string CompanionCubesId = "death-stranding-dc.companion-cubes";
+        static readonly string[] CubeConfirmationMailIds =
+        {
+            "2d98a275-6724-de4f-b7fc-86442264063c", // Benjamin: You Really Are the Great Deliverer
+            "89331078-a2fd-ef40-9f8e-663d8713f0c8", // William: You're Amazing!
+            "5664b5d0-60ff-1547-8341-b7bcb8256627", // Thomas: You're the Real Deal!
+            "42cfde73-acaf-c049-8953-2826a1f77ee4", // Thomas: You're My Savior, No Doubt About It!
+            "9135ba19-1957-2846-8c0f-9d40b17940b1", // Paleontologist: You're a True Friend!
+            "6794552f-fdbb-f448-825c-a7afe100e05c"  // Benjamin: You Put a Stop to the Experiments!
+        };
+
+        internal static AchievementTrackerSnapshot ProjectCompanionCubes(AchievementTrackerSnapshot mail)
+        {
+            var messages = mail.Items.ToDictionary(item => item.ItemId, StringComparer.Ordinal);
+            return new AchievementTrackerSnapshot
+            {
+                TrackerId = CompanionCubesId, Provider = mail.Provider, GameId = mail.GameId,
+                Account = mail.Account, Source = mail.Source, ObservedUtcTicks = mail.ObservedUtcTicks,
+                Evidence = "Saved receipt of the six Companion Cube completion emails. " + mail.Evidence,
+                Items = CubeConfirmationMailIds.Select((id, index) => new AchievementTrackerProgress
+                {
+                    ItemId = "cube-" + (index + 1),
+                    Current = messages[id].Availability == TrackerAvailability.Available ? 1 : 0
+                }).ToList()
+            };
+        }
+
         public string Id => AdapterId;
         public string Version => "1";
         public bool Supports(AchievementTrackerDefinition definition)=>definition?.Provider=="steam"&&definition.GameId=="1850570"
-            &&(DeathStrandingFacilityReader.Supports(definition)||PixelVault.Tracking.CenturyCargoGoal.Matches(definition)||DeathStrandingMailCatalogueReader.Supports(definition)||definition.Id==DeathStrandingMailReader.TrackerId||definition.Id==AchievementTrackingCatalog.DeathStrandingId||DeathStrandingWorldReader.Supports(definition.Id)||DeathStrandingOrderReader.Supports(definition.Id)||DeathStrandingChipReader.Supports(definition.Id)||DeathStrandingInterviewReader.Supports(definition.Id)||DeathStrandingInterviewCatalogueReader.Supports(definition)||DeathStrandingRoadReader.Supports(definition));
-        public string Coverage(AchievementTrackerDefinition definition)=>definition?.Id==PixelVault.Tracking.CenturyCargoGoal.TrackerId
+            &&(definition.Id==CompanionCubesId||DeathStrandingFacilityReader.Supports(definition)||PixelVault.Tracking.CenturyCargoGoal.Matches(definition)||DeathStrandingMailCatalogueReader.Supports(definition)||definition.Id==DeathStrandingMailReader.TrackerId||definition.Id==AchievementTrackingCatalog.DeathStrandingId||DeathStrandingWorldReader.Supports(definition.Id)||DeathStrandingOrderReader.Supports(definition.Id)||DeathStrandingChipReader.Supports(definition.Id)||DeathStrandingInterviewReader.Supports(definition.Id)||DeathStrandingInterviewCatalogueReader.Supports(definition)||DeathStrandingRoadReader.Supports(definition));
+        public string Coverage(AchievementTrackerDefinition definition)=>definition?.Id==CompanionCubesId
+            ?"Tracks completed cube turn-ins and the final incineration using received confirmation emails. Unread confirmations count."
+            :definition?.Id==PixelVault.Tracking.CenturyCargoGoal.TrackerId
             ?"Reads the cumulative delivered cargo weight in whole kilograms from the validated saved statistic table."
             :definition?.Id==DeathStrandingFacilityReader.TrackerId
             ?"Reads the saved whole-star connection level for all 36 Best Beloved facilities."
@@ -37,7 +66,7 @@ namespace PixelVaultNative
             :DeathStrandingOrderReader.Supports(definition?.Id)
             ?definition.Id == PixelVault.Tracking.CenturyLegendsCatalogue.TrackerId
                 ?"Reads a Legend or higher evaluation for every one of the 540 standard orders."
-                :"Reads all 540 standard orders directly from a validated save copy. LL and LLL are independent earned ranks."
+                :"Counts unique LL-or-LLL premium deliveries, capped at 20 in each of the four achievement categories."
             :DeathStrandingInterviewReader.Supports(definition?.Id)
             ?"Reads the game's interview achievement counter from a complete validated statistic table. Individual interview read states are not inferred."
             :DeathStrandingInterviewCatalogueReader.Supports(definition)
@@ -95,8 +124,16 @@ namespace PixelVaultNative
                 throw new NotSupportedException("This Death Stranding checklist does not match a supported save catalogue.");
             if (definition.Id == PixelVault.Tracking.CenturyLegendsCatalogue.TrackerId && !PixelVault.Tracking.CenturyLegendsCatalogue.Matches(definition))
                 throw new NotSupportedException("The LLL source requires all 540 original standard orders with one LLL requirement per order.");
+            if (definition.Id == AchievementTrackingCatalog.DeathStrandingOrdersId && (!definition.SumItemTargets || definition.Items.Any(i => i.Target != 20) || definition.Milestones.Count != 0 || definition.CategoryTargets.Count != 0))
+                throw new NotSupportedException("The premium achievement requires four category counters with a goal of 20 each.");
             bool roads = DeathStrandingRoadReader.Supports(definition);
-            var reference = definition.Id==DeathStrandingMailReader.TrackerId ? DeathStrandingMailReader.Definition() : DeathStrandingMailCatalogueReader.Supports(definition) ? DeathStrandingMailCatalogueReader.Definition() : roads || definition.Id == DeathStrandingFacilityReader.TrackerId ? definition : DeathStrandingInterviewCatalogueReader.Supports(definition) ? DeathStrandingInterviewCatalogueReader.Definition()
+            if (definition.Id == CompanionCubesId && (definition.Items.Count != CubeConfirmationMailIds.Length
+                || definition.Milestones.Count != 0 || definition.CategoryTargets.Count != 0
+                || definition.Items.Any(item => item.Target != 1 || item.Archived || item.ExcludedFromTotal)
+                || !definition.Items.Select(item => item.Id).ToHashSet(StringComparer.Ordinal)
+                    .SetEquals(Enumerable.Range(1, CubeConfirmationMailIds.Length).Select(n => "cube-" + n))))
+                throw new NotSupportedException("The Companion Cube source requires all six original checklist entries.");
+            var reference = definition.Id==DeathStrandingMailReader.TrackerId ? DeathStrandingMailReader.Definition() : DeathStrandingMailCatalogueReader.Supports(definition) ? DeathStrandingMailCatalogueReader.Definition() : roads || definition.Id == CompanionCubesId || definition.Id == DeathStrandingFacilityReader.TrackerId ? definition : DeathStrandingInterviewCatalogueReader.Supports(definition) ? DeathStrandingInterviewCatalogueReader.Definition()
                 : DeathStrandingInterviewReader.Supports(definition.Id) ? DeathStrandingInterviewReader.Definition() : AchievementTrackingCatalog.Builtins().Single(d => d.Id == definition.Id);
             if (definition.Items.Count != reference.Items.Count || !definition.Items.Select(i => i.Id).ToHashSet(StringComparer.Ordinal).SetEquals(reference.Items.Select(i => i.Id)))
                 throw new NotSupportedException("The save source needs the complete bundled milestone catalogue.");
@@ -186,7 +223,7 @@ namespace PixelVaultNative
                         var read = await ReadStableAsync(candidate.FullName, deadline.Token).ConfigureAwait(false);
                         var digest = Convert.ToHexString(SHA256.HashData(read.Bytes));
                         bool roads = DeathStrandingRoadReader.Supports(definition);
-                        var request = new DeathStrandingReadRequest { TrackerId = roads ? DeathStrandingRoadReader.TrackerId : definition.Id, Account = binding.Account, GameDirectory = binding.GameDirectory, ObservedUtc = read.Ticks,
+                        var request = new DeathStrandingReadRequest { TrackerId = definition.Id == CompanionCubesId ? DeathStrandingMailCatalogueReader.TrackerId : roads ? DeathStrandingRoadReader.TrackerId : definition.Id, Account = binding.Account, GameDirectory = binding.GameDirectory, ObservedUtc = read.Ticks,
                             SourceName = Path.GetRelativePath(root, candidate.FullName), SkippedNewer = skipped, AnalyzeAll = true };
                         var key = AnalysisKey(storageRoot, workerPath, binding.GameDirectory, binding.Account, digest, dllHash);
                         var serialized = await analysisCache.GetAsync(key, async ct =>
@@ -225,7 +262,7 @@ namespace PixelVaultNative
             catch (OperationCanceledException) when (!token.IsCancellationRequested) { throw new TimeoutException("The save read timed out. Saved tracker progress was preserved."); }
         }
         internal static string AnalysisKey(string storage, string worker, string game, string account, string fingerprint, string dllHash)
-            => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes("death-stranding-dc.analysis-v7\n"
+            => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes("death-stranding-dc.analysis-v8\n"
                 + Path.GetFullPath(storage).ToUpperInvariant() + "\n" + Path.GetFullPath(worker).ToUpperInvariant() + "\n"
                 + Path.GetFullPath(game).ToUpperInvariant() + "\n" + account + "\n" + fingerprint + "\n" + dllHash)));
         static void ThrowReaderError(string code, string message)
@@ -240,6 +277,7 @@ namespace PixelVaultNative
             var expectedCounts = AchievementTrackingCatalog.Builtins().Where(d => d.Id == AchievementTrackingCatalog.DeathStrandingId
                 || DeathStrandingWorldReader.Supports(d.Id) || DeathStrandingOrderReader.Supports(d.Id) || DeathStrandingChipReader.Supports(d.Id) || PixelVault.Tracking.CenturyCargoGoal.Matches(d))
                 .Append(DeathStrandingMailCatalogueReader.Definition()).Append(DeathStrandingMailReader.Definition()).Append(DeathStrandingInterviewReader.Definition()).Append(DeathStrandingInterviewCatalogueReader.Definition()).Append(DeathStrandingRoadReader.Definition()).ToDictionary(d => d.Id, d => d.Items.Count, StringComparer.Ordinal);
+            expectedCounts.Add(CompanionCubesId, CubeConfirmationMailIds.Length);
             expectedCounts.Add(DeathStrandingFacilityReader.TrackerId, DeathStrandingFacilityReader.FacilityCount);
             if (result.Version != 1 || result.Fingerprint != fingerprint || result.GameDllSha256 != dllHash || result.Projections == null
                 || !expectedCounts.Keys.ToHashSet(StringComparer.Ordinal).SetEquals(result.Projections.Keys))

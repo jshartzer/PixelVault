@@ -10,9 +10,10 @@ namespace PixelVaultNative.Tests;
 public sealed class DeathStrandingInterviewReaderTests
 {
     const int Start = 25;
-    internal static byte[] Payload(int value = 67, int optional = 2, bool statistic41 = false)
+    internal static byte[] Payload(int value = 67, int optional = 2, bool statistic41 = false, bool lateGame = false)
     {
-        var rows = DeathStrandingInterviewReader.References().Where(r => (statistic41 || r.Key != 41) && (optional == 2 || r.Key != 8 && (optional == 1 || r.Key != 7))).OrderBy(r => r.Key).ToList();
+        var rows = DeathStrandingInterviewReader.References().Where(r => (lateGame || r.Key is not (9 or 10 or 11 or 12 or 13 or 14 or 15 or 35 or 51))
+            && (statistic41 || r.Key != 41) && (optional == 2 || r.Key != 8 && (optional == 1 || r.Key != 7))).OrderBy(r => r.Key).ToList();
         var data = new byte[Start + rows.Count * 13 + 7];Convert.FromHexString("879ca01f131c7ece01").CopyTo(data, Start - 10);data[Start - 1] = (byte)rows.Count;
         for (int i = 0; i < rows.Count; i++)
         {
@@ -37,7 +38,7 @@ public sealed class DeathStrandingInterviewReaderTests
         switch (mutation)
         {
             case "prefix": data[Start - 10]++;break;
-            case "count": data[Start - 1] = 51;break;
+            case "count": data[Start - 1] = byte.MaxValue;break;
             case "missing": BinaryPrimitives.WriteUInt32LittleEndian(data.AsSpan(row), 99);break;
             case "duplicate": data.AsSpan(Start, 4).CopyTo(data.AsSpan(row));break;
             case "type": data[row + 4] = 5;break;
@@ -58,6 +59,44 @@ public sealed class DeathStrandingInterviewReaderTests
         data[row + 4] = 2; Assert.Throws<NotSupportedException>(() => Read(data));
         data[row + 4] = 1; BinaryPrimitives.WriteUInt64LittleEndian(data.AsSpan(row + 5), 2);
         Assert.Throws<NotSupportedException>(() => Read(data));
+    }
+    [Theory]
+    [InlineData(9u)][InlineData(10u)][InlineData(11u)][InlineData(12u)][InlineData(13u)]
+    [InlineData(14u)][InlineData(15u)][InlineData(35u)][InlineData(51u)]
+    public void LateGameBooleanIdentitiesAreOptionalAndStrictlyValidated(uint id)
+    {
+        var data = Payload(100, 2, true, true);
+        Assert.Equal(59, data[Start - 1]);Assert.Equal(100, Read(data).Items.Single().Current);
+        int row = Enumerable.Range(0, data[Start - 1]).Select(i => Start + i * 13)
+            .Single(p => BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(p)) == id);
+        BinaryPrimitives.WriteUInt64LittleEndian(data.AsSpan(row + 5), 1);Assert.Equal(100, DeathStrandingInterviewReader.ReadCount(data));
+        BinaryPrimitives.WriteUInt64LittleEndian(data.AsSpan(row + 5), 2);Assert.Throws<NotSupportedException>(() => Read(data));
+        BinaryPrimitives.WriteUInt64LittleEndian(data.AsSpan(row + 5), 0);data[row + 4] = 2;Assert.Throws<NotSupportedException>(() => Read(data));
+        data[row + 4] = 1;BinaryPrimitives.WriteUInt32LittleEndian(data.AsSpan(row), 256);Assert.Throws<NotSupportedException>(() => Read(data));
+        data = Payload(100, 2, true, true);
+        data = data[..row].Concat(data[(row + 13)..]).ToArray();data[Start - 1]--;
+        Assert.Equal(100, DeathStrandingInterviewReader.ReadCount(data));
+    }
+    [Theory]
+    [InlineData(25u, 1, 0ul, true)]
+    [InlineData(27u, 1, 1ul, true)]
+    [InlineData(63u, 1, 1ul, true)]
+    [InlineData(25u, 2, 0ul, false)]
+    [InlineData(25u, 1, 2ul, false)]
+    [InlineData(39u, 1, 1ul, false)]
+    [InlineData(0u, 1, 1ul, false)]
+    [InlineData(256u, 1, 1ul, false)]
+    public void AdditionalFlagsDoNotRequireAReaderUpdate(uint id, byte type, ulong value, bool accepted)
+    {
+        var data = Payload(100, 2, true, true);
+        int offset = Start + data[Start - 1] * 13;
+        Array.Resize(ref data, data.Length + 13);
+        data[Start - 1]++;
+        BinaryPrimitives.WriteUInt32LittleEndian(data.AsSpan(offset), id);
+        data[offset + 4] = type;
+        BinaryPrimitives.WriteUInt64LittleEndian(data.AsSpan(offset + 5), value);
+        if (accepted) Assert.Equal(100, DeathStrandingInterviewReader.ReadCount(data));
+        else Assert.Throws<NotSupportedException>(() => Read(data));
     }
     [Fact]
     public void CounterObservationPreservesManualCountNotesAndOtherAccounts()

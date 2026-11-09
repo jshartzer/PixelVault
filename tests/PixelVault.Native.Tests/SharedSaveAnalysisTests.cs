@@ -36,7 +36,7 @@ public sealed class SharedSaveAnalysisTests
         var request = new DeathStrandingReadRequest { Account = Account, ObservedUtc = DateTime.UtcNow.Ticks, SourceName = "manualsave1/checkpoint.dat" };
         var result = DeathStrandingSaveWorker.Analyze(Payload(), request, "save-hash", "dll-hash");
         DeathStrandingTrackerSource.ValidateAnalysis(result, Account, "save-hash", "dll-hash");
-        Assert.Equal(13, result.Projections.Count);
+        Assert.Equal(14, result.Projections.Count);
         Assert.All(result.Projections[AchievementTrackingCatalog.DeathStrandingId].Snapshot.Items, item => Assert.Equal(1, item.Current));
         Assert.Equal(67, Assert.Single(result.Projections[DeathStrandingInterviewReader.TrackerId].Snapshot.Items).Current);
         Assert.Equal("UnsupportedFormat", result.Projections[AchievementTrackingCatalog.DeathStrandingOrdersId].ErrorCode);

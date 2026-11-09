@@ -13,6 +13,7 @@ namespace PixelVaultNative
         internal const string TrackerId = "death-stranding-dc.the-past-guides-the-present";
         internal const string ItemId = "interviews-read";
         internal const int CatalogueCount = 158, Stride = 13;
+        internal static bool OptionalStatistic(uint id) => id is 7 or 8 or 9 or 10 or 11 or 12 or 13 or 14 or 15 or 35 or 41 or 51;
         internal static bool Supports(string id) => id == TrackerId;
         internal static AchievementTrackerDefinition Definition() => new()
         {
@@ -27,7 +28,8 @@ namespace PixelVaultNative
         {
             using var stream = typeof(DeathStrandingInterviewReader).Assembly.GetManifestResourceStream("PixelVault.Tracking.DeathStrandingAchievementCounters.json");
             var refs = JsonSerializer.Deserialize<Dictionary<uint, byte>>(stream);
-            if (refs?.Count != 50 || refs.GetValueOrDefault(39u) != 2 || refs.GetValueOrDefault(41u) != 1 || refs.Values.Any(t => t is not (1 or 2)))
+            if (refs?.Count != 59 || refs.GetValueOrDefault(39u) != 2 || refs.Count(r => OptionalStatistic(r.Key)) != 12
+                || refs.Any(r => OptionalStatistic(r.Key) && r.Value != 1) || refs.Values.Any(t => t is not (1 or 2)))
                 throw new InvalidDataException("The achievement-statistic reference is incomplete.");
             return refs;
         }
@@ -35,7 +37,7 @@ namespace PixelVaultNative
         {
             int count = ReadCount(data);
             return new() { TrackerId = TrackerId, Provider = "steam", GameId = "1850570", Account = account, ObservedUtcTicks = observed, Source = source,
-                Evidence = evidence + " Interview reader v2: complete 47–50-entry typed achievement-statistic table validated, including all required identities and bounded statistic 39. Optional boolean statistics 7, 8 and 41 are validated when present. Per-title state is handled by the separate catalogue reader.",
+                Evidence = evidence + " Interview reader v4: all required typed identities and bounded statistic 39 validated. Additional boolean flags are validated and ignored. The official counter can stop at 100; per-title state is handled by the separate catalogue reader.",
                 Items = new() { new() { ItemId = ItemId, Current = count, Availability = TrackerAvailability.Unknown } } };
         }
         internal static int ReadCount(byte[] data) => ReadStatistic(data,39,CatalogueCount);
@@ -51,16 +53,19 @@ namespace PixelVaultNative
                 int start = search + relative + prefix.Length;search = start;
                 if (++candidates > 128) throw new NotSupportedException("Too many achievement-statistic candidates.");
                 if (start >= data.Length) continue;int count = data[start++];
-                if (count < 47 || count > 50 || start > data.Length - count * Stride) continue;
+                if (count < 47 || start > data.Length - count * Stride) continue;
                 var seen = new HashSet<uint>();bool valid = true;ulong read = ulong.MaxValue;
                 for (int i = 0; i < count; i++)
                 {
                     var row = data.AsSpan(start + i * Stride, Stride);uint id = BinaryPrimitives.ReadUInt32LittleEndian(row);byte type = row[4];ulong value = BinaryPrimitives.ReadUInt64LittleEndian(row.Slice(5));
-                    if (!reference.TryGetValue(id, out var expected) || type != expected || !seen.Add(id) || (type == 1 && value > 1)) { valid = false;break; }
-                    if (id == statistic) read = value;
+                    bool known = reference.TryGetValue(id, out var expected);
+                    // Game progress can add flags. Extra bounded boolean IDs carry no counter values.
+                    bool validType = known ? type == expected : id is > 0 and <= byte.MaxValue && type == 1;
+                    if (!validType || !seen.Add(id) || (type == 1 && value > 1)) { valid = false;break; }
+                    if (known && id == statistic) read = value;
                 }
-                // These typed boolean identities appear as progress unlocks them; all other identities are required.
-                if (!valid || reference.Keys.Any(id => id is not (7 or 8 or 41) && !seen.Contains(id)) || read > (ulong)maximum) continue;
+                // All baseline identities remain mandatory, even when extra flags are present.
+                if (!valid || reference.Keys.Any(id => !OptionalStatistic(id) && !seen.Contains(id)) || read > (ulong)maximum) continue;
                 if (found.HasValue) throw new NotSupportedException("The interview achievement-counter table is ambiguous.");
                 found = (int)read;
             }

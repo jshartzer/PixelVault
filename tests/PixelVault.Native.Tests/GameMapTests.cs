@@ -115,7 +115,7 @@ public sealed class GameMapTests : IDisposable
     }
     [Fact] public void PinEditorDistinguishesGenericMilestonesAndKeepsUnavailableLinks() => OnSta(() =>
     {
-        var tracking = new AchievementTrackingStore(dir);var definition = tracking.Definitions().Single(d => d.Id == AchievementTrackingCatalog.DeathStrandingOrdersId);
+        var tracking = new AchievementTrackingStore(dir);var definition = AchievementTrackingCatalog.DeathStrandingOrderCatalogue();definition.Id="test.premium-rank-matrix";tracking.AddDefinition(definition);
         var marker = new GameMapMarker { Label = "An order", X = 0.5, Y = 0.5, TrackerId = definition.Id, ItemId = definition.Items[0].Id };
         var map = new GameMapDefinition { Provider = definition.Provider, GameId = definition.GameId, Title = "A map", Markers = new() { marker } };
         var editor = new GameMapPinWindow(null!, tracking, map, marker);

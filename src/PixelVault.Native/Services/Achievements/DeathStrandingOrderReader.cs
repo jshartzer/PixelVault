@@ -26,9 +26,16 @@ namespace PixelVaultNative
         internal static AchievementTrackerSnapshot Read(byte[] data, string account, long observed, string source, string evidence,
             out AchievementTrackerSnapshot legends)
         {
+            var ranks = ReadCatalogue(data, account, observed, source, evidence, out legends);
+            return PixelVault.Tracking.DeathStrandingPremiumGoal.Project(AchievementTrackingCatalog.DeathStrandingOrderCatalogue(), ranks);
+        }
+
+        internal static AchievementTrackerSnapshot ReadCatalogue(byte[] data, string account, long observed, string source, string evidence,
+            out AchievementTrackerSnapshot legends)
+        {
             if (data == null || data.Length < 3 + RecordCount * Stride || data.Length > DeathStrandingSaveReader.MaxPayload)
                 throw new NotSupportedException("The save does not contain the supported premium-order table.");
-            var definition = AchievementTrackingCatalog.Builtins().Single(d => d.Id == AchievementTrackingCatalog.DeathStrandingOrdersId);
+            var definition = AchievementTrackingCatalog.DeathStrandingOrderCatalogue();
             var targets = definition.Items.GroupBy(i => i.GroupId).ToDictionary(g => ulong.Parse(g.Key, CultureInfo.InvariantCulture), g => g.ToList());
             if (targets.Count != 540 || definition.Items.Count != 1080 || targets.Any(p => p.Key == 0 || p.Value.Count != 2
                 || !p.Value.Select(i => i.Milestone).ToHashSet().SetEquals(new[] { "LL", "LLL" })

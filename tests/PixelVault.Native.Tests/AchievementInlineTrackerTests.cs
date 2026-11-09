@@ -155,18 +155,15 @@ public sealed class AchievementInlineTrackerTests : IDisposable
         });
     }
     [Fact]
-    public void NativeOrderRanksUseIndependentSmallBoxesAndVirtualizeTheLongList()
+    public void NativePremiumGoalShowsFourCategoryCountersAndAchievementTotal()
     {
         OnSta(()=>{
             const string id=AchievementTrackingCatalog.DeathStrandingOrdersId;var store=Store();var native=new Native{Completed=1};Observe(NativeService(store,native,id),id);
             var control=new AchievementInlineTrackers();control.Bind(store,"steam","1850570","019",Account);((Expander)control.Children[0]).IsExpanded=true;Layout(control,650);
             Assert.Contains("1 / 80",((TextBlock)((Expander)control.Children[0]).Header).Text);
-            var list=Descendants(control).OfType<ListBox>().Single();Assert.Equal(540,list.Items.Count);
-            var boxes=Descendants(control).OfType<CheckBox>().ToList();Assert.InRange(boxes.Count,2,100);
-            var done=boxes.Single(box=>box.IsChecked==true);Assert.Equal("LL",done.Content);Assert.False(done.IsEnabled);
-            Assert.Contains(boxes,box=>Equals(box.Content,"LLL")&&box.IsEnabled);Assert.All(boxes,box=>Assert.True(box.FontSize<=12.5));
-            var ll=store.Load(id,Account).First();Assert.Throws<InvalidOperationException>(()=>store.SetInlineCompletion(id,Account,ll.Item.Id,false));
-            Render(new Window{Content=control},"achievement-inline-order-ranks",650,430);
+            var list=Descendants(control).OfType<ListBox>().Single();Assert.Equal(4,list.Items.Count);
+            Assert.All(store.Load(id,Account),s=>Assert.Equal(20,s.Item.Target));
+            Render(new Window{Content=control},"achievement-inline-premium-goal",650,430);
         });
     }
     [Fact]

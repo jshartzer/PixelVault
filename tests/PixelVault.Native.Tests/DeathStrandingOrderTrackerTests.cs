@@ -16,9 +16,9 @@ namespace PixelVaultNative.Tests;
 public sealed class DeathStrandingOrderTrackerTests : IDisposable
 {
     readonly string dir = Path.Combine(Path.GetTempPath(), "PV-OrderTracker-" + Guid.NewGuid().ToString("N"));
-    const string Id = AchievementTrackingCatalog.DeathStrandingOrdersId;
-    AchievementTrackingStore Store() => new(dir);
-    static AchievementTrackerDefinition Definition() => AchievementTrackingCatalog.Builtins().Single(d => d.Id == Id);
+    const string Id = "test.premium-rank-matrix";
+    AchievementTrackingStore Store() { var store=new AchievementTrackingStore(dir);if(!store.Definitions().Any(d=>d.Id==Id))store.AddDefinition(Definition());return store; }
+    static AchievementTrackerDefinition Definition() { var d=AchievementTrackingCatalog.DeathStrandingOrderCatalogue();d.Id=Id;d.GameId="matrix-fixture";return d; }
     static T Field<T>(object o, string name) => (T)o.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(o)!;
     static void Pump(Task task)
     {
@@ -37,7 +37,7 @@ public sealed class DeathStrandingOrderTrackerTests : IDisposable
     public void CatalogueCovers540OrdersWithIndependentRanksAndExtractedCategories()
     {
         var d = Definition(); AchievementTrackingCatalog.Validate(d);
-        Assert.Equal("019", d.AchievementId); Assert.Equal("1850570", d.GameId);
+        Assert.Equal("019", d.AchievementId); Assert.Equal("matrix-fixture", d.GameId);
         Assert.Equal(new[] { "LL", "LLL" }, d.Milestones); Assert.Equal(1080, d.Items.Count);
         Assert.Equal(540, d.Items.Select(i => i.GroupId).Distinct().Count()); Assert.Equal(80, d.CategoryTargets.Values.Sum());
         Assert.All(d.Items.GroupBy(i => i.GroupId), g => { Assert.Equal(2, g.Count()); Assert.Equal(g.Key, g.First().Identifiers["MissionId"]); });
@@ -52,7 +52,7 @@ public sealed class DeathStrandingOrderTrackerTests : IDisposable
     public void LllImportLeavesLlUnknownAndManualBothRanksQualifyOnlyOnceWithUndo()
     {
         var store = Store(); var d = Definition(); var lll = d.Items.Single(i => i.Id == "212002:LLL");
-        var snapshot = new AchievementTrackerSnapshot { TrackerId = Id, Provider = "steam", GameId = "1850570", Account = "player", Source = "Controlled LLL snapshot", ObservedUtcTicks = DateTime.UtcNow.Ticks,
+        var snapshot = new AchievementTrackerSnapshot { TrackerId = Id, Provider = "steam", GameId = "matrix-fixture", Account = "player", Source = "Controlled LLL snapshot", ObservedUtcTicks = DateTime.UtcNow.Ticks,
             Items = new() { new() { ItemId = lll.Id, Current = 1 } } };
         var json = JsonSerializer.Serialize(snapshot); Assert.Equal(1, store.Import(json, "player")); Assert.Equal(0, store.Import(json, "player"));
         var rows = store.Load(Id, "player"); Assert.Null(rows.Single(s => s.Item.Id == "212002:LL").Current);
@@ -83,7 +83,7 @@ public sealed class DeathStrandingOrderTrackerTests : IDisposable
             SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(Dispatcher.CurrentDispatcher));
             var store = Store(); var d = Definition(); var orders = new[] {176,181,182,184,199,210,211,212,220,230,248,250,253,331,388,391,392,405,406,408,409,410,416,422,424,432,435,439,447,453,468,469,473,479,490,491,493,499,508,605};
             foreach (var item in d.Items.Where(i => i.Milestone == "LLL" && orders.Contains(int.Parse(i.Identifiers["OrderNumber"])))) store.SetManualProgress(Id, "player", item.Id, 1);
-            var window = new AchievementTrackerWindow(null!, store, "player", "", provider: "steam", gameId: "1850570", achievementId: "019");
+            var window = new AchievementTrackerWindow(null!, store, "player", "", provider: "steam", gameId: "matrix-fixture", achievementId: "019");
             try
             {
                 Pump(window.LoadDefinitionsAsync()); Assert.Single(Field<ComboBox>(window, "trackers").Items);

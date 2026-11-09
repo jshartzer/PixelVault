@@ -1,3 +1,15 @@
+## November 7, 2026: late-game reader compatibility
+
+Live recovery verified in Native 0.128.006 / Companion 0.52.1: all five affected trackers completed automatic background refresh without errors or pending review. Official interviews: 100; interview catalogue: 108 read; mail counter and catalogue: 188 read; delivered cargo: 21,333 kg. All 43 automatic settings, source bindings, tracker definitions/links, manual values and notes were verified preserved. Main shortcut, current junction and App Testing use the new native executable; the service reader path was the only service-setting change. Evidence: `artifacts/ds-reader-fix-20261108/live-verification.json`.
+
+The latest checksum-verified save exposed three independent assumptions. The typed achievement table grows beyond 50 entries as known achievement identities appear. Sixty-nine read-only copied saves contain 51–59 records; new IDs 9–15, 35 and 51 are type-1 booleans, supplementing the earlier optional IDs 7, 8 and 41. The 47 previously required IDs remain present. Reader v3 accepts only these 59 known identities and exact types, requires all 47 core entries, and retains duplicate, boolean, count, value, truncation, candidate and ambiguity checks.
+
+The initial payload field at byte 5 changes through observed values 80–160 in increments of ten. Values through 120 use one byte; 130–160 use compact marker 0x81 plus a little-endian Int16. All fixed header/suffix bytes remain identical. The ordered interview flags therefore begin at 0x260 or 0x262. Catalogue v2 validates the supported values, canonical encoding width and fixed bytes before selecting the offset; it does not scan arbitrary candidate flag arrays. All nine empty catalogue slots must remain zero, and only states 0x00, 0x0B and 0x0D are interpreted.
+
+The copied progression includes 80, 82, 96 and 99 reads matching statistic 39 exactly, followed by 103 and 108 per-title reads while statistic 39 remains 100. Counter agreement now accepts equality, or specifically a counter of 100 with more than 100 read titles. A smaller counter or fewer than 100 title reads still rejects disagreement. The original official 100-interview goal and separate 149-title catalogue retain their identities and meaning.
+
+Private evidence: `C:/Codex/artifacts/ds-reader-fix-20261108` (69 copied inputs/payloads, decode hashes and test results), plus prior named reading controls under the existing private Reference directory. Game saves are never edited. Synthetic regression cases cover each optional new ID, strict typing/boolean values/unknown IDs, every supported header width/value, malformed signatures, and stopped-counter agreement. Private integration reads all five affected trackers across all 69 recent copies and the earlier interview control corpus.
+
 # Death Stranding interview achievement tracker
 
 ## October 29: production integration and deployment

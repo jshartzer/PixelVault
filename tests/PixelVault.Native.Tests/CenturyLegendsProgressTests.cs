@@ -41,8 +41,8 @@ public sealed class CenturyLegendsProgressTests : IDisposable
         var actual=store.Definitions().Single(d=>d.Id==definition.Id);
         Assert.True(CenturyLegendsCatalogue.Matches(actual));Assert.Equal(CenturyAchievementCatalog.DeathStrandingLegendsId,actual.AchievementId);
         var official=store.Definitions().Single(d=>d.Id==AchievementTrackingCatalog.DeathStrandingOrdersId);
-        Assert.Equal("019",official.AchievementId);Assert.Equal(new[]{"LL","LLL"},official.Milestones);
-        Assert.Equal(1080,official.Items.Count);Assert.All(official.CategoryTargets.Values,target=>Assert.Equal(20,target));
+        Assert.Equal("019",official.AchievementId);Assert.Empty(official.Milestones);
+        Assert.Equal(4,official.Items.Count);Assert.All(official.Items,item=>Assert.Equal(20,item.Target));
         Assert.Equal(540,actual.Items.Count);Assert.DoesNotContain(actual.Items,i=>i.Id.EndsWith(":LL"));
         Assert.All(store.Load(actual.Id,Account),i=>Assert.Null(i.Current));Assert.Null(Progress);
     }

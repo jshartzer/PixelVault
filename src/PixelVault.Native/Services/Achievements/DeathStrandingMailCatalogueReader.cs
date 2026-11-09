@@ -65,7 +65,7 @@ namespace PixelVaultNative
             }
             return found ?? throw Unsupported();
         }
-        internal static AchievementTrackerSnapshot Read(byte[] data, string account, long observed, string source, string evidence)
+        internal static AchievementTrackerSnapshot Read(byte[] data, string account, long observed, string source, string evidence, bool verifyOpenedTotal = true)
         {
             if (data == null || data.Length < 16 || data.Length > DeathStrandingSaveReader.MaxPayload) throw Unsupported();
             int directory = BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(data.Length - 8, 4));
@@ -96,9 +96,10 @@ namespace PixelVaultNative
                 result.Items.Add(new AchievementTrackerProgress { ItemId = mail.Id, Current = opened ? 1 : 0,
                     Availability = state == 2 ? TrackerAvailability.Available : TrackerAvailability.Locked });
             }
-            if (read != DeathStrandingInterviewReader.ReadStatistic(data, 38, 240)) throw Unsupported();
+            if (verifyOpenedTotal && read != DeathStrandingInterviewReader.ReadStatistic(data, 38, 240)) throw Unsupported();
             result.Items.Add(new AchievementTrackerProgress { ItemId = reference.UnmappedId, Current = null, Availability = TrackerAvailability.Unknown });
-            result.Evidence = evidence + " Mail catalogue v1: bounded directory markers, supported 512-record layout, installed resource indices, duplicate empty aliases, meaningful flags and complete statistic 38 validated. "
+            result.Evidence = evidence + " Mail catalogue v1: bounded directory markers, supported 512-record layout, installed resource indices, duplicate empty aliases, meaningful flags validated. "
+                + (verifyOpenedTotal ? "Complete statistic 38 validated. " : "")
                 + received + " received; " + read + " opened. Notification markers do not establish reading. One catalogue title absent from the runtime resource order remains unknown.";
             return result;
         }
