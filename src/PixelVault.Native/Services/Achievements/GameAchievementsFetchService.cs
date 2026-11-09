@@ -641,7 +641,7 @@ namespace PixelVaultNative
                                 Title = title.Trim(),
                                 Description = desc.Trim(),
                                 Meta = string.Join(" · ", metaParts.Where(s => !string.IsNullOrWhiteSpace(s))),
-                                SortKey = 0,
+                                SortKey = rows.Count,
                                 ProgressKnown = progressKnown,
                                 Unlocked = unlocked,
                                 UnlockUtcTicks = unlockTicks,
@@ -724,20 +724,17 @@ namespace PixelVaultNative
                 ? value : (double?)null;
         }
 
-        static List<AchievementRow> OrderAchievementRows(List<AchievementRow> rows)
+        internal static List<AchievementRow> OrderAchievementRows(List<AchievementRow> rows)
         {
             if (rows == null || rows.Count == 0) return rows ?? new List<AchievementRow>();
             var unlocked = rows.Where(r => r.ProgressKnown && r.Unlocked)
-                .OrderByDescending(r => r.UnlockUtcTicks)
-                .ThenBy(r => r.Title, StringComparer.OrdinalIgnoreCase)
+                .OrderBy(r => r.SortKey)
                 .ToList();
             var locked = rows.Where(r => r.ProgressKnown && !r.Unlocked)
                 .OrderBy(r => r.SortKey)
-                .ThenBy(r => r.Title, StringComparer.OrdinalIgnoreCase)
                 .ToList();
             var unknown = rows.Where(r => !r.ProgressKnown)
                 .OrderBy(r => r.SortKey)
-                .ThenBy(r => r.Title, StringComparer.OrdinalIgnoreCase)
                 .ToList();
             var all = new List<AchievementRow>(rows.Count);
             all.AddRange(unlocked);

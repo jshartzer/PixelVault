@@ -96,7 +96,7 @@ namespace PixelVaultNative
                     ? ordered.ThenByDescending(row => ValidUnlock(row, nowUtcTicks) ? row.UnlockUtcTicks : 0)
                     : ordered.ThenBy(row => ValidUnlock(row, nowUtcTicks) ? row.UnlockUtcTicks : 0)).ToList();
             }
-            return all.ToList();
+            return all.OrderBy(row => row.SortKey).ToList();
         }
     }
 }

@@ -96,10 +96,13 @@ public static class LocalAchievementReader
         foreach(var key in definitions.Keys.Union(snapshots.Keys).Order())
         {
             var parts=key.Split(':',2);var provider=parts[0];var game=parts[1];var saved=definitions.GetValueOrDefault(key)??new();var live=snapshots.GetValueOrDefault(key);
+            // Old Steam snapshots stored zero for every row. Prefer refreshed provider
+            // positions once available, without replacing a saved order with those zeros.
+            var hasProviderOrder=live.Rows?.Values.Any(row=>L(row,"SortKey")!=0)==true;
             if(live.Rows is not null)foreach(var pair in live.Rows)
             {
                 var row=pair.Value;var old=saved.GetValueOrDefault(pair.Key);var known=B(row,"ProgressKnown");
-                saved[pair.Key]=new(pair.Key,old?.Title??S(row,"Title"),old?.Description??S(row,"Description"),old?.Order??(int)L(row,"SortKey"),old?.Hidden??B(row,"Hidden"),known,known&&B(row,"Unlocked"),L(row,"UnlockUtcTicks"),N(row,"GlobalUnlockPercent"),N(row,"CounterCurrent"),N(row,"CounterTarget"),S(row,"IconUrlColor") is var icon&&icon.Length>0?icon:old?.Icon??"",old?.Guide??"",old?.SourceUrl??"",old?.SourceTitle??"",old?.Tags??"",old?.Missable??B(row,"IsMissable"),old?.Groups??Groups(S(row,"GroupName"),S(row,"DlcName"),(int)L(row,"GroupSortOrder")),S(row,"IconUrlGray"));
+                saved[pair.Key]=new(pair.Key,old?.Title??S(row,"Title"),old?.Description??S(row,"Description"),hasProviderOrder?(int)L(row,"SortKey"):old?.Order??(int)L(row,"SortKey"),old?.Hidden??B(row,"Hidden"),known,known&&B(row,"Unlocked"),L(row,"UnlockUtcTicks"),N(row,"GlobalUnlockPercent"),N(row,"CounterCurrent"),N(row,"CounterTarget"),S(row,"IconUrlColor") is var icon&&icon.Length>0?icon:old?.Icon??"",old?.Guide??"",old?.SourceUrl??"",old?.SourceTitle??"",old?.Tags??"",old?.Missable??B(row,"IsMissable"),old?.Groups??Groups(S(row,"GroupName"),S(row,"DlcName"),(int)L(row,"GroupSortOrder")),S(row,"IconUrlGray"));
             }
             if(saved.Count>0)results.Add(new(workspace,provider,game,accounts[provider],DateTime.UtcNow.Ticks,live.Updated,saved.Values.OrderBy(r=>r.Order).ToArray(),categories.Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),order,dlcs.GetValueOrDefault(key)??[]));
         }

@@ -1,5 +1,13 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');const a=require('../src/PixelVault.Companion/wwwroot/achievements.js');
 const row=(id,category,dlc,known=true,earned=false)=>({id,title:id,description:'',tags:'',order:0,progressKnown:known,unlocked:earned,groups:{category,dlc,sortOrder:0}});
+test('original order survives category and completion grouping without alphabetic or group-order sorting',()=>{
+  const rows=[{...row('Alpha','Story',''),order:3},{...row('Zulu','Story',''),order:0,groups:{category:'Story',dlc:'',sortOrder:9}},{...row('Beta','Story','',true,true),order:2},{...row('Yankee','Story','',true,true),order:1}];
+  const group=a.completionSections(rows)[0].groups[0];
+  assert.deepEqual(group.phases.map(p=>p.rows.map(r=>r.id)),[['Zulu','Alpha'],['Yankee','Beta']]);
+  assert.deepEqual(a.organize(rows,'','all','title')[0].groups[0].rows.map(r=>r.id),['Alpha','Beta','Yankee','Zulu']);
+  const tied=[row('Zulu','Story',''),row('Alpha','Story','')];
+  assert.deepEqual(a.organize(tied)[0].groups[0].rows.map(r=>r.id),['Zulu','Alpha']);
+});
 
 test('Century definitions show requirements without connection or implementation details',()=>{
   const century={planned:5,status:'Awaiting save connection',definitions:[{id:'century.roads',provider:'steam',gameId:'1850570',points:100,title:'All Roads Lead Home',description:'Rebuild every road section.',category:'Infrastructure',requirement:'Mountain routes and online contributions count.'}]};

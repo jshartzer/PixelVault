@@ -12,6 +12,27 @@ public sealed class AchievementCollectionStatsTests
     static readonly long Now = Day.AddDays(6).Ticks;
 
     [Fact]
+    public void OriginalOrder_SurvivesFetchGroupingAndCachedDisplayRegardlessOfTitlesAndUnlockDates()
+    {
+        var rows = new List<GameAchievementsFetchService.AchievementRow>
+        {
+            new() { Title = "Alpha", SortKey = 3, ProgressKnown = true },
+            new() { Title = "Zulu", SortKey = 0, ProgressKnown = true },
+            new() { Title = "Beta", SortKey = 2, ProgressKnown = true, Unlocked = true, UnlockUtcTicks = Now },
+            new() { Title = "Yankee", SortKey = 1, ProgressKnown = true, Unlocked = true, UnlockUtcTicks = Day.Ticks }
+        };
+        var fetched = GameAchievementsFetchService.OrderAchievementRows(rows);
+        Assert.Equal(new[] { "Yankee", "Beta", "Zulu", "Alpha" }, fetched.Select(r => r.Title));
+        var displayed = AchievementCollectionStats.Sort(fetched, AchievementCollectionSort.Provider, Now);
+        Assert.Equal(new[] { "Zulu", "Yankee", "Beta", "Alpha" }, displayed.Select(r => r.Title));
+        var sections = AchievementsInfoWindow.BuildAchievementGridSections(displayed);
+        Assert.Equal(new[] { "Zulu", "Alpha" }, sections[0].Rows.Select(r => r.Title));
+        Assert.Equal(new[] { "Yankee", "Beta" }, sections[1].Rows.Select(r => r.Title));
+        rows.ForEach(r => { r.SortKey = 0; r.ProgressKnown = false; });
+        Assert.Equal(rows, GameAchievementsFetchService.OrderAchievementRows(rows));
+    }
+
+    [Fact]
     public void Stats_UsesOnlyConfirmedEarnedProgressAndValidProviderDates()
     {
         var a = Earned("A", 1, 12); var b = Earned("B", 2, 2); var c = Earned("C", 2, null);

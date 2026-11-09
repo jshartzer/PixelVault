@@ -55,7 +55,7 @@ namespace PixelVaultNative
 
         FrameworkElement BuildSortControls()
         {
-            foreach (var label in new[] { "Provider / default", "Global unlock %: rarest first", "Global unlock %: most common first", "Unlock date: newest first", "Unlock date: oldest first", "Counter progress: highest first", "Counter progress: lowest first" })
+            foreach (var label in new[] { "Original order", "Global unlock %: rarest first", "Global unlock %: most common first", "Unlock date: newest first", "Unlock date: oldest first", "Counter progress: highest first", "Counter progress: lowest first" })
                 _sort.Items.Add(label);
             _sort.SelectedIndex = 0;
             _sort.ToolTip = "Sort within each group. Unavailable values appear last; ties retain default order.";
