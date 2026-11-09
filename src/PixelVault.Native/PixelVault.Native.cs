@@ -1232,9 +1232,20 @@ namespace PixelVaultNative
             return filenameParserService.Parse(file, string.IsNullOrWhiteSpace(root) ? libraryRoot : root);
         }
 
-        string GetGameNameFromFileName(string baseName)
+        /// <summary>Resolves a game title for sorting/organize. Pass <see cref="Path.GetFileName(string)"/> (with extension) when available so convention rules match; bare stems still work.</summary>
+        string GetGameNameFromFileName(string fileNameOrPath)
         {
-            return filenameParserService.GetGameTitleHint(baseName, libraryRoot);
+            if (string.IsNullOrWhiteSpace(fileNameOrPath)) return string.Empty;
+            var fileName = fileNameOrPath;
+            if (fileName.IndexOf('\\') >= 0 || fileName.IndexOf('/') >= 0)
+                fileName = Path.GetFileName(fileName.Trim());
+            if (string.IsNullOrWhiteSpace(fileName)) return string.Empty;
+            var parseInput = string.IsNullOrWhiteSpace(Path.GetExtension(fileName))
+                ? fileName + ".png"
+                : fileName;
+            var parsed = filenameParserService.Parse(parseInput, libraryRoot);
+            if (!string.IsNullOrWhiteSpace(parsed.GameTitleHint)) return parsed.GameTitleHint.Trim();
+            return filenameParserService.GetGameTitleHint(Path.GetFileNameWithoutExtension(parseInput), libraryRoot) ?? string.Empty;
         }
 
         string GetSafeGameFolderName(string name)
