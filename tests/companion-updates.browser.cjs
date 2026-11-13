@@ -146,11 +146,11 @@ test('completion rows stand out within game groups and only notify on the transi
       {...trackers[1],updateVersion:'v2',totals:{completed:100,total:100},updateProgress:[{id:'read',current:100}]},
       {...trackers[2],updateVersion:'v2',totals:{completed:5,total:10},updateProgress:[{id:'count',current:5}]}];
     await page.reload();await page.locator('#refresh-summary[open]').waitFor();
-    assert.deepEqual(await page.locator('#refresh-summary-list small').allTextContents(),[common.gameTitle,common.gameTitle,trackers[2].gameTitle]);
+    assert.deepEqual(await page.locator('#refresh-summary-list .update-game h4').allTextContents(),[common.gameTitle,trackers[2].gameTitle]);
     assert.deepEqual(await page.locator('#refresh-summary-list strong').allTextContents(),['The Post Guides the Present','Email catalogue','Side Ops']);
     assert.equal(await page.locator('#refresh-summary-message').innerText(),'3 trackers changed');
     assert.deepEqual(await page.locator('#refresh-summary .update-increase').allTextContents(),['+1','+4']);
-    assert.equal(await page.locator('.update-completed .update-completion-label').innerText(),'Tracker completed');
+    assert.equal(await page.locator('.update-completed .sr-only').textContent(),'Tracker completed');
     assert.equal(await page.locator('.update-completed .update-increase').count(),0);
     for(const width of [320,390,1280]){
       await page.setViewportSize({width,height:844});

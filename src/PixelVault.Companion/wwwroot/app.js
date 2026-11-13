@@ -539,9 +539,13 @@ function flushTrackerUpdateSummary(){
   $('refresh-summary').showModal();
 }
 function renderUpdateSummary(summary){
+  $('refresh-summary-list').style.setProperty('--tracker-update-count',summary.updated.length);
   $('refresh-summary-title').textContent=summary.title;$('refresh-summary-message').textContent=summary.message;
-  const trackerRows=PixelVaultUpdates.groupByGame(summary.updated,games).flatMap(group=>group.trackers.map(tracker=>renderTrackerUpdate({...tracker,gameTitle:group.title}))).join('');
-  $('refresh-summary-list').innerHTML=(trackerRows?`<section class="update-section" aria-label="Tracker updates"><div class="update-section-heading"><h3>Trackers</h3><span>${summary.updated.length} updated</span></div><ul>${trackerRows}</ul></section>`:'')
+  const trackerGroups=PixelVaultUpdates.groupByGame(summary.updated,games).map(group=>{
+    const rows=group.trackers.map(renderTrackerUpdate).join('');
+    return `<section class="update-game"><h4>${escapeHtml(group.title)}</h4><ul>${rows}</ul></section>`;
+  }).join('');
+  $('refresh-summary-list').innerHTML=(trackerGroups?`<section class="update-section" aria-label="Tracker updates"><div class="update-section-heading"><h3>Trackers</h3><span>${summary.updated.length} updated</span></div>${trackerGroups}</section>`:'')
     +(summary.achievements.length?`<section class="update-section update-achievements" aria-label="Newly unlocked achievements"><div class="update-section-heading"><h3>Achievements</h3><span class="update-unlocked-count">${summary.achievements.length} unlocked</span></div><ul>${summary.achievements.map(renderAchievementUpdate).join('')}</ul></section>`:'')
     +(summary.review.length?`<p class="hint">Needs review: ${summary.review.map(escapeHtml).join(', ')}. Your current progress is kept.</p>`:'')
     +(summary.failed.length?`<p class="hint">Could not check: ${summary.failed.map(escapeHtml).join(', ')}. Saved progress is kept.</p>`:'')
@@ -558,13 +562,13 @@ function renderAchievementUpdate(achievement){
 }
 function renderTrackerUpdate(tracker){
   const title=escapeHtml(tracker.title);
-  const game=`<small>${escapeHtml(tracker.gameTitle)}</small>`;
+
   const total=renderUpdateTotal(tracker.totals,'complete');
   if(tracker.completed){
-    return `<li class="update-completed"><span class="update-trophy" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8m-4-4v4M7 4h10v6a5 5 0 0 1-10 0V4ZM7 6H4v2a4 4 0 0 0 4 4m9-6h3v2a4 4 0 0 1-4 4"/></svg><span class="update-sparkle">✦</span></span><div><strong>${title}</strong><span class="update-completion-label">Tracker completed</span>${game}</div>${total}</li>`;
+    return `<li class="update-completed"><span class="update-trophy" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8m-4-4v4M7 4h10v6a5 5 0 0 1-10 0V4ZM7 6H4v2a4 4 0 0 0 4 4m9-6h3v2a4 4 0 0 1-4 4"/></svg><span class="update-sparkle">✦</span></span><div class="update-tracker-name"><strong>${title}</strong> ${total}<span class="sr-only">Tracker completed</span></div></li>`;
   }
   const increase=Number.isInteger(tracker.increased)?`<span class="update-increase" aria-label="Progress increased by ${tracker.increased}">+${tracker.increased}</span>`:'';
-  return `<li><span class="update-check" aria-hidden="true">✓</span><div><strong>${title}</strong>${game}</div>${increase||total?`<span class="update-metrics">${increase}${total}</span>`:''}</li>`;
+  return `<li><span class="update-check" aria-hidden="true">✓</span><div class="update-tracker-name"><strong>${title}</strong> ${total}</div>${increase}</li>`;
 }
 function acknowledgeUpdateSummary(){
   if(visibleUpdateSummary?.scope===updateScope && session?.authenticated){
