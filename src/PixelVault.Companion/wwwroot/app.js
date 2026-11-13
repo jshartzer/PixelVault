@@ -321,7 +321,17 @@ function flushTrackerUpdateSummary(){
   visibleUpdateSummary=pendingUpdateSummary;pendingUpdateSummary=undefined;summaryDismissed=false;
   const summary=visibleUpdateSummary.summary;
   $('refresh-summary-title').textContent=summary.title;$('refresh-summary-message').textContent=summary.message;
-  $('refresh-summary-list').innerHTML=(summary.updated.length?`<ul>${summary.updated.map(t=>`<li><span aria-hidden="true">✓</span><div><strong>${escapeHtml(t.title)}</strong><small>${escapeHtml(t.gameTitle)}</small></div>${Number.isInteger(t.increased)?`<span class="update-increase" aria-label="${t.increased} ${t.increased===1?'item':'items'} increased">+${t.increased}</span>`:''}</li>`).join('')}</ul>`:'')
+  const gameSections=PixelVaultUpdates.groupByGame(summary.updated,games).map(group=>{
+    const rows=group.trackers.map(tracker=>{
+      const count=tracker.increased;
+      const badge=Number.isInteger(count)
+        ? `<span class="update-increase" aria-label="${count} ${count===1?'item':'items'} increased">+${count}</span>`
+        : '';
+      return `<li><span aria-hidden="true">✓</span><div><strong>${escapeHtml(tracker.title)}</strong></div>${badge}</li>`;
+    }).join('');
+    return `<section class="update-game"><h3>${escapeHtml(group.title)}</h3><ul>${rows}</ul></section>`;
+  }).join('');
+  $('refresh-summary-list').innerHTML=gameSections
     +(summary.review.length?`<p class="hint">Needs review: ${summary.review.map(escapeHtml).join(', ')}. Your current progress is kept.</p>`:'')
     +(summary.failed.length?`<p class="hint">Could not check: ${summary.failed.map(escapeHtml).join(', ')}. Saved progress is kept.</p>`:'');
   $('refresh-summary').showModal();

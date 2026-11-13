@@ -12,12 +12,26 @@
     return groups.size;
   }
   function summary(previous,trackers,job){
-    const updated=changed(previous,trackers).map(t=>({title:t.title,gameTitle:t.gameTitle,increased:increased(previous[t.id],t)}));
+    const updated=changed(previous,trackers).map(t=>({
+      title:t.title,gameTitle:t.gameTitle,provider:t.provider,gameId:t.gameId,increased:increased(previous[t.id],t)
+    }));
     const review=(job?.tasks || []).filter(t=>t.status==='review').map(t=>t.title);
     const failed=(job?.tasks || []).filter(t=>t.status==='failed').map(t=>t.title);
     const offline=job?.status==='offline';
     return {title:updated.length?'Trackers updated':offline?'PC unavailable':review.length || failed.length?'Refresh finished':'Up to date',updated,review,failed,
       message:updated.length?`${updated.length} ${updated.length===1?'tracker changed':'trackers changed'}.`:offline?'The PC did not finish this check. Saved progress is kept.':review.length || failed.length?'No tracker changes were applied.':'No tracker changes since the last check.'};
   }
-  const api={snapshot,changed,summary};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.PixelVaultUpdates=api;
+  function groupByGame(updated,games){
+    const editions=new Map(games.map(game=>[`${game.provider}:${game.gameId}`,game]));
+    const groups=new Map();
+    for(const tracker of updated){
+      const edition=tracker.provider && tracker.gameId ? `${tracker.provider}:${tracker.gameId}` : null;
+      const game=editions.get(edition);
+      const key=game?.groupId ? `group:${game.groupId}` : edition ?? `title:${tracker.gameTitle}`;
+      if(!groups.has(key))groups.set(key,{title:game?.title || tracker.gameTitle,trackers:[]});
+      groups.get(key).trackers.push(tracker);
+    }
+    return [...groups.values()];
+  }
+  const api={snapshot,changed,summary,groupByGame};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.PixelVaultUpdates=api;
 })(typeof globalThis!=='undefined'?globalThis:this);
