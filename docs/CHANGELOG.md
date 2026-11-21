@@ -1,3 +1,46 @@
+## Companion web · November 19, 2026
+
+- Tracker gains stay visible as a +N and a light-orange segment until you refresh the monitor. Refreshing sets a new starting count for each tracker.
+
+## 0.132.007
+
+- Holofoil now lights the game cover artwork. The Stained Glass frame keeps its colors as the whole card tilts on PC and Companion.
+
+## 0.132.006
+
+- Gold, Emerald and Diamond game covers now use Stained Glass frames in the library, game profile and completion case. All three tiers have holographic foil and pointer-controlled tilt. Companion uses the same frames on library and case covers.
+
+## Companion web · November 18, 2026
+
+- Select **Hide completed** in the tracker monitor to show only unfinished trackers. The display remembers the setting across games and reloads.
+
+- Open a game’s live tracker monitor from its profile on a tablet or larger display. The four newest screenshots update across the top. Tracker counts update in place, and larger lists rotate six trackers at a time.
+
+## 0.129.010 — November 16, 2026 — Screenshot intake repair
+
+- Decode media-tool output as UTF-8 so filenames containing trademark symbols and other Unicode characters are correctly indexed after import.
+- Replace folder-cache snapshots atomically and retry brief sharing conflicts, preserving complete cached lists during desktop and Companion reads.
+
+## 0.129.005 — November 16, 2026 — Circuit Halo completion frames
+
+- Replace Heritage cover frames with the selected Circuit Halo design: interrupted light rails, cut corners, tier labels and compact trophy/gem/diamond tabs in Native and Companion.
+- Preserve gold/emerald/diamond completion rules, diamond-only foil, accessible completion text and cover controls.
+- Stop PC completion frames blinking during background refreshes by retaining verified frames while revalidating saved progress and rejecting stale reads.
+
+## 0.129.000 — November 15, 2026
+
+- Repair import undo and restart recovery with durable verified media/sidecar moves, content-checked duplicate detection, recoverable replacement backups and last-import batch history.
+- Fix incomplete filename tokens, structured metadata extraction, partial-sidecar precedence, explicit clears and honest per-file metadata failures.
+- Preserve concurrent edits in the Game/Photo Index editors, allocate non-reused game IDs, and reconcile interrupted folder moves without dropping authored metadata.
+- Migrate Windows path identities with verified pre-upgrade backups, preserve intentionally empty indexes, and isolate one-time recovery from damaged donor databases. See `docs/FOUNDATIONS_FIXES_2026-11-15.md` for validation and rollback requirements.
+- Speed up tracker editing and history browsing with indexed current revisions/provenance and paged history, preserving existing audit records and undo.
+- Avoid score writes during achievement browsing and refresh missing achievement details independently of progress freshness.
+- Add Native reader support for batched trackers sharing one save and retain source-specific failures until recovery. Companion-side batching awaits a Companion release.
+- Create visible tracker rows on demand and retain unsaved notes, counts and item settings through search/filter/group changes.
+- Recover interrupted Native reviews through explicit recreate/discard actions while preserving durable Companion reviews across restarts.
+- Reconcile source/build pointers and block publishing from the stale checkout.
+- Native validation: 1,650 passing tests and 3 independently verified pre-existing failures. Full implementation and validation: maintained `docs/TRACKER_ACHIEVEMENT_EFFICIENCY.md` and `docs/FOUNDATIONS_FIXES_2026-11-15.md`. Companion changes remain separately tracked.
+
 ## 0.128.021 — November 8, 2026
 
 - Keep Death Stranding interview, mail and cargo refresh working when late-game saves add achievement flags. The reader validates extra boolean flags without requiring each new flag ID to be registered.
