@@ -67,6 +67,9 @@ if (-not [string]::IsNullOrWhiteSpace($OnlyVerify))
     exit 0
 }
 
+. (Join-Path $PSScriptRoot "Assert-PixelVaultMaintainedSource.ps1")
+Assert-PixelVaultMaintainedSource -RepositoryRoot (Join-Path $PSScriptRoot "..")
+
 $ver = $Version
 if ([string]::IsNullOrWhiteSpace($ver)) { $ver = Get-AppVersionFromSource }
 

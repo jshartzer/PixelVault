@@ -1,10 +1,56 @@
 Centurion compact rail (November 7, 2026): replace the profile collection with the approved compact rail on PC and web. Show the section only for game/platforms with authored Centurion definitions. Keep five icons in one row and show selected requirements underneath; retain full detail navigation, badge eligibility and separate reward notifications. See CENTURION_COMPACT_RAIL.md.
 
+Centurion rewards (November 7, 2026): the approved slotted collection and separate reward notifications supersede earlier profile lock/checkmark and foil treatments. Require all five durable account-scoped verified unlocks for the badge, with no extra points. Preserve saved progress authority and first unlock dates. See CENTURION_REWARDS.md.
+
 # PixelVault Working Policy
+
+The Companion game profile offers **Open tracker monitor** at widths of 768 CSS pixels and up. A landscape touch viewport under 500 pixels high hides the button. The monitor shows the game's grouped editions, saved tracker totals and four newest captures. It uses the existing refresh stream and polling fallback. Opening or refreshing the monitor leaves the workspace's tracker notification acknowledgements alone. Hide completed is a browser-local display preference, initially off. Paging uses the visible trackers. Each tracker’s first available count in this tab sets its starting point. The monitor shows any net increase as a +N and a light-orange bar segment. Page rotation, filtering and revisiting the game preserve that starting point. Refreshing the tab, signing out or changing workspaces clears it.
+
+Stained Glass completion covers (November 19, 2026). Gold, Emerald and Diamond use the same tier-specific glass artwork on PC and Companion. Their verified tiers enable foil on the artwork only and tilt the artwork and frame together on library and completion-case covers and the PC profile cover. Use the transparent stained-glass PNGs in Companion’s completion-frames directory for both applications. Preserve cover input, the static finish under reduced motion and system colors with a readable completion label under high contrast.
+
+Completion refresh presentation (November 16, 2026): retain last verified cover frames during background revalidation; invalidating freshness must not blank the frame. Scope retained tiers to root/store/provider/account/game and reject stale store/refresh/load results. Known downgrades may remove the frame; unverified provider index flags and unavailable reads must not manufacture completion changes.
+
+Foundation data contracts (November 15, 2026; Native 0.129.000): never reuse deleted game IDs or save modeless editor snapshots over newer unrelated fields. Distinguish successful empty metadata from failed/unavailable reads, and keep failed library edits in place. Journal media/sidecar moves before mutation and retain mappings through index commit; undo must verify content and actual paths. Preserve missing stored paths until explicit reconciliation so recovery can use them. Canonical index migrations require verified pre-upgrade backups, one-time completion markers and read-only isolated donor recovery. Older Native releases require the matching pre-upgrade database backup. Keep maintenance/process/cache lock order and perform slow background extraction outside those locks with revision rechecks. See [foundation fixes](FOUNDATIONS_FIXES_2026-11-15.md).
+
+Single-field trackers (November 5, 2026): web rows with one binary field use native, unlabeled-visible checkboxes with accessible names; use the same checkbox in the expanded editor. Preserve read-only/source protection, saving and conflict behavior, multi-field labels and numeric count inputs. PC button text remains unchanged. TCG collections use only the saved originally obtained indicator (.ever / Collected); binder ownership is not a completion field. Keep prior binder observations/history recoverable.
+
+Web browsing performance (November 5, 2026): account/source identity reads must not deserialize unrelated tracker catalogues. Preserve immediate provider scope and deleted-tracker checks. Defer collapsed tracker editors, retain drafts across close/filter/refresh, preserve existing cover image elements when URLs are unchanged, and prioritize the first visible covers.
+
+Tracker groups (November 5, 2026): group by saved achievement link into Achievement-linked trackers, Manual trackers, and Centurian Achievements. Default order is achievement, manual, century; the owner can reorder all three through Order groups on PC; web follows the shared order without an ordering control. Persist one shared workspace order in the canonical tracker store and preserve per-group unfinished/title/completed organization. Empty groups are omitted from game lists but remain in the ordering controls. This supersedes the earlier two-section Century tracker presentation.
+
+Save review cleanup (November 2, 2026): retire pending web reviews when their source/definition changes, or a successful subsequent bound check covers at least their observation time. Failed/in-flight checks and undo must preserve genuine pending decisions. Show changed values, availability/note changes and relevant manual conflicts; identical older values alone do not require approval or move saved timestamps backwards. Chip restoration accepts fully validated collector states 0x0B and 0x1B, as established by the #3/#47 confirmed turn-in control. Prior v2 claims that 0x0B cannot be restored are superseded.
+
+Tracker item requirements (November 2, 2026): Missable is an independent warning flag. Required for completion defaults on and is exposed in both tracker details views for any game; optional items stay visible but are omitted from tracker and attached Centurian totals. Per-item overrides are shared across accounts, persist separately from observations and apply to whole milestone records. Keep at least one required item. Setting changes never write completion or points; only a subsequent approved bound game-source snapshot evaluates required items. Manual/effective values and generic imports cannot award points, including for required missables. Full source identity/coverage checks, unknown required entries, stale-source protection and first earned dates remain enforced. The four Mountaineer timing emails are optional defaults, including We're Halfway Done. This supersedes the former fixed 240-mail award target; the full source catalogue remains 240 identities.
+
+Heritage completion covers (November 1, 2026): all three tiers use matching slim rails and shallow edge ornaments, with compact lower-right emblems and no bulky gold wreath. Only verified diamond (`BaseAndDlcAndPv`) receives cover holofoil/perspective; gold and emerald keep normal artwork. Preserve classification, input routing, reduced-motion/high-contrast behavior and the separate earned Century achievement finish. Generate Native and Companion ornaments from `scripts/Build-HeritageCompletionAssets.py`; see [Heritage completion](HERITAGE_COMPLETION.md).
+
+Tracker list presentation (October31,2026): game tracker cards match web organization: unfinished first, completed below a counted Completed heading, stable title ordering within each group, green completed treatment and a checkmark. Completion requires positive total and completed >= total; zero-target and unknown-only progress do not imply completion. This is derived presentation and never writes progress, notes or source settings. Preserve system colors in high contrast.
+
+Century tracker sections (November 1, 2026): PC game tracker lists and Companion profile trackers place Century-linked trackers in a counted Century Achievements section after Game Trackers. Membership follows the existing Century achievement link, never the title or observed total; official 100-read counters and unlinked reference lists remain game trackers. Each section retains unfinished-first/title ordering and its own counted Completed subgroup. Omit empty sections and extra headings for games without Century links. Grouping is presentation only and must preserve scope, values, notes, link editing, navigation, expanded profile state and cached artwork.
+
+Companion update visibility (October29,2026): omit achievement-linked trackers from update summaries when known totals have a positive target and completed >= total. Unlinked catalogues and unfinished linked goals remain eligible. Retain all trackers in acknowledgement snapshots and preserve refresh review/failure/offline reporting. This is notification filtering only; it never caps or rewrites saved progress.
+
+Companion update badges (October 29, 2026): a standalone ungrouped counter shows its positive quantity delta between known numeric observations. Multi-item checklists count distinct records gaining progress, with grouped milestones counted once. Decreases do not cancel increases. Unknown single-counter baselines omit the numeric badge. These are browser acknowledgement summaries and never write tracker progress.
+
+Century save authority (October30,2026): road Century progress is a separate, durable, account-scoped verified observation written atomically from the current approved full road save source. Use incoming values, never manual/effective check-offs or generic imports. Complete known51/51 awards100 points once with a first-verification date; retain earned status and source evidence through failure, unknown values, disconnection and older saves. Never place Century observations in provider caches or award diamond from an incomplete planned Century set. See [Century connection](CENTURY_ACHIEVEMENTS.md).
+
+Achievement presentation (October30,2026): achievement cards, tooltips and details describe the player's unlock requirements, points, progress and earned state. Keep save connections, verification rules, source provenance and implementation/planning explanations in management and technical documentation, outside the achievement presentation.
+
+Century email authority (October30,2026): the complete240-entry email catalogue is separate from the official100-mail counter. Count known read item observations from the existing validated bound catalogue source; manual values and received/unread states cannot award credit. Retain the unmapped entry in the240 target and preserve its unknown state. Require240 known reads for the fixed100-point award. The link is metadata only and must preserve identities, content, notes, source permissions and official achievement records.
+
+Century profile shelf (October30,2026): reserve five visual spots per game and fill undefined spots with noninteractive question marks. Placeholders are never definitions, progress, points or completion credit. Shelf browsing reads saved account-scoped observations, does not run save readers, and must not show another account’s progress after a scope change.
+
+Century profile shelf presentation (November 1, 2026): use modest 100 px badges whose artwork fills the rounded surrounding frame. Omit the visible progress row beneath the art/title; retain progress in tooltips, accessibility labels and achievement details. Wrap to two, three or five columns as space permits. Preserve lock badges, earned foil/gold styling and click-through details.
 
 ## Purpose
 
+Century legends authority (November1,2026): Nothing Left to Deliver requires known LLL observations for all540 canonical standard-order identities. Its separate built-in tracker has540 binary items and no category caps or LL milestones. Only a current approved bound order-reader observation records Century progress; manual/effective values, LL ranks and official category totals cannot award points. Preserve existing official tracker identities/state, notes, first verified unlock, account isolation and failure/older-save safeguards.
+
+Century cargo authority (November 1, 2026): The Weight of a Nation requires 50,000 cumulative kilograms delivered. Its separate linked counter uses validated typed statistic 49 in whole kilograms, without rounding up fractional weight or estimating from order totals. Only current approved bound observations can record Century progress; imports/manual values, unknown/failing reads and older saves cannot award points. Cap Century display at 50,000 while retaining observed tracker totals above the goal. The numeric tracker keeps kilogram progress, while its AggregateAsSingleItem metadata contributes exactly one item to combined game tracker counts, completed only at the goal; preserve the first unlock and 100-point award, and keep other trackers, notes, official achievements and source authority unchanged.
+
 Tracker reference content (October26,2026): optional item content is plain text stored with private custom definitions, outside bundled source catalogues. Viewing/exporting it never writes completion or game-read state; source-confirmed progress remains independent. Null content is omitted from JSON to preserve existing definition/source fingerprints. Both connector and server must understand content before publishing lore-bearing definitions. See [TRACKER_CONTENT.md](TRACKER_CONTENT.md) for bounds and extraction evidence.
+
+Tracker source authority (October28,2026): manual values remain protected by default. A source binding may explicitly opt into `ReplaceManualProgress` when the user requests game data to control its checkmarks. Only known non-stale values from that current validated binding clear manual overrides; preserve notes, unknown rows, revision checks and older/undone-batch review. The road binding was the first opt-in. On October29 the user also explicitly authorized the email catalogue binding to use game values over manual checkmarks after its per-email mapping was validated. Never propagate replacement authority to other trackers by inference or widen an approved source scope. See [road refresh](DEATH_STRANDING_ROAD_RESEARCH.md).
 
 This document defines the working rules for the live `C:\Codex` PixelVault app line.
 
@@ -19,15 +65,13 @@ Use it as the source of truth for:
 
 ## Active Workspace
 
-Current active workspace:
+The maintained source workspace is:
 
-- `C:\Codex`
+- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex`
 
-Treat `C:\Codex` as the only live workspace for the active PixelVault line.
+Use that workspace for source edits, documentation, tests, and builds. `C:\Codex` is the runtime root for published releases, shortcuts, and persistent app data; `C:\Codex\src` is an older checkout. The `Maintained source:` line in `docs/CURRENT_BUILD.txt` resolves source ownership and supersedes historical instructions to build from `C:\Codex`. Shell working directories and older source snapshots do not override that pointer.
 
-If any shell, app thread, or tool session reports `A:\Codex`, treat that as a runtime/environment quirk only.
-
-The active project workspace remains `C:\Codex`.
+Publish/build scripts check the pointer before compiling or changing output. If the maintained workspace is intentionally relocated, reconcile the pointer and docs first. A source-location correction is not a release and must not bump versions, replace binaries, or repoint live shortcuts.
 
 Live packaged builds are published under:
 
@@ -67,11 +111,11 @@ The **rightmost** segment (**`BBB`**) is the usual **patch / build tick**. The *
 When a new app build is published:
 
 1. Update `AppVersion` in the current live source file to the new **`M.AAA.BBB`** string.
-2. Build and publish from `C:\Codex\src\PixelVault.Native\PixelVault.Native.csproj`, normally through `C:\Codex\scripts\Publish-PixelVault.ps1`.
+2. Build and publish from `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\src\PixelVault.Native\PixelVault.Native.csproj`, normally through `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\scripts\Publish-PixelVault.ps1` with `-OutputRoot C:\Codex\dist`.
 3. Publish the build into a new folder under `C:\Codex\dist\PixelVault-<M.AAA.BBB>\`.
 4. Copy the current source snapshot into that dist folder as `PixelVault.Native.cs`.
-5. Update `C:\Codex\docs\CURRENT_BUILD.txt`.
-6. Update `C:\Codex\docs\CHANGELOG.md` with a `## M.AAA.BBB` header.
+5. Update `docs/CURRENT_BUILD.txt` in the maintained source and synchronize `C:\Codex\docs\CURRENT_BUILD.txt` after verifying the deployed version.
+6. Update `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\docs\CHANGELOG.md` with a `## M.AAA.BBB` header.
 7. Update the version-local `CHANGELOG.md` inside the new dist folder.
 8. Repoint `C:\Codex\PixelVault.lnk` to the newest `PixelVault.exe`.
 
@@ -85,22 +129,22 @@ PixelVault is a native Windows desktop app built in C# and WPF.
 
 The current live implementation is now a modular monolith rooted in:
 
-- `C:\Codex\src\PixelVault.Native`
+- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\src\PixelVault.Native`
 
 Key live source areas currently include:
 
-- `C:\Codex\src\PixelVault.Native\PixelVault.Native.cs`
-- `C:\Codex\src\PixelVault.Native\Indexing`
-- `C:\Codex\src\PixelVault.Native\Import`
-- `C:\Codex\src\PixelVault.Native\MediaTools`
-- `C:\Codex\src\PixelVault.Native\Metadata`
-- `C:\Codex\src\PixelVault.Native\Models`
-- `C:\Codex\src\PixelVault.Native\Storage`
-- `C:\Codex\src\PixelVault.Native\UI`
+- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\src\PixelVault.Native\PixelVault.Native.cs`
+- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\src\PixelVault.Native\Indexing`
+- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\src\PixelVault.Native\Import`
+- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\src\PixelVault.Native\MediaTools`
+- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\src\PixelVault.Native\Metadata`
+- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\src\PixelVault.Native\Models`
+- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\src\PixelVault.Native\Storage`
+- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\src\PixelVault.Native\UI`
 
 The SDK build project for that source tree lives at:
 
-- `C:\Codex\src\PixelVault.Native\PixelVault.Native.csproj`
+- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\src\PixelVault.Native\PixelVault.Native.csproj`
 
 Published builds should still carry a version-local source snapshot in:
 
@@ -437,13 +481,13 @@ Recommended tag cadence:
 
 Any future handoff should update:
 
-- `C:\Codex\docs\HANDOFF.md`
-- `C:\Codex\docs\CHANGELOG.md`
+- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\docs\HANDOFF.md`
+- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\docs\CHANGELOG.md`
 - `C:\Codex\docs\CURRENT_BUILD.txt` when a new build is published
 
-`C:\Codex\docs\HANDOFF.md` should summarize the current stop point.
+`C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\docs\HANDOFF.md` should summarize the current stop point.
 
-`C:\Codex\docs\POLICY.md` should remain the durable rulebook.
+`C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\docs\POLICY.md` should remain the durable rulebook.
 
 
 ## Saved game-map media

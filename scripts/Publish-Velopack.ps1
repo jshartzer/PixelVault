@@ -17,6 +17,9 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot "Assert-PixelVaultMaintainedSource.ps1")
+Assert-PixelVaultMaintainedSource -RepositoryRoot (Join-Path $PSScriptRoot "..")
+
 . (Join-Path $PSScriptRoot "Merge-BundledToolLicenses.ps1")
 
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))

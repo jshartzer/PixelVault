@@ -1,5 +1,8 @@
 param([string]$OutputRoot='',[switch]$IncludeDesktop,[switch]$IncludeConnector)
 $ErrorActionPreference='Stop'
+
+. (Join-Path $PSScriptRoot "Assert-PixelVaultMaintainedSource.ps1")
+Assert-PixelVaultMaintainedSource -RepositoryRoot (Join-Path $PSScriptRoot "..")
 $companionRepo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $companionProject=Join-Path $companionRepo 'src\PixelVault.Companion\PixelVault.Companion.csproj'
 [xml]$companionProjectXml=Get-Content -LiteralPath $companionProject -Raw

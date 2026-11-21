@@ -1,28 +1,22 @@
 # PixelVault
 
-**PixelVault Companion (0.5.2):** Installed on the NAS at [http://192.168.1.99:8787](http://192.168.1.99:8787) for home-network access. Start with a searchable game-cover grid, then open a banner profile with saved playtime/achievement counts, live tracker totals and reorderable feature sections. Trackers support edits, notes, conflicts and history/undo; Achievements and Screenshots are marked Coming soon. See [NAS operation and backups](docs/COMPANION_NAS.md), [setup/current limits](docs/COMPANION_SETUP.md), and [plan PV-PLN-WEB-001](docs/plans/PV-PLN-WEB-001-nas-web-companion.md). Full native tracker cutover, periodic PC observations and automatic library metadata refresh remain pending.
+**PixelVault Companion:** Runs as the Windows service `PixelVaultCompanion` on this PC. See [the current build marker](docs/CURRENT_BUILD.txt) for deployed versions and the service address. Earlier NAS setup documents describe the retired deployment.
 
 PixelVault is a native Windows desktop app for organizing, tagging, indexing, and browsing game screenshots and clips.
 
-The live app line is based in:
+The maintained source workspace is:
 
-- `C:\Codex`
+- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex`
 
-Solution (optional): `C:\Codex\Codex.slnx` includes `PixelVault.Native`, **`PixelVault.LibraryAssets`**, and test projects.
-
-Important workspace note:
-
-- work out of `C:\Codex`
-- if a tool session ever starts in `A:\Codex`, treat that as an environment quirk, not the real project root
-- `C:\Codex` is the source of truth for code, builds, docs, and shared app data
+Open `Codex.slnx`, edit source/docs, and run builds/tests from that workspace. `C:\Codex` remains the runtime root for published releases, shortcuts, and shared app data. Its `src` tree is an older checkout and must not be used for release builds. The `Maintained source:` entry in `docs/CURRENT_BUILD.txt` is the authoritative source-location pointer; a current working directory alone does not establish source ownership.
 
 **Current version and published exe path** are not duplicated here (they change every release). Use:
 
 - `docs/CURRENT_BUILD.txt` — version string and full path to the last published `PixelVault.exe`
-- `docs/CHANGELOG.md` — release notes per version
-- `src/PixelVault.Native/PixelVault.Native.cs` — `const string AppVersion` for the in-repo build
+- maintained-source `docs/CHANGELOG.md` — release notes per version
+- maintained-source `src/PixelVault.Native/PixelVault.Native.cs` — `const string AppVersion` for the source build
 
-**Convenience:** after `Publish-PixelVault.ps1`, the repo-root shortcut `PixelVault.lnk` and the junction folder below track the latest publish without editing this file:
+**Runtime launchers:** the current published installation is available through:
 
 - `C:\Codex\PixelVault.lnk`
 - `C:\Codex\dist\PixelVault-current\` → points at the most recently published `PixelVault-<version>\` folder
@@ -106,12 +100,12 @@ Important paths (names depend on configured library root and cache hashing — a
 
 ## Workspace Map
 
-- `C:\Codex\src\PixelVault.Native`: live app source and SDK project
-- `C:\Codex\scripts`: build/publish and developer utility scripts
-- `C:\Codex\docs`: handoff, policy, changelog, project context, and current-build marker
+- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\src\PixelVault.Native`: live app source and SDK project
+- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\scripts`: build/publish and developer utility scripts
+- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\docs`: handoff, policy, changelog, project context, and current-build marker
 - `C:\Codex\dist`: published versioned builds (`PixelVault-<version>/`) plus `PixelVault-current` junction
-- `C:\Codex\tools-licenses`: third-party **license texts** merged into published **`tools\licenses\`** (primarily **ExifTool** — see **`docs/BUNDLED_TOOLS_REDISTRIBUTION.md`**)
-- `C:\Codex\assets`: shared branding and UI assets
+- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\tools-licenses`: third-party **license texts** merged into published **`tools\licenses\`** (primarily **ExifTool** — see **`docs/BUNDLED_TOOLS_REDISTRIBUTION.md`**)
+- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\assets`: shared branding and UI assets
 - `C:\Codex\tools`: optional local **`tools\`** folder for **`exiftool.exe`** (gitignored); **FFmpeg** is installed separately (**Path Settings**), not bundled here by default
 - `C:\Codex\PixelVaultData`: live shared app data, indexes, caches, and logs
 - `C:\Codex\legacy`: older GameCaptureManager workflow files kept for history
@@ -121,8 +115,8 @@ Important paths (names depend on configured library root and cache hashing — a
 
 Authoritative source:
 
-- `C:\Codex\src\PixelVault.Native\PixelVault.Native.cs`
-- `C:\Codex\src\PixelVault.Native\PixelVault.Native.csproj`
+- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\src\PixelVault.Native\PixelVault.Native.cs`
+- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\src\PixelVault.Native\PixelVault.Native.csproj`
 
 Each publish run also copies a source tree and changelog into the output folder (see `scripts/Publish-PixelVault.ps1`).
 
@@ -138,23 +132,23 @@ Or open `C:\Codex\PixelVault.lnk`. For an exact versioned path, read `docs/CURRE
 
 ## Building And Publishing
 
-Build the live source with the SDK project:
+Build the maintained source with the SDK project:
 
 ```powershell
-dotnet build C:\Codex\src\PixelVault.Native\PixelVault.Native.csproj -c Release
+dotnet build "C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\src\PixelVault.Native\PixelVault.Native.csproj" -c Release
 ```
 
-Publish a new versioned folder under `dist\` (name pattern **`PixelVault-M.AAA.BBB`** per **`docs/POLICY.md`**). The script reads **`AppVersion`** from `PixelVault.Native.cs` when you omit `-Version`:
+For an explicitly planned release, publish a new versioned folder under `C:\Codex\dist\` (name pattern **`PixelVault-M.AAA.BBB`** per **`docs/POLICY.md`**). The script reads **`AppVersion`** from `PixelVault.Native.cs` when you omit `-Version`:
 
 ```powershell
-pwsh -File C:\Codex\scripts\Publish-PixelVault.ps1 -Force
+pwsh -File "C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\scripts\Publish-PixelVault.ps1" -OutputRoot "C:\Codex\dist"
 ```
 
-Optional: `-OutputRoot` if the default `dist` folder is locked; see script header comments.
+Build/publish entry points reject a checkout that disagrees with the maintained-source marker before building or changing output. The publish script defaults to its checkout-local `dist` and creates a checkout-local shortcut; the explicit output path above targets the runtime releases. Update the runtime shortcut and both current-build markers only after verifying a new deployment. Source edits alone do not change the published release.
 
 **Installer / delta-update channel (Velopack):** self-contained **`win-x64`** publish + **`vpk pack`** — **`scripts/Publish-Velopack.ps1`** and **`docs/VELOPACK.md`**.
 
-**Plain-English distribution path:** start with **`docs/SIMPLE_RELEASE_STEPS.md`**, then run **`scripts/Run-LocalReleaseChecks.ps1`** from repo root (`cd C:\Codex` then `pwsh -File .\scripts\…`, or **`pwsh -File C:\Codex\scripts\Run-LocalReleaseChecks.ps1`** from any folder). It builds the Velopack publish folder, runs **`Verify-DistributionLayout.ps1`**, and prints what to do next. Fresh-machine smoke tests: **`docs/VELOPACK_VM_SPIKE_CHECKLIST.md`**.
+**Plain-English distribution path:** start with **`docs/SIMPLE_RELEASE_STEPS.md`**, then run **`scripts/Run-LocalReleaseChecks.ps1`** from repo root (`cd "C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex"` then `pwsh -File .\scripts\…`, or **`pwsh -File "C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\scripts\Run-LocalReleaseChecks.ps1"`** from any folder). It builds the Velopack publish folder, runs **`Verify-DistributionLayout.ps1`**, and prints what to do next. Fresh-machine smoke tests: **`docs/VELOPACK_VM_SPIKE_CHECKLIST.md`**.
 
 **Code signing (Authenticode):** **`docs/PUBLISH_SIGNING.md`** — **`Publish-PixelVault.ps1 -Sign`** and **`vpk pack`** **`signParams`**.
 

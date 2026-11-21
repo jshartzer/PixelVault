@@ -34,26 +34,18 @@ Core jobs:
 
 ## Workspace Rules
 
-Work out of:
-
-- `C:\Codex`
-
-Important:
-
-- treat `C:\Codex` as the only real workspace root
-- if a shell or tool reports `A:\Codex`, treat that as an environment quirk
-- do not treat `A:\` as the live project drive
+Edit, test, and build from `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex`. The `Maintained source:` entry in `docs/CURRENT_BUILD.txt` is authoritative. `C:\Codex` holds live runtime data, published packages, and shortcuts; its older `src` checkout must not be published. See `POLICY.md` for the source guard and release responsibilities.
 
 ## Runtime Layout
 
 Primary areas:
 
-- `C:\Codex\src\PixelVault.Native`: live app source
-- `C:\Codex\src\PixelVault.LibraryAssets`: portable library for canonical asset records, scan diffs, root health gates, and reconciliation planning (see `README.md` there)
-- `C:\Codex\docs`: repo documentation
-- `C:\Codex\scripts`: publish and developer utility scripts
+- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\src\PixelVault.Native`: live app source
+- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\src\PixelVault.LibraryAssets`: portable library for canonical asset records, scan diffs, root health gates, and reconciliation planning (see `README.md` there)
+- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\docs`: maintained repo documentation
+- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\scripts`: publish and developer utility scripts
 - `C:\Codex\dist`: versioned published builds
-- `C:\Codex\assets`: shared branding and UI assets
+- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\assets`: shared branding and UI assets
 - `C:\Codex\tools`: optional local **`exiftool.exe`** drop (gitignored); **FFmpeg** is user-installed (**Path Settings** / **`PATH`**), not bundled by default
 - `C:\Codex\PixelVaultData`: shared persistent app data, indexes, caches, and logs
 
@@ -61,7 +53,7 @@ Important runtime pointers:
 
 - current published build: `C:\Codex\docs\CURRENT_BUILD.txt`
 - desktop shortcut that should track the newest publish: `C:\Codex\PixelVault.lnk`
-- publish helper: `C:\Codex\scripts\Publish-PixelVault.ps1`
+- publish helper: `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\scripts\Publish-PixelVault.ps1`
 
 ## Source Layout
 
@@ -71,15 +63,15 @@ The app is still a modular monolith.
 
 Key source areas:
 
-- `C:\Codex\src\PixelVault.LibraryAssets`: asset lifecycle, `ScanDiffComputer`, `LibraryRootHealthChecker`, `ScanReconciliationPlan` (not yet wired into the WPF app)
-- `C:\Codex\src\PixelVault.Native\Import`: intake, rename, move, sort, undo, and import orchestration
-- `C:\Codex\src\PixelVault.Native\Indexing`: game-index, folder-cache, and library-index logic
-- `C:\Codex\src\PixelVault.Native\Metadata`: metadata builders, tag helpers, and library edit flows
-- `C:\Codex\src\PixelVault.Native\MediaTools`: `ExifTool` / `FFmpeg` execution helpers
-- `C:\Codex\src\PixelVault.Native\Models`: import, parsing, and index model types
-- `C:\Codex\src\PixelVault.Native\Services`: extracted service seams (subfolders include **`Config`**, **`Covers`**, **`FilenameParsing`**, **`FilenameRules`**, **`Indexing`**, **`Intake`** — **`IntakePipeline`** facade, **`IImportService`**, headless coordinator, analysis/policy — **`IO`**, **`Library`**, **`Logging`**, **`Achievements`**, **`Metadata`**)
-- `C:\Codex\src\PixelVault.Native\Storage`: SQLite/cache path and persistence helpers
-- `C:\Codex\src\PixelVault.Native\UI`: extracted windows, editor hosts, virtualization helpers, and UI-specific support code
+- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\src\PixelVault.LibraryAssets`: asset lifecycle, `ScanDiffComputer`, `LibraryRootHealthChecker`, `ScanReconciliationPlan` (not yet wired into the WPF app)
+- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\src\PixelVault.Native\Import`: intake, rename, move, sort, undo, and import orchestration
+- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\src\PixelVault.Native\Indexing`: game-index, folder-cache, and library-index logic
+- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\src\PixelVault.Native\Metadata`: metadata builders, tag helpers, and library edit flows
+- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\src\PixelVault.Native\MediaTools`: `ExifTool` / `FFmpeg` execution helpers
+- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\src\PixelVault.Native\Models`: import, parsing, and index model types
+- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\src\PixelVault.Native\Services`: extracted service seams (subfolders include **`Config`**, **`Covers`**, **`FilenameParsing`**, **`FilenameRules`**, **`Indexing`**, **`Intake`** — **`IntakePipeline`** facade, **`IImportService`**, headless coordinator, analysis/policy — **`IO`**, **`Library`**, **`Logging`**, **`Achievements`**, **`Metadata`**)
+- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\src\PixelVault.Native\Storage`: SQLite/cache path and persistence helpers
+- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\src\PixelVault.Native\UI`: extracted windows, editor hosts, virtualization helpers, and UI-specific support code
 
 ## Current App Shape
 
