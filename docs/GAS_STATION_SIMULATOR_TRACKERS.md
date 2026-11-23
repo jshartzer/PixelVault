@@ -28,8 +28,8 @@ All files are opened read-only, parsed from bounded private memory copies, and r
 
 Maintained source: `scripts/PixelVault.GasStationSimulator`, tests in `scripts/PixelVault.GasStationSimulator.Tests`; runner/install scripts in `scripts/GasStationSimulator`.
 
-Package: `C:\Codex\Game Readers\Gas Station Simulator\1.0.0`.
-Private configuration and output: `C:\Codex\PixelVaultData\achievement-tracking\gas-station-simulator`.
+Package: `<runtime-root>\Game Readers\Gas Station Simulator\1.0.0`.
+Private configuration and output: `<runtime-root>\PixelVaultData\achievement-tracking\gas-station-simulator`.
 Scheduled task: **PixelVault Gas Station Simulator Progress**, every minute and at user logon, with a hidden launcher under the configured user's interactive identity. Its bounded `reader-status.json` records success or failure. The existing Companion service consumes the JSON observations using its normal SaveChanges reconciliation.
 
 The helper atomically replaces only changed per-tracker JSON files. Known decreases retain an older/equal observation timestamp, requiring normal rollback review. Setup preflights definitions and sources, backs up the SQLite store, uses the standard source lease / preview / apply / history APIs, preserves notes/manual overrides, and enables SaveChanges only for the new bindings. Repeated setup preserves compatible existing definitions, source IDs and automation settings. Receipts support recovery after interruption. Pausing the scheduled helper or an individual tracker stops that part of the update pipeline.
@@ -54,6 +54,6 @@ Initial real save: **38 known fields and 12 unknown building fields**. The unkno
 
 Employee-skill goals (including Jack of all Trades), caravan counts, ocean-landmark/all-upgrade collections and the cinema-level goal are **not installed yet**: their partial-progress mappings have not been validated. They are multi-step candidates, not excluded as one-action goals. The task does not claim complete coverage of every multi-step achievement. Further game-save samples with employees and those DLC systems are needed to validate them. Broad before/after gameplay verification remains pending; parsing the fresh save is verified.
 
-Installation backup, rehearsal receipts, preservation comparisons and automatic-check results: `C:\Codex\artifacts\gas-station-setup-20261116`.
+Installation backup, rehearsal receipts, preservation comparisons and automatic-check results: `<runtime-root>\artifacts\gas-station-setup-20261116`.
 
 Final installation verification: all **48/48** bindings completed their first Companion automatic check; **0 failures**, **0 pending reviews**. The scheduled helper completed repeated successful exports with unchanged values. Unrelated definitions, bindings, automation settings, authored notes and manual progress matched their pre-installation backup. See the verification receipt above.

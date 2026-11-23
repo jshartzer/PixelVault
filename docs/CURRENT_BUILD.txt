@@ -1,43 +1,43 @@
 Current PixelVault release — November 19, 2026
 
 Native: 0.132.008
-Executable: C:\Codex\dist\PixelVault-0.132.008\PixelVault.exe
-Main shortcut: C:\Codex\PixelVault.lnk
-Current junction: C:\Codex\dist\PixelVault-current
-App Testing: C:\Codex\App Testing\PixelVault.exe
+Executable: <runtime-root>\dist\PixelVault-0.132.008\PixelVault.exe
+Main shortcut: <runtime-root>\PixelVault.lnk
+Current junction: <runtime-root>\dist\PixelVault-current
+App Testing: <runtime-root>\App Testing\PixelVault.exe
 Companion backend: 0.52.5
 Companion browser revision: tracker-monitor-session-gains-20261119
 Prior Native 0.131.000 release record: https://app.notion.com/p/41d73adc59b681f082a1e66ae1c2c7fc
 
-Maintained source: C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex
-Release source: C:\Codex\dist\PixelVault-0.132.008\source
+Maintained source: local release configuration (see LOCAL_RELEASE_CONFIGURATION.md)
+Release source: <runtime-root>\dist\PixelVault-0.132.008\source
 
 Perfect Practice — November 19, 2026
-The fifth Death Stranding 2 Centurion awards 100 points for earning S rank in all 25 VR drills. The checklist reads the earned rank for each drill. Reader 1.6.0 verified Covert Action I at installation. Desktop and Companion expose the linked tracker and both artwork variants. Evidence: C:\Codex\artifacts\ds2-vr-centurion-20261119.
+The fifth Death Stranding 2 Centurion awards 100 points for earning S rank in all 25 VR drills. The checklist reads the earned rank for each drill. Reader 1.6.0 verified Covert Action I at installation. Desktop and Companion expose the linked tracker and both artwork variants. Evidence: <runtime-root>\artifacts\ds2-vr-centurion-20261119.
 
 Tracker monitor session gains — November 19, 2026
-The tracker monitor shows each tracker’s net gain since it first appeared in this tab. The +N indicator and light-orange bar segment persist through page rotation and filtering. Refreshing clears the indicator and displays all saved progress in the normal bar color. The staged Chrome test covered cumulative gains, count corrections, independent tabs and refresh. All 18 live asset checks passed on Companion 0.52.5. The deployment receipt is in C:\Codex\artifacts\tracker-monitor-session-gains-20261119.
+The tracker monitor shows each tracker’s net gain since it first appeared in this tab. The +N indicator and light-orange bar segment persist through page rotation and filtering. Refreshing clears the indicator and displays all saved progress in the normal bar color. The staged Chrome test covered cumulative gains, count corrections, independent tabs and refresh. All 18 live asset checks passed on Companion 0.52.5. The deployment receipt is in <runtime-root>\artifacts\tracker-monitor-session-gains-20261119.
 
 Artwork-only holofoil — November 19, 2026
 Holofoil follows the game artwork on Gold, Emerald and Diamond covers. The Stained Glass frame keeps its colors during whole-card tilt. All 53 PC and 26 Companion tests passed. WPF, Edge and WebKit render comparisons confirmed the artwork changed and every sampled opaque frame pixel retained its color. The App Testing copy was restarted.
 
 Stained Glass completion covers — November 19, 2026
-Gold, Emerald and Diamond game covers now use the selected Stained Glass frame, foil and card tilt. PC library, profile and case covers and Companion library and case covers use the same three transparent overlays. All 53 focused PC tests and 26 Companion tests passed. WPF restored the exact resting render, and the live Companion assets passed Edge and WebKit checks. App Testing was updated and restarted with the verified release executable. Evidence is in C:\Codex\artifacts\stained-glass-20261119.
+Gold, Emerald and Diamond game covers now use the selected Stained Glass frame, foil and card tilt. PC library, profile and case covers and Companion library and case covers use the same three transparent overlays. All 53 focused PC tests and 26 Companion tests passed. WPF restored the exact resting render, and the live Companion assets passed Edge and WebKit checks. App Testing was updated and restarted with the verified release executable. Evidence is in <runtime-root>\artifacts\stained-glass-20261119.
 
 DS2 cargo correction and Centurion notification priority — November 19, 2026
-A Weight off Their Shoulders awards 100 points at 32,000 kg of cumulative delivered cargo. The upgrade restores verified delivered kilograms and corrects awards issued at the former threshold. The linked tracker keeps its identity, notes and source settings. All 19 DS2 trackers passed the live registration check. Desktop Centurion achievements and badges take priority above the ordinary notification stack. Companion presents the reward above open notification dialogs. Verified in the desktop test build, Edge and WebKit. The live service passed its health, cargo progress, points, locked artwork and browser asset checks. Verification is in C:\Codex\artifacts\ds2-cargo-32000-20261119.
+A Weight off Their Shoulders awards 100 points at 32,000 kg of cumulative delivered cargo. The upgrade restores verified delivered kilograms and corrects awards issued at the former threshold. The linked tracker keeps its identity, notes and source settings. All 19 DS2 trackers passed the live registration check. Desktop Centurion achievements and badges take priority above the ordinary notification stack. Companion presents the reward above open notification dialogs. Verified in the desktop test build, Edge and WebKit. The live service passed its health, cargo progress, points, locked artwork and browser asset checks. Verification is in <runtime-root>\artifacts\ds2-cargo-32000-20261119.
 
 Death Stranding 2 Centurions — November 19, 2026
-A Weight off Their Shoulders awards 100 points at 32,000 kg of cumulative delivered cargo. No More Detours covers the 57 Australian highway sections and A World Worth Reading covers the 437 read Corpus dossiers. Each has a linked tracker and original locked and unlocked artwork. Reader 1.4.0 exports 19 trackers. All 16 existing definitions, source bindings and automation preferences passed the preservation audit. The release passed 21 reader tests and 62 Centurion tests. Native rendered all four DS2 achievement details from a copy of the player database. The running Companion 0.52.5 service loaded the shared library. Its achievement, linked-tracker and artwork views passed the production-component check. Evidence: C:\Codex\artifacts\ds2-centurions-20261119.
+A Weight off Their Shoulders awards 100 points at 32,000 kg of cumulative delivered cargo. No More Detours covers the 57 Australian highway sections and A World Worth Reading covers the 437 read Corpus dossiers. Each has a linked tracker and original locked and unlocked artwork. Reader 1.4.0 exports 19 trackers. All 16 existing definitions, source bindings and automation preferences passed the preservation audit. The release passed 21 reader tests and 62 Centurion tests. Native rendered all four DS2 achievement details from a copy of the player database. The running Companion 0.52.5 service loaded the shared library. Its achievement, linked-tracker and artwork views passed the production-component check. Evidence: <runtime-root>\artifacts\ds2-centurions-20261119.
 
 Companion media (November 18, 2026)
-Companion 0.52.5 resolves previous gallery links after an edition changes ownership and shares the selected PC cover across the grouped game's editions. The Death Stranding 2 gallery served all ten imported photos as thumbnails and previews. A signed-in mobile-sized browser test opened the saved portrait cover, an old gallery link, and a full preview. Verification used a local copy of the PC index and the same service binary. Release evidence: C:\Codex\artifacts\companion-ds2-media-20261119.
+Companion 0.52.5 resolves previous gallery links after an edition changes ownership and shares the selected PC cover across the grouped game's editions. The Death Stranding 2 gallery served all ten imported photos as thumbnails and previews. A signed-in mobile-sized browser test opened the saved portrait cover, an old gallery link, and a full preview. Verification used a local copy of the PC index and the same service binary. Release evidence: <runtime-root>\artifacts\companion-ds2-media-20261119.
 
 Game actions and screenshot import (November 18, 2026)
-The profile menu includes a screenshot folder per game and platform. New folders copy by default. Move originals into library enables regular import undo for moved screenshots. Death Stranding 2's Steam folder uses move mode. Background intake moved all 10 existing PNGs, verified their decoded pixels and assigned all 10 to the Steam game ID. Steam capture count rose from 22 to 32. The PS5 count stayed at 186. The release passed 70 focused tests, strict package validation, App Testing parity and a live desktop menu check. Evidence is in C:\Codex\artifacts\game-screenshot-folders-20261118.
+The profile menu includes a screenshot folder per game and platform. New folders copy by default. Move originals into library enables regular import undo for moved screenshots. Death Stranding 2's Steam folder uses move mode. Background intake moved all 10 existing PNGs, verified their decoded pixels and assigned all 10 to the Steam game ID. Steam capture count rose from 22 to 32. The PS5 count stayed at 186. The release passed 70 focused tests, strict package validation, App Testing parity and a live desktop menu check. Evidence is in <runtime-root>\artifacts\game-screenshot-folders-20261118.
 
 DS2 Centurion release (November 18, 2026)
-Death Stranding 2's No One Left Waiting awards 100 PixelVault points for all 474 numbered orders. Native 0.130.000 introduced the award and the save-backed checklist. The current desktop release includes both. Companion 0.52.4 serves the shared achievement library and both icon states. The 1.3.0 reader exports 16 trackers. Verification covered 19 reader tests, 58 Centurion tests, a desktop detail render with 474 linked rows, and Companion's listing, tracker and artwork. Evidence: C:\Codex\artifacts\ds2-tracker-20261118\century-orders.
+Death Stranding 2's No One Left Waiting awards 100 PixelVault points for all 474 numbered orders. Native 0.130.000 introduced the award and the save-backed checklist. The current desktop release includes both. Companion 0.52.4 serves the shared achievement library and both icon states. The 1.3.0 reader exports 16 trackers. Verification covered 19 reader tests, 58 Centurion tests, a desktop detail render with 474 linked rows, and Companion's listing, tracker and artwork. Evidence: <runtime-root>\artifacts\ds2-tracker-20261118\century-orders.
 
 Executable SHA256: E2F05CAB892DFAE94DDE29C2A69D494450A5ABAFC42C63282A4DD14034981A69
 
@@ -46,21 +46,21 @@ Previous release record
 Current PixelVault release — November 16, 2026
 
 Native: 0.129.010
-Executable: C:\Codex\dist\PixelVault-0.129.010\PixelVault.exe
-Main shortcut: C:\Codex\PixelVault.lnk
-Current junction: C:\Codex\dist\PixelVault-current
-App Testing: C:\Codex\App Testing\PixelVault.exe (identical published executable)
+Executable: <runtime-root>\dist\PixelVault-0.129.010\PixelVault.exe
+Main shortcut: <runtime-root>\PixelVault.lnk
+Current junction: <runtime-root>\dist\PixelVault-current
+App Testing: <runtime-root>\App Testing\PixelVault.exe (identical published executable)
 Companion backend: 0.52.3; browser revision: circuit-halo-20261116 (unchanged)
 
-Historical source: C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex
-Release source: C:\Codex\dist\PixelVault-0.129.010\source
-C:\Codex\src remains an older checkout; do not build it for production.
+Historical source: <source-root>
+Release source: <runtime-root>\dist\PixelVault-0.129.010\source
+<runtime-root>\src remains an older checkout; do not build it for production.
 
 Fixed UTF-8 media-tool output decoding and concurrent folder-cache writes. Cache reads/writes are serialized locally; complete replacements and bounded sharing-lock retries preserve snapshots during Companion reads. Normal saves and alias rewrites share the same I/O.
 
 Recovered the three November 16 Horizon Zero Dawn Remastered screenshots using the published app's selected-folder metadata refresh: updated 3, unchanged 55, removed 0. Verified 58 captures and the three Today thumbnails in the gallery. Across the entire photo index, exactly three rows were added, with no existing rows changed or removed. All three screenshot hashes match their original import records.
 
-Validation: 35 focused tests; actual WinExe decoder probe for all three Unicode filenames; strict distribution layout; all 1,210 input hashes; published/App Testing executable equality. Native 0.129.010 was restarted and interactive folder-scan/gallery smoke passed. Companion service and reader remain unchanged. Evidence and recovery backups: C:\Codex\artifacts\horizon-uploader-fix-20261116.
+Validation: 35 focused tests; actual WinExe decoder probe for all three Unicode filenames; strict distribution layout; all 1,210 input hashes; published/App Testing executable equality. Native 0.129.010 was restarted and interactive folder-scan/gallery smoke passed. Companion service and reader remain unchanged. Evidence and recovery backups: <runtime-root>\artifacts\horizon-uploader-fix-20261116.
 
 Executable SHA256: 4470DE6A0B4C319AFED35688F6AAC047C69C4F1C243ED6806C3E6AFC8CC907AE
 Release scope: audited 0.129.005 baseline plus intake fixes; unrelated pending tracker source excluded. Existing migration/rollback requirements remain applicable.
@@ -71,21 +71,21 @@ Historical release records follow (superseded by the facts above):
 Current PixelVault release — November 16, 2026
 
 Native: 0.129.005
-Executable: C:\Codex\dist\PixelVault-0.129.005\PixelVault.exe
-Main shortcut: C:\Codex\PixelVault.lnk
-Current junction: C:\Codex\dist\PixelVault-current
-App Testing: C:\Codex\App Testing\PixelVault.exe (identical published executable)
+Executable: <runtime-root>\dist\PixelVault-0.129.005\PixelVault.exe
+Main shortcut: <runtime-root>\PixelVault.lnk
+Current junction: <runtime-root>\dist\PixelVault-current
+App Testing: <runtime-root>\App Testing\PixelVault.exe (identical published executable)
 Companion backend: 0.52.3, Windows service PixelVaultCompanion
 Companion browser revision: circuit-halo-20261116
-Companion URL: http://192.168.1.69:8787/
+Companion URL: deployment-specific; see local runbook
 
-Historical maintained source: C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex
-Release source: C:\Codex\dist\PixelVault-0.129.005\source
-C:\Codex\src is an older checkout; do not build it for production.
+Historical maintained source: <source-root>
+Release source: <runtime-root>\dist\PixelVault-0.129.005\source
+<runtime-root>\src is an older checkout; do not build it for production.
 
 Published Circuit Halo completion frames to PC library/profile covers and Companion library covers. PC frames retain verified completion during background refresh, fixing idle blinking. Completion rules, diamond-only foil, accessibility and cover controls are preserved.
 
-Ran C:\Codex\scripts\Build-PixelVault-AppTesting.ps1 after both publications. Published and App Testing executable SHA256: 344918D37CCF606F52E4D387722DB9CC7E1F109E4859DA9A45D7BBA88175775A. Main shortcut/current junction select 0.129.005; previous releases are retained. Both data-root sidecars retain C:\Codex\PixelVaultData. Restart older PC instances through the main shortcut and refresh Companion to load the new presentation.
+Ran <runtime-root>\scripts\Build-PixelVault-AppTesting.ps1 after both publications. Published and App Testing executable SHA256: 344918D37CCF606F52E4D387722DB9CC7E1F109E4859DA9A45D7BBA88175775A. Main shortcut/current junction select 0.129.005; previous releases are retained. Both data-root sidecars retain <runtime-root>\PixelVaultData. Restart older PC instances through the main shortcut and refresh Companion to load the new presentation.
 
 Release scope: published 0.129.000 baseline plus the approved Circuit Halo/frame-lifecycle changes. The audited source snapshot excludes concurrent unshipped Moon Sweepers source work. All 1,209 packaged source/assets/tools inputs match the release manifest; 15 embedded mail icons match their source assets. Maintained source ownership is unchanged.
 
@@ -93,7 +93,7 @@ Validation: 49 focused Native tests and 27 Companion tests passed. Strict distri
 
 Companion backend, service configuration and reader pinned to Native 0.128.021 remain unchanged. Browser-only changes were deployed without restarting the service. Prior sealed web package hashes are superseded for the changed assets; do not restore them over this browser revision. Companion canonical-path/batching improvements still await a separate backend release. Existing foundation migration/rollback requirements remain applicable; see docs/FOUNDATIONS_FIXES_2026-11-15.md.
 
-Evidence: C:\Codex\artifacts\circuit-halo-release-20261116\verification.json
+Evidence: <runtime-root>\artifacts\circuit-halo-release-20261116\verification.json
 Notion release: https://app.notion.com/p/41a73adc59b681819c28d513bb9c6a63
 
 Historical release record follows (superseded by the current facts above):
@@ -101,22 +101,22 @@ Historical release record follows (superseded by the current facts above):
 Current PixelVault release — November 15, 2026
 
 Native: 0.129.000
-Executable: C:\Codex\dist\PixelVault-0.129.000\PixelVault.exe
-Main shortcut: C:\Codex\PixelVault.lnk
-Current junction: C:\Codex\dist\PixelVault-current
-App Testing: C:\Codex\App Testing\PixelVault.exe (identical published executable)
+Executable: <runtime-root>\dist\PixelVault-0.129.000\PixelVault.exe
+Main shortcut: <runtime-root>\PixelVault.lnk
+Current junction: <runtime-root>\dist\PixelVault-current
+App Testing: <runtime-root>\App Testing\PixelVault.exe (identical published executable)
 Companion: 0.52.3, Windows service PixelVaultCompanion
-Companion URL: http://192.168.1.69:8787/
+Companion URL: deployment-specific; see local runbook
 
-Historical maintained source: C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex
-Release source: C:\Codex\dist\PixelVault-0.129.000\source
-C:\Codex\src is an older checkout; do not build it for production.
+Historical maintained source: <source-root>
+Release source: <runtime-root>\dist\PixelVault-0.129.000\source
+<runtime-root>\src is an older checkout; do not build it for production.
 
 Published the thirteen PC foundation fixes and tested Native tracker/history improvements. Import/undo and folder relocation are recoverable, metadata reads distinguish empty values from failures, modeless index saves preserve concurrent changes, game IDs are not reused, and canonical path migrations require verified backups.
 
-Ran C:\Codex\scripts\Build-PixelVault-AppTesting.ps1 after publishing. Published and App Testing executable SHA256: 248A37A02D4880F9972A968F21D662519619331B4FEDB5A4617FA13D531B5594. All 391 bundled source files match. Both data-root sidecars retain C:\Codex\PixelVaultData. Main shortcut and current junction select 0.129.000; older releases are retained.
+Ran <runtime-root>\scripts\Build-PixelVault-AppTesting.ps1 after publishing. Published and App Testing executable SHA256: 248A37A02D4880F9972A968F21D662519619331B4FEDB5A4617FA13D531B5594. All 391 bundled source files match. Both data-root sidecars retain <runtime-root>\PixelVaultData. Main shortcut and current junction select 0.129.000; older releases are retained.
 
-Validation: Native 1,650 passed / 3 independently verified pre-existing failures; Companion 219 passed; Connector 29 passed. Strict distribution-layout verification and packaged worker bootstrap/invalid-input rejection pass. No new interactive GUI smoke or live index migration was performed during publication. Evidence: C:\Codex\artifacts\foundations-release-20261115\verification.json.
+Validation: Native 1,650 passed / 3 independently verified pre-existing failures; Companion 219 passed; Connector 29 passed. Strict distribution-layout verification and packaged worker bootstrap/invalid-input rejection pass. No new interactive GUI smoke or live index migration was performed during publication. Evidence: <runtime-root>\artifacts\foundations-release-20261115\verification.json.
 
 Close older Native GUI instances before first opening 0.129.000: older index replacement writes are rejected after migration. Downgrading after migration requires the matching pre-upgrade index backup. See docs/FOUNDATIONS_FIXES_2026-11-15.md.
 
@@ -128,18 +128,18 @@ Historical reader validation retained below:
 
 The Death Stranding reader accepts additional valid boolean achievement flags while checking the required identities, types, and counter values. The Companion service uses the new PC reader. Live automatic refresh verified 120 read interviews, 201 opened emails, and 23,196 kg delivered. All five affected trackers cleared their failures without pending review. Manual values, notes, source bindings, and settings were preserved.
 
-Validation: 85 focused tests, older copied saves, and packaged reads of recent saves that add statistic 25. Evidence: C:\Codex\artifacts\interviews-live-check-20261108-144559.
+Validation: 85 focused tests, older copied saves, and packaged reads of recent saves that add statistic 25. Evidence: <runtime-root>\artifacts\interviews-live-check-20261108-144559.
 
 The PC profile uses a larger Centurion badge and five larger achievement tiles.
 
 Late-game Death Stranding readers support the expanded typed achievement table, compact header widths, and individual interview reads after the official counter stops at 100. The background service uses this reader. All 44 connected trackers have automatic refresh enabled.
 
 Validation: 69 recent save copies, older interview reading controls, 10 packaged-reader cases, and a packaged automatic-refresh integration test. The broader Death Stranding run passed 185 tests; two unchanged order UI width assertions failed (108 expected, 94 actual).
-Evidence: C:\Codex\artifacts\ds-reader-fix-20261108.
+Evidence: <runtime-root>\artifacts\ds-reader-fix-20261108.
 
 Live verification: all five repaired trackers completed automatic refresh with zero failures and no pending review; interview catalogue 108, emails 188, delivered cargo 21,333 kg. Manual progress, notes and settings preserved.
 
 Premium order update: Growth of a Legend uses four category counters capped at 20 unique LL-or-LLL deliveries each. Extra completed-category orders no longer change this tracker; Nothing Left to Deliver retains all 540 order records. Live save: Condition20, Quantity20, Time19, Miscellaneous20 (79/80).
-Validation: 73 focused native tests and 4 Companion tests; packaged latest-save comparison preserved all 12 other projections. Evidence: C:\Codex\artifacts\premium-order-goal-20261108.
+Validation: 73 focused native tests and 4 Companion tests; packaged latest-save comparison preserved all 12 other projections. Evidence: <runtime-root>\artifacts\premium-order-goal-20261108.
 
 Companion Cubes: six completion confirmations synced from saved mail receipt flags. Initial live progress: 2/6. Validated with 30 focused tests and a packaged read of the latest save.

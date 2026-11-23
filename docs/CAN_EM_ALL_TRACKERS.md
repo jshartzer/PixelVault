@@ -29,8 +29,8 @@ The bridge validates every incoming and previous observation before exporting an
 
 ## Runtime
 
-- Package: `C:\Codex\Game Readers\Can Em All\1.0.0`.
-- Configuration and exports: `C:\Codex\PixelVaultData\achievement-tracking\can-em-all`.
+- Package: `<runtime-root>\Game Readers\Can Em All\1.0.0`.
+- Configuration and exports: `<runtime-root>\PixelVaultData\achievement-tracking\can-em-all`.
 - Scheduled task: `PixelVault Can 'Em All Progress`, hidden, every minute and at user logon under the configured interactive Windows user.
 - Existing Companion service reconciles the exported JSON through its ordinary automatic checks.
 - Pausing the task stops new exports; pausing a tracker's automatic setting stops that tracker applying changes.
@@ -46,6 +46,6 @@ PixelVault.CanEmAll.exe setup <absolute-config.json> <absolute-receipt.json>
 
 32 tests cover lifetime/run separation, exact upgrade identities and thresholds, malformed/duplicate JSON, unknown fields, integer limits, account/user mismatch, read-only behavior, stable exports, rollback review, setup preservation, idempotency and conflicting source refusal. The packaged reader was tested on the real save and a private backup of the actual tracker database. A malformed private save preserved all four prior export files and their timestamps. The rehearsal preserved all 22 unrelated database tables. Initial real save: 973 lifetime cans sold, zero of 21 permanent upgrades. Controlled before/after gameplay validation remains pending; mappings were verified against installed code and assets.
 
-Private evidence, receipts and preservation checks: `C:\Codex\artifacts\can-em-all-setup-20261116`.
+Private evidence, receipts and preservation checks: `<runtime-root>\artifacts\can-em-all-setup-20261116`.
 
 Final live verification: all **4/4** sources completed automatic checks, with **0 failures** and **0 pending reviews**. All 24 saved fields are known. The scheduled task returned success and repeated exports were unchanged. Fourteen unrelated data/settings comparisons passed; the source save hash and timestamp are unchanged. See `verification.json` in the private evidence folder.

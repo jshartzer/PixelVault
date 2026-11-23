@@ -14,7 +14,7 @@ services:
       Companion__DemoEnabled: "true"
       # Trusted LAN preview only. Use HTTPS + a configured trusted proxy before enabling real data.
       Companion__AllowHttp: "true"
-      AllowedHosts: "localhost;127.0.0.1;192.168.1.99"
+      AllowedHosts: "localhost;127.0.0.1;${COMPANION_ALLOWED_HOST:-companion-host.example}"
     security_opt:
       - no-new-privileges:true
     cap_drop:

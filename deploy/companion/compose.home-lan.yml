@@ -8,14 +8,14 @@ services:
     user: "${COMPANION_UID:-1000}:${COMPANION_GID:-100}"
     restart: unless-stopped
     ports:
-      - "${COMPANION_LAN_IP:-192.168.1.99}:8787:8080"
+      - "${COMPANION_LAN_IP:-127.0.0.1}:8787:8080"
     volumes:
       - "${COMPANION_DATA_DIR:-/share/Container/pixelvault-companion/data}:/data"
     environment:
       Companion__DataRoot: /data
       Companion__DemoEnabled: "false"
       Companion__AllowHttp: "true"
-      AllowedHosts: "localhost;127.0.0.1;${COMPANION_LAN_IP:-192.168.1.99}"
+      AllowedHosts: "localhost;127.0.0.1;${COMPANION_LAN_IP:-127.0.0.1}"
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=64m,mode=1777

@@ -40,7 +40,7 @@ If the PC is offline, the request reports that immediately. A PC that disconnect
 - Start script: `C:\Codex\Companion Connector\Start-Connector.ps1`.
 - Private configuration, snapshots, PID and logs: `C:\Codex\PixelVaultCompanionConnectorData\`.
 - Automatic start: current user's Startup folder, `PixelVault Companion Connector.lnk`.
-- Endpoint: `http://192.168.1.99:8787/`, using the existing explicitly chosen home-LAN HTTP deployment.
+- Endpoint: `http://companion-host.example:8787/`, using the existing explicitly chosen home-LAN HTTP deployment.
 
 The private folder permits only its Windows owner, SYSTEM and Administrators. `connector.json` contains the device credential, approved workspace identity and exact allowed bindings/definitions. Do not publish it, print it, copy it into source archives or put it under a build-output folder. Back it up privately if retaining this pairing through recovery. Intermediate pairing exchange copies were removed after installation.
 
@@ -57,7 +57,7 @@ pwsh -File C:\Codex\scripts\Build-PixelVaultCompanion.ps1 -IncludeConnector
 Pairing is an administrator operation on the existing private NAS workspace, not a public web endpoint. In a restricted one-off container with the data mounted at `/data`, invoke:
 
 ```text
-dotnet PixelVault.Companion.dll --pair-connector /data /private-exchange/new-pairing.json http://192.168.1.99:8787/
+dotnet PixelVault.Companion.dll --pair-connector /data /private-exchange/new-pairing.json http://companion-host.example:8787/
 ```
 
 Copy that private file to the PC via the existing SSH key and use `scripts/Install-PixelVaultCompanionConnector.ps1 -PairingFile <private-file>`. The installer uses no administrator elevation, protects the configuration, installs a hidden background process and a user Startup shortcut. For this existing installation, `scripts/Upgrade-PixelVaultCompanionConnector.ps1` backs up the private configuration/start script, verifies the installed PID/executable, retains the credential and startup shortcut, and validates the original approved workspace manifest before enabling local metadata reads. Source ZIPs for the NAS contain only server/shared source; PC connection source is in `src/PixelVault.Companion.Connector` and links the existing Native reader files at build time.

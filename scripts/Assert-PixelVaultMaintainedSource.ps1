@@ -1,21 +1,29 @@
-# Local release guard. CURRENT_BUILD.txt records source ownership separately from runtime data.
+# Release ownership is local configuration, not public release metadata.
 function Assert-PixelVaultMaintainedSource {
     [CmdletBinding()]
     param([Parameter(Mandatory)][string]$RepositoryRoot)
-    $actual = [IO.Path]::GetFullPath($RepositoryRoot).TrimEnd('\', '/')
-    $marker = Join-Path $actual 'docs\CURRENT_BUILD.txt'
-    if (-not (Test-Path -LiteralPath $marker -PathType Leaf)) {
-        throw "Cannot verify maintained source: missing $marker. Reconcile the source-location pointer before publishing."
+
+    $actual = [IO.Path]::GetFullPath($RepositoryRoot)
+    $localConfig = Join-Path $actual '.pixelvault-release-root'
+    $configured = $env:PIXELVAULT_MAINTAINED_SOURCE
+    if ([string]::IsNullOrWhiteSpace($configured) -and (Test-Path -LiteralPath $localConfig -PathType Leaf)) {
+        $configured = Get-Content -LiteralPath $localConfig -Raw
     }
-    $matches = @(Select-String -LiteralPath $marker -Pattern '^Maintained source:\s*(.+?)\s*$')
-    if ($matches.Count -ne 1) {
-        throw "Cannot verify maintained source: $marker must contain one Maintained source: entry."
+    if ([string]::IsNullOrWhiteSpace($configured)) {
+        throw 'Release source is not configured. Set PIXELVAULT_MAINTAINED_SOURCE or create .pixelvault-release-root in the maintained checkout. See docs/LOCAL_RELEASE_CONFIGURATION.md.'
     }
-    $maintained = [IO.Path]::GetFullPath($matches[0].Matches[0].Groups[1].Value).TrimEnd('\', '/')
-    if (-not $actual.Equals($maintained, [StringComparison]::OrdinalIgnoreCase)) {
-        throw "Release/build stopped: $actual is not the maintained source. Run the script from $maintained\scripts. No build or output replacement was started."
+    $configured = $configured.Trim()
+    if ($configured -match '[\r\n]' -or -not [IO.Path]::IsPathFullyQualified($configured)) {
+        throw 'Release source configuration must be one absolute filesystem path.'
     }
-    if (-not (Test-Path -LiteralPath (Join-Path $maintained 'src\PixelVault.Native\PixelVault.Native.csproj') -PathType Leaf)) {
-        throw "The maintained source project is missing from $maintained. Reconcile the source pointer before publishing."
+    $maintained = [IO.Path]::GetFullPath($configured).TrimEnd('\', '/')
+    $actual = $actual.TrimEnd('\', '/')
+    $comparison = if ($IsWindows) { [StringComparison]::OrdinalIgnoreCase } else { [StringComparison]::Ordinal }
+    if (-not $actual.Equals($maintained, $comparison)) {
+        throw 'Release/build stopped: this checkout is not the configured maintained source. No build or output replacement was started.'
+    }
+    $nativeProject = Join-Path $actual 'src/PixelVault.Native/PixelVault.Native.csproj'
+    if (-not (Test-Path -LiteralPath $nativeProject -PathType Leaf)) {
+        throw 'The maintained source project is missing. Check the local release configuration.'
     }
 }

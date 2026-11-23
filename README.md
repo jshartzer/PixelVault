@@ -6,9 +6,9 @@ PixelVault is a native Windows desktop app for organizing, tagging, indexing, an
 
 The maintained source workspace is:
 
-- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex`
+- `<source-root>`
 
-Open `Codex.slnx`, edit source/docs, and run builds/tests from that workspace. `C:\Codex` remains the runtime root for published releases, shortcuts, and shared app data. Its `src` tree is an older checkout and must not be used for release builds. The `Maintained source:` entry in `docs/CURRENT_BUILD.txt` is the authoritative source-location pointer; a current working directory alone does not establish source ownership.
+Open `Codex.slnx`, edit source/docs, and run builds/tests from that workspace. `<runtime-root>` remains the runtime root for published releases, shortcuts, and shared app data. Its `src` tree is an older checkout and must not be used for release builds. The [local release configuration](docs/LOCAL_RELEASE_CONFIGURATION.md) establishes source ownership; public release metadata does not.
 
 **Current version and published exe path** are not duplicated here (they change every release). Use:
 
@@ -18,8 +18,8 @@ Open `Codex.slnx`, edit source/docs, and run builds/tests from that workspace. `
 
 **Runtime launchers:** the current published installation is available through:
 
-- `C:\Codex\PixelVault.lnk`
-- `C:\Codex\dist\PixelVault-current\` → points at the most recently published `PixelVault-<version>\` folder
+- `<runtime-root>\PixelVault.lnk`
+- `<runtime-root>\dist\PixelVault-current\` → points at the most recently published `PixelVault-<version>\` folder
 
 ## What PixelVault Does
 
@@ -87,7 +87,7 @@ The Game Index also acts as the canonical folder-naming authority when records a
 
 Shared persistent app data lives under:
 
-- `C:\Codex\PixelVaultData`
+- `<runtime-root>\PixelVaultData`
 
 Important paths (names depend on configured library root and cache hashing — adjust for your machine):
 
@@ -100,23 +100,23 @@ Important paths (names depend on configured library root and cache hashing — a
 
 ## Workspace Map
 
-- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\src\PixelVault.Native`: live app source and SDK project
-- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\scripts`: build/publish and developer utility scripts
-- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\docs`: handoff, policy, changelog, project context, and current-build marker
-- `C:\Codex\dist`: published versioned builds (`PixelVault-<version>/`) plus `PixelVault-current` junction
-- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\tools-licenses`: third-party **license texts** merged into published **`tools\licenses\`** (primarily **ExifTool** — see **`docs/BUNDLED_TOOLS_REDISTRIBUTION.md`**)
-- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\assets`: shared branding and UI assets
-- `C:\Codex\tools`: optional local **`tools\`** folder for **`exiftool.exe`** (gitignored); **FFmpeg** is installed separately (**Path Settings**), not bundled here by default
-- `C:\Codex\PixelVaultData`: live shared app data, indexes, caches, and logs
-- `C:\Codex\legacy`: older GameCaptureManager workflow files kept for history
-- `C:\Codex\archive`: backups and old artifacts not needed for day-to-day development
+- `<source-root>\src\PixelVault.Native`: live app source and SDK project
+- `<source-root>\scripts`: build/publish and developer utility scripts
+- `<source-root>\docs`: handoff, policy, changelog, project context, and current-build marker
+- `<runtime-root>\dist`: published versioned builds (`PixelVault-<version>/`) plus `PixelVault-current` junction
+- `<source-root>\tools-licenses`: third-party **license texts** merged into published **`tools\licenses\`** (primarily **ExifTool** — see **`docs/BUNDLED_TOOLS_REDISTRIBUTION.md`**)
+- `<source-root>\assets`: shared branding and UI assets
+- `<runtime-root>\tools`: optional local **`tools\`** folder for **`exiftool.exe`** (gitignored); **FFmpeg** is installed separately (**Path Settings**), not bundled here by default
+- `<runtime-root>\PixelVaultData`: live shared app data, indexes, caches, and logs
+- `<runtime-root>\legacy`: older GameCaptureManager workflow files kept for history
+- `<runtime-root>\archive`: backups and old artifacts not needed for day-to-day development
 
 ## Source And Packaging
 
 Authoritative source:
 
-- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\src\PixelVault.Native\PixelVault.Native.cs`
-- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\src\PixelVault.Native\PixelVault.Native.csproj`
+- `<source-root>\src\PixelVault.Native\PixelVault.Native.cs`
+- `<source-root>\src\PixelVault.Native\PixelVault.Native.csproj`
 
 Each publish run also copies a source tree and changelog into the output folder (see `scripts/Publish-PixelVault.ps1`).
 
@@ -125,30 +125,30 @@ Each publish run also copies a source tree and changelog into the output folder 
 **Latest published build** (after you run the publish script):
 
 ```powershell
-& "C:\Codex\dist\PixelVault-current\PixelVault.exe"
+& "<runtime-root>\dist\PixelVault-current\PixelVault.exe"
 ```
 
-Or open `C:\Codex\PixelVault.lnk`. For an exact versioned path, read `docs/CURRENT_BUILD.txt`.
+Or open `<runtime-root>\PixelVault.lnk`. For an exact versioned path, read `docs/CURRENT_BUILD.txt`.
 
 ## Building And Publishing
 
 Build the maintained source with the SDK project:
 
 ```powershell
-dotnet build "C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\src\PixelVault.Native\PixelVault.Native.csproj" -c Release
+dotnet build "<source-root>\src\PixelVault.Native\PixelVault.Native.csproj" -c Release
 ```
 
-For an explicitly planned release, publish a new versioned folder under `C:\Codex\dist\` (name pattern **`PixelVault-M.AAA.BBB`** per **`docs/POLICY.md`**). The script reads **`AppVersion`** from `PixelVault.Native.cs` when you omit `-Version`:
+For an explicitly planned release, publish a new versioned folder under `<runtime-root>\dist\` (name pattern **`PixelVault-M.AAA.BBB`** per **`docs/POLICY.md`**). The script reads **`AppVersion`** from `PixelVault.Native.cs` when you omit `-Version`:
 
 ```powershell
-pwsh -File "C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\scripts\Publish-PixelVault.ps1" -OutputRoot "C:\Codex\dist"
+pwsh -File "<source-root>\scripts\Publish-PixelVault.ps1" -OutputRoot "<runtime-root>\dist"
 ```
 
-Build/publish entry points reject a checkout that disagrees with the maintained-source marker before building or changing output. The publish script defaults to its checkout-local `dist` and creates a checkout-local shortcut; the explicit output path above targets the runtime releases. Update the runtime shortcut and both current-build markers only after verifying a new deployment. Source edits alone do not change the published release.
+Build/publish entry points reject a checkout that disagrees with the local release configuration before building or changing output. The publish script defaults to its checkout-local `dist` and creates a checkout-local shortcut; the explicit output path above targets the runtime releases. Update the runtime shortcut and both current-build markers only after verifying a new deployment. Source edits alone do not change the published release.
 
 **Installer / delta-update channel (Velopack):** self-contained **`win-x64`** publish + **`vpk pack`** — **`scripts/Publish-Velopack.ps1`** and **`docs/VELOPACK.md`**.
 
-**Plain-English distribution path:** start with **`docs/SIMPLE_RELEASE_STEPS.md`**, then run **`scripts/Run-LocalReleaseChecks.ps1`** from repo root (`cd "C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex"` then `pwsh -File .\scripts\…`, or **`pwsh -File "C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\scripts\Run-LocalReleaseChecks.ps1"`** from any folder). It builds the Velopack publish folder, runs **`Verify-DistributionLayout.ps1`**, and prints what to do next. Fresh-machine smoke tests: **`docs/VELOPACK_VM_SPIKE_CHECKLIST.md`**.
+**Plain-English distribution path:** start with **`docs/SIMPLE_RELEASE_STEPS.md`**, then run **`scripts/Run-LocalReleaseChecks.ps1`** from repo root (`cd "<source-root>"` then `pwsh -File .\scripts\…`, or **`pwsh -File "<source-root>\scripts\Run-LocalReleaseChecks.ps1"`** from any folder). It builds the Velopack publish folder, runs **`Verify-DistributionLayout.ps1`**, and prints what to do next. Fresh-machine smoke tests: **`docs/VELOPACK_VM_SPIKE_CHECKLIST.md`**.
 
 **Code signing (Authenticode):** **`docs/PUBLISH_SIGNING.md`** — **`Publish-PixelVault.ps1 -Sign`** and **`vpk pack`** **`signParams`**.
 
@@ -181,7 +181,7 @@ It should not track:
 
 ## Legacy Note
 
-Older PowerShell workflow files are now grouped under `C:\Codex\legacy\GameCaptureManager` so the active native app line is easier to navigate.
+Older PowerShell workflow files are now grouped under `<runtime-root>\legacy\GameCaptureManager` so the active native app line is easier to navigate.
 
 ## Storage Note
 

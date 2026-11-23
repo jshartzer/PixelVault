@@ -1,6 +1,6 @@
 # Central refresh and push delivery
 
-Native 0.126.000 / Companion 0.50.0. Maintained source is currently `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex`; the old checkout at `C:\Codex` is not the release source.
+Native 0.126.000 / Companion 0.50.0. Maintained source is currently `<source-root>`; the old checkout at `C:\Codex` is not the release source.
 
 The existing automatic Windows service remains the owner of supported save readers and scheduled provider refreshes. It continues running when the desktop window is closed. No second agent process, account credentials, inbound port or data migration is introduced.
 

@@ -52,7 +52,7 @@ Tracker reference content (October26,2026): optional item content is plain text 
 
 Tracker source authority (October28,2026): manual values remain protected by default. A source binding may explicitly opt into `ReplaceManualProgress` when the user requests game data to control its checkmarks. Only known non-stale values from that current validated binding clear manual overrides; preserve notes, unknown rows, revision checks and older/undone-batch review. The road binding was the first opt-in. On October29 the user also explicitly authorized the email catalogue binding to use game values over manual checkmarks after its per-email mapping was validated. Never propagate replacement authority to other trackers by inference or widen an approved source scope. See [road refresh](DEATH_STRANDING_ROAD_RESEARCH.md).
 
-This document defines the working rules for the live `C:\Codex` PixelVault app line.
+This document defines the working rules for the live `<runtime-root>` PixelVault app line.
 
 Use it as the source of truth for:
 
@@ -67,19 +67,19 @@ Use it as the source of truth for:
 
 The maintained source workspace is:
 
-- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex`
+- `<source-root>`
 
-Use that workspace for source edits, documentation, tests, and builds. `C:\Codex` is the runtime root for published releases, shortcuts, and persistent app data; `C:\Codex\src` is an older checkout. The `Maintained source:` line in `docs/CURRENT_BUILD.txt` resolves source ownership and supersedes historical instructions to build from `C:\Codex`. Shell working directories and older source snapshots do not override that pointer.
+Use that workspace for source edits, documentation, tests, and builds. `<runtime-root>` is the runtime root for published releases, shortcuts, and persistent app data; `<runtime-root>\src` is an older checkout. The [local release configuration](LOCAL_RELEASE_CONFIGURATION.md) resolves source ownership and supersedes historical instructions to build from `<runtime-root>`. Shell working directories and older source snapshots do not override that pointer.
 
 Publish/build scripts check the pointer before compiling or changing output. If the maintained workspace is intentionally relocated, reconcile the pointer and docs first. A source-location correction is not a release and must not bump versions, replace binaries, or repoint live shortcuts.
 
 Live packaged builds are published under:
 
-- `C:\Codex\dist\PixelVault-<M.AAA.BBB>\` — pattern under **Versioning Policy** (e.g. `PixelVault-0.998.000`)
+- `<runtime-root>\dist\PixelVault-<M.AAA.BBB>\` — pattern under **Versioning Policy** (e.g. `PixelVault-0.998.000`)
 
 Shared persistent app data lives under:
 
-- `C:\Codex\PixelVaultData`
+- `<runtime-root>\PixelVaultData`
 
 ## Versioning Policy
 
@@ -111,13 +111,13 @@ The **rightmost** segment (**`BBB`**) is the usual **patch / build tick**. The *
 When a new app build is published:
 
 1. Update `AppVersion` in the current live source file to the new **`M.AAA.BBB`** string.
-2. Build and publish from `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\src\PixelVault.Native\PixelVault.Native.csproj`, normally through `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\scripts\Publish-PixelVault.ps1` with `-OutputRoot C:\Codex\dist`.
-3. Publish the build into a new folder under `C:\Codex\dist\PixelVault-<M.AAA.BBB>\`.
+2. Build and publish from `<source-root>\src\PixelVault.Native\PixelVault.Native.csproj`, normally through `<source-root>\scripts\Publish-PixelVault.ps1` with `-OutputRoot <runtime-root>\dist`.
+3. Publish the build into a new folder under `<runtime-root>\dist\PixelVault-<M.AAA.BBB>\`.
 4. Copy the current source snapshot into that dist folder as `PixelVault.Native.cs`.
-5. Update `docs/CURRENT_BUILD.txt` in the maintained source and synchronize `C:\Codex\docs\CURRENT_BUILD.txt` after verifying the deployed version.
-6. Update `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\docs\CHANGELOG.md` with a `## M.AAA.BBB` header.
+5. Update `docs/CURRENT_BUILD.txt` in the maintained source and synchronize `<runtime-root>\docs\CURRENT_BUILD.txt` after verifying the deployed version.
+6. Update `<source-root>\docs\CHANGELOG.md` with a `## M.AAA.BBB` header.
 7. Update the version-local `CHANGELOG.md` inside the new dist folder.
-8. Repoint `C:\Codex\PixelVault.lnk` to the newest `PixelVault.exe`.
+8. Repoint `<runtime-root>\PixelVault.lnk` to the newest `PixelVault.exe`.
 
 Data-only cleanup work does not require a new build version unless app code changes are also shipped.
 
@@ -129,26 +129,26 @@ PixelVault is a native Windows desktop app built in C# and WPF.
 
 The current live implementation is now a modular monolith rooted in:
 
-- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\src\PixelVault.Native`
+- `<source-root>\src\PixelVault.Native`
 
 Key live source areas currently include:
 
-- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\src\PixelVault.Native\PixelVault.Native.cs`
-- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\src\PixelVault.Native\Indexing`
-- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\src\PixelVault.Native\Import`
-- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\src\PixelVault.Native\MediaTools`
-- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\src\PixelVault.Native\Metadata`
-- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\src\PixelVault.Native\Models`
-- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\src\PixelVault.Native\Storage`
-- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\src\PixelVault.Native\UI`
+- `<source-root>\src\PixelVault.Native\PixelVault.Native.cs`
+- `<source-root>\src\PixelVault.Native\Indexing`
+- `<source-root>\src\PixelVault.Native\Import`
+- `<source-root>\src\PixelVault.Native\MediaTools`
+- `<source-root>\src\PixelVault.Native\Metadata`
+- `<source-root>\src\PixelVault.Native\Models`
+- `<source-root>\src\PixelVault.Native\Storage`
+- `<source-root>\src\PixelVault.Native\UI`
 
 The SDK build project for that source tree lives at:
 
-- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\src\PixelVault.Native\PixelVault.Native.csproj`
+- `<source-root>\src\PixelVault.Native\PixelVault.Native.csproj`
 
 Published builds should still carry a version-local source snapshot in:
 
-- `C:\Codex\dist\PixelVault-<M.AAA.BBB>\PixelVault.Native.cs`
+- `<runtime-root>\dist\PixelVault-<M.AAA.BBB>\PixelVault.Native.cs`
 
 The modular extraction is acceptable as long as the behavioral contracts below remain stable.
 
@@ -319,11 +319,11 @@ If file metadata and cache disagree, the long-term target is for scans and reloa
 
 The photo index is a persistent per-file mirror and working cache.
 
-Its live runtime storage is the per-library SQLite index database under `C:\Codex\PixelVaultData\cache`.
+Its live runtime storage is the per-library SQLite index database under `<runtime-root>\PixelVaultData\cache`.
 
 Current file:
 
-- `C:\Codex\PixelVaultData\cache\library-metadata-index-y_game_captures.cache`
+- `<runtime-root>\PixelVaultData\cache\library-metadata-index-y_game_captures.cache`
 
 It stores:
 
@@ -339,11 +339,11 @@ The photo index should mirror the effective file metadata and should be updated 
 
 The game index is the master registry for game identities.
 
-Its live runtime storage is the per-library SQLite index database under `C:\Codex\PixelVaultData\cache`.
+Its live runtime storage is the per-library SQLite index database under `<runtime-root>\PixelVaultData\cache`.
 
 Current file:
 
-- `C:\Codex\PixelVaultData\cache\game-index-y_game_captures.cache`
+- `<runtime-root>\PixelVaultData\cache\game-index-y_game_captures.cache`
 
 It stores canonical game-level data such as:
 
@@ -389,7 +389,7 @@ The folder cache is derived state.
 
 Current file:
 
-- `C:\Codex\PixelVaultData\cache\library-folders-y_game_captures.cache`
+- `<runtime-root>\PixelVaultData\cache\library-folders-y_game_captures.cache`
 
 It is allowed to be rebuilt from the photo index and game index. It should not be treated as the long-term source of truth for tags.
 
@@ -435,7 +435,7 @@ Rules:
 
 App state should persist across versioned builds by storing shared data under:
 
-- `C:\Codex\PixelVaultData`
+- `<runtime-root>\PixelVaultData`
 
 Versioned `dist` folders should be replaceable without losing:
 
@@ -481,13 +481,13 @@ Recommended tag cadence:
 
 Any future handoff should update:
 
-- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\docs\HANDOFF.md`
-- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\docs\CHANGELOG.md`
-- `C:\Codex\docs\CURRENT_BUILD.txt` when a new build is published
+- `<source-root>\docs\HANDOFF.md`
+- `<source-root>\docs\CHANGELOG.md`
+- `<runtime-root>\docs\CURRENT_BUILD.txt` when a new build is published
 
-`C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\docs\HANDOFF.md` should summarize the current stop point.
+`<source-root>\docs\HANDOFF.md` should summarize the current stop point.
 
-`C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\docs\POLICY.md` should remain the durable rulebook.
+`<source-root>\docs\POLICY.md` should remain the durable rulebook.
 
 
 ## Saved game-map media

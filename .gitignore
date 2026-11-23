@@ -103,3 +103,6 @@ Thumbs.db
 /src/PixelVault.Companion/App_Data/
 /deploy/companion/compose.override.yml
 /deploy/companion/.env
+
+# Local authorization marker for release/build entry points
+/.pixelvault-release-root

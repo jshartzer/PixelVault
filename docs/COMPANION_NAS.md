@@ -35,9 +35,9 @@ Installed October25,2026; updated to **0.16.0** on October26. Tracking is the fi
 
 ## Open Companion
 
-**[http://192.168.1.99:8787](http://192.168.1.99:8787)**
+**[http://companion-host.example:8787](http://companion-host.example:8787)**
 
-If an existing phone tab still displays 0.3, open **[the fresh home page](http://192.168.1.99:8787/?v=0.16.0)** once. The phone had cached the old HTML while the updated API returned the expanded library. Version0.4.1 prohibits caching of HTML, scripts, styles and the manifest and uses new asset URLs. No browser-data reset or account setup is needed. The footer should say0.16.0; the home page shows covers and selecting one opens the game profile. Tracker deep links remain usable.
+If an existing phone tab still displays 0.3, open **[the fresh home page](http://companion-host.example:8787/?v=0.16.0)** once. The phone had cached the old HTML while the updated API returned the expanded library. Version0.4.1 prohibits caching of HTML, scripts, styles and the manifest and uses new asset URLs. No browser-data reset or account setup is needed. The footer should say0.16.0; the home page shows covers and selecting one opens the game profile. Tracker deep links remain usable.
 
 Use the same Companion login created on the PC. This is separate from the NAS administrator account. Access is on the home network, using HTTP as explicitly selected for this first installation. The PC can be off for browsing and manual tracking. Automatic PC updates require it awake and signed in. HTTPS/domain setup and access from outside the home network remain separate work.
 
@@ -61,13 +61,13 @@ The existing native desktop tracker's original database and automatic game reade
 | Settings | Installation directory's `.env` and `docker-compose.yml` |
 | Deployment record | Installation directory's `deployment.json` |
 | Container user | UID 1000 / GID 100, matching the folder's NAS owner |
-| Host listener | `192.168.1.99:8787` |
+| Host listener | `companion-host.example:8787` |
 | Restart policy | `unless-stopped` |
 | Runtime limits | 512 MiB, one CPU |
 
 The process runs without root privileges/capabilities, with a read-only application filesystem and writable persistent data/temporary mounts. The private data directories are mode 700 and transferred files mode 600. The application permits the NAS IP and loopback hostnames; authentication is still required for tracker data.
 
-SSH uses the existing key with `ssh admin1@192.168.1.99`. Docker is installed at `/share/CACHEDEV1_DATA/.qpkg/container-station/bin/docker`. Use the installation's private Docker configuration directory with `--config`; the package's default CLI configuration directory is not writable by this account. No sudo password is needed for Docker access through the existing administrators group.
+SSH uses the existing key with `ssh <nas-user>@companion-host.example`. Docker is installed at `/share/CACHEDEV1_DATA/.qpkg/container-station/bin/docker`. Use the installation's private Docker configuration directory with `--config`; the package's default CLI configuration directory is not writable by this account. No sudo password is needed for Docker access through the existing administrators group.
 
 The image build normalizes published artifact read/traverse permissions, so private source-file modes inherited during extraction do not prevent the non-root app from loading its configuration.
 
@@ -160,6 +160,6 @@ The exporter reads the configured desktop library/cache and approved-account ach
 
 The PC workspace remains at `C:\Codex\PixelVaultCompanionData`. Its `hosting.json` marker tells current launchers that this workspace moved to the NAS. Both ordinary and phone PC launchers print the NAS address and leave the local database stopped. Rebuilds preserve that marker. The desktop Companion connection's saved destination also points to the NAS, where applicable.
 
-Use the NAS URL for bookmarks and the phone. The previous PC address `192.168.1.69:8787` is no longer the Companion server.
+Use the NAS URL for bookmarks and the phone. The previous PC address `companion-host.example:8787` is no longer the Companion server.
 
 See [setup and architecture limits](COMPANION_SETUP.md) and [the implementation plan](plans/PV-PLN-WEB-001-nas-web-companion.md).

@@ -1,6 +1,6 @@
 # Tracker and achievement efficiency — November 15, 2026
 
-Implemented in `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex`. The Native changes are published in **0.129.000**, together with the foundation fixes, and the requested App Testing script copied the identical release. Companion remains 0.52.3; Companion-side batching/health updates await a separate release. Existing unrelated edits were preserved. Publication evidence: `C:\Codex\artifacts\foundations-release-20261115\verification.json`.
+Implemented in `<source-root>`. The Native changes are published in **0.129.000**, together with the foundation fixes, and the requested App Testing script copied the identical release. Companion remains 0.52.3; Companion-side batching/health updates await a separate release. Existing unrelated edits were preserved. Publication evidence: `<runtime-root>\artifacts\foundations-release-20261115\verification.json`.
 
 ## Implemented changes
 
@@ -11,7 +11,7 @@ Implemented in `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex`. T
 5. **Interrupted reviews:** Native attempts record process identity and process start time. Dead readers can retry; abandoned Native previews become an explicit review requirement. The tracker offers recreation or discard without applying observations. Durable Companion jobs carry a separate ownership marker and survive service restarts; unknown process liveness is not treated as proof of abandonment.
 6. **Source health:** Companion derives outstanding failures from individual persisted source/provider states. One successful tracker no longer hides another failure. Browser status identifies the affected game and exposes last-success/retry information and interrupted reviews.
 7. **Achievement detail freshness:** Hub refresh independently checks detail freshness, so a recent notification-only snapshot does not suppress missing rarity/counter details.
-8. **Source location:** README, policy, project context, versioning instructions and current-build markers agree on the maintained worktree and runtime root. Five release/build preparation entrypoints reject the stale `C:\Codex` source checkout before producing output.
+8. **Source location:** README, policy, project context, versioning instructions and current-build markers agree on the maintained worktree and runtime root. Five release/build preparation entrypoints reject the stale `<runtime-root>` source checkout before producing output.
 
 ## Validation
 
@@ -22,7 +22,7 @@ Implemented in `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex`. T
 - Native batch/cache tests confirm two fixture projections share one analysis. Regression coverage includes mixed old/new history, old-client writes, deletion cleanup, rollback, stale drafts, partial worker failure, cancellation, rebinds, abandoned reviews and durable review ownership.
 - All twelve changed PowerShell files parse; all five stale-checkout entrypoints reject invocation before build/output changes.
 
-Evidence is in `C:\Codex\artifacts\tracker-achievement-efficiency-20261115`: final Native and Companion TRX files, isolated baseline TRX/source-hash proof, history benchmark JSON, UI benchmark output and rendered PNGs under `ui`.
+Evidence is in `<runtime-root>\artifacts\tracker-achievement-efficiency-20261115`: final Native and Companion TRX files, isolated baseline TRX/source-hash proof, history benchmark JSON, UI benchmark output and rendered PNGs under `ui`.
 
 ## Measurements and practical limits
 

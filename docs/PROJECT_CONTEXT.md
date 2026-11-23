@@ -14,9 +14,9 @@ Do not use this file as a live build tracker or session handoff.
 
 For those, use:
 
-- `C:\Codex\docs\CURRENT_BUILD.txt`
-- `C:\Codex\docs\HANDOFF.md`
-- `C:\Codex\docs\CHANGELOG.md`
+- `<runtime-root>\docs\CURRENT_BUILD.txt`
+- `<runtime-root>\docs\HANDOFF.md`
+- `<runtime-root>\docs\CHANGELOG.md`
 
 ## Product Summary
 
@@ -34,26 +34,26 @@ Core jobs:
 
 ## Workspace Rules
 
-Edit, test, and build from `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex`. The `Maintained source:` entry in `docs/CURRENT_BUILD.txt` is authoritative. `C:\Codex` holds live runtime data, published packages, and shortcuts; its older `src` checkout must not be published. See `POLICY.md` for the source guard and release responsibilities.
+Edit, test, and build from `<source-root>`. The [local release configuration](LOCAL_RELEASE_CONFIGURATION.md) is authoritative. `<runtime-root>` holds live runtime data, published packages, and shortcuts; its older `src` checkout must not be published. See `POLICY.md` for the source guard and release responsibilities.
 
 ## Runtime Layout
 
 Primary areas:
 
-- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\src\PixelVault.Native`: live app source
-- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\src\PixelVault.LibraryAssets`: portable library for canonical asset records, scan diffs, root health gates, and reconciliation planning (see `README.md` there)
-- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\docs`: maintained repo documentation
-- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\scripts`: publish and developer utility scripts
-- `C:\Codex\dist`: versioned published builds
-- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\assets`: shared branding and UI assets
-- `C:\Codex\tools`: optional local **`exiftool.exe`** drop (gitignored); **FFmpeg** is user-installed (**Path Settings** / **`PATH`**), not bundled by default
-- `C:\Codex\PixelVaultData`: shared persistent app data, indexes, caches, and logs
+- `<source-root>\src\PixelVault.Native`: live app source
+- `<source-root>\src\PixelVault.LibraryAssets`: portable library for canonical asset records, scan diffs, root health gates, and reconciliation planning (see `README.md` there)
+- `<source-root>\docs`: maintained repo documentation
+- `<source-root>\scripts`: publish and developer utility scripts
+- `<runtime-root>\dist`: versioned published builds
+- `<source-root>\assets`: shared branding and UI assets
+- `<runtime-root>\tools`: optional local **`exiftool.exe`** drop (gitignored); **FFmpeg** is user-installed (**Path Settings** / **`PATH`**), not bundled by default
+- `<runtime-root>\PixelVaultData`: shared persistent app data, indexes, caches, and logs
 
 Important runtime pointers:
 
-- current published build: `C:\Codex\docs\CURRENT_BUILD.txt`
-- desktop shortcut that should track the newest publish: `C:\Codex\PixelVault.lnk`
-- publish helper: `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\scripts\Publish-PixelVault.ps1`
+- current published build: `<runtime-root>\docs\CURRENT_BUILD.txt`
+- desktop shortcut that should track the newest publish: `<runtime-root>\PixelVault.lnk`
+- publish helper: `<source-root>\scripts\Publish-PixelVault.ps1`
 
 ## Source Layout
 
@@ -63,15 +63,15 @@ The app is still a modular monolith.
 
 Key source areas:
 
-- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\src\PixelVault.LibraryAssets`: asset lifecycle, `ScanDiffComputer`, `LibraryRootHealthChecker`, `ScanReconciliationPlan` (not yet wired into the WPF app)
-- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\src\PixelVault.Native\Import`: intake, rename, move, sort, undo, and import orchestration
-- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\src\PixelVault.Native\Indexing`: game-index, folder-cache, and library-index logic
-- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\src\PixelVault.Native\Metadata`: metadata builders, tag helpers, and library edit flows
-- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\src\PixelVault.Native\MediaTools`: `ExifTool` / `FFmpeg` execution helpers
-- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\src\PixelVault.Native\Models`: import, parsing, and index model types
-- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\src\PixelVault.Native\Services`: extracted service seams (subfolders include **`Config`**, **`Covers`**, **`FilenameParsing`**, **`FilenameRules`**, **`Indexing`**, **`Intake`** — **`IntakePipeline`** facade, **`IImportService`**, headless coordinator, analysis/policy — **`IO`**, **`Library`**, **`Logging`**, **`Achievements`**, **`Metadata`**)
-- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\src\PixelVault.Native\Storage`: SQLite/cache path and persistence helpers
-- `C:\Users\justc\.codex\worktrees\pixelvault-test-source\Codex\src\PixelVault.Native\UI`: extracted windows, editor hosts, virtualization helpers, and UI-specific support code
+- `<source-root>\src\PixelVault.LibraryAssets`: asset lifecycle, `ScanDiffComputer`, `LibraryRootHealthChecker`, `ScanReconciliationPlan` (not yet wired into the WPF app)
+- `<source-root>\src\PixelVault.Native\Import`: intake, rename, move, sort, undo, and import orchestration
+- `<source-root>\src\PixelVault.Native\Indexing`: game-index, folder-cache, and library-index logic
+- `<source-root>\src\PixelVault.Native\Metadata`: metadata builders, tag helpers, and library edit flows
+- `<source-root>\src\PixelVault.Native\MediaTools`: `ExifTool` / `FFmpeg` execution helpers
+- `<source-root>\src\PixelVault.Native\Models`: import, parsing, and index model types
+- `<source-root>\src\PixelVault.Native\Services`: extracted service seams (subfolders include **`Config`**, **`Covers`**, **`FilenameParsing`**, **`FilenameRules`**, **`Indexing`**, **`Intake`** — **`IntakePipeline`** facade, **`IImportService`**, headless coordinator, analysis/policy — **`IO`**, **`Library`**, **`Logging`**, **`Achievements`**, **`Metadata`**)
+- `<source-root>\src\PixelVault.Native\Storage`: SQLite/cache path and persistence helpers
+- `<source-root>\src\PixelVault.Native\UI`: extracted windows, editor hosts, virtualization helpers, and UI-specific support code
 
 ## Current App Shape
 
@@ -102,7 +102,7 @@ Per-file metadata is the source of truth for:
 
 The live runtime store is a per-library SQLite database under:
 
-- `C:\Codex\PixelVaultData\cache\pixelvault-index-<library>.sqlite`
+- `<runtime-root>\PixelVaultData\cache\pixelvault-index-<library>.sqlite`
 
 It backs the live Game Index and Photo Index experience.
 
@@ -172,22 +172,22 @@ Current supported workflow families include:
 
 Use the docs by role:
 
-- `C:\Codex\docs\POLICY.md`: durable behavior rules and operating rules
-- `C:\Codex\docs\DOC_SYNC_POLICY.md`: repo/Notion sync rules
-- `C:\Codex\docs\HANDOFF.md`: short current stop point and immediate context
-- `C:\Codex\docs\CHANGELOG.md`: published version history
-- `C:\Codex\docs\CURRENT_BUILD.txt`: current published build pointer
-- `C:\Codex\docs\ROADMAP.md`: long-term sequencing
-- `C:\Codex\docs\ARCHITECTURE_REFACTOR_PLAN.md`: refactor contract (tiered goals, service ports, FS/async scope) aligned with extraction and service split
-- `C:\Codex\docs\completed-projects\README.md`: **completed initiatives** (e.g. MainWindow extraction A–F)
-- `C:\Codex\docs\MAINWINDOW_EXTRACTION_ROADMAP.md`: full historical record for MainWindow extraction (complete)
-- `C:\Codex\docs\PERFORMANCE_TODO.md`: active responsiveness and scalability backlog
-- `C:\Codex\docs\CODE_QUALITY_IMPROVEMENT_PLAN.md`: security, edge cases, and hardening backlog (slim); archive snapshot in `docs/archive/`
-- `C:\Codex\docs\NEXT_TRIM_PLAN.md`: ranked next steps to shrink/optimize after current publish (horizon doc; avoid duplicating `PERFORMANCE_TODO.md` long-term); **baseline refreshed 2026-04-12** for the **`0.075.xxx`** train and measured hotspots
-- `C:\Codex\docs\archive\README.md`: frozen snapshots of older perf / service-split plans (not a live backlog)
-- `C:\Codex\docs\MANUAL_GOLDEN_PATH_CHECKLIST.md`: short manual verification path for risky changes
-- `C:\Codex\docs\XBOX_ACHIEVEMENTS_API_READINESS_CHECKLIST.md`: parking-lot checklist for future Microsoft Xbox achievements integration readiness
-- `C:\Codex\docs\SERVICE_OWNERSHIP_AND_PARALLEL_WORK_MAP.md`: service boundaries and safe parallel-work lanes
+- `<runtime-root>\docs\POLICY.md`: durable behavior rules and operating rules
+- `<runtime-root>\docs\DOC_SYNC_POLICY.md`: repo/Notion sync rules
+- `<runtime-root>\docs\HANDOFF.md`: short current stop point and immediate context
+- `<runtime-root>\docs\CHANGELOG.md`: published version history
+- `<runtime-root>\docs\CURRENT_BUILD.txt`: current published build pointer
+- `<runtime-root>\docs\ROADMAP.md`: long-term sequencing
+- `<runtime-root>\docs\ARCHITECTURE_REFACTOR_PLAN.md`: refactor contract (tiered goals, service ports, FS/async scope) aligned with extraction and service split
+- `<runtime-root>\docs\completed-projects\README.md`: **completed initiatives** (e.g. MainWindow extraction A–F)
+- `<runtime-root>\docs\MAINWINDOW_EXTRACTION_ROADMAP.md`: full historical record for MainWindow extraction (complete)
+- `<runtime-root>\docs\PERFORMANCE_TODO.md`: active responsiveness and scalability backlog
+- `<runtime-root>\docs\CODE_QUALITY_IMPROVEMENT_PLAN.md`: security, edge cases, and hardening backlog (slim); archive snapshot in `docs/archive/`
+- `<runtime-root>\docs\NEXT_TRIM_PLAN.md`: ranked next steps to shrink/optimize after current publish (horizon doc; avoid duplicating `PERFORMANCE_TODO.md` long-term); **baseline refreshed 2026-04-12** for the **`0.075.xxx`** train and measured hotspots
+- `<runtime-root>\docs\archive\README.md`: frozen snapshots of older perf / service-split plans (not a live backlog)
+- `<runtime-root>\docs\MANUAL_GOLDEN_PATH_CHECKLIST.md`: short manual verification path for risky changes
+- `<runtime-root>\docs\XBOX_ACHIEVEMENTS_API_READINESS_CHECKLIST.md`: parking-lot checklist for future Microsoft Xbox achievements integration readiness
+- `<runtime-root>\docs\SERVICE_OWNERSHIP_AND_PARALLEL_WORK_MAP.md`: service boundaries and safe parallel-work lanes
 
 ## Current Direction
 

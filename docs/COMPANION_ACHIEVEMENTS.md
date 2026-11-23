@@ -33,7 +33,7 @@ Badges use matching game paths on fixed official provider hosts, redirects disab
 
 ## Deployment and checks
 
-Live: [Companion0.7.0](http://192.168.1.99:8787/?v=0.7.0). Source metadata matches **7,413 achievements across115 games**, all676 guides, titles/descriptions, sources/tags/missability and category/DLC/sort assignments. Canonical PC/NAS digest:
+Live: [Companion0.7.0](http://companion-host.example:8787/?v=0.7.0). Source metadata matches **7,413 achievements across115 games**, all676 guides, titles/descriptions, sources/tags/missability and category/DLC/sort assignments. Canonical PC/NAS digest:
 
 `D87AE22F2F260E3BDAC337BFE9FC7B3EA2C461CDFBC9310B213C7467600EAA61`
 
