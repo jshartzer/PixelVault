@@ -1,16 +1,19 @@
-Current PixelVault release — November 19, 2026
+Current PixelVault release — November 27, 2026
 
-Native: 0.132.008
-Executable: <runtime-root>\dist\PixelVault-0.132.008\PixelVault.exe
+Native: 0.133.008
+Executable: <runtime-root>\dist\PixelVault-0.133.008\PixelVault.exe
 Main shortcut: <runtime-root>\PixelVault.lnk
 Current junction: <runtime-root>\dist\PixelVault-current
 App Testing: <runtime-root>\App Testing\PixelVault.exe
-Companion backend: 0.52.5
-Companion browser revision: tracker-monitor-session-gains-20261119
+Companion backend: 0.52.8
+Companion browser revision: color-tiles-20261127 (23db0aaa578cc1fd)
 Prior Native 0.131.000 release record: https://app.notion.com/p/41d73adc59b681f082a1e66ae1c2c7fc
 
 Maintained source: local release configuration (see LOCAL_RELEASE_CONFIGURATION.md)
-Release source: <runtime-root>\dist\PixelVault-0.132.008\source
+Release source: <runtime-root>\dist\PixelVault-0.133.008\source
+
+Console color tiles — November 27, 2026
+The desktop library and Companion photo filters use the same seven color tiles. Xbox and Xbox 360 have separate artwork. The desktop and App Testing releases passed WPF rendering checks. Companion timeline and gallery filters passed desktop and phone-width browser checks.
 
 Perfect Practice — November 19, 2026
 The fifth Death Stranding 2 Centurion awards 100 points for earning S rank in all 25 VR drills. The checklist reads the earned rank for each drill. Reader 1.6.0 verified Covert Action I at installation. Desktop and Companion expose the linked tracker and both artwork variants. Evidence: <runtime-root>\artifacts\ds2-vr-centurion-20261119.
